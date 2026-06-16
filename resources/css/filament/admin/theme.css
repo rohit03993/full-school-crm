@@ -1,0 +1,97 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+
+@layer utilities {
+    .touch-manipulation {
+        touch-action: manipulation;
+    }
+}
+
+@layer components {
+    .fi-dashboard-hero-widget .fi-wi-widget {
+        @apply overflow-visible;
+    }
+
+    .fi-dashboard-panel {
+        @apply h-full;
+    }
+
+    .fi-dashboard-list-widget .fi-section {
+        @apply h-full;
+    }
+
+    .fi-wi-stats-overview .fi-section-content {
+        @apply gap-3 sm:gap-4;
+    }
+
+    .fi-wi-stats-overview .fi-wi-stats-overview-stat {
+        @apply rounded-xl ring-1 ring-gray-950/5 transition duration-200 hover:-translate-y-0.5 hover:shadow-md dark:ring-white/10;
+    }
+
+    .fi-wi-chart .fi-section {
+        @apply h-full rounded-xl;
+    }
+
+    .fi-wi-chart .fi-section-content {
+        @apply pt-2;
+    }
+
+    /* Mobile-first CRM polish */
+    @media (max-width: 639px) {
+        .fi-main-ctn {
+            @apply px-2;
+        }
+
+        .fi-page-header-main-ctn {
+            @apply gap-3;
+        }
+
+        .fi-header-actions {
+            @apply w-full;
+        }
+
+        .fi-header-actions .fi-ac {
+            @apply w-full flex-wrap gap-2;
+        }
+
+        .fi-header-actions .fi-btn {
+            @apply min-h-11 flex-1 touch-manipulation;
+        }
+
+        .fi-tabs-tab-list {
+            @apply -mx-1 flex-nowrap gap-1 overflow-x-auto pb-1;
+        }
+
+        .fi-tabs-tab {
+            @apply shrink-0 touch-manipulation;
+        }
+
+        .fi-ta-ctn {
+            @apply overflow-x-auto;
+        }
+
+        .fi-ta-actions .fi-ac-btn-action,
+        .fi-ta-row-action,
+        .fi-btn {
+            @apply min-h-11 touch-manipulation;
+        }
+
+        .fi-section-content-ctn {
+            @apply gap-4;
+        }
+
+        .fi-fo-field-wrp-label {
+            @apply text-sm;
+        }
+
+        .fi-dashboard-hero .grid {
+            @apply gap-2;
+        }
+    }
+
+    .fi-crm-scroll-hint {
+        @apply text-[11px] text-gray-400 dark:text-gray-500 sm:hidden;
+    }
+}
