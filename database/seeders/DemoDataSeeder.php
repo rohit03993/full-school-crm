@@ -34,9 +34,9 @@ class DemoDataSeeder extends Seeder
         }
 
         $staff = $this->demoStaff();
-        $diploma = Course::query()->where('code', 'DIP-HM-6M')->first()
+        $diploma = Course::query()->where('code', 'DIP-DCA-6M')->first()
             ?? Course::query()->where('course_type', 'diploma')->first();
-        $bsc = Course::query()->where('code', 'BSC-HM-3Y')->first()
+        $bsc = Course::query()->where('code', 'SCH-12-COM')->first()
             ?? Course::query()->where('course_type', 'bsc')->first();
 
         if (! $diploma || ! $bsc) {
@@ -180,7 +180,7 @@ class DemoDataSeeder extends Seeder
         }
 
         $this->command?->info('Demo CRM data seeded.');
-        $this->command?->line('Staff login: demo@folksindia.com / password');
+        $this->command?->line('Staff login: demo@example.com / password');
         $this->command?->line('Enrolled student portal: 9811000005 / DOB password 09082001');
         $this->command?->warn('Admission demo (Neha Singh): 9811000004 — form not yet submitted.');
     }
@@ -190,7 +190,7 @@ class DemoDataSeeder extends Seeder
         Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);
 
         $user = User::query()->firstOrCreate(
-            ['email' => 'demo@folksindia.com'],
+            ['email' => 'demo@example.com'],
             [
                 'name' => 'Demo Staff',
                 'password' => Hash::make('password'),

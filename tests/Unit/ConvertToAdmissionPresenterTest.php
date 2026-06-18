@@ -26,10 +26,10 @@ class ConvertToAdmissionPresenterTest extends TestCase
 
         $older = Enquiry::query()->create([
             'student_id' => $student->id,
-            'enquiry_number' => 'FI-ENQ-2026-000001',
+            'enquiry_number' => 'CRM-ENQ-2026-000001',
             'course_id' => $course->id,
             'lead_source' => LeadSource::Website,
-            'meeting_for' => 'folks_india',
+            'meeting_for' => 'school',
             'visit_type' => 'first_visit',
             'latest_visit_status' => 'interested',
             'created_at' => now()->subDay(),
@@ -37,7 +37,7 @@ class ConvertToAdmissionPresenterTest extends TestCase
 
         $latest = Enquiry::query()->create([
             'student_id' => $student->id,
-            'enquiry_number' => 'FI-ENQ-2026-000002',
+            'enquiry_number' => 'CRM-ENQ-2026-000002',
             'course_id' => $undecided->id,
             'lead_source' => LeadSource::WalkIn,
             'meeting_for' => 'english_coffee',
@@ -55,15 +55,15 @@ class ConvertToAdmissionPresenterTest extends TestCase
     public function test_warns_when_latest_enquiry_has_no_course_but_older_has_course(): void
     {
         $student = $this->createStudent();
-        $course = $this->createCourse('BSc in Hotel Management', 'BSC-HM');
+        $course = $this->createCourse('Class 12 Science', 'SCH-12-SCI');
         $undecided = DefaultCourse::undecided();
 
         Enquiry::query()->create([
             'student_id' => $student->id,
-            'enquiry_number' => 'FI-ENQ-2026-000001',
+            'enquiry_number' => 'CRM-ENQ-2026-000001',
             'course_id' => $course->id,
             'lead_source' => LeadSource::Website,
-            'meeting_for' => 'folks_india',
+            'meeting_for' => 'school',
             'visit_type' => 'first_visit',
             'latest_visit_status' => 'interested',
             'created_at' => now()->subDay(),
@@ -71,7 +71,7 @@ class ConvertToAdmissionPresenterTest extends TestCase
 
         Enquiry::query()->create([
             'student_id' => $student->id,
-            'enquiry_number' => 'FI-ENQ-2026-000002',
+            'enquiry_number' => 'CRM-ENQ-2026-000002',
             'course_id' => $undecided->id,
             'lead_source' => LeadSource::WalkIn,
             'meeting_for' => 'english_coffee',
@@ -86,8 +86,8 @@ class ConvertToAdmissionPresenterTest extends TestCase
         $warning = $presenter->selectionWarning($convertible);
 
         $this->assertNotNull($warning);
-        $this->assertStringContainsString('FI-ENQ-2026-000001', $warning);
-        $this->assertStringContainsString('BSc in Hotel Management', $warning);
+        $this->assertStringContainsString('CRM-ENQ-2026-000001', $warning);
+        $this->assertStringContainsString('Class 12 Science', $warning);
         $this->assertSame($convertible->first()->id, $presenter->defaultEnquiryId($convertible));
     }
 
@@ -98,10 +98,10 @@ class ConvertToAdmissionPresenterTest extends TestCase
 
         Enquiry::query()->create([
             'student_id' => $student->id,
-            'enquiry_number' => 'FI-ENQ-2026-000010',
+            'enquiry_number' => 'CRM-ENQ-2026-000010',
             'course_id' => $course->id,
             'lead_source' => LeadSource::WalkIn,
-            'meeting_for' => 'folks_india',
+            'meeting_for' => 'school',
             'visit_type' => 'first_visit',
             'latest_visit_status' => 'interested',
         ]);

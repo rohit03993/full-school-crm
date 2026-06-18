@@ -36,13 +36,13 @@ class InstituteSettings
             $g = fn (string $key, mixed $default = null) => Setting::getValue($key, $default);
 
             return [
-                'name' => (string) $g('site.name', config('folks.name')),
-                'tagline' => (string) $g('site.tagline', config('folks.tagline')),
-                'phone' => (string) $g('site.phone', config('folks.phone')),
-                'email' => (string) $g('site.email', config('folks.email')),
-                'address' => (string) $g('site.address', config('folks.address')),
+                'name' => (string) $g('site.name', config('institute.name')),
+                'tagline' => (string) $g('site.tagline', config('institute.tagline')),
+                'phone' => (string) $g('site.phone', config('institute.phone')),
+                'email' => (string) $g('site.email', config('institute.email')),
+                'address' => (string) $g('site.address', config('institute.address')),
                 'receipt_header' => (string) $g('crm.receipt_header', ''),
-                'footer' => (string) $g('crm.receipt_footer', config('folks.receipt_footer')),
+                'footer' => (string) $g('crm.receipt_footer', config('institute.receipt_footer')),
                 'logo_data_uri' => self::logoDataUri(
                     $g('crm.receipt_logo') ?: $g('site.logo'),
                 ),

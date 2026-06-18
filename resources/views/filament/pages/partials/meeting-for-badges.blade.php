@@ -1,27 +1,27 @@
 @php
-    $folksIndiaCount = $leadSources['folks_india_count'] ?? 0;
-    $englishCoffeeCount = $leadSources['english_coffee_count'] ?? 0;
+    $schoolCount = $leadSources['school_count'] ?? 0;
+    $coachingCount = $leadSources['coaching_count'] ?? 0;
 @endphp
 
-@if ($folksIndiaCount > 0 || $englishCoffeeCount > 0)
+@if ($schoolCount > 0 || $coachingCount > 0)
     <div class="flex flex-wrap items-center gap-2">
-        @if ($folksIndiaCount > 0)
+        @if ($schoolCount > 0)
             @include('filament.pages.partials.meeting-for-badge', [
-                'meetingFor' => \App\Enums\MeetingFor::FolksIndia,
+                'meetingFor' => \App\Enums\MeetingFor::School,
                 'size' => 'md',
             ])
-            @if ($folksIndiaCount > 1)
-                <span class="text-xs font-bold text-amber-700 dark:text-amber-400">×{{ $folksIndiaCount }}</span>
+            @if ($schoolCount > 1)
+                <span class="text-xs font-bold text-amber-700 dark:text-amber-400">×{{ $schoolCount }}</span>
             @endif
         @endif
 
-        @if ($englishCoffeeCount > 0)
+        @if ($coachingCount > 0)
             @include('filament.pages.partials.meeting-for-badge', [
-                'meetingFor' => \App\Enums\MeetingFor::EnglishCoffee,
+                'meetingFor' => \App\Enums\MeetingFor::Coaching,
                 'size' => 'md',
             ])
-            @if ($englishCoffeeCount > 1)
-                <span class="text-xs font-bold text-violet-700 dark:text-violet-400">×{{ $englishCoffeeCount }}</span>
+            @if ($coachingCount > 1)
+                <span class="text-xs font-bold text-violet-700 dark:text-violet-400">×{{ $coachingCount }}</span>
             @endif
         @endif
     </div>

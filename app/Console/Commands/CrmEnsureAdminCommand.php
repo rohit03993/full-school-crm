@@ -18,7 +18,7 @@ class CrmEnsureAdminCommand extends Command
         foreach ([$sessionPath, base_path('bootstrap/cache'), storage_path('logs'), storage_path('app')] as $path) {
             if (! is_writable($path)) {
                 $this->error("Not writable: {$path}");
-                $this->line('Run: chown -R folksindia:folksindia '.base_path());
+                $this->line('Run: chown -R www-data:www-data '.base_path());
                 $this->line('Run: chmod -R 775 storage bootstrap/cache');
 
                 return self::FAILURE;

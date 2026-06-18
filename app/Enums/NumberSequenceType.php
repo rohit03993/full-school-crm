@@ -11,10 +11,12 @@ enum NumberSequenceType: string
 
     public function prefix(): string
     {
+        $base = (string) config('institute.number_prefix', 'CRM');
+
         return match ($this) {
-            self::Enquiry => 'FI-ENQ',
-            self::Admission => 'FI-ADM',
-            self::Enrollment => 'FI',
+            self::Enquiry => "{$base}-ENQ",
+            self::Admission => "{$base}-ADM",
+            self::Enrollment => $base,
             self::Receipt => 'REC',
         };
     }

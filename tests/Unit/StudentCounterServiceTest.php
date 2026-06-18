@@ -36,7 +36,7 @@ class StudentCounterServiceTest extends TestCase
 
         $labels = collect($profile['items'])->pluck('label')->all();
 
-        $this->assertSame(['Visits', 'Enquiries', 'Website', 'Walk-in', 'Folks India', 'English Coffee'], $labels);
+        $this->assertSame(['Visits', 'Enquiries', 'Website', 'Walk-in', 'School', 'Coaching'], $labels);
         $this->assertNotContains('Attendance', $labels);
         $this->assertNotContains('Paid', $labels);
     }
@@ -64,10 +64,10 @@ class StudentCounterServiceTest extends TestCase
 
         Enquiry::query()->create([
             'student_id' => $student->id,
-            'enquiry_number' => 'FI-ENQ-2026-000101',
+            'enquiry_number' => 'CRM-ENQ-2026-000101',
             'course_id' => $course->id,
             'lead_source' => LeadSource::Website,
-            'meeting_for' => MeetingFor::FolksIndia,
+            'meeting_for' => MeetingFor::School,
             'visit_type' => 'first_visit',
             'latest_visit_status' => 'interested',
             'created_at' => now()->subDay(),
@@ -75,10 +75,10 @@ class StudentCounterServiceTest extends TestCase
 
         Enquiry::query()->create([
             'student_id' => $student->id,
-            'enquiry_number' => 'FI-ENQ-2026-000102',
+            'enquiry_number' => 'CRM-ENQ-2026-000102',
             'course_id' => $course->id,
             'lead_source' => LeadSource::WalkIn,
-            'meeting_for' => MeetingFor::EnglishCoffee,
+            'meeting_for' => MeetingFor::Coaching,
             'visit_type' => 'follow_up',
             'latest_visit_status' => 'interested',
             'created_at' => now(),
@@ -88,10 +88,10 @@ class StudentCounterServiceTest extends TestCase
 
         $this->assertSame(1, $profile['lead_sources']['website_count']);
         $this->assertSame(1, $profile['lead_sources']['walk_in_count']);
-        $this->assertSame(1, $profile['lead_sources']['folks_india_count']);
-        $this->assertSame(1, $profile['lead_sources']['english_coffee_count']);
+        $this->assertSame(1, $profile['lead_sources']['school_count']);
+        $this->assertSame(1, $profile['lead_sources']['coaching_count']);
         $this->assertSame('Website + Walk-in lead', $profile['lead_sources']['headline']);
-        $this->assertSame('Walk-in for English Coffee', $profile['lead_sources']['latest_intent']);
+        $this->assertSame('Walk-in for Coaching', $profile['lead_sources']['latest_intent']);
         $this->assertStringContainsString('First Website', $profile['lead_sources']['detail']);
     }
 

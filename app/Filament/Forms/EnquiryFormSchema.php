@@ -59,7 +59,7 @@ class EnquiryFormSchema
                     Select::make('meeting_for')
                         ->label('Meeting For')
                         ->options(self::meetingForOptions())
-                        ->default(MeetingFor::FolksIndia->value)
+                        ->default(MeetingFor::School->value)
                         ->required()
                         ->native(false),
                     Select::make('course_id')
@@ -137,7 +137,7 @@ class EnquiryFormSchema
             Select::make('meeting_for')
                 ->label('Meeting For')
                 ->options(self::meetingForOptions())
-                ->default(MeetingFor::FolksIndia->value)
+                ->default(MeetingFor::School->value)
                 ->required()
                 ->native(false),
             Select::make('course_id')
@@ -309,7 +309,7 @@ class EnquiryFormSchema
                 ->native(false),
             Select::make('meeting_for')
                 ->options(self::meetingForOptions())
-                ->default(MeetingFor::FolksIndia->value)
+                ->default(MeetingFor::School->value)
                 ->required()
                 ->native(false),
         ];

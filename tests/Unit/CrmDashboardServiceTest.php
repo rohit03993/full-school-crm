@@ -42,10 +42,10 @@ class CrmDashboardServiceTest extends TestCase
 
         $enquiry = Enquiry::query()->create([
             'student_id' => $student->id,
-            'enquiry_number' => 'FI-ENQ-2026-000200',
+            'enquiry_number' => 'CRM-ENQ-2026-000200',
             'course_id' => $course->id,
             'lead_source' => LeadSource::WalkIn,
-            'meeting_for' => 'folks_india',
+            'meeting_for' => 'school',
             'visit_type' => 'first_visit',
             'latest_visit_status' => 'interested',
         ]);
@@ -53,7 +53,7 @@ class CrmDashboardServiceTest extends TestCase
         Admission::query()->create([
             'student_id' => $student->id,
             'enquiry_id' => $enquiry->id,
-            'admission_number' => 'FI-ADM-2026-000200',
+            'admission_number' => 'CRM-ADM-2026-000200',
             'status' => AdmissionStatus::VerificationPending,
         ]);
 

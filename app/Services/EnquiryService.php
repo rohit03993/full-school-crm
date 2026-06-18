@@ -101,7 +101,7 @@ class EnquiryService
 
         $meetingFor = isset($data['meeting_for'])
             ? MeetingFor::from($data['meeting_for'])
-            : MeetingFor::FolksIndia;
+            : MeetingFor::School;
 
         $courseId = $data['course_id'] ?? DefaultCourse::undecided()->id;
 

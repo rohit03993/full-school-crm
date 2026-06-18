@@ -29,8 +29,8 @@ class StudentCounterService
      *     lead_sources: array{
      *         website_count: int,
      *         walk_in_count: int,
-     *         folks_india_count: int,
-     *         english_coffee_count: int,
+     *         school_count: int,
+     *         coaching_count: int,
      *         first_source: ?LeadSource,
      *         latest_source: ?LeadSource,
      *         latest_meeting_for: ?MeetingFor,
@@ -84,8 +84,8 @@ class StudentCounterService
      * @return array{
      *     website_count: int,
      *     walk_in_count: int,
-     *     folks_india_count: int,
-     *     english_coffee_count: int,
+     *     school_count: int,
+     *     coaching_count: int,
      *     first_source: ?LeadSource,
      *     latest_source: ?LeadSource,
      *     latest_meeting_for: ?MeetingFor,
@@ -100,8 +100,8 @@ class StudentCounterService
 
         $websiteCount = $enquiries->where('lead_source', LeadSource::Website)->count();
         $walkInCount = $enquiries->where('lead_source', LeadSource::WalkIn)->count();
-        $folksIndiaCount = $enquiries->where('meeting_for', MeetingFor::FolksIndia)->count();
-        $englishCoffeeCount = $enquiries->where('meeting_for', MeetingFor::EnglishCoffee)->count();
+        $schoolCount = $enquiries->where('meeting_for', MeetingFor::School)->count();
+        $coachingCount = $enquiries->where('meeting_for', MeetingFor::Coaching)->count();
 
         /** @var ?Enquiry $first */
         $first = $enquiries->first();
@@ -114,8 +114,8 @@ class StudentCounterService
         return [
             'website_count' => $websiteCount,
             'walk_in_count' => $walkInCount,
-            'folks_india_count' => $folksIndiaCount,
-            'english_coffee_count' => $englishCoffeeCount,
+            'school_count' => $schoolCount,
+            'coaching_count' => $coachingCount,
             'first_source' => $firstSource,
             'latest_source' => $latestSource,
             'latest_meeting_for' => $latestMeetingFor,
@@ -126,8 +126,8 @@ class StudentCounterService
                 $latestSource,
                 $websiteCount,
                 $walkInCount,
-                $folksIndiaCount,
-                $englishCoffeeCount,
+                $schoolCount,
+                $coachingCount,
             ),
         ];
     }
@@ -170,10 +170,10 @@ class StudentCounterService
         ?LeadSource $latestSource,
         int $websiteCount,
         int $walkInCount,
-        int $folksIndiaCount,
-        int $englishCoffeeCount,
+        int $schoolCount,
+        int $coachingCount,
     ): ?string {
-        if ($websiteCount === 0 && $walkInCount === 0 && $folksIndiaCount === 0 && $englishCoffeeCount === 0) {
+        if ($websiteCount === 0 && $walkInCount === 0 && $schoolCount === 0 && $coachingCount === 0) {
             return null;
         }
 
@@ -187,12 +187,14 @@ class StudentCounterService
             $parts[] = $walkInCount === 1 ? '1 walk-in enquiry' : "{$walkInCount} walk-in enquiries";
         }
 
-        if ($folksIndiaCount > 0) {
-            $parts[] = $folksIndiaCount === 1 ? '1 for Folks India' : "{$folksIndiaCount} for Folks India";
+        if ($schoolCount > 0) {
+            $schoolLabel = MeetingFor::School->label();
+            $parts[] = $schoolCount === 1 ? "1 for {$schoolLabel}" : "{$schoolCount} for {$schoolLabel}";
         }
 
-        if ($englishCoffeeCount > 0) {
-            $parts[] = $englishCoffeeCount === 1 ? '1 for English Coffee' : "{$englishCoffeeCount} for English Coffee";
+        if ($coachingCount > 0) {
+            $coachingLabel = MeetingFor::Coaching->label();
+            $parts[] = $coachingCount === 1 ? "1 for {$coachingLabel}" : "{$coachingCount} for {$coachingLabel}";
         }
 
         $detail = implode(' · ', $parts);
@@ -251,7 +253,7 @@ class StudentCounterService
     }
 
     /**
-     * @param  array{website_count: int, walk_in_count: int}  $leadSources
+     * @param  array{website_count: int, walk_in_count: int, school_count: int, coaching_count: int}  $leadSources
      * @return array<int, array{label: string, value: int|float|string|null}>
      */
     protected function leadCounters(Student $student, array $leadSources): array
@@ -261,13 +263,13 @@ class StudentCounterService
             ['label' => 'Enquiries', 'value' => $student->enquiries()->count()],
             ['label' => 'Website', 'value' => $leadSources['website_count']],
             ['label' => 'Walk-in', 'value' => $leadSources['walk_in_count']],
-            ['label' => 'Folks India', 'value' => $leadSources['folks_india_count']],
-            ['label' => 'English Coffee', 'value' => $leadSources['english_coffee_count']],
+            ['label' => MeetingFor::School->label(), 'value' => $leadSources['school_count']],
+            ['label' => MeetingFor::Coaching->label(), 'value' => $leadSources['coaching_count']],
         ];
     }
 
     /**
-     * @param  array{website_count: int, walk_in_count: int}  $leadSources
+     * @param  array{website_count: int, walk_in_count: int, school_count: int, coaching_count: int}  $leadSources
      * @return array<int, array{label: string, value: int|float|string|null}>
      */
     protected function admissionCounters(Student $student, array $leadSources): array
@@ -277,8 +279,8 @@ class StudentCounterService
         return [
             ['label' => 'Visits', 'value' => $student->visits()->count()],
             ['label' => 'Walk-in', 'value' => $leadSources['walk_in_count']],
-            ['label' => 'Folks India', 'value' => $leadSources['folks_india_count']],
-            ['label' => 'English Coffee', 'value' => $leadSources['english_coffee_count']],
+            ['label' => MeetingFor::School->label(), 'value' => $leadSources['school_count']],
+            ['label' => MeetingFor::Coaching->label(), 'value' => $leadSources['coaching_count']],
             ['label' => 'Admission', 'value' => $admission?->status?->label() ?? '—'],
         ];
     }

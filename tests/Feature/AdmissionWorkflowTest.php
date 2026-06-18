@@ -71,7 +71,7 @@ class AdmissionWorkflowTest extends TestCase
         $this->assertNotNull($enrollment->feeStructure);
         $this->assertSame(45000.0, (float) $enrollment->feeStructure->net_fee);
         $this->assertSame(45000.0, (float) $enrollment->feeStructure->pending_amount);
-        $this->assertStringStartsWith('FI-', $enrollment->enrollment_number);
+        $this->assertStringStartsWith('CRM-', $enrollment->enrollment_number);
         $this->assertSame(EnrollmentStatus::Enrolled, $enrollment->status);
         $this->assertTrue($enrollment->is_active);
         $this->assertSame(StudentStatus::Enrolled, $student->fresh()->status);

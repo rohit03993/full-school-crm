@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('course_id')->constrained()->restrictOnDelete();
             $table->string('lead_source');
             $table->foreignId('meeting_with_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('meeting_for')->default('folks_india');
+            $table->string('meeting_for')->default('school');
             $table->string('visit_type')->default('first_visit');
             $table->text('follow_up_reason')->nullable();
             $table->string('latest_visit_status')->nullable();

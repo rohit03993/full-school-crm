@@ -29,7 +29,7 @@ class RohitPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->brandName('Folks India')
+            ->brandName(config('institute.name', config('app.name')))
             ->colors([
                 'primary' => Color::Amber,
             ]);

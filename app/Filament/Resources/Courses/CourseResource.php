@@ -54,7 +54,7 @@ class CourseResource extends Resource
                             ->live(),
                         TextInput::make('name')
                             ->label('Course Name')
-                            ->placeholder('e.g. BSc in Hotel Management')
+                            ->placeholder('e.g. Class 12 Science')
                             ->required()
                             ->maxLength(255)
                             ->columnSpanFull(),

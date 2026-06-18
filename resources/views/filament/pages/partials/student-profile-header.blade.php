@@ -15,6 +15,9 @@
         $items = $profile['items'];
         $leadSources = $profile['lead_sources'];
         $columnCount = min(count($items), 6);
+        $schoolLabel = \App\Enums\MeetingFor::School->label();
+        $coachingLabel = \App\Enums\MeetingFor::Coaching->label();
+        $sourceLabels = ['Website', 'Walk-in', $schoolLabel, $coachingLabel];
     @endphp
 
     <div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
@@ -49,7 +52,7 @@
 
                     @include('filament.pages.partials.lead-intent-highlight', ['leadSources' => $leadSources])
 
-                    @if (($leadSources['folks_india_count'] ?? 0) > 0 || ($leadSources['english_coffee_count'] ?? 0) > 0)
+                    @if (($leadSources['school_count'] ?? 0) > 0 || ($leadSources['coaching_count'] ?? 0) > 0)
                         <div class="mt-3">
                             @include('filament.pages.partials.meeting-for-badges', ['leadSources' => $leadSources])
                         </div>
@@ -91,18 +94,18 @@
                     'rounded-xl px-3 py-2.5',
                     'bg-emerald-500/10 ring-1 ring-emerald-500/15 dark:bg-emerald-500/5' => $counter['label'] === 'Website',
                     'bg-sky-500/10 ring-1 ring-sky-500/15 dark:bg-sky-500/5' => $counter['label'] === 'Walk-in',
-                    'bg-amber-500/10 ring-1 ring-amber-500/15 dark:bg-amber-500/5' => $counter['label'] === 'Folks India',
-                    'bg-violet-500/10 ring-1 ring-violet-500/15 dark:bg-violet-500/5' => $counter['label'] === 'English Coffee',
-                    'bg-gray-50 dark:bg-white/5' => ! in_array($counter['label'], ['Website', 'Walk-in', 'Folks India', 'English Coffee'], true),
+                    'bg-amber-500/10 ring-1 ring-amber-500/15 dark:bg-amber-500/5' => $counter['label'] === $schoolLabel,
+                    'bg-violet-500/10 ring-1 ring-violet-500/15 dark:bg-violet-500/5' => $counter['label'] === $coachingLabel,
+                    'bg-gray-50 dark:bg-white/5' => ! in_array($counter['label'], $sourceLabels, true),
                 ])>
                     <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs dark:text-gray-400">{{ $counter['label'] }}</p>
                     <p @class([
                         'mt-0.5 truncate text-base font-bold sm:text-lg',
                         'text-emerald-700 dark:text-emerald-400' => $counter['label'] === 'Website',
                         'text-sky-800 dark:text-sky-400' => $counter['label'] === 'Walk-in',
-                        'text-amber-800 dark:text-amber-400' => $counter['label'] === 'Folks India',
-                        'text-violet-800 dark:text-violet-400' => $counter['label'] === 'English Coffee',
-                        'text-gray-950 dark:text-white' => ! in_array($counter['label'], ['Website', 'Walk-in', 'Folks India', 'English Coffee'], true),
+                        'text-amber-800 dark:text-amber-400' => $counter['label'] === $schoolLabel,
+                        'text-violet-800 dark:text-violet-400' => $counter['label'] === $coachingLabel,
+                        'text-gray-950 dark:text-white' => ! in_array($counter['label'], $sourceLabels, true),
                     ])>{{ $counter['value'] }}</p>
                 </div>
             @endforeach

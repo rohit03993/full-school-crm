@@ -47,7 +47,7 @@ class StorageCleanupService
 
     public function pruneLivewireTempFiles(?int $maxAgeHours = null): int
     {
-        $maxAgeHours ??= (int) config('folks.storage.livewire_temp_max_age_hours', 24);
+        $maxAgeHours ??= (int) config('institute.storage.livewire_temp_max_age_hours', 24);
         $cutoffTimestamp = now()->subHours($maxAgeHours)->getTimestamp();
         $deleted = 0;
 

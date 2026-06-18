@@ -1,6 +1,6 @@
 @php
     $whatsappUrl = filled($institute['whatsapp'])
-        ? 'https://wa.me/'.$institute['whatsapp'].'?text='.urlencode('Hello, I would like to enquire about courses at Folks India.')
+        ? 'https://wa.me/'.$institute['whatsapp'].'?text='.urlencode('Hello, I would like to enquire about courses at '.$institute['name'].'.')
         : null;
 @endphp
 

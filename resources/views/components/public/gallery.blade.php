@@ -5,12 +5,12 @@
 <section id="gallery" class="scroll-mt-36 bg-white py-14 sm:scroll-mt-28 sm:py-20 lg:py-28">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="mx-auto max-w-3xl text-center">
-            <p class="text-sm font-semibold uppercase tracking-wider text-brand-600">Campus & Industry</p>
+            <p class="text-sm font-semibold uppercase tracking-wider text-brand-600">Campus & Learning</p>
             <h2 class="mt-3 font-display text-2xl font-bold text-navy-900 sm:text-4xl lg:text-5xl">
-                Life at Folks India
+                Life at {{ $institute['name'] }}
             </h2>
             <p class="mt-4 text-base leading-relaxed text-navy-600 sm:text-lg">
-                Train in real hospitality environments — from front office and kitchens to tourism and events.
+                A vibrant campus with classrooms, labs, and coaching centres — built for academic growth and student success.
             </p>
         </div>
 

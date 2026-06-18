@@ -2,7 +2,7 @@
 
 @php
     $whatsappUrl = filled($institute['whatsapp'])
-        ? 'https://wa.me/'.$institute['whatsapp'].'?text='.urlencode('Hello, I would like to enquire about courses at Folks India.')
+        ? 'https://wa.me/'.$institute['whatsapp'].'?text='.urlencode('Hello, I would like to enquire about courses at '.$institute['name'].'.')
         : null;
 @endphp
 
@@ -202,7 +202,7 @@
                             </button>
 
                             <p class="text-center text-xs text-navy-500">
-                                By submitting, you agree to be contacted by Folks India regarding your enquiry.
+                                By submitting, you agree to be contacted by {{ $institute['name'] }} regarding your enquiry.
                             </p>
                         </form>
                     </div>

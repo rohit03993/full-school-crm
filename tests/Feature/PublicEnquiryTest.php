@@ -17,7 +17,7 @@ class PublicEnquiryTest extends TestCase
     public function test_public_enquiry_creates_student_enquiry_and_visit(): void
     {
         $course = Course::query()->create([
-            'name' => 'Diploma in Hotel Management',
+            'name' => 'Diploma in Computer Applications',
             'code' => 'TEST-DIP',
             'course_type' => 'diploma',
             'duration' => 6,
@@ -46,7 +46,7 @@ class PublicEnquiryTest extends TestCase
         $this->assertDatabaseCount('visits', 1);
 
         $enquiry = Enquiry::query()->first();
-        $this->assertStringStartsWith('FI-ENQ-', $enquiry->enquiry_number);
+        $this->assertStringStartsWith('CRM-ENQ-', $enquiry->enquiry_number);
 
         $student = Student::query()->first();
         $this->assertSame('9876543210', $student->mobile);
@@ -56,7 +56,7 @@ class PublicEnquiryTest extends TestCase
     public function test_existing_mobile_reuses_student_record(): void
     {
         $course = Course::query()->create([
-            'name' => 'BSc Hotel Management',
+            'name' => 'Class 12 Science',
             'code' => 'TEST-BSC',
             'course_type' => 'bsc',
             'duration' => 3,

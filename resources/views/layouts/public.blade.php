@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#102a43">
     <meta name="mobile-web-app-capable" content="yes">
 
-    <title>{{ isset($title) ? $title.' — ' : '' }}{{ $institute['name'] ?? 'Folks India' }}</title>
+    <title>{{ isset($title) ? $title.' — ' : '' }}{{ $institute['name'] ?? config('institute.name') }}</title>
 
     @if (! empty($institute['favicon_url']))
         <link rel="icon" href="{{ $institute['favicon_url'] }}" type="image/png">

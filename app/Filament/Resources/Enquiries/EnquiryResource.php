@@ -79,8 +79,8 @@ class EnquiryResource extends Resource
                     ->label('Came For')
                     ->badge()
                     ->color(fn (MeetingFor $state): string => match ($state) {
-                        MeetingFor::FolksIndia => 'warning',
-                        MeetingFor::EnglishCoffee => 'purple',
+                        MeetingFor::School => 'warning',
+                        MeetingFor::Coaching => 'purple',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (MeetingFor $state): string => $state->label())
@@ -119,8 +119,8 @@ class EnquiryResource extends Resource
                 SelectFilter::make('meeting_for')
                     ->label('Came For')
                     ->options([
-                        MeetingFor::FolksIndia->value => MeetingFor::FolksIndia->label(),
-                        MeetingFor::EnglishCoffee->value => MeetingFor::EnglishCoffee->label(),
+                        MeetingFor::School->value => MeetingFor::School->label(),
+                        MeetingFor::Coaching->value => MeetingFor::Coaching->label(),
                     ]),
                 Filter::make('created_at')
                     ->label('Date')

@@ -50,7 +50,7 @@ class StaffEnquiryTest extends TestCase
         $enquiry = app(EnquiryService::class)->create([
             'name' => 'Quick Walk-in',
             'mobile' => '9001234567',
-            'meeting_for' => 'folks_india',
+            'meeting_for' => 'school',
         ], $staff, LeadSource::WalkIn);
 
         $student = $enquiry->student;
@@ -59,7 +59,7 @@ class StaffEnquiryTest extends TestCase
         $this->assertSame('9001234567', $student->mobile);
         $this->assertNull($student->father_name);
         $this->assertNull($student->date_of_birth);
-        $this->assertStringStartsWith('FI-ENQ-', $enquiry->enquiry_number);
+        $this->assertStringStartsWith('CRM-ENQ-', $enquiry->enquiry_number);
     }
 
     public function test_existing_student_cannot_receive_second_enquiry(): void
@@ -106,7 +106,7 @@ class StaffEnquiryTest extends TestCase
         return $user;
     }
 
-    protected function createCourse(string $code = 'TEST-DIP', string $name = 'Diploma in Hotel Management'): Course
+    protected function createCourse(string $code = 'TEST-DIP', string $name = 'Diploma in Computer Applications'): Course
     {
         return Course::query()->create([
             'name' => $name,

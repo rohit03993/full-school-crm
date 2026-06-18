@@ -171,7 +171,7 @@ class StudentSearchPage extends Page
     {
         return [
             'mobile' => $mobile,
-            'meeting_for' => MeetingFor::FolksIndia->value,
+            'meeting_for' => MeetingFor::School->value,
         ];
     }
 

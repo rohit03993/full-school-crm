@@ -14,8 +14,8 @@
 
 <div @class([
     'mt-3 rounded-xl border-2 px-4 py-3 shadow-sm',
-    'border-amber-500/40 bg-gradient-to-r from-amber-500/15 to-amber-600/5' => $meetingFor === MeetingFor::FolksIndia,
-    'border-violet-500/40 bg-gradient-to-r from-violet-500/15 to-violet-600/5' => $meetingFor === MeetingFor::EnglishCoffee,
+    'border-amber-500/40 bg-gradient-to-r from-amber-500/15 to-amber-600/5' => $meetingFor === MeetingFor::School,
+    'border-violet-500/40 bg-gradient-to-r from-violet-500/15 to-violet-600/5' => $meetingFor === MeetingFor::Coaching,
 ])>
     <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
         Came for

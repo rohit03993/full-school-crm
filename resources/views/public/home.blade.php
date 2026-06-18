@@ -29,7 +29,7 @@
                     <div class="overflow-hidden rounded-3xl shadow-2xl shadow-navy-900/15">
                         <img
                             src="{{ $aboutImage }}"
-                            alt="Hospitality training at Folks India"
+                            alt="Students at {{ $institute['name'] }}"
                             class="aspect-[4/5] w-full object-cover"
                             loading="lazy"
                         >
@@ -42,13 +42,13 @@
                 <div class="order-1 lg:order-2">
                     <p class="text-sm font-semibold uppercase tracking-wider text-brand-600">About Us</p>
                     <h2 class="mt-3 font-display text-3xl font-bold text-navy-900 sm:text-4xl">
-                        Training the next generation of hospitality leaders
+                        Training the next generation of learners
                     </h2>
                     <p class="mt-6 text-lg leading-relaxed text-navy-600">
                         {{ $institute['about'] }}
                     </p>
                     <ul class="mt-8 space-y-4">
-                        @foreach (['Hands-on kitchen & front office labs', 'Industry visits & practical training', 'BSc & Diploma programmes with flexible durations', 'Career guidance from enquiry to placement'] as $point)
+                        @foreach (['Experienced faculty and mentors', 'Structured school and coaching programmes', 'Flexible course durations and batches', 'Guidance from enquiry to enrollment'] as $point)
                             <li class="flex items-start gap-3 text-navy-700">
                                 <svg class="mt-0.5 h-5 w-5 shrink-0 text-brand-500" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
@@ -78,7 +78,7 @@
                         Courses designed for real careers
                     </h2>
                     <p class="mt-4 max-w-2xl text-navy-600">
-                        BSc and Diploma options in Hotel Management — choose the duration that fits your goals.
+                        School and coaching programmes — choose the course that fits your goals.
                     </p>
                 </div>
                 <a href="{{ route('courses') }}" class="shrink-0 text-sm font-semibold text-brand-700 hover:text-brand-800">
@@ -116,7 +116,7 @@
                 >
                 <div class="absolute inset-0 bg-navy-950/85"></div>
                 <div class="relative px-8 py-16 text-center text-white sm:px-16 sm:py-24">
-                    <h2 class="font-display text-3xl font-bold sm:text-4xl lg:text-5xl">Ready to start your hospitality career?</h2>
+                    <h2 class="font-display text-3xl font-bold sm:text-4xl lg:text-5xl">Ready to start your learning journey?</h2>
                     <p class="mx-auto mt-4 max-w-2xl text-lg text-navy-200">
                         Visit our campus, speak with our counsellors, or call us to learn more about admissions.
                     </p>

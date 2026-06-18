@@ -6,7 +6,7 @@
             <p class="text-sm font-semibold uppercase tracking-wider text-brand-400">Programmes</p>
             <h1 class="mt-3 font-display text-4xl font-bold sm:text-5xl">Our Courses</h1>
             <p class="mt-4 max-w-2xl text-lg text-navy-200">
-                Explore BSc and Diploma programmes in Hotel Management. Each course can be customised — contact us for details and fees.
+                Explore our school and coaching programmes. Each course can be customised — contact us for details and fees.
             </p>
         </div>
     </section>

@@ -61,15 +61,15 @@ class StudentSearchServiceTest extends TestCase
 
         Enquiry::query()->create([
             'student_id' => $student->id,
-            'enquiry_number' => 'FI-ENQ-2026-000099',
+            'enquiry_number' => 'CRM-ENQ-2026-000099',
             'course_id' => $course->id,
             'lead_source' => LeadSource::Website,
-            'meeting_for' => 'folks_india',
+            'meeting_for' => 'school',
             'visit_type' => 'first_visit',
             'latest_visit_status' => 'interested',
         ]);
 
-        $result = app(StudentSearchService::class)->search(null, null, null, 'FI-ENQ-2026-000099');
+        $result = app(StudentSearchService::class)->search(null, null, null, 'CRM-ENQ-2026-000099');
 
         $this->assertSame(StudentSearchService::OUTCOME_FOUND, $result['outcome']);
         $this->assertTrue($result['student']->is($student));

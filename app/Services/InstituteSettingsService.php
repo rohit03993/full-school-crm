@@ -13,14 +13,14 @@ class InstituteSettingsService
         $g = fn (string $key, mixed $default = null) => Setting::getValue($key, $default);
 
         return [
-            'name' => $g('site.name', config('folks.name')),
-            'tagline' => $g('site.tagline', config('folks.tagline')),
-            'phone' => $g('site.phone', config('folks.phone')),
-            'email' => $g('site.email', config('folks.email')),
-            'address' => $g('site.address', config('folks.address')),
+            'name' => $g('site.name', config('institute.name')),
+            'tagline' => $g('site.tagline', config('institute.tagline')),
+            'phone' => $g('site.phone', config('institute.phone')),
+            'email' => $g('site.email', config('institute.email')),
+            'address' => $g('site.address', config('institute.address')),
             'receipt_logo' => $g('crm.receipt_logo') ?: $g('site.logo'),
             'receipt_header' => $g('crm.receipt_header', ''),
-            'receipt_footer' => $g('crm.receipt_footer', config('folks.receipt_footer')),
+            'receipt_footer' => $g('crm.receipt_footer', config('institute.receipt_footer')),
         ];
     }
 
