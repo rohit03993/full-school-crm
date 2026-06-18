@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Enums\ActivityKind;
 use App\Enums\DocumentType;
+use App\Models\ActivityType;
 use App\Enums\LeadSource;
 use App\Enums\MeetingFor;
 use App\Enums\ProfilePhase;
@@ -338,13 +338,19 @@ class StudentCounterService
     {
         $percentage = $this->attendance->percentageForStudent($student);
 
-        return [
+        $counters = [
             ['label' => 'Batch', 'value' => $student->activeBatchStudent?->batch?->name ?? '—'],
             ['label' => 'Attendance', 'value' => $percentage !== null ? "{$percentage}%" : '—'],
-            ['label' => 'Practicals', 'value' => $this->activityAttendance->presentCountForStudent($student, ActivityKind::Practical)],
-            ['label' => 'IV', 'value' => $this->activityAttendance->presentCountForStudent($student, ActivityKind::IndustrialVisit)],
-            ['label' => 'Seminars', 'value' => $this->activityAttendance->presentCountForStudent($student, ActivityKind::Seminar)],
         ];
+
+        foreach (ActivityType::query()->enabled()->ordered()->get() as $type) {
+            $counters[] = [
+                'label' => $type->name,
+                'value' => $this->activityAttendance->presentCountForStudent($student, $type),
+            ];
+        }
+
+        return $counters;
     }
 
     protected function latestAdmission(Student $student): ?Admission

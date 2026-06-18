@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Admission;
 use App\Models\Enrollment;
+use App\Models\FeeMiscCharge;
 use App\Models\FeeStructure;
 use App\Models\FeeStructureHistory;
 use App\Models\User;
@@ -15,6 +16,7 @@ class FeeStructureService
 {
     public function __construct(
         protected AuditService $audit,
+        protected FeeInstallmentService $installments,
     ) {}
 
     public function createFromAdmission(Enrollment $enrollment, Admission $admission, User $staff): FeeStructure
@@ -31,29 +33,46 @@ class FeeStructureService
             ]);
         }
 
-        $feeStructure = FeeStructure::query()->create([
-            'enrollment_id' => $enrollment->id,
-            'course_fee' => $admission->course_fee,
-            'discount_amount' => $admission->discount_amount ?? 0,
-            'net_fee' => $admission->net_fee,
-            'paid_amount' => 0,
-            'pending_amount' => $admission->net_fee,
-            'set_by_user_id' => $staff->id,
-        ]);
+        $admission->loadMissing(['miscFees', 'installmentPlans']);
 
-        $this->audit->log(
-            action: 'Fee Structure Created',
-            auditable: $feeStructure,
-            newValues: [
-                'enrollment_number' => $enrollment->enrollment_number,
-                'course_fee' => $feeStructure->course_fee,
-                'discount_amount' => $feeStructure->discount_amount,
-                'net_fee' => $feeStructure->net_fee,
-            ],
-            user: $staff,
-        );
+        return DB::transaction(function () use ($enrollment, $admission, $staff): FeeStructure {
+            $feeStructure = FeeStructure::query()->create([
+                'enrollment_id' => $enrollment->id,
+                'course_fee' => $admission->course_fee,
+                'discount_amount' => $admission->discount_amount ?? 0,
+                'net_fee' => $admission->net_fee,
+                'paid_amount' => 0,
+                'pending_amount' => $admission->net_fee,
+                'set_by_user_id' => $staff->id,
+            ]);
 
-        return $feeStructure;
+            foreach ($admission->miscFees as $index => $miscFee) {
+                FeeMiscCharge::query()->create([
+                    'fee_structure_id' => $feeStructure->id,
+                    'label' => $miscFee->label,
+                    'amount' => $miscFee->amount,
+                    'sort_order' => $miscFee->sort_order ?: $index + 1,
+                ]);
+            }
+
+            $this->audit->log(
+                action: 'Fee Structure Created',
+                auditable: $feeStructure,
+                newValues: [
+                    'enrollment_number' => $enrollment->enrollment_number,
+                    'course_fee' => $feeStructure->course_fee,
+                    'discount_amount' => $feeStructure->discount_amount,
+                    'misc_fees_total' => $admission->miscFeesTotal(),
+                    'net_fee' => $feeStructure->net_fee,
+                    'use_installment_plan' => $admission->use_installment_plan,
+                ],
+                user: $staff,
+            );
+
+            $this->installments->createForFeeStructure($feeStructure, $enrollment, $admission);
+
+            return $feeStructure->fresh(['installments', 'miscCharges']);
+        });
     }
 
     /**
@@ -61,6 +80,8 @@ class FeeStructureService
      *     course_fee: float|int|string,
      *     discount_amount: float|int|string,
      *     reason: string,
+     *     reschedule_installments?: bool|null,
+     *     installment_plan?: array<int, array<string, mixed>>|null,
      * }  $data
      */
     public function updateByAdmin(FeeStructure $feeStructure, array $data, User $admin): FeeStructure
@@ -70,6 +91,11 @@ class FeeStructureService
         $courseFee = round((float) $data['course_fee'], 2);
         $discount = round(max(0, (float) $data['discount_amount']), 2);
         $reason = trim((string) ($data['reason'] ?? ''));
+        $miscTotal = $feeStructure->miscChargesTotal();
+        $reschedule = (bool) ($data['reschedule_installments'] ?? false);
+        $installmentPlan = $reschedule
+            ? app(AdmissionFeePlanService::class)->normalizeInstallmentPlan($data['installment_plan'] ?? [])
+            : [];
 
         if ($reason === '') {
             throw ValidationException::withMessages([
@@ -83,7 +109,7 @@ class FeeStructureService
             ]);
         }
 
-        $newNet = round($courseFee - $discount, 2);
+        $newNet = round($courseFee - $discount + $miscTotal, 2);
         $paid = round((float) $feeStructure->paid_amount, 2);
 
         if ($newNet < $paid) {
@@ -92,7 +118,36 @@ class FeeStructureService
             ]);
         }
 
-        return DB::transaction(function () use ($feeStructure, $courseFee, $discount, $newNet, $paid, $reason, $admin): FeeStructure {
+        $newPending = round($newNet - $paid, 2);
+
+        if ($reschedule && $newPending > 0) {
+            app(AdmissionFeePlanService::class)->assertInstallmentPlanValid($installmentPlan, $newPending);
+        }
+
+        return DB::transaction(function () use (
+            $feeStructure,
+            $courseFee,
+            $discount,
+            $newNet,
+            $paid,
+            $newPending,
+            $reason,
+            $admin,
+            $reschedule,
+            $installmentPlan,
+        ): FeeStructure {
+            $oldInstallmentSnapshot = $feeStructure->installments()
+                ->orderBy('sort_order')
+                ->get()
+                ->map(fn ($row): array => [
+                    'label' => $row->label,
+                    'amount' => (float) $row->amount,
+                    'paid' => (float) $row->paid_amount,
+                    'pending' => (float) $row->pending_amount,
+                    'due_date' => $row->due_date?->toDateString(),
+                ])
+                ->all();
+
             $oldValues = [
                 'course_fee' => (float) $feeStructure->course_fee,
                 'discount_amount' => (float) $feeStructure->discount_amount,
@@ -116,24 +171,48 @@ class FeeStructureService
                 'course_fee' => $courseFee,
                 'discount_amount' => $discount,
                 'net_fee' => $newNet,
-                'pending_amount' => round($newNet - $paid, 2),
+                'pending_amount' => $newPending,
             ]);
+
+            if ($reschedule && $newPending > 0) {
+                $this->installments->reschedulePendingInstallments($feeStructure, $installmentPlan);
+            } elseif ($reschedule) {
+                $feeStructure->installments()->where('pending_amount', '>', 0)->delete();
+            } else {
+                $feeStructure->refresh();
+                $this->installments->syncAfterFeeStructureChange($feeStructure);
+            }
+
+            $newInstallmentSnapshot = $feeStructure->fresh('installments')->installments
+                ->map(fn ($row): array => [
+                    'label' => $row->label,
+                    'amount' => (float) $row->amount,
+                    'paid' => (float) $row->paid_amount,
+                    'pending' => (float) $row->pending_amount,
+                    'due_date' => $row->due_date?->toDateString(),
+                ])
+                ->all();
 
             $this->audit->log(
                 action: 'fee_structure_changed',
                 auditable: $feeStructure,
-                oldValues: $oldValues,
+                oldValues: [
+                    ...$oldValues,
+                    'installments' => $oldInstallmentSnapshot,
+                ],
                 newValues: [
                     'course_fee' => $courseFee,
                     'discount_amount' => $discount,
                     'net_fee' => $newNet,
-                    'pending_amount' => round($newNet - $paid, 2),
+                    'pending_amount' => $newPending,
+                    'installments' => $newInstallmentSnapshot,
+                    'rescheduled_installments' => $reschedule,
                 ],
                 reason: $reason,
                 user: $admin,
             );
 
-            return $feeStructure->fresh();
+            return $feeStructure->fresh(['installments', 'miscCharges']);
         });
     }
 }

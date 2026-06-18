@@ -3,12 +3,14 @@
 namespace App\Filament\Resources\Courses;
 
 use App\Enums\CourseStatus;
-use App\Enums\CourseType;
+use App\Enums\ProgrammeCategory;
+use App\Support\InstituteProfile;
 use App\Enums\DurationType;
 use App\Filament\Resources\Courses\Pages\CreateCourse;
 use App\Filament\Resources\Courses\Pages\EditCourse;
 use App\Filament\Resources\Courses\Pages\ListCourses;
 use App\Models\Course;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -19,6 +21,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class CourseResource extends Resource
 {
@@ -36,31 +39,30 @@ class CourseResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    public static function getEloquentQuery(): Builder
+    {
+        return InstituteProfile::scopeCourses(parent::getEloquentQuery());
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Section::make('Course Details')
-                    ->description('Create any course — BSc, Diploma, Certificate, or fully custom.')
+                Section::make('Programme Details')
+                    ->description(fn (): string => 'Create '.strtolower(InstituteProfile::type()->programmeLabel()).'s for this '.strtolower(InstituteProfile::type()->label()).'.')
                     ->schema([
-                        Select::make('course_type')
-                            ->label('Course Type')
-                            ->options(collect(CourseType::cases())->mapWithKeys(
-                                fn (CourseType $type) => [$type->value => $type->label()],
-                            ))
-                            ->default(CourseType::Custom->value)
-                            ->required()
-                            ->native(false)
-                            ->live(),
+                        Hidden::make('programme_category')
+                            ->default(InstituteProfile::type()->primaryProgrammeCategory()->value)
+                            ->dehydrated(),
                         TextInput::make('name')
-                            ->label('Course Name')
-                            ->placeholder('e.g. Class 12 Science')
+                            ->label('Programme Name')
+                            ->placeholder('e.g. Class 12 Science, JEE Foundation, B.Com Year 2')
                             ->required()
                             ->maxLength(255)
                             ->columnSpanFull(),
                         TextInput::make('code')
                             ->label('Course Code')
-                            ->placeholder('e.g. BSC-HM-2Y')
+                            ->placeholder('e.g. SCH-12-SCI, COACH-JEE-1Y, COL-BCOM-2Y')
                             ->required()
                             ->unique(ignoreRecord: true)
                             ->maxLength(50)
@@ -115,10 +117,11 @@ class CourseResource extends Resource
                     ->label('Code')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('course_type')
-                    ->label('Type')
+                TextColumn::make('programme_category')
+                    ->label('Category')
                     ->badge()
-                    ->formatStateUsing(fn (CourseType $state): string => $state->label()),
+                    ->color(fn (ProgrammeCategory $state): string => $state->badgeColor())
+                    ->formatStateUsing(fn (ProgrammeCategory $state): string => $state->label()),
                 TextColumn::make('duration_label')
                     ->label('Duration'),
                 TextColumn::make('fee')
@@ -140,11 +143,6 @@ class CourseResource extends Resource
             ])
             ->defaultSort('name')
             ->filters([
-                SelectFilter::make('course_type')
-                    ->label('Type')
-                    ->options(collect(CourseType::cases())->mapWithKeys(
-                        fn (CourseType $type) => [$type->value => $type->label()],
-                    )),
                 SelectFilter::make('status')
                     ->options(collect(CourseStatus::cases())->mapWithKeys(
                         fn (CourseStatus $status) => [$status->value => $status->label()],

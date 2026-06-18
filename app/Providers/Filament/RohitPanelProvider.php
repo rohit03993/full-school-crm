@@ -7,6 +7,7 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use App\Filament\Pages\Dashboard;
+use App\Support\InstituteSettings;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -29,7 +30,8 @@ class RohitPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->brandName(config('institute.name', config('app.name')))
+            ->brandName(fn (): string => InstituteSettings::brandName())
+            ->brandLogo(fn (): ?string => InstituteSettings::panelLogoUrl())
             ->colors([
                 'primary' => Color::Amber,
             ]);

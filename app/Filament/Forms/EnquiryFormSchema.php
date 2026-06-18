@@ -12,6 +12,7 @@ use App\Enums\RoleName;
 use App\Models\Course;
 use App\Models\User;
 use App\Support\DefaultCourse;
+use App\Support\InstituteProfile;
 use Filament\Support\Icons\Heroicon;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
@@ -59,13 +60,13 @@ class EnquiryFormSchema
                     Select::make('meeting_for')
                         ->label('Meeting For')
                         ->options(self::meetingForOptions())
-                        ->default(MeetingFor::School->value)
+                        ->default(InstituteProfile::meetingFor()->value)
                         ->required()
                         ->native(false),
                     Select::make('course_id')
                         ->label('Course Interest')
                         ->placeholder('Not decided yet')
-                        ->options(fn () => Course::query()
+                        ->options(fn () => InstituteProfile::scopeCourses(Course::query())
                             ->active()
                             ->where('code', '!=', DefaultCourse::UNDECIDED_CODE)
                             ->orderBy('name')
@@ -137,13 +138,13 @@ class EnquiryFormSchema
             Select::make('meeting_for')
                 ->label('Meeting For')
                 ->options(self::meetingForOptions())
-                ->default(MeetingFor::School->value)
+                ->default(InstituteProfile::meetingFor()->value)
                 ->required()
                 ->native(false),
             Select::make('course_id')
                 ->label('Course Interest')
                 ->placeholder('Not decided yet')
-                ->options(fn () => Course::query()
+                ->options(fn () => InstituteProfile::scopeCourses(Course::query())
                     ->active()
                     ->where('code', '!=', DefaultCourse::UNDECIDED_CODE)
                     ->orderBy('name')
@@ -265,7 +266,7 @@ class EnquiryFormSchema
         return [
             Select::make('course_id')
                 ->label('Course Interest')
-                ->options(fn () => Course::query()->active()->orderBy('name')->pluck('name', 'id'))
+                ->options(fn () => InstituteProfile::scopeCourses(Course::query()->active()->orderBy('name'))->pluck('name', 'id'))
                 ->required()
                 ->searchable()
                 ->live()
@@ -309,7 +310,7 @@ class EnquiryFormSchema
                 ->native(false),
             Select::make('meeting_for')
                 ->options(self::meetingForOptions())
-                ->default(MeetingFor::School->value)
+                ->default(InstituteProfile::meetingFor()->value)
                 ->required()
                 ->native(false),
         ];
@@ -381,9 +382,7 @@ class EnquiryFormSchema
      */
     protected static function meetingForOptions(): array
     {
-        return collect(MeetingFor::cases())
-            ->mapWithKeys(fn (MeetingFor $meetingFor) => [$meetingFor->value => $meetingFor->label()])
-            ->all();
+        return InstituteProfile::meetingForOptions();
     }
 
     /**

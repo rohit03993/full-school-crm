@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Support\InstituteSettings;
+
 enum NumberSequenceType: string
 {
     case Enquiry = 'enquiry';
@@ -11,7 +13,7 @@ enum NumberSequenceType: string
 
     public function prefix(): string
     {
-        $base = (string) config('institute.number_prefix', 'CRM');
+        $base = InstituteSettings::numberPrefix();
 
         return match ($this) {
             self::Enquiry => "{$base}-ENQ",

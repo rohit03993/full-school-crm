@@ -2,11 +2,13 @@
 
 namespace App\Filament\Resources\Batches;
 
+use App\Enums\BatchShift;
 use App\Enums\BatchStatus;
 use App\Enums\RoleName;
 use App\Filament\Resources\Batches\Pages\CreateBatch;
 use App\Filament\Resources\Batches\Pages\EditBatch;
 use App\Filament\Resources\Batches\Pages\ListBatches;
+use App\Models\AcademicSession;
 use App\Models\Batch;
 use App\Models\Course;
 use App\Models\User;
@@ -42,23 +44,42 @@ class BatchResource extends Resource
         return $schema
             ->components([
                 Section::make('Batch Details')
+                    ->description('Class sections, coaching batches, or college groups — linked to a programme and academic session.')
                     ->schema([
+                        Select::make('academic_session_id')
+                            ->label('Academic Session')
+                            ->relationship('academicSession', 'name')
+                            ->getOptionLabelFromRecordUsing(fn (AcademicSession $record): string => $record->selectLabel())
+                            ->default(fn (): ?int => AcademicSession::current()?->id)
+                            ->searchable()
+                            ->preload()
+                            ->native(false),
                         TextInput::make('name')
                             ->label('Batch Name')
-                            ->placeholder('e.g. Front Office Batch A')
+                            ->placeholder('e.g. Class 12-A, JEE Batch 2026, B.Com Sem 2-B')
                             ->required()
-                            ->maxLength(255)
-                            ->columnSpanFull(),
+                            ->maxLength(255),
+                        TextInput::make('section')
+                            ->label('Section')
+                            ->placeholder('e.g. A, B, Morning')
+                            ->maxLength(50),
+                        Select::make('shift')
+                            ->label('Shift')
+                            ->options(collect(BatchShift::cases())->mapWithKeys(
+                                fn (BatchShift $shift) => [$shift->value => $shift->label()],
+                            ))
+                            ->native(false),
                         Select::make('course_id')
-                            ->label('Course')
+                            ->label('Programme')
                             ->relationship('course', 'name')
                             ->getOptionLabelFromRecordUsing(fn (Course $record): string => $record->admissionSelectLabel())
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->native(false),
+                            ->native(false)
+                            ->columnSpanFull(),
                         Select::make('trainer_user_id')
-                            ->label('Trainer')
+                            ->label('Faculty / Teacher')
                             ->options(fn (): array => User::query()
                                 ->where('is_active', true)
                                 ->whereHas('roles', fn ($query) => $query->whereIn('name', [
@@ -99,12 +120,24 @@ class BatchResource extends Resource
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('section')
+                    ->label('Section')
+                    ->placeholder('—')
+                    ->toggleable(),
+                TextColumn::make('shift')
+                    ->label('Shift')
+                    ->formatStateUsing(fn (?BatchShift $state): string => $state?->label() ?? '—')
+                    ->toggleable(),
+                TextColumn::make('academicSession.name')
+                    ->label('Session')
+                    ->placeholder('—')
+                    ->sortable(),
                 TextColumn::make('course.name')
-                    ->label('Course')
+                    ->label('Programme')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('trainer.name')
-                    ->label('Trainer')
+                    ->label('Faculty')
                     ->searchable(),
                 TextColumn::make('start_date')
                     ->label('Start')
@@ -128,8 +161,11 @@ class BatchResource extends Resource
             ])
             ->defaultSort('name')
             ->filters([
+                SelectFilter::make('academic_session_id')
+                    ->label('Session')
+                    ->relationship('academicSession', 'name'),
                 SelectFilter::make('course_id')
-                    ->label('Course')
+                    ->label('Programme')
                     ->relationship('course', 'name'),
                 SelectFilter::make('status')
                     ->options(collect(BatchStatus::cases())->mapWithKeys(

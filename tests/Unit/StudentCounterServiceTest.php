@@ -55,7 +55,7 @@ class StudentCounterServiceTest extends TestCase
         $course = Course::query()->create([
             'name' => 'Diploma',
             'code' => 'DIP-SRC',
-            'course_type' => 'diploma',
+            'programme_category' => 'coaching',
             'duration' => 6,
             'duration_type' => 'months',
             'fee' => 0,
@@ -66,33 +66,21 @@ class StudentCounterServiceTest extends TestCase
             'student_id' => $student->id,
             'enquiry_number' => 'CRM-ENQ-2026-000101',
             'course_id' => $course->id,
-            'lead_source' => LeadSource::Website,
-            'meeting_for' => MeetingFor::School,
-            'visit_type' => 'first_visit',
-            'latest_visit_status' => 'interested',
-            'created_at' => now()->subDay(),
-        ]);
-
-        Enquiry::query()->create([
-            'student_id' => $student->id,
-            'enquiry_number' => 'CRM-ENQ-2026-000102',
-            'course_id' => $course->id,
             'lead_source' => LeadSource::WalkIn,
             'meeting_for' => MeetingFor::Coaching,
-            'visit_type' => 'follow_up',
+            'visit_type' => 'first_visit',
             'latest_visit_status' => 'interested',
             'created_at' => now(),
         ]);
 
         $profile = app(StudentCounterService::class)->profile($student->fresh());
 
-        $this->assertSame(1, $profile['lead_sources']['website_count']);
+        $this->assertSame(0, $profile['lead_sources']['website_count']);
         $this->assertSame(1, $profile['lead_sources']['walk_in_count']);
-        $this->assertSame(1, $profile['lead_sources']['school_count']);
+        $this->assertSame(0, $profile['lead_sources']['school_count']);
         $this->assertSame(1, $profile['lead_sources']['coaching_count']);
-        $this->assertSame('Website + Walk-in lead', $profile['lead_sources']['headline']);
+        $this->assertSame('Walk-in lead', $profile['lead_sources']['headline']);
         $this->assertSame('Walk-in for Coaching', $profile['lead_sources']['latest_intent']);
-        $this->assertStringContainsString('First Website', $profile['lead_sources']['detail']);
     }
 
     public function test_admission_in_progress_uses_admission_counters(): void

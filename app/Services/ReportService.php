@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Enums\ActivityKind;
+use App\Models\ActivitySession;
 use App\Enums\AdmissionStatus;
 use App\Enums\AttendanceStatus;
 use App\Enums\BatchStatus;
@@ -16,6 +16,7 @@ use App\Models\AuditLog;
 use App\Models\Batch;
 use App\Models\Enquiry;
 use App\Models\FeeStructure;
+use App\Models\FeeInstallment;
 use App\Models\Payment;
 use App\Models\Student;
 use Illuminate\Support\Carbon;
@@ -33,7 +34,7 @@ class ReportService
      *     student_id?: ?int,
      *     lead_source?: ?string,
      *     user_id?: ?int,
-     *     activity_kind?: ?string,
+     *     activity_type_id?: ?int,
      * }  $filters
      * @return array{
      *     title: string,
@@ -53,9 +54,10 @@ class ReportService
             ReportType::AdmissionsByStaff => $this->admissionsByStaffReport($from, $to, $filters['user_id'] ?? null),
             ReportType::AttendanceByBatch => $this->attendanceByBatchReport($from, $to, $filters['batch_id'] ?? null),
             ReportType::AttendanceByStudent => $this->attendanceByStudentReport($from, $to, $filters['student_id'] ?? null),
-            ReportType::Activities => $this->activitiesReport($from, $to, $filters['activity_kind'] ?? null),
+            ReportType::Activities => $this->activitiesReport($from, $to, $filters['activity_type_id'] ?? null),
             ReportType::FeeCollection => $this->feeCollectionReport($from, $to),
             ReportType::PendingFees => $this->pendingFeesReport($filters['course_id'] ?? null, $filters['batch_id'] ?? null),
+            ReportType::OverdueInstallments => $this->overdueInstallmentsReport($filters['course_id'] ?? null, $filters['batch_id'] ?? null),
             ReportType::Discounts => $this->discountsReport($from, $to),
             ReportType::PaymentModes => $this->paymentModesReport($from, $to),
             ReportType::AuditLogs => $this->auditLogsReport($from, $to, $filters['user_id'] ?? null),
@@ -267,49 +269,44 @@ class ReportService
   /**
      * @return array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>}
      */
-    protected function activitiesReport(Carbon $from, Carbon $to, ?string $kind): array
+    protected function activitiesReport(Carbon $from, Carbon $to, int|string|null $activityTypeId): array
     {
         $query = ActivityAttendance::query()
             ->where('is_present', true)
-            ->with(['student', 'attendable']);
+            ->where('attendable_type', ActivitySession::class)
+            ->with(['student', 'attendable.activityType', 'attendable.batch']);
 
-        if ($kind) {
-            $activityKind = ActivityKind::tryFrom($kind);
-
-            if ($activityKind) {
-                $query->where('attendable_type', $activityKind->modelClass());
-            }
+        if ($activityTypeId) {
+            $query->whereHasMorph('attendable', [ActivitySession::class], function ($builder) use ($activityTypeId): void {
+                $builder->where('activity_type_id', (int) $activityTypeId);
+            });
         }
 
         $rows = $query->get()
             ->filter(function (ActivityAttendance $row) use ($from, $to): bool {
                 $activity = $row->attendable;
 
-                if (! $activity) {
+                if (! $activity instanceof ActivitySession) {
                     return false;
                 }
 
-                $date = match (true) {
-                    $activity instanceof \App\Models\PracticalSession => $activity->session_date,
-                    $activity instanceof \App\Models\IndustrialVisit => $activity->visit_date,
-                    $activity instanceof \App\Models\Seminar => $activity->seminar_date,
-                    default => null,
-                };
-
-                return $date && $date->between($from, $to);
+                return $activity->session_date->between($from, $to);
             })
             ->map(fn (ActivityAttendance $row): array => [
-                class_basename($row->attendable_type),
+                $row->attendable?->activityType?->name ?? '—',
                 $row->attendable?->displayTitle() ?? '—',
                 $row->student?->name ?? '—',
                 $row->student?->mobile ?? '—',
+                $row->marks_obtained !== null
+                    ? rtrim(rtrim(number_format((float) $row->marks_obtained, 2), '0'), '.')
+                    : ($row->grade ?? '—'),
             ])
             ->values()
             ->all();
 
         return [
             'title' => 'Activity participation · '.$from->format('d M Y').' – '.$to->format('d M Y'),
-            'columns' => ['Type', 'Activity', 'Student', 'Mobile'],
+            'columns' => ['Type', 'Activity', 'Student', 'Mobile', 'Marks / Grade'],
             'rows' => $rows,
         ];
     }
@@ -370,6 +367,55 @@ class ReportService
         return [
             'title' => 'Pending fees',
             'columns' => ['Student', 'Mobile', 'Course', 'Net (₹)', 'Paid (₹)', 'Pending (₹)'],
+            'rows' => $rows,
+        ];
+    }
+
+    /**
+     * @return array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>}
+     */
+    protected function overdueInstallmentsReport(?int $courseId, ?int $batchId): array
+    {
+        $query = FeeInstallment::query()
+            ->with('feeStructure.enrollment.student', 'feeStructure.enrollment.course')
+            ->where('pending_amount', '>', 0)
+            ->whereNotNull('due_date')
+            ->whereDate('due_date', '<', now()->toDateString());
+
+        if ($courseId) {
+            $query->whereHas('feeStructure.enrollment', fn ($q) => $q->where('course_id', $courseId));
+        }
+
+        if ($batchId) {
+            $query->whereHas(
+                'feeStructure.enrollment.student.activeBatchStudent',
+                fn ($q) => $q->where('batch_id', $batchId),
+            );
+        }
+
+        $rows = $query
+            ->orderBy('due_date')
+            ->get()
+            ->map(function (FeeInstallment $installment): array {
+                $student = $installment->feeStructure?->enrollment?->student;
+                $course = $installment->feeStructure?->enrollment?->course;
+                $daysOverdue = $installment->due_date?->diffInDays(now()) ?? 0;
+
+                return [
+                    $student?->name ?? '—',
+                    $student?->mobile ?? '—',
+                    $course?->name ?? '—',
+                    $installment->label,
+                    $installment->due_date?->format('d M Y') ?? '—',
+                    number_format((float) $installment->pending_amount, 2),
+                    (int) $daysOverdue,
+                ];
+            })
+            ->all();
+
+        return [
+            'title' => 'Overdue installments',
+            'columns' => ['Student', 'Mobile', 'Course', 'Installment', 'Due date', 'Pending (₹)', 'Days overdue'],
             'rows' => $rows,
         ];
     }

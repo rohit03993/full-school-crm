@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('crm:cleanup')->dailyAt('03:00');
+        $schedule->command('crm:process-late-fees')->dailyAt('00:30');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

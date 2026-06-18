@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Enums\ActivityKind;
 use App\Models\BatchStudent;
 use App\Services\ActivityAttendanceService;
 use Filament\Notifications\Notification;
@@ -18,8 +17,6 @@ class ActivityAttendancePage extends Page
 
     protected static ?string $title = 'Mark Activity Attendance';
 
-    public ?string $activityKind = null;
-
     public ?int $activityId = null;
 
     /**
@@ -27,7 +24,16 @@ class ActivityAttendancePage extends Page
      */
     public array $marks = [];
 
+    /**
+     * @var array<int, array{marks_obtained: ?string, grade: ?string, remarks: ?string}>
+     */
+    public array $scoreMarks = [];
+
     public bool $rosterLoaded = false;
+
+    public bool $supportsScoring = false;
+
+    public ?float $maxMarks = null;
 
     public ?string $activityTitle = null;
 
@@ -40,11 +46,9 @@ class ActivityAttendancePage extends Page
     {
         $this->roster = new Collection;
 
-        $kind = request()->query('kind');
         $id = request()->query('id');
 
-        if (is_string($kind) && filled($id)) {
-            $this->activityKind = $kind;
+        if (filled($id)) {
             $this->activityId = (int) $id;
             $this->loadRoster();
         }
@@ -52,21 +56,26 @@ class ActivityAttendancePage extends Page
 
     public function loadRoster(): void
     {
-        $kind = ActivityKind::tryFrom((string) $this->activityKind);
         $id = $this->activityId;
 
-        if (! $kind || ! $id) {
+        if (! $id) {
             $this->roster = new Collection;
             $this->marks = [];
+            $this->scoreMarks = [];
             $this->rosterLoaded = false;
             $this->activityTitle = null;
+            $this->supportsScoring = false;
+            $this->maxMarks = null;
 
             return;
         }
 
-        $activity = app(ActivityAttendanceService::class)->resolve($kind, $id);
+        $activity = app(ActivityAttendanceService::class)->resolve($id);
         $this->activityTitle = $activity->displayTitle();
         $this->rosterLoaded = true;
+        $this->supportsScoring = (bool) $activity->activityType?->supportsScoring();
+        $maxMarks = $activity->metadataValue('max_marks');
+        $this->maxMarks = filled($maxMarks) ? (float) $maxMarks : null;
 
         $this->roster = BatchStudent::query()
             ->where('batch_students.batch_id', $activity->batch_id)
@@ -78,11 +87,19 @@ class ActivityAttendancePage extends Page
             ->get();
 
         $existing = app(ActivityAttendanceService::class)->marksFor($activity);
+        $scores = app(ActivityAttendanceService::class)->scoresFor($activity);
 
         $this->marks = [];
+        $this->scoreMarks = [];
 
         foreach ($this->roster as $row) {
-            $this->marks[$row->student_id] = (bool) ($existing[$row->student_id] ?? false);
+            $studentId = $row->student_id;
+            $this->marks[$studentId] = (bool) ($existing[$studentId] ?? false);
+            $this->scoreMarks[$studentId] = [
+                'marks_obtained' => $scores[$studentId]['marks_obtained'] ?? null,
+                'grade' => $scores[$studentId]['grade'] ?? null,
+                'remarks' => $scores[$studentId]['remarks'] ?? null,
+            ];
         }
     }
 
@@ -95,17 +112,26 @@ class ActivityAttendancePage extends Page
 
     public function saveAttendance(ActivityAttendanceService $attendance): void
     {
-        $kind = ActivityKind::tryFrom((string) $this->activityKind);
         $id = $this->activityId;
 
-        if (! $kind || ! $id) {
+        if (! $id) {
             Notification::make()->title('Invalid activity')->warning()->send();
 
             return;
         }
 
-        $activity = $attendance->resolve($kind, $id);
-        $saved = $attendance->saveMarks($activity, $this->marks, Auth::user());
+        try {
+            $activity = $attendance->resolve($id);
+            $saved = $attendance->saveMarks($activity, $this->marks, Auth::user(), $this->scoreMarks);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not save')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Check marks and try again.')
+                ->danger()
+                ->send();
+
+            return;
+        }
 
         Notification::make()
             ->title('Attendance saved')
@@ -127,7 +153,10 @@ class ActivityAttendancePage extends Page
                     'rosterLoaded' => $this->rosterLoaded,
                     'roster' => $this->roster,
                     'marks' => $this->marks,
+                    'scoreMarks' => $this->scoreMarks,
                     'activityTitle' => $this->activityTitle,
+                    'supportsScoring' => $this->supportsScoring,
+                    'maxMarks' => $this->maxMarks,
                 ]),
         ]);
     }

@@ -115,7 +115,7 @@ class StudentPortalFinancialTest extends TestCase
         $course = Course::query()->create([
             'name' => 'Diploma Portal',
             'code' => 'DIP-PORT-'.$mobile,
-            'course_type' => 'diploma',
+            'programme_category' => 'coaching',
             'duration' => 6,
             'duration_type' => 'months',
             'fee' => 50000,

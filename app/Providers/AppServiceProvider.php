@@ -19,6 +19,7 @@ class AppServiceProvider extends ServiceProvider
             'layouts.public',
             'public.*',
             'components.public.*',
+            'portal.*',
         ], function ($view): void {
             $view->with('institute', SiteContent::institute());
         });

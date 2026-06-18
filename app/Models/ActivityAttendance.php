@@ -13,6 +13,9 @@ class ActivityAttendance extends Model
         'attendable_id',
         'student_id',
         'is_present',
+        'marks_obtained',
+        'grade',
+        'remarks',
         'marked_by_user_id',
     ];
 
@@ -20,6 +23,7 @@ class ActivityAttendance extends Model
     {
         return [
             'is_present' => 'boolean',
+            'marks_obtained' => 'decimal:2',
         ];
     }
 

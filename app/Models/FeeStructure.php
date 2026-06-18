@@ -48,4 +48,39 @@ class FeeStructure extends Model
     {
         return $this->hasMany(FeeStructureHistory::class);
     }
+
+    public function installments(): HasMany
+    {
+        return $this->hasMany(FeeInstallment::class)
+            ->orderByRaw('due_date IS NULL')
+            ->orderBy('due_date')
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
+    public function miscCharges(): HasMany
+    {
+        return $this->hasMany(FeeMiscCharge::class)->orderBy('sort_order');
+    }
+
+    public function penalties(): HasMany
+    {
+        return $this->hasMany(FeePenalty::class);
+    }
+
+    public function miscChargesTotal(): float
+    {
+        if ($this->relationLoaded('miscCharges')) {
+            return round((float) $this->miscCharges->sum('amount'), 2);
+        }
+
+        return round((float) $this->miscCharges()->sum('amount'), 2);
+    }
+
+    public function pendingPenaltiesTotal(): float
+    {
+        return round((float) $this->penalties()
+            ->where('status', \App\Enums\FeePenaltyStatus::Pending)
+            ->sum('penalty_amount'), 2);
+    }
 }

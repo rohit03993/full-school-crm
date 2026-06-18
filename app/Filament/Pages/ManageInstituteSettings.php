@@ -35,9 +35,9 @@ class ManageInstituteSettings extends Page
 
     protected static ?string $title = 'Institute Settings';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 4;
 
-    protected static string | UnitEnum | null $navigationGroup = 'Administration';
+    protected static string | UnitEnum | null $navigationGroup = 'Setup';
 
     /**
      * @var array<string, mixed>|null

@@ -3,26 +3,40 @@
 namespace App\Filament\Forms;
 
 use App\Enums\BatchStatus;
+use App\Models\ActivityType;
 use App\Models\Batch;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Utilities\Get;
 
 class ActivitySessionFormSchema
 {
     /**
      * @return array<int, \Filament\Forms\Components\Component>
      */
-    public static function fields(string $titleField, string $dateField, ?string $titlePlaceholder = null): array
+    public static function fields(): array
     {
         return [
-            TextInput::make($titleField)
+            Select::make('activity_type_id')
+                ->label('Activity type')
+                ->options(fn (): array => ActivityType::query()
+                    ->enabled()
+                    ->ordered()
+                    ->pluck('name', 'id')
+                    ->all())
+                ->required()
+                ->native(false)
+                ->live()
+                ->searchable(),
+            TextInput::make('title')
                 ->label('Title')
-                ->placeholder($titlePlaceholder ?? 'e.g. Front Office practical — customer handling')
+                ->placeholder('e.g. Unit Test — Mathematics')
                 ->required()
                 ->maxLength(255)
                 ->columnSpanFull(),
-            DatePicker::make($dateField)
+            DatePicker::make('session_date')
                 ->label('Date')
                 ->required()
                 ->native(false),
@@ -40,6 +54,40 @@ class ActivitySessionFormSchema
                 ->searchable()
                 ->required()
                 ->native(false),
+            ...self::dynamicMetadataFields(),
         ];
+    }
+
+    /**
+     * @return array<int, TextInput|Textarea>
+     */
+    protected static function dynamicMetadataFields(): array
+    {
+        $types = ActivityType::query()->enabled()->ordered()->get()->keyBy('id');
+
+        $fields = [];
+
+        foreach ($types as $type) {
+            foreach ($type->fields() as $field) {
+                $key = (string) $field['key'];
+                $component = match ($field['type'] ?? 'text') {
+                    'textarea' => Textarea::make("metadata.{$key}")
+                        ->label($field['label'])
+                        ->rows(2),
+                    'number' => TextInput::make("metadata.{$key}")
+                        ->label($field['label'])
+                        ->numeric(),
+                    default => TextInput::make("metadata.{$key}")
+                        ->label($field['label'])
+                        ->maxLength(255),
+                };
+
+                $fields[] = $component
+                    ->visible(fn (Get $get): bool => (int) $get('activity_type_id') === $type->id)
+                    ->columnSpanFull();
+            }
+        }
+
+        return $fields;
     }
 }

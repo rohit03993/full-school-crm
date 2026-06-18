@@ -1,6 +1,5 @@
 @php
-    $instituteName = config('institute.name', config('app.name'));
-    $initials = collect(preg_split('/\s+/', $institute['name'] ?? $instituteName))
+    $initials = collect(preg_split('/\s+/', $institute['name'] ?? 'School CRM'))
         ->filter()
         ->take(2)
         ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))

@@ -2,6 +2,8 @@
     $enrollment = $record->activeEnrollment;
     $course = $enrollment?->course;
     $fees = $enrollment?->feeStructure;
+    $miscCharges = $fees?->miscCharges ?? collect();
+    $pendingPenalties = $penalties->filter(fn ($p) => $p->status === \App\Enums\FeePenaltyStatus::Pending);
 @endphp
 
 <div wire:init="loadFeesTab">
@@ -37,6 +39,19 @@
                     <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Discount</dt>
                     <dd class="mt-0.5 font-semibold text-gray-950 dark:text-white">₹{{ number_format((float) $fees->discount_amount, 2) }}</dd>
                 </div>
+                @if ($miscCharges->isNotEmpty())
+                    <div class="sm:col-span-2 lg:col-span-3">
+                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Miscellaneous</dt>
+                        <dd class="mt-1 space-y-1">
+                            @foreach ($miscCharges as $charge)
+                                <div class="flex justify-between gap-4 text-sm">
+                                    <span>{{ $charge->label }}</span>
+                                    <span class="font-medium">₹{{ number_format((float) $charge->amount, 2) }}</span>
+                                </div>
+                            @endforeach
+                        </dd>
+                    </div>
+                @endif
                 <div>
                     <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Net fee</dt>
                     <dd class="mt-0.5 text-lg font-bold text-primary-600 dark:text-primary-400">₹{{ number_format((float) $fees->net_fee, 2) }}</dd>
@@ -51,6 +66,71 @@
                 </div>
             </dl>
         </div>
+
+        @if ($installments->isNotEmpty())
+            <div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+                <div class="border-b border-gray-100 px-4 py-3 dark:border-white/10 sm:px-6">
+                    <h3 class="text-base font-semibold text-gray-950 dark:text-white">Installment schedule</h3>
+                </div>
+                <div class="divide-y divide-gray-100 dark:divide-white/10">
+                    @foreach ($installments as $installment)
+                        @php
+                            $status = $installment->statusLabel();
+                            $statusClass = match ($status) {
+                                'Paid' => 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
+                                'Overdue' => 'bg-red-500/15 text-red-800 dark:text-red-300',
+                                'Partial' => 'bg-amber-500/15 text-amber-900 dark:text-amber-200',
+                                default => 'bg-gray-500/10 text-gray-700 dark:text-gray-300',
+                            };
+                        @endphp
+                        <div class="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                            <div>
+                                <p class="font-semibold text-gray-950 dark:text-white">{{ $installment->label }}</p>
+                                <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
+                                    Due {{ $installment->due_date?->format('d M Y') ?? 'On enrollment' }}
+                                    · Paid ₹{{ number_format((float) $installment->paid_amount, 2) }}
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <p class="text-sm font-semibold text-gray-950 dark:text-white">
+                                    ₹{{ number_format((float) $installment->pending_amount, 2) }} pending
+                                </p>
+                                <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $statusClass }}">
+                                    {{ $status }}
+                                </span>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        @if ($pendingPenalties->isNotEmpty())
+            <div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+                <div class="border-b border-gray-100 px-4 py-3 dark:border-white/10 sm:px-6">
+                    <h3 class="text-base font-semibold text-gray-950 dark:text-white">Late fees</h3>
+                </div>
+                <div class="divide-y divide-gray-100 dark:divide-white/10">
+                    @foreach ($pendingPenalties as $penalty)
+                        <div class="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                            <div>
+                                <p class="font-semibold text-red-700 dark:text-red-300">{{ $penalty->penalty_type->label() }}</p>
+                                <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
+                                    {{ $penalty->feeInstallment?->label ?? 'Installment' }}
+                                    · {{ $penalty->days_late }} day(s) late
+                                    · {{ $penalty->description }}
+                                </p>
+                            </div>
+                            <p class="text-lg font-bold text-red-700 dark:text-red-300">₹{{ number_format((float) $penalty->penalty_amount, 2) }}</p>
+                        </div>
+                    @endforeach
+                </div>
+                <p class="border-t border-gray-100 px-4 py-3 text-xs text-gray-500 dark:border-white/10 sm:px-6">
+                    Late fees are calculated daily after {{ config('fees.late_fee.grace_days') }} day grace period.
+                    Super Admin can waive from Institute Setup support flow (contact admin).
+                </p>
+            </div>
+        @endif
 
         @if ((float) $fees->pending_amount > 0)
             <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-950 dark:text-emerald-200 sm:px-5">
@@ -73,12 +153,16 @@
                                 <p class="font-mono text-sm font-bold text-primary-600 dark:text-primary-400">{{ $payment->receipt_number }}</p>
                                 <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
                                     {{ $payment->payment_date->format('d M Y') }} · {{ $payment->payment_mode->label() }}
+                                    @if ($payment->feeInstallment) · {{ $payment->feeInstallment->label }} @endif
                                     @if ($payment->voucher_number) · Voucher {{ $payment->voucher_number }} @endif
                                     @if ($payment->transaction_id) · Txn {{ $payment->transaction_id }} @endif
                                     @if ($payment->utr_number) · UTR {{ $payment->utr_number }} @endif
                                 </p>
                                 <p class="text-xs text-gray-400">
                                     Collected by {{ $payment->addedBy?->staffCollectorLabel() ?? 'Staff' }}
+                                    @if ($payment->shortfallSummary())
+                                        <span class="block text-amber-700 dark:text-amber-300">{{ $payment->shortfallSummary() }}</span>
+                                    @endif
                                 </p>
                             </div>
                             <div class="flex flex-wrap items-center justify-end gap-2">

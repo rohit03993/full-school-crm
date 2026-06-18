@@ -52,7 +52,7 @@ class StudentSearchServiceTest extends TestCase
         $course = Course::query()->create([
             'name' => 'Diploma',
             'code' => 'DIP-TEST',
-            'course_type' => 'diploma',
+            'programme_category' => 'coaching',
             'duration' => 6,
             'duration_type' => 'months',
             'fee' => 0,

@@ -6,12 +6,14 @@ enum MeetingFor: string
 {
     case School = 'school';
     case Coaching = 'coaching';
+    case College = 'college';
 
     public function label(): string
     {
         return match ($this) {
             self::School => 'School',
             self::Coaching => 'Coaching',
+            self::College => 'College',
         };
     }
 
@@ -20,6 +22,7 @@ enum MeetingFor: string
         return match ($this) {
             self::School => 'heroicon-m-building-library',
             self::Coaching => 'heroicon-m-academic-cap',
+            self::College => 'heroicon-m-building-office-2',
         };
     }
 
@@ -38,6 +41,11 @@ enum MeetingFor: string
                 'bg' => 'bg-violet-500/20',
                 'text' => 'text-violet-900 dark:text-violet-300',
                 'ring' => 'ring-violet-500/35',
+            ],
+            self::College => [
+                'bg' => 'bg-sky-500/20',
+                'text' => 'text-sky-900 dark:text-sky-300',
+                'ring' => 'ring-sky-500/35',
             ],
         };
     }

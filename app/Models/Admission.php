@@ -6,6 +6,7 @@ use App\Enums\AdmissionStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -26,6 +27,7 @@ class Admission extends Model
         'course_fee',
         'discount_amount',
         'net_fee',
+        'use_installment_plan',
         'status',
         'staff_remarks',
         'submitted_at',
@@ -43,6 +45,7 @@ class Admission extends Model
             'course_fee' => 'decimal:2',
             'discount_amount' => 'decimal:2',
             'net_fee' => 'decimal:2',
+            'use_installment_plan' => 'boolean',
             'submitted_at' => 'datetime',
             'approved_at' => 'datetime',
         ];
@@ -66,6 +69,29 @@ class Admission extends Model
     public function enrollment(): HasOne
     {
         return $this->hasOne(Enrollment::class);
+    }
+
+    public function miscFees(): HasMany
+    {
+        return $this->hasMany(AdmissionMiscFee::class)->orderBy('sort_order');
+    }
+
+    public function installmentPlans(): HasMany
+    {
+        return $this->hasMany(AdmissionInstallmentPlan::class)
+            ->orderByRaw('due_date IS NULL')
+            ->orderBy('due_date')
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
+    public function miscFeesTotal(): float
+    {
+        if ($this->relationLoaded('miscFees')) {
+            return round((float) $this->miscFees->sum('amount'), 2);
+        }
+
+        return round((float) $this->miscFees()->sum('amount'), 2);
     }
 
     public function documents(): MorphMany
@@ -92,9 +118,9 @@ class Admission extends Model
             && $this->course_fee !== null;
     }
 
-    public function calculatedNetFee(float $discountAmount): float
+    public function calculatedNetFee(float $discountAmount, float $miscFeesTotal = 0): float
     {
-        return max(0, (float) $this->course_fee - max(0, $discountAmount));
+        return max(0, (float) $this->course_fee - max(0, $discountAmount) + max(0, $miscFeesTotal));
     }
 
     public function hasReviewableSubmission(): bool

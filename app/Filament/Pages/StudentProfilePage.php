@@ -2,13 +2,14 @@
 
 namespace App\Filament\Pages;
 
-use App\Enums\ActivityKind;
 use App\Enums\BatchStatus;
 use App\Enums\LeadSource;
 use App\Models\ActivityAttendance;
+use App\Models\ActivityType;
 use App\Enums\RoleName;
 use App\Models\Attendance;
 use App\Models\Batch;
+use App\Filament\Forms\AdjustFeeStructureFormSchema;
 use App\Filament\Forms\AddPaymentFormSchema;
 use App\Filament\Forms\ConvertToAdmissionFormSchema;
 use App\Filament\Forms\EnquiryFormSchema;
@@ -16,23 +17,28 @@ use App\Filament\Forms\StudentProfileFormSchema;
 use App\Models\Admission;
 use App\Models\Document;
 use App\Models\Enquiry;
+use App\Models\FeePenalty;
 use App\Models\Payment;
 use App\Models\Student;
 use App\Models\Visit;
 use App\Services\ActivityAttendanceService;
+use App\Services\AdmissionFeePlanService;
 use App\Services\AdmissionService;
 use App\Services\AttendanceService;
 use App\Services\BatchService;
 use App\Services\ConvertToAdmissionPresenter;
 use App\Services\EnquiryService;
+use App\Services\FeeInstallmentService;
 use App\Services\FeeStructureService;
 use App\Services\IdCardService;
 use App\Services\PaymentService;
+use App\Services\PenaltyCalculationService;
 use App\Services\ReceiptService;
 use App\Services\StorageCleanupService;
 use App\Services\StudentCounterService;
 use App\Services\StudentUpdateService;
-use App\Services\VisitService;
+use App\Support\FeePlanCalculator;
+use App\Support\FeePlanSubmissionGuard;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -74,11 +80,10 @@ class StudentProfilePage extends Page
 
     public bool $attendanceTabLoaded = false;
 
-    public bool $practicalsTabLoaded = false;
-
-    public bool $industrialVisitsTabLoaded = false;
-
-    public bool $seminarsTabLoaded = false;
+    /**
+     * @var array<int, bool>
+     */
+    public array $activityTabLoaded = [];
 
     public bool $showIdCardPreview = false;
 
@@ -91,20 +96,10 @@ class StudentProfilePage extends Page
 
     public ?float $attendancePercentage = null;
 
-  /**
-     * @var Collection<int, ActivityAttendance>
+    /**
+     * @var array<int, Collection<int, ActivityAttendance>>
      */
-    public Collection $practicalRecords;
-
-  /**
-     * @var Collection<int, ActivityAttendance>
-     */
-    public Collection $industrialVisitRecords;
-
-  /**
-     * @var Collection<int, ActivityAttendance>
-     */
-    public Collection $seminarRecords;
+    public array $activityRecords = [];
 
   /**
      * @var Collection<int, Visit>
@@ -116,10 +111,15 @@ class StudentProfilePage extends Page
      */
     public Collection $documents;
 
-  /**
+    /**
      * @var Collection<int, Payment>
      */
     public Collection $payments;
+
+    /**
+     * @var Collection<int, \App\Models\FeeInstallment>
+     */
+    public Collection $installments;
 
     public ?Admission $activeAdmission = null;
 
@@ -136,6 +136,19 @@ class StudentProfilePage extends Page
     public ?string $graduationPercentage = null;
 
     public ?string $discountAmount = null;
+
+    public bool $useInstallmentPlan = false;
+
+    /** @var array<int, array{label: string, amount: string}> */
+    public array $miscFees = [];
+
+    /** @var array<int, array{label: string, amount: string, due_date: ?string}> */
+    public array $installmentPlan = [];
+
+    /**
+     * @var Collection<int, \App\Models\FeePenalty>
+     */
+    public Collection $penalties;
 
     public ?TemporaryUploadedFile $uploadPhoto = null;
 
@@ -160,17 +173,14 @@ class StudentProfilePage extends Page
         $this->visits = new Collection;
         $this->documents = new Collection;
         $this->payments = new Collection;
+        $this->installments = new Collection;
+        $this->penalties = new Collection;
         $this->attendanceRecords = new Collection;
-        $this->practicalRecords = new Collection;
-        $this->industrialVisitRecords = new Collection;
-        $this->seminarRecords = new Collection;
+        $this->activityRecords = [];
 
         $tab = request()->query('tab');
 
-        if (is_string($tab) && in_array($tab, [
-            'overview', 'visits', 'admission', 'documents', 'fees', 'receipts', 'attendance',
-            'practicals', 'industrial_visits', 'seminars',
-        ], true)) {
+        if (is_string($tab) && in_array($tab, $this->validProfileTabs(), true)) {
             $this->profileTab = $tab;
             $this->updatedProfileTab();
         }
@@ -198,6 +208,17 @@ class StudentProfilePage extends Page
 
     public function updatedProfileTab(): void
     {
+        if (str_starts_with($this->profileTab, 'activity_')) {
+            $slug = substr($this->profileTab, strlen('activity_'));
+            $type = ActivityType::query()->where('slug', $slug)->first();
+
+            if ($type) {
+                $this->loadActivityTab($type->id);
+            }
+
+            return;
+        }
+
         match ($this->profileTab) {
             'visits' => $this->loadVisitsTab(),
             'admission' => $this->loadAdmissionTab(),
@@ -205,11 +226,59 @@ class StudentProfilePage extends Page
             'fees' => $this->loadFeesTab(),
             'receipts' => $this->loadReceiptsTab(),
             'attendance' => $this->loadAttendanceTab(),
-            'practicals' => $this->loadPracticalsTab(),
-            'industrial_visits' => $this->loadIndustrialVisitsTab(),
-            'seminars' => $this->loadSeminarsTab(),
             default => null,
         };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function validProfileTabs(): array
+    {
+        $activityTabs = ActivityType::query()
+            ->enabled()
+            ->ordered()
+            ->pluck('slug')
+            ->map(fn (string $slug): string => 'activity_'.$slug)
+            ->all();
+
+        return array_merge([
+            'overview', 'visits', 'admission', 'documents', 'fees', 'receipts', 'attendance',
+        ], $activityTabs);
+    }
+
+    public function loadActivityTab(int $activityTypeId): void
+    {
+        if ($this->activityTabLoaded[$activityTypeId] ?? false) {
+            return;
+        }
+
+        $this->activityTabLoaded[$activityTypeId] = true;
+        $this->activityRecords[$activityTypeId] = app(ActivityAttendanceService::class)
+            ->presentRecordsForStudent($this->record, $activityTypeId);
+    }
+
+    /**
+     * @return array<string, Tab>
+     */
+    protected function buildActivityTabs(): array
+    {
+        $tabs = [];
+
+        foreach (ActivityType::query()->enabled()->ordered()->get() as $type) {
+            $tabs['activity_'.$type->slug] = Tab::make($type->name)
+                ->visible(fn (): bool => $this->record->activeEnrollment !== null)
+                ->schema([
+                    View::make('filament.pages.partials.student-profile-activities')
+                        ->viewData(fn (): array => [
+                            'activityType' => $type,
+                            'loaded' => $this->activityTabLoaded[$type->id] ?? false,
+                            'records' => $this->activityRecords[$type->id] ?? new Collection,
+                        ]),
+                ]);
+        }
+
+        return $tabs;
     }
 
     public function loadVisitsTab(): void
@@ -235,7 +304,7 @@ class StudentProfilePage extends Page
 
         $this->admissionTabLoaded = true;
         $this->activeAdmission = $this->record->admissions()
-            ->with(['student', 'enquiry.course', 'documents', 'enrollment'])
+            ->with(['student', 'enquiry.course', 'documents', 'enrollment', 'miscFees', 'installmentPlans'])
             ->latest()
             ->first();
 
@@ -247,18 +316,170 @@ class StudentProfilePage extends Page
             $this->graduation = $this->activeAdmission->graduation;
             $this->graduationPercentage = $this->activeAdmission->graduation_percentage;
             $this->discountAmount = (string) ($this->activeAdmission->discount_amount ?? 0);
+            $this->useInstallmentPlan = (bool) $this->activeAdmission->use_installment_plan;
+            $this->miscFees = $this->activeAdmission->miscFees->map(fn ($row): array => [
+                'label' => $row->label,
+                'amount' => (string) $row->amount,
+            ])->values()->all();
+            $this->installmentPlan = $this->activeAdmission->installmentPlans->map(fn ($row): array => [
+                'label' => $row->label,
+                'amount' => (string) $row->amount,
+                'due_date' => $row->due_date?->toDateString(),
+            ])->values()->all();
         }
+    }
+
+    public function addMiscFeeRow(): void
+    {
+        $this->miscFees[] = ['label' => '', 'amount' => ''];
+    }
+
+    public function removeMiscFeeRow(int $index): void
+    {
+        unset($this->miscFees[$index]);
+        $this->miscFees = array_values($this->miscFees);
+    }
+
+    public function addInstallmentRow(): void
+    {
+        $courseFee = (float) ($this->activeAdmission?->course_fee ?? 0);
+        $discount = max(0, (float) ($this->discountAmount ?? 0));
+        $miscTotal = FeePlanCalculator::sumAmounts($this->miscFees);
+        $netFee = max(0, $courseFee - $discount + $miscTotal);
+
+        $this->installmentPlan[] = FeePlanCalculator::newInstallmentRow(
+            $this->installmentPlan,
+            $netFee,
+            count($this->installmentPlan),
+        );
+    }
+
+    public function removeInstallmentRow(int $index): void
+    {
+        unset($this->installmentPlan[$index]);
+        $this->installmentPlan = FeePlanCalculator::sortAndRenumberInstallmentPlan(
+            array_values($this->installmentPlan),
+        );
+    }
+
+    public function updatedInstallmentPlan(mixed $value, ?string $key = null): void
+    {
+        $courseFee = (float) ($this->activeAdmission?->course_fee ?? 0);
+        $discount = max(0, (float) ($this->discountAmount ?? 0));
+        $miscTotal = FeePlanCalculator::sumAmounts($this->miscFees);
+        $netFee = max(0, $courseFee - $discount + $miscTotal);
+
+        if (is_string($key) && str_ends_with($key, '.due_date')) {
+            $this->installmentPlan = FeePlanCalculator::sortAndRenumberInstallmentPlan($this->installmentPlan);
+
+            return;
+        }
+
+        if (is_string($key) && str_ends_with($key, '.amount')) {
+            $this->installmentPlan = FeePlanCalculator::autoFillSingleEmptyRow($this->installmentPlan, $netFee);
+        }
+    }
+
+    public function suggestInstallmentPlan(): void
+    {
+        $courseFee = (float) ($this->activeAdmission?->course_fee ?? 0);
+        $discount = max(0, (float) ($this->discountAmount ?? 0));
+        $miscTotal = FeePlanCalculator::sumAmounts($this->miscFees);
+        $netFee = max(0, $courseFee - $discount + $miscTotal);
+
+        $this->installmentPlan = FeePlanCalculator::defaultTwoPartPlan($netFee);
+        $this->useInstallmentPlan = true;
+    }
+
+    public function fillInstallmentBalance(): void
+    {
+        $courseFee = (float) ($this->activeAdmission?->course_fee ?? 0);
+        $discount = max(0, (float) ($this->discountAmount ?? 0));
+        $miscTotal = FeePlanCalculator::sumAmounts($this->miscFees);
+        $netFee = max(0, $courseFee - $discount + $miscTotal);
+
+        if ($this->installmentPlan === []) {
+            $this->installmentPlan = [FeePlanCalculator::singleFullFeeRow($netFee)];
+
+            return;
+        }
+
+        $this->installmentPlan = FeePlanCalculator::fillBalanceOnLastRow($this->installmentPlan, $netFee);
+    }
+
+    public function updatedUseInstallmentPlan(bool $value): void
+    {
+        if (! $value) {
+            return;
+        }
+
+        $courseFee = (float) ($this->activeAdmission?->course_fee ?? 0);
+        $discount = max(0, (float) ($this->discountAmount ?? 0));
+        $miscTotal = FeePlanCalculator::sumAmounts($this->miscFees);
+        $netFee = max(0, $courseFee - $discount + $miscTotal);
+
+        if ($this->installmentPlan === [] && $netFee > 0) {
+            $this->installmentPlan = [FeePlanCalculator::singleFullFeeRow($netFee)];
+        }
+    }
+
+    public function getAdmissionInstallmentSummaryProperty(): string
+    {
+        $courseFee = (float) ($this->activeAdmission?->course_fee ?? 0);
+        $discount = max(0, (float) ($this->discountAmount ?? 0));
+        $miscTotal = FeePlanCalculator::sumAmounts($this->miscFees);
+        $netFee = max(0, $courseFee - $discount + $miscTotal);
+
+        return FeePlanCalculator::formatSummary($netFee, $this->installmentPlan);
+    }
+
+    public function getAdmissionInstallmentWarningProperty(): ?string
+    {
+        if (! $this->useInstallmentPlan) {
+            return null;
+        }
+
+        $courseFee = (float) ($this->activeAdmission?->course_fee ?? 0);
+        $discount = max(0, (float) ($this->discountAmount ?? 0));
+        $miscTotal = FeePlanCalculator::sumAmounts($this->miscFees);
+        $netFee = max(0, $courseFee - $discount + $miscTotal);
+
+        return FeePlanCalculator::unallocatedWarningMessage($netFee, $this->installmentPlan);
+    }
+
+    public function getCanSaveAdmissionFeePlanProperty(): bool
+    {
+        if (! $this->useInstallmentPlan) {
+            return true;
+        }
+
+        $courseFee = (float) ($this->activeAdmission?->course_fee ?? 0);
+        $discount = max(0, (float) ($this->discountAmount ?? 0));
+        $miscTotal = FeePlanCalculator::sumAmounts($this->miscFees);
+        $netFee = max(0, $courseFee - $discount + $miscTotal);
+
+        if ($netFee <= 0) {
+            return true;
+        }
+
+        return FeePlanCalculator::isFullyAllocated($netFee, $this->installmentPlan);
+    }
+
+    public function getAdmissionCourseFeeZeroProperty(): bool
+    {
+        return (float) ($this->activeAdmission?->course_fee ?? 0) <= 0;
     }
 
     public function getAdmissionNetFeeProperty(): string
     {
         $courseFee = (float) ($this->activeAdmission?->course_fee ?? 0);
         $discount = max(0, (float) ($this->discountAmount ?? 0));
+        $miscTotal = round(collect($this->miscFees)->sum(fn (array $row): float => (float) ($row['amount'] ?? 0)), 2);
 
-        return number_format(max(0, $courseFee - $discount), 2);
+        return number_format(max(0, $courseFee - $discount + $miscTotal), 2);
     }
 
-    public function saveAdmissionDiscount(AdmissionService $admissions): void
+    public function saveAdmissionFeePlan(AdmissionService $admissions): void
     {
         $this->loadAdmissionTab();
 
@@ -268,23 +489,38 @@ class StudentProfilePage extends Page
 
         $this->validate([
             'discountAmount' => ['required', 'numeric', 'min:0'],
+            'useInstallmentPlan' => ['boolean'],
+            'miscFees' => ['array'],
+            'miscFees.*.label' => ['nullable', 'string', 'max:100'],
+            'miscFees.*.amount' => ['nullable', 'numeric', 'min:0'],
+            'installmentPlan' => ['array'],
+            'installmentPlan.*.label' => ['nullable', 'string', 'max:100'],
+            'installmentPlan.*.amount' => ['nullable', 'numeric', 'min:0'],
+            'installmentPlan.*.due_date' => ['nullable', 'date'],
         ]);
 
         try {
-            $this->activeAdmission = $admissions->updateFees(
-                $this->activeAdmission,
-                (float) $this->discountAmount,
-                Auth::user(),
-            );
+            $this->activeAdmission = $admissions->updateFeePlan($this->activeAdmission, [
+                'discount_amount' => (float) $this->discountAmount,
+                'use_installment_plan' => $this->useInstallmentPlan,
+                'misc_fees' => $this->miscFees,
+                'installment_plan' => $this->useInstallmentPlan ? $this->installmentPlan : [],
+            ], Auth::user());
         } catch (ValidationException $exception) {
             throw $exception;
         }
 
         Notification::make()
-            ->title('Discount saved')
+            ->title('Fee plan saved')
             ->body('Net fee is now ₹'.$this->admissionNetFee.'.')
             ->success()
             ->send();
+    }
+
+    /** @deprecated Use saveAdmissionFeePlan */
+    public function saveAdmissionDiscount(AdmissionService $admissions): void
+    {
+        $this->saveAdmissionFeePlan($admissions);
     }
 
     public function loadDocumentsTab(): void
@@ -311,8 +547,42 @@ class StudentProfilePage extends Page
         }
 
         $this->feesTabLoaded = true;
-        $this->record->loadMissing(['activeEnrollment.course', 'activeEnrollment.feeStructure']);
+        $this->record->loadMissing([
+            'activeEnrollment.course',
+            'activeEnrollment.feeStructure.installments',
+            'activeEnrollment.feeStructure.miscCharges',
+            'activeEnrollment.feeStructure.penalties.feeInstallment',
+        ]);
+        $feeStructure = $this->record->activeEnrollment?->feeStructure;
+
+        if ($feeStructure) {
+            app(FeeInstallmentService::class)->syncInstallmentOrderAndLabels($feeStructure);
+            $feeStructure->unsetRelation('installments');
+            $feeStructure->load('installments');
+        }
+
+        $this->installments = $feeStructure?->installments ?? new Collection;
+        $this->penalties = $feeStructure?->penalties ?? new Collection;
         $this->loadPayments();
+    }
+
+    public function waivePenalty(int $penaltyId, string $reason, PenaltyCalculationService $penalties): void
+    {
+        abort_unless(Auth::user()?->hasRole(RoleName::SuperAdmin->value), 403);
+
+        $penalty = FeePenalty::query()
+            ->where('student_id', $this->record->id)
+            ->findOrFail($penaltyId);
+
+        $penalties->waive($penalty, Auth::user(), $reason);
+
+        $this->feesTabLoaded = false;
+        $this->loadFeesTab();
+
+        Notification::make()
+            ->title('Late fee waived')
+            ->success()
+            ->send();
     }
 
     public function loadReceiptsTab(): void
@@ -329,7 +599,7 @@ class StudentProfilePage extends Page
     {
         $this->payments = Payment::query()
             ->where('student_id', $this->record->id)
-            ->with(['addedBy.staffProfile', 'feeStructure.enrollment.course'])
+            ->with(['addedBy.staffProfile', 'feeStructure.enrollment.course', 'feeInstallment'])
             ->orderByDesc('payment_date')
             ->orderByDesc('id')
             ->limit(100)
@@ -362,39 +632,6 @@ class StudentProfilePage extends Page
             ->get();
 
         $this->attendancePercentage = app(AttendanceService::class)->percentageForStudent($this->record);
-    }
-
-    public function loadPracticalsTab(): void
-    {
-        if ($this->practicalsTabLoaded) {
-            return;
-        }
-
-        $this->practicalsTabLoaded = true;
-        $this->practicalRecords = app(ActivityAttendanceService::class)
-            ->presentRecordsForStudent($this->record, ActivityKind::Practical);
-    }
-
-    public function loadIndustrialVisitsTab(): void
-    {
-        if ($this->industrialVisitsTabLoaded) {
-            return;
-        }
-
-        $this->industrialVisitsTabLoaded = true;
-        $this->industrialVisitRecords = app(ActivityAttendanceService::class)
-            ->presentRecordsForStudent($this->record, ActivityKind::IndustrialVisit);
-    }
-
-    public function loadSeminarsTab(): void
-    {
-        if ($this->seminarsTabLoaded) {
-            return;
-        }
-
-        $this->seminarsTabLoaded = true;
-        $this->seminarRecords = app(ActivityAttendanceService::class)
-            ->presentRecordsForStudent($this->record, ActivityKind::Seminar);
     }
 
     public function openIdCardPreview(): void
@@ -680,6 +917,81 @@ class StudentProfilePage extends Page
 
                     return ConvertToAdmissionFormSchema::fields($convertible, $presenter);
                 })
+                ->extraModalFooterActions([
+                    Action::make('suggestInstallmentPlan')
+                        ->label('Suggest 50/50 plan')
+                        ->color('gray')
+                        ->action(function (Action $action): void {
+                            $livewire = $action->getLivewire();
+                            $mounted = $livewire->mountedActionsData[0] ?? [];
+
+                            if (! is_array($mounted)) {
+                                return;
+                            }
+
+                            $courseId = $mounted['course_id'] ?? null;
+                            $discount = max(0, (float) ($mounted['discount_amount'] ?? 0));
+                            $miscTotal = FeePlanCalculator::sumAmounts($mounted['misc_fees'] ?? []);
+
+                            if (! $courseId) {
+                                return;
+                            }
+
+                            $course = \App\Models\Course::query()->find($courseId);
+
+                            if (! $course) {
+                                return;
+                            }
+
+                            $net = round(max(0, (float) $course->fee - $discount + $miscTotal), 2);
+                            $livewire->mountedActionsData[0]['use_installment_plan'] = true;
+                            $livewire->mountedActionsData[0]['installment_plan'] = FeePlanCalculator::defaultTwoPartPlan($net);
+                        }),
+                    Action::make('fillInstallmentBalance')
+                        ->label('Fill balance on last row')
+                        ->color('gray')
+                        ->action(function (Action $action): void {
+                            $livewire = $action->getLivewire();
+                            $mounted = $livewire->mountedActionsData[0] ?? [];
+
+                            if (! is_array($mounted)) {
+                                return;
+                            }
+
+                            $courseId = $mounted['course_id'] ?? null;
+                            $discount = max(0, (float) ($mounted['discount_amount'] ?? 0));
+                            $miscTotal = FeePlanCalculator::sumAmounts($mounted['misc_fees'] ?? []);
+                            $plan = $mounted['installment_plan'] ?? [];
+
+                            if (! $courseId || $plan === []) {
+                                return;
+                            }
+
+                            $course = \App\Models\Course::query()->find($courseId);
+
+                            if (! $course) {
+                                return;
+                            }
+
+                            $net = round(max(0, (float) $course->fee - $discount + $miscTotal), 2);
+                            $livewire->mountedActionsData[0]['installment_plan'] = FeePlanCalculator::fillBalanceOnLastRow($plan, $net);
+                            $livewire->mountedActionsData[0]['use_installment_plan'] = true;
+                        }),
+                ])
+                ->modalSubmitAction(function (Action $action): Action {
+                    return $action->disabled(function (): bool {
+                        $mounted = $this->mountedActionsData[0] ?? [];
+
+                        if (! is_array($mounted)) {
+                            return true;
+                        }
+
+                        return ! FeePlanSubmissionGuard::canSubmitConvert($mounted);
+                    });
+                })
+                ->before(function (array $data, Action $action): void {
+                    FeePlanSubmissionGuard::assertConvertable($data, $action);
+                })
                 ->action(function (array $data, ConvertToAdmissionPresenter $presenter, AdmissionService $admissions): void {
                     $convertible = $presenter->convertibleEnquiries($this->record);
 
@@ -697,6 +1009,9 @@ class StudentProfilePage extends Page
                         [
                             'course_id' => (int) $data['course_id'],
                             'discount_amount' => $data['discount_amount'] ?? 0,
+                            'use_installment_plan' => $data['use_installment_plan'] ?? false,
+                            'misc_fees' => $data['misc_fees'] ?? [],
+                            'installment_plan' => $data['installment_plan'] ?? [],
                         ],
                     );
 
@@ -760,32 +1075,73 @@ class StudentProfilePage extends Page
                 ->icon('heroicon-o-calculator')
                 ->color('warning')
                 ->modalHeading('Adjust fee structure')
-                ->modalDescription('Admin only. Changes are recorded in fee history and audit log.')
-                ->fillForm(fn (): array => [
-                    'course_fee' => $this->record->activeEnrollment?->feeStructure?->course_fee,
-                    'discount_amount' => $this->record->activeEnrollment?->feeStructure?->discount_amount,
+                ->modalDescription('Admin only. Fee changes, installment reschedules, and reasons are stored in fee history and the audit log.')
+                ->fillForm(function (): array {
+                    $feeStructure = $this->record->activeEnrollment?->feeStructure;
+
+                    if (! $feeStructure) {
+                        return [];
+                    }
+
+                    return AdjustFeeStructureFormSchema::initialState($feeStructure);
+                })
+                ->form(function (): array {
+                    $feeStructure = $this->record->activeEnrollment?->feeStructure;
+
+                    if (! $feeStructure) {
+                        return [];
+                    }
+
+                    return AdjustFeeStructureFormSchema::fields($feeStructure);
+                })
+                ->extraModalFooterActions([
+                    Action::make('fillAdjustInstallmentBalance')
+                        ->label('Fill balance on last row')
+                        ->color('gray')
+                        ->action(function (Action $action): void {
+                            $livewire = $action->getLivewire();
+                            $mounted = $livewire->mountedActionsData[0] ?? [];
+                            $feeStructure = $livewire->record->activeEnrollment?->feeStructure;
+
+                            if (! is_array($mounted) || ! $feeStructure) {
+                                return;
+                            }
+
+                            $feeStructure->loadMissing('miscCharges');
+                            $miscTotal = $feeStructure->miscChargesTotal();
+                            $courseFee = max(0, (float) ($mounted['course_fee'] ?? $feeStructure->course_fee));
+                            $discount = max(0, (float) ($mounted['discount_amount'] ?? $feeStructure->discount_amount));
+                            $net = round($courseFee - $discount + $miscTotal, 2);
+                            $target = round(max(0, $net - (float) $feeStructure->paid_amount), 2);
+                            $plan = $mounted['installment_plan'] ?? [];
+
+                            if ($plan === []) {
+                                return;
+                            }
+
+                            $livewire->mountedActionsData[0]['installment_plan'] = FeePlanCalculator::fillBalanceOnLastRow($plan, $target);
+                            $livewire->mountedActionsData[0]['reschedule_installments'] = true;
+                        }),
                 ])
-                ->form([
-                    TextInput::make('course_fee')
-                        ->label('Course fee')
-                        ->numeric()
-                        ->prefix('₹')
-                        ->required()
-                        ->minValue(0)
-                        ->step(0.01),
-                    TextInput::make('discount_amount')
-                        ->label('Discount')
-                        ->numeric()
-                        ->prefix('₹')
-                        ->required()
-                        ->minValue(0)
-                        ->step(0.01),
-                    Textarea::make('reason')
-                        ->label('Reason for change')
-                        ->required()
-                        ->rows(3)
-                        ->maxLength(1000),
-                ])
+                ->modalSubmitAction(function (Action $action): Action {
+                    return $action->disabled(function (): bool {
+                        $mounted = $this->mountedActionsData[0] ?? [];
+                        $feeStructure = $this->record->activeEnrollment?->feeStructure;
+
+                        if (! is_array($mounted) || ! $feeStructure) {
+                            return false;
+                        }
+
+                        return ! FeePlanSubmissionGuard::canSubmitAdjustFees($mounted, $feeStructure);
+                    });
+                })
+                ->before(function (array $data, Action $action): void {
+                    $feeStructure = $this->record->activeEnrollment?->feeStructure;
+
+                    if ($feeStructure) {
+                        FeePlanSubmissionGuard::assertAdjustFees($data, $feeStructure, $action);
+                    }
+                })
                 ->action(function (array $data, FeeStructureService $fees): void {
                     $feeStructure = $this->record->activeEnrollment?->feeStructure;
 
@@ -936,7 +1292,7 @@ class StudentProfilePage extends Page
                 ]),
             Tabs::make('Student Profile')
                 ->livewireProperty('profileTab')
-                ->tabs([
+                ->tabs(array_merge([
                     'overview' => Tab::make('Overview')
                         ->schema([
                             View::make('filament.pages.partials.student-profile-overview')
@@ -976,9 +1332,15 @@ class StudentProfilePage extends Page
                         ->schema([
                             View::make('filament.pages.partials.student-profile-fees')
                                 ->viewData(fn (): array => [
-                                    'record' => $this->record->loadMissing(['activeEnrollment.course', 'activeEnrollment.feeStructure']),
+                                    'record' => $this->record->loadMissing([
+                                        'activeEnrollment.course',
+                                        'activeEnrollment.feeStructure.installments',
+                                        'activeEnrollment.feeStructure.miscCharges',
+                                    ]),
                                     'feesTabLoaded' => $this->feesTabLoaded,
                                     'payments' => $this->payments,
+                                    'installments' => $this->installments,
+                                    'penalties' => $this->penalties,
                                 ]),
                         ]),
                     'receipts' => Tab::make('Receipts')
@@ -1002,34 +1364,7 @@ class StudentProfilePage extends Page
                                     'attendancePercentage' => $this->attendancePercentage,
                                 ]),
                         ]),
-                    'practicals' => Tab::make('Practicals')
-                        ->visible(fn (): bool => $this->record->activeEnrollment !== null)
-                        ->schema([
-                            View::make('filament.pages.partials.student-profile-practicals')
-                                ->viewData(fn (): array => [
-                                    'practicalsTabLoaded' => $this->practicalsTabLoaded,
-                                    'practicalRecords' => $this->practicalRecords,
-                                ]),
-                        ]),
-                    'industrial_visits' => Tab::make('Industrial Visits')
-                        ->visible(fn (): bool => $this->record->activeEnrollment !== null)
-                        ->schema([
-                            View::make('filament.pages.partials.student-profile-industrial-visits')
-                                ->viewData(fn (): array => [
-                                    'industrialVisitsTabLoaded' => $this->industrialVisitsTabLoaded,
-                                    'industrialVisitRecords' => $this->industrialVisitRecords,
-                                ]),
-                        ]),
-                    'seminars' => Tab::make('Seminars')
-                        ->visible(fn (): bool => $this->record->activeEnrollment !== null)
-                        ->schema([
-                            View::make('filament.pages.partials.student-profile-seminars')
-                                ->viewData(fn (): array => [
-                                    'seminarsTabLoaded' => $this->seminarsTabLoaded,
-                                    'seminarRecords' => $this->seminarRecords,
-                                ]),
-                        ]),
-                ]),
+                ], $this->buildActivityTabs())),
         ]);
     }
 }

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Setting;
+use App\Enums\NumberSequenceType;
 use App\Services\InstituteSettingsService;
 use App\Support\InstituteSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,10 +32,18 @@ class InstituteSettingsTest extends TestCase
 
     public function test_document_branding_falls_back_to_site_name(): void
     {
-        Setting::setValue('site.name', 'Folks India Demo', 'general');
+        Setting::setValue('site.name', 'Demo Institute', 'general');
 
         InstituteSettings::clearCache();
 
-        $this->assertSame('Folks India Demo', InstituteSettings::forDocuments()['name']);
+        $this->assertSame('Demo Institute', InstituteSettings::forDocuments()['name']);
+    }
+
+    public function test_number_prefix_falls_back_to_config(): void
+    {
+        config(['institute.number_prefix' => 'DEMO']);
+
+        $this->assertSame('DEMO', InstituteSettings::numberPrefix());
+        $this->assertSame('DEMO-ENQ', NumberSequenceType::Enquiry->prefix());
     }
 }

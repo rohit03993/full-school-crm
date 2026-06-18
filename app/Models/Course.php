@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CourseStatus;
-use App\Enums\CourseType;
+use App\Enums\ProgrammeCategory;
 use App\Enums\DurationType;
 use App\Support\DefaultCourse;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,7 +16,7 @@ class Course extends Model
     protected $fillable = [
         'name',
         'code',
-        'course_type',
+        'programme_category',
         'duration',
         'duration_type',
         'fee',
@@ -27,7 +27,7 @@ class Course extends Model
     protected function casts(): array
     {
         return [
-            'course_type' => CourseType::class,
+            'programme_category' => ProgrammeCategory::class,
             'duration_type' => DurationType::class,
             'status' => CourseStatus::class,
             'fee' => 'decimal:2',
@@ -81,6 +81,11 @@ class Course extends Model
     public function enrollments(): HasMany
     {
         return $this->hasMany(Enrollment::class);
+    }
+
+    public function installmentTemplates(): HasMany
+    {
+        return $this->hasMany(CourseInstallmentTemplate::class)->orderBy('sort_order');
     }
 
     /**

@@ -16,6 +16,36 @@ class InstituteSettings
         Cache::forget(self::CACHE_KEY);
     }
 
+    public static function brandName(): string
+    {
+        return self::forDocuments()['name'];
+    }
+
+    public static function numberPrefix(): string
+    {
+        $raw = Setting::getValue('crm.number_prefix');
+
+        if (filled($raw) && is_string($raw)) {
+            $prefix = strtoupper(preg_replace('/[^A-Z0-9]/', '', $raw));
+
+            if ($prefix !== '') {
+                return $prefix;
+            }
+        }
+
+        $fallback = (string) config('institute.number_prefix', 'CRM');
+        $prefix = strtoupper(preg_replace('/[^A-Z0-9]/', '', $fallback));
+
+        return $prefix !== '' ? $prefix : 'CRM';
+    }
+
+    public static function panelLogoUrl(): ?string
+    {
+        $path = Setting::getValue('site.logo');
+
+        return SiteImageService::url($path);
+    }
+
     /**
      * Branding used on receipts, ID cards, and CRM PDF exports.
      *

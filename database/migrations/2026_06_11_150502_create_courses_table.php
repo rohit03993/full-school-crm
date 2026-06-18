@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('code')->unique();
-            $table->string('course_type')->default('custom');
+            $table->string('programme_category')->default('custom');
             $table->unsignedSmallInteger('duration');
             $table->string('duration_type');
             $table->decimal('fee', 10, 2)->default(0);
@@ -21,7 +21,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index('status');
-            $table->index('course_type');
+            $table->index('programme_category');
         });
     }
 

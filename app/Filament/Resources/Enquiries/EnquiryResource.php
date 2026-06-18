@@ -81,6 +81,7 @@ class EnquiryResource extends Resource
                     ->color(fn (MeetingFor $state): string => match ($state) {
                         MeetingFor::School => 'warning',
                         MeetingFor::Coaching => 'purple',
+                        MeetingFor::College => 'info',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (MeetingFor $state): string => $state->label())
@@ -121,6 +122,7 @@ class EnquiryResource extends Resource
                     ->options([
                         MeetingFor::School->value => MeetingFor::School->label(),
                         MeetingFor::Coaching->value => MeetingFor::Coaching->label(),
+                        MeetingFor::College->value => MeetingFor::College->label(),
                     ]),
                 Filter::make('created_at')
                     ->label('Date')

@@ -33,7 +33,7 @@ class CrmDashboardServiceTest extends TestCase
         $course = Course::query()->create([
             'name' => 'Diploma',
             'code' => 'DIP-DASH',
-            'course_type' => 'diploma',
+            'programme_category' => 'coaching',
             'duration' => 6,
             'duration_type' => 'months',
             'fee' => 50000,

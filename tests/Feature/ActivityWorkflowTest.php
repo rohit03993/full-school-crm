@@ -2,16 +2,16 @@
 
 namespace Tests\Feature;
 
-use App\Enums\ActivityKind;
 use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\Gender;
 use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
+use App\Models\ActivitySession;
+use App\Models\ActivityType;
 use App\Models\Batch;
 use App\Models\Course;
-use App\Models\PracticalSession;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\ActivityAttendanceService;
@@ -28,9 +28,11 @@ class ActivityWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_practical_attendance_records_present_participation(): void
+    public function test_activity_attendance_records_present_participation(): void
     {
         Storage::fake('local');
+
+        $this->seed(\Database\Seeders\ActivityTypeSeeder::class);
 
         $staff = $this->createStaffUser();
         $student = $this->createEnrolledStudent($staff);
@@ -46,10 +48,14 @@ class ActivityWorkflowTest extends TestCase
 
         app(BatchService::class)->assign($student, $batch, $staff);
 
-        $session = PracticalSession::query()->create([
-            'title' => 'Front Office — guest handling',
+        $examType = ActivityType::query()->where('slug', 'exam')->firstOrFail();
+
+        $session = ActivitySession::query()->create([
+            'activity_type_id' => $examType->id,
+            'title' => 'Unit Test — Mathematics',
             'batch_id' => $batch->id,
             'session_date' => '2026-06-10',
+            'metadata' => ['subject' => 'Mathematics', 'max_marks' => 100],
             'created_by_user_id' => $staff->id,
         ]);
 
@@ -57,10 +63,10 @@ class ActivityWorkflowTest extends TestCase
         $saved = $service->saveMarks($session, [$student->id => true], $staff);
 
         $this->assertSame(1, $saved);
-        $this->assertSame(1, $service->presentCountForStudent($student->fresh(), ActivityKind::Practical));
+        $this->assertSame(1, $service->presentCountForStudent($student->fresh(), $examType));
 
         $this->assertDatabaseHas('activity_attendances', [
-            'attendable_type' => PracticalSession::class,
+            'attendable_type' => ActivitySession::class,
             'attendable_id' => $session->id,
             'student_id' => $student->id,
             'is_present' => true,
@@ -90,9 +96,9 @@ class ActivityWorkflowTest extends TestCase
         ]);
 
         $course = Course::query()->create([
-            'name' => 'Diploma Activity',
+            'name' => 'Class 12 Science',
             'code' => 'DIP-ACT',
-            'course_type' => 'diploma',
+            'programme_category' => 'coaching',
             'duration' => 6,
             'duration_type' => 'months',
             'fee' => 50000,

@@ -213,7 +213,7 @@ class AdmissionWorkflowTest extends TestCase
         return Course::query()->create([
             'name' => 'Diploma Test',
             'code' => 'DIP-ADM',
-            'course_type' => 'diploma',
+            'programme_category' => 'coaching',
             'duration' => 6,
             'duration_type' => 'months',
             'fee' => 50000,

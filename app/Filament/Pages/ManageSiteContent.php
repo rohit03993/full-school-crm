@@ -82,6 +82,11 @@ class ManageSiteContent extends Page
                                     TextInput::make('name')->required()->maxLength(255),
                                     TextInput::make('tagline')->required()->maxLength(255),
                                     TextInput::make('established')->label('Established Year')->maxLength(10),
+                                    TextInput::make('number_prefix')
+                                        ->label('Record ID prefix')
+                                        ->maxLength(12)
+                                        ->placeholder('CRM')
+                                        ->helperText('Used for enquiry, admission, and enrollment numbers (e.g. CRM-ENQ-2026-000001). Letters and numbers only.'),
                                 ]),
                         ]),
                     Tab::make('Contact')

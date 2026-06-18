@@ -3,13 +3,13 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Student Portal — {{ config('institute.name', config('app.name')) }}</title>
+    <title>Student Portal — {{ $institute['name'] ?? config('app.name') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-navy-950 text-white">
     <div class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12">
         <div class="text-center">
-            <p class="text-sm font-semibold uppercase tracking-wider text-brand-400">{{ config('institute.name', config('app.name')) }}</p>
+            <p class="text-sm font-semibold uppercase tracking-wider text-brand-400">{{ $institute['name'] ?? config('app.name') }}</p>
             <h1 class="mt-2 font-display text-3xl font-bold">Student Portal</h1>
             <p class="mt-2 text-sm text-navy-200">Login with mobile + date of birth (DDMMYYYY)</p>
         </div>

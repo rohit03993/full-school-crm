@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PaymentMode;
+use App\Enums\PaymentShortfallAction;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,9 +11,11 @@ class Payment extends Model
 {
     protected $fillable = [
         'fee_structure_id',
+        'fee_installment_id',
         'student_id',
         'payment_date',
         'amount',
+        'shortfall_allocation',
         'payment_mode',
         'voucher_number',
         'transaction_id',
@@ -31,6 +34,7 @@ class Payment extends Model
         return [
             'payment_date' => 'date',
             'amount' => 'decimal:2',
+            'shortfall_allocation' => 'array',
             'payment_mode' => PaymentMode::class,
             'corrected_at' => 'datetime',
         ];
@@ -39,6 +43,11 @@ class Payment extends Model
     public function feeStructure(): BelongsTo
     {
         return $this->belongsTo(FeeStructure::class);
+    }
+
+    public function feeInstallment(): BelongsTo
+    {
+        return $this->belongsTo(FeeInstallment::class);
     }
 
     public function student(): BelongsTo
@@ -101,5 +110,24 @@ class Payment extends Model
     public function portalReceiptDownloadUrl(): string
     {
         return route('portal.receipts.download', $this);
+    }
+
+    public function shortfallSummary(): ?string
+    {
+        $allocation = $this->shortfall_allocation;
+
+        if (! is_array($allocation) || empty($allocation['amount'])) {
+            return null;
+        }
+
+        $amount = '₹'.number_format((float) $allocation['amount'], 2);
+        $target = $allocation['target_label'] ?? 'next installment';
+
+        return match ($allocation['action'] ?? null) {
+            PaymentShortfallAction::NewInstallment->value => "{$amount} balance scheduled as {$target}"
+                .(filled($allocation['target_due_date'] ?? null) ? ' · due '.date('d M Y', strtotime((string) $allocation['target_due_date'])) : ''),
+            PaymentShortfallAction::CarryForward->value => "{$amount} balance added to {$target}",
+            default => "{$amount} installment balance adjusted",
+        };
     }
 }

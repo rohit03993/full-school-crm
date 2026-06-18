@@ -19,7 +19,7 @@ class PublicEnquiryTest extends TestCase
         $course = Course::query()->create([
             'name' => 'Diploma in Computer Applications',
             'code' => 'TEST-DIP',
-            'course_type' => 'diploma',
+            'programme_category' => 'coaching',
             'duration' => 6,
             'duration_type' => 'months',
             'fee' => 0,
@@ -58,7 +58,7 @@ class PublicEnquiryTest extends TestCase
         $course = Course::query()->create([
             'name' => 'Class 12 Science',
             'code' => 'TEST-BSC',
-            'course_type' => 'bsc',
+            'programme_category' => 'school',
             'duration' => 3,
             'duration_type' => 'years',
             'fee' => 0,

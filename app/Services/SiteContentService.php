@@ -19,6 +19,48 @@ class SiteContentService
         'about_image' => 'site.about_image',
     ];
 
+    /**
+     * @return array<string, array{value: mixed, group: string}>
+     */
+    public function defaultSiteSettings(): array
+    {
+        return [
+            'site.name' => ['value' => config('institute.name'), 'group' => 'general'],
+            'site.tagline' => ['value' => config('institute.tagline'), 'group' => 'general'],
+            'site.phone' => ['value' => config('institute.phone'), 'group' => 'contact'],
+            'site.email' => ['value' => config('institute.email'), 'group' => 'contact'],
+            'site.whatsapp' => ['value' => config('institute.whatsapp'), 'group' => 'contact'],
+            'site.address' => ['value' => config('institute.address'), 'group' => 'contact'],
+            'site.city' => ['value' => config('institute.city'), 'group' => 'contact'],
+            'site.hours' => ['value' => config('institute.hours'), 'group' => 'contact'],
+            'site.established' => ['value' => config('institute.established'), 'group' => 'general'],
+            'site.hero_title' => ['value' => config('institute.hero.title'), 'group' => 'hero'],
+            'site.hero_subtitle' => ['value' => config('institute.hero.subtitle'), 'group' => 'hero'],
+            'site.about' => ['value' => config('institute.about'), 'group' => 'about'],
+            'site.highlights' => [
+                'value' => [
+                    ['value' => '15+', 'label' => 'Years of Excellence'],
+                    ['value' => '5000+', 'label' => 'Students Enrolled'],
+                    ['value' => '100%', 'label' => 'Dedicated Faculty'],
+                    ['value' => '10+', 'label' => 'Programme Options'],
+                ],
+                'group' => 'home',
+            ],
+            'crm.receipt_footer' => ['value' => config('institute.receipt_footer'), 'group' => 'crm'],
+            'crm.number_prefix' => ['value' => config('institute.number_prefix', 'CRM'), 'group' => 'crm'],
+        ];
+    }
+
+    public function syncDefaultsFromConfig(): void
+    {
+        foreach ($this->defaultSiteSettings() as $key => $meta) {
+            Setting::setValue($key, $meta['value'], $meta['group']);
+        }
+
+        SiteContent::clearCache();
+        InstituteSettings::clearCache();
+    }
+
     public function getFormData(): array
     {
         $g = fn (string $key, mixed $default = null) => Setting::getValue($key, $default);
@@ -26,6 +68,7 @@ class SiteContentService
         return [
             'name' => $g('site.name', config('institute.name')),
             'tagline' => $g('site.tagline', config('institute.tagline')),
+            'number_prefix' => $g('crm.number_prefix', config('institute.number_prefix', 'CRM')),
             'phone' => $g('site.phone', config('institute.phone')),
             'email' => $g('site.email', config('institute.email')),
             'whatsapp' => $g('site.whatsapp', config('institute.whatsapp')),
@@ -77,13 +120,18 @@ class SiteContentService
 
         Setting::setValue('site.name', $data['name'] ?? '', 'general');
         Setting::setValue('site.tagline', $data['tagline'] ?? '', 'general');
+        Setting::setValue('site.established', $data['established'] ?? '', 'general');
+        Setting::setValue(
+            'crm.number_prefix',
+            $this->normalizeNumberPrefix($data['number_prefix'] ?? null),
+            'crm',
+        );
         Setting::setValue('site.phone', $data['phone'] ?? '', 'contact');
         Setting::setValue('site.email', $data['email'] ?? '', 'contact');
         Setting::setValue('site.whatsapp', $data['whatsapp'] ?? '', 'contact');
         Setting::setValue('site.address', $data['address'] ?? '', 'contact');
         Setting::setValue('site.city', $data['city'] ?? '', 'contact');
         Setting::setValue('site.hours', $data['hours'] ?? '', 'contact');
-        Setting::setValue('site.established', $data['established'] ?? '', 'general');
         Setting::setValue('site.hero_title', $data['hero_title'] ?? '', 'hero');
         Setting::setValue('site.hero_subtitle', $data['hero_subtitle'] ?? '', 'hero');
         Setting::setValue('site.about', $data['about'] ?? '', 'about');
@@ -143,5 +191,16 @@ class SiteContentService
             ->when(count($keptIds) === 0, fn ($q) => $q)
             ->get()
             ->each->delete();
+    }
+
+    protected function normalizeNumberPrefix(mixed $value): string
+    {
+        $prefix = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) ($value ?? '')));
+
+        if ($prefix === '') {
+            $prefix = strtoupper((string) config('institute.number_prefix', 'CRM'));
+        }
+
+        return $prefix !== '' ? $prefix : 'CRM';
     }
 }

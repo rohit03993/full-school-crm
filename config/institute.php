@@ -8,6 +8,12 @@ return [
 
     'number_prefix' => env('INSTITUTE_NUMBER_PREFIX', 'CRM'),
 
+    /*
+    | Deployment profile — one per installation: school, coaching, or college.
+    | Super Admin can change this under Setup → Institute Setup (saved in DB).
+    */
+    'type' => env('INSTITUTE_TYPE', 'school'),
+
     'hero' => [
         'title' => env('INSTITUTE_HERO_TITLE', 'Quality Education for Every Student'),
         'subtitle' => env('INSTITUTE_HERO_SUBTITLE', 'Manage admissions, fees, batches, and attendance — built for schools and coaching institutes. Start your learning journey with us.'),

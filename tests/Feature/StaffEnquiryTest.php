@@ -111,7 +111,7 @@ class StaffEnquiryTest extends TestCase
         return Course::query()->create([
             'name' => $name,
             'code' => $code,
-            'course_type' => 'diploma',
+            'programme_category' => 'coaching',
             'duration' => 6,
             'duration_type' => 'months',
             'fee' => 50000,

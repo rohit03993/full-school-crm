@@ -2,7 +2,7 @@
 
 namespace App\Filament\Pages;
 
-use App\Enums\ActivityKind;
+use App\Models\ActivityType;
 use App\Enums\LeadSource;
 use App\Enums\ReportType;
 use App\Models\Batch;
@@ -172,11 +172,9 @@ class ReportsPage extends Page
                     ->options(fn (): array => User::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id')->all())
                     ->searchable()
                     ->native(false),
-                Select::make('activity_kind')
+                Select::make('activity_type_id')
                     ->label('Activity type')
-                    ->options(collect(ActivityKind::cases())->mapWithKeys(
-                        fn (ActivityKind $kind) => [$kind->value => $kind->label()],
-                    ))
+                    ->options(fn (): array => ActivityType::query()->enabled()->ordered()->pluck('name', 'id')->all())
                     ->native(false),
             ]);
     }

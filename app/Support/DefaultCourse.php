@@ -3,7 +3,7 @@
 namespace App\Support;
 
 use App\Enums\CourseStatus;
-use App\Enums\CourseType;
+use App\Enums\ProgrammeCategory;
 use App\Enums\DurationType;
 use App\Models\Course;
 
@@ -17,7 +17,7 @@ class DefaultCourse
             ['code' => self::UNDECIDED_CODE],
             [
                 'name' => 'Course Not Decided',
-                'course_type' => CourseType::Custom,
+                'programme_category' => ProgrammeCategory::Custom,
                 'duration' => 1,
                 'duration_type' => DurationType::Months,
                 'fee' => 0,

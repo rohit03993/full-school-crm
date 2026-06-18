@@ -52,6 +52,32 @@ class FeeStructureHistoryTest extends TestCase
         $this->assertSame(1, FeeStructureHistory::query()->count());
     }
 
+    public function test_admin_can_reschedule_remaining_installments_after_fee_change(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->createAdminUser();
+        $staff = $this->createStaffUser();
+        $student = $this->createEnrolledStudent($staff);
+        $feeStructure = $student->activeEnrollment->feeStructure;
+
+        $updated = app(FeeStructureService::class)->updateByAdmin($feeStructure, [
+            'course_fee' => 50000,
+            'discount_amount' => 10000,
+            'reason' => 'Revised scholarship and installment plan',
+            'reschedule_installments' => true,
+            'installment_plan' => [
+                ['label' => 'Term 1', 'amount' => 20000, 'due_date' => now()->addMonth()->toDateString()],
+                ['label' => 'Term 2', 'amount' => 20000, 'due_date' => now()->addMonths(2)->toDateString()],
+            ],
+        ], $admin);
+
+        $this->assertSame(40000.0, (float) $updated->net_fee);
+        $this->assertSame(40000.0, (float) $updated->pending_amount);
+        $this->assertCount(2, $updated->installments);
+        $this->assertSame(20000.0, (float) $updated->installments->first()->pending_amount);
+    }
+
     protected function createStaffUser(): User
     {
         Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);
@@ -87,7 +113,7 @@ class FeeStructureHistoryTest extends TestCase
         $course = Course::query()->create([
             'name' => 'Diploma Fee Hist',
             'code' => 'DIP-FH',
-            'course_type' => 'diploma',
+            'programme_category' => 'coaching',
             'duration' => 6,
             'duration_type' => 'months',
             'fee' => 50000,
