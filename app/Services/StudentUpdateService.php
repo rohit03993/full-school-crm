@@ -11,6 +11,8 @@ class StudentUpdateService
     public function __construct(
         protected StudentAuthService $studentAuth,
         protected AuditService $audit,
+        protected StudentMobileService $mobiles,
+        protected CustomFieldService $customFields,
     ) {}
 
     /**
@@ -19,11 +21,18 @@ class StudentUpdateService
     public function update(Student $student, array $data, ?User $staff = null): Student
     {
         return DB::transaction(function () use ($student, $data, $staff): Student {
+            $phones = $this->mobiles->validateForUpdate(
+                $student,
+                (string) ($data['mobile'] ?? $student->mobile),
+                $data['alternate_mobile'] ?? null,
+            );
+
             $oldValues = $student->only([
                 'name',
                 'father_name',
                 'date_of_birth',
                 'gender',
+                'mobile',
                 'alternate_mobile',
                 'email',
                 'address',
@@ -38,7 +47,8 @@ class StudentUpdateService
                 'father_name' => $data['father_name'] ?? null,
                 'date_of_birth' => $data['date_of_birth'] ?? null,
                 'gender' => $data['gender'] ?? null,
-                'alternate_mobile' => $data['alternate_mobile'] ?? null,
+                'mobile' => $phones['mobile'],
+                'alternate_mobile' => $phones['alternate_mobile'],
                 'email' => $data['email'] ?? null,
                 'address' => $data['address'] ?? null,
                 'city' => $data['city'] ?? null,
@@ -47,11 +57,10 @@ class StudentUpdateService
                 'category' => $data['category'] ?? $student->category?->value ?? 'general',
             ];
 
-            if (filled($data['date_of_birth'] ?? null)) {
-                $attributes['portal_password'] = $this->studentAuth->hashPortalPassword(
-                    $this->studentAuth->formatDobPassword(
-                        \Carbon\Carbon::parse($data['date_of_birth']),
-                    ),
+            if (array_key_exists('custom_data', $data)) {
+                $attributes['custom_data'] = $this->customFields->validateForEntity(
+                    CustomFieldService::ENTITY_STUDENT,
+                    is_array($data['custom_data']) ? $data['custom_data'] : [],
                 );
             }
 

@@ -85,4 +85,17 @@ class FeePlanCalculatorTest extends TestCase
 
         $this->assertSame($rows, $filled);
     }
+
+    public function test_fill_balance_on_last_row_works_with_string_repeater_keys(): void
+    {
+        $rows = [
+            'a1b2c3d4' => ['label' => 'Installment 1', 'amount' => '15000'],
+            'e5f6g7h8' => ['label' => 'Installment 2', 'amount' => '95000'],
+        ];
+
+        $filled = FeePlanCalculator::fillBalanceOnLastRow($rows, 100000);
+
+        $this->assertSame('15000', $filled['a1b2c3d4']['amount']);
+        $this->assertSame('85000', $filled['e5f6g7h8']['amount']);
+    }
 }

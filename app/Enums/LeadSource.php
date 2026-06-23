@@ -13,6 +13,7 @@ enum LeadSource: string
     case Seminar = 'seminar';
     case Banner = 'banner';
     case Newspaper = 'newspaper';
+    case BulkImport = 'bulk_import';
     case Other = 'other';
 
     public function label(): string
@@ -27,6 +28,7 @@ enum LeadSource: string
             self::Seminar => 'Seminar',
             self::Banner => 'Banner',
             self::Newspaper => 'Newspaper',
+            self::BulkImport => 'Bulk Import',
             self::Other => 'Other',
         };
     }

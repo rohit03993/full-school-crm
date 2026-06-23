@@ -8,6 +8,7 @@ use App\Models\Batch;
 use App\Models\BatchStudent;
 use App\Models\Student;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -122,6 +123,34 @@ class AttendanceService
             ->whereDate('attendance_date', $date)
             ->get()
             ->mapWithKeys(fn (Attendance $row): array => [$row->student_id => $row->status->value])
+            ->all();
+    }
+
+    /**
+     * @return list<array{date: string, label: string, present: int, absent: int, leave: int, total: int}>
+     */
+    public function markedDateSummariesForBatch(Batch $batch, int $limit = 30): array
+    {
+        $rows = Attendance::query()
+            ->where('batch_id', $batch->id)
+            ->orderByDesc('attendance_date')
+            ->get()
+            ->groupBy(fn (Attendance $row): string => $row->attendance_date->toDateString());
+
+        return $rows
+            ->map(function ($group, string $date): array {
+                return [
+                    'date' => $date,
+                    'label' => Carbon::parse($date)->format('d M Y'),
+                    'present' => $group->where('status', AttendanceStatus::Present)->count(),
+                    'absent' => $group->where('status', AttendanceStatus::Absent)->count(),
+                    'leave' => $group->where('status', AttendanceStatus::Leave)->count(),
+                    'total' => $group->count(),
+                ];
+            })
+            ->sortByDesc('date')
+            ->take($limit)
+            ->values()
             ->all();
     }
 }

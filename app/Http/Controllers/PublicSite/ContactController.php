@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePublicEnquiryRequest;
 use App\Models\Course;
 use App\Services\EnquiryService;
+use App\Support\InstituteProfile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -13,8 +14,7 @@ class ContactController extends Controller
 {
     public function __invoke(): View
     {
-        $courses = Course::query()
-            ->active()
+        $courses = InstituteProfile::publicCoursesQuery(Course::query())
             ->orderBy('name')
             ->orderBy('duration')
             ->get();

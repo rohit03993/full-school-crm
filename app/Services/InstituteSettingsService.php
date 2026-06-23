@@ -8,6 +8,10 @@ use App\Support\SiteContent;
 
 class InstituteSettingsService
 {
+    public function __construct(
+        protected StudentAuthService $studentAuth,
+    ) {}
+
     public function getFormData(): array
     {
         $g = fn (string $key, mixed $default = null) => Setting::getValue($key, $default);
@@ -21,6 +25,7 @@ class InstituteSettingsService
             'receipt_logo' => $g('crm.receipt_logo') ?: $g('site.logo'),
             'receipt_header' => $g('crm.receipt_header', ''),
             'receipt_footer' => $g('crm.receipt_footer', config('institute.receipt_footer')),
+            'portal_shared_password' => '',
         ];
     }
 
@@ -30,6 +35,20 @@ class InstituteSettingsService
 
         Setting::setValue('crm.receipt_header', $data['receipt_header'] ?? '', 'crm');
         Setting::setValue('crm.receipt_footer', $data['receipt_footer'] ?? '', 'crm');
+
+        Setting::setValue('portal.login_mode', StudentAuthService::LOGIN_MODE_SHARED, 'portal');
+
+        $sharedPlain = trim((string) ($data['portal_shared_password'] ?? ''));
+
+        if ($sharedPlain !== '') {
+            Setting::setValue(
+                'portal.shared_password_hash',
+                $this->studentAuth->hashPortalPassword($sharedPlain),
+                'portal',
+            );
+        } else {
+            $this->studentAuth->sharedPortalPasswordHash();
+        }
 
         InstituteSettings::clearCache();
         SiteContent::clearCache();

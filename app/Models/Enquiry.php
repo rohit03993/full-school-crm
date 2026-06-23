@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\LeadSource;
-use App\Enums\MeetingFor;
 use App\Enums\VisitStatus;
 use App\Enums\VisitType;
 use Illuminate\Database\Eloquent\Model;
@@ -22,19 +21,23 @@ class Enquiry extends Model
         'course_id',
         'lead_source',
         'meeting_with_user_id',
+        'calling_assigned_at',
+        'calling_assigned_by_user_id',
         'meeting_for',
         'visit_type',
         'follow_up_reason',
         'latest_visit_status',
+        'custom_data',
     ];
 
     protected function casts(): array
     {
         return [
             'lead_source' => LeadSource::class,
-            'meeting_for' => MeetingFor::class,
             'visit_type' => VisitType::class,
             'latest_visit_status' => VisitStatus::class,
+            'calling_assigned_at' => 'datetime',
+            'custom_data' => 'array',
         ];
     }
 
@@ -51,6 +54,11 @@ class Enquiry extends Model
     public function meetingWith(): BelongsTo
     {
         return $this->belongsTo(User::class, 'meeting_with_user_id');
+    }
+
+    public function callingAssignedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'calling_assigned_by_user_id');
     }
 
     public function visits(): HasMany

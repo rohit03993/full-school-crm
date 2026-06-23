@@ -17,6 +17,7 @@ class Admission extends Model
     protected $fillable = [
         'student_id',
         'enquiry_id',
+        'import_batch_id',
         'admission_number',
         'tenth_board',
         'tenth_percentage',
@@ -26,6 +27,7 @@ class Admission extends Model
         'graduation_percentage',
         'course_fee',
         'discount_amount',
+        'discount_set_by_user_id',
         'net_fee',
         'use_installment_plan',
         'status',
@@ -61,9 +63,19 @@ class Admission extends Model
         return $this->belongsTo(Enquiry::class);
     }
 
+    public function importBatch(): BelongsTo
+    {
+        return $this->belongsTo(StudentImportBatch::class, 'import_batch_id');
+    }
+
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by_user_id');
+    }
+
+    public function discountSetBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'discount_set_by_user_id');
     }
 
     public function enrollment(): HasOne
@@ -83,6 +95,11 @@ class Admission extends Model
             ->orderBy('due_date')
             ->orderBy('sort_order')
             ->orderBy('id');
+    }
+
+    public function discountEntries(): HasMany
+    {
+        return $this->hasMany(FeeDiscountEntry::class)->orderBy('created_at');
     }
 
     public function miscFeesTotal(): float
@@ -125,13 +142,17 @@ class Admission extends Model
 
     public function hasReviewableSubmission(): bool
     {
-        return $this->submitted_at !== null
-            || filled($this->tenth_board)
-            || filled($this->twelfth_board)
-            || filled($this->graduation)
-            || $this->relationLoaded('documents')
-                ? $this->documents->isNotEmpty()
-                : $this->documents()->exists();
+        if ($this->submitted_at !== null) {
+            return true;
+        }
+
+        if (filled($this->tenth_board) || filled($this->twelfth_board) || filled($this->graduation)) {
+            return true;
+        }
+
+        return $this->relationLoaded('documents')
+            ? $this->documents->isNotEmpty()
+            : $this->documents()->exists();
     }
 
     public function documentForType(\App\Enums\DocumentType $type): ?Document

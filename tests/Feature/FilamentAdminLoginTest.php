@@ -3,23 +3,33 @@
 namespace Tests\Feature;
 
 use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
+use App\Models\Setting;
+use App\Models\Student;
 use App\Models\User;
+use App\Services\CrmPermissionSyncService;
+use App\Services\StudentAuthService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class FilamentAdminLoginTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_super_admin_can_authenticate_via_filament_login(): void
+    protected function setUp(): void
     {
-        Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);
+        parent::setUp();
 
+        app(CrmPermissionSyncService::class)->sync();
+    }
+
+    public function test_super_admin_can_authenticate_with_mobile(): void
+    {
         $user = User::factory()->create([
-            'email' => 'admin@test.com',
+            'email' => null,
+            'mobile' => '9811000001',
             'password' => 'password',
             'is_active' => true,
         ]);
@@ -27,9 +37,9 @@ class FilamentAdminLoginTest extends TestCase
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        Livewire::test(\Filament\Auth\Pages\Login::class)
+        Livewire::test(\App\Filament\Auth\Login::class)
             ->fillForm([
-                'email' => 'admin@test.com',
+                'login' => '9811000001',
                 'password' => 'password',
             ])
             ->call('authenticate')
@@ -38,22 +48,69 @@ class FilamentAdminLoginTest extends TestCase
         $this->assertAuthenticatedAs($user);
     }
 
-    public function test_user_without_role_cannot_authenticate(): void
+    public function test_staff_can_authenticate_with_mobile(): void
+    {
+        $user = User::factory()->create([
+            'email' => null,
+            'mobile' => '9811000002',
+            'password' => 'password',
+            'is_active' => true,
+        ]);
+        $user->assignRole(StaffJobRole::Counsellor->value);
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(\App\Filament\Auth\Login::class)
+            ->fillForm([
+                'login' => '9811000002',
+                'password' => 'password',
+            ])
+            ->call('authenticate')
+            ->assertHasNoErrors();
+
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_staff_can_authenticate_with_country_code_mobile(): void
+    {
+        $user = User::factory()->create([
+            'email' => null,
+            'mobile' => '9811000003',
+            'password' => 'password',
+            'is_active' => true,
+        ]);
+        $user->assignRole(StaffJobRole::Counsellor->value);
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(\App\Filament\Auth\Login::class)
+            ->fillForm([
+                'login' => '+91 9811000003',
+                'password' => 'password',
+            ])
+            ->call('authenticate')
+            ->assertHasNoErrors();
+
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_user_without_panel_access_cannot_authenticate(): void
     {
         User::factory()->create([
-            'email' => 'nostaff@test.com',
+            'email' => null,
+            'mobile' => '9811000099',
             'password' => 'password',
             'is_active' => true,
         ]);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        Livewire::test(\Filament\Auth\Pages\Login::class)
+        Livewire::test(\App\Filament\Auth\Login::class)
             ->fillForm([
-                'email' => 'nostaff@test.com',
+                'login' => '9811000099',
                 'password' => 'password',
             ])
             ->call('authenticate')
-            ->assertHasErrors(['data.email']);
+            ->assertHasErrors(['data.login']);
     }
 }

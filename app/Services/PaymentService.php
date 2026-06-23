@@ -9,6 +9,7 @@ use App\Models\FeeStructure;
 use App\Models\Payment;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\CrmCacheInvalidator;
 use App\Support\FeePaymentPolicy;
 use App\Support\PaymentShortfallHelper;
 use Illuminate\Http\UploadedFile;
@@ -27,6 +28,7 @@ class PaymentService
         protected ReceiptService $receipts,
         protected IdCardService $idCards,
         protected FeeInstallmentService $installments,
+        protected PenaltyCalculationService $penalties,
     ) {}
 
     /**
@@ -61,7 +63,7 @@ class PaymentService
         }
 
         $amount = round((float) $data['amount'], 2);
-        $pending = round((float) $feeStructure->pending_amount, 2);
+        $collectible = round((float) $feeStructure->totalCollectiblePending(), 2);
 
         if ($amount <= 0) {
             throw ValidationException::withMessages([
@@ -69,16 +71,19 @@ class PaymentService
             ]);
         }
 
-        if ($amount > $pending) {
+        if ($amount > $collectible) {
             throw ValidationException::withMessages([
-                'amount' => "Amount cannot exceed pending fee of ₹".number_format($pending, 2).'.',
+                'amount' => "Amount cannot exceed outstanding balance of ₹".number_format($collectible, 2).'.',
             ]);
         }
+
+        $pending = round((float) $feeStructure->pending_amount, 2);
+        $feePaymentAmount = min($amount, $pending);
 
         $installment = $this->resolveInstallment($feeStructure, $data['fee_installment_id'] ?? null);
         $flexible = FeePaymentPolicy::usesFlexibleAllocation();
 
-        if (! $flexible && $installment && $amount > round((float) $installment->pending_amount, 2)) {
+        if (! $flexible && $installment && $feePaymentAmount > round((float) $installment->pending_amount, 2)) {
             throw ValidationException::withMessages([
                 'amount' => "Amount cannot exceed pending for {$installment->label} (₹"
                     .number_format((float) $installment->pending_amount, 2).').',
@@ -87,13 +92,54 @@ class PaymentService
 
         $mode = PaymentMode::from($data['payment_mode']);
         $this->validateModeFields($mode, $data);
-        $shortfallHandling = $this->resolveShortfallHandling($installment, $amount, $data, $flexible);
 
-        return DB::transaction(function () use ($feeStructure, $student, $data, $proof, $staff, $amount, $mode, $installment, $flexible, $shortfallHandling): Payment {
+        return DB::transaction(function () use ($feeStructure, $student, $data, $proof, $staff, $amount, $mode, $flexible): Payment {
+            $locked = FeeStructure::query()
+                ->whereKey($feeStructure->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $locked->loadMissing('enrollment', 'installments', 'penalties');
+
+            $pending = round((float) $locked->pending_amount, 2);
+            $collectible = round((float) $locked->totalCollectiblePending(), 2);
+
+            if ($amount > $collectible) {
+                throw ValidationException::withMessages([
+                    'amount' => "Amount cannot exceed outstanding balance of ₹".number_format($collectible, 2).'.',
+                ]);
+            }
+
+            $feePaymentAmount = min($amount, $pending);
+            $penaltyPaymentAmount = round($amount - $feePaymentAmount, 2);
+
+            $installment = $this->resolveInstallment($locked, $data['fee_installment_id'] ?? null);
+
+            if (! $flexible && $installment && $feePaymentAmount > round((float) $installment->pending_amount, 2)) {
+                throw ValidationException::withMessages([
+                    'amount' => "Amount cannot exceed pending for {$installment->label} (₹"
+                        .number_format((float) $installment->pending_amount, 2).').',
+                ]);
+            }
+
+            $shortfallHandling = $this->resolveShortfallHandling($installment, $feePaymentAmount, $data, $flexible);
+
+            if ($feePaymentAmount > 0 && ($installment || $locked->installments->isNotEmpty())) {
+                $installmentPendingTotal = round((float) $locked->installments->sum(
+                    fn (\App\Models\FeeInstallment $row): float => (float) $row->pending_amount,
+                ), 2);
+
+                if ($installmentPendingTotal > 0 && abs($installmentPendingTotal - $pending) > 0.02) {
+                    throw ValidationException::withMessages([
+                        'amount' => 'Installment totals do not match the fee balance. Contact an administrator.',
+                    ]);
+                }
+            }
+
             $receiptNumber = $this->numberGenerator->generate(NumberSequenceType::Receipt);
 
             $payment = Payment::query()->create([
-                'fee_structure_id' => $feeStructure->id,
+                'fee_structure_id' => $locked->id,
                 'fee_installment_id' => $installment?->id,
                 'student_id' => $student->id,
                 'payment_date' => $data['payment_date'],
@@ -108,20 +154,20 @@ class PaymentService
                 'added_by_user_id' => $staff->id,
             ]);
 
-            $newPaid = round((float) $feeStructure->paid_amount + $amount, 2);
-            $newPending = round(max(0, (float) $feeStructure->net_fee - $newPaid), 2);
+            $newPaid = round((float) $locked->paid_amount + $feePaymentAmount, 2);
+            $newPending = round(max(0, (float) $locked->net_fee - $newPaid), 2);
 
-            $feeStructure->update([
+            $locked->update([
                 'paid_amount' => $newPaid,
                 'pending_amount' => $newPending,
             ]);
 
-            if ($installment || $feeStructure->installments->isNotEmpty()) {
+            if ($feePaymentAmount > 0 && ($installment || $locked->installments->isNotEmpty())) {
                 if ($flexible) {
                     $allocationResult = $this->installments->allocatePayment(
-                        $feeStructure,
+                        $locked,
                         $installment,
-                        $amount,
+                        $feePaymentAmount,
                         $shortfallHandling,
                     );
 
@@ -131,8 +177,12 @@ class PaymentService
                         ]);
                     }
                 } elseif ($installment) {
-                    $this->installments->applyPayment($installment, $amount);
+                    $this->installments->applyPayment($installment, $feePaymentAmount);
                 }
+            }
+
+            if ($penaltyPaymentAmount > 0) {
+                $this->penalties->applyPendingPayments($locked, $penaltyPaymentAmount);
             }
 
             $staff->loadMissing('staffProfile');
@@ -156,8 +206,10 @@ class PaymentService
             $payment = $this->receipts->generateForPayment($payment, $staff);
 
             if ($this->idCards->shouldGenerateForFirstPayment($payment)) {
-                $this->idCards->generateForEnrollment($feeStructure->enrollment, $staff);
+                $this->idCards->generateForEnrollment($locked->enrollment, $staff);
             }
+
+            CrmCacheInvalidator::afterPayment();
 
             return $payment->fresh(['addedBy.staffProfile', 'feeStructure.enrollment.course', 'feeInstallment', 'student']);
         });

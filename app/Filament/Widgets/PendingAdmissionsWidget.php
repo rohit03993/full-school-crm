@@ -3,11 +3,14 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Resources\Admissions\AdmissionResource;
+use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
 use App\Services\CrmDashboardService;
 use Filament\Widgets\Widget;
 
 class PendingAdmissionsWidget extends Widget
 {
+    use VisibleToSuperAdminOnly;
+
     protected static ?int $sort = 4;
 
     protected string $view = 'filament.widgets.pending-admissions';

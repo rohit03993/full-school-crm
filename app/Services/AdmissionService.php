@@ -8,14 +8,18 @@ use App\Enums\NumberSequenceType;
 use App\Enums\StudentStatus;
 use App\Enums\VisitStatus;
 use App\Models\Admission;
+use App\Models\AcademicSession;
 use App\Models\Course;
 use App\Models\Enquiry;
 use App\Models\Enrollment;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\DefaultCourse;
+use App\Support\SoftDeleteRecordGuard;
 use Illuminate\Http\UploadedFile;
+use App\Support\CrmCacheInvalidator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 class AdmissionService
@@ -26,6 +30,7 @@ class AdmissionService
         protected AuditService $audit,
         protected FeeStructureService $feeStructures,
         protected AdmissionFeePlanService $feePlans,
+        protected StudentAuthService $studentAuth,
     ) {}
 
     /**
@@ -45,17 +50,8 @@ class AdmissionService
             ]);
         }
 
-        if ($enquiry->admission()->exists()) {
-            throw ValidationException::withMessages([
-                'enquiry_id' => 'An admission already exists for this enquiry.',
-            ]);
-        }
-
-        if (Admission::query()->where('student_id', $student->id)->exists()) {
-            throw ValidationException::withMessages([
-                'admission' => 'This student already has an admission on file.',
-            ]);
-        }
+        SoftDeleteRecordGuard::ensureEnquiryAdmissionSlotAvailable($enquiry);
+        SoftDeleteRecordGuard::ensureAdmissionSlotAvailable($student);
 
         $course = $this->resolveAdmissionCourse((int) $feeData['course_id']);
         $discountAmount = max(0, (float) ($feeData['discount_amount'] ?? 0));
@@ -112,6 +108,8 @@ class AdmissionService
         ): Admission {
             $enquiry->update(['course_id' => $course->id]);
 
+            app(LeadAssignmentService::class)->clearCallingAssignment($enquiry);
+
             $admission = Admission::query()->create([
                 'student_id' => $student->id,
                 'enquiry_id' => $enquiry->id,
@@ -142,6 +140,8 @@ class AdmissionService
                 ],
                 user: $staff,
             );
+
+            CrmCacheInvalidator::afterAdmissionChange($enquiry->meeting_with_user_id);
 
             return $admission->load(['enquiry.course', 'documents']);
         });
@@ -252,12 +252,16 @@ class AdmissionService
                 user: $staff,
             );
 
+            CrmCacheInvalidator::afterAdmissionChange($admission->enquiry?->meeting_with_user_id);
+
             return $admission->fresh(['enquiry.course', 'documents', 'student']);
         });
     }
 
     public function approve(Admission $admission, User $staff): Enrollment
     {
+        Gate::forUser($staff)->authorize('approve', $admission);
+
         if (! $admission->canBeApproved()) {
             throw ValidationException::withMessages([
                 'admission' => 'Only admissions pending verification can be approved.',
@@ -276,40 +280,84 @@ class AdmissionService
         }
 
         return DB::transaction(function () use ($admission, $staff): Enrollment {
-            $admission->update([
+            $locked = Admission::query()
+                ->whereKey($admission->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $locked->loadMissing(['enquiry', 'student']);
+
+            if ($locked->status !== AdmissionStatus::VerificationPending) {
+                throw ValidationException::withMessages([
+                    'admission' => 'Only admissions pending verification can be approved.',
+                ]);
+            }
+
+            if (Enrollment::query()->where('admission_id', $locked->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'admission' => 'This admission has already been approved.',
+                ]);
+            }
+
+            if (
+                Enrollment::query()
+                    ->where('student_id', $locked->student_id)
+                    ->where('is_active', true)
+                    ->exists()
+            ) {
+                throw ValidationException::withMessages([
+                    'admission' => 'Student already has an active enrollment.',
+                ]);
+            }
+
+            $locked->update([
                 'status' => AdmissionStatus::Approved,
                 'approved_by_user_id' => $staff->id,
                 'approved_at' => now(),
             ]);
 
             Enrollment::query()
-                ->where('student_id', $admission->student_id)
+                ->where('student_id', $locked->student_id)
                 ->where('is_active', true)
                 ->update(['is_active' => false]);
 
             $enrollment = Enrollment::query()->create([
-                'student_id' => $admission->student_id,
-                'admission_id' => $admission->id,
-                'course_id' => $admission->enquiry->course_id,
+                'student_id' => $locked->student_id,
+                'admission_id' => $locked->id,
+                'course_id' => $locked->enquiry->course_id,
+                'academic_session_id' => AcademicSession::current()?->id,
                 'enrollment_number' => $this->numberGenerator->generate(NumberSequenceType::Enrollment),
                 'enrolled_at' => now(),
                 'status' => EnrollmentStatus::Enrolled,
                 'is_active' => true,
             ]);
 
-            $admission->student->update(['status' => StudentStatus::Enrolled]);
+            $locked->student->update(['status' => StudentStatus::Enrolled]);
 
-            $this->feeStructures->createFromAdmission($enrollment, $admission, $staff);
+            if ($locked->enquiry) {
+                app(LeadAssignmentService::class)->clearCallingAssignment($locked->enquiry);
+            }
+
+            $this->studentAuth->ensurePortalLoginForStudent($locked->student);
+
+            $this->feeStructures->createFromAdmission($enrollment, $locked, $staff);
 
             $this->audit->log(
                 action: 'Admission Approved, Enrollment Generated',
                 auditable: $enrollment,
                 newValues: [
                     'enrollment_number' => $enrollment->enrollment_number,
-                    'admission_number' => $admission->admission_number,
+                    'admission_number' => $locked->admission_number,
+                    'academic_session_id' => $enrollment->academic_session_id,
                 ],
                 user: $staff,
             );
+
+            if ($locked->enquiry?->meeting_with_user_id) {
+                CrmCacheInvalidator::afterAdmissionChange($locked->enquiry->meeting_with_user_id);
+            } else {
+                CrmCacheInvalidator::afterAdmissionChange();
+            }
 
             return $enrollment->load(['course', 'admission', 'feeStructure']);
         });
@@ -317,6 +365,8 @@ class AdmissionService
 
     public function returnForCorrection(Admission $admission, User $staff, string $remarks): Admission
     {
+        Gate::forUser($staff)->authorize('returnForCorrection', $admission);
+
         if ($admission->status !== AdmissionStatus::VerificationPending) {
             throw ValidationException::withMessages([
                 'admission' => 'Only pending admissions can be returned for correction.',
@@ -338,6 +388,8 @@ class AdmissionService
                 newValues: ['remarks' => $remarks],
                 user: $staff,
             );
+
+            CrmCacheInvalidator::afterAdmissionChange($admission->enquiry?->meeting_with_user_id);
 
             return $admission->fresh(['enquiry.course', 'documents']);
         });

@@ -9,9 +9,6 @@
 <article {{ $attributes->merge(['class' => 'group flex h-full flex-col overflow-hidden rounded-2xl border border-navy-100 bg-white shadow-sm transition hover:-translate-y-1 hover:border-brand-200 hover:shadow-lg hover:shadow-brand-500/10']) }}>
     <div class="border-b border-navy-50 bg-gradient-to-br from-navy-50 to-brand-50/40 px-6 py-5">
         <div class="flex items-start justify-between gap-3">
-            <span class="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-700 shadow-sm">
-                {{ $course->programme_category->label() }}
-            </span>
             <span class="rounded-lg bg-navy-900 px-2.5 py-1 font-mono text-xs font-medium text-brand-300">
                 {{ $course->code }}
             </span>

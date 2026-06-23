@@ -281,9 +281,11 @@ class FeePlanCalculator
             return $rows;
         }
 
-        $lastIndex = array_key_last($rows);
-        $otherTotal = self::sumAmounts(array_slice($rows, 0, $lastIndex, true));
-        $rows[$lastIndex]['amount'] = (string) round(max(0, $targetTotal - $otherTotal), 2);
+        $lastKey = array_key_last($rows);
+        $otherRows = $rows;
+        unset($otherRows[$lastKey]);
+        $otherTotal = self::sumAmounts($otherRows);
+        $rows[$lastKey]['amount'] = (string) round(max(0, $targetTotal - $otherTotal), 2);
 
         return $rows;
     }

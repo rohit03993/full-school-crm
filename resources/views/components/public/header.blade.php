@@ -9,6 +9,7 @@
         ['label' => 'Courses', 'url' => route('courses'), 'active' => request()->routeIs('courses')],
         ['label' => 'Gallery', 'url' => route('home').'#gallery', 'active' => false],
         ['label' => 'Contact', 'url' => route('contact'), 'active' => request()->routeIs('contact')],
+        ['label' => 'Login', 'url' => route('login'), 'active' => request()->routeIs('login')],
     ];
 @endphp
 

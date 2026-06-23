@@ -27,3 +27,7 @@ php artisan test
 ## Deploy note
 
 CloudPanel/nginx requires `public/vendor/livewire/` (run `php artisan crm:publish-assets` on server).
+
+## Client install guide
+
+Share **`docs/INSTALL_AND_CUSTOMIZE_GUIDE.md`** with each school/coaching/college — covers install, wizard, terminology, custom fields, and checklists by institute type. In admin: **Setup → Setup Guide**.

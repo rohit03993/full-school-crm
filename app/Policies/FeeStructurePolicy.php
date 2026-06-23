@@ -2,32 +2,25 @@
 
 namespace App\Policies;
 
-use App\Enums\RoleName;
+use App\Enums\CrmPermission;
 use App\Models\FeeStructure;
 use App\Models\User;
+use App\Support\CrmAccess;
 
 class FeeStructurePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $this->isStaff($user);
+        return CrmAccess::can($user, CrmPermission::StudentsView);
     }
 
     public function view(User $user, FeeStructure $feeStructure): bool
     {
-        return $this->isStaff($user);
+        return $this->viewAny($user);
     }
 
     public function update(User $user, FeeStructure $feeStructure): bool
     {
-        return $user->hasRole(RoleName::SuperAdmin->value);
-    }
-
-    protected function isStaff(User $user): bool
-    {
-        return $user->hasAnyRole([
-            RoleName::SuperAdmin->value,
-            RoleName::Staff->value,
-        ]);
+        return CrmAccess::can($user, CrmPermission::FeesAdjustStructure);
     }
 }

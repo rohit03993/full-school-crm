@@ -2,13 +2,17 @@
 
 namespace App\Filament\Pages;
 
-use App\Enums\RoleName;
+use App\Enums\CrmPermission;
+use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Pages\ManageSiteContent as ManageSiteContentPage;
 use App\Services\InstituteSettingsService;
 use App\Services\SiteImageService;
+use App\Support\CrmHint;
+use App\Support\CrmNavigation;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -21,13 +25,18 @@ use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 use UnitEnum;
 
 class ManageInstituteSettings extends Page
 {
     use CanUseDatabaseTransactions;
+    use RequiresCrmPermission;
+
+    protected static function requiredCrmPermission(): CrmPermission
+    {
+        return CrmPermission::SettingsManage;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
 
@@ -35,19 +44,14 @@ class ManageInstituteSettings extends Page
 
     protected static ?string $title = 'Institute Settings';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 50;
 
-    protected static string | UnitEnum | null $navigationGroup = 'Setup';
+    protected static string | UnitEnum | null $navigationGroup = CrmNavigation::GROUP_SETTINGS;
 
     /**
      * @var array<string, mixed>|null
      */
     public ?array $data = [];
-
-    public static function canAccess(): bool
-    {
-        return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
-    }
 
     public function mount(InstituteSettingsService $settings): void
     {
@@ -62,6 +66,7 @@ class ManageInstituteSettings extends Page
     public function form(Schema $schema): Schema
     {
         return $schema->components([
+            CrmHint::placeholder('setup.institute_settings'),
             Section::make('Institute identity')
                 ->description('Name and contact details are shared with the public website. Edit them under Website → Site Content.')
                 ->schema([
@@ -114,6 +119,16 @@ class ManageInstituteSettings extends Page
                         ->helperText('Legal note printed at the bottom of every fee receipt.'),
                 ])
                 ->columns(2),
+            Section::make('Student portal login')
+                ->description('All students sign in at /portal/login with mobile + this password. They can change their password after logging in.')
+                ->schema([
+                    TextInput::make('portal_shared_password')
+                        ->label('Default student portal password')
+                        ->password()
+                        ->revealable()
+                        ->helperText('Leave blank to keep the current password. New students receive this password when enrolled. Changing it does not reset passwords students already changed.'),
+                ])
+                ->columns(1),
         ]);
     }
 

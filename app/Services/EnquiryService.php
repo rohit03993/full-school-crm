@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Enums\LeadSource;
-use App\Enums\MeetingFor;
+use App\Support\MeetingForOptions;
 use App\Enums\NumberSequenceType;
 use App\Enums\StudentStatus;
 use App\Enums\VisitStatus;
@@ -12,7 +12,10 @@ use App\Models\Enquiry;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\Visit;
+use App\Services\CustomFieldService;
+use App\Support\CrmCacheInvalidator;
 use App\Support\DefaultCourse;
+use App\Support\SoftDeleteRecordGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -22,6 +25,8 @@ class EnquiryService
         protected NumberGeneratorService $numberGenerator,
         protected StudentAuthService $studentAuth,
         protected AuditService $audit,
+        protected CustomFieldService $customFields,
+        protected StudentMobileService $mobiles,
     ) {}
 
     /**
@@ -56,12 +61,10 @@ class EnquiryService
     protected function resolveStudent(array $data): Student
     {
         $mobile = $this->normalizeMobile($data['mobile']);
-        $student = Student::query()->where('mobile', $mobile)->first();
+        $student = $this->mobiles->findStudentByNumber($mobile, restoreIfTrashed: true);
 
         $attributes = $this->studentAttributes($data, $student);
-        $portalPassword = filled($data['date_of_birth'] ?? null)
-            ? $this->portalPasswordHash($data['date_of_birth'])
-            : $student?->portal_password;
+        $portalPassword = $student?->portal_password ?? $this->studentAuth->hashForNewStudent();
 
         if ($student) {
             $student->update([
@@ -99,9 +102,7 @@ class EnquiryService
             ? VisitStatus::from($data['visit_status'])
             : VisitStatus::Interested;
 
-        $meetingFor = isset($data['meeting_for'])
-            ? MeetingFor::from($data['meeting_for'])
-            : MeetingFor::School;
+        $meetingFor = MeetingForOptions::resolve($data['meeting_for'] ?? null);
 
         $courseId = $data['course_id'] ?? DefaultCourse::undecided()->id;
 
@@ -110,13 +111,14 @@ class EnquiryService
             'enquiry_number' => $this->numberGenerator->generate(NumberSequenceType::Enquiry),
             'course_id' => $courseId,
             'lead_source' => $leadSource,
-            'meeting_with_user_id' => $data['meeting_with_user_id'] ?? $staff?->id,
+            'meeting_with_user_id' => $data['meeting_with_user_id'] ?? null,
             'meeting_for' => $meetingFor,
             'visit_type' => $visitType,
             'follow_up_reason' => $visitType === VisitType::FollowUp
                 ? ($data['follow_up_reason'] ?? null)
                 : null,
             'latest_visit_status' => $visitStatus,
+            'custom_data' => $this->resolveEnquiryCustomData($data),
         ]);
 
         $summary = $data['discussion_summary']
@@ -145,7 +147,31 @@ class EnquiryService
             user: $staff,
         );
 
+        if ($enquiry->meeting_with_user_id) {
+            CrmCacheInvalidator::afterEnquiryChange($enquiry->meeting_with_user_id);
+        } else {
+            CrmCacheInvalidator::afterEnquiryChange();
+        }
+
         return $enquiry->load(['student', 'course']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>|null
+     */
+    protected function resolveEnquiryCustomData(array $data): ?array
+    {
+        if (! array_key_exists('custom_data', $data)) {
+            return null;
+        }
+
+        $validated = $this->customFields->validateForEntity(
+            CustomFieldService::ENTITY_ENQUIRY,
+            is_array($data['custom_data']) ? $data['custom_data'] : [],
+        );
+
+        return $validated === [] ? null : $validated;
     }
 
     /**
@@ -169,24 +195,6 @@ class EnquiryService
         ];
     }
 
-    protected function portalPasswordHash(string $dateOfBirth): string
-    {
-        return $this->studentAuth->hashPortalPassword(
-            $this->studentAuth->formatDobPassword(
-                \Carbon\Carbon::parse($dateOfBirth),
-            ),
-        );
-    }
-
-    protected function ensureStudentCanReceiveEnquiry(Student $student): void
-    {
-        if ($student->enquiries()->exists()) {
-            throw ValidationException::withMessages([
-                'mobile' => 'This mobile number already has an enquiry on file. Open the student profile to add a visit or continue admission.',
-            ]);
-        }
-    }
-
     protected function normalizeMobile(string $mobile): string
     {
         $normalized = preg_replace('/\D/', '', $mobile);
@@ -198,5 +206,10 @@ class EnquiryService
         }
 
         return $normalized;
+    }
+
+    protected function ensureStudentCanReceiveEnquiry(Student $student): void
+    {
+        SoftDeleteRecordGuard::ensureEnquirySlotAvailable($student);
     }
 }

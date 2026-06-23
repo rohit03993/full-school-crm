@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Enums\DocumentType;
 use App\Models\ActivityType;
 use App\Enums\LeadSource;
-use App\Enums\MeetingFor;
+use App\Support\MeetingForOptions;
 use App\Enums\ProfilePhase;
 use App\Enums\StudentStatus;
 use App\Models\Admission;
@@ -29,8 +29,7 @@ class StudentCounterService
      *     lead_sources: array{
      *         website_count: int,
      *         walk_in_count: int,
-     *         school_count: int,
-     *         coaching_count: int,
+     *         meeting_for_counts: array<string, int>,
      *         first_source: ?LeadSource,
      *         latest_source: ?LeadSource,
      *         latest_meeting_for: ?MeetingFor,
@@ -84,11 +83,10 @@ class StudentCounterService
      * @return array{
      *     website_count: int,
      *     walk_in_count: int,
-     *     school_count: int,
-     *     coaching_count: int,
+     *     meeting_for_counts: array<string, int>,
      *     first_source: ?LeadSource,
      *     latest_source: ?LeadSource,
-     *     latest_meeting_for: ?MeetingFor,
+     *     latest_meeting_for: ?string,
      *     latest_intent: ?string,
      *     headline: string,
      *     detail: ?string
@@ -100,8 +98,12 @@ class StudentCounterService
 
         $websiteCount = $enquiries->where('lead_source', LeadSource::Website)->count();
         $walkInCount = $enquiries->where('lead_source', LeadSource::WalkIn)->count();
-        $schoolCount = $enquiries->where('meeting_for', MeetingFor::School)->count();
-        $coachingCount = $enquiries->where('meeting_for', MeetingFor::Coaching)->count();
+
+        $meetingForCounts = $enquiries
+            ->filter(fn (Enquiry $enquiry): bool => filled($enquiry->meeting_for))
+            ->groupBy(fn (Enquiry $enquiry): string => (string) $enquiry->meeting_for)
+            ->map(fn ($group): int => $group->count())
+            ->all();
 
         /** @var ?Enquiry $first */
         $first = $enquiries->first();
@@ -114,8 +116,7 @@ class StudentCounterService
         return [
             'website_count' => $websiteCount,
             'walk_in_count' => $walkInCount,
-            'school_count' => $schoolCount,
-            'coaching_count' => $coachingCount,
+            'meeting_for_counts' => $meetingForCounts,
             'first_source' => $firstSource,
             'latest_source' => $latestSource,
             'latest_meeting_for' => $latestMeetingFor,
@@ -126,8 +127,7 @@ class StudentCounterService
                 $latestSource,
                 $websiteCount,
                 $walkInCount,
-                $schoolCount,
-                $coachingCount,
+                $meetingForCounts,
             ),
         ];
     }
@@ -139,7 +139,7 @@ class StudentCounterService
         }
 
         $source = $enquiry->lead_source?->label();
-        $meetingFor = $enquiry->meeting_for?->label();
+        $meetingFor = MeetingForOptions::label($enquiry->meeting_for);
 
         if ($source && $meetingFor) {
             return "{$source} for {$meetingFor}";
@@ -170,10 +170,9 @@ class StudentCounterService
         ?LeadSource $latestSource,
         int $websiteCount,
         int $walkInCount,
-        int $schoolCount,
-        int $coachingCount,
+        array $meetingForCounts,
     ): ?string {
-        if ($websiteCount === 0 && $walkInCount === 0 && $schoolCount === 0 && $coachingCount === 0) {
+        if ($websiteCount === 0 && $walkInCount === 0 && $meetingForCounts === []) {
             return null;
         }
 
@@ -187,14 +186,13 @@ class StudentCounterService
             $parts[] = $walkInCount === 1 ? '1 walk-in enquiry' : "{$walkInCount} walk-in enquiries";
         }
 
-        if ($schoolCount > 0) {
-            $schoolLabel = MeetingFor::School->label();
-            $parts[] = $schoolCount === 1 ? "1 for {$schoolLabel}" : "{$schoolCount} for {$schoolLabel}";
-        }
+        foreach ($meetingForCounts as $value => $count) {
+            if ($count <= 0) {
+                continue;
+            }
 
-        if ($coachingCount > 0) {
-            $coachingLabel = MeetingFor::Coaching->label();
-            $parts[] = $coachingCount === 1 ? "1 for {$coachingLabel}" : "{$coachingCount} for {$coachingLabel}";
+            $label = MeetingForOptions::label((string) $value);
+            $parts[] = $count === 1 ? "1 for {$label}" : "{$count} for {$label}";
         }
 
         $detail = implode(' · ', $parts);
@@ -253,36 +251,55 @@ class StudentCounterService
     }
 
     /**
-     * @param  array{website_count: int, walk_in_count: int, school_count: int, coaching_count: int}  $leadSources
+     * @param  array{website_count: int, walk_in_count: int, meeting_for_counts: array<string, int>}  $leadSources
      * @return array<int, array{label: string, value: int|float|string|null}>
      */
     protected function leadCounters(Student $student, array $leadSources): array
     {
-        return [
+        $counters = [
             ['label' => 'Visits', 'value' => $student->visits()->count()],
             ['label' => 'Enquiries', 'value' => $student->enquiries()->count()],
             ['label' => 'Website', 'value' => $leadSources['website_count']],
             ['label' => 'Walk-in', 'value' => $leadSources['walk_in_count']],
-            ['label' => MeetingFor::School->label(), 'value' => $leadSources['school_count']],
-            ['label' => MeetingFor::Coaching->label(), 'value' => $leadSources['coaching_count']],
         ];
+
+        foreach (MeetingForOptions::active() as $option) {
+            $counters[] = [
+                'label' => $option['label'],
+                'value' => $leadSources['meeting_for_counts'][$option['value']] ?? 0,
+            ];
+        }
+
+        return $counters;
     }
 
     /**
-     * @param  array{website_count: int, walk_in_count: int, school_count: int, coaching_count: int}  $leadSources
+     * @param  array{website_count: int, walk_in_count: int, meeting_for_counts: array<string, int>}  $leadSources
      * @return array<int, array{label: string, value: int|float|string|null}>
      */
     protected function admissionCounters(Student $student, array $leadSources): array
     {
         $admission = $this->latestAdmission($student);
 
-        return [
+        $counters = [
             ['label' => 'Visits', 'value' => $student->visits()->count()],
             ['label' => 'Walk-in', 'value' => $leadSources['walk_in_count']],
-            ['label' => MeetingFor::School->label(), 'value' => $leadSources['school_count']],
-            ['label' => MeetingFor::Coaching->label(), 'value' => $leadSources['coaching_count']],
-            ['label' => 'Admission', 'value' => $admission?->status?->label() ?? '—'],
         ];
+
+        foreach (MeetingForOptions::active() as $option) {
+            $count = $leadSources['meeting_for_counts'][$option['value']] ?? 0;
+
+            if ($count > 0) {
+                $counters[] = [
+                    'label' => $option['label'],
+                    'value' => $count,
+                ];
+            }
+        }
+
+        $counters[] = ['label' => 'Admission', 'value' => $admission?->status?->label() ?? '—'];
+
+        return $counters;
     }
 
     /**
@@ -344,9 +361,22 @@ class StudentCounterService
         ];
 
         foreach (ActivityType::query()->enabled()->ordered()->get() as $type) {
+            if ($type->supportsScoring()) {
+                $counters[] = [
+                    'label' => $type->name,
+                    'value' => $this->activityAttendance->presentCountForStudent($student, $type),
+                ];
+
+                continue;
+            }
+
+            $summary = $this->activityAttendance->attendanceSummaryForStudent($student, $type);
+
             $counters[] = [
                 'label' => $type->name,
-                'value' => $this->activityAttendance->presentCountForStudent($student, $type),
+                'value' => $summary['total'] > 0
+                    ? "{$summary['present']}/{$summary['total']} present"
+                    : 0,
             ];
         }
 

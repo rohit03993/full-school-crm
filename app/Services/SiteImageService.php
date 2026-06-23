@@ -22,7 +22,9 @@ class SiteImageService
             return $path;
         }
 
-        return Storage::disk(self::DISK)->url($path);
+        $normalized = ltrim((string) $path, '/');
+
+        return $normalized !== '' ? '/storage/'.$normalized : null;
     }
 
     public static function delete(?string $path): void

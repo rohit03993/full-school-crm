@@ -15,6 +15,20 @@ class StudentSearchService
     public const OUTCOME_NOT_FOUND = 'not_found';
 
     /**
+     * @return array<int|string, mixed>
+     */
+    protected function searchRelations(): array
+    {
+        return [
+            'latestEnquiry.course',
+            'lastCall.staff',
+            'activeEnrollment.admission.documents',
+            'activeBatchStudent.batch',
+            'admissions' => fn ($query) => $query->latest()->limit(1)->with('documents'),
+        ];
+    }
+
+    /**
      * @return array{outcome: string, student: ?Student, students: Collection<int, Student>}
      */
     public function search(
@@ -30,8 +44,11 @@ class StudentSearchService
 
         if (filled($mobile)) {
             $student = Student::query()
-                ->with(['latestEnquiry.course'])
-                ->where('mobile', $mobile)
+                ->with($this->searchRelations())
+                ->where(function ($query) use ($mobile): void {
+                    $query->where('mobile', $mobile)
+                        ->orWhere('alternate_mobile', $mobile);
+                })
                 ->first();
 
             return $this->result(
@@ -42,7 +59,7 @@ class StudentSearchService
 
         if (filled($enquiryNumber)) {
             $enquiry = Enquiry::query()
-                ->with(['student.latestEnquiry.course', 'course'])
+                ->with(['student' => fn ($query) => $query->with($this->searchRelations()), 'course'])
                 ->where('enquiry_number', $enquiryNumber)
                 ->first();
 
@@ -55,7 +72,7 @@ class StudentSearchService
 
         if (filled($enrollment)) {
             $enrollmentRecord = \App\Models\Enrollment::query()
-                ->with(['student.latestEnquiry.course'])
+                ->with(['student' => fn ($query) => $query->with($this->searchRelations())])
                 ->where('enrollment_number', strtoupper($enrollment))
                 ->first();
 
@@ -68,9 +85,10 @@ class StudentSearchService
 
         if (filled($name)) {
             $students = Student::query()
-                ->with(['latestEnquiry.course'])
+                ->with($this->searchRelations())
                 ->where('name', 'like', '%'.$name.'%')
                 ->orderBy('name')
+                ->orderByDesc('updated_at')
                 ->limit(25)
                 ->get();
 
@@ -86,18 +104,6 @@ class StudentSearchService
         }
 
         return $this->result(self::OUTCOME_NOT_FOUND);
-    }
-
-    /**
-     * @return Collection<int, Enquiry>
-     */
-    public function recentEnquiries(int $limit = 5): Collection
-    {
-        return Enquiry::query()
-            ->with(['student', 'course'])
-            ->latest()
-            ->limit($limit)
-            ->get();
     }
 
     /**

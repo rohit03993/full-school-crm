@@ -11,6 +11,7 @@ enum ReportType: string
     case AttendanceByBatch = 'attendance_by_batch';
     case AttendanceByStudent = 'attendance_by_student';
     case Activities = 'activities';
+    case TestMarks = 'test_marks';
     case FeeCollection = 'fee_collection';
     case PendingFees = 'pending_fees';
     case OverdueInstallments = 'overdue_installments';
@@ -28,7 +29,8 @@ enum ReportType: string
             self::AdmissionsByStaff => 'Admissions by staff',
             self::AttendanceByBatch => 'Attendance by batch',
             self::AttendanceByStudent => 'Attendance by student',
-            self::Activities => 'Activities (exams, mocks, events)',
+            self::Activities => 'Tests & exams (marks)',
+            self::TestMarks => 'Test marks (detail export)',
             self::FeeCollection => 'Fee collection',
             self::PendingFees => 'Pending fees',
             self::OverdueInstallments => 'Overdue installments',

@@ -1,24 +1,24 @@
 @php
-    use App\Enums\MeetingFor;
+    use App\Support\MeetingForOptions;
 
     $intent = $leadSources['latest_intent'] ?? null;
-    $meetingFor = $leadSources['latest_meeting_for'] ?? null;
+    $meetingForValue = $leadSources['latest_meeting_for'] ?? null;
     $source = $leadSources['latest_source'] ?? null;
 
-    if (blank($intent) || ! $meetingFor instanceof MeetingFor) {
+    if (blank($intent) || blank($meetingForValue)) {
         return;
     }
 
-    $meetingColors = $meetingFor->badgeColors();
+    $meetingColors = MeetingForOptions::badgeStyle((string) $meetingForValue);
 @endphp
 
 <div @class([
     'mt-3 rounded-xl border-2 px-4 py-3 shadow-sm',
-    'border-amber-500/40 bg-gradient-to-r from-amber-500/15 to-amber-600/5' => $meetingFor === MeetingFor::School,
-    'border-violet-500/40 bg-gradient-to-r from-violet-500/15 to-violet-600/5' => $meetingFor === MeetingFor::Coaching,
+    $meetingColors['ring'],
+    $meetingColors['bg'],
 ])>
     <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-        Came for
+        Meeting for
     </p>
     <div class="mt-2 flex flex-wrap items-center gap-2">
         @if ($source?->value === 'walk_in')
@@ -39,8 +39,8 @@
             $meetingColors['text'],
             $meetingColors['ring'],
         ])>
-            <x-filament::icon :icon="$meetingFor->icon()" class="h-5 w-5 sm:h-6 sm:w-6" />
-            {{ $meetingFor->label() }}
+            <x-filament::icon :icon="$meetingColors['icon']" class="h-5 w-5 sm:h-6 sm:w-6" />
+            {{ MeetingForOptions::label((string) $meetingForValue) }}
         </span>
     </div>
     <p class="mt-2 text-sm font-semibold text-gray-700 dark:text-gray-300">

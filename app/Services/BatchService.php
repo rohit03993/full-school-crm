@@ -23,6 +23,8 @@ class BatchService
             ]);
         }
 
+        $this->assertBatchMatchesEnrollment($student, $batch);
+
         return DB::transaction(function () use ($student, $batch, $staff): BatchStudent {
             $previous = BatchStudent::query()
                 ->where('student_id', $student->id)
@@ -99,5 +101,30 @@ class BatchService
         }
 
         return $assigned;
+    }
+
+    protected function assertBatchMatchesEnrollment(Student $student, Batch $batch): void
+    {
+        $enrollment = $student->activeEnrollment;
+
+        if (! $enrollment) {
+            return;
+        }
+
+        if ($enrollment->course_id !== $batch->course_id) {
+            throw ValidationException::withMessages([
+                'batch_id' => 'This batch belongs to a different course than the student’s active enrollment.',
+            ]);
+        }
+
+        if (
+            $enrollment->academic_session_id !== null
+            && $batch->academic_session_id !== null
+            && $enrollment->academic_session_id !== $batch->academic_session_id
+        ) {
+            throw ValidationException::withMessages([
+                'batch_id' => 'This batch belongs to a different academic session than the student’s enrollment.',
+            ]);
+        }
     }
 }

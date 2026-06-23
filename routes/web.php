@@ -8,6 +8,7 @@ use App\Http\Controllers\PublicSite\ContactController;
 use App\Http\Controllers\PublicSite\IdCardVerifyController;
 use App\Http\Controllers\PublicSite\CourseController;
 use App\Http\Controllers\PublicSite\HomeController;
+use App\Http\Controllers\PublicSite\LoginController;
 use App\Http\Controllers\StudentPortal\AuthController;
 use App\Http\Controllers\StudentPortal\DashboardController;
 use App\Http\Controllers\StudentPortal\IdCardDownloadController as PortalIdCardDownloadController;
@@ -38,6 +39,7 @@ Route::get('/verify/{enrollment}', IdCardVerifyController::class)->name('id-card
 
 Route::get('/', HomeController::class)->name('home');
 Route::get('/courses', CourseController::class)->name('courses');
+Route::get('/login', LoginController::class)->name('login');
 Route::get('/contact', ContactController::class)->name('contact');
 Route::post('/contact/enquiry', [ContactController::class, 'store'])
     ->middleware('throttle:10,1')
@@ -45,11 +47,16 @@ Route::post('/contact/enquiry', [ContactController::class, 'store'])
 
 Route::prefix('portal')->name('portal.')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
+    Route::post('/login', [AuthController::class, 'login'])
+        ->middleware('throttle:10,1')
+        ->name('login.submit');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::middleware(EnsureStudentPortalAuth::class)->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::post('/password', [AuthController::class, 'changePassword'])
+            ->middleware('throttle:10,1')
+            ->name('password.change');
         Route::post('/admission', [DashboardController::class, 'submitAdmission'])->name('admission.submit');
         Route::get('/receipts/{payment}/download', [PortalReceiptDownloadController::class, 'download'])
             ->name('receipts.download');

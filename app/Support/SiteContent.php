@@ -90,10 +90,23 @@ class SiteContent
             ],
             'highlights' => $g('site.highlights', [
                 ['value' => '15+', 'label' => 'Years of Excellence'],
-                ['value' => '5000+', 'label' => 'Students Enrolled'],
+                ['value' => '500+', 'label' => 'Students Enrolled'],
                 ['value' => '100%', 'label' => 'Dedicated Faculty'],
                 ['value' => '10+', 'label' => 'Programme Options'],
             ]),
+            'home' => [
+                'about_eyebrow' => $g('site.home_about_eyebrow', 'About Us'),
+                'about_title' => $g('site.home_about_title', 'Training the next generation of learners'),
+                'about_points' => $g('site.home_about_points', []),
+                'about_cta' => $g('site.home_about_cta', 'Learn more about admissions'),
+                'courses_eyebrow' => $g('site.home_courses_eyebrow', 'Our Programmes'),
+                'courses_title' => $g('site.home_courses_title', 'Courses designed for real careers'),
+                'courses_subtitle' => $g('site.home_courses_subtitle', 'Choose the programme that fits your goals.'),
+                'show_courses_section' => (bool) $g('site.home_show_courses_section', true),
+                'cta_title' => $g('site.home_cta_title', 'Ready to start your learning journey?'),
+                'cta_subtitle' => $g('site.home_cta_subtitle', 'Visit our campus, speak with our counsellors, or call us to learn more about admissions.'),
+            ],
+            'hero_stats' => $g('site.hero_stats', []),
         ];
     }
 }

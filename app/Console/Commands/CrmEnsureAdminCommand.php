@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Database\Seeders\AdminUserSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
@@ -29,14 +30,21 @@ class CrmEnsureAdminCommand extends Command
             File::makeDirectory($sessionPath, 0755, true);
         }
 
+        if (! File::exists(public_path('storage'))) {
+            $this->warn('public/storage is missing — logos and uploaded images will not load.');
+            $this->call('storage:link');
+        }
+
         $this->call('crm:publish-assets');
 
+        $this->call('crm:sync-permissions');
+        $this->call('db:seed', ['--class' => RoleSeeder::class, '--force' => true]);
         $this->call('db:seed', ['--class' => AdminUserSeeder::class, '--force' => true]);
 
-        $email = env('ADMIN_EMAIL', 'rohit03993@gmail.com');
+        $mobile = env('ADMIN_MOBILE', '9876543210');
         $this->newLine();
         $this->info('Admin login URL: '.url('/admin'));
-        $this->line("Email: {$email}");
+        $this->line("Mobile: {$mobile}");
         $this->line('Password: value of ADMIN_PASSWORD in .env (default Admin@2026)');
         $this->newLine();
         $this->call('config:clear');

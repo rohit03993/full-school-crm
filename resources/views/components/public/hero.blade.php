@@ -1,7 +1,8 @@
-@props(['courseGroups'])
+@props(['courses'])
 
 @php
     $images = $institute['images']['hero'];
+    $heroStats = $institute['hero_stats'] ?? [];
 @endphp
 
 <section class="relative min-h-[min(100svh,900px)] overflow-hidden bg-navy-950 text-white sm:min-h-[88vh]">
@@ -44,24 +45,27 @@
                         </svg>
                         View Gallery
                     </a>
+                    <a
+                        href="{{ route('login') }}"
+                        class="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl border border-white/25 bg-white/5 px-6 py-3.5 text-base font-semibold text-white backdrop-blur-sm touch-manipulation active:bg-white/15 sm:w-auto sm:px-8 sm:py-4"
+                    >
+                        Login
+                    </a>
                 </div>
 
-                <div class="mt-8 grid grid-cols-2 gap-4 border-t border-white/10 pt-6 sm:mt-12 sm:flex sm:flex-wrap sm:gap-6 sm:pt-8">
-                    <div>
-                        <p class="font-display text-xl font-bold text-brand-400 sm:text-2xl">School</p>
-                        <p class="text-xs text-navy-300 sm:text-sm">Academic Programmes</p>
+                @if ($heroStats !== [])
+                    <div class="mt-8 grid grid-cols-2 gap-4 border-t border-white/10 pt-6 sm:mt-12 sm:flex sm:flex-wrap sm:gap-6 sm:pt-8">
+                        @foreach ($heroStats as $index => $stat)
+                            <div @class(['col-span-2 sm:col-span-1' => $index === 2 && count($heroStats) === 3])>
+                                <p class="font-display text-xl font-bold text-brand-400 sm:text-2xl">{{ $stat['title'] ?? '' }}</p>
+                                <p class="text-xs text-navy-300 sm:text-sm">{{ $stat['subtitle'] ?? '' }}</p>
+                            </div>
+                            @if ($index < count($heroStats) - 1)
+                                <div class="hidden h-10 w-px bg-white/15 sm:block"></div>
+                            @endif
+                        @endforeach
                     </div>
-                    <div class="hidden h-10 w-px bg-white/15 sm:block"></div>
-                    <div>
-                        <p class="font-display text-xl font-bold text-brand-400 sm:text-2xl">Coaching</p>
-                        <p class="text-xs text-navy-300 sm:text-sm">Competitive Exam Prep</p>
-                    </div>
-                    <div class="hidden h-10 w-px bg-white/15 sm:block"></div>
-                    <div class="col-span-2 sm:col-span-1">
-                        <p class="font-display text-xl font-bold text-brand-400 sm:text-2xl">100%</p>
-                        <p class="text-xs text-navy-300 sm:text-sm">Practical Training</p>
-                    </div>
-                </div>
+                @endif
             </div>
 
             {{-- Desktop collage --}}
@@ -75,8 +79,8 @@
                     </div>
                     <div class="absolute -right-4 top-8 rounded-2xl border border-brand-400/30 bg-navy-900/90 px-5 py-4 backdrop-blur-md">
                         <p class="text-xs font-medium uppercase tracking-wider text-brand-300">Now enrolling</p>
-                        <p class="mt-1 font-display text-lg font-semibold">Our Programmes</p>
-                        <p class="text-sm text-navy-300">{{ $courseGroups->flatten()->count() }} programmes open</p>
+                        <p class="mt-1 font-display text-lg font-semibold">{{ $institute['home']['courses_eyebrow'] ?? 'Our Programmes' }}</p>
+                        <p class="text-sm text-navy-300">{{ $courses->count() }} programmes open</p>
                     </div>
                 </div>
             </div>

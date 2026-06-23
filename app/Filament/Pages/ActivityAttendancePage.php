@@ -2,8 +2,14 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\FinishesAttendanceSave;
+use App\Enums\CrmPermission;
+use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
 use App\Models\BatchStudent;
 use App\Services\ActivityAttendanceService;
+use App\Support\CrmAccess;
+use App\Support\CrmHint;
+use App\Support\EduExamLabels;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
@@ -13,9 +19,25 @@ use Illuminate\Support\Facades\Auth;
 
 class ActivityAttendancePage extends Page
 {
+    use FinishesAttendanceSave;
+
     protected static bool $shouldRegisterNavigation = false;
 
-    protected static ?string $title = 'Mark Activity Attendance';
+    protected static ?string $title = 'Enter Test Marks';
+
+    public static function canAccess(): bool
+    {
+        return CrmAccess::canAny(
+            Auth::user(),
+            CrmPermission::MarksImport,
+            CrmPermission::AttendanceWorkshops,
+        );
+    }
+
+    public function getSubheading(): ?string
+    {
+        return CrmHint::text('activity.attendance');
+    }
 
     public ?int $activityId = null;
 
@@ -110,8 +132,12 @@ class ActivityAttendancePage extends Page
         }
     }
 
-    public function saveAttendance(ActivityAttendanceService $attendance): void
+    public function saveAttendance(ActivityAttendanceService $attendance, array $marks = []): void
     {
+        if ($marks !== []) {
+            $this->marks = $this->normalizeBooleanMarksFromClient($marks);
+        }
+
         $id = $this->activityId;
 
         if (! $id) {
@@ -133,16 +159,22 @@ class ActivityAttendancePage extends Page
             return;
         }
 
-        Notification::make()
-            ->title('Attendance saved')
-            ->body("{$saved} student record(s) saved.")
-            ->success()
-            ->send();
+        $this->finishAttendanceSave(
+            'Saved',
+            "{$saved} student record(s) saved.",
+            ActivitySessionResource::getUrl('index'),
+        );
     }
 
     public function getHeading(): string
     {
-        return $this->activityTitle ?? 'Mark Activity Attendance';
+        if ($this->activityTitle) {
+            return $this->supportsScoring
+                ? $this->activityTitle
+                : 'Mark attendance · '.$this->activityTitle;
+        }
+
+        return $this->supportsScoring ? 'Enter Test Marks' : 'Mark Activity Attendance';
     }
 
     public function content(Schema $schema): Schema

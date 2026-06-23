@@ -4,9 +4,11 @@ namespace Database\Seeders;
 
 use App\Enums\BatchShift;
 use App\Enums\BatchStatus;
+use App\Enums\CourseStatus;
 use App\Enums\Gender;
 use App\Enums\InstituteType;
 use App\Enums\LeadSource;
+use App\Enums\PaymentShortfallAction;
 use App\Enums\RoleName;
 use App\Enums\StudentCategory;
 use App\Enums\StudentStatus;
@@ -15,20 +17,26 @@ use App\Models\ActivitySession;
 use App\Models\ActivityType;
 use App\Models\Batch;
 use App\Models\Course;
+use App\Models\FeeStructure;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\ActivityAttendanceService;
 use App\Services\AdmissionService;
 use App\Services\BatchService;
 use App\Services\EnquiryService;
+use App\Services\EnrollmentRollNumberService;
 use App\Services\PaymentService;
 use App\Services\StudentAuthService;
 use App\Support\DefaultCourse;
+use App\Support\DefaultProgrammes;
+use App\Support\FeePaymentPolicy;
 use App\Support\FeePlanCalculator;
 use App\Support\InstituteProfile;
+use App\Support\PaymentShortfallHelper;
 use Illuminate\Database\Seeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 
 class DemoDataSeeder extends Seeder
@@ -36,6 +44,7 @@ class DemoDataSeeder extends Seeder
     public function run(): void
     {
         $staff = $this->demoStaff();
+        $superAdmin = $this->superAdmin();
         $session = AcademicSession::current();
 
         if (! $session) {
@@ -45,6 +54,7 @@ class DemoDataSeeder extends Seeder
         }
 
         $instituteType = InstituteProfile::type();
+        $this->seedDemoCourses($instituteType);
         $primaryCourse = $this->primaryCourseForType($instituteType);
 
         if (! $primaryCourse) {
@@ -135,6 +145,7 @@ class DemoDataSeeder extends Seeder
 
         $enrolledStudent = $this->seedEnrolledStudent(
             staff: $staff,
+            approver: $superAdmin,
             name: $demo['name'],
             mobile: $demo['mobile'],
             dob: $demo['dob'],
@@ -145,9 +156,72 @@ class DemoDataSeeder extends Seeder
             gender: $demo['gender'],
         );
 
-        $this->seedDemoActivities($staff, $batch, $enrolledStudent, $instituteType);
+        $studentTwo = $this->seedEnrolledStudent(
+            staff: $staff,
+            approver: $superAdmin,
+            name: 'Sneha Gupta',
+            mobile: '9811000008',
+            dob: '2001-03-12',
+            course: $primaryCourse,
+            batch: $batch,
+            discount: 8000,
+            payment: 12000,
+            gender: Gender::Female,
+        );
+
+        $studentThree = $this->seedEnrolledStudent(
+            staff: $staff,
+            approver: $superAdmin,
+            name: 'Amit Verma',
+            mobile: '9811000009',
+            dob: '2001-11-05',
+            course: $primaryCourse,
+            batch: $batch,
+            discount: 5000,
+            payment: 10000,
+            gender: Gender::Male,
+        );
+
+        $rolls = app(EnrollmentRollNumberService::class);
+        $enrollmentOne = $enrolledStudent->activeEnrollment;
+        $enrollmentTwo = $studentTwo->activeEnrollment;
+        $enrollmentThree = $studentThree->activeEnrollment;
+
+        if ($enrollmentOne) {
+            $rolls->update($enrollmentOne, '101', $staff);
+        }
+
+        if ($enrollmentTwo) {
+            $rolls->update($enrollmentTwo, '102', $staff);
+        }
+
+        if ($enrollmentThree) {
+            $rolls->update($enrollmentThree, '103', $staff);
+        }
+
+        $classStudents = [
+            $enrolledStudent->fresh(),
+            $studentTwo->fresh(),
+            $studentThree->fresh(),
+        ];
+
+        $this->seedDemoActivities($staff, $batch, $classStudents, $instituteType);
 
         $this->printSummary($instituteType, $primaryCourse, $demo, $nehaNet);
+    }
+
+    protected function seedDemoCourses(InstituteType $type): void
+    {
+        foreach (DefaultProgrammes::forType($type) as $course) {
+            Course::query()->updateOrCreate(
+                ['code' => $course['code']],
+                [
+                    ...$course,
+                    'status' => CourseStatus::Active,
+                    'show_on_website' => true,
+                ],
+            );
+        }
     }
 
     protected function primaryCourseForType(InstituteType $type): ?Course
@@ -229,6 +303,7 @@ class DemoDataSeeder extends Seeder
 
     protected function seedEnrolledStudent(
         User $staff,
+        User $approver,
         string $name,
         string $mobile,
         string $dob,
@@ -290,7 +365,7 @@ class DemoDataSeeder extends Seeder
             $staff,
         );
 
-        $enrollment = $admissions->approve($admission, $staff);
+        $enrollment = $admissions->approve($admission, $approver);
         app(BatchService::class)->assign($student, $batch, $staff);
 
         $feeStructure = $enrollment->feeStructure;
@@ -299,90 +374,244 @@ class DemoDataSeeder extends Seeder
             app(PaymentService::class)->add(
                 $feeStructure,
                 $student,
-                [
-                    'payment_date' => now()->toDateString(),
-                    'amount' => $payment,
-                    'payment_mode' => 'cash',
-                    'voucher_number' => 'DEMO-'.strtoupper(substr($name, 0, 3)),
-                ],
+                $this->demoPaymentPayload(
+                    $feeStructure,
+                    $payment,
+                    'DEMO-'.strtoupper(substr($name, 0, 3)),
+                ),
                 UploadedFile::fake()->image('proof.jpg'),
                 $staff,
             );
         }
 
-        return $student;
+        return $student->fresh(['activeEnrollment']);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    protected function demoPaymentPayload(FeeStructure $feeStructure, float $amount, string $voucherNumber): array
+    {
+        $feeStructure->loadMissing('installments');
+
+        $payload = [
+            'payment_date' => now()->toDateString(),
+            'amount' => $amount,
+            'payment_mode' => 'cash',
+            'voucher_number' => $voucherNumber,
+        ];
+
+        if (! FeePaymentPolicy::usesFlexibleAllocation() || $feeStructure->installments->isEmpty()) {
+            return $payload;
+        }
+
+        $installment = $feeStructure->installments->sortBy('sort_order')->first();
+
+        if (! $installment || PaymentShortfallHelper::shortfallAmount($amount, $installment) <= 0) {
+            return $payload;
+        }
+
+        if (PaymentShortfallHelper::hasNextPayableInstallment($installment)) {
+            $payload['shortfall_action'] = PaymentShortfallAction::CarryForward->value;
+
+            return $payload;
+        }
+
+        $payload['shortfall_action'] = PaymentShortfallAction::NewInstallment->value;
+        $payload['shortfall_due_date'] = now()->addMonth()->toDateString();
+        $payload['shortfall_label'] = PaymentShortfallHelper::suggestNewInstallmentLabel($feeStructure->id);
+
+        return $payload;
+    }
+
+    /**
+     * @param  list<Student>  $students
+     */
     protected function seedDemoActivities(
         User $staff,
         Batch $batch,
-        Student $student,
+        array $students,
         InstituteType $instituteType,
     ): void {
         $examType = ActivityType::query()->where('slug', 'exam')->first();
         $mockType = ActivityType::query()->where('slug', 'mock_test')->first();
 
         if (! $examType || ! $mockType) {
-            $this->command?->warn('Activity types missing — run ActivityTypeSeeder first.');
+            $this->command?->warn('Exam types missing — run ActivityTypeSeeder first.');
 
             return;
         }
 
-        $attendance = app(ActivityAttendanceService::class);
+        $type = $instituteType === InstituteType::Coaching ? $mockType : $examType;
+        $tests = $this->demoExamTestsForType($instituteType);
 
-        [$type, $title, $metadata, $marks] = match ($instituteType) {
+        foreach ($tests as $test) {
+            $this->seedTestMarks($staff, $batch, $students, $type, $test);
+        }
+
+        $this->command?->line('Demo marks: '.count($tests).' test(s) · rolls 101–103 · student profile shows subject columns');
+    }
+
+    /**
+     * @param  list<Student>  $students
+     * @param  array{
+     *     name: string,
+     *     date: string,
+     *     max_marks: int|float,
+     *     subjects: array<string, array<string, int|float>>
+     * }  $test
+     */
+    protected function seedTestMarks(
+        User $staff,
+        Batch $batch,
+        array $students,
+        ActivityType $type,
+        array $test,
+    ): void {
+        $attendance = app(ActivityAttendanceService::class);
+        $testKey = Str::slug($test['name']).'-'.$test['date'];
+
+        foreach ($test['subjects'] as $subject => $marksByRoll) {
+            $session = ActivitySession::query()->create([
+                'activity_type_id' => $type->id,
+                'title' => "{$test['name']} — {$subject}",
+                'session_date' => $test['date'],
+                'batch_id' => $batch->id,
+                'metadata' => [
+                    'test_key' => $testKey,
+                    'test_name' => $test['name'],
+                    'subject' => $subject,
+                    'max_marks' => $test['max_marks'],
+                ],
+                'created_by_user_id' => $staff->id,
+            ]);
+
+            $scores = [];
+
+            foreach ($students as $student) {
+                $roll = strtoupper((string) ($student->activeEnrollment?->enrollment_number ?? ''));
+
+                if ($roll === '' || ! isset($marksByRoll[$roll])) {
+                    continue;
+                }
+
+                $scores[$student->id] = $marksByRoll[$roll];
+            }
+
+            if ($scores !== []) {
+                $attendance->importStudentScores($session, $scores, $staff);
+            }
+        }
+    }
+
+    /**
+     * @return list<array{
+     *     name: string,
+     *     date: string,
+     *     max_marks: int|float,
+     *     subjects: array<string, array<string, int|float>>
+     * }>
+     */
+    protected function demoExamTestsForType(InstituteType $instituteType): array
+    {
+        return match ($instituteType) {
             InstituteType::School => [
-                $examType,
-                'Unit Test — Accountancy',
-                ['subject' => 'Accountancy', 'max_marks' => 50],
-                ['marks_obtained' => 38],
+                [
+                    'name' => 'Unit Test — June 2026',
+                    'date' => now()->subDays(15)->toDateString(),
+                    'max_marks' => 50,
+                    'subjects' => [
+                        'Mathematics' => ['101' => 42, '102' => 38, '103' => 45],
+                        'Physics' => ['101' => 35, '102' => 40, '103' => 33],
+                        'Chemistry' => ['101' => 44, '102' => 41, '103' => 39],
+                    ],
+                ],
+                [
+                    'name' => 'Unit Test — July 2026',
+                    'date' => now()->subDays(3)->toDateString(),
+                    'max_marks' => 50,
+                    'subjects' => [
+                        'Mathematics' => ['101' => 40, '102' => 43, '103' => 41],
+                        'Physics' => ['101' => 36, '102' => 38, '103' => 35],
+                        'Chemistry' => ['101' => 42, '102' => 40, '103' => 44],
+                        'Biology' => ['101' => 38, '102' => 36, '103' => 40],
+                    ],
+                ],
             ],
             InstituteType::Coaching => [
-                $mockType,
-                'JEE Mock — Paper 1',
-                ['paper' => 'Physics & Chemistry', 'max_marks' => 100],
-                ['marks_obtained' => 72],
+                [
+                    'name' => 'Mock Test — June 2026',
+                    'date' => now()->subDays(15)->toDateString(),
+                    'max_marks' => 100,
+                    'subjects' => [
+                        'Physics' => ['101' => 72, '102' => 68, '103' => 75],
+                        'Chemistry' => ['101' => 65, '102' => 70, '103' => 62],
+                    ],
+                ],
+                [
+                    'name' => 'Mock Test — July 2026',
+                    'date' => now()->subDays(3)->toDateString(),
+                    'max_marks' => 100,
+                    'subjects' => [
+                        'Physics' => ['101' => 78, '102' => 74, '103' => 80],
+                        'Chemistry' => ['101' => 70, '102' => 72, '103' => 68],
+                        'Mathematics' => ['101' => 82, '102' => 79, '103' => 85],
+                    ],
+                ],
             ],
             InstituteType::College => [
-                $examType,
-                'Internal — Business Law',
-                ['subject' => 'Business Law', 'max_marks' => 40],
-                ['marks_obtained' => 31],
+                [
+                    'name' => 'Internal — June 2026',
+                    'date' => now()->subDays(15)->toDateString(),
+                    'max_marks' => 40,
+                    'subjects' => [
+                        'Business Law' => ['101' => 31, '102' => 28, '103' => 34],
+                        'Financial Accounting' => ['101' => 36, '102' => 33, '103' => 38],
+                    ],
+                ],
+                [
+                    'name' => 'Internal — July 2026',
+                    'date' => now()->subDays(3)->toDateString(),
+                    'max_marks' => 40,
+                    'subjects' => [
+                        'Business Law' => ['101' => 33, '102' => 30, '103' => 35],
+                        'Financial Accounting' => ['101' => 34, '102' => 32, '103' => 36],
+                        'Economics' => ['101' => 29, '102' => 31, '103' => 30],
+                    ],
+                ],
             ],
         };
-
-        $session = ActivitySession::query()->create([
-            'activity_type_id' => $type->id,
-            'title' => $title,
-            'session_date' => now()->subDays(2)->toDateString(),
-            'batch_id' => $batch->id,
-            'metadata' => $metadata,
-            'created_by_user_id' => $staff->id,
-        ]);
-
-        $attendance->saveMarks(
-            $session,
-            [$student->id => true],
-            $staff,
-            [$student->id => $marks],
-        );
     }
 
     protected function demoStaff(): User
     {
         Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);
 
-        $user = User::query()->create([
-            'name' => 'Demo Staff',
-            'email' => 'demo@example.com',
-            'password' => Hash::make('password'),
-            'mobile' => '9999900000',
-            'is_active' => true,
-        ]);
+        $user = User::query()->updateOrCreate(
+            ['email' => 'demo@example.com'],
+            [
+                'name' => 'Demo Staff',
+                'password' => Hash::make('password'),
+                'mobile' => '9999900000',
+                'is_active' => true,
+            ],
+        );
 
-        $user->assignRole(RoleName::Staff->value);
+        if (! $user->hasRole(RoleName::Staff->value)) {
+            $user->assignRole(RoleName::Staff->value);
+        }
 
         return $user;
+    }
+
+    protected function superAdmin(): User
+    {
+        $mobile = (string) env('ADMIN_MOBILE', '9876543210');
+
+        return User::query()
+            ->where('mobile', $mobile)
+            ->orWhereHas('roles', fn ($query) => $query->where('name', RoleName::SuperAdmin->value))
+            ->firstOrFail();
     }
 
     protected function printSummary(InstituteType $instituteType, Course $course, array $demo, float $nehaNet): void
@@ -396,6 +625,8 @@ class DemoDataSeeder extends Seeder
         $this->command?->newLine();
         $this->command?->line('Leads: Aarav 9811000001 · Priya 9811000002 · Karan 9811000003 (undecided course)');
         $this->command?->line("Admission pending: Neha Singh 9811000004 · net ₹".number_format($nehaNet, 2).' · 2 installments + transport');
-        $this->command?->line("Enrolled: {$demo['name']} {$demo['mobile']} · portal password DOB {$demo['dob_password']} · partial fee paid");
+        $this->command?->line("Enrolled: {$demo['name']} roll 101 · Sneha Gupta roll 102 · Amit Verma roll 103 · partial fees paid");
+        $this->command?->line('Marks: Student profile → Exam tab — Unit Test June & July (subjects as columns)');
+        $this->command?->line('Import Marks: use rolls 101–103 · template under Academics → Import Marks');
     }
 }

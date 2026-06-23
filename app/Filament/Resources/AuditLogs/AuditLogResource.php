@@ -4,7 +4,9 @@ namespace App\Filament\Resources\AuditLogs;
 
 use App\Enums\RoleName;
 use App\Filament\Resources\AuditLogs\Pages\ListAuditLogs;
+use App\Filament\Support\CrmTable;
 use App\Models\AuditLog;
+use App\Support\CrmNavigation;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -30,9 +32,9 @@ class AuditLogResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Audit log';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 20;
 
-    protected static string | UnitEnum | null $navigationGroup = 'Administration';
+    protected static string | UnitEnum | null $navigationGroup = CrmNavigation::GROUP_ADMIN;
 
     public static function canAccess(): bool
     {
@@ -46,7 +48,7 @@ class AuditLogResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return CrmTable::configure($table)
             ->defaultSort('created_at', 'desc')
             ->paginated([25, 50, 100])
             ->columns([

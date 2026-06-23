@@ -13,6 +13,7 @@ class Enrollment extends Model
         'student_id',
         'admission_id',
         'course_id',
+        'academic_session_id',
         'enrollment_number',
         'enrolled_at',
         'status',
@@ -69,6 +70,11 @@ class Enrollment extends Model
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);
+    }
+
+    public function academicSession(): BelongsTo
+    {
+        return $this->belongsTo(AcademicSession::class);
     }
 
     public function feeStructure(): HasOne

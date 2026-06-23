@@ -36,7 +36,7 @@ class StudentCounterServiceTest extends TestCase
 
         $labels = collect($profile['items'])->pluck('label')->all();
 
-        $this->assertSame(['Visits', 'Enquiries', 'Website', 'Walk-in', 'School', 'Coaching'], $labels);
+        $this->assertSame(['Visits', 'Enquiries', 'Website', 'Walk-in', 'Enquiry', 'Admission', 'Marketing', 'Fees', 'General'], $labels);
         $this->assertNotContains('Attendance', $labels);
         $this->assertNotContains('Paid', $labels);
     }
@@ -67,7 +67,7 @@ class StudentCounterServiceTest extends TestCase
             'enquiry_number' => 'CRM-ENQ-2026-000101',
             'course_id' => $course->id,
             'lead_source' => LeadSource::WalkIn,
-            'meeting_for' => MeetingFor::Coaching,
+            'meeting_for' => MeetingFor::Marketing,
             'visit_type' => 'first_visit',
             'latest_visit_status' => 'interested',
             'created_at' => now(),
@@ -77,10 +77,9 @@ class StudentCounterServiceTest extends TestCase
 
         $this->assertSame(0, $profile['lead_sources']['website_count']);
         $this->assertSame(1, $profile['lead_sources']['walk_in_count']);
-        $this->assertSame(0, $profile['lead_sources']['school_count']);
-        $this->assertSame(1, $profile['lead_sources']['coaching_count']);
+        $this->assertSame(1, $profile['lead_sources']['meeting_for_counts']['marketing'] ?? 0);
         $this->assertSame('Walk-in lead', $profile['lead_sources']['headline']);
-        $this->assertSame('Walk-in for Coaching', $profile['lead_sources']['latest_intent']);
+        $this->assertSame('Walk-in for Marketing', $profile['lead_sources']['latest_intent']);
     }
 
     public function test_admission_in_progress_uses_admission_counters(): void

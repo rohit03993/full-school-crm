@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\BatchOverviewWidget;
+use App\Filament\Widgets\CallingStatsWidget;
 use App\Filament\Widgets\CrmFinanceStatsWidget;
 use App\Filament\Widgets\CrmLeadStatsWidget;
 use App\Filament\Widgets\CourseAdmissionsChartWidget;
@@ -11,6 +13,7 @@ use App\Filament\Widgets\MonthlyAdmissionsChartWidget;
 use App\Filament\Widgets\MonthlyFeeCollectionChartWidget;
 use App\Filament\Widgets\PendingAdmissionsWidget;
 use App\Filament\Widgets\RecentEnquiriesWidget;
+use App\Support\CrmHint;
 use Filament\Actions\Action;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Support\Icons\Heroicon;
@@ -25,6 +28,11 @@ class Dashboard extends BaseDashboard
     public function getTitle(): string | Htmlable
     {
         return '';
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        return CrmHint::text('dashboard');
     }
 
     /**
@@ -59,6 +67,8 @@ class Dashboard extends BaseDashboard
     {
         return [
             DashboardHeroWidget::class,
+            BatchOverviewWidget::class,
+            CallingStatsWidget::class,
             CrmLeadStatsWidget::class,
             CrmFinanceStatsWidget::class,
             RecentEnquiriesWidget::class,

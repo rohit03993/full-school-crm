@@ -9,15 +9,19 @@
             <div>
                 <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Discount (₹)</dt>
                 <dd>
-                    <x-filament::input.wrapper>
-                        <x-filament::input
-                            type="number"
-                            wire:model.live="discountAmount"
-                            step="0.01"
-                            min="0"
-                        />
-                    </x-filament::input.wrapper>
-                    @error('discountAmount')<p class="mt-1 text-xs text-danger-600">{{ $message }}</p>@enderror
+                    @if ($this->canManageAdmissionFeePlan)
+                        <x-filament::input.wrapper>
+                            <x-filament::input
+                                type="number"
+                                wire:model.live="discountAmount"
+                                step="0.01"
+                                min="0"
+                            />
+                        </x-filament::input.wrapper>
+                        @error('discountAmount')<p class="mt-1 text-xs text-danger-600">{{ $message }}</p>@enderror
+                    @else
+                        <span class="font-semibold text-gray-950 dark:text-white">₹{{ number_format((float) ($activeAdmission->discount_amount ?? 0), 2) }}</span>
+                    @endif
                 </dd>
             </div>
             <div>
@@ -28,6 +32,9 @@
             <div>
                 <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Discount</dt>
                 <dd class="font-semibold text-gray-950 dark:text-white">₹{{ number_format((float) ($activeAdmission->discount_amount ?? 0), 2) }}</dd>
+                @if ((float) ($activeAdmission->discount_amount ?? 0) > 0 && $activeAdmission->discountSetBy)
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Granted by {{ $activeAdmission->discountSetBy->name }}</p>
+                @endif
             </div>
             <div>
                 <dt class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Net fee</dt>
@@ -36,7 +43,7 @@
         @endif
     </dl>
 
-    @if ($activeAdmission->canAdjustFees())
+    @if ($activeAdmission->canAdjustFees() && $this->canManageAdmissionFeePlan)
         @if ($this->admissionCourseFeeZero)
             <div class="mt-3 rounded-lg border border-danger-500/30 bg-danger-500/5 px-3 py-2 text-xs text-danger-700 dark:text-danger-300">
                 This course has ₹0 fee. Set the fee in Courses admin before saving a fee plan.
@@ -50,7 +57,7 @@
                     <x-filament::button type="button" wire:click="addMiscFeeRow" size="xs" color="gray">Add charge</x-filament::button>
                 </div>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Optional extras (transport, exam fee, etc.) added to the net fee.</p>
-                @forelse ($miscFees as $index => $miscFee)
+                @forelse ($this->miscFees as $index => $miscFee)
                     <div class="mt-3 grid gap-2 sm:grid-cols-[1fr_140px_auto]" wire:key="misc-fee-{{ $index }}">
                         <x-filament::input.wrapper>
                             <x-filament::input type="text" wire:model.live="miscFees.{{ $index }}.label" placeholder="Label" />
@@ -72,7 +79,7 @@
                 </label>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">When off, full net fee is due as one installment after approval.</p>
 
-                @if ($useInstallmentPlan)
+                @if ($this->useInstallmentPlan)
                     <div class="mt-3 rounded-lg border border-primary-500/30 bg-primary-500/5 px-3 py-2 text-xs text-primary-900 dark:text-primary-200">
                         {{ $this->admissionInstallmentSummary }}
                     </div>
@@ -86,7 +93,7 @@
                         <x-filament::button type="button" wire:click="suggestInstallmentPlan" size="xs" color="gray" outlined>Suggest 50/50 plan</x-filament::button>
                         <x-filament::button type="button" wire:click="fillInstallmentBalance" size="xs" color="gray" outlined>Fill balance on last row</x-filament::button>
                     </div>
-                    @foreach ($installmentPlan as $index => $row)
+                    @foreach ($this->installmentPlan as $index => $row)
                         <div class="mt-3 grid gap-2 lg:grid-cols-[1fr_140px_160px_auto]" wire:key="installment-plan-{{ $index }}">
                             <x-filament::input.wrapper>
                                 <x-filament::input type="text" wire:model="installmentPlan.{{ $index }}.label" placeholder="Label" />

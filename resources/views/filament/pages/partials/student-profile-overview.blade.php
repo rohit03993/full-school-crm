@@ -20,7 +20,6 @@
             <dl class="grid gap-3 px-4 py-4 text-sm sm:grid-cols-2 sm:gap-4 sm:px-6 sm:pb-6">
                 <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Name</dt><dd class="mt-0.5 font-medium text-gray-950 dark:text-white">{{ $record->name }}</dd></div>
                 <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Mobile</dt><dd class="mt-0.5 font-medium text-gray-950 dark:text-white">{{ $record->mobile }}</dd></div>
-                <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Email</dt><dd class="mt-0.5 font-medium text-gray-950 dark:text-white">{{ $record->email ?? '—' }}</dd></div>
                 <div class="sm:col-span-2"><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Address</dt><dd class="mt-0.5 font-medium text-gray-950 dark:text-white">{{ collect([$record->address, $record->city, $record->state, $record->pincode])->filter()->implode(', ') ?: '—' }}</dd></div>
             </dl>
         </div>
@@ -56,7 +55,7 @@
                                 </span>
                                 @if ($enquiry->meeting_for)
                                     @include('filament.pages.partials.meeting-for-badge', [
-                                        'meetingFor' => $enquiry->meeting_for,
+                                        'value' => $enquiry->meeting_for,
                                         'size' => 'sm',
                                     ])
                                 @endif
@@ -126,7 +125,7 @@
             <div class="border-b border-gray-100 px-4 py-3 dark:border-white/10 sm:px-6 sm:py-4">
                 <h3 class="text-base font-semibold text-gray-950 dark:text-white">
                     @if ($record->activeEnrollment)
-                        Enrollment
+                        Student record
                     @else
                         Enquiries
                     @endif
@@ -135,7 +134,7 @@
 
             @if ($record->activeEnrollment)
                 <dl class="grid gap-3 px-4 py-4 text-sm sm:px-6 sm:pb-6">
-                    <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Enrollment No.</dt><dd class="mt-0.5 font-mono font-medium text-primary-600 dark:text-primary-400">{{ $record->activeEnrollment->enrollment_number }}</dd></div>
+                    <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ \App\Support\StudentLabels::rollNumberLabel() }}</dt><dd class="mt-0.5 font-mono font-medium text-primary-600 dark:text-primary-400">{{ $record->activeEnrollment->enrollment_number }}</dd></div>
                     <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Course</dt><dd class="mt-0.5 font-medium text-gray-950 dark:text-white">{{ $record->activeEnrollment->course?->name ?? '—' }}</dd></div>
                     <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Enrolled On</dt><dd class="mt-0.5 font-medium text-gray-950 dark:text-white">{{ $record->activeEnrollment->enrolled_at?->format('d M Y') ?? '—' }}</dd></div>
                     <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Batch</dt><dd class="mt-0.5 font-medium text-gray-950 dark:text-white">{{ $record->hasActiveBatch() ? 'Assigned' : 'Not assigned yet' }}</dd></div>

@@ -2,35 +2,28 @@
 
 namespace App\Policies;
 
+use App\Enums\CrmPermission;
 use App\Enums\ReportType;
-use App\Enums\RoleName;
 use App\Models\User;
+use App\Support\CrmAccess;
 
 class ReportPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $this->isStaff($user);
+        return CrmAccess::can($user, CrmPermission::ReportsView);
     }
 
     public function export(User $user, ReportType $report): bool
     {
-        if (! $this->isStaff($user)) {
+        if (! CrmAccess::can($user, CrmPermission::ReportsExport)) {
             return false;
         }
 
         if ($report->isFinancial()) {
-            return $user->hasRole(RoleName::SuperAdmin->value);
+            return CrmAccess::can($user, CrmPermission::DashboardFinanceStats);
         }
 
         return true;
-    }
-
-    protected function isStaff(User $user): bool
-    {
-        return $user->hasAnyRole([
-            RoleName::SuperAdmin->value,
-            RoleName::Staff->value,
-        ]);
     }
 }

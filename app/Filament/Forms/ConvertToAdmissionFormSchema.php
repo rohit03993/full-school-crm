@@ -6,6 +6,7 @@ use App\Models\Course;
 use App\Models\Enquiry;
 use App\Services\ConvertToAdmissionPresenter;
 use App\Support\DefaultCourse;
+use App\Support\InstituteProfile;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -138,7 +139,7 @@ class ConvertToAdmissionFormSchema
      */
     public static function courseOptions(): array
     {
-        return Course::query()
+        return InstituteProfile::adminCoursesQuery(Course::query())
             ->active()
             ->where('code', '!=', DefaultCourse::UNDECIDED_CODE)
             ->orderBy('name')

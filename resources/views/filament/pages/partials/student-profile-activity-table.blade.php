@@ -5,7 +5,7 @@
                 <th class="px-4 py-2.5">Activity</th>
                 <th class="px-4 py-2.5">Batch</th>
                 <th class="px-4 py-2.5">Date</th>
-                <th class="px-4 py-2.5">Marks</th>
+                <th class="px-4 py-2.5">{{ $attendanceOnly ? 'Status' : 'Marks' }}</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-white/10">
@@ -25,7 +25,19 @@
                     <td class="px-4 py-2.5 text-gray-600 dark:text-gray-400">
                         {{ $activity?->session_date?->format('d M Y') ?? '—' }}
                     </td>
-                    <td class="px-4 py-2.5 text-gray-600 dark:text-gray-400">{{ $marksLabel }}</td>
+                    <td class="px-4 py-2.5 text-gray-600 dark:text-gray-400">
+                        @if ($attendanceOnly)
+                            <span @class([
+                                'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold',
+                                'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' => $record->is_present,
+                                'bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300' => ! $record->is_present,
+                            ])>
+                                {{ $record->is_present ? 'Present' : 'Absent' }}
+                            </span>
+                        @else
+                            {{ $marksLabel }}
+                        @endif
+                    </td>
                 </tr>
             @endforeach
         </tbody>

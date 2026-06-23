@@ -3,12 +3,14 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Widgets\Concerns\InteractsWithDashboardCharts;
+use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
 use App\Services\CrmDashboardService;
 use Filament\Widgets\ChartWidget;
 
 class MonthlyAdmissionsChartWidget extends ChartWidget
 {
     use InteractsWithDashboardCharts;
+    use VisibleToSuperAdminOnly;
 
     protected ?string $maxHeight = '280px';
 

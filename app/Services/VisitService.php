@@ -7,7 +7,9 @@ use App\Models\Enquiry;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\Visit;
+use App\Support\CrmCacheInvalidator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class VisitService
 {
@@ -20,6 +22,12 @@ class VisitService
      */
     public function add(Student $student, Enquiry $enquiry, array $data, User $staff): Visit
     {
+        if ($enquiry->student_id !== $student->id) {
+            throw ValidationException::withMessages([
+                'enquiry_id' => 'Enquiry does not belong to this student.',
+            ]);
+        }
+
         return DB::transaction(function () use ($student, $enquiry, $data, $staff): Visit {
             $status = VisitStatus::from($data['status']);
 
@@ -46,6 +54,8 @@ class VisitService
                 ],
                 user: $staff,
             );
+
+            CrmCacheInvalidator::afterVisitOrFollowUpChange($enquiry->meeting_with_user_id);
 
             return $visit->load(['staff', 'enquiry.course']);
         });

@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'pal_digital' => [
+        'api_key' => env('PAL_DIGITAL_API_KEY'),
+        'api_url' => env('PAL_DIGITAL_API_URL'),
+        'default_template' => env('PAL_DIGITAL_DEFAULT_TEMPLATE'),
+        'api_v1_prefix' => env('PAL_DIGITAL_API_V1_PREFIX', '/api/v1'),
+    ],
+
 ];

@@ -7,6 +7,22 @@
             <p class="mt-2 text-xs text-gray-500">Use <strong>Convert to Admission</strong> when the student is ready.</p>
         </div>
     @else
+        @if ($activeAdmission->canBeApproved() && ! auth()->user()?->can('approve', $activeAdmission))
+            <div class="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-500/30 dark:bg-sky-500/10">
+                <p class="text-sm font-medium text-sky-900 dark:text-sky-100">Waiting for approval</p>
+                <p class="mt-1 text-sm text-sky-800 dark:text-sky-200">
+                    The admission form is submitted. An authorized admission officer or admin must verify documents and approve to create the roll number.
+                </p>
+            </div>
+        @elseif ($activeAdmission->status->value === 'submitted' && ! $activeAdmission->hasReviewableSubmission())
+            <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/10">
+                <p class="text-sm font-medium text-amber-900 dark:text-amber-100">Waiting for admission form</p>
+                <p class="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                    The student must submit academic details and documents via the student portal or staff can complete the form here.
+                </p>
+            </div>
+        @endif
+
         @if ($activeAdmission->isEditable())
             @include('filament.partials.admission-form-edit', [
                 'activeAdmission' => $activeAdmission,
@@ -19,7 +35,7 @@
             ])
         @endif
 
-        @if ($activeAdmission->canBeApproved())
+        @if ($activeAdmission->canBeApproved() && auth()->user()?->can('approve', $activeAdmission))
             <div class="mt-4 flex flex-col gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
                 <p class="text-sm text-warning-900 dark:text-warning-200">
                     Verify the admission form above, then approve or return for correction.

@@ -14,6 +14,7 @@ class AdmissionFeePlanService
 {
     public function __construct(
         protected AuditService $audit,
+        protected FeeDiscountLedgerService $discountLedger,
     ) {}
 
     /**
@@ -62,14 +63,25 @@ class AdmissionFeePlanService
             $installmentPlan,
             $staff,
         ): Admission {
+            $previousDiscount = round((float) $admission->discount_amount, 2);
+
             $admission->update([
                 'discount_amount' => $discount,
+                'discount_set_by_user_id' => $staff && $discount > 0 ? $staff->id : null,
                 'net_fee' => $netFee,
                 'use_installment_plan' => $useInstallmentPlan,
             ]);
 
             $this->syncMiscFees($admission, $miscFees);
             $this->syncInstallmentPlan($admission, $installmentPlan);
+
+            $this->discountLedger->recordAdmissionChange(
+                $admission,
+                $previousDiscount,
+                round($discount, 2),
+                $staff,
+                'Admission fee plan saved',
+            );
 
             $this->audit->log(
                 action: 'Admission Fees Updated',

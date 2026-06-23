@@ -14,6 +14,8 @@ return [
     */
     'type' => env('INSTITUTE_TYPE', 'school'),
 
+    'seed_demo_data' => filter_var(env('SEED_DEMO_DATA', false), FILTER_VALIDATE_BOOLEAN),
+
     'hero' => [
         'title' => env('INSTITUTE_HERO_TITLE', 'Quality Education for Every Student'),
         'subtitle' => env('INSTITUTE_HERO_SUBTITLE', 'Manage admissions, fees, batches, and attendance — built for schools and coaching institutes. Start your learning journey with us.'),
@@ -35,6 +37,12 @@ return [
 
     'established' => env('INSTITUTE_ESTABLISHED', '2010'),
 
+    /*
+    | Default student portal password (mobile + this password at /portal/login).
+    | Super Admin can change it under Settings → Institute Settings.
+    */
+    'portal_default_password' => env('PORTAL_DEFAULT_PASSWORD', 'Student@2026'),
+
     'receipt_footer' => env(
         'INSTITUTE_RECEIPT_FOOTER',
         'This is a computer-generated receipt. Fees once paid are non-refundable except as per institute policy. Please retain this receipt for your records.',
@@ -52,14 +60,14 @@ return [
 
     'images' => [
         'hero' => [
-            'main' => 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1920&q=80',
+            'main' => 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1920&q=80',
             'accent_one' => 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=800&q=80',
             'accent_two' => 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=800&q=80',
             'about' => 'https://images.unsplash.com/photo-1498243691581-b145c3f54a5a?auto=format&fit=crop&w=900&q=80',
         ],
         'gallery' => [
             [
-                'src' => 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=900&q=80',
+                'src' => 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=900&q=80',
                 'alt' => 'Students on campus',
                 'caption' => 'Campus & Classrooms',
                 'span' => 'sm:col-span-2 sm:min-h-[280px] lg:col-span-2 lg:row-span-2',
@@ -95,7 +103,7 @@ return [
                 'span' => '',
             ],
             [
-                'src' => 'https://images.unsplash.com/photo-1541339907198-e08756dedf3d?auto=format&fit=crop&w=600&q=80',
+                'src' => 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=600&q=80',
                 'alt' => 'Graduation and achievements',
                 'caption' => 'Student Achievements',
                 'span' => '',

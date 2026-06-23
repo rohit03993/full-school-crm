@@ -25,7 +25,7 @@
                         <dd class="mt-0.5 font-semibold text-gray-950">{{ $student->name }}</dd>
                     </div>
                     <div>
-                        <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Enrollment number</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ \App\Support\StudentLabels::rollNumberLabel() }}</dt>
                         <dd class="mt-0.5 font-mono font-semibold text-amber-700">{{ $enrollment->enrollment_number }}</dd>
                     </div>
                     <div>

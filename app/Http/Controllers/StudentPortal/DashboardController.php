@@ -4,9 +4,13 @@ namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\StudentPortal\Concerns\ResolvesPortalStudent;
+use App\Models\ActivityType;
 use App\Models\Admission;
 use App\Models\Payment;
+use App\Services\ActivityAttendanceService;
 use App\Services\AdmissionService;
+use App\Services\AttendanceService;
+use App\Support\StudentExamMarksMatrix;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -36,6 +40,33 @@ class DashboardController extends Controller
                 ->get()
             : collect();
 
+        $examMarksSections = [];
+        $sessionAttendanceRecords = collect();
+        $classAttendancePercentage = null;
+
+        if ($enrollment) {
+            $attendance = app(ActivityAttendanceService::class);
+            $sessionAttendanceRecords = $attendance->sessionAttendanceRecordsForStudent($student);
+            $classAttendancePercentage = app(AttendanceService::class)->percentageForStudent($student);
+
+            foreach (ActivityType::query()->enabled()->ordered()->get() as $activityType) {
+                if (! $activityType->supportsScoring()) {
+                    continue;
+                }
+
+                $records = $attendance->presentRecordsForStudent($student, $activityType);
+
+                if ($records->isEmpty()) {
+                    continue;
+                }
+
+                $examMarksSections[] = [
+                    'label' => $activityType->name,
+                    'matrix' => StudentExamMarksMatrix::fromRecords($records),
+                ];
+            }
+        }
+
         return view('portal.dashboard', [
             'student' => $student,
             'admission' => $admission,
@@ -43,6 +74,9 @@ class DashboardController extends Controller
             'enrollment' => $enrollment,
             'fees' => $fees,
             'payments' => $payments,
+            'examMarksSections' => $examMarksSections,
+            'sessionAttendanceRecords' => $sessionAttendanceRecords,
+            'classAttendancePercentage' => $classAttendancePercentage,
         ]);
     }
 

@@ -17,12 +17,12 @@
                     <span class="text-gray-400">·</span> {{ $attendanceRecords->count() }} class day(s) recorded
                 </p>
             @else
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">No attendance marked yet for this batch.</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">No daily attendance marked yet for this batch.</p>
             @endif
         </div>
 
         @if ($attendanceRecords->isEmpty())
-            <p class="text-sm text-gray-500 dark:text-gray-400">Attendance history will appear here after staff marks daily attendance.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Daily class attendance appears here after staff marks batch attendance.</p>
         @else
             <div class="overflow-hidden rounded-xl ring-1 ring-gray-200 dark:ring-white/10">
                 <table class="w-full text-left text-sm">

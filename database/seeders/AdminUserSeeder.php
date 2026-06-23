@@ -5,27 +5,32 @@ namespace Database\Seeders;
 use App\Enums\RoleName;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Role;
 
 class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
-        $email = (string) env('ADMIN_EMAIL', 'rohit03993@gmail.com');
+        $mobile = (string) env('ADMIN_MOBILE', '9876543210');
         $password = (string) env('ADMIN_PASSWORD', 'Admin@2026');
         $name = (string) env('ADMIN_NAME', 'Super Admin');
 
         $user = User::query()->updateOrCreate(
-            ['email' => $email],
+            ['mobile' => $mobile],
             [
                 'name' => $name,
+                'email' => null,
                 'password' => $password,
-                'mobile' => env('ADMIN_MOBILE', '9876543210'),
                 'is_active' => true,
             ],
         );
 
+        Role::query()->firstOrCreate(
+            ['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web'],
+        );
+
         $user->syncRoles([RoleName::SuperAdmin->value]);
 
-        $this->command?->info("Super Admin ready: {$email}");
+        $this->command?->info("Super Admin ready: {$mobile}");
     }
 }

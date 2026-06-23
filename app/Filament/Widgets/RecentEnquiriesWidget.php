@@ -4,11 +4,14 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Pages\StudentProfilePage;
 use App\Filament\Resources\Enquiries\EnquiryResource;
+use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
 use App\Services\CrmDashboardService;
 use Filament\Widgets\Widget;
 
 class RecentEnquiriesWidget extends Widget
 {
+    use VisibleToSuperAdminOnly;
+
     protected static ?int $sort = 3;
 
     protected string $view = 'filament.widgets.recent-enquiries';

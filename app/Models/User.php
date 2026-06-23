@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\RoleName;
+use App\Support\CrmAccess;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -46,14 +47,22 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        if (! $this->is_active) {
-            return false;
-        }
+        return CrmAccess::hasPanelAccess($this);
+    }
 
-        return $this->hasAnyRole([
-            RoleName::SuperAdmin->value,
-            RoleName::Staff->value,
-        ]);
+    public function canCrm(\App\Enums\CrmPermission|string $permission): bool
+    {
+        return CrmAccess::can($this, $permission);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function staffJobRoleLabels(): array
+    {
+        return collect(CrmAccess::jobRoleNamesFor($this))
+            ->map(fn (string $name): string => \App\Enums\StaffJobRole::from($name)->label())
+            ->all();
     }
 
     public function primaryRoleLabel(): string

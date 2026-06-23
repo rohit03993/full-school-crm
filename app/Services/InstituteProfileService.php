@@ -41,6 +41,11 @@ class InstituteProfileService
         ];
     }
 
+    public function syncProgrammesForType(InstituteType $type): int
+    {
+        return $this->syncProgrammes($type);
+    }
+
     protected function syncProgrammes(InstituteType $type): int
     {
         $count = 0;

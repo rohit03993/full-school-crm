@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Filament\Forms\AdjustFeeStructureFormSchema;
 use App\Models\Course;
 use App\Models\FeeStructure;
 use Filament\Actions\Action;
@@ -73,9 +74,8 @@ class FeePlanSubmissionGuard
         }
 
         $feeStructure->loadMissing('miscCharges');
-        $courseFee = max(0, (float) ($data['course_fee'] ?? $feeStructure->course_fee));
-        $discount = max(0, (float) ($data['discount_amount'] ?? $feeStructure->discount_amount));
-        $net = round($courseFee - $discount + $feeStructure->miscChargesTotal(), 2);
+        $miscTotal = $feeStructure->miscChargesTotal();
+        $net = AdjustFeeStructureFormSchema::previewNetFromMounted($feeStructure, $data, $miscTotal);
         $target = round(max(0, $net - (float) $feeStructure->paid_amount), 2);
 
         if ($target <= 0) {
@@ -96,9 +96,7 @@ class FeePlanSubmissionGuard
 
         $feeStructure->loadMissing('miscCharges');
         $miscTotal = $feeStructure->miscChargesTotal();
-        $courseFee = max(0, (float) ($data['course_fee'] ?? $feeStructure->course_fee));
-        $discount = max(0, (float) ($data['discount_amount'] ?? $feeStructure->discount_amount));
-        $net = round($courseFee - $discount + $miscTotal, 2);
+        $net = AdjustFeeStructureFormSchema::previewNetFromMounted($feeStructure, $data, $miscTotal);
         $target = round(max(0, $net - (float) $feeStructure->paid_amount), 2);
 
         if ($target <= 0) {

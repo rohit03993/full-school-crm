@@ -59,13 +59,13 @@ class ViewAdmission extends ViewRecord
                 ->color('success')
                 ->icon('heroicon-o-check-circle')
                 ->requiresConfirmation()
-                ->visible(fn (): bool => $this->record->canBeApproved())
+                ->visible(fn (): bool => Auth::user()?->can('approve', $this->record) ?? false)
                 ->action(fn (AdmissionService $admissions) => $this->approve($admissions)),
             Action::make('return')
                 ->label('Return for Correction')
                 ->color('warning')
                 ->icon('heroicon-o-arrow-uturn-left')
-                ->visible(fn (): bool => $this->record->canBeApproved())
+                ->visible(fn (): bool => Auth::user()?->can('returnForCorrection', $this->record) ?? false)
                 ->form([
                     \Filament\Forms\Components\Textarea::make('returnRemarks')
                         ->label('Remarks for student / staff')
@@ -126,7 +126,7 @@ class ViewAdmission extends ViewRecord
 
         Notification::make()
             ->title('Admission approved')
-            ->body("Enrollment {$enrollment->enrollment_number} created.")
+            ->body('Roll No. '.$enrollment->enrollment_number.' created.')
             ->success()
             ->send();
     }

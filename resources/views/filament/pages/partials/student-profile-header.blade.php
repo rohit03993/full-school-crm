@@ -6,35 +6,34 @@
 @endphp
 
 @if (($phase === ProfilePhase::Enrolled || $phase === ProfilePhase::ActiveStudent) && ($profile['dossier'] ?? null))
-    @include('filament.pages.partials.student-profile-header-dossier', [
-        'record' => $record,
-        'profile' => $profile,
-    ])
+    <div class="fi-student-profile-shell">
+        @include('filament.pages.partials.student-profile-header-dossier', [
+            'record' => $record,
+            'profile' => $profile,
+        ])
+    </div>
 @else
     @php
         $items = $profile['items'];
         $leadSources = $profile['lead_sources'];
         $columnCount = min(count($items), 6);
-        $schoolLabel = \App\Enums\MeetingFor::School->label();
-        $coachingLabel = \App\Enums\MeetingFor::Coaching->label();
-        $sourceLabels = ['Website', 'Walk-in', $schoolLabel, $coachingLabel];
+        $highlightLabels = collect(['Website', 'Walk-in'])
+            ->merge(collect(\App\Support\MeetingForOptions::active())->pluck('label'))
+            ->all();
     @endphp
 
-    <div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+    <div class="fi-student-profile-shell overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
         <div class="px-4 py-4 sm:px-6 sm:py-5">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0 flex-1">
                     <h2 class="truncate text-lg font-bold text-gray-950 sm:text-xl dark:text-white">{{ $record->name }}</h2>
-                    <p class="mt-1 text-base font-semibold text-primary-600 dark:text-primary-400">
-                        {{ $record->mobile }}
-                    </p>
-                    @if ($record->email || $record->activeEnrollment)
+                    <div class="mt-1 flex items-center gap-2">
+                        <p class="text-base font-semibold text-primary-600 dark:text-primary-400">{{ $record->mobile }}</p>
+                        @include('filament.pages.partials.student-call-button', ['record' => $record])
+                    </div>
+                    @if ($record->activeEnrollment)
                         <p class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
-                            @if ($record->email){{ $record->email }}@endif
-                            @if ($record->activeEnrollment)
-                                @if ($record->email) · @endif
-                                <span class="font-mono">{{ $record->activeEnrollment->enrollment_number }}</span>
-                            @endif
+                            <span class="font-mono">{{ $record->activeEnrollment->enrollment_number }}</span>
                         </p>
                     @endif
 
@@ -52,7 +51,7 @@
 
                     @include('filament.pages.partials.lead-intent-highlight', ['leadSources' => $leadSources])
 
-                    @if (($leadSources['school_count'] ?? 0) > 0 || ($leadSources['coaching_count'] ?? 0) > 0)
+                    @if (! empty(array_filter($leadSources['meeting_for_counts'] ?? [])))
                         <div class="mt-3">
                             @include('filament.pages.partials.meeting-for-badges', ['leadSources' => $leadSources])
                         </div>
@@ -78,6 +77,12 @@
                             Admission in progress — complete form in the Admission tab
                         </p>
                     @endif
+
+                    @include('filament.pages.partials.student-calling-assignment-banner', [
+                        'callingAssignment' => $profile['calling_assignment'] ?? null,
+                    ])
+
+                    @include('filament.pages.partials.student-last-call-summary', ['record' => $record])
                 </div>
             </div>
         </div>
@@ -94,18 +99,14 @@
                     'rounded-xl px-3 py-2.5',
                     'bg-emerald-500/10 ring-1 ring-emerald-500/15 dark:bg-emerald-500/5' => $counter['label'] === 'Website',
                     'bg-sky-500/10 ring-1 ring-sky-500/15 dark:bg-sky-500/5' => $counter['label'] === 'Walk-in',
-                    'bg-amber-500/10 ring-1 ring-amber-500/15 dark:bg-amber-500/5' => $counter['label'] === $schoolLabel,
-                    'bg-violet-500/10 ring-1 ring-violet-500/15 dark:bg-violet-500/5' => $counter['label'] === $coachingLabel,
-                    'bg-gray-50 dark:bg-white/5' => ! in_array($counter['label'], $sourceLabels, true),
+                    'bg-gray-50 dark:bg-white/5' => ! in_array($counter['label'], $highlightLabels, true),
                 ])>
                     <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs dark:text-gray-400">{{ $counter['label'] }}</p>
                     <p @class([
                         'mt-0.5 truncate text-base font-bold sm:text-lg',
                         'text-emerald-700 dark:text-emerald-400' => $counter['label'] === 'Website',
                         'text-sky-800 dark:text-sky-400' => $counter['label'] === 'Walk-in',
-                        'text-amber-800 dark:text-amber-400' => $counter['label'] === $schoolLabel,
-                        'text-violet-800 dark:text-violet-400' => $counter['label'] === $coachingLabel,
-                        'text-gray-950 dark:text-white' => ! in_array($counter['label'], $sourceLabels, true),
+                        'text-gray-950 dark:text-white' => ! in_array($counter['label'], $highlightLabels, true),
                     ])>{{ $counter['value'] }}</p>
                 </div>
             @endforeach

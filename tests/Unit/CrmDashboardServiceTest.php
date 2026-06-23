@@ -62,6 +62,6 @@ class CrmDashboardServiceTest extends TestCase
         $this->assertSame(1, $stats['today_enquiries']);
         $this->assertSame(1, $stats['walk_in_today']);
         $this->assertSame(1, $stats['pending_admissions']);
-        $this->assertSame(1, $stats['total_leads']);
+        $this->assertSame(1, $stats['total_enquiries']);
     }
 }

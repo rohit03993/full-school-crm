@@ -168,30 +168,30 @@ Use this section to steer the agent when opening this project.
 
 ### Phase G1 — Branding & naming
 
-- [ ] Replace “Folks India” strings with `APP_NAME` / institute settings
-- [ ] Rename `config/folks.php` → `config/institute.php` (or similar)
-- [ ] Update Filament `brandName()` to use DB settings
-- [ ] Generic public site copy (hero, about, contact)
-- [ ] Default seeders use neutral demo data (not Folks-specific)
+- [x] Replace “Folks India” strings with `APP_NAME` / institute settings
+- [x] Rename `config/folks.php` → `config/institute.php` (or similar)
+- [x] Update Filament `brandName()` to use DB settings
+- [x] Generic public site copy (hero, about, contact)
+- [x] Default seeders use neutral demo data (not Folks-specific)
 
 ### Phase G2 — Multi-institute readiness (optional later)
 
 - [ ] Single deployment per school (V1) vs multi-tenant (V2) — **decide with user**
-- [ ] Environment-based branding only for V1
-- [ ] Document install guide for new schools
+- [x] Environment-based branding only for V1
+- [x] Document install guide for new schools (`docs/INSTALL_AND_CUSTOMIZE_GUIDE.md`)
 
 ### Phase G3 — Product packaging
 
 - [ ] New GitHub repo (not `folksindia`)
 - [ ] README for installers
 - [ ] Deployment doc (CloudPanel checklist from Folks India learnings)
-- [ ] Optional: installer wizard or setup command
+- [x] Optional: installer wizard or setup command (First-run setup wizard)
 
 ### Phase G4 — Coaching-specific tweaks (if needed)
 
-- [ ] Course types: school vs coaching batches
-- [ ] Fee plans / installment labels
-- [ ] Custom fields per institute (future)
+- [x] Course types: school vs coaching batches
+- [x] Fee plans / installment labels
+- [x] Custom fields per institute (student + enquiry)
 
 ---
 

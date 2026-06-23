@@ -146,4 +146,36 @@ class PenaltyCalculationService
 
         return $penalty->fresh(['feeInstallment', 'waivedBy']);
     }
+
+    public function applyPendingPayments(FeeStructure $feeStructure, float $amount): void
+    {
+        $remaining = round($amount, 2);
+
+        if ($remaining <= 0) {
+            return;
+        }
+
+        $penalties = $feeStructure->penalties()
+            ->where('status', FeePenaltyStatus::Pending)
+            ->orderBy('penalty_date')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($penalties as $penalty) {
+            if ($remaining <= 0.01) {
+                break;
+            }
+
+            $due = round((float) $penalty->penalty_amount, 2);
+
+            if ($remaining + 0.01 < $due) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'amount' => 'Late fee payments must cover each penalty in full.',
+                ]);
+            }
+
+            $penalty->update(['status' => FeePenaltyStatus::Paid]);
+            $remaining = round($remaining - $due, 2);
+        }
+    }
 }

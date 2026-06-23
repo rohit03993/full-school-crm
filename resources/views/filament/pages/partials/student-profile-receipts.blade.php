@@ -32,7 +32,7 @@
                             >
                                 Download PDF
                             </a>
-                            @if ($isSuperAdmin ?? false)
+                            @if ($canAdjustFees ?? false)
                                 <x-filament::button
                                     wire:click="regenerateReceipt({{ $payment->id }})"
                                     size="sm"
@@ -43,6 +43,7 @@
                                 </x-filament::button>
                             @endif
                         @else
+                            @if ($canCollectFees ?? false)
                             <x-filament::button
                                 wire:click="generateReceipt({{ $payment->id }})"
                                 size="sm"
@@ -50,6 +51,7 @@
                             >
                                 Generate PDF
                             </x-filament::button>
+                            @endif
                         @endif
                         @if ($payment->isProofPreviewable())
                             <x-crm.media-preview-button

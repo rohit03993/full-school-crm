@@ -60,7 +60,7 @@
             <td>{{ $student->name }}</td>
         </tr>
         <tr>
-            <td class="label">Enrollment No.</td>
+            <td class="label">{{ \App\Support\StudentLabels::rollNumberLabel() }}</td>
             <td>{{ $enrollment->enrollment_number }}</td>
         </tr>
         <tr>

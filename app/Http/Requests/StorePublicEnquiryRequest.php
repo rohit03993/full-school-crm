@@ -3,7 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\Gender;
-use App\Models\Course;
+use App\Support\InstituteProfile;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -26,7 +26,15 @@ class StorePublicEnquiryRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:255'],
             'date_of_birth' => ['required', 'date', 'before:today', 'after:1950-01-01'],
             'gender' => ['required', Rule::enum(Gender::class)],
-            'course_id' => ['required', Rule::exists(Course::class, 'id')->where('status', 'active')],
+            'course_id' => [
+                'required',
+                'integer',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! InstituteProfile::isPublicCourseId((int) $value)) {
+                        $fail('Please select a valid course.');
+                    }
+                },
+            ],
             'city' => ['nullable', 'string', 'max:100'],
             'message' => ['nullable', 'string', 'max:1000'],
         ];

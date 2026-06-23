@@ -4,14 +4,19 @@ namespace App\Filament\Resources\Batches;
 
 use App\Enums\BatchShift;
 use App\Enums\BatchStatus;
+use App\Enums\CrmPermission;
 use App\Enums\RoleName;
+use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Resources\Batches\Pages\CreateBatch;
 use App\Filament\Resources\Batches\Pages\EditBatch;
 use App\Filament\Resources\Batches\Pages\ListBatches;
+use App\Filament\Support\CrmTable;
 use App\Models\AcademicSession;
 use App\Models\Batch;
-use App\Models\Course;
 use App\Models\User;
+use App\Support\CrmHint;
+use App\Support\CrmNavigation;
+use App\Support\InstituteProfile;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -22,9 +27,17 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class BatchResource extends Resource
 {
+    use RequiresCrmPermission;
+
+    protected static function requiredCrmPermission(): CrmPermission
+    {
+        return CrmPermission::AcademicsManage;
+    }
+
     protected static ?string $model = Batch::class;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
@@ -37,7 +50,14 @@ class BatchResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 30;
+
+    protected static string | UnitEnum | null $navigationGroup = CrmNavigation::GROUP_ACADEMICS;
+
+    public static function getNavigationTooltip(): ?string
+    {
+        return CrmHint::navigationTooltip('batches.list');
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -71,10 +91,8 @@ class BatchResource extends Resource
                             ->native(false),
                         Select::make('course_id')
                             ->label('Programme')
-                            ->relationship('course', 'name')
-                            ->getOptionLabelFromRecordUsing(fn (Course $record): string => $record->admissionSelectLabel())
+                            ->options(fn (): array => InstituteProfile::activeCourseAdmissionOptions())
                             ->searchable()
-                            ->preload()
                             ->required()
                             ->native(false)
                             ->columnSpanFull(),
@@ -115,7 +133,7 @@ class BatchResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return CrmTable::configure($table)
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
@@ -166,7 +184,7 @@ class BatchResource extends Resource
                     ->relationship('academicSession', 'name'),
                 SelectFilter::make('course_id')
                     ->label('Programme')
-                    ->relationship('course', 'name'),
+                    ->options(fn (): array => InstituteProfile::activeCourseOptions()),
                 SelectFilter::make('status')
                     ->options(collect(BatchStatus::cases())->mapWithKeys(
                         fn (BatchStatus $status) => [$status->value => $status->label()],

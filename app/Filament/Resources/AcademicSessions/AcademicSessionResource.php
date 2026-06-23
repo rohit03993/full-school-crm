@@ -6,7 +6,10 @@ use App\Enums\RoleName;
 use App\Filament\Resources\AcademicSessions\Pages\CreateAcademicSession;
 use App\Filament\Resources\AcademicSessions\Pages\EditAcademicSession;
 use App\Filament\Resources\AcademicSessions\Pages\ListAcademicSessions;
+use App\Filament\Support\CrmTable;
 use App\Models\AcademicSession;
+use App\Support\CrmHint;
+use App\Support\CrmNavigation;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -32,13 +35,18 @@ class AcademicSessionResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Academic Sessions';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 10;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Setup';
+    protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_ACADEMICS;
 
     public static function canAccess(): bool
     {
         return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
+    }
+
+    public static function getNavigationTooltip(): ?string
+    {
+        return CrmHint::navigationTooltip('sessions.list');
     }
 
     public static function form(Schema $schema): Schema
@@ -82,7 +90,7 @@ class AcademicSessionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return CrmTable::configure($table)
             ->columns([
                 TextColumn::make('name')
                     ->searchable()

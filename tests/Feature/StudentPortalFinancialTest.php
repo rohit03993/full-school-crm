@@ -6,6 +6,7 @@ use App\Enums\CourseStatus;
 use App\Enums\Gender;
 use App\Enums\LeadSource;
 use App\Enums\PaymentMode;
+use App\Enums\PaymentShortfallAction;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Models\Course;
@@ -39,6 +40,9 @@ class StudentPortalFinancialTest extends TestCase
                 'amount' => 10000,
                 'payment_mode' => PaymentMode::Cash->value,
                 'voucher_number' => 'VCH-PORTAL-1',
+                'shortfall_action' => PaymentShortfallAction::NewInstallment->value,
+                'shortfall_due_date' => now()->addMonth()->toDateString(),
+                'shortfall_label' => 'Installment 2',
             ],
             UploadedFile::fake()->image('proof.jpg'),
             $staff,
@@ -46,15 +50,15 @@ class StudentPortalFinancialTest extends TestCase
 
         $this->post(route('portal.login.submit'), [
             'mobile' => $student->mobile,
-            'password' => '15052000',
+            'password' => config('institute.portal_default_password'),
         ])->assertRedirect(route('portal.dashboard'));
 
         $this->get(route('portal.dashboard'))
             ->assertOk()
             ->assertSee('Fee summary')
-            ->assertSee('₹40,000.00')
+            ->assertSee('₹40,000')
             ->assertSee($payment->receipt_number)
-            ->assertSee('Download receipt');
+            ->assertSee('Receipt');
 
         $this->get(route('portal.receipts.download', $payment))
             ->assertOk()
@@ -77,6 +81,9 @@ class StudentPortalFinancialTest extends TestCase
                 'amount' => 5000,
                 'payment_mode' => PaymentMode::Cash->value,
                 'voucher_number' => 'VCH-A',
+                'shortfall_action' => PaymentShortfallAction::NewInstallment->value,
+                'shortfall_due_date' => now()->addMonth()->toDateString(),
+                'shortfall_label' => 'Installment 2',
             ],
             UploadedFile::fake()->image('proof.jpg'),
             $staff,
@@ -84,7 +91,7 @@ class StudentPortalFinancialTest extends TestCase
 
         $this->post(route('portal.login.submit'), [
             'mobile' => $studentB->mobile,
-            'password' => '15052000',
+            'password' => config('institute.portal_default_password'),
         ]);
 
         $this->get(route('portal.receipts.download', $payment))->assertForbidden();
@@ -92,10 +99,10 @@ class StudentPortalFinancialTest extends TestCase
 
     protected function createStaffUser(): User
     {
-        Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);
+        Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);
 
         $user = User::factory()->create(['is_active' => true]);
-        $user->assignRole(RoleName::Staff->value);
+        $user->assignRole(RoleName::SuperAdmin->value);
 
         return $user;
     }
@@ -109,7 +116,7 @@ class StudentPortalFinancialTest extends TestCase
             'gender' => Gender::Male,
             'mobile' => $mobile,
             'status' => StudentStatus::Enquiry,
-            'portal_password' => app(\App\Services\StudentAuthService::class)->hashPortalPassword('15052000'),
+            'portal_password' => app(\App\Services\StudentAuthService::class)->hashForNewStudent(),
         ]);
 
         $course = Course::query()->create([

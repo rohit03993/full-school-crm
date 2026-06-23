@@ -73,4 +73,24 @@ class ActivityType extends Model
         return collect($this->fields())
             ->contains(fn (array $field): bool => ($field['key'] ?? null) === 'max_marks');
     }
+
+    public function scopeAttendanceOnly(Builder $query): Builder
+    {
+        return $query->enabled()->ordered();
+    }
+
+    /**
+     * Exam types without marks (Workshop, Event, etc.) — attendance per session.
+     *
+     * @return array<int, string>
+     */
+    public static function attendanceTypeOptions(): array
+    {
+        return static::query()
+            ->attendanceOnly()
+            ->get()
+            ->reject(fn (ActivityType $type): bool => $type->supportsScoring())
+            ->pluck('name', 'id')
+            ->all();
+    }
 }

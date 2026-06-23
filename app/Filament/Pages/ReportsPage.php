@@ -3,7 +3,9 @@
 namespace App\Filament\Pages;
 
 use App\Models\ActivityType;
+use App\Enums\CrmPermission;
 use App\Enums\LeadSource;
+use App\Support\CrmAccess;
 use App\Enums\ReportType;
 use App\Models\Batch;
 use App\Models\Course;
@@ -14,6 +16,9 @@ use App\Services\ReportPdfService;
 use App\Services\ReportService;
 use App\Exports\ReportExport;
 use App\Support\ReportCsvExporter;
+use App\Support\CrmHint;
+use App\Support\CrmNavigation;
+use App\Support\InstituteProfile;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Filament\Forms\Components\DatePicker;
@@ -32,6 +37,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use UnitEnum;
 
 class ReportsPage extends Page
 {
@@ -41,7 +47,19 @@ class ReportsPage extends Page
 
     protected static ?string $title = 'Reports';
 
-    protected static ?int $navigationSort = 50;
+    protected static ?int $navigationSort = 10;
+
+    protected static string | UnitEnum | null $navigationGroup = CrmNavigation::GROUP_REPORTS;
+
+    public static function canAccess(): bool
+    {
+        return CrmAccess::can(Auth::user(), CrmPermission::ReportsView);
+    }
+
+    public function getSubheading(): ?string
+    {
+        return CrmHint::text('reports');
+    }
 
     public ?string $reportType = ReportType::Enquiries->value;
 
@@ -142,7 +160,7 @@ class ReportsPage extends Page
                 DatePicker::make('date_to')->label('To')->native(false),
                 Select::make('course_id')
                     ->label('Course')
-                    ->options(fn (): array => Course::query()->orderBy('name')->pluck('name', 'id')->all())
+                    ->options(fn (): array => InstituteProfile::activeCourseOptions())
                     ->searchable()
                     ->native(false),
                 Select::make('batch_id')
@@ -173,7 +191,7 @@ class ReportsPage extends Page
                     ->searchable()
                     ->native(false),
                 Select::make('activity_type_id')
-                    ->label('Activity type')
+                    ->label('Exam type')
                     ->options(fn (): array => ActivityType::query()->enabled()->ordered()->pluck('name', 'id')->all())
                     ->native(false),
             ]);

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Enquiry;
 use App\Models\Student;
 use App\Support\DefaultCourse;
+use App\Support\MeetingForOptions;
 use Illuminate\Support\Collection;
 
 class ConvertToAdmissionPresenter
@@ -27,7 +28,7 @@ class ConvertToAdmissionPresenter
             $enquiry->enquiry_number,
             $enquiry->course?->name ?? 'No course',
             $enquiry->lead_source?->label(),
-            $enquiry->meeting_for?->label(),
+            MeetingForOptions::label($enquiry->meeting_for),
             $enquiry->created_at?->format('d M Y'),
             $isLatest ? 'Latest' : null,
         ]);

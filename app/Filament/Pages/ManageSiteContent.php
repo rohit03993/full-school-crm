@@ -5,6 +5,8 @@ namespace App\Filament\Pages;
 use App\Enums\RoleName;
 use App\Services\SiteContentService;
 use App\Services\SiteImageService;
+use App\Support\CrmHint;
+use App\Support\CrmNavigation;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -12,6 +14,7 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Concerns\CanUseDatabaseTransactions;
 use Filament\Pages\Page;
@@ -37,9 +40,9 @@ class ManageSiteContent extends Page
 
     protected static ?string $title = 'Website Content';
 
-    protected static ?int $navigationSort = 0;
+    protected static ?int $navigationSort = 10;
 
-    protected static string | UnitEnum | null $navigationGroup = 'Website';
+    protected static string | UnitEnum | null $navigationGroup = CrmNavigation::GROUP_WEBSITE;
 
     /**
      * @var array<string, mixed>|null
@@ -49,6 +52,11 @@ class ManageSiteContent extends Page
     public static function canAccess(): bool
     {
         return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
+    }
+
+    public function getSubheading(): ?string
+    {
+        return CrmHint::text('setup.site_content');
     }
 
     public function mount(SiteContentService $siteContent): void
@@ -64,6 +72,7 @@ class ManageSiteContent extends Page
     public function form(Schema $schema): Schema
     {
         return $schema->components([
+            CrmHint::placeholder('setup.site_content'),
             Tabs::make('Site Content')
                 ->tabs([
                     Tab::make('Branding')
@@ -86,7 +95,7 @@ class ManageSiteContent extends Page
                                         ->label('Record ID prefix')
                                         ->maxLength(12)
                                         ->placeholder('CRM')
-                                        ->helperText('Used for enquiry, admission, and enrollment numbers (e.g. CRM-ENQ-2026-000001). Letters and numbers only.'),
+                                        ->helperText(CrmHint::field('record_prefix')),
                                 ]),
                         ]),
                     Tab::make('Contact')
@@ -134,6 +143,55 @@ class ManageSiteContent extends Page
                                 ->maxItems(6)
                                 ->reorderable()
                                 ->columnSpanFull(),
+                        ]),
+                    Tab::make('Home Page')
+                        ->icon(Heroicon::OutlinedHomeModern)
+                        ->schema([
+                            Section::make('About section')
+                                ->schema([
+                                    TextInput::make('home_about_eyebrow')->label('Eyebrow label')->maxLength(80),
+                                    TextInput::make('home_about_title')->label('Heading')->maxLength(255)->columnSpanFull(),
+                                    Repeater::make('home_about_points')
+                                        ->label('Bullet points')
+                                        ->schema([
+                                            TextInput::make('text')->required()->maxLength(255),
+                                        ])
+                                        ->defaultItems(3)
+                                        ->columnSpanFull(),
+                                    TextInput::make('home_about_cta')->label('Link text')->maxLength(120),
+                                ])
+                                ->columns(2),
+                            Section::make('Courses section')
+                                ->schema([
+                                    Toggle::make('home_show_courses_section')
+                                        ->label('Show programmes section on homepage')
+                                        ->helperText('Individual courses still need “Show on public website” enabled under Academics → Courses.')
+                                        ->default(true)
+                                        ->columnSpanFull(),
+                                    TextInput::make('home_courses_eyebrow')->label('Eyebrow label')->maxLength(80),
+                                    TextInput::make('home_courses_title')->label('Heading')->maxLength(255)->columnSpanFull(),
+                                    Textarea::make('home_courses_subtitle')->label('Subtitle')->rows(2)->columnSpanFull(),
+                                ])
+                                ->columns(2),
+                            Section::make('Bottom call to action')
+                                ->schema([
+                                    TextInput::make('home_cta_title')->label('Heading')->maxLength(255)->columnSpanFull(),
+                                    Textarea::make('home_cta_subtitle')->label('Subtitle')->rows(2)->columnSpanFull(),
+                                ]),
+                            Section::make('Hero highlights')
+                                ->schema([
+                                    Repeater::make('hero_stats')
+                                        ->label('Hero stat blocks')
+                                        ->schema([
+                                            TextInput::make('title')->required()->maxLength(40),
+                                            TextInput::make('subtitle')->required()->maxLength(80),
+                                        ])
+                                        ->columns(2)
+                                        ->defaultItems(3)
+                                        ->minItems(1)
+                                        ->maxItems(4)
+                                        ->columnSpanFull(),
+                                ]),
                         ]),
                     Tab::make('Gallery')
                         ->icon(Heroicon::OutlinedRectangleGroup)

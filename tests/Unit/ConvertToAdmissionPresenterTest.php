@@ -3,7 +3,6 @@
 namespace Tests\Unit;
 
 use App\Enums\CourseStatus;
-use App\Enums\Gender;
 use App\Enums\LeadSource;
 use App\Enums\StudentStatus;
 use App\Models\Course;
@@ -18,13 +17,12 @@ class ConvertToAdmissionPresenterTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_convertible_enquiries_are_sorted_latest_first(): void
+    public function test_convertible_enquiry_is_returned_for_open_lead(): void
     {
         $student = $this->createStudent();
         $course = $this->createCourse('BSc', 'BSC-01');
-        $undecided = DefaultCourse::undecided();
 
-        $older = Enquiry::query()->create([
+        $enquiry = Enquiry::query()->create([
             'student_id' => $student->id,
             'enquiry_number' => 'CRM-ENQ-2026-000001',
             'course_id' => $course->id,
@@ -32,63 +30,35 @@ class ConvertToAdmissionPresenterTest extends TestCase
             'meeting_for' => 'school',
             'visit_type' => 'first_visit',
             'latest_visit_status' => 'interested',
-            'created_at' => now()->subDay(),
-        ]);
-
-        $latest = Enquiry::query()->create([
-            'student_id' => $student->id,
-            'enquiry_number' => 'CRM-ENQ-2026-000002',
-            'course_id' => $undecided->id,
-            'lead_source' => LeadSource::WalkIn,
-            'meeting_for' => 'coaching',
-            'visit_type' => 'follow_up',
-            'latest_visit_status' => 'interested',
-            'created_at' => now(),
         ]);
 
         $convertible = app(ConvertToAdmissionPresenter::class)->convertibleEnquiries($student->fresh());
 
-        $this->assertTrue($convertible->first()->is($latest));
-        $this->assertTrue($convertible->last()->is($older));
+        $this->assertCount(1, $convertible);
+        $this->assertTrue($convertible->first()->is($enquiry));
     }
 
-    public function test_warns_when_latest_enquiry_has_no_course_but_older_has_course(): void
+    public function test_selection_warning_is_null_for_single_undecided_enquiry(): void
     {
         $student = $this->createStudent();
-        $course = $this->createCourse('Class 12 Science', 'SCH-12-SCI');
         $undecided = DefaultCourse::undecided();
 
-        Enquiry::query()->create([
+        $enquiry = Enquiry::query()->create([
             'student_id' => $student->id,
             'enquiry_number' => 'CRM-ENQ-2026-000001',
-            'course_id' => $course->id,
-            'lead_source' => LeadSource::Website,
-            'meeting_for' => 'school',
-            'visit_type' => 'first_visit',
-            'latest_visit_status' => 'interested',
-            'created_at' => now()->subDay(),
-        ]);
-
-        Enquiry::query()->create([
-            'student_id' => $student->id,
-            'enquiry_number' => 'CRM-ENQ-2026-000002',
             'course_id' => $undecided->id,
             'lead_source' => LeadSource::WalkIn,
             'meeting_for' => 'coaching',
             'visit_type' => 'follow_up',
             'latest_visit_status' => 'interested',
-            'created_at' => now(),
         ]);
 
         $presenter = app(ConvertToAdmissionPresenter::class);
         $convertible = $presenter->convertibleEnquiries($student->fresh());
 
-        $warning = $presenter->selectionWarning($convertible);
-
-        $this->assertNotNull($warning);
-        $this->assertStringContainsString('CRM-ENQ-2026-000001', $warning);
-        $this->assertStringContainsString('Class 12 Science', $warning);
-        $this->assertSame($convertible->first()->id, $presenter->defaultEnquiryId($convertible));
+        $this->assertNull($presenter->selectionWarning($convertible));
+        $this->assertTrue($presenter->enquiryNeedsCourseSelection($enquiry));
+        $this->assertSame($enquiry->id, $presenter->defaultEnquiryId($convertible));
     }
 
     public function test_enquiry_option_labels_include_latest_marker(): void

@@ -19,12 +19,15 @@ use App\Models\FeeStructure;
 use App\Models\FeeInstallment;
 use App\Models\Payment;
 use App\Models\Student;
+use App\Support\StudentExamMarksMatrix;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class ReportService
 {
+    public const MAX_DETAIL_ROWS = 5000;
+
     /**
      * @param  array{
      *     date_from?: ?string,
@@ -55,6 +58,12 @@ class ReportService
             ReportType::AttendanceByBatch => $this->attendanceByBatchReport($from, $to, $filters['batch_id'] ?? null),
             ReportType::AttendanceByStudent => $this->attendanceByStudentReport($from, $to, $filters['student_id'] ?? null),
             ReportType::Activities => $this->activitiesReport($from, $to, $filters['activity_type_id'] ?? null),
+            ReportType::TestMarks => $this->testMarksReport(
+                $from,
+                $to,
+                $filters['batch_id'] ?? null,
+                $filters['activity_type_id'] ?? null,
+            ),
             ReportType::FeeCollection => $this->feeCollectionReport($from, $to),
             ReportType::PendingFees => $this->pendingFeesReport($filters['course_id'] ?? null, $filters['batch_id'] ?? null),
             ReportType::OverdueInstallments => $this->overdueInstallmentsReport($filters['course_id'] ?? null, $filters['batch_id'] ?? null),
@@ -86,6 +95,19 @@ class ReportService
         return [$from, $to];
     }
 
+    /**
+     * @param  array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>}  $report
+     * @return array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>}
+     */
+    protected function finalizeDetailReport(array $report): array
+    {
+        if (count($report['rows']) >= self::MAX_DETAIL_ROWS) {
+            $report['title'] .= ' (first '.number_format(self::MAX_DETAIL_ROWS).' rows — narrow filters for more)';
+        }
+
+        return $report;
+    }
+
   /**
      * @return array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>}
      */
@@ -95,6 +117,7 @@ class ReportService
             ->with(['student', 'course'])
             ->whereBetween('created_at', [$from, $to])
             ->orderByDesc('created_at')
+            ->limit(self::MAX_DETAIL_ROWS)
             ->get()
             ->map(fn (Enquiry $enquiry): array => [
                 $enquiry->created_at->format('d M Y'),
@@ -106,11 +129,11 @@ class ReportService
             ])
             ->all();
 
-        return [
+        return $this->finalizeDetailReport([
             'title' => 'Enquiries · '.$from->format('d M Y').' – '.$to->format('d M Y'),
             'columns' => ['Date', 'Enquiry #', 'Student', 'Mobile', 'Course', 'Source'],
             'rows' => $rows,
-        ];
+        ]);
     }
 
   /**
@@ -217,18 +240,18 @@ class ReportService
             $query->where('batch_id', $batchId);
         }
 
-        $rows = $query->orderBy('attendance_date')->get()->map(fn (Attendance $row): array => [
+        $rows = $query->orderBy('attendance_date')->limit(self::MAX_DETAIL_ROWS)->get()->map(fn (Attendance $row): array => [
             $row->attendance_date->format('d M Y'),
             $row->batch?->name ?? '—',
             $row->student?->name ?? '—',
             $row->status->code(),
         ])->all();
 
-        return [
+        return $this->finalizeDetailReport([
             'title' => 'Batch attendance · '.$from->format('d M Y').' – '.$to->format('d M Y'),
             'columns' => ['Date', 'Batch', 'Student', 'Status'],
             'rows' => $rows,
-        ];
+        ]);
     }
 
   /**
@@ -251,6 +274,7 @@ class ReportService
             ->where('student_id', $studentId)
             ->whereBetween('attendance_date', [$from->toDateString(), $to->toDateString()])
             ->orderBy('attendance_date')
+            ->limit(self::MAX_DETAIL_ROWS)
             ->get()
             ->map(fn (Attendance $row): array => [
                 $row->attendance_date->format('d M Y'),
@@ -259,11 +283,11 @@ class ReportService
             ])
             ->all();
 
-        return [
+        return $this->finalizeDetailReport([
             'title' => 'Attendance · '.($student?->name ?? 'Student').' · '.$from->format('d M Y').' – '.$to->format('d M Y'),
             'columns' => ['Date', 'Batch', 'Status'],
             'rows' => $rows,
-        ];
+        ]);
     }
 
   /**
@@ -282,7 +306,9 @@ class ReportService
             });
         }
 
-        $rows = $query->get()
+        $rows = $query
+            ->limit(self::MAX_DETAIL_ROWS)
+            ->get()
             ->filter(function (ActivityAttendance $row) use ($from, $to): bool {
                 $activity = $row->attendable;
 
@@ -304,11 +330,69 @@ class ReportService
             ->values()
             ->all();
 
-        return [
+        return $this->finalizeDetailReport([
             'title' => 'Activity participation · '.$from->format('d M Y').' – '.$to->format('d M Y'),
             'columns' => ['Type', 'Activity', 'Student', 'Mobile', 'Marks / Grade'],
             'rows' => $rows,
-        ];
+        ]);
+    }
+
+  /**
+     * @return array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>}
+     */
+    protected function testMarksReport(
+        Carbon $from,
+        Carbon $to,
+        ?int $batchId,
+        int|string|null $activityTypeId,
+    ): array {
+        $query = ActivityAttendance::query()
+            ->where('is_present', true)
+            ->whereNotNull('marks_obtained')
+            ->where('attendable_type', ActivitySession::class)
+            ->with([
+                'student.activeEnrollment',
+                'attendable.batch',
+                'attendable.activityType',
+            ])
+            ->whereHasMorph('attendable', [ActivitySession::class], function ($builder) use ($from, $to, $batchId, $activityTypeId): void {
+                $builder->whereBetween('session_date', [$from->toDateString(), $to->toDateString()]);
+
+                if ($batchId) {
+                    $builder->where('batch_id', $batchId);
+                }
+
+                if ($activityTypeId) {
+                    $builder->where('activity_type_id', (int) $activityTypeId);
+                }
+            })
+            ->orderByDesc('updated_at')
+            ->limit(self::MAX_DETAIL_ROWS);
+
+        $rows = $query->get()->map(function (ActivityAttendance $row): array {
+            $session = $row->attendable;
+            $maxMarks = $session instanceof ActivitySession && filled($session->metadataValue('max_marks'))
+                ? (float) $session->metadataValue('max_marks')
+                : null;
+            $marks = $row->marks_obtained !== null ? (float) $row->marks_obtained : null;
+
+            return [
+                $session?->session_date?->format('d M Y') ?? '—',
+                $session?->activityType?->name ?? '—',
+                $session instanceof ActivitySession ? StudentExamMarksMatrix::testLabelForSession($session) : '—',
+                $session instanceof ActivitySession ? StudentExamMarksMatrix::subjectForSession($session) : '—',
+                $session?->batch?->name ?? '—',
+                $row->student?->activeEnrollment?->enrollment_number ?? '—',
+                $row->student?->name ?? '—',
+                StudentExamMarksMatrix::formatMarks($marks, $maxMarks, $row->grade),
+            ];
+        })->all();
+
+        return $this->finalizeDetailReport([
+            'title' => 'Test marks · '.$from->format('d M Y').' – '.$to->format('d M Y'),
+            'columns' => ['Date', 'Exam type', 'Test', 'Subject', 'Batch', 'Roll #', 'Student', 'Marks'],
+            'rows' => $rows,
+        ]);
     }
 
   /**
@@ -320,6 +404,7 @@ class ReportService
             ->with(['student', 'addedBy'])
             ->whereBetween('payment_date', [$from->toDateString(), $to->toDateString()])
             ->orderByDesc('payment_date')
+            ->limit(self::MAX_DETAIL_ROWS)
             ->get()
             ->map(fn (Payment $payment): array => [
                 $payment->payment_date->format('d M Y'),
@@ -331,11 +416,11 @@ class ReportService
             ])
             ->all();
 
-        return [
+        return $this->finalizeDetailReport([
             'title' => 'Fee collection · '.$from->format('d M Y').' – '.$to->format('d M Y'),
             'columns' => ['Date', 'Receipt #', 'Student', 'Mode', 'Amount (₹)', 'Collected by'],
             'rows' => $rows,
-        ];
+        ]);
     }
 
   /**
@@ -344,6 +429,7 @@ class ReportService
     protected function pendingFeesReport(?int $courseId, ?int $batchId): array
     {
         $query = FeeStructure::query()
+            ->forActiveEnrollments()
             ->with('enrollment.student', 'enrollment.course')
             ->where('pending_amount', '>', 0);
 
@@ -355,7 +441,10 @@ class ReportService
             $query->whereHas('enrollment.student.activeBatchStudent', fn ($q) => $q->where('batch_id', $batchId));
         }
 
-        $rows = $query->get()->map(fn (FeeStructure $fee): array => [
+        $rows = $query
+            ->limit(self::MAX_DETAIL_ROWS)
+            ->get()
+            ->map(fn (FeeStructure $fee): array => [
             $fee->enrollment?->student?->name ?? '—',
             $fee->enrollment?->student?->mobile ?? '—',
             $fee->enrollment?->course?->name ?? '—',
@@ -364,11 +453,11 @@ class ReportService
             number_format((float) $fee->pending_amount, 2),
         ])->all();
 
-        return [
+        return $this->finalizeDetailReport([
             'title' => 'Pending fees',
             'columns' => ['Student', 'Mobile', 'Course', 'Net (₹)', 'Paid (₹)', 'Pending (₹)'],
             'rows' => $rows,
-        ];
+        ]);
     }
 
     /**
@@ -378,6 +467,7 @@ class ReportService
     {
         $query = FeeInstallment::query()
             ->with('feeStructure.enrollment.student', 'feeStructure.enrollment.course')
+            ->whereHas('feeStructure', fn ($q) => $q->forActiveEnrollments())
             ->where('pending_amount', '>', 0)
             ->whereNotNull('due_date')
             ->whereDate('due_date', '<', now()->toDateString());
@@ -395,6 +485,7 @@ class ReportService
 
         $rows = $query
             ->orderBy('due_date')
+            ->limit(self::MAX_DETAIL_ROWS)
             ->get()
             ->map(function (FeeInstallment $installment): array {
                 $student = $installment->feeStructure?->enrollment?->student;
@@ -413,11 +504,11 @@ class ReportService
             })
             ->all();
 
-        return [
+        return $this->finalizeDetailReport([
             'title' => 'Overdue installments',
             'columns' => ['Student', 'Mobile', 'Course', 'Installment', 'Due date', 'Pending (₹)', 'Days overdue'],
             'rows' => $rows,
-        ];
+        ]);
     }
 
   /**
@@ -431,6 +522,7 @@ class ReportService
             ->whereBetween('approved_at', [$from, $to])
             ->with(['student', 'enquiry.course'])
             ->orderByDesc('approved_at')
+            ->limit(self::MAX_DETAIL_ROWS)
             ->get()
             ->map(fn (Admission $admission): array => [
                 $admission->approved_at?->format('d M Y') ?? '—',
@@ -443,11 +535,11 @@ class ReportService
             ])
             ->all();
 
-        return [
+        return $this->finalizeDetailReport([
             'title' => 'Discounts · '.$from->format('d M Y').' – '.$to->format('d M Y'),
             'columns' => ['Date', 'Admission #', 'Student', 'Course', 'Course fee (₹)', 'Discount (₹)', 'Net (₹)'],
             'rows' => $rows,
-        ];
+        ]);
     }
 
   /**
@@ -514,7 +606,7 @@ class ReportService
             ->whereBetween('payment_date', [$from->toDateString(), $to->toDateString()])
             ->sum('amount');
 
-        $pending = (float) FeeStructure::query()->sum('pending_amount');
+        $pending = (float) FeeStructure::query()->forActiveEnrollments()->sum('pending_amount');
         $discounts = (float) Admission::query()
             ->where('status', AdmissionStatus::Approved)
             ->whereBetween('approved_at', [$from, $to])

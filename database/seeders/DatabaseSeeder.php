@@ -12,14 +12,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            RoleSeeder::class,
-            AdminUserSeeder::class,
-            AcademicSessionSeeder::class,
-            InstituteProfileSeeder::class,
-            CourseSeeder::class,
-            ActivityTypeSeeder::class,
-            SiteContentSeeder::class,
-            DemoDataSeeder::class,
+            DemoBaselineSeeder::class,
         ]);
+
+        if (config('institute.seed_demo_data', false)) {
+            $this->call(DemoDataSeeder::class);
+        }
     }
 }

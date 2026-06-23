@@ -178,10 +178,10 @@ class FeeInstallmentTest extends TestCase
 
     protected function createStaffUser(): User
     {
-        Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);
+        Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);
 
         $user = User::factory()->create(['is_active' => true]);
-        $user->assignRole(RoleName::Staff->value);
+        $user->assignRole(RoleName::SuperAdmin->value);
 
         return $user;
     }

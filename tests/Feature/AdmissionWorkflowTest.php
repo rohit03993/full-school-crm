@@ -9,6 +9,7 @@ use App\Enums\Gender;
 use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
+use App\Models\AcademicSession;
 use App\Models\Course;
 use App\Models\Enquiry;
 use App\Models\Student;
@@ -30,6 +31,14 @@ class AdmissionWorkflowTest extends TestCase
         Storage::fake('local');
 
         $staff = $this->createStaffUser();
+        $session = AcademicSession::query()->create([
+            'name' => '2026–27',
+            'code' => '2026-27',
+            'starts_on' => '2026-04-01',
+            'ends_on' => '2027-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
         $student = $this->createStudent();
         $course = $this->createCourse();
         $enquiry = $this->createEnquiry($student, $course, $staff);
@@ -74,7 +83,81 @@ class AdmissionWorkflowTest extends TestCase
         $this->assertStringStartsWith('CRM-', $enrollment->enrollment_number);
         $this->assertSame(EnrollmentStatus::Enrolled, $enrollment->status);
         $this->assertTrue($enrollment->is_active);
+        $this->assertSame($session->id, $enrollment->academic_session_id);
         $this->assertSame(StudentStatus::Enrolled, $student->fresh()->status);
+    }
+
+    public function test_enrollment_ensures_default_portal_password(): void
+    {
+        Storage::fake('local');
+
+        $staff = $this->createStaffUser();
+        AcademicSession::query()->create([
+            'name' => '2026–27',
+            'code' => '2026-27',
+            'starts_on' => '2026-04-01',
+            'ends_on' => '2027-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
+
+        $student = Student::query()->create([
+            'name' => 'Portal Student',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2000-05-15',
+            'gender' => Gender::Male,
+            'mobile' => '9811223344',
+            'status' => StudentStatus::Enquiry,
+            'portal_password' => null,
+        ]);
+
+        $course = $this->createCourse();
+        $enquiry = $this->createEnquiry($student, $course, $staff);
+        $admissionService = app(AdmissionService::class);
+
+        $admission = $admissionService->convert($student, $enquiry, $staff, [
+            'course_id' => $course->id,
+            'discount_amount' => 0,
+        ]);
+
+        $admission = $admissionService->submitForm(
+            $admission,
+            [
+                'tenth_board' => 'CBSE',
+                'tenth_percentage' => 85,
+            ],
+            [
+                'photo' => UploadedFile::fake()->image('photo.jpg'),
+                'aadhaar' => UploadedFile::fake()->create('aadhaar.pdf', 100, 'application/pdf'),
+                'marksheet' => UploadedFile::fake()->create('marksheet.pdf', 100, 'application/pdf'),
+                'signature' => UploadedFile::fake()->image('sign.jpg'),
+            ],
+            $staff,
+        );
+
+        $admissionService->approve($admission, $staff);
+
+        $student->refresh();
+        $this->assertNotNull($student->portal_password);
+        $this->assertTrue(
+            app(\App\Services\StudentAuthService::class)->login(
+                '9811223344',
+                config('institute.portal_default_password'),
+            ) !== null,
+        );
+    }
+
+    public function test_student_portal_login_with_default_password(): void
+    {
+        $student = $this->createStudent();
+
+        $response = $this->post(route('portal.login.submit'), [
+            'mobile' => $student->mobile,
+            'password' => config('institute.portal_default_password'),
+        ]);
+
+        $response->assertRedirect(route('portal.dashboard'));
+        $this->assertSame($student->id, session('student_portal_id'));
     }
 
     public function test_staff_can_download_admission_document(): void
@@ -170,27 +253,12 @@ class AdmissionWorkflowTest extends TestCase
         ]);
     }
 
-    public function test_student_portal_login_with_dob(): void
-    {
-        $student = $this->createStudent();
-
-        $dob = $student->date_of_birth->format('dmY');
-
-        $response = $this->post(route('portal.login.submit'), [
-            'mobile' => $student->mobile,
-            'password' => $dob,
-        ]);
-
-        $response->assertRedirect(route('portal.dashboard'));
-        $this->assertSame($student->id, session('student_portal_id'));
-    }
-
     protected function createStaffUser(): User
     {
-        Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);
+        Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);
 
         $user = User::factory()->create(['is_active' => true]);
-        $user->assignRole(RoleName::Staff->value);
+        $user->assignRole(RoleName::SuperAdmin->value);
 
         return $user;
     }
@@ -204,7 +272,7 @@ class AdmissionWorkflowTest extends TestCase
             'gender' => Gender::Male,
             'mobile' => '9876543210',
             'status' => StudentStatus::Enquiry,
-            'portal_password' => app(\App\Services\StudentAuthService::class)->hashPortalPassword('15052000'),
+            'portal_password' => app(\App\Services\StudentAuthService::class)->hashForNewStudent(),
         ]);
     }
 

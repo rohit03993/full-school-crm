@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Batches\Pages;
 
+use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Models\Student;
 use App\Services\BatchService;
@@ -15,7 +16,14 @@ use Illuminate\Support\Facades\Auth;
 
 class EditBatch extends EditRecord
 {
+    use ShowsCrmPageHint;
+
     protected static string $resource = BatchResource::class;
+
+    protected static function crmHintKey(): ?string
+    {
+        return 'batches.edit';
+    }
 
     protected function getHeaderActions(): array
     {

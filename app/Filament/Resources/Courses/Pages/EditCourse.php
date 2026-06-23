@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Courses\Pages;
 
 use App\Enums\CourseStatus;
+use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Courses\CourseResource;
 use App\Models\Course;
 use Filament\Actions\Action;
@@ -12,7 +13,14 @@ use Filament\Resources\Pages\EditRecord;
 
 class EditCourse extends EditRecord
 {
+    use ShowsCrmPageHint;
+
     protected static string $resource = CourseResource::class;
+
+    protected static function crmHintKey(): ?string
+    {
+        return 'courses.edit';
+    }
 
     protected function getHeaderActions(): array
     {

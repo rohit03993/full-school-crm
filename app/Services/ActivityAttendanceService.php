@@ -130,7 +130,138 @@ class ActivityAttendanceService
         return $saved;
     }
 
-    public function presentCountForStudent(Student $student, ActivityType|int $activityType): int
+    public function findSession(
+        int $activityTypeId,
+        int $batchId,
+        string $date,
+        string $title,
+    ): ?ActivitySession {
+        $title = trim($title);
+
+        if ($title === '') {
+            return null;
+        }
+
+        return ActivitySession::query()
+            ->where('activity_type_id', $activityTypeId)
+            ->where('batch_id', $batchId)
+            ->whereDate('session_date', $date)
+            ->where('title', $title)
+            ->first();
+    }
+
+    public function findOrCreateSession(
+        int $activityTypeId,
+        int $batchId,
+        string $date,
+        string $title,
+        User $staff,
+    ): ActivitySession {
+        $existing = $this->findSession($activityTypeId, $batchId, $date, $title);
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $title = trim($title);
+
+        if ($title === '') {
+            throw ValidationException::withMessages([
+                'session_title' => 'Enter a session name (e.g. Career counselling seminar).',
+            ]);
+        }
+
+        $activityType = ActivityType::query()->findOrFail($activityTypeId);
+
+        if ($activityType->supportsScoring()) {
+            throw ValidationException::withMessages([
+                'activity_type_id' => 'This type uses marks upload. Use Tests & Exams instead.',
+            ]);
+        }
+
+        return ActivitySession::query()->create([
+            'activity_type_id' => $activityTypeId,
+            'batch_id' => $batchId,
+            'session_date' => $date,
+            'title' => $title,
+            'metadata' => [],
+            'created_by_user_id' => $staff->id,
+        ]);
+    }
+
+    /**
+     * @param  array<int, float|string|null>  $studentScores student_id => marks_obtained
+     */
+    public function importStudentScores(ActivitySession $session, array $studentScores, User $staff): int
+    {
+        $maxMarks = $this->maxMarksForSession($session);
+        $saved = 0;
+
+        DB::transaction(function () use ($session, $studentScores, $staff, $maxMarks, &$saved): void {
+            foreach ($studentScores as $studentId => $rawMark) {
+                if (! filled($rawMark) && $rawMark !== 0 && $rawMark !== '0') {
+                    continue;
+                }
+
+                $score = $this->normalizeScore(['marks_obtained' => $rawMark], $maxMarks);
+
+                ActivityAttendance::query()->updateOrCreate(
+                    [
+                        'attendable_type' => $session->getMorphClass(),
+                        'attendable_id' => $session->getKey(),
+                        'student_id' => (int) $studentId,
+                    ],
+                    [
+                        'is_present' => true,
+                        'marks_obtained' => $score['marks_obtained'],
+                        'grade' => $score['grade'],
+                        'remarks' => $score['remarks'],
+                        'marked_by_user_id' => $staff->id,
+                    ],
+                );
+
+                $saved++;
+            }
+
+            if ($saved > 0) {
+                $this->audit->log(
+                    'activity_attendance_marked',
+                    $session,
+                    null,
+                    [
+                        'activity_type_id' => $session->activity_type_id,
+                        'records_saved' => $saved,
+                        'imported' => true,
+                    ],
+                    user: $staff,
+                );
+            }
+        });
+
+        return $saved;
+    }
+
+    /**
+     * @return array{present: int, total: int, absent: int}
+     */
+    public function attendanceSummaryForStudent(Student $student, ActivityType|int $activityType): array
+    {
+        $records = $this->recordsForStudent($student, $activityType);
+        $present = $records->where('is_present', true)->count();
+
+        return [
+            'present' => $present,
+            'absent' => $records->count() - $present,
+            'total' => $records->count(),
+        ];
+    }
+
+    /**
+     * All session attendance rows for a student and activity type (present and absent).
+     *
+     * @return \Illuminate\Support\Collection<int, ActivityAttendance>
+     */
+    public function recordsForStudent(Student $student, ActivityType|int $activityType)
     {
         $activityTypeId = $activityType instanceof ActivityType
             ? $activityType->id
@@ -138,12 +269,50 @@ class ActivityAttendanceService
 
         return ActivityAttendance::query()
             ->where('student_id', $student->id)
-            ->where('is_present', true)
             ->where('attendable_type', ActivitySession::class)
             ->whereHasMorph('attendable', [ActivitySession::class], function ($query) use ($activityTypeId): void {
                 $query->where('activity_type_id', $activityTypeId);
             })
-            ->count();
+            ->with(['attendable.batch', 'attendable.activityType'])
+            ->get()
+            ->sortByDesc(fn (ActivityAttendance $row): string => $row->attendable?->session_date?->format('Y-m-d') ?? '')
+            ->values();
+    }
+
+    /**
+     * Workshops, events, and other attendance-only sessions for the student profile.
+     *
+     * @return \Illuminate\Support\Collection<int, ActivityAttendance>
+     */
+    public function sessionAttendanceRecordsForStudent(Student $student)
+    {
+        $attendanceOnlyTypeIds = ActivityType::query()
+            ->enabled()
+            ->ordered()
+            ->get()
+            ->reject(fn (ActivityType $type): bool => $type->supportsScoring())
+            ->pluck('id')
+            ->all();
+
+        if ($attendanceOnlyTypeIds === []) {
+            return collect();
+        }
+
+        return ActivityAttendance::query()
+            ->where('student_id', $student->id)
+            ->where('attendable_type', ActivitySession::class)
+            ->whereHasMorph('attendable', [ActivitySession::class], function ($query) use ($attendanceOnlyTypeIds): void {
+                $query->whereIn('activity_type_id', $attendanceOnlyTypeIds);
+            })
+            ->with(['attendable.batch', 'attendable.activityType'])
+            ->get()
+            ->sortByDesc(fn (ActivityAttendance $row): string => $row->attendable?->session_date?->format('Y-m-d') ?? '')
+            ->values();
+    }
+
+    public function presentCountForStudent(Student $student, ActivityType|int $activityType): int
+    {
+        return $this->attendanceSummaryForStudent($student, $activityType)['present'];
     }
 
     /**

@@ -6,11 +6,15 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use App\Filament\Pages\BulkActivityMarksImportPage;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Pages\TestMarksReviewPage;
 use App\Support\InstituteSettings;
+use App\Support\CrmNavigation;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
 use Filament\Widgets\AccountWidget;
@@ -29,12 +33,17 @@ class RohitPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(\App\Filament\Auth\Login::class)
             ->brandName(fn (): string => InstituteSettings::brandName())
             ->brandLogo(fn (): ?string => InstituteSettings::panelLogoUrl())
             ->colors([
                 'primary' => Color::Amber,
-            ]);
+            ])
+            ->spa()
+            ->sidebarCollapsibleOnDesktop()
+            ->collapsibleNavigationGroups()
+            ->navigationGroups(CrmNavigation::groups())
+            ->maxContentWidth(Width::Full);
 
         if (file_exists(public_path('build/manifest.json'))) {
             $panel->viteTheme('resources/css/filament/admin/theme.css');
@@ -45,6 +54,8 @@ class RohitPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
+                BulkActivityMarksImportPage::class,
+                TestMarksReviewPage::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
@@ -63,10 +74,13 @@ class RohitPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                \App\Http\Middleware\EnsureInstituteOnboardingComplete::class,
             ])
             ->renderHook(
                 PanelsRenderHook::BODY_END,
-                fn (): string => Blade::render('<x-crm.media-preview-dialog />'),
+                fn (): string => Blade::render('<x-crm.media-preview-dialog />')
+                    .view('filament.partials.mobile-bottom-nav')->render()
+                    .view('filament.partials.pending-call-flow')->render(),
             );
     }
 }

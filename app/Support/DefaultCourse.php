@@ -22,6 +22,7 @@ class DefaultCourse
                 'duration_type' => DurationType::Months,
                 'fee' => 0,
                 'status' => CourseStatus::Active,
+                'show_on_website' => false,
                 'description' => 'Placeholder for walk-in enquiries when course interest is not yet confirmed.',
             ],
         );

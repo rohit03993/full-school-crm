@@ -21,7 +21,7 @@
 @else
     <div class="space-y-4">
         <div class="rounded-xl border-2 border-primary-500/40 bg-gradient-to-r from-primary-500/10 to-amber-500/5 px-4 py-5 sm:px-6">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-primary-700 dark:text-primary-400">Fee structure</p>
+            <p class="text-[10px] font-bold uppercase tracking-widest text-primary-700 dark:text-primary-400">{{ \App\Support\StudentLabels::rollNumberLabel() }}</p>
             <h3 class="mt-1 text-lg font-bold text-gray-950 dark:text-white">{{ $enrollment->enrollment_number }}</h3>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ $course?->name ?? 'Course' }} · {{ $course?->duration_label }}</p>
         </div>
@@ -38,7 +38,47 @@
                 <div>
                     <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Discount</dt>
                     <dd class="mt-0.5 font-semibold text-gray-950 dark:text-white">₹{{ number_format((float) $fees->discount_amount, 2) }}</dd>
+                    @if ((float) $fees->discount_amount > 0)
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            @if ($fees->discountSetBy)
+                                Granted by {{ $fees->discountSetBy->name }}.
+                            @endif
+                            Net fee ₹{{ number_format((float) $fees->net_fee, 2) }} is the amount due (course fee minus discount plus misc charges).
+                        </p>
+                    @endif
                 </div>
+                @if ($fees->discountEntries->isNotEmpty())
+                    <div class="sm:col-span-2 lg:col-span-3">
+                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Discount history</dt>
+                        <dd class="mt-2 space-y-2">
+                            @foreach ($fees->discountEntries as $entry)
+                                <div class="flex flex-col gap-0.5 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-white/5 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <span @class([
+                                            'font-semibold',
+                                            'text-emerald-700 dark:text-emerald-400' => $entry->isIncrease(),
+                                            'text-amber-700 dark:text-amber-300' => ! $entry->isIncrease(),
+                                        ])>
+                                            {{ $entry->isIncrease() ? '+' : '' }}₹{{ number_format((float) $entry->amount, 2) }}
+                                        </span>
+                                        <span class="text-gray-600 dark:text-gray-400">
+                                            · {{ $entry->created_at->format('d M Y') }}
+                                            @if ($entry->grantedBy)
+                                                · {{ $entry->grantedBy->name }}
+                                            @endif
+                                        </span>
+                                        @if ($entry->reason)
+                                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ $entry->reason }}</p>
+                                        @endif
+                                    </div>
+                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                        Total discount ₹{{ number_format((float) $entry->total_after, 2) }}
+                                    </span>
+                                </div>
+                            @endforeach
+                        </dd>
+                    </div>
+                @endif
                 @if ($miscCharges->isNotEmpty())
                     <div class="sm:col-span-2 lg:col-span-3">
                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Miscellaneous</dt>
@@ -132,10 +172,15 @@
             </div>
         @endif
 
-        @if ((float) $fees->pending_amount > 0)
+        @if ((float) $fees->pending_amount > 0 && ($canCollectFees ?? false))
             <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-950 dark:text-emerald-200 sm:px-5">
                 <p class="font-semibold">Collect fee</p>
-                <p class="mt-1">Use <strong>Add Payment</strong> in the page header to record cash, online or UPI payments.</p>
+                <p class="mt-1">Use the green <strong>Add Payment</strong> button at the top of this page to record cash, online or UPI payments.</p>
+            </div>
+        @elseif ((float) $fees->pending_amount > 0)
+            <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 sm:px-5">
+                <p class="font-semibold">Pending fees</p>
+                <p class="mt-1">Only staff with fee collection permission can record payments. Contact your accountant or admin.</p>
             </div>
         @endif
 

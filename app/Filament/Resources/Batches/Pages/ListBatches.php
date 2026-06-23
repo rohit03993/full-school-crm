@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Batches\Pages;
 
+use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Pages\BatchAttendancePage;
 use App\Filament\Resources\Batches\BatchResource;
 use Filament\Actions\Action;
@@ -11,6 +12,13 @@ use Filament\Support\Icons\Heroicon;
 
 class ListBatches extends ListRecords
 {
+    use ShowsCrmPageHint;
+
+    protected static function crmHintKey(): ?string
+    {
+        return 'batches.list';
+    }
+
     protected static string $resource = BatchResource::class;
 
     protected function getHeaderActions(): array

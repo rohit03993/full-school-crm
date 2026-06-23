@@ -17,6 +17,7 @@ class FeeStructureService
     public function __construct(
         protected AuditService $audit,
         protected FeeInstallmentService $installments,
+        protected FeeDiscountLedgerService $discountLedger,
     ) {}
 
     public function createFromAdmission(Enrollment $enrollment, Admission $admission, User $staff): FeeStructure
@@ -40,6 +41,7 @@ class FeeStructureService
                 'enrollment_id' => $enrollment->id,
                 'course_fee' => $admission->course_fee,
                 'discount_amount' => $admission->discount_amount ?? 0,
+                'discount_set_by_user_id' => $admission->discount_set_by_user_id,
                 'net_fee' => $admission->net_fee,
                 'paid_amount' => 0,
                 'pending_amount' => $admission->net_fee,
@@ -71,7 +73,9 @@ class FeeStructureService
 
             $this->installments->createForFeeStructure($feeStructure, $enrollment, $admission);
 
-            return $feeStructure->fresh(['installments', 'miscCharges']);
+            $this->discountLedger->linkAdmissionEntriesToFeeStructure($admission, $feeStructure);
+
+            return $feeStructure->fresh(['installments', 'miscCharges', 'discountEntries']);
         });
     }
 
@@ -154,6 +158,8 @@ class FeeStructureService
                 'net_fee' => (float) $feeStructure->net_fee,
             ];
 
+            $previousDiscount = $oldValues['discount_amount'];
+
             FeeStructureHistory::query()->create([
                 'fee_structure_id' => $feeStructure->id,
                 'old_course_fee' => $oldValues['course_fee'],
@@ -170,9 +176,18 @@ class FeeStructureService
             $feeStructure->update([
                 'course_fee' => $courseFee,
                 'discount_amount' => $discount,
+                'discount_set_by_user_id' => $discount > 0 ? $admin->id : null,
                 'net_fee' => $newNet,
                 'pending_amount' => $newPending,
             ]);
+
+            $this->discountLedger->recordFeeStructureChange(
+                $feeStructure,
+                $previousDiscount,
+                $discount,
+                $admin,
+                $reason,
+            );
 
             if ($reschedule && $newPending > 0) {
                 $this->installments->reschedulePendingInstallments($feeStructure, $installmentPlan);
@@ -212,7 +227,7 @@ class FeeStructureService
                 user: $admin,
             );
 
-            return $feeStructure->fresh(['installments', 'miscCharges']);
+            return $feeStructure->fresh(['installments', 'miscCharges', 'discountEntries']);
         });
     }
 }

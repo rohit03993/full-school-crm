@@ -1,28 +1,20 @@
 @php
-    $schoolCount = $leadSources['school_count'] ?? 0;
-    $coachingCount = $leadSources['coaching_count'] ?? 0;
+    use App\Support\MeetingForOptions;
+
+    $counts = array_filter($leadSources['meeting_for_counts'] ?? [], fn (int $count): bool => $count > 0);
 @endphp
 
-@if ($schoolCount > 0 || $coachingCount > 0)
+@if ($counts !== [])
     <div class="flex flex-wrap items-center gap-2">
-        @if ($schoolCount > 0)
+        @foreach ($counts as $value => $count)
             @include('filament.pages.partials.meeting-for-badge', [
-                'meetingFor' => \App\Enums\MeetingFor::School,
+                'value' => (string) $value,
                 'size' => 'md',
             ])
-            @if ($schoolCount > 1)
-                <span class="text-xs font-bold text-amber-700 dark:text-amber-400">×{{ $schoolCount }}</span>
+            @if ($count > 1)
+                @php($style = MeetingForOptions::badgeStyle((string) $value))
+                <span @class(['text-xs font-bold', $style['text']])>×{{ $count }}</span>
             @endif
-        @endif
-
-        @if ($coachingCount > 0)
-            @include('filament.pages.partials.meeting-for-badge', [
-                'meetingFor' => \App\Enums\MeetingFor::Coaching,
-                'size' => 'md',
-            ])
-            @if ($coachingCount > 1)
-                <span class="text-xs font-bold text-violet-700 dark:text-violet-400">×{{ $coachingCount }}</span>
-            @endif
-        @endif
+        @endforeach
     </div>
 @endif

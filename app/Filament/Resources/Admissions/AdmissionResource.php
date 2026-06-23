@@ -3,10 +3,15 @@
 namespace App\Filament\Resources\Admissions;
 
 use App\Enums\AdmissionStatus;
+use App\Enums\CrmPermission;
+use App\Filament\Concerns\RequiresCrmPermission;
+use App\Support\CrmNavBadges;
 use App\Filament\Pages\StudentProfilePage;
 use App\Filament\Resources\Admissions\Pages\ListAdmissions;
+use App\Filament\Support\CrmTable;
 use App\Filament\Resources\Admissions\Pages\ViewAdmission;
 use App\Models\Admission;
+use App\Support\CrmNavigation;
 use Filament\Actions\Action;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
@@ -18,27 +23,32 @@ use UnitEnum;
 
 class AdmissionResource extends Resource
 {
+    use RequiresCrmPermission;
+
+    protected static function requiredCrmPermission(): CrmPermission
+    {
+        return CrmPermission::AdmissionsView;
+    }
+
     protected static ?string $model = Admission::class;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
 
-    protected static ?string $navigationLabel = 'Admission Requests';
+    protected static ?string $navigationLabel = 'Admissions';
 
-    protected static ?string $modelLabel = 'Admission Request';
+    protected static ?string $modelLabel = 'Admission';
 
-    protected static ?string $pluralModelLabel = 'Admission Requests';
+    protected static ?string $pluralModelLabel = 'Admissions';
 
     protected static ?string $recordTitleAttribute = 'admission_number';
 
-    protected static ?int $navigationSort = -90;
+    protected static ?int $navigationSort = 20;
 
-    protected static string | UnitEnum | null $navigationGroup = 'CRM';
+    protected static string | UnitEnum | null $navigationGroup = CrmNavigation::GROUP_STUDENTS;
 
     public static function getNavigationBadge(): ?string
     {
-        $count = static::getModel()::query()
-            ->where('status', AdmissionStatus::VerificationPending)
-            ->count();
+        $count = CrmNavBadges::admissionsAwaitingApproval();
 
         return $count > 0 ? (string) $count : null;
     }
@@ -56,7 +66,7 @@ class AdmissionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return CrmTable::configure($table)
             ->columns([
                 TextColumn::make('admission_number')
                     ->label('Admission No.')
@@ -105,10 +115,10 @@ class AdmissionResource extends Resource
             ->defaultSort('submitted_at', 'desc')
             ->filters([
                 SelectFilter::make('status')
+                    ->label('Status')
                     ->options(collect(AdmissionStatus::cases())->mapWithKeys(
                         fn (AdmissionStatus $status) => [$status->value => $status->label()],
-                    ))
-                    ->default(AdmissionStatus::VerificationPending->value),
+                    )),
             ])
             ->recordActions([
                 Action::make('review')
@@ -125,8 +135,8 @@ class AdmissionResource extends Resource
             ->recordUrl(
                 fn (Admission $record): string => static::getUrl('view', ['record' => $record]),
             )
-            ->emptyStateHeading('No admission requests yet')
-            ->emptyStateDescription('Converted admissions awaiting form submission or verification will appear here.')
+            ->emptyStateHeading('No admissions yet')
+            ->emptyStateDescription('When staff convert an enquiry, the admission appears here. Filter by status to find forms awaiting verification or approval.')
             ->emptyStateIcon(Heroicon::OutlinedClipboardDocumentCheck);
     }
 

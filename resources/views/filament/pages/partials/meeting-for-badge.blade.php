@@ -1,15 +1,15 @@
 @php
-    use App\Enums\MeetingFor;
+    use App\Support\MeetingForOptions;
 
-    /** @var ?MeetingFor $meetingFor */
-    $meetingFor = $meetingFor ?? null;
+    $value = $value ?? ($meetingFor ?? null);
     $size = $size ?? 'md';
 
-    if (! $meetingFor instanceof MeetingFor) {
+    if (blank($value)) {
         return;
     }
 
-    $colors = $meetingFor->badgeColors();
+    $value = (string) $value;
+    $colors = MeetingForOptions::badgeStyle($value);
 @endphp
 
 <span @class([
@@ -21,10 +21,10 @@
     'rounded-lg px-3 py-1.5 text-xs' => $size === 'md',
     'rounded-xl px-4 py-2 text-sm' => $size === 'lg',
 ])>
-    <x-filament::icon :icon="$meetingFor->icon()" @class([
+    <x-filament::icon :icon="$colors['icon']" @class([
         'h-3 w-3' => $size === 'sm',
         'h-4 w-4' => $size === 'md',
         'h-5 w-5' => $size === 'lg',
     ]) />
-    {{ $meetingFor->label() }}
+    {{ MeetingForOptions::label($value) }}
 </span>

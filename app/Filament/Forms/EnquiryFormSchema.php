@@ -4,13 +4,15 @@ namespace App\Filament\Forms;
 
 use App\Enums\Gender;
 use App\Enums\LeadSource;
-use App\Enums\MeetingFor;
+use App\Support\MeetingForOptions;
 use App\Enums\StudentCategory;
 use App\Enums\VisitStatus;
 use App\Enums\VisitType;
 use App\Enums\RoleName;
 use App\Models\Course;
 use App\Models\User;
+use App\Services\CustomFieldService;
+use App\Support\CustomFieldFormBuilder;
 use App\Support\DefaultCourse;
 use App\Support\InstituteProfile;
 use Filament\Support\Icons\Heroicon;
@@ -25,6 +27,43 @@ use Illuminate\Support\Collection;
 
 class EnquiryFormSchema
 {
+    /**
+     * Minimal fields for Search Student → new number flow (no sections, no scroll box).
+     *
+     * @return array<int, TextInput|Select|Textarea>
+     */
+    public static function forSearchPageQuickEntry(?string $prefillMobile = null): array
+    {
+        return [
+            TextInput::make('name')
+                ->label('Student name')
+                ->required()
+                ->maxLength(255)
+                ->autofocus()
+                ->placeholder('Full name'),
+            Select::make('meeting_for')
+                ->label('Meeting for')
+                ->options(self::meetingForOptions())
+                ->default(MeetingForOptions::defaultValue())
+                ->required()
+                ->native(false),
+            Select::make('course_id')
+                ->label('Course interest')
+                ->placeholder('Not decided yet')
+                ->options(fn () => InstituteProfile::adminCoursesQuery(Course::query())
+                    ->active()
+                    ->where('code', '!=', DefaultCourse::UNDECIDED_CODE)
+                    ->orderBy('name')
+                    ->pluck('name', 'id'))
+                ->searchable()
+                ->native(false),
+            Textarea::make('discussion_summary')
+                ->label('Note')
+                ->placeholder('Walk-in, fees question, batch timing…')
+                ->rows(2),
+        ];
+    }
+
     /**
      * Fast walk-in capture — only name, mobile & meeting for are required.
      *
@@ -60,13 +99,13 @@ class EnquiryFormSchema
                     Select::make('meeting_for')
                         ->label('Meeting For')
                         ->options(self::meetingForOptions())
-                        ->default(InstituteProfile::meetingFor()->value)
+                        ->default(MeetingForOptions::defaultValue())
                         ->required()
                         ->native(false),
                     Select::make('course_id')
                         ->label('Course Interest')
                         ->placeholder('Not decided yet')
-                        ->options(fn () => InstituteProfile::scopeCourses(Course::query())
+                        ->options(fn () => InstituteProfile::adminCoursesQuery(Course::query())
                             ->active()
                             ->where('code', '!=', DefaultCourse::UNDECIDED_CODE)
                             ->orderBy('name')
@@ -91,10 +130,8 @@ class EnquiryFormSchema
                         ->maxLength(255),
                     TextInput::make('city')
                         ->maxLength(100),
-                    TextInput::make('email')
-                        ->email()
-                        ->maxLength(255),
                 ]),
+            ...CustomFieldFormBuilder::sections(CustomFieldService::ENTITY_ENQUIRY),
         ];
     }
 
@@ -126,6 +163,7 @@ class EnquiryFormSchema
             Section::make('Visit Details')
                 ->columns(2)
                 ->schema(self::visitFields()),
+            ...CustomFieldFormBuilder::sections(CustomFieldService::ENTITY_ENQUIRY),
         ];
     }
 
@@ -138,13 +176,13 @@ class EnquiryFormSchema
             Select::make('meeting_for')
                 ->label('Meeting For')
                 ->options(self::meetingForOptions())
-                ->default(InstituteProfile::meetingFor()->value)
+                ->default(MeetingForOptions::defaultValue())
                 ->required()
                 ->native(false),
             Select::make('course_id')
                 ->label('Course Interest')
                 ->placeholder('Not decided yet')
-                ->options(fn () => InstituteProfile::scopeCourses(Course::query())
+                ->options(fn () => InstituteProfile::adminCoursesQuery(Course::query())
                     ->active()
                     ->where('code', '!=', DefaultCourse::UNDECIDED_CODE)
                     ->orderBy('name')
@@ -155,6 +193,7 @@ class EnquiryFormSchema
                 ->label('Quick Note')
                 ->rows(2)
                 ->placeholder('Reason for this enquiry'),
+            ...CustomFieldFormBuilder::flatComponents(CustomFieldService::ENTITY_ENQUIRY),
         ];
     }
 
@@ -232,10 +271,6 @@ class EnquiryFormSchema
                 ->tel()
                 ->maxLength(10)
                 ->rule('nullable|regex:/^[6-9]\d{9}$/'),
-            TextInput::make('email')
-                ->email()
-                ->maxLength(255)
-                ->columnSpanFull(),
         ];
     }
 
@@ -266,7 +301,7 @@ class EnquiryFormSchema
         return [
             Select::make('course_id')
                 ->label('Course Interest')
-                ->options(fn () => InstituteProfile::scopeCourses(Course::query()->active()->orderBy('name'))->pluck('name', 'id'))
+                ->options(fn () => InstituteProfile::adminCoursesQuery(Course::query()->active()->orderBy('name'))->pluck('name', 'id'))
                 ->required()
                 ->searchable()
                 ->live()
@@ -310,7 +345,7 @@ class EnquiryFormSchema
                 ->native(false),
             Select::make('meeting_for')
                 ->options(self::meetingForOptions())
-                ->default(InstituteProfile::meetingFor()->value)
+                ->default(MeetingForOptions::defaultValue())
                 ->required()
                 ->native(false),
         ];

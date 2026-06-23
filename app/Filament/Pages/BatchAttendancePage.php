@@ -2,11 +2,17 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\FinishesAttendanceSave;
 use App\Enums\AttendanceStatus;
+use App\Enums\CrmPermission;
 use App\Enums\BatchStatus;
+use App\Support\CrmAccess;
 use App\Models\Batch;
 use App\Models\BatchStudent;
 use App\Services\AttendanceService;
+use App\Services\AttendanceWhatsAppService;
+use App\Support\CrmHint;
+use App\Support\CrmNavigation;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
@@ -21,20 +27,33 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 class BatchAttendancePage extends Page
 {
+    use FinishesAttendanceSave;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
     protected static ?string $navigationLabel = 'Attendance';
 
     protected static ?string $title = 'Batch Attendance';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 40;
 
-    protected static string | UnitEnum | null $navigationGroup = null;
+    protected static string | UnitEnum | null $navigationGroup = CrmNavigation::GROUP_ACADEMICS;
+
+    public static function canAccess(): bool
+    {
+        return CrmAccess::can(Auth::user(), CrmPermission::AttendanceMark);
+    }
+
+    public function getSubheading(): ?string
+    {
+        return CrmHint::text('attendance.batch');
+    }
 
     /**
      * @var array{batch_id: ?int, attendance_date: ?string}
@@ -111,8 +130,12 @@ class BatchAttendancePage extends Page
         }
     }
 
-    public function saveAttendance(AttendanceService $attendance): void
+    public function saveAttendance(AttendanceService $attendance, AttendanceWhatsAppService $attendanceWhatsApp, array $marks = []): void
     {
+        if ($marks !== []) {
+            $this->marks = $this->normalizeStatusMarksFromClient($marks);
+        }
+
         $batchId = $this->filters['batch_id'] ?? null;
         $date = $this->filters['attendance_date'] ?? null;
 
@@ -127,12 +150,46 @@ class BatchAttendancePage extends Page
 
         $batch = Batch::query()->findOrFail($batchId);
         $saved = $attendance->saveBatchAttendance($batch, $date, $this->marks, Auth::user());
+        $queued = $attendanceWhatsApp->maybeQueueAfterBatchAttendance($batch, $date, $this->marks, Auth::user());
 
-        Notification::make()
-            ->title('Attendance saved')
-            ->body("{$saved} record(s) saved for {$batch->name} · ".date('d M Y', strtotime($date)))
-            ->success()
-            ->send();
+        $body = "{$saved} record(s) saved for {$batch->name} · ".$this->formatAttendanceDate($date);
+
+        if ($queued !== null) {
+            $body .= " WhatsApp queued for {$queued} present student(s).";
+        }
+
+        $this->finishAttendanceSave('Attendance saved', $body);
+    }
+
+    /**
+     * @return list<array{date: string, label: string, present: int, absent: int, leave: int, total: int}>
+     */
+    public function markedDateSummaries(): array
+    {
+        $batchId = $this->filters['batch_id'] ?? null;
+
+        if (! $batchId) {
+            return [];
+        }
+
+        $batch = Batch::query()->find($batchId);
+
+        if (! $batch) {
+            return [];
+        }
+
+        return app(AttendanceService::class)->markedDateSummariesForBatch($batch);
+    }
+
+    public function openMarkedDate(string $date): void
+    {
+        $this->filters['attendance_date'] = $date;
+        $this->loadRoster();
+    }
+
+    protected function formatAttendanceDate(string $date): string
+    {
+        return Carbon::parse($date)->format('d M Y');
     }
 
     public function filtersForm(Schema $schema): Schema
@@ -188,6 +245,12 @@ class BatchAttendancePage extends Page
                     $this->getFiltersFormComponent(),
                 ])
                 ->compact(),
+            View::make('filament.pages.partials.batch-attendance-history')
+                ->viewData(fn (): array => [
+                    'summaries' => $this->markedDateSummaries(),
+                    'selectedDate' => $this->filters['attendance_date'] ?? null,
+                ])
+                ->visible(fn (): bool => filled($this->filters['batch_id'])),
             View::make('filament.pages.partials.batch-attendance-roster')
                 ->viewData(fn (): array => [
                     'rosterLoaded' => $this->rosterLoaded,

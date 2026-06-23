@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,6 +13,7 @@ class FeeStructure extends Model
         'enrollment_id',
         'course_fee',
         'discount_amount',
+        'discount_set_by_user_id',
         'net_fee',
         'paid_amount',
         'pending_amount',
@@ -39,6 +41,11 @@ class FeeStructure extends Model
         return $this->belongsTo(User::class, 'set_by_user_id');
     }
 
+    public function discountSetBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'discount_set_by_user_id');
+    }
+
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
@@ -63,6 +70,11 @@ class FeeStructure extends Model
         return $this->hasMany(FeeMiscCharge::class)->orderBy('sort_order');
     }
 
+    public function discountEntries(): HasMany
+    {
+        return $this->hasMany(FeeDiscountEntry::class)->orderBy('created_at');
+    }
+
     public function penalties(): HasMany
     {
         return $this->hasMany(FeePenalty::class);
@@ -82,5 +94,19 @@ class FeeStructure extends Model
         return round((float) $this->penalties()
             ->where('status', \App\Enums\FeePenaltyStatus::Pending)
             ->sum('penalty_amount'), 2);
+    }
+
+    public function totalCollectiblePending(): float
+    {
+        return round((float) $this->pending_amount + $this->pendingPenaltiesTotal(), 2);
+    }
+
+    /**
+     * @param  Builder<FeeStructure>  $query
+     * @return Builder<FeeStructure>
+     */
+    public function scopeForActiveEnrollments(Builder $query): Builder
+    {
+        return $query->whereHas('enrollment', fn (Builder $enrollmentQuery): Builder => $enrollmentQuery->where('is_active', true));
     }
 }

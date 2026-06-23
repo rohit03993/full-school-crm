@@ -52,6 +52,40 @@ class DocumentService
         ]);
     }
 
+    public function storeFromFilamentUpload(
+        Model $documentable,
+        DocumentType $type,
+        mixed $upload,
+        ?User $uploader = null,
+    ): Document {
+        return $this->store($documentable, $type, $this->resolveUploadedFile($upload), $uploader);
+    }
+
+    protected function resolveUploadedFile(mixed $upload): UploadedFile
+    {
+        if ($upload instanceof UploadedFile) {
+            return $upload;
+        }
+
+        if (is_array($upload)) {
+            $upload = $upload[0] ?? null;
+        }
+
+        if (is_string($upload) && Storage::disk(self::DISK)->exists($upload)) {
+            return new UploadedFile(
+                Storage::disk(self::DISK)->path($upload),
+                basename($upload),
+                Storage::disk(self::DISK)->mimeType($upload) ?: null,
+                null,
+                true,
+            );
+        }
+
+        throw \Illuminate\Validation\ValidationException::withMessages([
+            'photo' => 'Please upload a valid JPG or PNG photo.',
+        ]);
+    }
+
     public function deleteFile(Document $document): void
     {
         $this->storage->deleteStoredFile($document->file_path);

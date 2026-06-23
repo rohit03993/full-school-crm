@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Filament\Resources\Enquiries\EnquiryResource;
+use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
 use App\Services\CrmDashboardService;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget;
@@ -11,6 +12,8 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class CrmLeadStatsWidget extends StatsOverviewWidget
 {
+    use VisibleToSuperAdminOnly;
+
     protected static ?int $sort = 1;
 
     protected ?string $heading = 'Leads & Admissions';

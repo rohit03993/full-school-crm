@@ -75,6 +75,22 @@ class StudentSearchServiceTest extends TestCase
         $this->assertTrue($result['student']->is($student));
     }
 
+    public function test_finds_student_by_alternate_mobile(): void
+    {
+        $student = Student::query()->create([
+            'name' => 'Priya Singh',
+            'father_name' => 'Parent',
+            'mobile' => '9111111111',
+            'alternate_mobile' => '9222222222',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $result = app(StudentSearchService::class)->search('9222222222', null, null);
+
+        $this->assertSame(StudentSearchService::OUTCOME_FOUND, $result['outcome']);
+        $this->assertTrue($result['student']->is($student));
+    }
+
     protected function createStudent(string $name, string $mobile): Student
     {
         return Student::query()->create([

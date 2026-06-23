@@ -38,6 +38,31 @@
         @apply pt-2;
     }
 
+    /* Bottom nav spacing — all mobile pages */
+    .fi-body:has(.fi-mobile-bottom-nav) .fi-main-ctn {
+        @apply pb-2;
+    }
+
+    .fi-mobile-bottom-nav + .fi-layout,
+    .fi-body:has(.fi-mobile-bottom-nav) .fi-page {
+        @apply pb-0;
+    }
+
+    /* Stacked tables on mobile — card-style rows */
+    @media (max-width: 1023px) {
+        .fi-ta-stack .fi-ta-record {
+            @apply rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10;
+        }
+
+        .fi-ta-stack .fi-ta-record:not(:last-child) {
+            @apply mb-3;
+        }
+
+        .fi-ta-stack .fi-ta-actions {
+            @apply mt-2 border-t border-gray-100 pt-2 dark:border-white/10;
+        }
+    }
+
     /* Mobile-first CRM polish */
     @media (max-width: 639px) {
         .fi-main-ctn {
@@ -45,7 +70,15 @@
         }
 
         .fi-page-header-main-ctn {
-            @apply gap-3;
+            @apply gap-2;
+        }
+
+        .fi-header-heading {
+            @apply text-lg leading-tight;
+        }
+
+        .fi-header-subheading {
+            @apply text-xs leading-relaxed;
         }
 
         .fi-header-actions {
@@ -57,19 +90,41 @@
         }
 
         .fi-header-actions .fi-btn {
-            @apply min-h-11 flex-1 touch-manipulation;
+            @apply min-h-11 flex-1 touch-manipulation text-sm;
+        }
+
+        .fi-topbar {
+            @apply px-2;
         }
 
         .fi-tabs-tab-list {
-            @apply -mx-1 flex-nowrap gap-1 overflow-x-auto pb-1;
+            @apply -mx-1 flex-nowrap gap-1 overflow-x-auto pb-1 scroll-smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .fi-student-profile-tabs .fi-tabs-tab-list {
+            @apply mx-0 grid overflow-hidden pb-0;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .fi-student-profile-tabs .fi-tabs-tab {
+            @apply w-full;
         }
 
         .fi-tabs-tab {
-            @apply shrink-0 touch-manipulation;
+            @apply shrink-0 touch-manipulation text-sm;
         }
 
         .fi-ta-ctn {
-            @apply overflow-x-auto;
+            @apply -mx-1 overflow-visible;
+        }
+
+        .fi-ta-header-toolbar {
+            @apply flex-col items-stretch gap-2;
+        }
+
+        .fi-ta-header-toolbar .fi-ta-search-field {
+            @apply w-full;
         }
 
         .fi-ta-actions .fi-ac-btn-action,
@@ -82,16 +137,361 @@
             @apply gap-4;
         }
 
+        /* Force single-column forms on small screens */
+        .fi-section-content-ctn,
+        .fi-fo-component-ctn {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+
         .fi-fo-field-wrp-label {
             @apply text-sm;
+        }
+
+        .fi-input-wrp input,
+        .fi-input-wrp select,
+        .fi-input-wrp textarea {
+            @apply text-base;
         }
 
         .fi-dashboard-hero .grid {
             @apply gap-2;
         }
+
+        /* Modals — nearly full screen on phones */
+        .fi-modal-window:not(.fi-modal-window-size-screen) {
+            @apply mx-2 max-h-[92dvh] w-[calc(100%-1rem)] max-w-none;
+        }
+
+        .fi-modal-content {
+            @apply max-h-[calc(92dvh-8rem)] overflow-y-auto;
+        }
+
+        .fi-modal-footer .fi-btn {
+            @apply min-h-11 flex-1;
+        }
+
+        .fi-modal-footer .fi-ac {
+            @apply w-full flex-wrap gap-2;
+        }
+
+        /* Filters drawer */
+        .fi-ta-filters-above-content-ctn {
+            @apply rounded-xl;
+        }
+
+        /* Widget stats — 2 columns max on phone */
+        .fi-wi-stats-overview .fi-wi-stats-overview-stats-ctn {
+            @apply grid-cols-2;
+        }
+
+        /* Setup guide & custom cards */
+        .fi-page .rounded-xl.border {
+            @apply mx-0;
+        }
     }
 
     .fi-crm-scroll-hint {
         @apply text-[11px] text-gray-400 dark:text-gray-500 sm:hidden;
+    }
+
+    /* Student profile & custom partials */
+    @media (max-width: 639px) {
+        .fi-student-profile-actions {
+            @apply flex w-full flex-col gap-2;
+        }
+
+        .fi-student-profile-actions .fi-btn {
+            @apply w-full justify-center;
+        }
+    }
+
+    /* Student search page — mobile-first hero layout */
+    .fi-page:has(.fi-student-search-page) .fi-page-header {
+        @apply mb-2 gap-0.5 py-0;
+    }
+
+    .fi-page:has(.fi-student-search-page) .fi-header-heading {
+        @apply text-xl sm:text-2xl;
+    }
+
+    .fi-page:has(.fi-student-search-page) .fi-page-main {
+        @apply pt-0;
+    }
+
+    .fi-student-search-page {
+        @apply mx-auto flex w-full max-w-lg flex-col gap-3;
+        min-height: calc(100dvh - 7.5rem);
+    }
+
+    .fi-body:has(.fi-mobile-bottom-nav) .fi-student-search-page {
+        min-height: calc(100dvh - 11.5rem);
+    }
+
+    .fi-student-search-page:not(.fi-student-search-page--active) {
+        @apply justify-center;
+    }
+
+    .fi-student-search-page--active {
+        @apply justify-start;
+        min-height: auto;
+    }
+
+    .fi-student-search-page--active .fi-student-search-results {
+        max-height: min(42dvh, 22rem);
+    }
+
+    .fi-student-search-page--enquiry {
+        @apply justify-start gap-0;
+        min-height: auto;
+    }
+
+    .fi-student-search-enquiry-context {
+        @apply flex items-start justify-between gap-3 rounded-t-2xl border border-b-0 border-gray-200/80 bg-white px-4 py-4 shadow-md ring-1 ring-gray-950/5 dark:border-white/10 dark:bg-gray-900 dark:ring-white/10 sm:px-6;
+    }
+
+    .fi-student-search-enquiry-context-label {
+        @apply text-xs font-medium text-gray-500 dark:text-gray-400;
+    }
+
+    .fi-student-search-enquiry-context-mobile {
+        @apply mt-0.5 font-mono text-2xl font-bold tracking-wide text-gray-950 dark:text-white;
+    }
+
+    .fi-student-search-enquiry-context-hint {
+        @apply mt-2 text-xs text-gray-500 dark:text-gray-400;
+    }
+
+    .fi-student-search-enquiry-context-change {
+        @apply inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white;
+    }
+
+    .fi-student-search-enquiry-form {
+        @apply overflow-visible rounded-t-none border-t border-gray-100 shadow-md dark:border-white/10;
+    }
+
+    .fi-student-search-enquiry-form .fi-sc {
+        @apply gap-4 px-4 py-4 sm:px-6 sm:py-5;
+    }
+
+    .fi-student-search-enquiry-form .fi-sc-component-ctn {
+        @apply grid grid-cols-1 gap-4 sm:grid-cols-2;
+    }
+
+    .fi-student-search-enquiry-form .fi-fo-field-wrp:has([name="data.name"]) {
+        @apply sm:col-span-2;
+    }
+
+    .fi-student-search-enquiry-form .fi-fo-field-wrp:has([name="data.discussion_summary"]) {
+        @apply sm:col-span-2;
+    }
+
+    .fi-student-search-enquiry-form .fi-form-actions {
+        @apply border-t border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6;
+    }
+
+    .fi-student-search-enquiry-form .fi-student-search-enquiry-save {
+        @apply min-h-11 w-full text-base font-semibold;
+    }
+
+    .fi-student-search-form {
+        @apply shrink-0 overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-md ring-1 ring-gray-950/5 dark:border-white/10 dark:bg-gray-900 dark:ring-white/10;
+    }
+
+    .fi-student-search-form--primary {
+        @apply border-primary-200/60 ring-primary-500/10 dark:border-primary-500/20;
+    }
+
+    .fi-student-search-form .fi-sc {
+        @apply gap-4 px-4 py-5 sm:px-6 sm:py-6;
+    }
+
+    .fi-student-search-form .fi-sc-component-ctn {
+        @apply grid grid-cols-1 gap-3;
+    }
+
+    .fi-student-search-hero {
+        @apply flex flex-col items-center gap-3 text-center sm:flex-row sm:items-start sm:text-left;
+    }
+
+    .fi-student-search-hero-icon {
+        @apply flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-500/10 ring-1 ring-primary-500/20 dark:bg-primary-500/15;
+    }
+
+    .fi-student-search-hero-title {
+        @apply text-lg font-bold tracking-tight text-gray-950 dark:text-white sm:text-xl;
+    }
+
+    .fi-student-search-hero-subtitle {
+        @apply mt-1 text-sm leading-snug text-gray-500 dark:text-gray-400;
+    }
+
+    .fi-student-search-mobile-field .fi-fo-field-wrp-label span {
+        @apply text-sm font-semibold text-gray-700 dark:text-gray-300;
+    }
+
+    .fi-student-search-mobile-field .fi-input-wrp {
+        @apply min-h-[3.25rem] rounded-xl border-2 border-gray-200 bg-gray-50/80 shadow-inner transition focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20 dark:border-white/15 dark:bg-white/5;
+    }
+
+    .fi-student-search-mobile-field .fi-input-wrp:focus-within {
+        @apply border-primary-500;
+    }
+
+    .fi-student-search-name-toggle {
+        @apply flex items-center gap-3 py-1;
+    }
+
+    .fi-student-search-name-toggle-line {
+        @apply h-px min-w-0 flex-1 bg-gray-200 dark:bg-white/10;
+    }
+
+    .fi-student-search-name-toggle-btn {
+        @apply inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200;
+    }
+
+    .fi-student-search-name-header {
+        @apply rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-3 py-2.5 dark:border-white/10 dark:bg-white/[0.03];
+    }
+
+    .fi-student-search-name-label {
+        @apply text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400;
+    }
+
+    .fi-student-search-name-hint {
+        @apply mt-0.5 text-[11px] leading-snug text-gray-500 dark:text-gray-500;
+    }
+
+    .fi-student-search-name-field .fi-fo-field-wrp-label span {
+        @apply text-xs font-medium text-gray-600 dark:text-gray-400;
+    }
+
+    .fi-student-search-name-field .fi-input-wrp {
+        @apply min-h-10;
+    }
+
+    .fi-student-search-form .fi-form-actions {
+        @apply border-t border-gray-100 px-4 py-3 dark:border-white/10 sm:px-6;
+    }
+
+    .fi-student-search-form .fi-sc-actions {
+        @apply flex flex-row flex-wrap gap-2;
+    }
+
+    .fi-student-search-form .fi-sc-actions .fi-btn {
+        @apply min-h-10;
+    }
+
+    .fi-student-search-form .fi-sc-actions .fi-student-search-submit {
+        @apply min-h-11 flex-1 px-6 text-base font-semibold sm:flex-none;
+    }
+
+    /* Custom CRM pages — native inputs that match Filament field styling */
+    .fi-crm-field {
+        @apply w-full;
+    }
+
+    .fi-crm-field .fi-fo-field-label-col {
+        @apply mb-2;
+    }
+
+    .fi-crm-hint {
+        @apply text-xs leading-relaxed text-gray-500 dark:text-gray-400;
+    }
+
+    .fi-crm-select {
+        @apply block min-h-11 w-full cursor-pointer appearance-none rounded-lg border border-gray-200 bg-white bg-no-repeat px-3 py-2.5 pr-10 text-sm leading-normal text-gray-950 shadow-sm transition duration-75;
+        @apply focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20;
+        @apply disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-60;
+        @apply dark:border-white/10 dark:bg-white/5 dark:text-white dark:disabled:bg-white/[0.02];
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+        background-position: right 0.75rem center;
+        background-size: 1.25rem;
+    }
+
+    .fi-crm-input {
+        @apply block min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm leading-normal text-gray-950 shadow-sm transition duration-75;
+        @apply placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20;
+        @apply disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-60;
+        @apply dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-gray-500 dark:disabled:bg-white/[0.02];
+    }
+
+    .fi-crm-form select.fi-input,
+    .fi-crm-form input.fi-input:not([type='file']):not([type='checkbox']):not([type='radio']),
+    .fi-page select.fi-input,
+    .fi-page input.fi-input:not([type='file']):not([type='checkbox']):not([type='radio']) {
+        @apply min-h-11 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm leading-normal text-gray-950 shadow-sm transition duration-75;
+        @apply focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20;
+        @apply disabled:cursor-not-allowed disabled:bg-gray-50 disabled:opacity-60;
+        @apply dark:border-white/10 dark:bg-white/5 dark:text-white dark:disabled:bg-white/[0.02];
+    }
+
+    .fi-crm-form select.fi-input,
+    .fi-page select.fi-input {
+        @apply cursor-pointer appearance-none bg-no-repeat pr-10;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+        background-position: right 0.75rem center;
+        background-size: 1.25rem;
+    }
+
+    .fi-crm-form label:not(.sr-only):not(.fi-fo-field-wrp-label):not(.group) {
+        @apply mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300;
+    }
+
+    .fi-crm-btn-primary {
+        @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 disabled:cursor-not-allowed disabled:opacity-60;
+    }
+
+    .fi-crm-btn-secondary {
+        @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10;
+    }
+
+    /* Student profile — header actions & tab bar */
+    .fi-page:has(.fi-student-profile-shell) .fi-page-header {
+        @apply mb-3 gap-1;
+    }
+
+    .fi-page:has(.fi-student-profile-shell) .fi-header-heading {
+        @apply text-xl font-bold sm:text-2xl;
+    }
+
+    .fi-page:has(.fi-student-profile-shell) .fi-header-subheading {
+        @apply text-xs text-gray-500 dark:text-gray-400;
+    }
+
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions {
+        @apply w-full justify-end;
+    }
+
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
+        @apply flex-wrap justify-end gap-2;
+    }
+
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn {
+        @apply min-h-10 shrink-0 text-sm;
+    }
+
+    .fi-student-profile-shell {
+        @apply mb-4;
+    }
+
+    .fi-student-profile-tabs {
+        @apply mt-1;
+    }
+
+    .fi-student-profile-tabs .fi-tabs-tab-list {
+        @apply grid gap-1.5 overflow-hidden rounded-2xl bg-gray-50/80 p-2 ring-1 ring-gray-200/80 dark:bg-white/5 dark:ring-white/10;
+        grid-template-columns: repeat(auto-fill, minmax(8.75rem, 1fr));
+    }
+
+    .fi-student-profile-tabs .fi-tabs-tab {
+        @apply min-w-0 w-full justify-center rounded-xl px-2 py-2.5 text-xs font-semibold text-gray-600 transition sm:px-3 sm:text-sm dark:text-gray-400;
+    }
+
+    .fi-student-profile-tabs .fi-tabs-tab[aria-selected='true'] {
+        @apply bg-white text-primary-700 shadow-sm ring-1 ring-gray-200/80 dark:bg-gray-900 dark:text-primary-400 dark:ring-white/10;
+    }
+
+    .fi-student-profile-tabs .fi-tabs-panel {
+        @apply pt-4 sm:pt-5;
     }
 }

@@ -2,11 +2,18 @@
 
 namespace App\Filament\Resources\ActivityTypes;
 
+use App\Enums\CrmPermission;
 use App\Enums\RoleName;
+use App\Filament\Concerns\RequiresAnyCrmPermission;
 use App\Filament\Resources\ActivityTypes\Pages\CreateActivityType;
+use App\Support\CrmAccess;
 use App\Filament\Resources\ActivityTypes\Pages\EditActivityType;
 use App\Filament\Resources\ActivityTypes\Pages\ListActivityTypes;
+use App\Filament\Support\CrmTable;
 use App\Models\ActivityType;
+use App\Support\ActivityTypePresets;
+use App\Support\CrmNavigation;
+use App\Support\EduExamLabels;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -24,31 +31,69 @@ use UnitEnum;
 
 class ActivityTypeResource extends Resource
 {
+    use RequiresAnyCrmPermission;
+
+    /**
+     * @return list<CrmPermission>
+     */
+    protected static function anyCrmPermissions(): array
+    {
+        return [
+            CrmPermission::MarksImport,
+            CrmPermission::AcademicsManage,
+        ];
+    }
+
     protected static ?string $model = ActivityType::class;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedAdjustmentsHorizontal;
 
-    protected static ?string $navigationLabel = 'Activity Types';
+    protected static ?string $navigationLabel = 'Exam Types';
 
-    protected static ?string $modelLabel = 'Activity Type';
+    protected static ?string $modelLabel = 'Exam Type';
 
-    protected static ?string $pluralModelLabel = 'Activity Types';
+    protected static ?string $pluralModelLabel = 'Exam Types';
 
-    protected static ?int $navigationSort = 2;
-
-    protected static string|UnitEnum|null $navigationGroup = 'Setup';
-
-    public static function canAccess(): bool
+    public static function getNavigationLabel(): string
     {
-        return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
+        return EduExamLabels::examTypes();
+    }
+
+    public static function getModelLabel(): string
+    {
+        return EduExamLabels::examType();
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return EduExamLabels::examTypes();
+    }
+
+    protected static ?int $navigationSort = 45;
+
+    protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_ACADEMICS;
+
+    public static function canCreate(): bool
+    {
+        return CrmAccess::can(Auth::user(), CrmPermission::AcademicsManage);
+    }
+
+    public static function canEdit($record): bool
+    {
+        return static::canCreate();
+    }
+
+    public static function canDelete($record): bool
+    {
+        return static::canCreate();
     }
 
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Section::make('Activity Type')
-                    ->description('Define what kinds of activities your institute tracks — exams, mock tests, workshops, etc.')
+                Section::make(EduExamLabels::examType())
+                    ->description('Workshop & Event: leave Marks ✗ — staff mark attendance under Academics → Workshops & Events.')
                     ->schema([
                         TextInput::make('name')
                             ->required()
@@ -72,6 +117,11 @@ class ActivityTypeResource extends Resource
                         Toggle::make('is_enabled')
                             ->label('Enabled')
                             ->default(true),
+                        Toggle::make('tracks_marks')
+                            ->label('Records marks & scores')
+                            ->helperText('Required for Import Marks and score entry. Adds Subject and Max Marks fields.')
+                            ->default(true)
+                            ->live(),
                         Textarea::make('description')
                             ->rows(2)
                             ->columnSpanFull(),
@@ -106,12 +156,20 @@ class ActivityTypeResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return CrmTable::configure($table)
             ->columns([
                 TextColumn::make('name')->searchable()->sortable(),
                 TextColumn::make('plural_name')->label('Plural'),
                 TextColumn::make('sessions_count')->counts('sessions')->label('Sessions'),
                 TextColumn::make('sort_order')->sortable(),
+                IconColumn::make('marks_enabled')
+                    ->label('Marks')
+                    ->boolean()
+                    ->getStateUsing(fn (ActivityType $record): bool => $record->supportsScoring())
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('gray'),
                 IconColumn::make('is_enabled')->boolean()->label('Enabled'),
             ])
             ->defaultSort('sort_order')

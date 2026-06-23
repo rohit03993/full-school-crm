@@ -22,6 +22,7 @@ class Course extends Model
         'fee',
         'description',
         'status',
+        'show_on_website',
     ];
 
     protected function casts(): array
@@ -32,7 +33,17 @@ class Course extends Model
             'status' => CourseStatus::class,
             'fee' => 'decimal:2',
             'duration' => 'integer',
+            'show_on_website' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Course $course): void {
+            if ($course->programme_category === null) {
+                $course->programme_category = ProgrammeCategory::Custom;
+            }
+        });
     }
 
     protected function code(): Attribute
