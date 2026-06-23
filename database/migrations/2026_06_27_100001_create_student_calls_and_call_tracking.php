@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -64,10 +65,26 @@ return new class extends Migration
                 $table->timestamp('call_blocked_at')->nullable();
             }
         });
+
+        if (
+            Schema::hasColumn('students', 'is_call_blocked')
+            && Schema::hasColumn('students', 'next_call_followup_at')
+            && ! $this->indexExists('students', 'students_call_followup_idx')
+        ) {
+            Schema::table('students', function (Blueprint $table): void {
+                $table->index(['is_call_blocked', 'next_call_followup_at'], 'students_call_followup_idx');
+            });
+        }
     }
 
     public function down(): void
     {
+        if ($this->indexExists('students', 'students_call_followup_idx')) {
+            Schema::table('students', function (Blueprint $table): void {
+                $table->dropIndex('students_call_followup_idx');
+            });
+        }
+
         Schema::table('students', function (Blueprint $table) {
             $columns = array_filter([
                 Schema::hasColumn('students', 'total_calls') ? 'total_calls' : null,
@@ -86,5 +103,15 @@ return new class extends Migration
         });
 
         Schema::dropIfExists('student_calls');
+    }
+
+    private function indexExists(string $table, string $indexName): bool
+    {
+        return DB::select(
+            'SELECT 1 FROM information_schema.statistics
+             WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?
+             LIMIT 1',
+            [$table, $indexName]
+        ) !== [];
     }
 };
