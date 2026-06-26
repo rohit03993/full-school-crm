@@ -105,9 +105,7 @@ class StudentBulkImportService
                 $seenRolls[$rollKey] = $rowNumber;
             }
 
-            if ($mobileKey !== '' && isset($seenMobiles[$mobileKey])) {
-                $errors[] = "Duplicate mobile in file (also on row {$seenMobiles[$mobileKey]}).";
-            } elseif ($mobileKey !== '') {
+            if ($mobileKey !== '' && ! isset($seenMobiles[$mobileKey])) {
                 $seenMobiles[$mobileKey] = $rowNumber;
             }
 
@@ -167,6 +165,51 @@ class StudentBulkImportService
                     'roll_number' => $existingStudent->activeEnrollment?->enrollment_number,
                 ] : null,
             ];
+        }
+
+        return $this->applyDuplicateMobileErrors($preview);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $preview
+     * @return list<array<string, mixed>>
+     */
+    protected function applyDuplicateMobileErrors(array $preview): array
+    {
+        $mobileIndexes = [];
+
+        foreach ($preview as $index => $row) {
+            $mobile = trim((string) ($row['data'][StudentImportFields::MOBILE] ?? ''));
+
+            if ($mobile !== '' && preg_match('/^[6-9]\d{9}$/', $mobile)) {
+                $mobileIndexes[$mobile][] = $index;
+            }
+        }
+
+        foreach ($mobileIndexes as $indices) {
+            if (count($indices) < 2) {
+                continue;
+            }
+
+            $rowNumbers = array_map(
+                fn (int $index): int => (int) $preview[$index]['row_number'],
+                $indices,
+            );
+
+            foreach ($indices as $index) {
+                $rowNumber = (int) $preview[$index]['row_number'];
+                $otherRows = array_values(array_filter(
+                    $rowNumbers,
+                    fn (int $number): bool => $number !== $rowNumber,
+                ));
+
+                $preview[$index]['errors'] = array_values(array_unique(array_merge(
+                    $preview[$index]['errors'] ?? [],
+                    ['Duplicate mobile in file (also on row '.implode(', ', $otherRows).').'],
+                )));
+                $preview[$index]['status'] = 'error';
+                $preview[$index]['resolved_batch'] = null;
+            }
         }
 
         return $preview;

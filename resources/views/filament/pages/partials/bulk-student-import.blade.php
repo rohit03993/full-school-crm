@@ -297,26 +297,93 @@
 
     @if ($step === 3)
         @php
-            $readyCount = collect($previewRows)->where('status', 'ready')->count();
-            $duplicateCount = collect($previewRows)->where('status', 'duplicate')->count();
-            $errorCount = collect($previewRows)->where('status', 'error')->count();
-            $noMobileCount = collect($previewRows)->filter(fn (array $row): bool => ($row['status'] ?? '') === 'ready' && ! empty($row['warnings'] ?? []))->count();
+            $allPreviewRows = $allPreviewRows ?? $previewRows;
+            $readyCount = collect($allPreviewRows)->where('status', 'ready')->count();
+            $duplicateCount = collect($allPreviewRows)->where('status', 'duplicate')->count();
+            $errorCount = collect($allPreviewRows)->where('status', 'error')->count();
+            $noMobileCount = collect($allPreviewRows)->filter(fn (array $row): bool => ($row['status'] ?? '') === 'ready' && ! empty($row['warnings'] ?? []))->count();
+            $previewStatusFilter = $previewStatusFilter ?? 'all';
+            $filterLabels = [
+                'all' => 'All rows',
+                'ready' => 'Ready only',
+                'no_mobile' => 'No mobile only',
+                'duplicate' => 'Duplicates only',
+                'error' => 'Errors only',
+            ];
         @endphp
 
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
             @foreach ([
-                ['label' => 'Ready', 'value' => $readyCount, 'tone' => 'text-emerald-600 dark:text-emerald-400'],
-                ['label' => 'No mobile', 'value' => $noMobileCount, 'tone' => 'text-amber-600 dark:text-amber-400'],
-                ['label' => 'Duplicates', 'value' => $duplicateCount, 'tone' => 'text-amber-600 dark:text-amber-400'],
-                ['label' => 'Errors', 'value' => $errorCount, 'tone' => 'text-danger-600 dark:text-danger-400'],
-                ['label' => 'Will import', 'value' => $importableCount, 'tone' => 'text-primary-600 dark:text-primary-400'],
+                ['key' => 'ready', 'label' => 'Ready', 'value' => $readyCount, 'tone' => 'text-emerald-600 dark:text-emerald-400'],
+                ['key' => 'no_mobile', 'label' => 'No mobile', 'value' => $noMobileCount, 'tone' => 'text-amber-600 dark:text-amber-400'],
+                ['key' => 'duplicate', 'label' => 'Duplicates', 'value' => $duplicateCount, 'tone' => 'text-amber-600 dark:text-amber-400'],
+                ['key' => 'error', 'label' => 'Errors', 'value' => $errorCount, 'tone' => 'text-danger-600 dark:text-danger-400'],
+                ['key' => 'all', 'label' => 'Will import', 'value' => $importableCount, 'tone' => 'text-primary-600 dark:text-primary-400'],
             ] as $stat)
-                <div class="rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <button
+                    type="button"
+                    wire:click="setPreviewStatusFilter('{{ $stat['key'] }}')"
+                    @class([
+                        'rounded-xl px-3 py-3 text-left shadow-sm ring-1 transition',
+                        'bg-white ring-gray-950/5 hover:ring-primary-300 dark:bg-gray-900 dark:ring-white/10 dark:hover:ring-primary-500/40' => $previewStatusFilter !== $stat['key'],
+                        'bg-primary-50 ring-primary-400 dark:bg-primary-500/10 dark:ring-primary-500/50' => $previewStatusFilter === $stat['key'],
+                    ])
+                >
                     <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ $stat['label'] }}</p>
                     <p @class(['mt-1 text-2xl font-bold', $stat['tone']])>{{ $stat['value'] }}</p>
-                </div>
+                    @if ($previewStatusFilter === $stat['key'])
+                        <p class="mt-1 text-[10px] font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-300">Filtered</p>
+                    @endif
+                </button>
             @endforeach
         </div>
+
+        @if ($errorCount > 0)
+            <div class="rounded-xl border border-danger-200 bg-danger-50 px-4 py-4 dark:border-danger-500/30 dark:bg-danger-500/10">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="text-sm font-bold text-danger-900 dark:text-danger-200">
+                        {{ $errorCount }} row{{ $errorCount === 1 ? '' : 's' }} will not import
+                    </h3>
+                    @if ($previewStatusFilter !== 'error')
+                        <button
+                            type="button"
+                            wire:click="setPreviewStatusFilter('error')"
+                            class="text-xs font-semibold text-danger-700 underline decoration-danger-300 underline-offset-2 hover:text-danger-900 dark:text-danger-300"
+                        >
+                            Show errors only
+                        </button>
+                    @else
+                        <button
+                            type="button"
+                            wire:click="setPreviewStatusFilter('all')"
+                            class="text-xs font-semibold text-danger-700 underline decoration-danger-300 underline-offset-2 hover:text-danger-900 dark:text-danger-300"
+                        >
+                            Show all rows
+                        </button>
+                    @endif
+                </div>
+                <ul class="mt-3 max-h-48 space-y-2 overflow-auto">
+                    @foreach ($previewErrorRows ?? [] as $errorRow)
+                        <li class="rounded-lg bg-white/80 px-3 py-2 text-xs text-danger-900 ring-1 ring-danger-100 dark:bg-gray-900/60 dark:text-danger-100 dark:ring-danger-500/20">
+                            <span class="font-mono font-bold">Row {{ $errorRow['row_number'] }}</span>
+                            · {{ $errorRow['data']['name'] ?? '—' }}
+                            @if (filled($errorRow['data']['roll_number'] ?? null))
+                                · Roll {{ $errorRow['data']['roll_number'] }}
+                            @endif
+                            <p class="mt-1 text-danger-700 dark:text-danger-300">{{ implode(' ', $errorRow['errors'] ?? []) }}</p>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        @if ($previewStatusFilter !== 'all')
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+                Showing <span class="font-semibold text-gray-950 dark:text-white">{{ count($previewRows) }}</span>
+                {{ $filterLabels[$previewStatusFilter] ?? 'rows' }}.
+                <button type="button" wire:click="setPreviewStatusFilter('all')" class="font-semibold text-primary-700 underline underline-offset-2 dark:text-primary-300">Clear filter</button>
+            </p>
+        @endif
 
         <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
             <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
@@ -341,7 +408,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-white/10">
-                        @foreach ($previewRows as $row)
+                        @forelse ($previewRows as $row)
                             <tr @class([
                                 'transition',
                                 'bg-danger-50/40 dark:bg-danger-500/5' => ($row['status'] ?? '') === 'error',
@@ -400,7 +467,13 @@
                                     @endif
                                 </td>
                             </tr>
-                        @endforeach
+                        @empty
+                            <tr>
+                                <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                                    No rows match this filter.
+                                </td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>

@@ -113,6 +113,8 @@ class BulkStudentImportPage extends Page
 
     public ?string $importError = null;
 
+    public string $previewStatusFilter = 'all';
+
     public function mount(): void
     {
         $this->academicSessionId = AcademicSession::current()?->id;
@@ -233,6 +235,7 @@ class BulkStudentImportPage extends Page
             );
 
             $this->importBatchId = $previewBatch->id;
+            $this->previewStatusFilter = 'all';
             $this->fileRows = [];
             $this->fileHeaders = [];
             $this->step = 3;
@@ -461,6 +464,7 @@ class BulkStudentImportPage extends Page
             'importTotal',
             'importRunningTotals',
             'isImporting',
+            'previewStatusFilter',
         ]);
 
         $this->step = 1;
@@ -470,6 +474,53 @@ class BulkStudentImportPage extends Page
     /**
      * @return list<array<string, mixed>>
      */
+    public function setPreviewStatusFilter(string $filter): void
+    {
+        $allowed = ['all', 'ready', 'no_mobile', 'duplicate', 'error'];
+
+        $this->previewStatusFilter = in_array($filter, $allowed, true) ? $filter : 'all';
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function filteredPreviewRowsForDisplay(): array
+    {
+        $rows = $this->previewRowsForDisplay();
+
+        return match ($this->previewStatusFilter) {
+            'error' => array_values(array_filter(
+                $rows,
+                fn (array $row): bool => ($row['status'] ?? '') === 'error',
+            )),
+            'ready' => array_values(array_filter(
+                $rows,
+                fn (array $row): bool => ($row['status'] ?? '') === 'ready' && empty($row['warnings'] ?? []),
+            )),
+            'no_mobile' => array_values(array_filter(
+                $rows,
+                fn (array $row): bool => ($row['status'] ?? '') === 'ready' && ! empty($row['warnings'] ?? []),
+            )),
+            'duplicate' => array_values(array_filter(
+                $rows,
+                fn (array $row): bool => ($row['status'] ?? '') === 'duplicate',
+            )),
+            default => $rows,
+        };
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function previewErrorRowsForDisplay(): array
+    {
+        return collect($this->previewRowsForDisplay())
+            ->filter(fn (array $row): bool => ($row['status'] ?? '') === 'error')
+            ->sortBy('row_number')
+            ->values()
+            ->all();
+    }
+
     protected function previewRowsForDisplay(): array
     {
         if (! $this->importBatchId) {
@@ -618,7 +669,10 @@ class BulkStudentImportPage extends Page
                     'fileRows' => $this->fileRows,
                     'columnMapping' => $this->columnMapping,
                     'fieldLabels' => StudentImportFields::labels(),
-                    'previewRows' => $this->previewRowsForDisplay(),
+                    'allPreviewRows' => $this->previewRowsForDisplay(),
+                    'previewRows' => $this->filteredPreviewRowsForDisplay(),
+                    'previewErrorRows' => $this->previewErrorRowsForDisplay(),
+                    'previewStatusFilter' => $this->previewStatusFilter,
                     'duplicateResolutions' => $this->duplicateResolutions,
                     'duplicateOptions' => StudentImportDuplicateResolution::cases(),
                     'importResult' => $this->importResult,

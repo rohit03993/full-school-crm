@@ -3,11 +3,13 @@
 namespace Tests\Unit;
 
 use App\Enums\AdmissionStatus;
+use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\Gender;
 use App\Enums\LeadSource;
 use App\Enums\StudentStatus;
 use App\Models\Admission;
+use App\Models\Batch;
 use App\Models\Course;
 use App\Models\Enquiry;
 use App\Models\Student;
@@ -63,5 +65,52 @@ class CrmDashboardServiceTest extends TestCase
         $this->assertSame(1, $stats['walk_in_today']);
         $this->assertSame(1, $stats['pending_admissions']);
         $this->assertSame(1, $stats['total_enquiries']);
+    }
+
+    public function test_batch_overview_includes_active_batches_without_end_date(): void
+    {
+        $course = Course::query()->create([
+            'name' => 'IIT JEE',
+            'code' => 'JEE-DASH',
+            'programme_category' => 'coaching',
+            'duration' => 12,
+            'duration_type' => 'months',
+            'fee' => 100000,
+            'status' => CourseStatus::Active,
+        ]);
+
+        Batch::query()->create([
+            'name' => 'JEE Target Batch',
+            'course_id' => $course->id,
+            'start_date' => '2026-06-01',
+            'end_date' => null,
+            'status' => BatchStatus::Active,
+        ]);
+
+        Batch::query()->create([
+            'name' => 'NEET Target Batch',
+            'course_id' => $course->id,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-12-31',
+            'status' => BatchStatus::Active,
+        ]);
+
+        Batch::query()->create([
+            'name' => 'Old Completed Batch',
+            'course_id' => $course->id,
+            'start_date' => '2025-06-01',
+            'end_date' => '2025-12-31',
+            'status' => BatchStatus::Completed,
+        ]);
+
+        CrmDashboardService::flushAllCaches();
+
+        $overview = app(CrmDashboardService::class)->batchOverview();
+
+        $this->assertCount(2, $overview['rows']);
+
+        $labels = collect($overview['rows'])->pluck('label')->implode(' | ');
+        $this->assertStringContainsString('JEE Target Batch', $labels);
+        $this->assertStringContainsString('NEET Target Batch', $labels);
     }
 }

@@ -79,7 +79,6 @@ class CrmDashboardService
                 'pending_fees_total' => (float) FeeStructure::query()->forActiveEnrollments()->sum('pending_amount'),
                 'active_batches' => Batch::query()
                     ->where('status', BatchStatus::Active)
-                    ->whereDate('end_date', '>=', $today)
                     ->count(),
                 'attendance_present_today' => $attendance['present'],
                 'attendance_marked_today' => $attendance['marked'],
@@ -120,7 +119,6 @@ class CrmDashboardService
 
             $batches = Batch::query()
                 ->where('status', BatchStatus::Active)
-                ->whereDate('end_date', '>=', $today)
                 ->with('course')
                 ->orderBy('name')
                 ->get();
@@ -235,7 +233,6 @@ class CrmDashboardService
     {
         $batchIds = Batch::query()
             ->where('status', BatchStatus::Active)
-            ->whereDate('end_date', '>=', $today)
             ->pluck('id');
 
         if ($batchIds->isEmpty()) {

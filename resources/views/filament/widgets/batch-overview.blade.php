@@ -19,9 +19,9 @@
         @if (($overview['rows'] ?? []) === [])
             <p class="px-4 py-8 text-center text-sm text-gray-500 sm:px-6 dark:text-gray-400">No active batches. Create batches under Academics.</p>
         @else
-            <div class="overflow-x-auto">
+            <div class="max-h-[28rem] overflow-auto">
                 <table class="w-full min-w-[44rem] text-left text-sm">
-                    <thead class="bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
+                    <thead class="sticky top-0 z-10 bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
                         <tr>
                             <th class="px-4 py-2.5">Batch</th>
                             <th class="px-4 py-2.5 text-center">Students</th>
