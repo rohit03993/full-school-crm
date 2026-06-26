@@ -89,6 +89,7 @@ class StudentDataResetService
             'admission_misc_fees',
             'admission_installment_plans',
             'activity_attendances',
+            'activity_sessions',
             'attendances',
             'batch_students',
             'student_calls',

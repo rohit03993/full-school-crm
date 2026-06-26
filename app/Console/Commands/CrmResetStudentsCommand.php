@@ -20,7 +20,7 @@ class CrmResetStudentsCommand extends Command
         $studentCount = Student::withTrashed()->count();
 
         $this->warn('This permanently deletes ALL student-related data.');
-        $this->line('Removed: students, enquiries, visits, admissions, enrollments, fees, payments, receipts, attendance, test marks, calls, WhatsApp campaigns, and import history.');
+        $this->line('Removed: students, enquiries, visits, admissions, enrollments, fees, payments, receipts, attendance, test marks, test/workshop sessions, calls, WhatsApp campaigns, and import history.');
         $this->newLine();
         $this->line('Kept: courses, batches, academic sessions, staff accounts, institute settings, website content, and WhatsApp templates.');
         $this->newLine();
