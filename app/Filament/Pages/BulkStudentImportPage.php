@@ -138,10 +138,8 @@ class BulkStudentImportPage extends Page
 
     public function goToStep(int $step, StudentImportFileReader $reader): void
     {
-        if ($step === 2 && $this->fileRows === [] && filled($this->storedFilePath)) {
-            $parsed = $reader->parse(Storage::path($this->storedFilePath));
-            $this->fileHeaders = $parsed['headers'];
-            $this->fileRows = $parsed['rows'];
+        if ($step === 2) {
+            $this->hydrateFileFromStorage($reader);
         }
 
         $this->step = max(1, min(4, $step));
@@ -188,8 +186,16 @@ class BulkStudentImportPage extends Page
         $this->step = 2;
     }
 
-    public function buildPreview(StudentBulkImportService $importService): void
-    {
+    public function buildPreview(
+        StudentBulkImportService $importService,
+        StudentImportFileReader $reader,
+    ): void {
+        $this->validate([
+            'academicSessionId' => 'required|exists:academic_sessions,id',
+            'courseId' => 'required|exists:courses,id',
+            'batchId' => 'nullable|exists:batches,id',
+        ]);
+
         $missing = app(StudentImportColumnMapper::class)->missingRequiredFields($this->columnMapping);
 
         if ($missing !== []) {
@@ -202,33 +208,58 @@ class BulkStudentImportPage extends Page
             return;
         }
 
-        $preview = $importService->buildPreview($this->columnMapping, $this->fileRows);
+        try {
+            $rows = $this->resolveImportRows($reader);
 
-        foreach ($preview as $row) {
-            if (($row['status'] ?? '') === 'duplicate') {
-                $this->duplicateResolutions[(int) $row['row_number']] = StudentImportDuplicateResolution::KeepExisting->value;
+            if ($rows === []) {
+                Notification::make()
+                    ->title('Spreadsheet data missing')
+                    ->body('Upload the file again from step 1 — the server could not read the stored copy.')
+                    ->warning()
+                    ->send();
+
+                return;
             }
+
+            $preview = $importService->buildPreview($this->columnMapping, $rows);
+
+            foreach ($preview as $row) {
+                if (($row['status'] ?? '') === 'duplicate') {
+                    $this->duplicateResolutions[(int) $row['row_number']] = StudentImportDuplicateResolution::KeepExisting->value;
+                }
+            }
+
+            $session = AcademicSession::query()->findOrFail($this->academicSessionId);
+            $course = Course::query()->findOrFail($this->courseId);
+            $batch = $this->batchId ? Batch::query()->find($this->batchId) : null;
+
+            $this->discardPreviewBatch();
+
+            $previewBatch = $importService->storePreviewBatch(
+                Auth::user(),
+                $session,
+                $course,
+                $batch,
+                $this->originalFilename,
+                $preview,
+            );
+
+            $this->importBatchId = $previewBatch->id;
+            $this->fileRows = [];
+            $this->fileHeaders = [];
+            $this->step = 3;
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Preview failed')
+                ->body(config('app.debug')
+                    ? $exception->getMessage()
+                    : 'Could not read the spreadsheet. Try uploading again or use the CSV template.')
+                ->danger()
+                ->persistent()
+                ->send();
         }
-
-        $session = AcademicSession::query()->findOrFail($this->academicSessionId);
-        $course = Course::query()->findOrFail($this->courseId);
-        $batch = $this->batchId ? Batch::query()->find($this->batchId) : null;
-
-        $this->discardPreviewBatch();
-
-        $previewBatch = $importService->storePreviewBatch(
-            Auth::user(),
-            $session,
-            $course,
-            $batch,
-            $this->originalFilename,
-            $preview,
-        );
-
-        $this->importBatchId = $previewBatch->id;
-        $this->fileRows = [];
-        $this->fileHeaders = [];
-        $this->step = 3;
     }
 
     public function runImport(StudentBulkImportService $importService): void
@@ -489,6 +520,29 @@ class BulkStudentImportPage extends Page
             ->delete();
 
         $this->importBatchId = null;
+    }
+
+    protected function hydrateFileFromStorage(StudentImportFileReader $reader): void
+    {
+        if (! filled($this->storedFilePath)) {
+            return;
+        }
+
+        $parsed = $reader->parse(Storage::path($this->storedFilePath));
+        $this->fileHeaders = $parsed['headers'];
+        $this->fileRows = $parsed['rows'];
+    }
+
+    /**
+     * @return list<list<string|null>>
+     */
+    protected function resolveImportRows(StudentImportFileReader $reader): array
+    {
+        if (filled($this->storedFilePath)) {
+            return $reader->parse(Storage::path($this->storedFilePath))['rows'];
+        }
+
+        return $this->fileRows;
     }
 
     /**
