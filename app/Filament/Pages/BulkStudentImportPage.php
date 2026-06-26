@@ -35,6 +35,8 @@ class BulkStudentImportPage extends Page
 {
     use WithFileUploads;
 
+    private const IMPORT_SESSION_KEY = 'crm.bulk_student_import';
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowUpTray;
 
     protected static ?string $navigationLabel = 'Import Students';
@@ -184,12 +186,16 @@ class BulkStudentImportPage extends Page
         $this->importError = null;
         $this->uploadFile = null;
         $this->step = 2;
+        $this->persistImportSession();
     }
 
     public function buildPreview(
         StudentBulkImportService $importService,
         StudentImportFileReader $reader,
     ): void {
+        $this->restoreImportSession();
+        $this->persistImportSession();
+
         $this->validate([
             'academicSessionId' => 'required|exists:academic_sessions,id',
             'courseId' => 'required|exists:courses,id',
@@ -251,11 +257,15 @@ class BulkStudentImportPage extends Page
         } catch (\Throwable $exception) {
             report($exception);
 
+            $message = $exception->getMessage();
+
+            if (filled($this->storedFilePath) && ! Storage::disk('local')->exists($this->storedFilePath)) {
+                $message = 'Uploaded file not found on server. Please go back to step 1 and upload again.';
+            }
+
             Notification::make()
                 ->title('Preview failed')
-                ->body(config('app.debug')
-                    ? $exception->getMessage()
-                    : 'Could not read the spreadsheet. Try uploading again or use the CSV template.')
+                ->body($message !== '' ? $message : 'Could not read the spreadsheet. Try uploading again or use the CSV template.')
                 ->danger()
                 ->persistent()
                 ->send();
@@ -455,8 +465,10 @@ class BulkStudentImportPage extends Page
 
     public function startOver(StudentImportFileReader $reader): void
     {
+        $this->restoreImportSession();
         $reader->deleteStoredFile($this->storedFilePath);
         $this->discardPreviewBatch();
+        $this->clearImportSession();
 
         $this->reset([
             'step',
@@ -524,11 +536,15 @@ class BulkStudentImportPage extends Page
 
     protected function hydrateFileFromStorage(StudentImportFileReader $reader): void
     {
-        if (! filled($this->storedFilePath)) {
+        $this->restoreImportSession();
+
+        $absolutePath = $this->storedFileAbsolutePath();
+
+        if ($absolutePath === null) {
             return;
         }
 
-        $parsed = $reader->parse(Storage::path($this->storedFilePath));
+        $parsed = $reader->parse($absolutePath);
         $this->fileHeaders = $parsed['headers'];
         $this->fileRows = $parsed['rows'];
     }
@@ -538,11 +554,73 @@ class BulkStudentImportPage extends Page
      */
     protected function resolveImportRows(StudentImportFileReader $reader): array
     {
-        if (filled($this->storedFilePath)) {
-            return $reader->parse(Storage::path($this->storedFilePath))['rows'];
+        $this->restoreImportSession();
+
+        $absolutePath = $this->storedFileAbsolutePath();
+
+        if ($absolutePath !== null) {
+            return $reader->parse($absolutePath)['rows'];
         }
 
         return $this->fileRows;
+    }
+
+    protected function storedFileAbsolutePath(): ?string
+    {
+        if (! filled($this->storedFilePath)) {
+            return null;
+        }
+
+        if (! Storage::disk('local')->exists($this->storedFilePath)) {
+            return null;
+        }
+
+        return Storage::disk('local')->path($this->storedFilePath);
+    }
+
+    protected function persistImportSession(): void
+    {
+        session([
+            self::IMPORT_SESSION_KEY => [
+                'user_id' => Auth::id(),
+                'stored_file_path' => $this->storedFilePath,
+                'original_filename' => $this->originalFilename,
+                'academic_session_id' => $this->academicSessionId,
+                'course_id' => $this->courseId,
+                'batch_id' => $this->batchId,
+                'column_mapping' => $this->columnMapping,
+            ],
+        ]);
+    }
+
+    protected function restoreImportSession(): void
+    {
+        $data = session(self::IMPORT_SESSION_KEY);
+
+        if (! is_array($data) || ($data['user_id'] ?? null) !== Auth::id()) {
+            return;
+        }
+
+        if (filled($data['stored_file_path'] ?? null)) {
+            $this->storedFilePath = (string) $data['stored_file_path'];
+        }
+
+        if (filled($data['original_filename'] ?? null)) {
+            $this->originalFilename = (string) $data['original_filename'];
+        }
+
+        $this->academicSessionId = $data['academic_session_id'] ?? $this->academicSessionId;
+        $this->courseId = $data['course_id'] ?? $this->courseId;
+        $this->batchId = $data['batch_id'] ?? $this->batchId;
+
+        if ($this->columnMapping === [] && is_array($data['column_mapping'] ?? null)) {
+            $this->columnMapping = $data['column_mapping'];
+        }
+    }
+
+    protected function clearImportSession(): void
+    {
+        session()->forget(self::IMPORT_SESSION_KEY);
     }
 
     /**
