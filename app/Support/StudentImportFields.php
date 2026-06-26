@@ -32,7 +32,7 @@ class StudentImportFields
             self::MOBILE => 'Primary mobile (optional)',
             self::DATE_OF_BIRTH => 'Date of birth (optional)',
             self::GENDER => 'Gender (optional)',
-            self::BATCH_SECTION => 'Batch / section (optional)',
+            self::BATCH_SECTION => 'Batch name (from spreadsheet)',
             self::SKIP => 'Skip this column',
         ];
     }
@@ -45,6 +45,7 @@ class StudentImportFields
         return [
             self::ROLL_NUMBER,
             self::NAME,
+            self::BATCH_SECTION,
         ];
     }
 }

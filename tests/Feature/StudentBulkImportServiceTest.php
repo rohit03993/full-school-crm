@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\RoleName;
 use App\Enums\StudentImportDuplicateResolution;
 use App\Enums\StudentStatus;
 use App\Models\AcademicSession;
+use App\Models\Batch;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Student;
@@ -24,17 +26,21 @@ class StudentBulkImportServiceTest extends TestCase
 
     public function test_preview_imports_rows_with_missing_or_invalid_mobile_as_ready_with_warnings(): void
     {
+        [, , $batch] = $this->seedImportBatch();
+
         $preview = app(StudentBulkImportService::class)->buildPreview(
             [
                 0 => StudentImportFields::ROLL_NUMBER,
                 1 => StudentImportFields::NAME,
                 2 => StudentImportFields::MOBILE,
+                3 => StudentImportFields::BATCH_SECTION,
             ],
             [
-                ['501', 'No Mobile Student', ''],
-                ['502', 'Bad Mobile Student', 'not-a-phone'],
-                ['503', 'Scientific Mobile', '9.18321E+11'],
+                ['501', 'No Mobile Student', '', $batch->name],
+                ['502', 'Bad Mobile Student', 'not-a-phone', $batch->name],
+                ['503', 'Scientific Mobile', '9.18321E+11', $batch->name],
             ],
+            $batch->academic_session_id,
         );
 
         $this->assertSame('ready', $preview[0]['status']);
@@ -51,43 +57,28 @@ class StudentBulkImportServiceTest extends TestCase
     public function test_import_creates_student_without_mobile_when_spreadsheet_mobile_is_invalid(): void
     {
         $staff = $this->createStaffUser();
-        $session = AcademicSession::query()->create([
-            'name' => '2026–27',
-            'code' => '2026-27',
-            'starts_on' => '2026-04-01',
-            'ends_on' => '2027-03-31',
-            'is_current' => true,
-            'is_active' => true,
-        ]);
-        $course = Course::query()->create([
-            'name' => 'Class 12 Science',
-            'code' => 'CLS-12-SCI',
-            'programme_category' => 'school',
-            'duration' => 1,
-            'duration_type' => 'years',
-            'fee' => 50000,
-            'status' => CourseStatus::Active,
-        ]);
+        [, , $batch] = $this->seedImportBatch();
 
         $preview = app(StudentBulkImportService::class)->buildPreview(
             [
                 0 => StudentImportFields::ROLL_NUMBER,
                 1 => StudentImportFields::NAME,
                 2 => StudentImportFields::MOBILE,
+                3 => StudentImportFields::BATCH_SECTION,
             ],
             [
-                ['601', 'Imported Without Mobile', '9.18321E+11'],
+                ['601', 'Imported Without Mobile', '9.18321E+11', $batch->name],
             ],
+            $batch->academic_session_id,
         );
 
         $result = app(StudentBulkImportService::class)->import(
             $staff,
-            $session,
-            $course,
-            null,
             'students.xlsx',
             $preview,
             [],
+            null,
+            $batch->academic_session_id,
         );
 
         $this->assertSame(1, $result['created']);
@@ -101,17 +92,21 @@ class StudentBulkImportServiceTest extends TestCase
 
     public function test_preview_normalizes_mixed_mobile_formats(): void
     {
+        [, , $batch] = $this->seedImportBatch();
+
         $preview = app(StudentBulkImportService::class)->buildPreview(
             [
                 0 => StudentImportFields::ROLL_NUMBER,
                 1 => StudentImportFields::NAME,
                 2 => StudentImportFields::MOBILE,
+                3 => StudentImportFields::BATCH_SECTION,
             ],
             [
-                ['1', 'Ten Digit', '8410054825'],
-                ['2', 'With Ninety One', '919027620525'],
-                ['3', 'Excel Float', 919027620525.0],
+                ['1', 'Ten Digit', '8410054825', $batch->name],
+                ['2', 'With Ninety One', '919027620525', $batch->name],
+                ['3', 'Excel Float', 919027620525.0, $batch->name],
             ],
+            $batch->academic_session_id,
         );
 
         $this->assertSame('ready', $preview[0]['status']);
@@ -137,26 +132,21 @@ class StudentBulkImportServiceTest extends TestCase
         $this->assertSame(StudentImportFields::MOBILE, $mapping[3]);
     }
 
+    public function test_column_mapper_guesses_class_course_as_batch(): void
+    {
+        $mapping = app(StudentImportColumnMapper::class)->guess([
+            'Roll No',
+            'Student Name',
+            'Class (Course)',
+        ]);
+
+        $this->assertSame(StudentImportFields::BATCH_SECTION, $mapping[2]);
+    }
+
     public function test_import_creates_enrolled_student_with_roll_number_and_fee(): void
     {
         $staff = $this->createStaffUser();
-        $session = AcademicSession::query()->create([
-            'name' => '2026–27',
-            'code' => '2026-27',
-            'starts_on' => '2026-04-01',
-            'ends_on' => '2027-03-31',
-            'is_current' => true,
-            'is_active' => true,
-        ]);
-        $course = Course::query()->create([
-            'name' => 'Class 12 Science',
-            'code' => 'CLS-12-SCI',
-            'programme_category' => 'school',
-            'duration' => 1,
-            'duration_type' => 'years',
-            'fee' => 50000,
-            'status' => CourseStatus::Active,
-        ]);
+        [$session, , $batch] = $this->seedImportBatch('Class 12 Science Batch');
 
         $preview = app(StudentBulkImportService::class)->buildPreview(
             [
@@ -164,22 +154,23 @@ class StudentBulkImportServiceTest extends TestCase
                 1 => StudentImportFields::NAME,
                 2 => StudentImportFields::FATHER_NAME,
                 3 => StudentImportFields::MOBILE,
+                4 => StudentImportFields::BATCH_SECTION,
             ],
             [
-                ['101', 'Import Student', 'Import Parent', '9876500101'],
+                ['101', 'Import Student', 'Import Parent', '9876500101', $batch->name],
             ],
+            $session->id,
         );
 
         $this->assertSame('ready', $preview[0]['status']);
 
         $result = app(StudentBulkImportService::class)->import(
             $staff,
-            $session,
-            $course,
-            null,
             'students.xlsx',
             $preview,
             [],
+            null,
+            $session->id,
         );
 
         $this->assertSame(1, $result['created']);
@@ -195,23 +186,7 @@ class StudentBulkImportServiceTest extends TestCase
     public function test_duplicate_mobile_can_be_skipped(): void
     {
         $staff = $this->createStaffUser();
-        $session = AcademicSession::query()->create([
-            'name' => '2026–27',
-            'code' => '2026-27',
-            'starts_on' => '2026-04-01',
-            'ends_on' => '2027-03-31',
-            'is_current' => true,
-            'is_active' => true,
-        ]);
-        $course = Course::query()->create([
-            'name' => 'Diploma',
-            'code' => 'DIP-01',
-            'programme_category' => 'coaching',
-            'duration' => 6,
-            'duration_type' => 'months',
-            'fee' => 30000,
-            'status' => CourseStatus::Active,
-        ]);
+        [$session, , $batch] = $this->seedImportBatch('Diploma Batch', 30000);
 
         Student::query()->create([
             'name' => 'Existing Student',
@@ -226,22 +201,23 @@ class StudentBulkImportServiceTest extends TestCase
                 1 => StudentImportFields::NAME,
                 2 => StudentImportFields::FATHER_NAME,
                 3 => StudentImportFields::MOBILE,
+                4 => StudentImportFields::BATCH_SECTION,
             ],
             [
-                ['202', 'New Name', 'New Parent', '9876500202'],
+                ['202', 'New Name', 'New Parent', '9876500202', $batch->name],
             ],
+            $session->id,
         );
 
         $this->assertSame('duplicate', $preview[0]['status']);
 
         $result = app(StudentBulkImportService::class)->import(
             $staff,
-            $session,
-            $course,
-            null,
             'students.xlsx',
             $preview,
             [2 => StudentImportDuplicateResolution::KeepExisting->value],
+            null,
+            $session->id,
         );
 
         $this->assertSame(1, $result['skipped']);
@@ -251,43 +227,28 @@ class StudentBulkImportServiceTest extends TestCase
     public function test_import_rejects_course_with_no_fee(): void
     {
         $staff = $this->createStaffUser();
-        $session = AcademicSession::query()->create([
-            'name' => '2026–27',
-            'code' => '2026-27',
-            'starts_on' => '2026-04-01',
-            'ends_on' => '2027-03-31',
-            'is_current' => true,
-            'is_active' => true,
-        ]);
-        $course = Course::query()->create([
-            'name' => 'Free Course',
-            'code' => 'FREE-01',
-            'programme_category' => 'school',
-            'duration' => 1,
-            'duration_type' => 'years',
-            'fee' => 0,
-            'status' => CourseStatus::Active,
-        ]);
+        [$session, , $batch] = $this->seedImportBatch('Free Course Batch', 0);
 
         $preview = app(StudentBulkImportService::class)->buildPreview(
             [
                 0 => StudentImportFields::ROLL_NUMBER,
                 1 => StudentImportFields::NAME,
                 2 => StudentImportFields::MOBILE,
+                3 => StudentImportFields::BATCH_SECTION,
             ],
             [
-                ['404', 'Zero Fee Student', '9876500404'],
+                ['404', 'Zero Fee Student', '9876500404', $batch->name],
             ],
+            $session->id,
         );
 
         $result = app(StudentBulkImportService::class)->import(
             $staff,
-            $session,
-            $course,
-            null,
             'students.csv',
             $preview,
             [],
+            null,
+            $session->id,
         );
 
         $this->assertSame(0, $result['created']);
@@ -298,23 +259,7 @@ class StudentBulkImportServiceTest extends TestCase
     public function test_import_proceeds_without_father_name_or_valid_dob(): void
     {
         $staff = $this->createStaffUser();
-        $session = AcademicSession::query()->create([
-            'name' => '2026–27',
-            'code' => '2026-27',
-            'starts_on' => '2026-04-01',
-            'ends_on' => '2027-03-31',
-            'is_current' => true,
-            'is_active' => true,
-        ]);
-        $course = Course::query()->create([
-            'name' => 'Class 11 Science',
-            'code' => 'CLS-11-SCI',
-            'programme_category' => 'school',
-            'duration' => 1,
-            'duration_type' => 'years',
-            'fee' => 40000,
-            'status' => CourseStatus::Active,
-        ]);
+        [$session, , $batch] = $this->seedImportBatch('Class 11 Batch', 40000);
 
         $preview = app(StudentBulkImportService::class)->buildPreview(
             [
@@ -323,22 +268,23 @@ class StudentBulkImportServiceTest extends TestCase
                 2 => StudentImportFields::MOBILE,
                 3 => StudentImportFields::DATE_OF_BIRTH,
                 4 => StudentImportFields::GENDER,
+                5 => StudentImportFields::BATCH_SECTION,
             ],
             [
-                ['303', 'Minimal Student', '9876500303', 'not-a-date', 'unknown'],
+                ['303', 'Minimal Student', '9876500303', 'not-a-date', 'unknown', $batch->name],
             ],
+            $session->id,
         );
 
         $this->assertSame('ready', $preview[0]['status']);
 
         $result = app(StudentBulkImportService::class)->import(
             $staff,
-            $session,
-            $course,
-            null,
             'students.csv',
             $preview,
             [],
+            null,
+            $session->id,
         );
 
         $this->assertSame(1, $result['created']);
@@ -352,6 +298,39 @@ class StudentBulkImportServiceTest extends TestCase
     public function test_preview_errors_are_not_counted_as_import_failures(): void
     {
         $staff = $this->createStaffUser();
+        [$session, , $batch] = $this->seedImportBatch('Class 10 Batch', 25000);
+
+        $preview = app(StudentBulkImportService::class)->buildPreview(
+            [
+                0 => StudentImportFields::ROLL_NUMBER,
+                1 => StudentImportFields::NAME,
+                2 => StudentImportFields::MOBILE,
+                3 => StudentImportFields::BATCH_SECTION,
+            ],
+            [
+                ['401', 'Valid Student', '9876500401', $batch->name],
+                ['', 'Missing Roll', '9876500402', $batch->name],
+            ],
+            $session->id,
+        );
+
+        $result = app(StudentBulkImportService::class)->import(
+            $staff,
+            'students.csv',
+            $preview,
+            [],
+            null,
+            $session->id,
+        );
+
+        $this->assertSame(1, $result['created']);
+        $this->assertSame(1, $result['preview_rejected']);
+        $this->assertSame(0, $result['failed']);
+    }
+
+    public function test_import_assigns_course_from_each_matched_batch_in_one_file(): void
+    {
+        $staff = $this->createStaffUser();
         $session = AcademicSession::query()->create([
             'name' => '2026–27',
             'code' => '2026-27',
@@ -360,14 +339,43 @@ class StudentBulkImportServiceTest extends TestCase
             'is_current' => true,
             'is_active' => true,
         ]);
-        $course = Course::query()->create([
-            'name' => 'Class 10',
-            'code' => 'CLS-10',
-            'programme_category' => 'school',
+
+        $jeeCourse = Course::query()->create([
+            'name' => 'IIT JEE',
+            'code' => 'JEE',
+            'programme_category' => 'coaching',
             'duration' => 1,
             'duration_type' => 'years',
-            'fee' => 25000,
+            'fee' => 50000,
             'status' => CourseStatus::Active,
+        ]);
+
+        $neetCourse = Course::query()->create([
+            'name' => 'NEET',
+            'code' => 'NEET',
+            'programme_category' => 'coaching',
+            'duration' => 1,
+            'duration_type' => 'years',
+            'fee' => 45000,
+            'status' => CourseStatus::Active,
+        ]);
+
+        $jeeBatch = Batch::query()->create([
+            'name' => '12th JEE Batch A (2026-27)',
+            'course_id' => $jeeCourse->id,
+            'academic_session_id' => $session->id,
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'status' => BatchStatus::Active,
+        ]);
+
+        $neetBatch = Batch::query()->create([
+            'name' => '11th NEET BATCH (2026-2027)',
+            'course_id' => $neetCourse->id,
+            'academic_session_id' => $session->id,
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'status' => BatchStatus::Active,
         ]);
 
         $preview = app(StudentBulkImportService::class)->buildPreview(
@@ -375,26 +383,31 @@ class StudentBulkImportServiceTest extends TestCase
                 0 => StudentImportFields::ROLL_NUMBER,
                 1 => StudentImportFields::NAME,
                 2 => StudentImportFields::MOBILE,
+                3 => StudentImportFields::BATCH_SECTION,
             ],
             [
-                ['401', 'Valid Student', '9876500401'],
-                ['', 'Missing Roll', '9876500402'],
+                ['701', 'JEE Student', '9876500701', $jeeBatch->name],
+                ['702', 'NEET Student', '9876500702', $neetBatch->name],
             ],
+            $session->id,
         );
+
+        $this->assertSame('ready', $preview[0]['status']);
+        $this->assertSame('IIT JEE', $preview[0]['resolved_batch']['course_name']);
+        $this->assertSame('NEET', $preview[1]['resolved_batch']['course_name']);
 
         $result = app(StudentBulkImportService::class)->import(
             $staff,
-            $session,
-            $course,
-            null,
-            'students.csv',
+            'students.xlsx',
             $preview,
             [],
+            null,
+            $session->id,
         );
 
-        $this->assertSame(1, $result['created']);
-        $this->assertSame(1, $result['preview_rejected']);
-        $this->assertSame(0, $result['failed']);
+        $this->assertSame(2, $result['created']);
+        $this->assertSame($jeeCourse->id, Student::query()->where('name', 'JEE Student')->first()?->activeEnrollment?->course_id);
+        $this->assertSame($neetCourse->id, Student::query()->where('name', 'NEET Student')->first()?->activeEnrollment?->course_id);
     }
 
     protected function createStaffUser(): User
@@ -405,5 +418,41 @@ class StudentBulkImportServiceTest extends TestCase
         $user->assignRole(RoleName::Staff->value);
 
         return $user;
+    }
+
+    /**
+     * @return array{0: AcademicSession, 1: Course, 2: Batch}
+     */
+    protected function seedImportBatch(string $batchName = 'Import Batch', float $fee = 50000): array
+    {
+        $session = AcademicSession::query()->create([
+            'name' => '2026–27',
+            'code' => '2026-27',
+            'starts_on' => '2026-04-01',
+            'ends_on' => '2027-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
+
+        $course = Course::query()->create([
+            'name' => 'Import Course',
+            'code' => 'IMP-01',
+            'programme_category' => 'coaching',
+            'duration' => 1,
+            'duration_type' => 'years',
+            'fee' => $fee,
+            'status' => CourseStatus::Active,
+        ]);
+
+        $batch = Batch::query()->create([
+            'name' => $batchName,
+            'course_id' => $course->id,
+            'academic_session_id' => $session->id,
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'status' => BatchStatus::Active,
+        ]);
+
+        return [$session, $course, $batch];
     }
 }

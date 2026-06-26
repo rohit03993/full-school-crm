@@ -7,8 +7,6 @@ use App\Enums\StudentImportDuplicateResolution;
 use App\Support\CrmAccess;
 use App\Exports\StudentImportTemplateExport;
 use App\Models\AcademicSession;
-use App\Models\Batch;
-use App\Models\Course;
 use App\Models\StudentImportBatch;
 use App\Services\StudentBulkImportService;
 use App\Services\StudentImportColumnMapper;
@@ -16,7 +14,6 @@ use App\Services\StudentImportFileReader;
 use App\Support\StudentImportFields;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
-use App\Support\InstituteProfile;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
@@ -55,10 +52,6 @@ class BulkStudentImportPage extends Page
     public int $step = 1;
 
     public ?int $academicSessionId = null;
-
-    public ?int $courseId = null;
-
-    public ?int $batchId = null;
 
     public ?int $importBatchId = null;
 
@@ -149,12 +142,7 @@ class BulkStudentImportPage extends Page
 
     public function updatedAcademicSessionId(): void
     {
-        $this->batchId = null;
-    }
-
-    public function updatedCourseId(): void
-    {
-        $this->batchId = null;
+        //
     }
 
     public function parseFileAndContinue(
@@ -162,9 +150,7 @@ class BulkStudentImportPage extends Page
         StudentImportColumnMapper $mapper,
     ): void {
         $this->validate([
-            'academicSessionId' => 'required|exists:academic_sessions,id',
-            'courseId' => 'required|exists:courses,id',
-            'batchId' => 'nullable|exists:batches,id',
+            'academicSessionId' => 'nullable|exists:academic_sessions,id',
             'uploadFile' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240',
         ]);
 
@@ -197,9 +183,7 @@ class BulkStudentImportPage extends Page
         $this->persistImportSession();
 
         $this->validate([
-            'academicSessionId' => 'required|exists:academic_sessions,id',
-            'courseId' => 'required|exists:courses,id',
-            'batchId' => 'nullable|exists:batches,id',
+            'academicSessionId' => 'nullable|exists:academic_sessions,id',
         ]);
 
         $missing = app(StudentImportColumnMapper::class)->missingRequiredFields($this->columnMapping);
@@ -227,7 +211,11 @@ class BulkStudentImportPage extends Page
                 return;
             }
 
-            $preview = $importService->buildPreview($this->columnMapping, $rows);
+            $preview = $importService->buildPreview(
+                $this->columnMapping,
+                $rows,
+                filled($this->academicSessionId) ? (int) $this->academicSessionId : null,
+            );
 
             foreach ($preview as $row) {
                 if (($row['status'] ?? '') === 'duplicate') {
@@ -235,17 +223,11 @@ class BulkStudentImportPage extends Page
                 }
             }
 
-            $session = AcademicSession::query()->findOrFail($this->academicSessionId);
-            $course = Course::query()->findOrFail($this->courseId);
-            $batch = $this->batchId ? Batch::query()->find($this->batchId) : null;
-
             $this->discardPreviewBatch();
 
             $previewBatch = $importService->storePreviewBatch(
                 Auth::user(),
-                $session,
-                $course,
-                $batch,
+                filled($this->academicSessionId) ? (int) $this->academicSessionId : null,
                 $this->originalFilename,
                 $preview,
             );
@@ -321,10 +303,6 @@ class BulkStudentImportPage extends Page
         @set_time_limit(300);
 
         try {
-            $session = $previewBatch->academicSession ?? AcademicSession::query()->findOrFail($this->academicSessionId);
-            $course = $previewBatch->course ?? Course::query()->findOrFail($this->courseId);
-            $batch = $previewBatch->batch;
-
             $chunk = null;
             $chunksThisRequest = 0;
             $maxChunksPerRequest = (int) ceil($this->importTotal / StudentBulkImportService::IMPORT_CHUNK_SIZE);
@@ -332,9 +310,6 @@ class BulkStudentImportPage extends Page
             do {
                 $chunk = $importService->importChunk(
                     Auth::user(),
-                    $session,
-                    $course,
-                    $batch,
                     $previewBatch,
                     $preview,
                     $this->duplicateResolutions,
@@ -586,8 +561,6 @@ class BulkStudentImportPage extends Page
                 'stored_file_path' => $this->storedFilePath,
                 'original_filename' => $this->originalFilename,
                 'academic_session_id' => $this->academicSessionId,
-                'course_id' => $this->courseId,
-                'batch_id' => $this->batchId,
                 'column_mapping' => $this->columnMapping,
             ],
         ]);
@@ -610,8 +583,6 @@ class BulkStudentImportPage extends Page
         }
 
         $this->academicSessionId = $data['academic_session_id'] ?? $this->academicSessionId;
-        $this->courseId = $data['course_id'] ?? $this->courseId;
-        $this->batchId = $data['batch_id'] ?? $this->batchId;
 
         if ($this->columnMapping === [] && is_array($data['column_mapping'] ?? null)) {
             $this->columnMapping = $data['column_mapping'];
@@ -636,31 +607,6 @@ class BulkStudentImportPage extends Page
             ->all();
     }
 
-    /**
-     * @return array<int, string>
-     */
-    public function courseOptions(): array
-    {
-        return InstituteProfile::activeCourseOptions(excludeUndecided: true);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    public function batchOptions(): array
-    {
-        if (! $this->courseId || ! $this->academicSessionId) {
-            return [];
-        }
-
-        return Batch::query()
-            ->where('course_id', $this->courseId)
-            ->where('academic_session_id', $this->academicSessionId)
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->all();
-    }
-
     public function content(Schema $schema): Schema
     {
         return $schema->components([
@@ -668,8 +614,6 @@ class BulkStudentImportPage extends Page
                 ->viewData(fn (): array => [
                     'step' => $this->step,
                     'sessionOptions' => $this->sessionOptions(),
-                    'courseOptions' => $this->courseOptions(),
-                    'batchOptions' => $this->batchOptions(),
                     'fileHeaders' => $this->fileHeaders,
                     'fileRows' => $this->fileRows,
                     'columnMapping' => $this->columnMapping,

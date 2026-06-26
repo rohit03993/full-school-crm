@@ -32,7 +32,8 @@ class StudentImportColumnMapper
             'gender', 'sex',
         ],
         StudentImportFields::BATCH_SECTION => [
-            'batch', 'section', 'batch section', 'class section', 'division', 'group',
+            'batch', 'section', 'batch section', 'class section', 'class course',
+            'class (course)', 'batch name', 'class batch', 'programme batch', 'division', 'group',
         ],
     ];
 

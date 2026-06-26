@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\RoleName;
 use App\Filament\Pages\BulkStudentImportPage;
 use App\Models\AcademicSession;
+use App\Models\Batch;
 use App\Models\Course;
 use App\Models\Student;
 use App\Models\StudentImportBatch;
@@ -45,10 +47,20 @@ class BulkStudentImportPageTest extends TestCase
             'status' => CourseStatus::Active,
         ]);
 
+        $crmBatch = Batch::query()->create([
+            'name' => '12th Science Batch A',
+            'course_id' => $course->id,
+            'academic_session_id' => $session->id,
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'status' => BatchStatus::Active,
+        ]);
+
         $mapping = [
             0 => StudentImportFields::ROLL_NUMBER,
             1 => StudentImportFields::NAME,
             2 => StudentImportFields::MOBILE,
+            3 => StudentImportFields::BATCH_SECTION,
         ];
 
         $rows = [];
@@ -58,25 +70,21 @@ class BulkStudentImportPageTest extends TestCase
                 (string) (100 + $index),
                 "Student {$index}",
                 '98765'.str_pad((string) $index, 5, '0', STR_PAD_LEFT),
+                $crmBatch->name,
             ];
         }
 
-        $preview = app(StudentBulkImportService::class)->buildPreview($mapping, $rows);
+        $preview = app(StudentBulkImportService::class)->buildPreview($mapping, $rows, $session->id);
 
         $previewBatch = app(StudentBulkImportService::class)->storePreviewBatch(
             $staff,
-            $session,
-            $course,
-            null,
+            $session->id,
             'students.xlsx',
             $preview,
         );
 
         $firstChunk = app(StudentBulkImportService::class)->importChunk(
             $staff,
-            $session,
-            $course,
-            null,
             $previewBatch->fresh(),
             $preview,
             [],
@@ -90,7 +98,6 @@ class BulkStudentImportPageTest extends TestCase
         Livewire::test(BulkStudentImportPage::class)
             ->set('step', 3)
             ->set('academicSessionId', $session->id)
-            ->set('courseId', $course->id)
             ->set('importBatchId', $previewBatch->id)
             ->set('importTotal', 25)
             ->set('importProcessed', 20)

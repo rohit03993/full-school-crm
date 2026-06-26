@@ -6,8 +6,8 @@
         4 => ['label' => 'Results', 'hint' => 'Import summary'],
     ];
 
-    $requiredColumns = ['Roll number', 'Student name'];
-    $optionalColumns = ['Primary mobile', "Father's name", 'Date of birth', 'Gender', 'Batch / section'];
+    $requiredColumns = ['Roll number', 'Student name', 'Batch name'];
+    $optionalColumns = ['Primary mobile', "Father's name", 'Date of birth', 'Gender'];
 @endphp
 
 <div class="mx-auto max-w-4xl space-y-5 pb-24 lg:pb-8">
@@ -112,7 +112,7 @@
                         <div>
                             <h2 class="text-lg font-bold text-gray-950 dark:text-white">Import enrolled students</h2>
                             <p class="mt-1 max-w-xl text-sm text-gray-600 dark:text-gray-400">
-                                Upload a spreadsheet with roll number, student name, and mobile. Course fee and batch are optional — students import with ₹0 fee if the course has none; assign batch and update fees later from the profile.
+                                Upload a spreadsheet with roll number, student name, and batch name (e.g. Class (Course) column). Course and session come from the matched CRM batch — create batches under Academics first.
                             </p>
                         </div>
                     </div>
@@ -132,39 +132,21 @@
             <div class="fi-crm-form grid gap-6 border-t border-transparent p-4 pt-6 sm:p-6 sm:pt-6 lg:grid-cols-5">
                 <div class="space-y-5 lg:col-span-3">
                     <x-crm.select-input
-                        label="Academic session"
+                        label="Limit batch lookup to session (optional)"
                         for="import-session"
+                        hint="Leave as current session, or pick All sessions by clearing this after upload if batches span years."
                         wire:model.live="academicSessionId"
                     >
-                        <option value="">Select session…</option>
+                        <option value="">All active sessions</option>
                         @foreach ($sessionOptions as $id => $label)
                             <option value="{{ $id }}">{{ $label }}</option>
                         @endforeach
                     </x-crm.select-input>
 
-                    <x-crm.select-input
-                        label="Course / programme"
-                        for="import-course"
-                        wire:model.live="courseId"
-                    >
-                        <option value="">Select course…</option>
-                        @foreach ($courseOptions as $id => $label)
-                            <option value="{{ $id }}">{{ $label }}</option>
-                        @endforeach
-                    </x-crm.select-input>
-
-                    <x-crm.select-input
-                        label="Default batch (optional)"
-                        for="import-batch"
-                        hint="Used when a row has no batch/section column. Rows can override this value."
-                        wire:model="batchId"
-                        :disabled="empty($batchOptions)"
-                    >
-                        <option value="">No default batch</option>
-                        @foreach ($batchOptions as $id => $label)
-                            <option value="{{ $id }}">{{ $label }}</option>
-                        @endforeach
-                    </x-crm.select-input>
+                    <div class="rounded-xl border border-primary-200 bg-primary-50/60 px-4 py-3 text-sm text-primary-950 dark:border-primary-500/30 dark:bg-primary-500/10 dark:text-primary-100">
+                        <p class="font-semibold">Batch names must exist in CRM</p>
+                        <p class="mt-1">Create batches under <span class="font-semibold">Academics → Batches</span> with the same names as your Excel column (e.g. <span class="font-mono text-xs">12th JEE Batch C (2026-27)</span>). Each batch already links to its course and session.</p>
+                    </div>
                 </div>
 
                 <div class="lg:col-span-2">
@@ -340,7 +322,7 @@
             <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
                 <h2 class="text-lg font-bold text-gray-950 dark:text-white">Review rows before import</h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Rows with roll and name will be imported. Invalid or missing mobiles are imported without a number — add later from the student profile.
+                    Each row is matched to a CRM batch by name. Course and session are taken from that batch. Invalid or missing mobiles still import without a number.
                 </p>
             </div>
 
@@ -352,6 +334,8 @@
                             <th class="px-4 py-3">Roll</th>
                             <th class="px-4 py-3">Name</th>
                             <th class="px-4 py-3">Mobile</th>
+                            <th class="px-4 py-3">CRM batch</th>
+                            <th class="px-4 py-3">Course</th>
                             <th class="px-4 py-3">Status</th>
                             <th class="px-4 py-3">If duplicate</th>
                         </tr>
@@ -372,6 +356,16 @@
                                     @else
                                         <span class="text-amber-600 dark:text-amber-400">—</span>
                                     @endif
+                                </td>
+                                <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
+                                    @if ($row['resolved_batch']['name'] ?? null)
+                                        <span class="font-medium text-gray-950 dark:text-white">{{ $row['resolved_batch']['name'] }}</span>
+                                    @else
+                                        <span class="text-danger-600 dark:text-danger-400">{{ $row['data']['batch_section'] ?? '—' }}</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
+                                    {{ $row['resolved_batch']['course_name'] ?? '—' }}
                                 </td>
                                 <td class="px-4 py-3">
                                     @if ($row['status'] === 'ready')

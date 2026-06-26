@@ -17,15 +17,15 @@ class StudentImportTemplateExport implements FromArray, ShouldAutoSize, WithHead
             'Mobile',
             'Date of Birth',
             'Gender',
-            'Batch Section',
+            'Batch Name',
         ];
     }
 
     public function array(): array
     {
         return [
-            ['101', 'Rohit Kumar', 'Mr Kumar', '9876543210', '2008-05-15', 'Male', 'A'],
-            ['102', 'Priya Sharma', 'Mr Sharma', '9123456780', '', '', 'B'],
+            ['101', 'Rohit Kumar', 'Mr Kumar', '9876543210', '2008-05-15', 'Male', '12th JEE Batch A (2026-27)'],
+            ['102', 'Priya Sharma', 'Mr Sharma', '9123456780', '', '', '12th JEE Batch B (2026-27)'],
         ];
     }
 }

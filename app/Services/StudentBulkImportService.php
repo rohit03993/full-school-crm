@@ -42,6 +42,7 @@ class StudentBulkImportService
         protected AuditService $audit,
         protected StudentAuthService $studentAuth,
         protected StudentMobileService $mobiles,
+        protected StudentImportBatchResolver $batchResolver,
     ) {}
 
     /**
@@ -49,7 +50,7 @@ class StudentBulkImportService
      * @param  list<list<string|null>>  $rows
      * @return list<array<string, mixed>>
      */
-    public function buildPreview(array $columnMapping, array $rows): array
+    public function buildPreview(array $columnMapping, array $rows, ?int $academicSessionScopeId = null): array
     {
         $preview = [];
         $seenRolls = [];
@@ -118,6 +119,24 @@ class StudentBulkImportService
                 ? $existingStudentsByMobile->get($mobileKey)
                 : null;
 
+            $resolvedBatch = null;
+            $batchLabel = trim((string) ($data[StudentImportFields::BATCH_SECTION] ?? ''));
+
+            if ($batchLabel !== '' && $errors === []) {
+                $resolvedBatch = $this->batchResolver->resolve($batchLabel, $academicSessionScopeId);
+
+                if (! $resolvedBatch) {
+                    $suggestions = $this->batchResolver->suggestions($batchLabel, $academicSessionScopeId);
+                    $message = "No CRM batch matches “{$batchLabel}”. Create it under Academics → Batches first.";
+
+                    if ($suggestions !== []) {
+                        $message .= ' Did you mean: '.implode(', ', $suggestions).'?';
+                    }
+
+                    $errors[] = $message;
+                }
+            }
+
             $status = 'ready';
 
             if ($errors !== []) {
@@ -132,6 +151,14 @@ class StudentBulkImportService
                 'status' => $status,
                 'errors' => $errors,
                 'warnings' => $warnings,
+                'resolved_batch' => $resolvedBatch ? [
+                    'id' => $resolvedBatch->id,
+                    'name' => $resolvedBatch->name,
+                    'course_id' => $resolvedBatch->course_id,
+                    'course_name' => $resolvedBatch->course?->name,
+                    'session_id' => $resolvedBatch->academic_session_id,
+                    'session_name' => $resolvedBatch->academicSession?->name,
+                ] : null,
                 'existing_student' => $existingStudent ? [
                     'id' => $existingStudent->id,
                     'name' => $existingStudent->name,
@@ -160,19 +187,15 @@ class StudentBulkImportService
      */
     public function import(
         User $staff,
-        AcademicSession $session,
-        Course $course,
-        ?Batch $defaultBatch,
         string $originalFilename,
         array $preview,
         array $duplicateResolutions,
         ?StudentImportBatch $existingBatch = null,
+        ?int $academicSessionScopeId = null,
     ): array {
         $batch = $this->prepareImportBatch(
             $staff,
-            $session,
-            $course,
-            $defaultBatch,
+            $academicSessionScopeId,
             $originalFilename,
             $preview,
             $duplicateResolutions,
@@ -185,9 +208,6 @@ class StudentBulkImportService
         do {
             $chunk = $this->importChunk(
                 $staff,
-                $session,
-                $course,
-                $defaultBatch,
                 $batch,
                 $preview,
                 $duplicateResolutions,
@@ -219,9 +239,6 @@ class StudentBulkImportService
      */
     public function importChunk(
         User $staff,
-        AcademicSession $session,
-        Course $course,
-        ?Batch $defaultBatch,
         StudentImportBatch $batch,
         array $preview,
         array $duplicateResolutions,
@@ -250,6 +267,21 @@ class StudentBulkImportService
             ? collect()
             : Student::query()->whereIn('id', $existingStudentIds)->get()->keyBy('id');
 
+        $batchIds = collect($slice)
+            ->pluck('resolved_batch.id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $batchesById = $batchIds === []
+            ? collect()
+            : Batch::query()
+                ->with(['course', 'academicSession'])
+                ->whereIn('id', $batchIds)
+                ->get()
+                ->keyBy('id');
+
         $chunk = $this->emptyImportTotals();
         $chunk['processed'] = count($slice);
 
@@ -259,18 +291,24 @@ class StudentBulkImportService
             $existingStudent = isset($item['existing_student']['id'])
                 ? $existingStudents->get($item['existing_student']['id'])
                 : null;
+            $resolvedBatchId = $item['resolved_batch']['id'] ?? null;
+            $rowBatch = $resolvedBatchId ? $batchesById->get($resolvedBatchId) : null;
 
             try {
+                if (! $rowBatch) {
+                    throw ValidationException::withMessages([
+                        'batch' => 'Batch could not be resolved for this row. Preview the file again.',
+                    ]);
+                }
+
                 $result = DB::transaction(function () use (
                     $staff,
-                    $session,
-                    $course,
-                    $defaultBatch,
                     $batch,
                     $data,
+                    $rowBatch,
                     $existingStudent,
                 ): string {
-                    return $this->importRow($staff, $session, $course, $defaultBatch, $batch, $data, $existingStudent);
+                    return $this->importRow($staff, $batch, $data, $rowBatch, $existingStudent);
                 });
 
                 if ($result === 'created') {
@@ -361,9 +399,7 @@ class StudentBulkImportService
 
     protected function prepareImportBatch(
         User $staff,
-        AcademicSession $session,
-        Course $course,
-        ?Batch $defaultBatch,
+        ?int $academicSessionScopeId,
         string $originalFilename,
         array $preview,
         array $duplicateResolutions,
@@ -375,9 +411,9 @@ class StudentBulkImportService
 
         return StudentImportBatch::query()->create([
             'user_id' => $staff->id,
-            'academic_session_id' => $session->id,
-            'course_id' => $course->id,
-            'batch_id' => $defaultBatch?->id,
+            'academic_session_id' => $academicSessionScopeId,
+            'course_id' => null,
+            'batch_id' => null,
             'original_filename' => $originalFilename,
             'total_rows' => count($preview),
             'status' => 'processing',
@@ -511,17 +547,15 @@ class StudentBulkImportService
      */
     public function storePreviewBatch(
         User $staff,
-        AcademicSession $session,
-        Course $course,
-        ?Batch $defaultBatch,
+        ?int $academicSessionScopeId,
         string $originalFilename,
         array $preview,
     ): StudentImportBatch {
         return StudentImportBatch::query()->create([
             'user_id' => $staff->id,
-            'academic_session_id' => $session->id,
-            'course_id' => $course->id,
-            'batch_id' => $defaultBatch?->id,
+            'academic_session_id' => $academicSessionScopeId,
+            'course_id' => null,
+            'batch_id' => null,
             'original_filename' => $originalFilename,
             'preview_rows' => $preview,
             'total_rows' => count($preview),
@@ -557,6 +591,10 @@ class StudentBulkImportService
 
         if (filled($data[StudentImportFields::ROLL_NUMBER] ?? null)) {
             $data[StudentImportFields::ROLL_NUMBER] = strtoupper(trim((string) $data[StudentImportFields::ROLL_NUMBER]));
+        }
+
+        if (filled($data[StudentImportFields::BATCH_SECTION] ?? null)) {
+            $data[StudentImportFields::BATCH_SECTION] = trim((string) $data[StudentImportFields::BATCH_SECTION]);
         }
 
         if (filled($data[StudentImportFields::MOBILE] ?? null)) {
@@ -654,13 +692,14 @@ class StudentBulkImportService
      */
     protected function importRow(
         User $staff,
-        AcademicSession $session,
-        Course $course,
-        ?Batch $defaultBatch,
         StudentImportBatch $importBatch,
         array $data,
+        Batch $batch,
         ?Student $existingStudent,
     ): string {
+        $course = $batch->course ?? Course::query()->findOrFail($batch->course_id);
+        $session = $batch->academicSession ?? AcademicSession::query()->findOrFail($batch->academic_session_id);
+
         $created = false;
         $student = $existingStudent;
 
@@ -686,11 +725,7 @@ class StudentBulkImportService
                 $staff,
             );
 
-            $batch = $this->resolveBatch($course, $session, $defaultBatch, $data);
-
-            if ($batch) {
-                $this->batches->assign($student, $batch, $staff);
-            }
+            $this->batches->assign($student, $batch, $staff);
 
             return $created ? 'created' : 'updated';
         }
@@ -719,11 +754,7 @@ class StudentBulkImportService
             $staff,
         );
 
-        $batch = $this->resolveBatch($course, $session, $defaultBatch, $data);
-
-        if ($batch) {
-            $this->batches->assign($student, $batch, $staff);
-        }
+        $this->batches->assign($student, $batch, $staff);
 
         return $created ? 'created' : 'updated';
     }
@@ -858,39 +889,6 @@ class StudentBulkImportService
         }
 
         return $attributes;
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    protected function resolveBatch(
-        Course $course,
-        AcademicSession $session,
-        ?Batch $defaultBatch,
-        array $data,
-    ): ?Batch {
-        $section = trim((string) ($data[StudentImportFields::BATCH_SECTION] ?? ''));
-
-        if ($section !== '') {
-            $matched = Batch::query()
-                ->where('course_id', $course->id)
-                ->where('academic_session_id', $session->id)
-                ->where(function ($query) use ($section): void {
-                    $query->where('section', $section)
-                        ->orWhere('name', $section);
-                })
-                ->first();
-
-            if ($matched) {
-                return $matched;
-            }
-
-            throw ValidationException::withMessages([
-                'batch' => "No batch/section “{$section}” found for this course and session.",
-            ]);
-        }
-
-        return $defaultBatch;
     }
 
     protected function parseGender(string $value): ?Gender
