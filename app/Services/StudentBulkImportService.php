@@ -23,6 +23,7 @@ use App\Models\StudentImportBatch;
 use App\Models\User;
 use App\Models\Visit;
 use App\Support\CrmCacheInvalidator;
+use App\Support\IndianMobileNumber;
 use App\Support\StudentImportFields;
 use App\Support\MeetingForOptions;
 use Illuminate\Support\Carbon;
@@ -59,7 +60,7 @@ class StudentBulkImportService
         foreach ($rows as $index => $row) {
             $data = $this->mapRow($columnMapping, $row);
             $rollKey = strtoupper(trim((string) ($data[StudentImportFields::ROLL_NUMBER] ?? '')));
-            $mobileKey = $this->normalizeMobile($data[StudentImportFields::MOBILE] ?? null);
+            $mobileKey = IndianMobileNumber::normalizeFromSpreadsheet($data[StudentImportFields::MOBILE] ?? null) ?? '';
 
             if ($rollKey !== '') {
                 $rollKeys[] = $rollKey;
@@ -93,7 +94,7 @@ class StudentBulkImportService
             $errors = $this->validateRowData($data);
 
             $rollKey = strtoupper(trim((string) ($data[StudentImportFields::ROLL_NUMBER] ?? '')));
-            $mobileKey = $this->normalizeMobile($data[StudentImportFields::MOBILE] ?? null);
+            $mobileKey = IndianMobileNumber::normalizeFromSpreadsheet($data[StudentImportFields::MOBILE] ?? null) ?? '';
 
             if ($rollKey !== '' && isset($seenRolls[$rollKey])) {
                 $errors[] = "Duplicate roll number in file (also on row {$seenRolls[$rollKey]}).";
@@ -549,7 +550,7 @@ class StudentBulkImportService
         }
 
         if (filled($data[StudentImportFields::MOBILE] ?? null)) {
-            $data[StudentImportFields::MOBILE] = $this->normalizeMobile((string) $data[StudentImportFields::MOBILE]);
+            $data[StudentImportFields::MOBILE] = IndianMobileNumber::normalizeFromSpreadsheet($data[StudentImportFields::MOBILE]) ?? '';
         }
 
         return $data;
@@ -824,17 +825,6 @@ class StudentBulkImportService
         }
 
         return $defaultBatch;
-    }
-
-    protected function normalizeMobile(?string $mobile): string
-    {
-        $digits = preg_replace('/\D/', '', (string) $mobile) ?? '';
-
-        if (strlen($digits) > 10) {
-            $digits = substr($digits, -10);
-        }
-
-        return $digits;
     }
 
     protected function parseGender(string $value): ?Gender

@@ -22,6 +22,29 @@ class StudentBulkImportServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_preview_normalizes_mixed_mobile_formats(): void
+    {
+        $preview = app(StudentBulkImportService::class)->buildPreview(
+            [
+                0 => StudentImportFields::ROLL_NUMBER,
+                1 => StudentImportFields::NAME,
+                2 => StudentImportFields::MOBILE,
+            ],
+            [
+                ['1', 'Ten Digit', '8410054825'],
+                ['2', 'With Ninety One', '919027620525'],
+                ['3', 'Excel Float', 919027620525.0],
+            ],
+        );
+
+        $this->assertSame('ready', $preview[0]['status']);
+        $this->assertSame('8410054825', $preview[0]['data']['mobile']);
+        $this->assertSame('ready', $preview[1]['status']);
+        $this->assertSame('9027620525', $preview[1]['data']['mobile']);
+        $this->assertSame('ready', $preview[2]['status']);
+        $this->assertSame('9027620525', $preview[2]['data']['mobile']);
+    }
+
     public function test_column_mapper_guesses_common_headers(): void
     {
         $mapping = app(StudentImportColumnMapper::class)->guess([

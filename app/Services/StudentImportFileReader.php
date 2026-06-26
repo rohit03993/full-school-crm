@@ -67,7 +67,7 @@ class StudentImportFileReader
             }
 
             $rows[] = array_map(
-                fn ($value): ?string => filled($value) ? trim((string) $value) : null,
+                fn ($value): ?string => $this->cellToString($value),
                 $row,
             );
 
@@ -105,5 +105,36 @@ class StudentImportFileReader
         }
 
         return true;
+    }
+
+    protected function cellToString(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_bool($value)) {
+            return null;
+        }
+
+        if (is_int($value)) {
+            return (string) $value;
+        }
+
+        if (is_float($value)) {
+            if (abs($value) >= 1_000_000_000) {
+                return sprintf('%.0f', $value);
+            }
+
+            return rtrim(rtrim(sprintf('%.10F', $value), '0'), '.');
+        }
+
+        $string = trim((string) $value);
+
+        if (preg_match('/^[\d.]+[eE][+\-]?\d+$/', $string)) {
+            return sprintf('%.0f', (float) $string);
+        }
+
+        return $string !== '' ? $string : null;
     }
 }
