@@ -22,8 +22,8 @@ class StudentImportColumnMapper
             'guardian name', 's/o', 'parent',
         ],
         StudentImportFields::MOBILE => [
-            'mobile', 'phone', 'contact', 'primary mobile', 'mobile number', 'phone number',
-            'contact number', 'whatsapp', 'cell',
+            'mobile', 'phone', 'contact', 'primary mobile', 'primary whatsapp', 'secondary whatsapp',
+            'mobile number', 'phone number', 'contact number', 'whatsapp', 'cell',
         ],
         StudentImportFields::DATE_OF_BIRTH => [
             'dob', 'date of birth', 'birth date', 'birthdate', 'date_of_birth',

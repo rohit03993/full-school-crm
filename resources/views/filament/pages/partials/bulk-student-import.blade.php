@@ -194,6 +194,7 @@
                             </span>
                             <p class="mt-3 text-sm font-semibold text-gray-950 dark:text-white">Drop file here or click to browse</p>
                             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">.xlsx, .xls, .csv — max {{ number_format($maxRows) }} rows</p>
+                        <p class="mt-2 text-xs text-amber-700 dark:text-amber-300">Tip: In Excel, select the WhatsApp column → Format Cells → Text. This keeps 10-digit and 91-prefixed numbers accurate.</p>
                         @endif
 
                         <span wire:loading wire:target="uploadFile" class="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/80 text-sm font-medium text-primary-700 dark:bg-gray-900/80 dark:text-primary-300">

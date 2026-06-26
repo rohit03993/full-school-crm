@@ -5,6 +5,10 @@ namespace App\Services;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\RichText\RichText;
 use RuntimeException;
 
 class StudentImportFileReader
@@ -26,7 +30,7 @@ class StudentImportFileReader
             throw new RuntimeException('Could not store the uploaded file.');
         }
 
-        $absolutePath = Storage::path($path);
+        $absolutePath = Storage::disk('local')->path($path);
 
         if (! is_readable($absolutePath)) {
             throw new RuntimeException('Uploaded file could not be read after storage.');
@@ -44,6 +48,85 @@ class StudentImportFileReader
      * @return array{headers: list<string|null>, rows: list<list<string|null>>}
      */
     public function parse(string $absolutePath): array
+    {
+        $extension = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+
+        if (in_array($extension, ['csv', 'txt'], true)) {
+            return $this->parseDelimited($absolutePath);
+        }
+
+        return $this->parseSpreadsheet($absolutePath);
+    }
+
+    public function deleteStoredFile(?string $relativePath): void
+    {
+        if (filled($relativePath)) {
+            Storage::disk('local')->delete($relativePath);
+        }
+    }
+
+    /**
+     * @return array{headers: list<string|null>, rows: list<list<string|null>>}
+     */
+    protected function parseSpreadsheet(string $absolutePath): array
+    {
+        $reader = IOFactory::createReaderForFile($absolutePath);
+        $reader->setReadDataOnly(true);
+
+        $sheet = $reader->load($absolutePath)->getActiveSheet();
+        $highestRow = $sheet->getHighestDataRow();
+        $highestColumnIndex = Coordinate::columnIndexFromString($sheet->getHighestDataColumn());
+
+        if ($highestRow < 1 || $highestColumnIndex < 1) {
+            throw new RuntimeException('The uploaded file is empty.');
+        }
+
+        $headers = [];
+        $rows = [];
+
+        for ($rowIndex = 1; $rowIndex <= $highestRow; $rowIndex++) {
+            $rowData = [];
+
+            for ($columnIndex = 1; $columnIndex <= $highestColumnIndex; $columnIndex++) {
+                $rowData[] = $this->cellValueFromSpreadsheet(
+                    $sheet->getCell(Coordinate::stringFromColumnIndex($columnIndex).$rowIndex),
+                );
+            }
+
+            if ($rowIndex === 1) {
+                $headers = array_map(
+                    fn ($value): ?string => filled($value) ? trim((string) $value) : null,
+                    $rowData,
+                );
+
+                continue;
+            }
+
+            if ($this->rowIsEmpty($rowData)) {
+                continue;
+            }
+
+            $rows[] = $rowData;
+
+            if (count($rows) >= self::MAX_ROWS) {
+                break;
+            }
+        }
+
+        if ($rows === []) {
+            throw new RuntimeException('No student rows were found below the header row.');
+        }
+
+        return [
+            'headers' => $headers,
+            'rows' => $rows,
+        ];
+    }
+
+    /**
+     * @return array{headers: list<string|null>, rows: list<list<string|null>>}
+     */
+    protected function parseDelimited(string $absolutePath): array
     {
         $sheets = Excel::toArray(null, $absolutePath);
         $sheet = $sheets[0] ?? [];
@@ -86,11 +169,15 @@ class StudentImportFileReader
         ];
     }
 
-    public function deleteStoredFile(?string $relativePath): void
+    protected function cellValueFromSpreadsheet(Cell $cell): ?string
     {
-        if (filled($relativePath)) {
-            Storage::delete($relativePath);
+        $value = $cell->getCalculatedValue();
+
+        if ($value instanceof RichText) {
+            $value = $value->getPlainText();
         }
+
+        return $this->cellToString($value);
     }
 
     /**
@@ -122,19 +209,28 @@ class StudentImportFileReader
         }
 
         if (is_float($value)) {
-            if (abs($value) >= 1_000_000_000) {
-                return sprintf('%.0f', $value);
-            }
-
-            return rtrim(rtrim(sprintf('%.10F', $value), '0'), '.');
+            return $this->numericToDigitString($value);
         }
 
         $string = trim((string) $value);
 
-        if (preg_match('/^[\d.]+[eE][+\-]?\d+$/', $string)) {
-            return sprintf('%.0f', (float) $string);
+        if ($string === '') {
+            return null;
         }
 
-        return $string !== '' ? $string : null;
+        if (preg_match('/^[\d.]+[eE][+\-]?\d+$/', $string)) {
+            return $this->numericToDigitString((float) $string);
+        }
+
+        return $string;
+    }
+
+    protected function numericToDigitString(float $value): string
+    {
+        if (abs($value) >= 1_000_000_000 && abs($value - round($value)) < 0.0001) {
+            return (string) (int) round($value);
+        }
+
+        return rtrim(rtrim(sprintf('%.10F', $value), '0'), '.');
     }
 }

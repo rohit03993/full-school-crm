@@ -573,7 +573,7 @@ class StudentBulkImportService
         $mobile = (string) ($data[StudentImportFields::MOBILE] ?? '');
 
         if ($mobile !== '' && ! preg_match('/^[6-9]\d{9}$/', $mobile)) {
-            $errors[] = 'Mobile must be a valid 10-digit Indian number.';
+            $errors[] = 'Mobile must be a valid 10-digit Indian number. In Excel, format the WhatsApp column as Text before entering numbers.';
         }
 
         $roll = (string) ($data[StudentImportFields::ROLL_NUMBER] ?? '');
