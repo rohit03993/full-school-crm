@@ -60,7 +60,7 @@ class ListStudents extends ListRecords
 
         if ($this->missingMobileCount() > 0) {
             $actions[] = Action::make('missingMobile')
-                ->label('Mobile errors ('.$this->missingMobileCount().')')
+                ->label('Missing mobile ('.$this->missingMobileCount().')')
                 ->icon(Heroicon::OutlinedExclamationTriangle)
                 ->color('danger')
                 ->url(StudentResource::getUrl('index', [

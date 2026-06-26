@@ -533,7 +533,7 @@
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {{ ($importResult['created'] ?? 0) + ($importResult['updated'] ?? 0) }} student(s) processed successfully.
                     @if (($importResult['without_mobile'] ?? 0) > 0)
-                        {{ $importResult['without_mobile'] }} imported without a mobile number — see All Students → filter “Missing mobile”.
+                        {{ $importResult['without_mobile'] }} imported without a mobile number — see All Students → filter “Missing mobile / import issue”.
                     @endif
                     @if (($importResult['preview_rejected'] ?? 0) > 0)
                         {{ $importResult['preview_rejected'] }} row(s) were skipped from the file due to validation issues.

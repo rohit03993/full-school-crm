@@ -57,6 +57,10 @@ class StudentUpdateService
                 'category' => $data['category'] ?? $student->category?->value ?? 'general',
             ];
 
+            if (filled($phones['mobile'])) {
+                $attributes['mobile_import_note'] = null;
+            }
+
             if (array_key_exists('custom_data', $data)) {
                 $attributes['custom_data'] = $this->customFields->validateForEntity(
                     CustomFieldService::ENTITY_STUDENT,

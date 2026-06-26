@@ -87,7 +87,77 @@ class StudentBulkImportServiceTest extends TestCase
         $student = Student::query()->where('name', 'Imported Without Mobile')->first();
         $this->assertNotNull($student);
         $this->assertNull($student->mobile);
+        $this->assertStringContainsString('scientific', strtolower((string) $student->mobile_import_note));
         $this->assertSame('601', $student->activeEnrollment->enrollment_number);
+    }
+
+    public function test_preview_treats_duplicate_mobile_in_file_as_ready_without_mobile(): void
+    {
+        [, , $batch] = $this->seedImportBatch();
+
+        $preview = app(StudentBulkImportService::class)->buildPreview(
+            [
+                0 => StudentImportFields::ROLL_NUMBER,
+                1 => StudentImportFields::NAME,
+                2 => StudentImportFields::MOBILE,
+                3 => StudentImportFields::BATCH_SECTION,
+            ],
+            [
+                ['701', 'First Duplicate', '9876500701', $batch->name],
+                ['702', 'Second Duplicate', '9876500701', $batch->name],
+            ],
+            $batch->academic_session_id,
+        );
+
+        $this->assertSame('ready', $preview[0]['status']);
+        $this->assertSame('ready', $preview[1]['status']);
+        $this->assertSame('', $preview[0]['data']['mobile']);
+        $this->assertSame('', $preview[1]['data']['mobile']);
+        $this->assertStringContainsString('Duplicate mobile in file', implode(' ', $preview[0]['warnings']));
+        $this->assertStringContainsString('row 3', implode(' ', $preview[0]['warnings']));
+        $this->assertStringContainsString('row 2', implode(' ', $preview[1]['warnings']));
+    }
+
+    public function test_import_creates_both_students_without_mobile_when_file_has_duplicate_mobile(): void
+    {
+        $staff = $this->createStaffUser();
+        [, , $batch] = $this->seedImportBatch();
+
+        $preview = app(StudentBulkImportService::class)->buildPreview(
+            [
+                0 => StudentImportFields::ROLL_NUMBER,
+                1 => StudentImportFields::NAME,
+                2 => StudentImportFields::MOBILE,
+                3 => StudentImportFields::BATCH_SECTION,
+            ],
+            [
+                ['801', 'Dup Student A', '9876500801', $batch->name],
+                ['802', 'Dup Student B', '9876500801', $batch->name],
+            ],
+            $batch->academic_session_id,
+        );
+
+        $result = app(StudentBulkImportService::class)->import(
+            $staff,
+            'students.xlsx',
+            $preview,
+            [],
+            null,
+            $batch->academic_session_id,
+        );
+
+        $this->assertSame(2, $result['created']);
+        $this->assertSame(2, $result['without_mobile']);
+
+        $first = Student::query()->where('name', 'Dup Student A')->first();
+        $second = Student::query()->where('name', 'Dup Student B')->first();
+
+        $this->assertNotNull($first);
+        $this->assertNotNull($second);
+        $this->assertNull($first->mobile);
+        $this->assertNull($second->mobile);
+        $this->assertStringContainsString('Duplicate mobile in file', (string) $first->mobile_import_note);
+        $this->assertStringContainsString('Duplicate mobile in file', (string) $second->mobile_import_note);
     }
 
     public function test_preview_normalizes_mixed_mobile_formats(): void

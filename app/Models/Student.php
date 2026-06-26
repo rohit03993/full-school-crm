@@ -24,6 +24,7 @@ class Student extends Model
         'date_of_birth',
         'gender',
         'mobile',
+        'mobile_import_note',
         'alternate_mobile',
         'email',
         'address',

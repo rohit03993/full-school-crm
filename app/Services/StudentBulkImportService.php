@@ -167,14 +167,16 @@ class StudentBulkImportService
             ];
         }
 
-        return $this->applyDuplicateMobileErrors($preview);
+        return $this->applyDuplicateMobileImportPolicy($preview);
     }
 
     /**
+     * Duplicate mobiles in the spreadsheet import without a number so staff can fix later.
+     *
      * @param  list<array<string, mixed>>  $preview
      * @return list<array<string, mixed>>
      */
-    protected function applyDuplicateMobileErrors(array $preview): array
+    protected function applyDuplicateMobileImportPolicy(array $preview): array
     {
         $mobileIndexes = [];
 
@@ -197,18 +199,21 @@ class StudentBulkImportService
             );
 
             foreach ($indices as $index) {
+                if (($preview[$index]['status'] ?? '') === 'error') {
+                    continue;
+                }
+
                 $rowNumber = (int) $preview[$index]['row_number'];
                 $otherRows = array_values(array_filter(
                     $rowNumbers,
                     fn (int $number): bool => $number !== $rowNumber,
                 ));
 
-                $preview[$index]['errors'] = array_values(array_unique(array_merge(
-                    $preview[$index]['errors'] ?? [],
-                    ['Duplicate mobile in file (also on row '.implode(', ', $otherRows).').'],
+                $preview[$index]['data'][StudentImportFields::MOBILE] = '';
+                $preview[$index]['warnings'] = array_values(array_unique(array_merge(
+                    $preview[$index]['warnings'] ?? [],
+                    ['Duplicate mobile in file (also on row '.implode(', ', $otherRows).') — importing without mobile; add from profile later.'],
                 )));
-                $preview[$index]['status'] = 'error';
-                $preview[$index]['resolved_batch'] = null;
             }
         }
 
@@ -350,8 +355,16 @@ class StudentBulkImportService
                     $data,
                     $rowBatch,
                     $existingStudent,
+                    $item,
                 ): string {
-                    return $this->importRow($staff, $batch, $data, $rowBatch, $existingStudent);
+                    return $this->importRow(
+                        $staff,
+                        $batch,
+                        $data,
+                        $rowBatch,
+                        $existingStudent,
+                        $item['warnings'] ?? [],
+                    );
                 });
 
                 if ($result === 'created') {
@@ -739,6 +752,7 @@ class StudentBulkImportService
         array $data,
         Batch $batch,
         ?Student $existingStudent,
+        array $mobileWarnings = [],
     ): string {
         $course = $batch->course ?? Course::query()->findOrFail($batch->course_id);
         $session = $batch->academicSession ?? AcademicSession::query()->findOrFail($batch->academic_session_id);
@@ -747,10 +761,10 @@ class StudentBulkImportService
         $student = $existingStudent;
 
         if (! $student) {
-            $student = Student::query()->create($this->studentAttributes($data));
+            $student = Student::query()->create($this->studentAttributes($data, null, $mobileWarnings));
             $created = true;
         } else {
-            $student->update($this->studentAttributes($data, $student));
+            $student->update($this->studentAttributes($data, $student, $mobileWarnings));
         }
 
         if ($student->activeEnrollment) {
@@ -895,7 +909,7 @@ class StudentBulkImportService
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    protected function studentAttributes(array $data, ?Student $existing = null): array
+    protected function studentAttributes(array $data, ?Student $existing = null, array $mobileWarnings = []): array
     {
         $attributes = [
             'name' => trim((string) $data[StudentImportFields::NAME]),
@@ -927,11 +941,33 @@ class StudentBulkImportService
             $attributes['portal_password'] = $this->studentAuth->hashForNewStudent();
         } elseif ($this->resolvedImportMobile($data) !== null) {
             $attributes['mobile'] = $this->resolvedImportMobile($data);
+            $attributes['mobile_import_note'] = null;
         } elseif (blank($existing->portal_password)) {
             $attributes['portal_password'] = $this->studentAuth->hashForNewStudent();
         }
 
+        if ($this->resolvedImportMobile($data) === null) {
+            $note = $this->mobileImportNoteFromWarnings($mobileWarnings);
+
+            if ($note !== null) {
+                $attributes['mobile_import_note'] = $note;
+            }
+        }
+
         return $attributes;
+    }
+
+    /**
+     * @param  list<string>  $warnings
+     */
+    protected function mobileImportNoteFromWarnings(array $warnings): ?string
+    {
+        $warnings = array_values(array_filter(array_map(
+            fn (string $warning): string => trim($warning),
+            $warnings,
+        )));
+
+        return $warnings === [] ? null : implode(' ', $warnings);
     }
 
     protected function parseGender(string $value): ?Gender

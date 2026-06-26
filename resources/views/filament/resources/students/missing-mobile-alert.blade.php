@@ -14,11 +14,11 @@
                 </span>
                 <div>
                     <p class="font-bold text-danger-900 dark:text-danger-200">
-                        {{ $count }} student{{ $count === 1 ? '' : 's' }} with mobile number error
+                        {{ $count }} student{{ $count === 1 ? '' : 's' }} need a mobile number
                     </p>
                     <p class="mt-1 text-danger-800 dark:text-danger-300">
-                        These students were imported without a valid mobile (missing, invalid, or corrupted from Excel).
-                        Open each profile and add the correct WhatsApp / mobile number.
+                        Imported without a valid mobile (missing, invalid, duplicate in Excel, or corrupted from Excel).
+                        Each row shows the exact reason — open the profile and add the correct WhatsApp / mobile number.
                     </p>
                 </div>
             </div>

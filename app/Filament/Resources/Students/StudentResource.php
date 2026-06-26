@@ -85,6 +85,7 @@ class StudentResource extends Resource
                     ->fontFamily('mono')
                     ->copyable(fn (?string $state): bool => filled($state))
                     ->formatStateUsing(fn (?string $state): string => filled($state) ? $state : 'Missing — add from profile')
+                    ->description(fn (Student $record): ?string => blank($record->mobile) ? $record->mobile_import_note : null)
                     ->badge(fn (?string $state): bool => blank($state))
                     ->color(fn (?string $state): string => blank($state) ? 'danger' : 'gray'),
                 TextColumn::make('activeEnrollment.course.name')
@@ -121,7 +122,7 @@ class StudentResource extends Resource
                 TernaryFilter::make('missing_mobile')
                     ->label('Mobile number')
                     ->placeholder('All students')
-                    ->trueLabel('Mobile error / missing')
+                    ->trueLabel('Missing mobile / import issue')
                     ->falseLabel('Has mobile')
                     ->queries(
                         true: fn (Builder $query): Builder => $query->whereNull('mobile'),
