@@ -64,6 +64,18 @@ class WhatsAppTemplateParamMappingInferrer
         'announcement_topic' => 'campaign.topic',
         'subject' => 'campaign.subject',
         'announcement_subject' => 'campaign.subject',
+        'tes' => 'activity.test_name',
+        'test' => 'activity.test_name',
+        'test_name' => 'activity.test_name',
+        'exam_name' => 'activity.test_name',
+        'exam' => 'activity.test_name',
+        'test_date' => 'activity.test_date',
+        'exam_date' => 'activity.test_date',
+        'all_subject_marks' => 'activity.marks_summary',
+        'subject_marks' => 'activity.marks_summary',
+        'marks_summary' => 'activity.marks_summary',
+        'all_marks' => 'activity.marks_summary',
+        'marks' => 'activity.marks_summary',
     ];
 
     /**

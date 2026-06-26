@@ -138,7 +138,17 @@ class PalDigitalTemplateSyncService
         $previousSource = data_get($existing?->provider_meta, 'source');
 
         if (! $existing || in_array($previousSource, ['waservice_manual_register', 'waservice_api_sync'], true)) {
-            $attributes['param_mappings'] = WhatsAppTemplateParamMappingInferrer::infer($bodyVariables, $paramCount);
+            $inferred = WhatsAppTemplateParamMappingInferrer::infer($bodyVariables, $paramCount);
+
+            if ($existing && is_array($existing->param_mappings)) {
+                foreach ($inferred as $index => $source) {
+                    if ($source === null && filled($existing->param_mappings[$index] ?? null)) {
+                        $inferred[$index] = $existing->param_mappings[$index];
+                    }
+                }
+            }
+
+            $attributes['param_mappings'] = $inferred;
         }
 
         if (! $existing) {

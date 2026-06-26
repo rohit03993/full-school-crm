@@ -55,6 +55,21 @@ class WhatsAppTemplateParamMappingInferrerTest extends TestCase
         ], $sources);
     }
 
+    public function test_infers_marks_template_variables(): void
+    {
+        $sources = WhatsAppTemplateParamMappingInferrer::infer(
+            ['name', 'roll_number', 'tes', 'all_subject_marks'],
+            4,
+        );
+
+        $this->assertSame([
+            'student.name',
+            'student.enrollment_number',
+            'activity.test_name',
+            'activity.marks_summary',
+        ], $sources);
+    }
+
     public function test_numeric_variable_labels_stay_manual(): void
     {
         $sources = WhatsAppTemplateParamMappingInferrer::infer(['1', '2', '3'], 3);
