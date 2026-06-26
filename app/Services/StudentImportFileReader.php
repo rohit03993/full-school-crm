@@ -22,7 +22,7 @@ class StudentImportFileReader
      *     path: string
      * }
      */
-    public function storeAndParse(UploadedFile $file): array
+    public function storeAndParse(UploadedFile $file, bool $detectMarksHeaderRow = false): array
     {
         $path = $file->store('temp-student-imports');
 
@@ -36,7 +36,7 @@ class StudentImportFileReader
             throw new RuntimeException('Uploaded file could not be read after storage.');
         }
 
-        $parsed = $this->parse($absolutePath);
+        $parsed = $this->parse($absolutePath, $detectMarksHeaderRow);
 
         return [
             ...$parsed,
@@ -47,7 +47,7 @@ class StudentImportFileReader
     /**
      * @return array{headers: list<string|null>, rows: list<list<string|null>>}
      */
-    public function parse(string $absolutePath): array
+    public function parse(string $absolutePath, bool $detectMarksHeaderRow = false): array
     {
         $extension = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
 
@@ -55,7 +55,7 @@ class StudentImportFileReader
             return $this->parseDelimited($absolutePath);
         }
 
-        return $this->parseSpreadsheet($absolutePath);
+        return $this->parseSpreadsheet($absolutePath, $detectMarksHeaderRow);
     }
 
     public function deleteStoredFile(?string $relativePath): void
@@ -68,7 +68,7 @@ class StudentImportFileReader
     /**
      * @return array{headers: list<string|null>, rows: list<list<string|null>>}
      */
-    protected function parseSpreadsheet(string $absolutePath): array
+    protected function parseSpreadsheet(string $absolutePath, bool $detectMarksHeaderRow = false): array
     {
         $reader = IOFactory::createReaderForFile($absolutePath);
         $reader->setReadDataOnly(true);
@@ -80,6 +80,10 @@ class StudentImportFileReader
         if ($highestRow < 1 || $highestColumnIndex < 1) {
             throw new RuntimeException('The uploaded file is empty.');
         }
+
+        $headerRowIndex = $detectMarksHeaderRow
+            ? $this->detectMarksHeaderRowIndex($sheet, $highestRow, $highestColumnIndex)
+            : 1;
 
         $headers = [];
         $rows = [];
@@ -93,12 +97,16 @@ class StudentImportFileReader
                 );
             }
 
-            if ($rowIndex === 1) {
+            if ($rowIndex === $headerRowIndex) {
                 $headers = array_map(
                     fn ($value): ?string => filled($value) ? trim((string) $value) : null,
                     $rowData,
                 );
 
+                continue;
+            }
+
+            if ($rowIndex < $headerRowIndex) {
                 continue;
             }
 
@@ -121,6 +129,33 @@ class StudentImportFileReader
             'headers' => $headers,
             'rows' => $rows,
         ];
+    }
+
+    protected function detectMarksHeaderRowIndex(
+        \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet,
+        int $highestRow,
+        int $highestColumnIndex,
+    ): int {
+        $mapper = app(ActivityMarksImportColumnMapper::class);
+
+        for ($rowIndex = 1; $rowIndex <= min(10, $highestRow); $rowIndex++) {
+            $headers = [];
+
+            for ($columnIndex = 1; $columnIndex <= $highestColumnIndex; $columnIndex++) {
+                $value = $this->cellValueFromSpreadsheet(
+                    $sheet->getCell(Coordinate::stringFromColumnIndex($columnIndex).$rowIndex),
+                );
+                $headers[] = filled($value) ? trim((string) $value) : null;
+            }
+
+            $mapping = $mapper->guess($headers);
+
+            if ($mapping['roll_column'] !== null && $mapping['subject_columns'] !== []) {
+                return $rowIndex;
+            }
+        }
+
+        return 1;
     }
 
     /**

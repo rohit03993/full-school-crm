@@ -18,6 +18,7 @@ use App\Services\ActivityMarksWhatsAppService;
 use App\Services\StudentImportFileReader;
 use App\Support\CrmNavigation;
 use App\Support\EduExamLabels;
+use App\Support\ExamSubjectCatalog;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -92,6 +93,11 @@ class BulkActivityMarksImportPage extends Page
         'roll_column' => null,
         'subject_columns' => [],
     ];
+
+    /**
+     * @var array<int, float|int|string>
+     */
+    public array $subjectMaxMarks = [];
 
     /**
      * @var array<string, mixed>|null
@@ -208,13 +214,14 @@ class BulkActivityMarksImportPage extends Page
             $reader->deleteStoredFile($this->storedFilePath);
         }
 
-        $parsed = $reader->storeAndParse($this->uploadFile);
+        $parsed = $reader->storeAndParse($this->uploadFile, detectMarksHeaderRow: true);
 
         $this->storedFilePath = $parsed['path'];
         $this->originalFilename = $this->uploadFile->getClientOriginalName();
         $this->fileHeaders = $parsed['headers'];
         $this->fileRows = $parsed['rows'];
         $this->columnMapping = $mapper->guess($this->fileHeaders);
+        $this->syncSubjectMaxMarksFromMapping();
         $this->previewPayload = null;
         $this->importResult = null;
         $this->importError = null;
@@ -243,6 +250,7 @@ class BulkActivityMarksImportPage extends Page
             $this->academicSessionId,
             $this->limitToBatch ? $this->batchId : null,
             $this->defaultMaxMarks,
+            $this->subjectMaxMarks,
         );
 
         $this->step = 3;
@@ -280,6 +288,7 @@ class BulkActivityMarksImportPage extends Page
                 (string) $this->sessionDate,
                 $this->defaultMaxMarks,
                 $this->previewPayload['rows'],
+                $this->previewPayload['subject_max_marks'] ?? [],
             );
 
             $this->step = 4;
@@ -365,6 +374,7 @@ class BulkActivityMarksImportPage extends Page
             'fileHeaders',
             'fileRows',
             'columnMapping',
+            'subjectMaxMarks',
             'previewPayload',
             'importResult',
             'importError',
@@ -382,6 +392,35 @@ class BulkActivityMarksImportPage extends Page
             'roll_column' => null,
             'subject_columns' => [],
         ];
+        $this->subjectMaxMarks = [];
+    }
+
+    public function updatedColumnMapping(): void
+    {
+        $this->syncSubjectMaxMarksFromMapping();
+    }
+
+    protected function syncSubjectMaxMarksFromMapping(): void
+    {
+        $defaults = ExamSubjectCatalog::defaultMaxMarksForColumns(
+            $this->fileHeaders,
+            $this->columnMapping['subject_columns'] ?? [],
+            $this->defaultMaxMarks,
+        );
+
+        foreach ($defaults as $columnIndex => $maxMarks) {
+            if (! array_key_exists($columnIndex, $this->subjectMaxMarks)
+                && ! array_key_exists((string) $columnIndex, $this->subjectMaxMarks)) {
+                $this->subjectMaxMarks[$columnIndex] = $maxMarks;
+            }
+        }
+
+        $activeColumns = $this->columnMapping['subject_columns'] ?? [];
+
+        $this->subjectMaxMarks = collect($this->subjectMaxMarks)
+            ->filter(fn (mixed $value, int|string $key): bool => in_array((int) $key, $activeColumns, true))
+            ->mapWithKeys(fn (mixed $value, int|string $key): array => [(int) $key => (float) $value])
+            ->all();
     }
 
     /**
@@ -450,6 +489,7 @@ class BulkActivityMarksImportPage extends Page
                     'whatsappTemplateOptions' => $this->whatsappTemplateOptions(),
                     'fileHeaders' => $this->fileHeaders,
                     'columnMapping' => $this->columnMapping,
+                    'subjectMaxMarks' => $this->subjectMaxMarks,
                     'previewPayload' => $this->previewPayload,
                     'importResult' => $this->importResult,
                     'uploadFileName' => $this->uploadFile?->getClientOriginalName(),

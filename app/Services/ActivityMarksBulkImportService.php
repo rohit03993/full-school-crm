@@ -7,6 +7,7 @@ use App\Models\ActivityType;
 use App\Models\BatchStudent;
 use App\Models\Enrollment;
 use App\Models\User;
+use App\Support\ExamSubjectCatalog;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -26,9 +27,11 @@ class ActivityMarksBulkImportService
      * @param  list<string|null>  $headers
      * @param  list<list<string|null>>  $rows
      * @param  array{roll_column: int|null, subject_columns: list<int>}  $mapping
+     * @param  array<int, float|int|string>  $subjectMaxMarksByColumn
      * @return array{
      *     rows: list<array<string, mixed>>,
      *     subjects: list<string>,
+     *     subject_max_marks: array<string, float>,
      *     batches: list<array{id: int, name: string, count: int}>,
      *     ready_count: int,
      *     error_count: int
@@ -41,8 +44,16 @@ class ActivityMarksBulkImportService
         ?int $academicSessionId = null,
         ?int $batchId = null,
         float $defaultMaxMarks = 100,
+        array $subjectMaxMarksByColumn = [],
     ): array {
-        $subjects = $this->subjectLabels($headers, $mapping['subject_columns'] ?? []);
+        $subjectLabels = $this->subjectLabels($headers, $mapping['subject_columns'] ?? []);
+        $subjectMaxMarks = $this->resolvedSubjectMaxMarks(
+            $headers,
+            $mapping['subject_columns'] ?? [],
+            $subjectMaxMarksByColumn,
+            $defaultMaxMarks,
+        );
+        $subjects = array_values(array_unique($subjectLabels));
         $seenRolls = [];
         $previewRows = [];
         $batchCounts = [];
@@ -93,7 +104,8 @@ class ActivityMarksBulkImportService
             $subjectErrors = [];
 
             foreach ($mapping['subject_columns'] ?? [] as $columnIndex) {
-                $subject = $subjects[$columnIndex] ?? 'Subject';
+                $subject = $subjectLabels[$columnIndex] ?? 'Subject';
+                $maxMarks = $subjectMaxMarks[$subject] ?? $defaultMaxMarks;
                 $rawMark = $this->cell($row, $columnIndex);
 
                 if ($rawMark === '') {
@@ -114,8 +126,8 @@ class ActivityMarksBulkImportService
                     continue;
                 }
 
-                if ($mark > $defaultMaxMarks) {
-                    $subjectErrors[] = "{$subject}: mark exceeds max marks ({$defaultMaxMarks}).";
+                if ($mark > $maxMarks) {
+                    $subjectErrors[] = "{$subject}: mark exceeds max marks ({$maxMarks}).";
                 }
 
                 $subjectMarks[$subject] = $mark;
@@ -164,7 +176,8 @@ class ActivityMarksBulkImportService
 
         return [
             'rows' => $previewRows,
-            'subjects' => array_values($subjects),
+            'subjects' => $subjects,
+            'subject_max_marks' => $subjectMaxMarks,
             'batches' => $batches,
             'ready_count' => $readyCount,
             'error_count' => $errorCount,
@@ -190,6 +203,7 @@ class ActivityMarksBulkImportService
         string $sessionDate,
         float $defaultMaxMarks,
         array $previewRows,
+        array $subjectMaxMarks = [],
     ): array {
         if (! $activityType->supportsScoring()) {
             throw new \InvalidArgumentException('Selected activity type does not support marks.');
@@ -225,7 +239,7 @@ class ActivityMarksBulkImportService
                         $sessionDate,
                         $testKey,
                         $subject,
-                        $defaultMaxMarks,
+                        (float) ($subjectMaxMarks[$subject] ?? $defaultMaxMarks),
                         $staff,
                     );
 
@@ -284,12 +298,36 @@ class ActivityMarksBulkImportService
         $labels = [];
 
         foreach ($subjectColumnIndexes as $index) {
-            $header = trim((string) ($headers[$index] ?? ''));
-
-            $labels[$index] = $header !== '' ? $header : 'Subject '.($index + 1);
+            $labels[$index] = ExamSubjectCatalog::resolveLabel($headers[$index] ?? null);
         }
 
         return $labels;
+    }
+
+    /**
+     * @param  list<int>  $subjectColumnIndexes
+     * @param  array<int, float|int|string>  $subjectMaxMarksByColumn
+     * @return array<string, float>
+     */
+    protected function resolvedSubjectMaxMarks(
+        array $headers,
+        array $subjectColumnIndexes,
+        array $subjectMaxMarksByColumn,
+        float $defaultMaxMarks,
+    ): array {
+        $resolved = [];
+
+        foreach ($subjectColumnIndexes as $columnIndex) {
+            $label = ExamSubjectCatalog::resolveLabel($headers[$columnIndex] ?? null);
+            $rawMax = $subjectMaxMarksByColumn[$columnIndex]
+                ?? $subjectMaxMarksByColumn[(string) $columnIndex]
+                ?? null;
+            $resolved[$label] = $rawMax !== null && $rawMax !== ''
+                ? (float) $rawMax
+                : ExamSubjectCatalog::defaultMaxForHeader($headers[$columnIndex] ?? null, $defaultMaxMarks);
+        }
+
+        return $resolved;
     }
 
     /**

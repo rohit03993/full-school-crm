@@ -71,20 +71,43 @@ class StudentExamMarksMatrix
             ->values()
             ->map(function (array $row) use ($subjects): array {
                 $scores = [];
+                $totalMarks = 0.0;
+                $totalMax = 0.0;
+                $hasMarks = false;
 
                 foreach ($subjects as $subject) {
-                    $scores[$subject] = $row['scores'][$subject] ?? [
+                    $cell = $row['scores'][$subject] ?? [
                         'marks' => null,
                         'max' => null,
                         'display' => '—',
                     ];
+                    $scores[$subject] = $cell;
+
+                    if ($cell['marks'] !== null) {
+                        $hasMarks = true;
+                        $totalMarks += (float) $cell['marks'];
+                    }
+
+                    if ($cell['max'] !== null && (float) $cell['max'] > 0) {
+                        $totalMax += (float) $cell['max'];
+                    }
                 }
+
+                $percentage = $hasMarks && $totalMax > 0
+                    ? round(($totalMarks / $totalMax) * 100, 2)
+                    : null;
 
                 return [
                     'label' => $row['label'],
                     'date' => $row['date'],
                     'batch' => $row['batch'],
                     'scores' => $scores,
+                    'total' => [
+                        'marks' => $hasMarks ? $totalMarks : null,
+                        'max' => $totalMax > 0 ? $totalMax : null,
+                        'percentage' => $percentage,
+                        'display' => self::formatTotal($totalMarks, $totalMax, $percentage, $hasMarks),
+                    ],
                 ];
             })
             ->all();
@@ -162,5 +185,28 @@ class StudentExamMarksMatrix
         }
 
         return filled($grade) ? $grade : '—';
+    }
+
+    public static function formatTotal(float $totalMarks, float $totalMax, ?float $percentage, bool $hasMarks): string
+    {
+        if (! $hasMarks) {
+            return '—';
+        }
+
+        $marksFormatted = rtrim(rtrim(number_format($totalMarks, 2), '0'), '.');
+
+        if ($totalMax <= 0) {
+            return $marksFormatted;
+        }
+
+        $maxFormatted = rtrim(rtrim(number_format($totalMax, 2), '0'), '.');
+
+        if ($percentage !== null) {
+            $percentFormatted = rtrim(rtrim(number_format($percentage, 2), '0'), '.');
+
+            return "{$marksFormatted} / {$maxFormatted} ({$percentFormatted}%)";
+        }
+
+        return "{$marksFormatted} / {$maxFormatted}";
     }
 }

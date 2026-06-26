@@ -168,6 +168,7 @@ class ActivityMarksBulkImportServiceTest extends TestCase
             null,
             null,
             50,
+            [1 => 50, 2 => 50],
         );
 
         $result = $import->import(
@@ -177,6 +178,7 @@ class ActivityMarksBulkImportServiceTest extends TestCase
             '2026-03-20',
             50,
             $preview['rows'],
+            $preview['subject_max_marks'],
         );
 
         $summaries = app(ActivityMarksWhatsAppService::class)->buildStudentMarksSummaries($result['test_key']);
@@ -286,5 +288,43 @@ class ActivityMarksBulkImportServiceTest extends TestCase
             ->update(['enrollment_number' => $rollNumber]);
 
         return $student->fresh();
+    }
+
+    public function test_motion_style_preview_uses_per_subject_max_marks(): void
+    {
+        $staff = $this->createStaffUser();
+        $student = $this->createEnrolledStudent($staff, '26175000061', '9876543601');
+        $course = Course::query()->firstOrFail();
+
+        $batch = Batch::query()->create([
+            'name' => '26A1AG',
+            'course_id' => $course->id,
+            'trainer_user_id' => $staff->id,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-12-31',
+            'status' => BatchStatus::Active,
+        ]);
+
+        app(BatchService::class)->assign($student, $batch, $staff);
+
+        $headers = ['S.No.', 'Roll No', 'Batch', 'Name', 'P', 'C', 'M', 'Mark Obtain', 'Percent'];
+        $rows = [[1, '26175000061', '26A1AG', 'AARAV BINDAL', 76, 57, 48, 181, 60.33]];
+        $mapping = ['roll_column' => 1, 'subject_columns' => [4, 5, 6]];
+        $subjectMaxMarks = [4 => 100, 5 => 100, 6 => 100];
+
+        $preview = app(ActivityMarksBulkImportService::class)->buildPreview(
+            $headers,
+            $rows,
+            $mapping,
+            null,
+            null,
+            100,
+            $subjectMaxMarks,
+        );
+
+        $this->assertSame(1, $preview['ready_count']);
+        $this->assertSame(['Physics', 'Chemistry', 'Mathematics'], $preview['subjects']);
+        $this->assertSame(100.0, $preview['subject_max_marks']['Physics']);
+        $this->assertSame(76.0, $preview['rows'][0]['subject_marks']['Physics']);
     }
 }

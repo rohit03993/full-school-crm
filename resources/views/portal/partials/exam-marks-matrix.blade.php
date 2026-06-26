@@ -8,6 +8,8 @@
                 @foreach ($matrix['subjects'] as $subject)
                     <th class="px-3 py-2.5 text-center">{{ $subject }}</th>
                 @endforeach
+                <th class="px-3 py-2.5 text-center">Total</th>
+                <th class="px-3 py-2.5 text-center">%</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-navy-100">
@@ -25,6 +27,22 @@
                             {{ $row['scores'][$subject]['display'] ?? '—' }}
                         </td>
                     @endforeach
+                    <td class="px-3 py-2.5 text-center font-semibold text-navy-900">
+                        @if (($row['total']['max'] ?? null) !== null)
+                            {{ rtrim(rtrim(number_format((float) ($row['total']['marks'] ?? 0), 2), '0'), '.') }}
+                            /
+                            {{ rtrim(rtrim(number_format((float) $row['total']['max'], 2), '0'), '.') }}
+                        @else
+                            {{ $row['total']['display'] ?? '—' }}
+                        @endif
+                    </td>
+                    <td class="px-3 py-2.5 text-center font-semibold text-navy-700">
+                        @if (($row['total']['percentage'] ?? null) !== null)
+                            {{ rtrim(rtrim(number_format((float) $row['total']['percentage'], 2), '0'), '.') }}%
+                        @else
+                            —
+                        @endif
+                    </td>
                 </tr>
             @endforeach
         </tbody>

@@ -90,11 +90,23 @@ class ActivityMarksImportColumnMapper
             'phone',
             'class',
             'section',
+            'batch',
             'total',
+            'mark obtain',
+            'marks obtain',
+            'obtained',
             'percentage',
+            'percent',
+            'percentile',
             'rank',
             'remarks',
             'remark',
+            'right ans',
+            'wrong ans',
+            's no',
+            's.no',
+            'sr no',
+            'serial',
         ] as $needle) {
             if (str_contains($normalized, $needle)) {
                 return true;
