@@ -26,6 +26,7 @@ class WhatsAppTemplateParamMappingInferrer
         'student_phone' => 'student.mobile',
         'contact_number' => 'student.mobile',
         'roll_number' => 'student.enrollment_number',
+        'roll_numbebr' => 'student.enrollment_number',
         'roll_no' => 'student.enrollment_number',
         'rollnumber' => 'student.enrollment_number',
         'roll' => 'student.enrollment_number',

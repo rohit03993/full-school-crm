@@ -14,6 +14,13 @@ class PalDigitalWhatsAppServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_normalize_template_params_pads_blank_slots(): void
+    {
+        $params = PalDigitalWhatsAppService::normalizeTemplateParams(['Rohit', '123'], 4);
+
+        $this->assertSame(['Rohit', '123', '—', '—'], $params);
+    }
+
     public function test_send_posts_waservice_compatible_payload(): void
     {
         config([
@@ -32,6 +39,8 @@ class PalDigitalWhatsAppServiceTest extends TestCase
             '9811223344',
             ['Rohit', 'Demo School'],
             'test_announcement',
+            null,
+            2,
         );
 
         $this->assertSame('success', $result['status']);

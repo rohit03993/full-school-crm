@@ -17,6 +17,7 @@ class PalDigitalWhatsAppService
         array $templateParams = [],
         ?string $templateName = null,
         ?string $userName = null,
+        int $expectedParamCount = 0,
     ): array {
         if (! $this->isConfigured()) {
             return ['status' => 'failed', 'error' => 'Pal Digital API key or URL not configured.'];
@@ -36,6 +37,8 @@ class PalDigitalWhatsAppService
             return ['status' => 'failed', 'error' => 'WhatsApp template name is required.'];
         }
 
+        $templateParams = self::normalizeTemplateParams($templateParams, $expectedParamCount);
+
         $userName = $this->sanitizeUserName($userName ?? $templateParams[0] ?? 'User');
 
         $payload = [
@@ -43,7 +46,7 @@ class PalDigitalWhatsAppService
             'campaignName' => $campaignName,
             'destination' => $destination,
             'userName' => $userName,
-            'templateParams' => array_values($templateParams),
+            'templateParams' => $templateParams,
         ];
 
         Log::info('Pal Digital WhatsApp request', [
@@ -51,6 +54,7 @@ class PalDigitalWhatsAppService
             'campaignName' => $campaignName,
             'destination' => $destination,
             'param_count' => count($templateParams),
+            'templateParams' => $templateParams,
         ]);
 
         try {
@@ -79,6 +83,27 @@ class PalDigitalWhatsAppService
 
             return ['status' => 'failed', 'error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Pad to the template slot count and replace blanks so providers do not drop trailing params.
+     *
+     * @param  list<string>  $templateParams
+     * @return list<string>
+     */
+    public static function normalizeTemplateParams(array $templateParams, int $expectedParamCount = 0): array
+    {
+        $params = array_values($templateParams);
+
+        if ($expectedParamCount > 0) {
+            $params = array_slice($params, 0, $expectedParamCount);
+            $params = array_pad($params, $expectedParamCount, '');
+        }
+
+        return array_map(
+            fn (string $value): string => trim($value) === '' ? '—' : $value,
+            $params,
+        );
     }
 
     public function isConfigured(): bool

@@ -116,6 +116,7 @@ class RunWhatsAppCampaign extends Command
                 $templateParams,
                 $template->name,
                 (string) ($student->name ?? 'User'),
+                (int) $template->param_count,
             );
 
             $recipient->template_params = $templateParams;

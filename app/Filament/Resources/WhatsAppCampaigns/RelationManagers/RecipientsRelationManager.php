@@ -90,6 +90,19 @@ class RecipientsRelationManager extends RelationManager
                         default => 'gray',
                     })
                     ->sortable(),
+                TextColumn::make('template_params')
+                    ->label('Params sent')
+                    ->formatStateUsing(function (mixed $state): string {
+                        if (! is_array($state) || $state === []) {
+                            return '—';
+                        }
+
+                        return count($state).' param(s): '.collect($state)
+                            ->map(fn (mixed $value, int $index): string => '{{'.($index + 1).'}}='.(string) $value)
+                            ->implode(', ');
+                    })
+                    ->wrap()
+                    ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('error_message')
                     ->label('Error / note')
                     ->wrap()
