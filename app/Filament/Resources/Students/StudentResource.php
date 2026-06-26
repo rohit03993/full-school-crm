@@ -63,6 +63,9 @@ class StudentResource extends Resource
     public static function table(Table $table): Table
     {
         return CrmTable::configure($table)
+            ->recordClasses(fn (Student $record): ?string => blank($record->mobile)
+                ? 'bg-danger-50/60 dark:bg-danger-500/5'
+                : null)
             ->columns([
                 TextColumn::make('activeEnrollment.enrollment_number')
                     ->label('Roll No.')
@@ -80,9 +83,10 @@ class StudentResource extends Resource
                     ->label('Mobile')
                     ->searchable()
                     ->fontFamily('mono')
-                    ->copyable()
-                    ->placeholder('—')
-                    ->color(fn (?string $state): string => blank($state) ? 'warning' : 'gray'),
+                    ->copyable(fn (?string $state): bool => filled($state))
+                    ->formatStateUsing(fn (?string $state): string => filled($state) ? $state : 'Missing — add from profile')
+                    ->badge(fn (?string $state): bool => blank($state))
+                    ->color(fn (?string $state): string => blank($state) ? 'danger' : 'gray'),
                 TextColumn::make('activeEnrollment.course.name')
                     ->label('Course')
                     ->placeholder('—')
@@ -117,7 +121,7 @@ class StudentResource extends Resource
                 TernaryFilter::make('missing_mobile')
                     ->label('Mobile number')
                     ->placeholder('All students')
-                    ->trueLabel('Missing mobile')
+                    ->trueLabel('Mobile error / missing')
                     ->falseLabel('Has mobile')
                     ->queries(
                         true: fn (Builder $query): Builder => $query->whereNull('mobile'),
