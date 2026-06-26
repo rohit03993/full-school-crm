@@ -22,6 +22,83 @@ class StudentBulkImportServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_preview_imports_rows_with_missing_or_invalid_mobile_as_ready_with_warnings(): void
+    {
+        $preview = app(StudentBulkImportService::class)->buildPreview(
+            [
+                0 => StudentImportFields::ROLL_NUMBER,
+                1 => StudentImportFields::NAME,
+                2 => StudentImportFields::MOBILE,
+            ],
+            [
+                ['501', 'No Mobile Student', ''],
+                ['502', 'Bad Mobile Student', 'not-a-phone'],
+                ['503', 'Scientific Mobile', '9.18321E+11'],
+            ],
+        );
+
+        $this->assertSame('ready', $preview[0]['status']);
+        $this->assertNotEmpty($preview[0]['warnings']);
+        $this->assertSame('', $preview[0]['data']['mobile']);
+
+        $this->assertSame('ready', $preview[1]['status']);
+        $this->assertNotEmpty($preview[1]['warnings']);
+
+        $this->assertSame('ready', $preview[2]['status']);
+        $this->assertStringContainsString('scientific', strtolower(implode(' ', $preview[2]['warnings'])));
+    }
+
+    public function test_import_creates_student_without_mobile_when_spreadsheet_mobile_is_invalid(): void
+    {
+        $staff = $this->createStaffUser();
+        $session = AcademicSession::query()->create([
+            'name' => '2026–27',
+            'code' => '2026-27',
+            'starts_on' => '2026-04-01',
+            'ends_on' => '2027-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
+        $course = Course::query()->create([
+            'name' => 'Class 12 Science',
+            'code' => 'CLS-12-SCI',
+            'programme_category' => 'school',
+            'duration' => 1,
+            'duration_type' => 'years',
+            'fee' => 50000,
+            'status' => CourseStatus::Active,
+        ]);
+
+        $preview = app(StudentBulkImportService::class)->buildPreview(
+            [
+                0 => StudentImportFields::ROLL_NUMBER,
+                1 => StudentImportFields::NAME,
+                2 => StudentImportFields::MOBILE,
+            ],
+            [
+                ['601', 'Imported Without Mobile', '9.18321E+11'],
+            ],
+        );
+
+        $result = app(StudentBulkImportService::class)->import(
+            $staff,
+            $session,
+            $course,
+            null,
+            'students.xlsx',
+            $preview,
+            [],
+        );
+
+        $this->assertSame(1, $result['created']);
+        $this->assertSame(1, $result['without_mobile']);
+
+        $student = Student::query()->where('name', 'Imported Without Mobile')->first();
+        $this->assertNotNull($student);
+        $this->assertNull($student->mobile);
+        $this->assertSame('601', $student->activeEnrollment->enrollment_number);
+    }
+
     public function test_preview_normalizes_mixed_mobile_formats(): void
     {
         $preview = app(StudentBulkImportService::class)->buildPreview(

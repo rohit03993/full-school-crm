@@ -6,8 +6,8 @@
         4 => ['label' => 'Results', 'hint' => 'Import summary'],
     ];
 
-    $requiredColumns = ['Roll number', 'Student name', 'Mobile'];
-    $optionalColumns = ["Father's name", 'Date of birth', 'Gender', 'Batch / section'];
+    $requiredColumns = ['Roll number', 'Student name'];
+    $optionalColumns = ['Primary mobile', "Father's name", 'Date of birth', 'Gender', 'Batch / section'];
 @endphp
 
 <div class="mx-auto max-w-4xl space-y-5 pb-24 lg:pb-8">
@@ -194,7 +194,9 @@
                             </span>
                             <p class="mt-3 text-sm font-semibold text-gray-950 dark:text-white">Drop file here or click to browse</p>
                             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">.xlsx, .xls, .csv — max {{ number_format($maxRows) }} rows</p>
-                        <p class="mt-2 text-xs text-amber-700 dark:text-amber-300">Tip: In Excel, select the WhatsApp column → Format Cells → Text. This keeps 10-digit and 91-prefixed numbers accurate.</p>
+                        <p class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                            <span class="font-semibold">Important:</span> Upload the original <span class="font-semibold">.xlsx</span> file. If you save as CSV, Excel turns mobiles into <span class="font-mono">9.18E+11</span> and digits are lost. In Excel: select WhatsApp column → Format Cells → Text → then save as .xlsx.
+                        </p>
                         @endif
 
                         <span wire:loading wire:target="uploadFile" class="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/80 text-sm font-medium text-primary-700 dark:bg-gray-900/80 dark:text-primary-300">
@@ -260,7 +262,7 @@
                             @endif
                             @php
                                 $mappedField = $columnMapping[$index] ?? 'skip';
-                                $isRequired = in_array($mappedField, ['roll_number', 'name', 'mobile'], true);
+                                $isRequired = in_array($mappedField, ['roll_number', 'name'], true);
                             @endphp
                             <tr class="transition hover:bg-gray-50/80 dark:hover:bg-white/[0.02]">
                                 <td class="px-4 py-3 font-medium text-gray-950 dark:text-white">{{ $header }}</td>
@@ -316,11 +318,13 @@
             $readyCount = collect($previewRows)->where('status', 'ready')->count();
             $duplicateCount = collect($previewRows)->where('status', 'duplicate')->count();
             $errorCount = collect($previewRows)->where('status', 'error')->count();
+            $noMobileCount = collect($previewRows)->filter(fn (array $row): bool => ($row['status'] ?? '') === 'ready' && ! empty($row['warnings'] ?? []))->count();
         @endphp
 
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
             @foreach ([
                 ['label' => 'Ready', 'value' => $readyCount, 'tone' => 'text-emerald-600 dark:text-emerald-400'],
+                ['label' => 'No mobile', 'value' => $noMobileCount, 'tone' => 'text-amber-600 dark:text-amber-400'],
                 ['label' => 'Duplicates', 'value' => $duplicateCount, 'tone' => 'text-amber-600 dark:text-amber-400'],
                 ['label' => 'Errors', 'value' => $errorCount, 'tone' => 'text-danger-600 dark:text-danger-400'],
                 ['label' => 'Will import', 'value' => $importableCount, 'tone' => 'text-primary-600 dark:text-primary-400'],
@@ -336,7 +340,7 @@
             <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
                 <h2 class="text-lg font-bold text-gray-950 dark:text-white">Review rows before import</h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Only valid rows will be imported. Rows with missing roll, name, or mobile are skipped automatically.
+                    Rows with roll and name will be imported. Invalid or missing mobiles are imported without a number — add later from the student profile.
                 </p>
             </div>
 
@@ -362,10 +366,19 @@
                                 <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ $row['row_number'] }}</td>
                                 <td class="px-4 py-3 font-mono font-semibold text-gray-950 dark:text-white">{{ $row['data']['roll_number'] ?? '—' }}</td>
                                 <td class="px-4 py-3 text-gray-950 dark:text-white">{{ $row['data']['name'] ?? '—' }}</td>
-                                <td class="px-4 py-3 font-mono text-gray-700 dark:text-gray-300">{{ $row['data']['mobile'] ?? '—' }}</td>
+                                <td class="px-4 py-3 font-mono text-gray-700 dark:text-gray-300">
+                                    @if (filled($row['data']['mobile'] ?? null))
+                                        {{ $row['data']['mobile'] }}
+                                    @else
+                                        <span class="text-amber-600 dark:text-amber-400">—</span>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-3">
                                     @if ($row['status'] === 'ready')
                                         <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Ready</span>
+                                        @if (! empty($row['warnings'] ?? []))
+                                            <p class="mt-1.5 text-xs text-amber-600 dark:text-amber-400">{{ implode(' ', $row['warnings']) }}</p>
+                                        @endif
                                     @elseif ($row['status'] === 'duplicate')
                                         <span class="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">Duplicate mobile</span>
                                         @if ($row['existing_student'] ?? null)
@@ -452,16 +465,20 @@
                 </h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {{ ($importResult['created'] ?? 0) + ($importResult['updated'] ?? 0) }} student(s) processed successfully.
+                    @if (($importResult['without_mobile'] ?? 0) > 0)
+                        {{ $importResult['without_mobile'] }} imported without a mobile number — see All Students → filter “Missing mobile”.
+                    @endif
                     @if (($importResult['preview_rejected'] ?? 0) > 0)
                         {{ $importResult['preview_rejected'] }} row(s) were skipped from the file due to validation issues.
                     @endif
                 </p>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 p-4 sm:grid-cols-5 sm:p-6">
+            <div class="grid grid-cols-2 gap-3 p-4 sm:grid-cols-6 sm:p-6">
                 @foreach ([
                     ['Created', $importResult['created'] ?? 0, 'text-emerald-700 dark:text-emerald-300', 'bg-emerald-50 dark:bg-emerald-500/10'],
                     ['Updated', $importResult['updated'] ?? 0, 'text-primary-700 dark:text-primary-300', 'bg-primary-50 dark:bg-primary-500/10'],
+                    ['No mobile', $importResult['without_mobile'] ?? 0, 'text-amber-700 dark:text-amber-300', 'bg-amber-50 dark:bg-amber-500/10'],
                     ['Skipped', $importResult['skipped'] ?? 0, 'text-gray-700 dark:text-gray-300', 'bg-gray-50 dark:bg-white/5'],
                     ['File rejected', $importResult['preview_rejected'] ?? 0, 'text-amber-700 dark:text-amber-300', 'bg-amber-50 dark:bg-amber-500/10'],
                     ['Failed', $importResult['failed'] ?? 0, 'text-danger-700 dark:text-danger-300', 'bg-danger-50 dark:bg-danger-500/10'],

@@ -29,7 +29,7 @@ class StudentImportFields
             self::ROLL_NUMBER => 'Roll number',
             self::NAME => 'Student name',
             self::FATHER_NAME => "Father's name (optional)",
-            self::MOBILE => 'Primary mobile',
+            self::MOBILE => 'Primary mobile (optional)',
             self::DATE_OF_BIRTH => 'Date of birth (optional)',
             self::GENDER => 'Gender (optional)',
             self::BATCH_SECTION => 'Batch / section (optional)',
@@ -45,7 +45,6 @@ class StudentImportFields
         return [
             self::ROLL_NUMBER,
             self::NAME,
-            self::MOBILE,
         ];
     }
 }

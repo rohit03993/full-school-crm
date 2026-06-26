@@ -91,7 +91,9 @@ class StudentBulkImportService
         foreach ($rows as $index => $row) {
             $rowNumber = $index + 2;
             $data = $this->mapRow($columnMapping, $row);
+            $warnings = $this->mobileImportWarnings($data);
             $errors = $this->validateRowData($data);
+            $data = $this->stripImportMeta($data);
 
             $rollKey = strtoupper(trim((string) ($data[StudentImportFields::ROLL_NUMBER] ?? '')));
             $mobileKey = IndianMobileNumber::normalizeFromSpreadsheet($data[StudentImportFields::MOBILE] ?? null) ?? '';
@@ -129,6 +131,7 @@ class StudentBulkImportService
                 'data' => $data,
                 'status' => $status,
                 'errors' => $errors,
+                'warnings' => $warnings,
                 'existing_student' => $existingStudent ? [
                     'id' => $existingStudent->id,
                     'name' => $existingStudent->name,
@@ -275,6 +278,10 @@ class StudentBulkImportService
                 } else {
                     $chunk['updated']++;
                 }
+
+                if ($this->resolvedImportMobile($data) === null) {
+                    $chunk['without_mobile']++;
+                }
             } catch (\Throwable $exception) {
                 $chunk['failed']++;
                 $chunk['errors'][] = [
@@ -347,6 +354,7 @@ class StudentBulkImportService
             'skipped' => $totals['skipped'],
             'failed' => $totals['failed'],
             'preview_rejected' => $totals['preview_rejected'],
+            'without_mobile' => $totals['without_mobile'] ?? 0,
             'errors' => $totals['errors'],
         ];
     }
@@ -398,6 +406,7 @@ class StudentBulkImportService
             'skipped' => 0,
             'failed' => 0,
             'preview_rejected' => 0,
+            'without_mobile' => 0,
             'errors' => [],
             'done' => false,
         ];
@@ -430,6 +439,7 @@ class StudentBulkImportService
         $totals['created'] += $chunk['created'];
         $totals['updated'] += $chunk['updated'];
         $totals['failed'] += $chunk['failed'];
+        $totals['without_mobile'] += $chunk['without_mobile'] ?? 0;
         $totals['errors'] = array_merge($totals['errors'], $chunk['errors']);
 
         if ($chunk['done']) {
@@ -550,7 +560,26 @@ class StudentBulkImportService
         }
 
         if (filled($data[StudentImportFields::MOBILE] ?? null)) {
-            $data[StudentImportFields::MOBILE] = IndianMobileNumber::normalizeFromSpreadsheet($data[StudentImportFields::MOBILE]) ?? '';
+            $rawMobile = $data[StudentImportFields::MOBILE];
+            $data['_import_mobile_had_raw'] = true;
+
+            if (IndianMobileNumber::isLossyScientificNotation(
+                is_scalar($rawMobile) ? trim((string) $rawMobile) : null,
+            )) {
+                $data['_import_mobile_error'] = 'scientific_notation';
+                $data[StudentImportFields::MOBILE] = '';
+            } else {
+                $normalized = IndianMobileNumber::normalizeFromSpreadsheet($rawMobile);
+
+                if ($normalized === null) {
+                    $data['_import_mobile_error'] = 'invalid';
+                    $data[StudentImportFields::MOBILE] = '';
+                } else {
+                    $data[StudentImportFields::MOBILE] = $normalized;
+                }
+            }
+        } else {
+            $data['_import_mobile_had_raw'] = false;
         }
 
         return $data;
@@ -570,12 +599,6 @@ class StudentBulkImportService
             }
         }
 
-        $mobile = (string) ($data[StudentImportFields::MOBILE] ?? '');
-
-        if ($mobile !== '' && ! preg_match('/^[6-9]\d{9}$/', $mobile)) {
-            $errors[] = 'Mobile must be a valid 10-digit Indian number. In Excel, format the WhatsApp column as Text before entering numbers.';
-        }
-
         $roll = (string) ($data[StudentImportFields::ROLL_NUMBER] ?? '');
 
         if ($roll !== '' && strlen($roll) > 50) {
@@ -583,6 +606,47 @@ class StudentBulkImportService
         }
 
         return $errors;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<string>
+     */
+    protected function mobileImportWarnings(array $data): array
+    {
+        $warnings = [];
+        $mobile = trim((string) ($data[StudentImportFields::MOBILE] ?? ''));
+        $error = $data['_import_mobile_error'] ?? null;
+
+        if ($error === 'scientific_notation') {
+            $warnings[] = 'Mobile unreadable (Excel scientific format) — importing without mobile.';
+        } elseif ($mobile === '') {
+            if ($data['_import_mobile_had_raw'] ?? false) {
+                $warnings[] = 'Mobile invalid — importing without mobile.';
+            } else {
+                $warnings[] = 'No mobile — importing without mobile; add from student profile later.';
+            }
+        }
+
+        return $warnings;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function stripImportMeta(array $data): array
+    {
+        unset($data['_import_mobile_error'], $data['_import_mobile_had_raw']);
+
+        return $data;
+    }
+
+    protected function resolvedImportMobile(array $data): ?string
+    {
+        $mobile = trim((string) ($data[StudentImportFields::MOBILE] ?? ''));
+
+        return preg_match('/^[6-9]\d{9}$/', $mobile) ? $mobile : null;
     }
 
     /**
@@ -784,9 +848,11 @@ class StudentBulkImportService
         }
 
         if (! $existing) {
-            $attributes['mobile'] = (string) $data[StudentImportFields::MOBILE];
+            $attributes['mobile'] = $this->resolvedImportMobile($data);
             $attributes['status'] = StudentStatus::Enquiry;
             $attributes['portal_password'] = $this->studentAuth->hashForNewStudent();
+        } elseif ($this->resolvedImportMobile($data) !== null) {
+            $attributes['mobile'] = $this->resolvedImportMobile($data);
         } elseif (blank($existing->portal_password)) {
             $attributes['portal_password'] = $this->studentAuth->hashForNewStudent();
         }

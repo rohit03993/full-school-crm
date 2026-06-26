@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Students\Pages;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Pages\StudentSearchPage;
 use App\Filament\Resources\Students\StudentResource;
+use App\Models\Student;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Support\Icons\Heroicon;
@@ -29,5 +30,16 @@ class ListStudents extends ListRecords
                 ->url(StudentSearchPage::getUrl())
                 ->color('gray'),
         ];
+    }
+
+    public function getSubheading(): ?string
+    {
+        $count = Student::query()->whereNull('mobile')->count();
+
+        if ($count === 0) {
+            return null;
+        }
+
+        return "{$count} student(s) have no mobile number — use the Mobile number filter below or add from their profile.";
     }
 }

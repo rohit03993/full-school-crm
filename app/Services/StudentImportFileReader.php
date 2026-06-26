@@ -219,6 +219,10 @@ class StudentImportFileReader
         }
 
         if (preg_match('/^[\d.]+[eE][+\-]?\d+$/', $string)) {
+            if (\App\Support\IndianMobileNumber::isLossyScientificNotation($string)) {
+                return $string;
+            }
+
             return $this->numericToDigitString((float) $string);
         }
 

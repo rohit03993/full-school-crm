@@ -19,6 +19,7 @@ use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -79,7 +80,9 @@ class StudentResource extends Resource
                     ->label('Mobile')
                     ->searchable()
                     ->fontFamily('mono')
-                    ->copyable(),
+                    ->copyable()
+                    ->placeholder('—')
+                    ->color(fn (?string $state): string => blank($state) ? 'warning' : 'gray'),
                 TextColumn::make('activeEnrollment.course.name')
                     ->label('Course')
                     ->placeholder('—')
@@ -111,6 +114,16 @@ class StudentResource extends Resource
             ])
             ->defaultSort('name')
             ->filters([
+                TernaryFilter::make('missing_mobile')
+                    ->label('Mobile number')
+                    ->placeholder('All students')
+                    ->trueLabel('Missing mobile')
+                    ->falseLabel('Has mobile')
+                    ->queries(
+                        true: fn (Builder $query): Builder => $query->whereNull('mobile'),
+                        false: fn (Builder $query): Builder => $query->whereNotNull('mobile'),
+                        blank: fn (Builder $query): Builder => $query,
+                    ),
                 SelectFilter::make('status')
                     ->options(collect(StudentStatus::cases())->mapWithKeys(
                         fn (StudentStatus $status) => [$status->value => $status->label()],

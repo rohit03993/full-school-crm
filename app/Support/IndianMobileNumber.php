@@ -15,6 +15,10 @@ class IndianMobileNumber
 
         $input = trim((string) $input);
 
+        if (self::isLossyScientificNotation($input)) {
+            return null;
+        }
+
         if (preg_match('/^[\d.]+[eE][+\-]?\d+$/', $input)) {
             $input = sprintf('%.0f', (float) $input);
         }
@@ -49,7 +53,30 @@ class IndianMobileNumber
             return self::normalize(self::stringifyFloat($input));
         }
 
-        return self::normalize((string) $input);
+        $string = trim((string) $input);
+
+        if (self::isLossyScientificNotation($string)) {
+            return null;
+        }
+
+        return self::normalize($string);
+    }
+
+    /**
+     * Excel CSV exports often store mobiles as 9.18321E+11 — only ~5 digits survive.
+     */
+    public static function isLossyScientificNotation(?string $input): bool
+    {
+        if (blank($input)) {
+            return false;
+        }
+
+        return (bool) preg_match('/^\d\.\d+[eE][+\-]?\d+$/', trim((string) $input));
+    }
+
+    public static function lossyScientificNotationHelp(): string
+    {
+        return 'Mobile is in Excel scientific format (e.g. 9.18E+11) — digits were lost. Open the original Excel file, format the WhatsApp column as Text, re-enter numbers, and upload the .xlsx file (not CSV).';
     }
 
     /**
@@ -60,7 +87,7 @@ class IndianMobileNumber
         return [
             '10-digit mobile: 8410054825',
             'With country code: 919027620525 or +91 9027620525',
-            'Excel number / scientific notation is accepted — stored as 10 digits in CRM',
+            'Upload the original .xlsx file — not CSV (CSV loses digits as 9.18E+11)',
         ];
     }
 
