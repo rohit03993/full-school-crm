@@ -5,7 +5,6 @@ namespace App\Filament\Resources\Batches;
 use App\Enums\BatchShift;
 use App\Enums\BatchStatus;
 use App\Enums\CrmPermission;
-use App\Enums\RoleName;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Resources\Batches\Pages\CreateBatch;
 use App\Filament\Resources\Batches\Pages\EditBatch;
@@ -13,10 +12,10 @@ use App\Filament\Resources\Batches\Pages\ListBatches;
 use App\Filament\Support\CrmTable;
 use App\Models\AcademicSession;
 use App\Models\Batch;
-use App\Models\User;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
 use App\Support\InstituteProfile;
+use App\Support\StaffOptions;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -98,25 +97,15 @@ class BatchResource extends Resource
                             ->columnSpanFull(),
                         Select::make('trainer_user_id')
                             ->label('Faculty / Teacher')
-                            ->options(fn (): array => User::query()
-                                ->where('is_active', true)
-                                ->whereHas('roles', fn ($query) => $query->whereIn('name', [
-                                    RoleName::Staff->value,
-                                    RoleName::SuperAdmin->value,
-                                ]))
-                                ->orderBy('name')
-                                ->pluck('name', 'id')
-                                ->all())
+                            ->options(fn (): array => StaffOptions::facultyOptions())
                             ->searchable()
                             ->required()
                             ->native(false),
                         DatePicker::make('start_date')
                             ->label('Start Date')
-                            ->required()
                             ->native(false),
                         DatePicker::make('end_date')
                             ->label('End Date')
-                            ->required()
                             ->afterOrEqual('start_date')
                             ->native(false),
                         Select::make('status')
@@ -160,10 +149,12 @@ class BatchResource extends Resource
                 TextColumn::make('start_date')
                     ->label('Start')
                     ->date('d M Y')
+                    ->placeholder('—')
                     ->sortable(),
                 TextColumn::make('end_date')
                     ->label('End')
                     ->date('d M Y')
+                    ->placeholder('—')
                     ->sortable(),
                 TextColumn::make('active_students_count')
                     ->label('Students')
