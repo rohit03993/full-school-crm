@@ -235,6 +235,22 @@ class WhatsAppSettingsService
                     ->implode(' ')
                 : '<span class="text-xs text-gray-500 dark:text-gray-400">No parameters</span>';
 
+            $mappingSources = $template->paramSources();
+            $mappingsHtml = $mappingSources !== []
+                ? collect($mappingSources)
+                    ->map(function (?string $source, int $index) use ($variables): string {
+                        $label = is_array($variables) && filled($variables[$index] ?? null)
+                            ? (string) $variables[$index]
+                            : 'param '.($index + 1);
+                        $mapped = filled($source)
+                            ? e($source)
+                            : '<span class="text-danger-600 dark:text-danger-400">not mapped</span>';
+
+                        return '<div class="text-xs text-gray-600 dark:text-gray-300"><strong>'.e($label).'</strong> → '.$mapped.'</div>';
+                    })
+                    ->implode('')
+                : '';
+
             $body = filled($template->body)
                 ? '<div class="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm leading-relaxed text-gray-800 whitespace-pre-wrap dark:border-white/10 dark:bg-white/5 dark:text-gray-100">'
                     .e($template->body)
@@ -252,6 +268,9 @@ class WhatsAppSettingsService
                 .$paramLabel
                 .'</span></div>'
                 .'<div class="mt-3 flex flex-wrap gap-2">'.$variablesHtml.'</div>'
+                .($mappingsHtml !== ''
+                    ? '<div class="mt-3 space-y-1 rounded-lg border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-black/20">'.$mappingsHtml.'</div>'
+                    : '')
                 .$body
                 .'</div>';
         })->implode('');

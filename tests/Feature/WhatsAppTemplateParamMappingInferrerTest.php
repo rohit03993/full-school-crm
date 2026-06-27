@@ -95,4 +95,44 @@ class WhatsAppTemplateParamMappingInferrerTest extends TestCase
             'campaign.date',
         ], $template->paramSources());
     }
+
+    public function test_template_uses_inferred_mappings_when_param_mappings_are_null_slots(): void
+    {
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'test_marks_api',
+            'param_count' => 4,
+            'param_mappings' => [null, null, null, null],
+            'provider_meta' => [
+                'body_variables' => ['name', 'roll_numbebr', 'tes', 'all_subject_marks'],
+            ],
+        ]);
+
+        $this->assertSame([
+            'student.name',
+            'student.enrollment_number',
+            'activity.test_name',
+            'activity.marks_summary',
+        ], $template->paramSources());
+    }
+
+    public function test_ensure_param_mappings_persists_inferred_marks_mappings(): void
+    {
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'test_marks_api',
+            'param_count' => 4,
+            'param_mappings' => [null, null, null, null],
+            'provider_meta' => [
+                'body_variables' => ['name', 'roll_numbebr', 'tes', 'all_subject_marks'],
+            ],
+        ]);
+
+        $template->ensureParamMappings();
+
+        $this->assertSame([
+            'student.name',
+            'student.enrollment_number',
+            'activity.test_name',
+            'activity.marks_summary',
+        ], $template->fresh()->param_mappings);
+    }
 }

@@ -156,6 +156,8 @@ class PalDigitalTemplateSyncService
         }
 
         WhatsAppTemplate::query()->updateOrCreate(['name' => $name], $attributes);
+
+        WhatsAppTemplate::query()->where('name', $name)->first()?->ensureParamMappings();
     }
 
     /**

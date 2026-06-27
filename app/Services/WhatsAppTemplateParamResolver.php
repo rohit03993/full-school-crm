@@ -81,11 +81,7 @@ class WhatsAppTemplateParamResolver
             'campaign.time' => $this->resolveCampaignTime($campaign),
             'activity.test_name' => (string) ($campaign?->campaignVariable('test_name') ?? ''),
             'activity.test_date' => (string) ($campaign?->campaignVariable('test_date') ?? ''),
-            'activity.marks_summary' => (string) data_get(
-                $campaign?->campaign_variables,
-                '_student_marks.'.$student->id,
-                '',
-            ),
+            'activity.marks_summary' => $this->resolveStudentMarksSummary($campaign, $student),
             'attendance.date' => $this->resolveAttendanceDate($campaign),
             'attendance.time' => $this->resolveCampaignTime($campaign),
             'attendance.status' => (string) data_get(
@@ -176,5 +172,20 @@ class WhatsAppTemplateParamResolver
         }
 
         return Carbon::parse((string) $attendanceDate)->format('d M Y');
+    }
+
+    protected function resolveStudentMarksSummary(?WhatsAppCampaign $campaign, Student $student): string
+    {
+        $marksByStudent = $campaign?->campaignVariable('_student_marks', []);
+
+        if (! is_array($marksByStudent) || $marksByStudent === []) {
+            return '';
+        }
+
+        $summary = $marksByStudent[$student->id]
+            ?? $marksByStudent[(string) $student->id]
+            ?? null;
+
+        return filled($summary) ? (string) $summary : '';
     }
 }

@@ -76,6 +76,7 @@ class RunWhatsAppCampaign extends Command
         }
 
         $template = $campaign->template;
+        $template->ensureParamMappings();
         $sources = $template->paramSources();
         $sender = $campaign->shotBy ?? ($campaign->created_by ? User::find($campaign->created_by) : null);
         $claimedIds = $this->claimBatchRecipientIds($campaign->id, $batchSize);
@@ -111,12 +112,27 @@ class RunWhatsAppCampaign extends Command
                 $campaign,
             );
 
+            $templateParams = PalDigitalWhatsAppService::normalizeTemplateParams(
+                $templateParams,
+                (int) $template->param_count,
+            );
+
+            if (collect($templateParams)->every(fn (string $value): bool => $value === '—')) {
+                $recipient->update([
+                    'status' => WhatsAppRecipientStatus::Failed,
+                    'template_params' => $templateParams,
+                    'error_message' => 'Template parameters could not be resolved. Open Setup → WhatsApp Settings, click Sync templates, then resend from marks import step 4.',
+                ]);
+                $failed++;
+
+                continue;
+            }
+
             $result = $whatsapp->send(
                 $recipient->phone,
                 $templateParams,
                 $template->name,
                 (string) ($student->name ?? 'User'),
-                (int) $template->param_count,
             );
 
             $recipient->template_params = $templateParams;

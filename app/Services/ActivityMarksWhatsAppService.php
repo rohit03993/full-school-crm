@@ -146,7 +146,8 @@ class ActivityMarksWhatsAppService
         $template = WhatsAppTemplate::query()
             ->whereKey($templateId)
             ->where('is_active', true)
-            ->firstOrFail();
+            ->firstOrFail()
+            ->ensureParamMappings();
 
         $campaign = $this->createMarksCampaign(
             $creator,
