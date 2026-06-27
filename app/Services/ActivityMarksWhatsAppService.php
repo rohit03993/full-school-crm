@@ -121,6 +121,14 @@ class ActivityMarksWhatsAppService
             throw new \InvalidArgumentException('No marks were found for this test.');
         }
 
+        $rollNumbers = \App\Models\Enrollment::query()
+            ->whereIn('student_id', $studentIds)
+            ->where('is_active', true)
+            ->whereNotNull('enrollment_number')
+            ->where('enrollment_number', '!=', '')
+            ->pluck('enrollment_number', 'student_id')
+            ->all();
+
         return $this->campaigns->createCampaign([
             'name' => 'Marks · '.$testName,
             'whatsapp_template_id' => $template->id,
@@ -132,6 +140,7 @@ class ActivityMarksWhatsAppService
                 'test_date' => $sessionDate,
                 '_student_ids' => $studentIds,
                 '_student_marks' => $summaries,
+                '_student_rolls' => $rollNumbers,
             ],
         ], $creator);
     }

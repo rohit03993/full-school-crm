@@ -59,7 +59,7 @@ class WhatsAppTemplateParamResolver
             'student.name' => (string) ($student->name ?? ''),
             'student.father_name' => (string) ($student->father_name ?? ''),
             'student.mobile' => (string) ($student->mobile ?? ''),
-            'student.enrollment_number' => (string) ($student->activeEnrollment?->enrollment_number ?? ''),
+            'student.enrollment_number' => $this->resolveEnrollmentNumber($student, $campaign),
             'batch.name' => (string) (
                 $student->activeBatchStudent?->batch?->name
                 ?? $campaign?->batch?->name
@@ -172,6 +172,35 @@ class WhatsAppTemplateParamResolver
         }
 
         return Carbon::parse((string) $attendanceDate)->format('d M Y');
+    }
+
+    protected function resolveEnrollmentNumber(Student $student, ?WhatsAppCampaign $campaign): string
+    {
+        $rollsByStudent = $campaign?->campaignVariable('_student_rolls', []);
+
+        if (is_array($rollsByStudent)) {
+            $fromCampaign = $rollsByStudent[$student->id]
+                ?? $rollsByStudent[(string) $student->id]
+                ?? null;
+
+            if (filled($fromCampaign)) {
+                return (string) $fromCampaign;
+            }
+        }
+
+        $fromActive = $student->activeEnrollment?->enrollment_number;
+
+        if (filled($fromActive)) {
+            return (string) $fromActive;
+        }
+
+        $fromLatest = $student->enrollments()
+            ->whereNotNull('enrollment_number')
+            ->where('enrollment_number', '!=', '')
+            ->latest('id')
+            ->value('enrollment_number');
+
+        return filled($fromLatest) ? (string) $fromLatest : '';
     }
 
     protected function resolveStudentMarksSummary(?WhatsAppCampaign $campaign, Student $student): string

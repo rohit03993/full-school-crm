@@ -271,6 +271,12 @@ class WhatsAppCampaignService
             'campaign_variables' => array_merge($campaign->campaign_variables ?? [], [
                 '_student_ids' => $students->pluck('id')->all(),
                 '_student_marks' => $summaries,
+                '_student_rolls' => $students->load('activeEnrollment')
+                    ->mapWithKeys(fn (Student $student): array => [
+                        $student->id => (string) ($student->activeEnrollment?->enrollment_number ?? ''),
+                    ])
+                    ->filter(fn (string $roll): bool => $roll !== '')
+                    ->all(),
             ]),
             'total_recipients' => $students->count(),
         ]);
@@ -343,7 +349,7 @@ class WhatsAppCampaignService
         }
 
         $normalized = [];
-        $preserveArrayKeys = ['_student_marks', '_student_ids', '_student_attendance_status', '_manual'];
+        $preserveArrayKeys = ['_student_marks', '_student_ids', '_student_rolls', '_student_attendance_status', '_manual'];
 
         foreach ($variables as $key => $value) {
             if (is_array($value)) {

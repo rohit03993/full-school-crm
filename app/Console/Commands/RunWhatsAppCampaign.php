@@ -90,6 +90,7 @@ class RunWhatsAppCampaign extends Command
             $recipient->load([
                 'student.enquiries.course',
                 'student.activeEnrollment.course',
+                'student.enrollments',
                 'student.activeBatchStudent.batch',
             ]);
             $student = $recipient->student;
