@@ -9,7 +9,6 @@ use App\Support\CrmPagination;
 use App\Support\SiteContent;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
 use Filament\Tables\Table;
-use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,8 +21,6 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Paginator::defaultPerPage(CrmPagination::PER_PAGE);
-
         Table::configureUsing(function (Table $table): void {
             $table
                 ->paginationPageOptions(CrmPagination::perPageOptions())
