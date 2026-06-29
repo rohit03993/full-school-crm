@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Student;
 use App\Models\Visit;
+use App\Support\CrmPagination;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -12,7 +13,7 @@ class FollowUpWorklistService
 {
     protected const DUE_COUNT_CACHE_SECONDS = 60;
 
-    public const LIST_LIMIT = 100;
+    public const LIST_LIMIT = CrmPagination::PER_PAGE;
     /**
      * @return EloquentCollection<int, Visit>
      */

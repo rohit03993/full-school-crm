@@ -11,6 +11,7 @@ use App\Enums\CrmPermission;
 use App\Enums\DocumentType;
 use App\Enums\RoleName;
 use App\Support\CrmAccess;
+use App\Support\CrmPagination;
 use App\Models\Attendance;
 use App\Models\Batch;
 use App\Filament\Concerns\HandlesLogCallModal;
@@ -393,7 +394,7 @@ class StudentProfilePage extends Page
             ->with(['staff', 'enquiry.course'])
             ->orderByDesc('visit_date')
             ->orderByDesc('id')
-            ->limit(100)
+            ->limit(CrmPagination::PER_PAGE)
             ->get();
     }
 
@@ -408,7 +409,7 @@ class StudentProfilePage extends Page
             ->with(['staff', 'enquiry.course'])
             ->orderByDesc('called_at')
             ->orderByDesc('id')
-            ->limit(100)
+            ->limit(CrmPagination::PER_PAGE)
             ->get();
     }
 
@@ -422,7 +423,7 @@ class StudentProfilePage extends Page
         $this->whatsappMessages = $this->record->whatsappMessages()
             ->with(['campaign.template'])
             ->orderByDesc('created_at')
-            ->limit(100)
+            ->limit(CrmPagination::PER_PAGE)
             ->get();
     }
 
@@ -792,7 +793,7 @@ class StudentProfilePage extends Page
             ->with(['addedBy.staffProfile', 'feeStructure.enrollment.course', 'feeInstallment'])
             ->orderByDesc('payment_date')
             ->orderByDesc('id')
-            ->limit(100)
+            ->limit(CrmPagination::PER_PAGE)
             ->get();
     }
 
@@ -819,7 +820,7 @@ class StudentProfilePage extends Page
             ->where('batch_id', $this->activeBatch->id)
             ->where('student_id', $this->record->id)
             ->orderByDesc('attendance_date')
-            ->limit(100)
+            ->limit(CrmPagination::PER_PAGE)
             ->get();
 
         $this->attendancePercentage = app(AttendanceService::class)->percentageForStudent($this->record);

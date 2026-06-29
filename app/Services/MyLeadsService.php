@@ -7,6 +7,7 @@ use App\Enums\VisitStatus;
 use App\Models\Enquiry;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\CrmPagination;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -44,14 +45,20 @@ class MyLeadsService
         User $staff,
         ?string $search = null,
         ?string $calledFilter = 'all',
-        int $perPage = 25,
+        ?int $perPage = null,
+        ?int $page = null,
     ): LengthAwarePaginator {
         $query = $this->applyLeadFilters($this->baseQuery($staff), $search, $calledFilter);
 
         return $query
             ->orderByDesc('calling_assigned_at')
             ->orderByDesc('created_at')
-            ->paginate($perPage);
+            ->paginate(
+                $perPage ?? CrmPagination::PER_PAGE,
+                ['*'],
+                'page',
+                $page,
+            );
     }
 
     /**

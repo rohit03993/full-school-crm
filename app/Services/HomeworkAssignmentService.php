@@ -8,6 +8,8 @@ use App\Models\HomeworkAssignment;
 use App\Models\HomeworkView;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\CrmPagination;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
@@ -144,11 +146,39 @@ class HomeworkAssignmentService
     }
 
     /**
+     * @return LengthAwarePaginator<int, array{
+     *     student: Student,
+     *     viewed: bool,
+     *     viewed_at: ?string
+     * }>
+     */
+    public function paginatedViewReport(
+        HomeworkAssignment $assignment,
+        ?int $page = null,
+        ?int $perPage = null,
+    ): LengthAwarePaginator {
+        $perPage = $perPage ?? CrmPagination::PER_PAGE;
+        $page = $page ?? LengthAwarePaginator::resolveCurrentPage('tracking_page');
+        $items = collect($this->viewReport($assignment));
+
+        return new LengthAwarePaginator(
+            $items->slice(($page - 1) * $perPage, $perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            [
+                'path' => request()->url(),
+                'pageName' => 'tracking_page',
+            ],
+        );
+    }
+
+    /**
      * @return Collection<int, HomeworkAssignment>
      */
-    public function assignmentsForStudentProfile(Student $student, int $limit = 20): Collection
+    public function assignmentsForStudentProfile(Student $student): Collection
     {
-        return $this->assignmentsForStudent($student)->take($limit);
+        return $this->assignmentsForStudent($student)->take(CrmPagination::PER_PAGE);
     }
 
     public function unviewedCountForStudent(Student $student): int

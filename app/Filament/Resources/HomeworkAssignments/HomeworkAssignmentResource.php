@@ -135,7 +135,7 @@ class HomeworkAssignmentResource extends Resource
                 ->columns(2),
             ViewComponent::make('filament.resources.homework-assignments.view-report')
                 ->viewData(fn (HomeworkAssignment $record): array => [
-                    'report' => app(HomeworkAssignmentService::class)->viewReport($record),
+                    'report' => app(HomeworkAssignmentService::class)->paginatedViewReport($record),
                 ]),
         ]);
     }

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Visit;
+use App\Support\CrmPagination;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -36,9 +37,15 @@ class InstituteVisitsService
         Carbon $to,
         string $enrollmentFilter = 'all',
         ?string $search = null,
-        int $perPage = 25,
+        ?int $perPage = null,
+        ?int $page = null,
     ): LengthAwarePaginator {
-        return $this->baseQuery($from, $to, $enrollmentFilter, $search)->paginate($perPage);
+        return $this->baseQuery($from, $to, $enrollmentFilter, $search)->paginate(
+            $perPage ?? CrmPagination::PER_PAGE,
+            ['*'],
+            'page',
+            $page,
+        );
     }
 
     /**

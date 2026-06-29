@@ -9,6 +9,7 @@ use App\Support\CrmAccess;
 use App\Services\CallReportService;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
+use App\Support\CrmPagination;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -56,6 +57,8 @@ class CallReportPage extends Page
     public string $search = '';
 
     public ?int $staffUserId = null;
+
+    public int $perPage = CrmPagination::PER_PAGE;
 
     /**
      * @var array{total: int, connected: int, not_connected: int, new_calls: int, followup_calls: int}

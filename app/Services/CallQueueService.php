@@ -8,6 +8,7 @@ use App\Models\Enquiry;
 use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\User;
+use App\Support\CrmPagination;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -21,8 +22,10 @@ class CallQueueService
     /**
      * @return EloquentCollection<int, Student>
      */
-    public function todayQueue(User $staff, int $limit = 50): EloquentCollection
+    public function todayQueue(User $staff, ?int $limit = null): EloquentCollection
     {
+        $limit ??= CrmPagination::PER_PAGE;
+
         return $this->todayQueueQuery($staff)
             ->with(['enquiries' => fn ($query) => $query->latest()->limit(1), 'enquiries.course'])
             ->withCount([

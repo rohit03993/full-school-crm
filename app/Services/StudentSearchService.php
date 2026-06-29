@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Enquiry;
 use App\Models\Student;
+use App\Support\CrmPagination;
 use Illuminate\Database\Eloquent\Collection;
 
 class StudentSearchService
@@ -89,7 +90,7 @@ class StudentSearchService
                 ->where('name', 'like', '%'.$name.'%')
                 ->orderBy('name')
                 ->orderByDesc('updated_at')
-                ->limit(25)
+                ->limit(CrmPagination::PER_PAGE)
                 ->get();
 
             if ($students->isEmpty()) {

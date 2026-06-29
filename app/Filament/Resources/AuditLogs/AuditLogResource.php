@@ -50,7 +50,6 @@ class AuditLogResource extends Resource
     {
         return CrmTable::configure($table)
             ->defaultSort('created_at', 'desc')
-            ->paginated([25, 50, 100])
             ->columns([
                 TextColumn::make('created_at')
                     ->label('When')

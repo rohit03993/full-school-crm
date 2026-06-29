@@ -9,6 +9,7 @@ use App\Services\MyLeadsService;
 use App\Support\CrmHint;
 use App\Support\CrmNavBadges;
 use App\Support\CrmNavigation;
+use App\Support\CrmPagination;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -51,6 +52,8 @@ class MyLeadsPage extends Page
     public string $search = '';
 
     public string $calledFilter = 'all';
+
+    public int $perPage = CrmPagination::PER_PAGE;
 
     /**
      * @var array{total: int, uncalled: int, called: int, due_call_followups: int}
@@ -110,7 +113,12 @@ class MyLeadsPage extends Page
             View::make('filament.pages.partials.my-leads')
                 ->viewData(fn (): array => [
                     'leads' => $staff
-                        ? app(MyLeadsService::class)->paginateLeads($staff, $this->search, $this->calledFilter)
+                        ? app(MyLeadsService::class)->paginateLeads(
+                            $staff,
+                            $this->search,
+                            $this->calledFilter,
+                            page: $this->getPage(),
+                        )
                         : null,
                     'stats' => $this->stats,
                     'search' => $this->search,

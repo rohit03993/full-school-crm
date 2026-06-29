@@ -7,6 +7,7 @@ use App\Enums\RoleName;
 use App\Enums\VisitStatus;
 use App\Models\StudentCall;
 use App\Models\User;
+use App\Support\CrmPagination;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -97,11 +98,13 @@ class CallReportService
     /**
      * @param  array<string, mixed>  $filters
      */
-    public function calls(array $filters, User $viewer, int $perPage = 25, ?int $page = null): LengthAwarePaginator
+    public function calls(array $filters, User $viewer, ?int $perPage = null, ?int $page = null): LengthAwarePaginator
     {
         $query = $this->filteredQuery($filters, $viewer)
             ->with(['student', 'staff', 'enquiry.course'])
             ->orderByDesc('called_at');
+
+        $perPage = $perPage ?? CrmPagination::PER_PAGE;
 
         return $page !== null
             ? $query->paginate($perPage, ['*'], 'page', $page)

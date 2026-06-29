@@ -7,6 +7,7 @@ use App\Services\InstituteVisitsService;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
+use App\Support\CrmPagination;
 use Carbon\Carbon;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
@@ -37,6 +38,8 @@ class CampusVisitsPage extends Page
     public string $enrollmentFilter = 'all';
 
     public string $search = '';
+
+    public int $perPage = CrmPagination::PER_PAGE;
 
     public function mount(): void
     {
@@ -96,7 +99,13 @@ class CampusVisitsPage extends Page
         return $schema->components([
             View::make('filament.pages.partials.campus-visits')
                 ->viewData(fn (): array => [
-                    'visits' => $service->paginate($from, $to, $this->enrollmentFilter, $this->search),
+                    'visits' => $service->paginate(
+                        $from,
+                        $to,
+                        $this->enrollmentFilter,
+                        $this->search,
+                        page: $this->getPage(),
+                    ),
                     'stats' => $service->stats($from, $to, $this->enrollmentFilter),
                     'dateFrom' => $from->toDateString(),
                     'dateTo' => $to->toDateString(),

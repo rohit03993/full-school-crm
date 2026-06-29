@@ -1,5 +1,5 @@
 @php
-    /** @var list<array{student: \App\Models\Student, viewed: bool, viewed_at: ?string}> $report */
+    /** @var \Illuminate\Contracts\Pagination\LengthAwarePaginator<int, array{student: \App\Models\Student, viewed: bool, viewed_at: ?string}> $report */
 @endphp
 
 <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
@@ -8,6 +8,11 @@
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Students in this batch who have a mobile number. View is recorded when they open homework in the student portal.
         </p>
+        @if ($report->total() > 0)
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Showing {{ $report->firstItem() }}–{{ $report->lastItem() }} of {{ $report->total() }} students
+            </p>
+        @endif
     </div>
     <div class="overflow-x-auto">
         <table class="w-full min-w-[32rem] text-left text-sm">
@@ -47,4 +52,9 @@
             </tbody>
         </table>
     </div>
+    @if ($report->hasPages())
+        <div class="border-t border-gray-200 px-4 py-3 dark:border-white/10">
+            {{ $report->links() }}
+        </div>
+    @endif
 </div>

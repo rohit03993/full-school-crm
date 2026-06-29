@@ -2,6 +2,7 @@
 
 namespace App\Filament\Support;
 
+use App\Support\CrmPagination;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Table;
 
@@ -18,8 +19,8 @@ final class CrmTable
                 'md' => 2,
                 'xl' => 3,
             ])
-            ->paginationPageOptions([10, 25, 50])
-            ->defaultPaginationPageOption(10)
+            ->paginationPageOptions(CrmPagination::perPageOptions())
+            ->defaultPaginationPageOption(CrmPagination::PER_PAGE)
             ->striped();
     }
 }
