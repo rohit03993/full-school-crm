@@ -1,4 +1,65 @@
 @once
+    <style>
+        #crm-media-preview-modal {
+            z-index: 99999;
+        }
+
+        #crm-media-preview-modal .crm-media-preview-shell {
+            width: min(96vw, 56rem);
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #crm-media-preview-modal .crm-media-preview-pdf-body {
+            flex: 1 1 auto;
+            position: relative;
+            min-height: 72vh;
+            height: 72vh;
+            overflow: hidden;
+            background: #f3f4f6;
+        }
+
+        #crm-media-preview-modal [data-crm-preview-iframe] {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: #fff;
+        }
+
+        #crm-media-preview-modal .crm-media-preview-image-body {
+            flex: 1 1 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 50vh;
+            max-height: 75vh;
+            overflow: auto;
+            padding: 1rem;
+            background: #f9fafb;
+        }
+
+        #crm-media-preview-modal [data-crm-preview-image] {
+            display: block;
+            max-width: 100%;
+            max-height: 70vh;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        .dark #crm-media-preview-modal .crm-media-preview-pdf-body {
+            background: #111827;
+        }
+
+        .dark #crm-media-preview-modal .crm-media-preview-image-body {
+            background: #030712;
+        }
+    </style>
     <script>
         (function () {
             if (window.__crmMediaPreviewInit) {
@@ -58,17 +119,17 @@
                 const iframe = modal.querySelector('[data-crm-preview-iframe]');
                 const image = modal.querySelector('[data-crm-preview-image]');
                 const shell = modal.querySelector('[data-crm-preview-shell]');
+                const pdfBody = modal.querySelector('.crm-media-preview-pdf-body');
 
-                shell.classList.toggle('max-w-[min(100%,56rem)]', isIdCard);
-                shell.classList.toggle('bg-gray-950', isIdCard);
-                shell.classList.toggle('max-w-[min(100%,42rem)]', ! isIdCard);
-                shell.classList.toggle('bg-white', ! isIdCard);
-                shell.classList.toggle('dark:bg-gray-900', ! isIdCard);
+                shell.style.width = isIdCard ? 'min(96vw, 56rem)' : 'min(96vw, 52rem)';
+                pdfBody.style.minHeight = isIdCard ? '28rem' : '72vh';
+                pdfBody.style.height = isIdCard ? '28rem' : '72vh';
 
                 if (isPdf) {
                     pdfPanel.hidden = false;
                     imagePanel.hidden = true;
-                    iframe.src = url + (url.includes('#') ? '' : '#toolbar=1&navpanes=0');
+                    const hash = 'toolbar=1&navpanes=0&scrollbar=1&view=Fit';
+                    iframe.src = url.includes('#') ? url : url + '#' + hash;
                 } else {
                     pdfPanel.hidden = true;
                     imagePanel.hidden = false;
@@ -110,13 +171,13 @@
     id="crm-media-preview-modal"
     hidden
     aria-hidden="true"
-    class="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-8"
+    style="position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0.75rem;"
 >
-    <div data-crm-preview-backdrop class="absolute inset-0 bg-gray-950/90 backdrop-blur-sm"></div>
+    <div data-crm-preview-backdrop style="position: absolute; inset: 0; background: rgb(3 7 18 / 0.9); backdrop-filter: blur(4px);"></div>
 
     <div
         data-crm-preview-shell
-        class="relative flex max-h-[96vh] w-full max-w-[min(100%,42rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-white/10 dark:bg-gray-900"
+        class="crm-media-preview-shell relative overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-white/10 dark:bg-gray-900"
         role="dialog"
         aria-modal="true"
     >
@@ -132,20 +193,15 @@
             </button>
         </div>
 
-        <div data-crm-preview-pdf-panel hidden class="flex flex-1 flex-col overflow-hidden bg-gray-100 dark:bg-gray-950">
+        <div data-crm-preview-pdf-panel hidden class="crm-media-preview-pdf-body">
             <iframe
                 data-crm-preview-iframe
                 title="Document preview"
-                class="block h-[min(72vh,48rem)] w-full border-0 bg-white"
             ></iframe>
         </div>
 
-        <div data-crm-preview-image-panel hidden class="flex flex-1 items-center justify-center overflow-auto bg-gray-50 p-4 dark:bg-gray-950">
-            <img
-                data-crm-preview-image
-                alt="Preview"
-                class="max-h-[70vh] max-w-full rounded-lg object-contain shadow-md"
-            />
+        <div data-crm-preview-image-panel hidden class="crm-media-preview-image-body">
+            <img data-crm-preview-image alt="Preview" />
         </div>
 
         <div class="flex justify-end gap-2 border-t border-gray-100 px-4 py-3 dark:border-white/10 sm:px-5">
