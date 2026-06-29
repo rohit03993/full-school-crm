@@ -11,6 +11,10 @@ class EnsureStudentPortalAuth
     public function handle(Request $request, Closure $next): Response
     {
         if (! session()->has('student_portal_id')) {
+            if ($request->isMethod('GET') && ! $request->expectsJson()) {
+                session(['portal_intended_url' => $request->fullUrl()]);
+            }
+
             return redirect()->route('portal.login');
         }
 

@@ -36,6 +36,8 @@ class CrmHint
         'import.bulk' => 'For migrating old student data only — not for day-to-day admissions. Creates enrolled students in one step and skips the normal enquiry → call → admission flow. Use Convert to Admission for new students.',
         'reports' => 'Export summaries for management. Filter by date, batch, and course before downloading. Detail reports export at most 5,000 rows — narrow the date range if you need a full export.',
         'attendance.batch' => 'Mark daily class attendance (P / A / L). When attendance WhatsApp is enabled in Settings, present students are notified automatically after save.',
+        'homework.list' => 'Upload homework for one batch at a time. Students view it in the student portal (mobile login). Optional WhatsApp sends the portal link with name and roll number.',
+        'homework.create' => 'PDF or image attachment optional. Turn on WhatsApp to notify parents with a link — they log in to the portal to view homework.',
         'attendance.session' => 'Workshops and events (Exam Types with Marks ✗): pick type, batch, date, and session name — then mark Present or Absent.',
         'activity.types' => 'Tests & exams: turn Marks ✓ on. Workshops & events: leave Marks ✗ — mark attendance under Academics → Workshops & Events.',
         'followups' => 'Students due for a follow-up call today. Open the profile to log the call and schedule the next date.',

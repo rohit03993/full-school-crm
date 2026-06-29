@@ -54,6 +54,12 @@ class AuthController extends Controller
 
         session(['student_portal_id' => $student->id]);
 
+        $intended = session()->pull('portal_intended_url');
+
+        if (filled($intended) && str_starts_with((string) $intended, url('/portal'))) {
+            return redirect()->to((string) $intended);
+        }
+
         return redirect()->route('portal.dashboard');
     }
 
@@ -68,14 +74,14 @@ class AuthController extends Controller
 
         if (! $auth->changePassword($student, $data['current_password'], $data['password'])) {
             return redirect()
-                ->route('portal.dashboard')
+                ->to(route('portal.dashboard').'#more')
                 ->withErrors([
                     'current_password' => 'Current password is incorrect.',
                 ]);
         }
 
         return redirect()
-            ->route('portal.dashboard')
+            ->to(route('portal.dashboard').'#more')
             ->with('portal_success', 'Your portal password has been updated.');
     }
 

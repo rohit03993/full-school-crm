@@ -11,6 +11,7 @@ use App\Http\Controllers\PublicSite\HomeController;
 use App\Http\Controllers\PublicSite\LoginController;
 use App\Http\Controllers\StudentPortal\AuthController;
 use App\Http\Controllers\StudentPortal\DashboardController;
+use App\Http\Controllers\StudentPortal\HomeworkController;
 use App\Http\Controllers\StudentPortal\IdCardDownloadController as PortalIdCardDownloadController;
 use App\Http\Controllers\StudentPortal\ReceiptDownloadController as PortalReceiptDownloadController;
 use App\Http\Middleware\EnsureStudentPortalAuth;
@@ -62,5 +63,8 @@ Route::prefix('portal')->name('portal.')->group(function () {
             ->name('receipts.download');
         Route::get('/id-card/download', [PortalIdCardDownloadController::class, 'download'])
             ->name('id-card.download');
+        Route::get('/homework', [HomeworkController::class, 'index'])->name('homework.index');
+        Route::get('/homework/{homeworkAssignment}', [HomeworkController::class, 'show'])->name('homework.show');
+        Route::get('/homework/{homeworkAssignment}/download', [HomeworkController::class, 'download'])->name('homework.download');
     });
 });

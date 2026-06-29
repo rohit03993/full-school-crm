@@ -39,6 +39,7 @@ use App\Services\EnquiryService;
 use App\Services\EnrollmentRollNumberService;
 use App\Services\FeeInstallmentService;
 use App\Services\FeeStructureService;
+use App\Services\HomeworkAssignmentService;
 use App\Services\IdCardService;
 use App\Services\LeadAssignmentService;
 use App\Services\PaymentService;
@@ -104,6 +105,8 @@ class StudentProfilePage extends Page
 
     public bool $attendanceTabLoaded = false;
 
+    public bool $homeworkTabLoaded = false;
+
     /**
      * @var array<int, bool>
      */
@@ -139,6 +142,11 @@ class StudentProfilePage extends Page
      * @var Collection<int, \App\Models\WhatsAppCampaignRecipient>
      */
     public Collection $whatsappMessages;
+
+    /**
+     * @var Collection<int, \App\Models\HomeworkAssignment>
+     */
+    public Collection $homeworkAssignments;
 
     public ?int $sendWhatsAppTemplateId = null;
 
@@ -225,6 +233,7 @@ class StudentProfilePage extends Page
         $this->visits = new Collection;
         $this->calls = new Collection;
         $this->whatsappMessages = new Collection;
+        $this->homeworkAssignments = new Collection;
         $this->documents = new Collection;
         $this->payments = new Collection;
         $this->installments = new Collection;
@@ -288,6 +297,7 @@ class StudentProfilePage extends Page
             'fees' => $this->loadFeesTab(),
             'receipts' => $this->loadReceiptsTab(),
             'attendance' => $this->loadAttendanceTab(),
+            'homework' => $this->loadHomeworkTab(),
             default => null,
         };
     }
@@ -298,7 +308,7 @@ class StudentProfilePage extends Page
     protected function validProfileTabs(): array
     {
         $tabs = [
-            'overview', 'visits', 'calls', 'messages', 'admission', 'documents', 'fees', 'receipts', 'attendance',
+            'overview', 'visits', 'calls', 'messages', 'admission', 'documents', 'fees', 'receipts', 'attendance', 'homework',
         ];
 
         if ($this->record->activeEnrollment !== null && $this->enabledActivityTypes()->isNotEmpty()) {
@@ -813,6 +823,17 @@ class StudentProfilePage extends Page
             ->get();
 
         $this->attendancePercentage = app(AttendanceService::class)->percentageForStudent($this->record);
+    }
+
+    public function loadHomeworkTab(): void
+    {
+        if ($this->homeworkTabLoaded) {
+            return;
+        }
+
+        $this->homeworkTabLoaded = true;
+        $this->homeworkAssignments = app(HomeworkAssignmentService::class)
+            ->assignmentsForStudentProfile($this->record);
     }
 
     public function openIdCardPreview(): void
@@ -1739,6 +1760,17 @@ class StudentProfilePage extends Page
                                     'activeBatch' => $this->activeBatch,
                                     'attendanceRecords' => $this->attendanceRecords,
                                     'attendancePercentage' => $this->attendancePercentage,
+                                ]),
+                        ]),
+                    'homework' => Tab::make('Homework')
+                        ->icon('heroicon-o-book-open')
+                        ->visible(fn (): bool => $this->record->activeBatchStudent !== null)
+                        ->schema([
+                            View::make('filament.pages.partials.student-profile-homework')
+                                ->viewData(fn (): array => [
+                                    'homeworkTabLoaded' => $this->homeworkTabLoaded,
+                                    'assignments' => $this->homeworkAssignments,
+                                    'portalUrl' => route('portal.homework.index'),
                                 ]),
                         ]),
                     'activities' => Tab::make('Activities')

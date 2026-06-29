@@ -16,4 +16,14 @@ return [
 
     'pause_seconds' => (float) env('WHATSAPP_CAMPAIGN_PAUSE_SECONDS', 0),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Homework WhatsApp (Pal Digital live API campaign name)
+    |--------------------------------------------------------------------------
+    |
+    | Template should accept: student name, roll number, homework title, portal link.
+    */
+
+    'homework_template_name' => env('WHATSAPP_HOMEWORK_TEMPLATE', 'homework_api'),
+
 ];

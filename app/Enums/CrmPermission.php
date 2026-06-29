@@ -28,6 +28,7 @@ enum CrmPermission: string
     case AttendanceMark = 'crm.attendance.mark';
     case AttendanceWorkshops = 'crm.attendance.workshops';
     case MarksImport = 'crm.marks.import';
+    case HomeworkManage = 'crm.homework.manage';
     case AcademicsManage = 'crm.academics.manage';
 
     case WhatsappCampaigns = 'crm.whatsapp.campaigns';
@@ -61,6 +62,7 @@ enum CrmPermission: string
             self::AttendanceMark => 'Mark batch attendance',
             self::AttendanceWorkshops => 'Workshop / event attendance',
             self::MarksImport => 'Import marks',
+            self::HomeworkManage => 'Assign homework & view tracking',
             self::AcademicsManage => 'Manage courses, batches, exam types',
             self::WhatsappCampaigns => 'WhatsApp campaigns',
             self::WhatsappSettings => 'WhatsApp settings',

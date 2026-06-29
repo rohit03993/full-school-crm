@@ -77,6 +77,10 @@ class WhatsAppTemplateParamMappingInferrer
         'marks_summary' => 'activity.marks_summary',
         'all_marks' => 'activity.marks_summary',
         'marks' => 'activity.marks_summary',
+        'homework_title' => 'homework.title',
+        'homework_link' => 'homework.portal_link',
+        'portal_link' => 'homework.portal_link',
+        'link' => 'homework.portal_link',
     ];
 
     /**

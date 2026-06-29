@@ -37,7 +37,7 @@ class StudentPortalPasswordChangeTest extends TestCase
             'current_password' => $default,
             'password' => 'MyNewPass123',
             'password_confirmation' => 'MyNewPass123',
-        ])->assertRedirect(route('portal.dashboard'));
+        ])->assertRedirect(route('portal.dashboard').'#more');
 
         $student->refresh();
         $this->assertTrue($auth->login($student->mobile, 'MyNewPass123') !== null);

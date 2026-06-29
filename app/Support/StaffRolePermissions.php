@@ -46,10 +46,12 @@ class StaffRolePermissions
                 CrmPermission::AttendanceMark,
                 CrmPermission::AttendanceWorkshops,
                 CrmPermission::MarksImport,
+                CrmPermission::HomeworkManage,
             ],
             StaffJobRole::MessagingCoordinator->value => [
                 CrmPermission::StudentsView,
                 CrmPermission::WhatsappCampaigns,
+                CrmPermission::HomeworkManage,
             ],
         ];
     }
