@@ -114,35 +114,39 @@ class HomeworkAssignmentResource extends Resource
 
     public static function infolist(Schema $schema): Schema
     {
-        return $schema->components([
-            Section::make('Homework details')
-                ->schema([
-                    TextEntry::make('title'),
-                    TextEntry::make('batch.name')->label('Batch'),
-                    TextEntry::make('content_type')->badge(),
-                    TextEntry::make('published_at')->dateTime('d M Y, h:i A'),
-                    TextEntry::make('description')->columnSpanFull(),
-                    TextEntry::make('portalUrl')
-                        ->label('Student portal link')
-                        ->state(fn (HomeworkAssignment $record): string => $record->portalUrl())
-                        ->copyable(),
-                    TextEntry::make('viewPercentage')
-                        ->label('Viewed')
-                        ->state(fn (HomeworkAssignment $record): string => $record->viewedStudentsCount()
-                            .' / '.$record->totalStudentsCount()
-                            .' ('.$record->viewPercentage().'%)'),
-                ])
-                ->columns(2),
-            ViewComponent::make('filament.resources.homework-assignments.attachment')
-                ->viewData(fn (HomeworkAssignment $record): array => [
-                    'record' => $record,
-                ])
-                ->columnSpanFull(),
-            ViewComponent::make('filament.resources.homework-assignments.view-report')
-                ->viewData(fn (HomeworkAssignment $record): array => [
-                    'report' => app(HomeworkAssignmentService::class)->paginatedViewReport($record),
-                ]),
-        ]);
+        return $schema
+            ->columns(2)
+            ->components([
+                Section::make('Homework details')
+                    ->schema([
+                        TextEntry::make('title'),
+                        TextEntry::make('batch.name')->label('Batch'),
+                        TextEntry::make('content_type')->badge(),
+                        TextEntry::make('published_at')->dateTime('d M Y, h:i A'),
+                        TextEntry::make('description')->columnSpanFull(),
+                        TextEntry::make('portalUrl')
+                            ->label('Student portal link')
+                            ->state(fn (HomeworkAssignment $record): string => $record->portalUrl())
+                            ->copyable()
+                            ->columnSpanFull(),
+                        TextEntry::make('viewPercentage')
+                            ->label('Viewed')
+                            ->state(fn (HomeworkAssignment $record): string => $record->viewedStudentsCount()
+                                .' / '.$record->totalStudentsCount()
+                                .' ('.$record->viewPercentage().'%)'),
+                        ViewComponent::make('filament.resources.homework-assignments.attachment')
+                            ->viewData(fn (HomeworkAssignment $record): array => [
+                                'record' => $record,
+                            ])
+                            ->columnSpanFull()
+                            ->visible(fn (HomeworkAssignment $record): bool => $record->hasFile()),
+                    ])
+                    ->columns(2),
+                ViewComponent::make('filament.resources.homework-assignments.view-report')
+                    ->viewData(fn (HomeworkAssignment $record): array => [
+                        'report' => app(HomeworkAssignmentService::class)->paginatedViewReport($record),
+                    ]),
+            ]);
     }
 
     public static function table(Table $table): Table
