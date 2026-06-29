@@ -24,12 +24,10 @@
         @if ($document && $document->isImage())
             <button
                 type="button"
-                class="block w-full cursor-zoom-in"
+                class="js-media-preview-trigger block w-full cursor-zoom-in"
                 data-preview-url="{{ $document->previewUrl() }}"
                 data-preview-title="{{ $label }}"
                 data-preview-pdf="0"
-                x-data
-                x-on:click="$dispatch('open-media-preview', { url: $el.dataset.previewUrl, title: $el.dataset.previewTitle, isPdf: false })"
             >
                 <img
                     src="{{ $document->previewUrl() }}"

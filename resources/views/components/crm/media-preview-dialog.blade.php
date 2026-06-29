@@ -1,5 +1,34 @@
 @once
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        window.openCrmMediaPreview = function (trigger) {
+            if (! trigger?.dataset?.previewUrl) {
+                return;
+            }
+
+            window.dispatchEvent(new CustomEvent('open-media-preview', {
+                detail: {
+                    url: trigger.dataset.previewUrl,
+                    title: trigger.dataset.previewTitle || 'Preview',
+                    isPdf: trigger.dataset.previewPdf === '1',
+                    downloadUrl: trigger.dataset.previewDownload || trigger.dataset.previewUrl,
+                    previewMode: trigger.dataset.previewMode || 'document',
+                },
+            }));
+        };
+
+        document.addEventListener('click', function (event) {
+            const trigger = event.target.closest('.js-media-preview-trigger');
+
+            if (! trigger) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+            window.openCrmMediaPreview(trigger);
+        });
+    </script>
 @endonce
 
 <div

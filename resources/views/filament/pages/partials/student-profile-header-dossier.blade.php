@@ -16,12 +16,10 @@
                 @if ($photo && $photo->isImage())
                     <button
                         type="button"
-                        class="group relative cursor-zoom-in overflow-hidden rounded-2xl ring-4 ring-white shadow-lg dark:ring-gray-800"
+                        class="js-media-preview-trigger group relative cursor-zoom-in overflow-hidden rounded-2xl ring-4 ring-white shadow-lg dark:ring-gray-800"
                         data-preview-url="{{ $photo->previewUrl() }}"
                         data-preview-title="{{ $record->name }} — photo"
                         data-preview-pdf="0"
-                        x-data
-                        x-on:click="$dispatch('open-media-preview', { url: $el.dataset.previewUrl, title: $el.dataset.previewTitle, isPdf: false })"
                     >
                         <img
                             src="{{ $photo->previewUrl() }}"
