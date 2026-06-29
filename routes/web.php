@@ -14,6 +14,7 @@ use App\Http\Controllers\StudentPortal\DashboardController;
 use App\Http\Controllers\StudentPortal\HomeworkController;
 use App\Http\Controllers\StudentPortal\IdCardDownloadController as PortalIdCardDownloadController;
 use App\Http\Controllers\StudentPortal\ReceiptDownloadController as PortalReceiptDownloadController;
+use App\Http\Controllers\Admin\HomeworkFileController;
 use App\Http\Middleware\EnsureStudentPortalAuth;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,10 @@ Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
         ->name('admin.id-cards.preview');
     Route::get('enrollments/{enrollment}/id-card/download', [IdCardDownloadController::class, 'download'])
         ->name('admin.id-cards.download');
+    Route::get('homework-assignments/{homeworkAssignment}/preview', [HomeworkFileController::class, 'preview'])
+        ->name('admin.homework.preview');
+    Route::get('homework-assignments/{homeworkAssignment}/download', [HomeworkFileController::class, 'download'])
+        ->name('admin.homework.download');
 });
 
 Route::get('/verify/{enrollment}', IdCardVerifyController::class)->name('id-card.verify');
@@ -65,6 +70,7 @@ Route::prefix('portal')->name('portal.')->group(function () {
             ->name('id-card.download');
         Route::get('/homework', [HomeworkController::class, 'index'])->name('homework.index');
         Route::get('/homework/{homeworkAssignment}', [HomeworkController::class, 'show'])->name('homework.show');
+        Route::get('/homework/{homeworkAssignment}/view', [HomeworkController::class, 'view'])->name('homework.view');
         Route::get('/homework/{homeworkAssignment}/download', [HomeworkController::class, 'download'])->name('homework.download');
     });
 });

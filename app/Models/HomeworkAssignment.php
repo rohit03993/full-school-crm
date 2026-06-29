@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HomeworkAssignment extends Model
 {
@@ -52,13 +53,89 @@ class HomeworkAssignment extends Model
         return route('portal.homework.show', $this);
     }
 
-    public function fileUrl(): ?string
+    public function portalViewUrl(): ?string
     {
-        if (blank($this->file_path)) {
+        if (! $this->hasFile()) {
             return null;
         }
 
-        return Storage::disk('public')->url($this->file_path);
+        return route('portal.homework.view', $this);
+    }
+
+    public function staffPreviewUrl(): ?string
+    {
+        if (! $this->hasFile()) {
+            return null;
+        }
+
+        return route('admin.homework.preview', $this);
+    }
+
+    public function staffDownloadUrl(): ?string
+    {
+        if (! $this->hasFile()) {
+            return null;
+        }
+
+        return route('admin.homework.download', $this);
+    }
+
+    public function isPreviewable(): bool
+    {
+        return $this->hasFile() && in_array($this->content_type, [
+            HomeworkContentType::Pdf,
+            HomeworkContentType::Image,
+        ], true);
+    }
+
+    public function inlineFileResponse(): StreamedResponse
+    {
+        abort_unless($this->hasFile(), 404);
+        abort_unless(Storage::disk('public')->exists($this->file_path), 404);
+
+        $filename = basename((string) $this->file_path);
+
+        $response = Storage::disk('public')->response(
+            (string) $this->file_path,
+            $filename,
+            ['Content-Type' => $this->previewMimeType()],
+        );
+
+        $response->headers->set('Content-Disposition', 'inline; filename="'.$filename.'"');
+        $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
+        $response->headers->set('Cache-Control', 'private, max-age=3600');
+
+        return $response;
+    }
+
+    public function downloadFileResponse(): StreamedResponse
+    {
+        abort_unless($this->hasFile(), 404);
+        abort_unless(Storage::disk('public')->exists($this->file_path), 404);
+
+        $extension = pathinfo((string) $this->file_path, PATHINFO_EXTENSION);
+
+        return Storage::disk('public')->download(
+            (string) $this->file_path,
+            $this->title.($extension !== '' ? '.'.$extension : ''),
+        );
+    }
+
+    public function previewMimeType(): string
+    {
+        if (filled($this->file_path) && Storage::disk('public')->exists($this->file_path)) {
+            $detected = Storage::disk('public')->mimeType($this->file_path);
+
+            if (is_string($detected) && $detected !== '') {
+                return $detected;
+            }
+        }
+
+        return match ($this->content_type) {
+            HomeworkContentType::Pdf => 'application/pdf',
+            HomeworkContentType::Image => 'image/jpeg',
+            default => 'application/octet-stream',
+        };
     }
 
     public function hasFile(): bool

@@ -6,8 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\StudentPortal\Concerns\ResolvesPortalStudent;
 use App\Models\HomeworkAssignment;
 use App\Services\HomeworkAssignmentService;
-use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -39,7 +37,19 @@ class HomeworkController extends Controller
         ]);
     }
 
-    public function download(HomeworkAssignment $homeworkAssignment, HomeworkAssignmentService $homeworkService): StreamedResponse|Response
+    public function view(HomeworkAssignment $homeworkAssignment, HomeworkAssignmentService $homeworkService): StreamedResponse
+    {
+        $student = $this->portalStudent();
+
+        abort_unless($homeworkService->studentCanAccess($homeworkAssignment, $student), 404);
+        abort_unless($homeworkAssignment->isPreviewable(), 404);
+
+        $homeworkService->recordView($homeworkAssignment, $student);
+
+        return $homeworkAssignment->inlineFileResponse();
+    }
+
+    public function download(HomeworkAssignment $homeworkAssignment, HomeworkAssignmentService $homeworkService): StreamedResponse
     {
         $student = $this->portalStudent();
 
@@ -48,9 +58,6 @@ class HomeworkController extends Controller
 
         $homeworkService->recordView($homeworkAssignment, $student);
 
-        return Storage::disk('public')->download(
-            (string) $homeworkAssignment->file_path,
-            $homeworkAssignment->title.'.'.pathinfo((string) $homeworkAssignment->file_path, PATHINFO_EXTENSION),
-        );
+        return $homeworkAssignment->downloadFileResponse();
     }
 }

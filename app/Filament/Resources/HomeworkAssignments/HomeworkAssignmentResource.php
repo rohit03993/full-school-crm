@@ -133,6 +133,11 @@ class HomeworkAssignmentResource extends Resource
                             .' ('.$record->viewPercentage().'%)'),
                 ])
                 ->columns(2),
+            ViewComponent::make('filament.resources.homework-assignments.attachment')
+                ->viewData(fn (HomeworkAssignment $record): array => [
+                    'record' => $record,
+                ])
+                ->columnSpanFull(),
             ViewComponent::make('filament.resources.homework-assignments.view-report')
                 ->viewData(fn (HomeworkAssignment $record): array => [
                     'report' => app(HomeworkAssignmentService::class)->paginatedViewReport($record),
