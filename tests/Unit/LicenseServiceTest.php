@@ -83,4 +83,34 @@ class LicenseServiceTest extends TestCase
         $this->assertTrue($this->license->hasFeature(LicenseFeature::Fees));
         $this->assertFalse($this->license->hasFeature(LicenseFeature::Enquiries));
     }
+
+    public function test_dashboard_summary_flags_warning_and_critical_levels(): void
+    {
+        config([
+            'license.expiry_warning_days' => 30,
+            'license.expiry_critical_days' => 7,
+        ]);
+
+        $this->license->save([
+            'plan' => LicensePlan::FullResults->value,
+            'features' => LicenseFeature::values(),
+            'expires_at' => now()->addDays(20)->toDateString(),
+        ]);
+
+        $summary = $this->license->dashboardSummary();
+
+        $this->assertTrue($summary['show_warning']);
+        $this->assertSame('warning', $summary['level']);
+
+        $this->license->save([
+            'plan' => LicensePlan::FullResults->value,
+            'features' => LicenseFeature::values(),
+            'expires_at' => now()->addDays(3)->toDateString(),
+        ]);
+
+        $summary = $this->license->dashboardSummary();
+
+        $this->assertTrue($summary['show_warning']);
+        $this->assertSame('critical', $summary['level']);
+    }
 }

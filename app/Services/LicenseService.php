@@ -88,6 +88,43 @@ class LicenseService
         return (int) now()->startOfDay()->diffInDays($expiresAt->startOfDay(), false);
     }
 
+    /**
+     * Read-only summary for the school Super Admin dashboard.
+     *
+     * @return array{
+     *     expires_at_label: string|null,
+     *     days_remaining: int|null,
+     *     level: string,
+     *     plan_label: string,
+     *     show_warning: bool,
+     * }
+     */
+    public function dashboardSummary(): array
+    {
+        $expiresAt = $this->expiresAt();
+        $daysRemaining = $this->daysRemaining();
+        $warningDays = max(1, (int) config('license.expiry_warning_days', 30));
+        $criticalDays = max(1, min($warningDays, (int) config('license.expiry_critical_days', 7)));
+
+        $level = 'ok';
+
+        if (! $this->isActive()) {
+            $level = 'expired';
+        } elseif ($daysRemaining !== null && $daysRemaining <= $criticalDays) {
+            $level = 'critical';
+        } elseif ($daysRemaining !== null && $daysRemaining <= $warningDays) {
+            $level = 'warning';
+        }
+
+        return [
+            'expires_at_label' => $expiresAt?->format('d M Y'),
+            'days_remaining' => $daysRemaining,
+            'level' => $level,
+            'plan_label' => $this->plan()->label(),
+            'show_warning' => in_array($level, ['warning', 'critical'], true),
+        ];
+    }
+
     public function plan(): LicensePlan
     {
         return LicensePlan::tryFrom((string) ($this->current()['plan'] ?? ''))

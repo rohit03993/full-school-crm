@@ -19,6 +19,13 @@ return [
     'default_valid_days' => (int) env('LICENSE_DEFAULT_VALID_DAYS', 365),
 
     /*
+    | School dashboard warnings — shown to Super Admin only.
+    */
+    'expiry_warning_days' => (int) env('LICENSE_EXPIRY_WARNING_DAYS', 30),
+
+    'expiry_critical_days' => (int) env('LICENSE_EXPIRY_CRITICAL_DAYS', 7),
+
+    /*
     | Preset feature packs — platform admin can switch plan or override with Custom.
     |
     | @var array<string, list<string>>

@@ -8,6 +8,7 @@ use App\Filament\Widgets\CrmFinanceStatsWidget;
 use App\Filament\Widgets\CrmLeadStatsWidget;
 use App\Filament\Widgets\CourseAdmissionsChartWidget;
 use App\Filament\Widgets\DashboardHeroWidget;
+use App\Filament\Widgets\LicenseStatusWidget;
 use App\Filament\Widgets\LeadSourceChartWidget;
 use App\Filament\Widgets\MonthlyAdmissionsChartWidget;
 use App\Filament\Widgets\MonthlyFeeCollectionChartWidget;
@@ -66,6 +67,7 @@ class Dashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
+            LicenseStatusWidget::class,
             DashboardHeroWidget::class,
             BatchOverviewWidget::class,
             CallingStatsWidget::class,
