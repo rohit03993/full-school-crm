@@ -135,7 +135,7 @@ class ExamTestGroupMatrix
      *     batch: ?string,
      *     date: ?\Illuminate\Support\Carbon,
      *     subjects: list<string>,
-     *     rows: list<array{roll_number: string, student_name: string, scores: array<string, string>}>
+     *     rows: list<array{student_id: int, roll_number: string, student_name: string, scores: array<string, string>}>
      * }|null
      */
     public static function markSheetForGroup(string $groupKey): ?array
@@ -166,7 +166,7 @@ class ExamTestGroupMatrix
 
         $first = $sessions->first();
         $subjects = [];
-        /** @var array<int, array{roll_number: string, student_name: string, scores: array<string, string>}> $studentRows */
+        /** @var array<int, array{student_id: int, roll_number: string, student_name: string, scores: array<string, string>}> $studentRows */
         $studentRows = [];
 
         foreach ($sessions as $session) {
@@ -184,7 +184,8 @@ class ExamTestGroupMatrix
 
                 if (! isset($studentRows[$studentId])) {
                     $studentRows[$studentId] = [
-                        'roll_number' => (string) ($student->activeEnrollment?->enrollment_number ?? '—'),
+                        'student_id' => $studentId,
+                        'roll_number' => (string) ($student->activeEnrollment?->enrollment_number ?? "\u{2014}"),
                         'student_name' => (string) $student->name,
                         'scores' => [],
                     ];
@@ -210,7 +211,7 @@ class ExamTestGroupMatrix
             ->values()
             ->map(function (array $row) use ($subjectList): array {
                 foreach ($subjectList as $subject) {
-                    $row['scores'][$subject] = $row['scores'][$subject] ?? '—';
+                    $row['scores'][$subject] = $row['scores'][$subject] ?? "\u{2014}";
                 }
 
                 return $row;
