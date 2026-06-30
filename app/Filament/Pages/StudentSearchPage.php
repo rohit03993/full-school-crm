@@ -91,10 +91,48 @@ class StudentSearchPage extends Page
 
     public function mount(): void
     {
+        if (filled(request()->query('roll'))) {
+            $this->lookupRoll((string) request()->query('roll'));
+
+            return;
+        }
+
         if (filled(request()->query('mobile'))) {
             $this->search['mobile'] = request()->query('mobile');
             $this->performSearch(app(StudentSearchService::class));
         }
+    }
+
+    public function lookupRoll(string $roll): void
+    {
+        $roll = strtoupper(trim($roll));
+
+        if ($roll === '') {
+            return;
+        }
+
+        $result = app(StudentSearchService::class)->search(null, null, null, $roll);
+
+        if ($result['outcome'] === StudentSearchService::OUTCOME_FOUND && $result['student']) {
+            $this->redirect(
+                StudentProfilePage::getUrl(['record' => $result['student']->id]),
+                navigate: true,
+            );
+
+            return;
+        }
+
+        $this->search['mobile'] = null;
+        $this->search['name'] = null;
+        $this->resetLookupState();
+        $this->lookedUpMobile = null;
+        $this->searchedName = $roll;
+
+        Notification::make()
+            ->title('No student for this roll number')
+            ->body("Roll {$roll} is not linked to an active enrollment. Check the roll on the admission or assign batch.")
+            ->warning()
+            ->send();
     }
 
     public function searchForm(Schema $schema): Schema

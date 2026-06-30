@@ -109,13 +109,74 @@ class ManageWhatsAppSettings extends Page
                 ])
                 ->columns(2),
             Section::make('Synced templates')
-                ->description('Live API campaigns from Pal Digital. Sync again to refresh or remove old CRM-only copies.')
+                ->description('Step 1 — Click Sync templates after saving your API key. Step 2 — Pick templates for each attendance action below.')
                 ->schema([
                     Placeholder::make('synced_templates_table')
                         ->label('')
                         ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderSyncedTemplatesTable())
                         ->columnSpanFull(),
                 ]),
+            Section::make('Attendance & punch — parent WhatsApp')
+                ->description('Step 3 — Match each real-world action to one Pal Digital template.')
+                ->icon(Heroicon::OutlinedChatBubbleLeftRight)
+                ->schema([
+                    Placeholder::make('attendance_automation_guide')
+                        ->label('')
+                        ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderAttendanceAutomationGuide())
+                        ->columnSpanFull(),
+                    Toggle::make('punch_autosend_enabled')
+                        ->label('Send parent WhatsApp on IN and OUT')
+                        ->helperText('Master switch for all four templates below (machine + manual).')
+                        ->columnSpanFull(),
+                    Placeholder::make('machine_templates_heading')
+                        ->label('')
+                        ->content(new HtmlString('<p class="text-sm font-bold text-gray-950 dark:text-white">From biometric device (punch_logs)</p><p class="mt-0.5 text-xs text-gray-500">EasyTimePro writes to MySQL — CRM reads automatically.</p>'))
+                        ->columnSpanFull(),
+                    Select::make('punch_in_autosend_template_id')
+                        ->label('Biometric check-in (IN)')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('When student punches IN at the gate/device.'),
+                    Select::make('punch_out_autosend_template_id')
+                        ->label('Biometric check-out (OUT)')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('When student punches OUT at the device.'),
+                    Placeholder::make('manual_templates_heading')
+                        ->label('')
+                        ->content(new HtmlString('<p class="mt-2 text-sm font-bold text-gray-950 dark:text-white">From staff on Attendance screen</p><p class="mt-0.5 text-xs text-gray-500">Manual IN, Manual OUT, or batch IN/OUT buttons.</p>'))
+                        ->columnSpanFull(),
+                    Select::make('punch_manual_in_autosend_template_id')
+                        ->label('Manual check-in (IN)')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Staff marks IN. Leave blank to reuse Biometric IN template.'),
+                    Select::make('punch_manual_out_autosend_template_id')
+                        ->label('Manual check-out (OUT)')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Staff marks OUT. Leave blank to reuse Biometric OUT template.'),
+                    Toggle::make('attendance_autosend_enabled')
+                        ->label('Legacy: batch-save template (optional)')
+                        ->helperText('Old roll-call Present flow only. Manual IN/OUT on Attendance uses the four punch templates above.')
+                        ->columnSpanFull(),
+                    Select::make('attendance_autosend_template_id')
+                        ->label('Fallback attendance template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Used when a specific IN/OUT template (machine or manual) is left blank.'),
+                ])
+                ->columns(2),
             Section::make('Post-call auto message')
                 ->description('After a connected outgoing call is logged, queue a WhatsApp using the selected template.')
                 ->collapsed()
@@ -128,21 +189,6 @@ class ManageWhatsAppSettings extends Page
                         ->searchable()
                         ->nullable()
                         ->native(false),
-                ])
-                ->columns(2),
-            Section::make('Attendance auto message')
-                ->description('After batch attendance is saved, queue WhatsApp to students marked Present (with a mobile number).')
-                ->collapsed()
-                ->schema([
-                    Toggle::make('attendance_autosend_enabled')
-                        ->label('Enable attendance WhatsApp'),
-                    Select::make('attendance_autosend_template_id')
-                        ->label('Template')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
-                        ->searchable()
-                        ->nullable()
-                        ->native(false)
-                        ->helperText('Map template variables to student.name, batch.name, attendance.date, attendance.time, attendance.status, etc.'),
                 ])
                 ->columns(2),
             Section::make('Campaign processing')

@@ -109,6 +109,18 @@ class InstituteSetup extends Page
                 'icon' => 'heroicon-o-adjustments-horizontal',
             ],
             [
+                'label' => 'Biometric Attendance',
+                'description' => 'EasyTimePro punch_logs setup, roll mapping, and processor checklist.',
+                'url' => ManageAttendanceBiometricPage::getUrl(),
+                'icon' => 'heroicon-o-finger-print',
+            ],
+            [
+                'label' => 'WhatsApp Settings',
+                'description' => 'Pal Digital API, sync templates, map IN/OUT/batch messages to actions.',
+                'url' => ManageWhatsAppSettings::getUrl(),
+                'icon' => 'heroicon-o-chat-bubble-left-right',
+            ],
+            [
                 'label' => 'Institute Settings',
                 'description' => 'Receipt logo, PDF header/footer for receipts, ID cards, and reports.',
                 'url' => ManageInstituteSettings::getUrl(),

@@ -3,12 +3,10 @@
     $selectedDate = $selectedDate ?? null;
 @endphp
 
-<div class="rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
-    <div class="border-b border-gray-200 px-4 py-3 dark:border-white/10">
-        <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Marked attendance dates</h3>
-        <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-            Past dates for this batch. Click a row to load and edit that day.
-        </p>
+<div class="fi-section overflow-hidden rounded-2xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+    <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-5">
+        <h3 class="text-sm font-bold text-gray-950 dark:text-white">Marked dates</h3>
+        <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Tap a row to edit that day</p>
     </div>
 
     @if ($summaries === [])

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Filament\Pages\AttendancePage;
+use App\Filament\Pages\ManageAttendanceBiometricPage;
 use App\Models\Setting;
 use App\Models\WhatsAppTemplate;
 use Illuminate\Support\HtmlString;
@@ -24,6 +26,11 @@ class WhatsAppSettingsService
             'postcall_autosend_template_id' => Setting::getValue('whatsapp.postcall_autosend_template_id'),
             'attendance_autosend_enabled' => (bool) Setting::getValue('whatsapp.attendance_autosend_enabled', false),
             'attendance_autosend_template_id' => Setting::getValue('whatsapp.attendance_autosend_template_id'),
+            'punch_autosend_enabled' => (bool) Setting::getValue('whatsapp.punch_autosend_enabled', true),
+            'punch_in_autosend_template_id' => Setting::getValue('whatsapp.punch_in_autosend_template_id'),
+            'punch_out_autosend_template_id' => Setting::getValue('whatsapp.punch_out_autosend_template_id'),
+            'punch_manual_in_autosend_template_id' => Setting::getValue('whatsapp.punch_manual_in_autosend_template_id'),
+            'punch_manual_out_autosend_template_id' => Setting::getValue('whatsapp.punch_manual_out_autosend_template_id'),
             'campaign_batch_size' => (int) Setting::getValue('whatsapp.campaign_batch_size', config('whatsapp.batch_size', 10)),
             'campaign_batch_delay_seconds' => (int) Setting::getValue(
                 'whatsapp.campaign_next_batch_delay_seconds',
@@ -175,6 +182,31 @@ class WhatsAppSettingsService
             'whatsapp',
         );
         Setting::setValue(
+            'whatsapp.punch_autosend_enabled',
+            ! empty($data['punch_autosend_enabled']) ? '1' : '0',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.punch_in_autosend_template_id',
+            filled($data['punch_in_autosend_template_id'] ?? null) ? (string) $data['punch_in_autosend_template_id'] : '',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.punch_out_autosend_template_id',
+            filled($data['punch_out_autosend_template_id'] ?? null) ? (string) $data['punch_out_autosend_template_id'] : '',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.punch_manual_in_autosend_template_id',
+            filled($data['punch_manual_in_autosend_template_id'] ?? null) ? (string) $data['punch_manual_in_autosend_template_id'] : '',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.punch_manual_out_autosend_template_id',
+            filled($data['punch_manual_out_autosend_template_id'] ?? null) ? (string) $data['punch_manual_out_autosend_template_id'] : '',
+            'whatsapp',
+        );
+        Setting::setValue(
             'whatsapp.campaign_batch_size',
             (string) max(1, min(50, (int) ($data['campaign_batch_size'] ?? 10))),
             'whatsapp',
@@ -210,6 +242,50 @@ class WhatsAppSettingsService
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();
+    }
+
+    public function templateName(?string $id): ?string
+    {
+        if (! filled($id)) {
+            return null;
+        }
+
+        return WhatsAppTemplate::query()->whereKey($id)->value('name');
+    }
+
+    public function renderAttendanceAutomationGuide(): HtmlString
+    {
+        $biometricUrl = e(ManageAttendanceBiometricPage::getUrl());
+        $attendanceUrl = e(AttendancePage::getUrl());
+
+        return new HtmlString(
+            '<div class="overflow-hidden rounded-xl border border-primary-200/60 bg-primary-50/40 dark:border-primary-500/20 dark:bg-primary-500/5">'
+            .'<div class="border-b border-primary-200/60 px-4 py-3 dark:border-primary-500/20">'
+            .'<p class="text-sm font-bold text-gray-950 dark:text-white">Which action sends which message?</p>'
+            .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">Turn each option on below and pick a synced template. '
+            .'<a href="'.$biometricUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Biometric setup</a> · '
+            .'<a href="'.$attendanceUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Attendance screen</a>'
+            .'</p></div>'
+            .'<div class="overflow-x-auto"><table class="w-full min-w-[36rem] text-left text-sm">'
+            .'<thead class="bg-white/60 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-black/20 dark:text-gray-400">'
+            .'<tr><th class="px-4 py-2">Action</th><th class="px-4 py-2">Trigger</th><th class="px-4 py-2">Template to pick below</th></tr></thead><tbody class="divide-y divide-primary-100 dark:divide-primary-500/10">'
+            .'<tr class="bg-white/40 dark:bg-transparent"><td class="px-4 py-3 font-semibold text-emerald-700 dark:text-emerald-300">Machine check-in (IN)</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">EasyTimePro → <code class="text-xs">punch_logs</code></td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300"><strong>Biometric IN</strong></td></tr>'
+            .'<tr><td class="px-4 py-3 font-semibold text-rose-700 dark:text-rose-300">Machine check-out (OUT)</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Device punch OUT from punch_logs</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300"><strong>Biometric OUT</strong></td></tr>'
+            .'<tr class="bg-white/40 dark:bg-transparent"><td class="px-4 py-3 font-semibold text-emerald-700 dark:text-emerald-300">Manual check-in (IN)</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Staff IN on Attendance (live or batch save)</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300"><strong>Manual IN</strong> (falls back to Biometric IN)</td></tr>'
+            .'<tr><td class="px-4 py-3 font-semibold text-rose-700 dark:text-rose-300">Manual check-out (OUT)</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Staff OUT button on Attendance</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300"><strong>Manual OUT</strong> (falls back to Biometric OUT)</td></tr>'
+            .'<tr><td class="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300">Absent / Leave</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Staff marks A or L</td>'
+            .'<td class="px-4 py-3 text-gray-500 dark:text-gray-400">Not sent automatically</td></tr>'
+            .'</tbody></table></div></div>'
+        );
     }
 
     public function renderSyncedTemplatesTable(): HtmlString

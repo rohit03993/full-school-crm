@@ -2,7 +2,7 @@
 
 namespace App\Filament\Widgets;
 
-use App\Filament\Pages\BatchAttendancePage;
+use App\Filament\Pages\AttendancePage;
 use App\Filament\Widgets\Concerns\VisibleWithCrmPermission;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
@@ -58,7 +58,7 @@ class CrmFinanceStatsWidget extends StatsOverviewWidget
                 ->description("{$stats['attendance_marked_today']} marked of {$stats['attendance_students_in_batches']} in batches")
                 ->descriptionIcon(Heroicon::OutlinedCheckCircle)
                 ->color('primary')
-                ->url(BatchAttendancePage::getUrl()),
+                ->url(AttendancePage::getUrl()),
             Stat::make('Fee Collection Today', '₹'.number_format($stats['fee_collection_today'], 2))
                 ->description('Payments recorded today')
                 ->descriptionIcon(Heroicon::OutlinedBanknotes)

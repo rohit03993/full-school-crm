@@ -13,6 +13,9 @@ class Attendance extends Model
         'student_id',
         'attendance_date',
         'status',
+        'checked_in_at',
+        'checked_out_at',
+        'punch_source',
         'marked_by_user_id',
     ];
 
@@ -21,6 +24,8 @@ class Attendance extends Model
         return [
             'attendance_date' => 'date',
             'status' => AttendanceStatus::class,
+            'checked_in_at' => 'datetime',
+            'checked_out_at' => 'datetime',
         ];
     }
 

@@ -2,7 +2,7 @@
 
 namespace App\Filament\Widgets;
 
-use App\Filament\Pages\BatchAttendancePage;
+use App\Filament\Pages\AttendancePage;
 use App\Filament\Pages\CallQueuePage;
 use App\Filament\Pages\FollowUpsPage;
 use App\Filament\Pages\MyLeadsPage;
@@ -57,7 +57,7 @@ class DashboardHeroWidget extends Widget
                 'label' => 'Attendance',
                 'description' => 'Mark batch attendance',
                 'icon' => 'heroicon-o-calendar-days',
-                'url' => BatchAttendancePage::getUrl(),
+                'url' => AttendancePage::getUrl(),
                 'feature' => LicenseFeature::Attendance,
             ],
             [

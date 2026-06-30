@@ -2,7 +2,7 @@
 
 namespace App\Filament\Widgets;
 
-use App\Filament\Pages\BatchAttendancePage;
+use App\Filament\Pages\AttendancePage;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
@@ -37,7 +37,7 @@ class BatchOverviewWidget extends Widget
 
         return [
             'overview' => $overview,
-            'attendanceUrl' => BatchAttendancePage::getUrl(),
+            'attendanceUrl' => AttendancePage::getUrl(),
             'showAttendance' => FeatureGate::enabled(LicenseFeature::Attendance),
             'showFees' => FeatureGate::enabled(LicenseFeature::Fees),
         ];

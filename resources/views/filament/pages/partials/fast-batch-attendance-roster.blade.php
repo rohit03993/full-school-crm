@@ -11,93 +11,88 @@
         marks: @js($marks),
         studentIds: @js($studentIds),
         saving: false,
-        current(id) {
-            return this.marks[id] ?? 'present';
-        },
-        setStatus(id, value) {
-            this.marks[id] = value;
-        },
-        markAllPresent() {
-            this.studentIds.forEach((id) => { this.marks[id] = 'present'; });
-        },
+        current(id) { return this.marks[id] ?? 'present'; },
+        setStatus(id, value) { this.marks[id] = value; },
+        markAllIn() { this.studentIds.forEach((id) => { this.marks[id] = 'present'; }); },
         async save() {
             this.saving = true;
-            try {
-                await $wire.saveAttendance(this.marks);
-            } finally {
-                this.saving = false;
-            }
+            try { await $wire.saveAttendance(this.marks); } finally { this.saving = false; }
         }
     }"
     class="space-y-4"
 >
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            {{ $roster->count() }} student(s) · instant P / A / L
+    <div class="fi-section rounded-2xl px-4 py-4 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 sm:px-5">
+        <p class="text-sm font-bold text-gray-950 dark:text-white">Same flow as live punches</p>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <strong class="text-emerald-600">IN</strong> = check-in + Present + IN WhatsApp ·
+            <strong class="text-rose-600">OUT</strong> = check-out + OUT WhatsApp ·
+            <strong>A / L</strong> = absent or leave only (no punch message)
         </p>
-        <div class="flex flex-wrap gap-2">
-            <button
-                type="button"
-                x-on:click="markAllPresent()"
-                class="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10"
-            >
-                Mark all Present
+        <div class="mt-3 flex flex-wrap gap-2">
+            <button type="button" x-on:click="markAllIn()" class="rounded-xl bg-gray-100 px-4 py-2 text-xs font-bold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-200">
+                All IN
             </button>
-            <button
-                type="button"
-                x-on:click="save()"
-                x-bind:disabled="saving"
-                class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
-            >
-                <span x-show="! saving">Save &amp; finish</span>
+            <button type="button" x-on:click="save()" x-bind:disabled="saving" class="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-60">
+                <span x-show="! saving">Save IN / A / L</span>
                 <span x-show="saving" x-cloak>Saving…</span>
             </button>
         </div>
     </div>
 
-    <div class="overflow-hidden rounded-xl ring-1 ring-gray-200 dark:ring-white/10">
+    <div class="fi-section overflow-hidden rounded-2xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
         <div class="divide-y divide-gray-100 dark:divide-white/10">
             @foreach ($roster as $row)
                 @php $student = $row->student; @endphp
-                <div class="flex flex-col gap-3 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:bg-gray-900">
-                    <div class="min-w-0">
-                        <p class="truncate font-semibold text-gray-950 dark:text-white">{{ $student->name }}</p>
-                        @if (filled($student->mobile))
-                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ $student->mobile }}</p>
-                        @endif
+                <div class="flex flex-col gap-3 bg-white px-4 py-4 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-500/10 text-sm font-bold text-primary-700 dark:text-primary-300">
+                            {{ strtoupper(substr($student->name, 0, 1)) }}
+                        </span>
+                        <div class="min-w-0">
+                            <p class="truncate font-bold text-gray-950 dark:text-white">{{ $student->name }}</p>
+                            @if (filled($student->mobile))
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ $student->mobile }}</p>
+                            @endif
+                        </div>
                     </div>
-                    <div class="flex shrink-0 gap-1.5">
-                        @foreach ($statuses as $status)
+                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                        <div class="flex gap-1 rounded-xl bg-gray-50 p-1 dark:bg-white/5">
                             <button
                                 type="button"
-                                x-on:click="setStatus({{ $student->id }}, '{{ $status->value }}')"
-                                x-bind:class="current({{ $student->id }}) === '{{ $status->value }}'
-                                    ? @js(match ($status) {
-                                        AttendanceStatus::Present => 'bg-emerald-500 text-white ring-emerald-600',
-                                        AttendanceStatus::Absent => 'bg-rose-500 text-white ring-rose-600',
-                                        AttendanceStatus::Leave => 'bg-amber-400 text-amber-950 ring-amber-500',
-                                    })
-                                    : 'bg-gray-50 text-gray-600 ring-gray-200 hover:bg-gray-100 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10'"
-                                class="min-w-[2.75rem] rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide ring-1 transition"
+                                x-on:click="setStatus({{ $student->id }}, 'present')"
+                                x-bind:class="current({{ $student->id }}) === 'present' ? 'bg-emerald-500 text-white shadow-sm' : 'text-gray-500 hover:bg-white dark:hover:bg-white/10'"
+                                class="rounded-lg px-3 py-2 text-xs font-extrabold uppercase tracking-wide transition"
+                                title="Check-in — same as punch IN"
                             >
-                                {{ $status->code() }}
+                                IN
                             </button>
-                        @endforeach
+                            @foreach ([AttendanceStatus::Absent, AttendanceStatus::Leave] as $status)
+                                <button
+                                    type="button"
+                                    x-on:click="setStatus({{ $student->id }}, '{{ $status->value }}')"
+                                    x-bind:class="current({{ $student->id }}) === '{{ $status->value }}'
+                                        ? @js(match ($status) {
+                                            AttendanceStatus::Absent => 'bg-rose-500 text-white shadow-sm',
+                                            AttendanceStatus::Leave => 'bg-amber-400 text-amber-950 shadow-sm',
+                                        })
+                                        : 'text-gray-500 hover:bg-white dark:hover:bg-white/10'"
+                                    class="rounded-lg px-3 py-2 text-xs font-extrabold uppercase tracking-wide transition"
+                                >
+                                    {{ $status->code() }}
+                                </button>
+                            @endforeach
+                        </div>
+                        <button
+                            type="button"
+                            wire:click="markManualOutForStudent({{ $student->id }})"
+                            class="rounded-xl bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-500"
+                            title="Check-out now — same as punch OUT"
+                        >
+                            OUT
+                        </button>
                     </div>
                 </div>
             @endforeach
         </div>
-    </div>
-
-    <div class="flex justify-end">
-        <button
-            type="button"
-            x-on:click="save()"
-            x-bind:disabled="saving"
-            class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60 sm:w-auto"
-        >
-            <span x-show="! saving">Save attendance &amp; finish</span>
-            <span x-show="saving" x-cloak>Saving…</span>
-        </button>
     </div>
 </div>

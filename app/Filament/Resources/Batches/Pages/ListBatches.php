@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\Batches\Pages;
 
 use App\Filament\Concerns\ShowsCrmPageHint;
-use App\Filament\Pages\BatchAttendancePage;
+use App\Filament\Pages\AttendancePage;
 use App\Filament\Resources\Batches\BatchResource;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -27,7 +27,7 @@ class ListBatches extends ListRecords
             Action::make('markAttendance')
                 ->label('Mark Attendance')
                 ->icon(Heroicon::OutlinedCalendarDays)
-                ->url(BatchAttendancePage::getUrl())
+                ->url(AttendancePage::getUrl(['mode' => 'manual']))
                 ->color('gray'),
             CreateAction::make()
                 ->label('Add Batch'),
