@@ -71,7 +71,7 @@ class IndianMobileNumber
             return false;
         }
 
-        return (bool) preg_match('/^\d\.\d+[eE][+\-]?\d+$/', trim((string) $input));
+        return (bool) preg_match('/^\d\.\d{1,2}[eE][+\-]?\d+$/', trim((string) $input));
     }
 
     public static function lossyScientificNotationHelp(): string

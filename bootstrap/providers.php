@@ -2,5 +2,5 @@
 
 return [
     App\Providers\AppServiceProvider::class,
-    App\Providers\Filament\RohitPanelProvider::class,
+    App\Providers\Filament\AdminPanelProvider::class,
 ];

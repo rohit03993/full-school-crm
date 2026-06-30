@@ -152,8 +152,47 @@ class ResultDeclarationService
             ]);
         }
 
-        $issueDate = $issueDate ?: now()->toDateString();
+        if ($declaration->marksheetsIssued()) {
+            throw ValidationException::withMessages([
+                'status' => 'Marksheets already issued. Use regenerate to create PDFs again.',
+            ]);
+        }
 
+        return $this->generateMarksheetsForDeclaration(
+            $declaration,
+            $staff,
+            $issueDate ?: now()->toDateString(),
+        );
+    }
+
+    public function regenerateMarksheets(string $groupKey, User $staff, ?string $issueDate = null): ResultDeclaration
+    {
+        $declaration = $this->findForGroupKey($groupKey);
+
+        if (! $declaration || ! $declaration->isPublished()) {
+            throw ValidationException::withMessages([
+                'status' => 'Publish results online before regenerating marksheets.',
+            ]);
+        }
+
+        if (! $declaration->marksheetsIssued()) {
+            throw ValidationException::withMessages([
+                'status' => 'Issue marksheets once before regenerating PDFs.',
+            ]);
+        }
+
+        return $this->generateMarksheetsForDeclaration(
+            $declaration,
+            $staff,
+            $issueDate ?: now()->toDateString(),
+        );
+    }
+
+    protected function generateMarksheetsForDeclaration(
+        ResultDeclaration $declaration,
+        User $staff,
+        string $issueDate,
+    ): ResultDeclaration {
         $declaration->load(['studentMarksheets.student.activeEnrollment.course', 'batch', 'activityType']);
 
         DB::transaction(function () use ($declaration, $staff, $issueDate): void {

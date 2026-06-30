@@ -49,6 +49,20 @@
                         @endif
                     </p>
                     <p class="mt-2 text-xs text-gray-600 dark:text-gray-400">Students see marks online. Collect printed PDF marksheets from the office.</p>
+                    @if (($canIssueMarksheet ?? false) && ($status['status'] ?? '') === 'issued')
+                        <div class="mt-4 rounded-xl border border-gray-200 bg-white/80 p-4 dark:border-white/10 dark:bg-gray-900/40">
+                            <p class="text-sm font-semibold text-gray-950 dark:text-white">Regenerate PDF marksheets</p>
+                            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Super Admin — rebuild PDF files if links are missing or marks were corrected after issue.</p>
+                            <div class="mt-3 max-w-xs">
+                                <x-crm.field label="Issue date" for="regenerate-issue-date">
+                                    <input id="regenerate-issue-date" type="date" wire:model="marksheetIssueDate" class="fi-input block w-full rounded-lg border-gray-300 text-sm dark:border-white/10 dark:bg-white/5" />
+                                </x-crm.field>
+                            </div>
+                            <button type="button" wire:click="regenerateMarksheets" class="mt-3 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-500">
+                                Regenerate PDF marksheets
+                            </button>
+                        </div>
+                    @endif
                 </div>
             @endif
             @if (($canIssueMarksheet ?? false) && ($status['status'] ?? '') === 'published')

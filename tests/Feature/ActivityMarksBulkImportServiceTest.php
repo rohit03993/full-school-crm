@@ -183,7 +183,7 @@ class ActivityMarksBulkImportServiceTest extends TestCase
 
         $summaries = app(ActivityMarksWhatsAppService::class)->buildStudentMarksSummaries($result['test_key']);
 
-        $this->assertStringContainsString('Maths: 45/50', $summaries[$student->id]);
+        $this->assertStringContainsString('Mathematics: 45/50', $summaries[$student->id]);
         $this->assertStringContainsString('Physics: 38/50', $summaries[$student->id]);
 
         $template = WhatsAppTemplate::query()->create([
@@ -216,7 +216,7 @@ class ActivityMarksBulkImportServiceTest extends TestCase
         );
 
         $this->assertSame('Half Yearly', $params[2]);
-        $this->assertStringContainsString('Maths: 45/50', $params[3]);
+        $this->assertStringContainsString('Mathematics: 45/50', $params[3]);
     }
 
     protected function createStaffUser(): User

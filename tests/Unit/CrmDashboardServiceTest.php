@@ -79,9 +79,12 @@ class CrmDashboardServiceTest extends TestCase
             'status' => CourseStatus::Active,
         ]);
 
+        $trainer = $this->createTrainerUser();
+
         Batch::query()->create([
             'name' => 'JEE Target Batch',
             'course_id' => $course->id,
+            'trainer_user_id' => $trainer->id,
             'start_date' => '2026-06-01',
             'end_date' => null,
             'status' => BatchStatus::Active,
@@ -90,6 +93,7 @@ class CrmDashboardServiceTest extends TestCase
         Batch::query()->create([
             'name' => 'NEET Target Batch',
             'course_id' => $course->id,
+            'trainer_user_id' => $trainer->id,
             'start_date' => '2026-06-01',
             'end_date' => '2026-12-31',
             'status' => BatchStatus::Active,
@@ -98,6 +102,7 @@ class CrmDashboardServiceTest extends TestCase
         Batch::query()->create([
             'name' => 'Old Completed Batch',
             'course_id' => $course->id,
+            'trainer_user_id' => $trainer->id,
             'start_date' => '2025-06-01',
             'end_date' => '2025-12-31',
             'status' => BatchStatus::Completed,

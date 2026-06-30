@@ -65,10 +65,13 @@ class StudentImportBatchResolverTest extends TestCase
             'status' => CourseStatus::Active,
         ]);
 
+        $trainer = $this->createTrainerUser();
+
         $batch = Batch::query()->create([
             'name' => $name,
             'course_id' => $course->id,
             'academic_session_id' => $session->id,
+            'trainer_user_id' => $trainer->id,
             'start_date' => '2026-04-01',
             'end_date' => '2027-03-31',
             'status' => BatchStatus::Active,

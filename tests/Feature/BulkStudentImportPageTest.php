@@ -51,6 +51,7 @@ class BulkStudentImportPageTest extends TestCase
             'name' => '12th Science Batch A',
             'course_id' => $course->id,
             'academic_session_id' => $session->id,
+            'trainer_user_id' => $staff->id,
             'start_date' => '2026-04-01',
             'end_date' => '2027-03-31',
             'status' => BatchStatus::Active,

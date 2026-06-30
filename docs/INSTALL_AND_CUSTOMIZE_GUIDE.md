@@ -42,7 +42,7 @@ cd "path\to\school-crm"
 
 # 2. Environment (server settings only)
 copy .env.example .env
-# Edit .env: DB_DATABASE, DB_USERNAME, DB_PASSWORD, APP_URL, ADMIN_EMAIL, ADMIN_PASSWORD
+# Edit .env: DB_DATABASE, DB_USERNAME, DB_PASSWORD, APP_URL, ADMIN_MOBILE, ADMIN_PASSWORD
 
 # 3. Install dependencies
 composer install
@@ -73,7 +73,7 @@ On production, run the queue worker under **Supervisor** or systemd so it stays 
 | `/admin/setup` | First-run wizard (once) |
 | `/portal/login` | Student portal |
 
-Login with `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`.
+Login with `ADMIN_MOBILE` / `ADMIN_PASSWORD` from `.env`.
 
 ### Optional `.env` flags
 

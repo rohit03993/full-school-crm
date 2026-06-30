@@ -38,7 +38,7 @@ class CrmResetDemoCommand extends Command
         $this->info('Demo CRM ready.');
         $this->newLine();
         $this->line('Log in at /admin');
-        $this->line('  Super Admin: '.env('ADMIN_EMAIL', 'rohit03993@gmail.com').' / '.env('ADMIN_PASSWORD', 'Admin@2026'));
+        $this->line('  Super Admin mobile: '.env('ADMIN_MOBILE', '9876543210').' / '.env('ADMIN_PASSWORD', 'Admin@2026'));
         $this->line('  Staff: demo@example.com / password');
         $this->newLine();
         $this->line('Explore:');

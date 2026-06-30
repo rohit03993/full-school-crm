@@ -164,6 +164,51 @@ class TestMarksReviewPage extends Page
         }
     }
 
+    public function regenerateMarksheets(ResultDeclarationService $declarations): void
+    {
+        abort_unless(Auth::user()?->hasRole(RoleName::SuperAdmin->value), 403);
+
+        $this->validate([
+            'marksheetIssueDate' => 'required|date',
+        ]);
+
+        if (blank($this->groupKey)) {
+            Notification::make()->title('Test not found')->warning()->send();
+
+            return;
+        }
+
+        try {
+            $declaration = $declarations->regenerateMarksheets(
+                (string) $this->groupKey,
+                Auth::user(),
+                $this->marksheetIssueDate,
+            );
+
+            Notification::make()
+                ->title('Marksheets regenerated')
+                ->body("PDF marksheets refreshed for {$declaration->studentMarksheets()->count()} student(s).")
+                ->success()
+                ->duration(10000)
+                ->send();
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not regenerate marksheets')
+                ->body(collect($exception->errors())->flatten()->first())
+                ->danger()
+                ->send();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Could not regenerate marksheets')
+                ->body($exception->getMessage())
+                ->danger()
+                ->duration(15000)
+                ->send();
+        }
+    }
+
     /**
      * @return array<string, mixed>
      */

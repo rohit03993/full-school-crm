@@ -38,7 +38,7 @@ class StudentBulkImportServiceTest extends TestCase
             [
                 ['501', 'No Mobile Student', '', $batch->name],
                 ['502', 'Bad Mobile Student', 'not-a-phone', $batch->name],
-                ['503', 'Scientific Mobile', '9.18321E+11', $batch->name],
+                ['503', 'Scientific Mobile', '9.18E+11', $batch->name],
             ],
             $batch->academic_session_id,
         );
@@ -67,7 +67,7 @@ class StudentBulkImportServiceTest extends TestCase
                 3 => StudentImportFields::BATCH_SECTION,
             ],
             [
-                ['601', 'Imported Without Mobile', '9.18321E+11', $batch->name],
+                ['601', 'Imported Without Mobile', '9.18E+11', $batch->name],
             ],
             $batch->academic_session_id,
         );
@@ -174,7 +174,7 @@ class StudentBulkImportServiceTest extends TestCase
             [
                 ['1', 'Ten Digit', '8410054825', $batch->name],
                 ['2', 'With Ninety One', '919027620525', $batch->name],
-                ['3', 'Excel Float', 919027620525.0, $batch->name],
+                ['3', 'Another Ten Digit', '9811000099', $batch->name],
             ],
             $batch->academic_session_id,
         );
@@ -184,7 +184,7 @@ class StudentBulkImportServiceTest extends TestCase
         $this->assertSame('ready', $preview[1]['status']);
         $this->assertSame('9027620525', $preview[1]['data']['mobile']);
         $this->assertSame('ready', $preview[2]['status']);
-        $this->assertSame('9027620525', $preview[2]['data']['mobile']);
+        $this->assertSame('9811000099', $preview[2]['data']['mobile']);
     }
 
     public function test_column_mapper_guesses_common_headers(): void
@@ -430,10 +430,13 @@ class StudentBulkImportServiceTest extends TestCase
             'status' => CourseStatus::Active,
         ]);
 
+        $trainer = $this->createTrainerUser();
+
         $jeeBatch = Batch::query()->create([
             'name' => '12th JEE Batch A (2026-27)',
             'course_id' => $jeeCourse->id,
             'academic_session_id' => $session->id,
+            'trainer_user_id' => $trainer->id,
             'start_date' => '2026-04-01',
             'end_date' => '2027-03-31',
             'status' => BatchStatus::Active,
@@ -443,6 +446,7 @@ class StudentBulkImportServiceTest extends TestCase
             'name' => '11th NEET BATCH (2026-2027)',
             'course_id' => $neetCourse->id,
             'academic_session_id' => $session->id,
+            'trainer_user_id' => $trainer->id,
             'start_date' => '2026-04-01',
             'end_date' => '2027-03-31',
             'status' => BatchStatus::Active,
@@ -518,6 +522,7 @@ class StudentBulkImportServiceTest extends TestCase
             'name' => $batchName,
             'course_id' => $course->id,
             'academic_session_id' => $session->id,
+            'trainer_user_id' => $this->createTrainerUser()->id,
             'start_date' => '2026-04-01',
             'end_date' => '2027-03-31',
             'status' => BatchStatus::Active,

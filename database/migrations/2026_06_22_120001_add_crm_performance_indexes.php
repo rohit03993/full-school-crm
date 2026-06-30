@@ -61,6 +61,16 @@ return new class extends Migration
 
     private function indexExists(string $table, string $indexName): bool
     {
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            $indexes = DB::select('PRAGMA index_list('.DB::getPdo()->quote($table).')');
+
+            return collect($indexes)->contains(
+                fn (object $index): bool => ($index->name ?? null) === $indexName,
+            );
+        }
+
         return DB::select(
             'SELECT 1 FROM information_schema.statistics
              WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?

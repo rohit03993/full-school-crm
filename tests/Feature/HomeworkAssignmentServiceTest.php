@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Enums\AdmissionStatus;
+use App\Enums\Gender;
+use App\Enums\LeadSource;
 use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\EnrollmentStatus;
@@ -86,23 +88,36 @@ class HomeworkAssignmentServiceTest extends TestCase
             'name' => '11-A',
             'course_id' => $course->id,
             'academic_session_id' => $session->id,
+            'trainer_user_id' => $staff->id,
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
             'status' => BatchStatus::Active,
         ]);
 
-        $student = Student::factory()->create([
-            'name' => 'Rohit',
+        $student = Student::query()->create([
+            'name' => 'Demo Student',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2000-05-15',
+            'gender' => Gender::Male,
             'mobile' => '8320936486',
             'status' => StudentStatus::Enrolled,
+            'portal_password' => app(\App\Services\StudentAuthService::class)->hashPortalPassword('15052000'),
         ]);
 
-        $enquiry = Enquiry::factory()->create([
+        $enquiry = Enquiry::query()->create([
             'student_id' => $student->id,
+            'enquiry_number' => 'CRM-ENQ-2026-000501',
             'course_id' => $course->id,
+            'lead_source' => LeadSource::WalkIn,
+            'meeting_for' => 'school',
+            'visit_type' => 'first_visit',
+            'latest_visit_status' => 'interested',
         ]);
 
-        $admission = Admission::factory()->create([
+        $admission = Admission::query()->create([
             'student_id' => $student->id,
             'enquiry_id' => $enquiry->id,
+            'admission_number' => 'CRM-ADM-2026-000501',
             'status' => AdmissionStatus::Approved,
         ]);
 
@@ -120,6 +135,8 @@ class HomeworkAssignmentServiceTest extends TestCase
         BatchStudent::query()->create([
             'batch_id' => $batch->id,
             'student_id' => $student->id,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $staff->id,
             'is_active' => true,
         ]);
 

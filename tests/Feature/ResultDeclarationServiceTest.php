@@ -85,6 +85,97 @@ class ResultDeclarationServiceTest extends TestCase
         ));
     }
 
+    public function test_regenerate_marksheets_refreshes_pdf_paths(): void
+    {
+        Storage::fake('local');
+
+        $this->seed(\Database\Seeders\ActivityTypeSeeder::class);
+
+        $staff = $this->createSuperAdmin();
+        $student = $this->createEnrolledStudent($staff);
+        $batch = Batch::query()->where('name', 'Result Batch')->firstOrFail();
+        $examType = ActivityType::query()->where('slug', 'exam')->firstOrFail();
+        $attendance = app(ActivityAttendanceService::class);
+
+        $testName = 'Unit Test — June 2026';
+        $testDate = '2026-06-10';
+        $groupKey = Str::slug($testName).'-'.$testDate;
+
+        foreach (['Mathematics' => 42] as $subject => $score) {
+            $session = ActivitySession::query()->create([
+                'activity_type_id' => $examType->id,
+                'title' => "{$testName} — {$subject}",
+                'batch_id' => $batch->id,
+                'session_date' => $testDate,
+                'metadata' => [
+                    'test_key' => $groupKey,
+                    'test_name' => $testName,
+                    'subject' => $subject,
+                    'max_marks' => 50,
+                ],
+                'created_by_user_id' => $staff->id,
+            ]);
+
+            $attendance->importStudentScores($session, [$student->id => $score], $staff);
+        }
+
+        $service = app(ResultDeclarationService::class);
+        $service->publish($groupKey, $staff, '2026-06-15');
+        $service->issueMarksheets($groupKey, $staff, '2026-06-16');
+
+        $sheet = $service->findForGroupKey($groupKey)?->studentMarksheets()->where('student_id', $student->id)->first();
+        $this->assertNotNull($sheet);
+        $originalPath = $sheet->pdf_path;
+        $this->assertTrue($sheet->hasPdf());
+
+        $service->regenerateMarksheets($groupKey, $staff, '2026-06-17');
+
+        $sheet->refresh();
+        $this->assertTrue($sheet->hasPdf());
+        $this->assertNotNull($sheet->pdf_path);
+        $this->assertSame('2026-06-17', $service->findForGroupKey($groupKey)?->marksheet_issue_date?->toDateString());
+    }
+
+    public function test_issue_marksheets_rejects_when_already_issued(): void
+    {
+        Storage::fake('local');
+
+        $this->seed(\Database\Seeders\ActivityTypeSeeder::class);
+
+        $staff = $this->createSuperAdmin();
+        $student = $this->createEnrolledStudent($staff);
+        $batch = Batch::query()->where('name', 'Result Batch')->firstOrFail();
+        $examType = ActivityType::query()->where('slug', 'exam')->firstOrFail();
+        $attendance = app(ActivityAttendanceService::class);
+
+        $testName = 'Unit Test — June 2026';
+        $testDate = '2026-06-10';
+        $groupKey = Str::slug($testName).'-'.$testDate;
+
+        $session = ActivitySession::query()->create([
+            'activity_type_id' => $examType->id,
+            'title' => "{$testName} — Mathematics",
+            'batch_id' => $batch->id,
+            'session_date' => $testDate,
+            'metadata' => [
+                'test_key' => $groupKey,
+                'test_name' => $testName,
+                'subject' => 'Mathematics',
+                'max_marks' => 50,
+            ],
+            'created_by_user_id' => $staff->id,
+        ]);
+
+        $attendance->importStudentScores($session, [$student->id => 40], $staff);
+
+        $service = app(ResultDeclarationService::class);
+        $service->publish($groupKey, $staff, '2026-06-15');
+        $service->issueMarksheets($groupKey, $staff, '2026-06-16');
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $service->issueMarksheets($groupKey, $staff, '2026-06-18');
+    }
+
     protected function createSuperAdmin(): User
     {
         Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);

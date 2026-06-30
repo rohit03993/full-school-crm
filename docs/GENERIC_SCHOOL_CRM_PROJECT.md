@@ -98,7 +98,7 @@ DB_DATABASE=school_crm
 DB_USERNAME=root
 DB_PASSWORD=
 
-ADMIN_EMAIL=admin@example.com
+ADMIN_MOBILE=9876543210
 ADMIN_PASSWORD=Admin@2026
 ```
 
@@ -118,7 +118,7 @@ php artisan serve
 | http://localhost:8000/admin | Staff CRM |
 | http://localhost:8000/portal/login | Student portal |
 
-Default admin (after `crm:ensure-admin`): see `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env`.
+Default admin (after `crm:ensure-admin`): see `ADMIN_MOBILE` / `ADMIN_PASSWORD` in `.env`.
 
 ---
 
@@ -263,7 +263,7 @@ Learned from Folks India production deploy:
 - Student Profile is the operational hub (lazy-loaded tabs)
 - Payments immutable for Staff; corrections Super Admin only
 - Documents in private storage only
-- Enrollment number format: `FI-YYYY-XXXXXX` — **rename prefix for generic product later**
+- Enrollment number format: `{PREFIX}-YYYY-XXXXXX` — prefix from **Website → Site Content** (`number_prefix`, default `CRM`)
 
 ---
 

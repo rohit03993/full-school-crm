@@ -620,7 +620,7 @@ class DemoDataSeeder extends Seeder
         $this->command?->info('=== Fresh demo data ('.$instituteType->label().') ===');
         $this->command?->line('Primary course: '.$course->name.' · Fee ₹'.number_format((float) $course->fee, 2));
         $this->command?->newLine();
-        $this->command?->line('Super Admin: '.env('ADMIN_EMAIL', 'rohit03993@gmail.com').' / '.env('ADMIN_PASSWORD', 'Admin@2026'));
+        $this->command?->line('Super Admin mobile: '.env('ADMIN_MOBILE', '9876543210').' / '.env('ADMIN_PASSWORD', 'Admin@2026'));
         $this->command?->line('Staff: demo@example.com / password');
         $this->command?->newLine();
         $this->command?->line('Leads: Aarav 9811000001 · Priya 9811000002 · Karan 9811000003 (undecided course)');
