@@ -4,13 +4,24 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Pages\StudentProfilePage;
 use App\Filament\Resources\Enquiries\EnquiryResource;
+use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
 use App\Services\CrmDashboardService;
+use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use Filament\Widgets\Widget;
+use Illuminate\Support\Facades\Auth;
 
 class RecentEnquiriesWidget extends Widget
 {
     use VisibleToSuperAdminOnly;
+
+    public static function canView(): bool
+    {
+        return FeatureGate::enabled(LicenseFeature::Enquiries)
+            && CrmAccess::can(Auth::user(), CrmPermission::DashboardOwnerStats);
+    }
 
     protected static ?int $sort = 3;
 

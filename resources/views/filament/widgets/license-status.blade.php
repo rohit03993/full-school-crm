@@ -56,7 +56,7 @@
                             @if ($days_remaining !== null)
                                 ({{ $days_remaining }} {{ str('day')->plural($days_remaining) }} remaining)
                             @endif
-                            · Plan: <strong>{{ $plan_label }}</strong>
+                            · <strong>{{ $plan_label }}</strong>
                         </p>
                     @endif
                 </div>

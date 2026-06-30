@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Students;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Enums\StudentStatus;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Pages\StudentProfilePage;
@@ -14,6 +15,7 @@ use App\Models\Course;
 use App\Models\Student;
 use App\Services\FeesDashboardService;
 use App\Support\CrmNavigation;
+use App\Support\FeatureGate;
 use App\Support\InstituteProfile;
 use Filament\Actions\Action;
 use Filament\Resources\Resource;
@@ -100,7 +102,8 @@ class StudentResource extends Resource
                     ->money('INR')
                     ->placeholder('—')
                     ->sortable()
-                    ->color(fn ($state): string => (float) ($state ?? 0) > 0 ? 'warning' : 'success'),
+                    ->color(fn ($state): string => (float) ($state ?? 0) > 0 ? 'warning' : 'success')
+                    ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees)),
                 TextColumn::make('fee_next_due')
                     ->label('Next due')
                     ->state(function (Student $record): ?string {
@@ -109,7 +112,8 @@ class StudentResource extends Resource
                         return $date?->format('d M Y');
                     })
                     ->placeholder('—')
-                    ->toggleable(),
+                    ->toggleable()
+                    ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees)),
                 TextColumn::make('fee_status')
                     ->label('Fee status')
                     ->badge()
@@ -120,7 +124,8 @@ class StudentResource extends Resource
                         return app(FeesDashboardService::class)->feeStatusForStudent($record)['color'] ?? 'gray';
                     })
                     ->placeholder('—')
-                    ->toggleable(),
+                    ->toggleable()
+                    ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees)),
                 TextColumn::make('activeEnrollment.academicSession.name')
                     ->label('Session')
                     ->placeholder('—')

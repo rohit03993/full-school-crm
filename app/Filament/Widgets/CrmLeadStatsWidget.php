@@ -5,14 +5,25 @@ namespace App\Filament\Widgets;
 use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Filament\Resources\Enquiries\EnquiryResource;
 use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
+use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Services\CrmDashboardService;
+use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Support\Facades\Auth;
 
 class CrmLeadStatsWidget extends StatsOverviewWidget
 {
     use VisibleToSuperAdminOnly;
+
+    public static function canView(): bool
+    {
+        return FeatureGate::anyEnabled(LicenseFeature::Enquiries, LicenseFeature::Admissions)
+            && CrmAccess::can(Auth::user(), CrmPermission::DashboardOwnerStats);
+    }
 
     protected static ?int $sort = 1;
 

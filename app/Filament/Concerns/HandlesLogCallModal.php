@@ -2,7 +2,9 @@
 
 namespace App\Filament\Concerns;
 
+use App\Enums\LicenseFeature;
 use App\Enums\VisitStatus;
+use App\Support\FeatureGate;
 use App\Models\Student;
 use App\Services\CallLogService;
 use Filament\Notifications\Notification;
@@ -44,6 +46,15 @@ trait HandlesLogCallModal
 
     public function openLogCallModal(): void
     {
+        if (! FeatureGate::enabled(LicenseFeature::Calls)) {
+            Notification::make()
+                ->title('Calling module is not enabled')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->resetLogCallForm();
         $this->showLogCallModal = true;
     }
@@ -91,6 +102,15 @@ trait HandlesLogCallModal
 
     protected function persistLogCall(Student $student, CallLogService $callLog): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Calls)) {
+            Notification::make()
+                ->title('Calling module is not enabled')
+                ->warning()
+                ->send();
+
+            return false;
+        }
+
         try {
             $callLog->log($student, Auth::user(), $this->logCallForm);
         } catch (ValidationException $exception) {

@@ -8,7 +8,6 @@ use App\Services\LicenseService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -51,7 +50,6 @@ class ManageSubscriptionPage extends Page
         $current = $license->current();
 
         $this->form->fill([
-            'plan' => $current['plan'],
             'features' => $current['features'],
             'expires_at' => optional($license->expiresAt())?->toDateString(),
             'annual_price_inr' => $current['annual_price_inr'],
@@ -90,29 +88,16 @@ class ManageSubscriptionPage extends Page
                         ->minValue(0)
                         ->helperText('Leave empty for unlimited.'),
                 ]),
-            Section::make('Plan & modules')
-                ->description('Pick a preset pack or choose Custom and toggle modules individually.')
+            Section::make('Enabled modules')
+                ->description('Core student, course, batch, and staff management is always included. Toggle optional modules for this school.')
                 ->schema([
-                    Select::make('plan')
-                        ->label('Plan')
-                        ->options(LicensePlan::options())
-                        ->required()
-                        ->live()
-                        ->afterStateUpdated(function (?string $state, callable $set, LicenseService $license): void {
-                            $plan = LicensePlan::tryFrom((string) $state);
-
-                            if ($plan !== null && $plan !== LicensePlan::Custom) {
-                                $set('features', $license->featuresForPlan($plan));
-                            }
-                        }),
                     CheckboxList::make('features')
-                        ->label('Enabled modules')
+                        ->label('Modules')
                         ->options(LicenseFeature::options())
                         ->descriptions(collect(LicenseFeature::cases())
                             ->mapWithKeys(fn (LicenseFeature $feature): array => [$feature->value => $feature->description()])
                             ->all())
                         ->columns(2)
-                        ->disabled(fn (callable $get): bool => LicensePlan::tryFrom((string) $get('plan')) !== LicensePlan::Custom)
                         ->required(),
                 ]),
             Section::make('Internal notes')
@@ -155,7 +140,10 @@ class ManageSubscriptionPage extends Page
 
     public function save(LicenseService $license): void
     {
-        $license->save($this->form->getState());
+        $data = $this->form->getState();
+        $data['plan'] = LicensePlan::Custom->value;
+
+        $license->save($data);
         $this->refreshStatus($license);
 
         Notification::make()

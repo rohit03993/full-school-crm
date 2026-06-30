@@ -23,4 +23,15 @@ class FeatureGate
 
         return ! $service->isSignatureValid() || $service->isExpired();
     }
+
+    public static function anyEnabled(LicenseFeature ...$features): bool
+    {
+        foreach ($features as $feature) {
+            if (self::enabled($feature)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

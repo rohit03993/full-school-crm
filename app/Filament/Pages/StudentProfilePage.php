@@ -9,8 +9,10 @@ use App\Models\ActivityAttendance;
 use App\Models\ActivityType;
 use App\Enums\CrmPermission;
 use App\Enums\DocumentType;
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use App\Support\CrmPagination;
 use App\Models\Attendance;
 use App\Models\Batch;
@@ -254,6 +256,10 @@ class StudentProfilePage extends Page
 
             $this->updatedProfileTab();
         }
+
+        if (! in_array($this->profileTab, $this->validProfileTabs(), true)) {
+            $this->profileTab = 'overview';
+        }
     }
 
     public static function getRoutePath(Panel $panel): string
@@ -308,15 +314,49 @@ class StudentProfilePage extends Page
      */
     protected function validProfileTabs(): array
     {
-        $tabs = [
-            'overview', 'visits', 'calls', 'messages', 'admission', 'documents', 'fees', 'receipts', 'attendance', 'homework',
-        ];
+        $tabs = ['overview', 'documents'];
 
-        if ($this->record->activeEnrollment !== null && $this->enabledActivityTypes()->isNotEmpty()) {
+        if ($this->licensed(LicenseFeature::Enquiries)) {
+            $tabs[] = 'visits';
+        }
+
+        if ($this->licensed(LicenseFeature::Calls)) {
+            $tabs[] = 'calls';
+        }
+
+        if ($this->licensed(LicenseFeature::WhatsApp)) {
+            $tabs[] = 'messages';
+        }
+
+        if ($this->licensed(LicenseFeature::Admissions)) {
+            $tabs[] = 'admission';
+        }
+
+        if ($this->licensed(LicenseFeature::Fees) && $this->record->activeEnrollment !== null) {
+            $tabs[] = 'fees';
+            $tabs[] = 'receipts';
+        }
+
+        if ($this->licensed(LicenseFeature::Attendance) && $this->record->activeEnrollment !== null) {
+            $tabs[] = 'attendance';
+        }
+
+        if ($this->licensed(LicenseFeature::Homework) && $this->record->activeBatchStudent !== null) {
+            $tabs[] = 'homework';
+        }
+
+        if ($this->licensed(LicenseFeature::Marks)
+            && $this->record->activeEnrollment !== null
+            && $this->enabledActivityTypes()->isNotEmpty()) {
             $tabs[] = 'activities';
         }
 
         return $tabs;
+    }
+
+    protected function licensed(LicenseFeature $feature): bool
+    {
+        return FeatureGate::enabled($feature);
     }
 
     public function selectActivitySubTab(string $slug): void
@@ -429,6 +469,15 @@ class StudentProfilePage extends Page
 
     public function sendWhatsAppMessage(): void
     {
+        if (! $this->licensed(LicenseFeature::WhatsApp)) {
+            Notification::make()
+                ->title('WhatsApp module is not enabled')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         if (! $this->sendWhatsAppTemplateId) {
             Notification::make()
                 ->title('Choose a template')
@@ -1149,7 +1198,8 @@ class StudentProfilePage extends Page
                         ->success()
                         ->send();
                 })
-                ->visible(fn (): bool => $this->userCan(CrmPermission::LeadsCall)
+                ->visible(fn (): bool => $this->licensed(LicenseFeature::Enquiries)
+                    && $this->userCan(CrmPermission::LeadsCall)
                     && $this->record->enquiries->isNotEmpty()),
             Action::make('addEnquiry')
                 ->label('Add Enquiry')
@@ -1173,7 +1223,8 @@ class StudentProfilePage extends Page
                         ->success()
                         ->send();
                 })
-                ->visible(fn (): bool => $this->userCan(CrmPermission::LeadsCall)
+                ->visible(fn (): bool => $this->licensed(LicenseFeature::Enquiries)
+                    && $this->userCan(CrmPermission::LeadsCall)
                     && $this->record->enquiries()->doesntExist()),
             Action::make('convertToAdmission')
                 ->label('Convert to Admission')
@@ -1309,7 +1360,8 @@ class StudentProfilePage extends Page
                         ->success()
                         ->send();
                 })
-                ->visible(fn (ConvertToAdmissionPresenter $presenter): bool => $this->userCan(CrmPermission::AdmissionsView)
+                ->visible(fn (ConvertToAdmissionPresenter $presenter): bool => $this->licensed(LicenseFeature::Admissions)
+                    && $this->userCan(CrmPermission::AdmissionsView)
                     && $presenter->convertibleEnquiries($this->record)->isNotEmpty()),
             Action::make('assignBatch')
                 ->label('Assign Batch')
@@ -1414,7 +1466,8 @@ class StudentProfilePage extends Page
                         ->success()
                         ->send();
                 })
-                ->visible(fn (): bool => $this->userCan(CrmPermission::FeesCollect)
+                ->visible(fn (): bool => $this->licensed(LicenseFeature::Fees)
+                    && $this->userCan(CrmPermission::FeesCollect)
                     && $this->record->activeEnrollment?->feeStructure !== null
                     && (float) ($this->record->activeEnrollment->feeStructure->pending_amount ?? 0) > 0),
             Action::make('adjustFees')
@@ -1517,7 +1570,8 @@ class StudentProfilePage extends Page
                         ->success()
                         ->send();
                 })
-                ->visible(fn (): bool => $this->userCan(CrmPermission::FeesAdjustStructure)
+                ->visible(fn (): bool => $this->licensed(LicenseFeature::Fees)
+                    && $this->userCan(CrmPermission::FeesAdjustStructure)
                     && $this->record->activeEnrollment?->feeStructure !== null),
             Action::make('editStudent')
                 ->label('Edit Details')
@@ -1702,6 +1756,7 @@ class StudentProfilePage extends Page
                         ]),
                     'visits' => Tab::make('Visits')
                         ->icon('heroicon-o-calendar-days')
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::Enquiries))
                         ->schema([
                             View::make('filament.pages.partials.student-profile-visits')
                                 ->viewData(fn (): array => [
@@ -1711,6 +1766,7 @@ class StudentProfilePage extends Page
                         ]),
                     'calls' => Tab::make('Calls')
                         ->icon('heroicon-o-phone')
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::Calls))
                         ->schema([
                             View::make('filament.pages.partials.student-profile-calls')
                                 ->viewData(fn (): array => [
@@ -1720,6 +1776,7 @@ class StudentProfilePage extends Page
                         ]),
                     'messages' => Tab::make('Messages')
                         ->icon('heroicon-o-chat-bubble-left-right')
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::WhatsApp))
                         ->schema([
                             View::make('filament.pages.partials.student-profile-messages')
                                 ->viewData(fn (): array => [
@@ -1730,6 +1787,7 @@ class StudentProfilePage extends Page
                         ]),
                     'admission' => Tab::make('Admission')
                         ->icon('heroicon-o-document-text')
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::Admissions))
                         ->schema([
                             View::make('filament.pages.partials.student-profile-admission')
                                 ->viewData(fn (): array => [
@@ -1749,7 +1807,8 @@ class StudentProfilePage extends Page
                         ]),
                     'fees' => Tab::make('Fees')
                         ->icon('heroicon-o-banknotes')
-                        ->visible(fn (): bool => $this->record->activeEnrollment !== null)
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::Fees)
+                            && $this->record->activeEnrollment !== null)
                         ->schema([
                             View::make('filament.pages.partials.student-profile-fees')
                                 ->viewData(fn (): array => [
@@ -1767,7 +1826,8 @@ class StudentProfilePage extends Page
                         ]),
                     'receipts' => Tab::make('Receipts')
                         ->icon('heroicon-o-receipt-percent')
-                        ->visible(fn (): bool => $this->record->activeEnrollment !== null)
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::Fees)
+                            && $this->record->activeEnrollment !== null)
                         ->schema([
                             View::make('filament.pages.partials.student-profile-receipts')
                                 ->viewData(fn (): array => [
@@ -1779,7 +1839,8 @@ class StudentProfilePage extends Page
                         ]),
                     'attendance' => Tab::make('Attendance')
                         ->icon('heroicon-o-clipboard-document-check')
-                        ->visible(fn (): bool => $this->record->activeEnrollment !== null)
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::Attendance)
+                            && $this->record->activeEnrollment !== null)
                         ->schema([
                             View::make('filament.pages.partials.student-profile-attendance')
                                 ->viewData(fn (): array => [
@@ -1791,7 +1852,8 @@ class StudentProfilePage extends Page
                         ]),
                     'homework' => Tab::make('Homework')
                         ->icon('heroicon-o-book-open')
-                        ->visible(fn (): bool => $this->record->activeBatchStudent !== null)
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::Homework)
+                            && $this->record->activeBatchStudent !== null)
                         ->schema([
                             View::make('filament.pages.partials.student-profile-homework')
                                 ->viewData(fn (): array => [
@@ -1802,7 +1864,8 @@ class StudentProfilePage extends Page
                         ]),
                     'activities' => Tab::make('Activities')
                         ->icon('heroicon-o-academic-cap')
-                        ->visible(fn (): bool => $this->record->activeEnrollment !== null
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::Marks)
+                            && $this->record->activeEnrollment !== null
                             && $this->enabledActivityTypes()->isNotEmpty())
                         ->schema([
                             View::make('filament.pages.partials.student-profile-activities-hub')

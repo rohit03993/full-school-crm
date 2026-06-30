@@ -3,13 +3,24 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Resources\Admissions\AdmissionResource;
+use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
 use App\Services\CrmDashboardService;
+use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use Filament\Widgets\Widget;
+use Illuminate\Support\Facades\Auth;
 
 class PendingAdmissionsWidget extends Widget
 {
     use VisibleToSuperAdminOnly;
+
+    public static function canView(): bool
+    {
+        return FeatureGate::enabled(LicenseFeature::Admissions)
+            && CrmAccess::can(Auth::user(), CrmPermission::DashboardOwnerStats);
+    }
 
     protected static ?int $sort = 4;
 

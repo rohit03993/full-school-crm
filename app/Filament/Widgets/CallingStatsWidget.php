@@ -3,6 +3,9 @@
 namespace App\Filament\Widgets;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
+use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use App\Filament\Widgets\Concerns\VisibleWithCrmPermission;
 use App\Filament\Pages\CallQueuePage;
 use App\Filament\Pages\CallReportPage;
@@ -22,6 +25,12 @@ class CallingStatsWidget extends StatsOverviewWidget
     protected static function crmPermissionForWidget(): CrmPermission
     {
         return CrmPermission::DashboardCallingStats;
+    }
+
+    public static function canView(): bool
+    {
+        return FeatureGate::enabled(LicenseFeature::Calls)
+            && CrmAccess::can(Auth::user(), CrmPermission::DashboardCallingStats);
     }
 
     protected static ?int $sort = -5;

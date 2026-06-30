@@ -326,6 +326,15 @@ class BulkActivityMarksImportPage extends Page
 
     public function queueWhatsAppCampaign(ActivityMarksWhatsAppService $marksWhatsApp): void
     {
+        if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
+            Notification::make()
+                ->title('WhatsApp module is not enabled')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->validate([
             'whatsappTemplateId' => 'required|exists:whatsapp_templates,id',
         ]);

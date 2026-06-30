@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'student.portal' => \App\Http\Middleware\EnsureStudentPortalAuth::class,
+            'license.feature' => \App\Http\Middleware\EnsureLicenseFeature::class,
         ]);
     })
     ->withSchedule(function (Schedule $schedule): void {

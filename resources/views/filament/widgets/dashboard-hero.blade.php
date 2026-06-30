@@ -26,25 +26,29 @@
                             <x-filament::icon icon="heroicon-m-user-group" class="h-3.5 w-3.5" />
                             {{ $activeStudents }} enrolled
                         </span>
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
-                            <x-filament::icon icon="heroicon-m-check-circle" class="h-3.5 w-3.5" />
-                            {{ $presentToday }} present today
-                        </span>
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
-                            <x-filament::icon icon="heroicon-m-banknotes" class="h-3.5 w-3.5" />
-                            ₹{{ number_format($feeToday, 0) }} collected
-                        </span>
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
-                            <x-filament::icon icon="heroicon-m-exclamation-triangle" class="h-3.5 w-3.5" />
-                            ₹{{ number_format($pendingFeesTotal, 0) }} pending fees
-                        </span>
-                        @if ($pendingAdmissions > 0)
+                        @if ($showAttendanceSummary)
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
+                                <x-filament::icon icon="heroicon-m-check-circle" class="h-3.5 w-3.5" />
+                                {{ $presentToday }} present today
+                            </span>
+                        @endif
+                        @if ($showFeesSummary)
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
+                                <x-filament::icon icon="heroicon-m-banknotes" class="h-3.5 w-3.5" />
+                                ₹{{ number_format($feeToday, 0) }} collected
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
+                                <x-filament::icon icon="heroicon-m-exclamation-triangle" class="h-3.5 w-3.5" />
+                                ₹{{ number_format($pendingFeesTotal, 0) }} pending fees
+                            </span>
+                        @endif
+                        @if ($showAdmissionsSummary && $pendingAdmissions > 0)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/30 backdrop-blur-sm">
                                 <x-filament::icon icon="heroicon-m-clipboard-document-check" class="h-3.5 w-3.5" />
                                 {{ $pendingAdmissions }} pending admissions
                             </span>
                         @endif
-                        @if ($todayEnquiries > 0)
+                        @if ($showEnquirySummary && $todayEnquiries > 0)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
                                 <x-filament::icon icon="heroicon-m-inbox-arrow-down" class="h-3.5 w-3.5" />
                                 {{ $todayEnquiries }} new leads today

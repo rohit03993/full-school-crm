@@ -4,13 +4,24 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Widgets\Concerns\InteractsWithDashboardCharts;
 use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
+use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Services\CrmDashboardService;
+use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Support\Facades\Auth;
 
 class MonthlyAdmissionsChartWidget extends ChartWidget
 {
     use InteractsWithDashboardCharts;
     use VisibleToSuperAdminOnly;
+
+    public static function canView(): bool
+    {
+        return FeatureGate::enabled(LicenseFeature::Admissions)
+            && CrmAccess::can(Auth::user(), CrmPermission::DashboardOwnerStats);
+    }
 
     protected ?string $maxHeight = '280px';
 

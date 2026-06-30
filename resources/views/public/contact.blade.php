@@ -96,10 +96,17 @@
 
                 <div class="lg:col-span-3">
                     <div class="rounded-3xl border border-navy-100 bg-white p-6 shadow-sm sm:p-8 lg:p-10">
+                        @if ($enquiriesEnabled ?? true)
                         <h2 class="font-display text-xl font-bold text-navy-900 sm:text-2xl">Online Enquiry Form</h2>
                         <p class="mt-2 text-sm text-navy-600 sm:text-base">
                             Fill in your details and course interest. Your enquiry will be registered in our system instantly.
                         </p>
+                        @else
+                        <h2 class="font-display text-xl font-bold text-navy-900 sm:text-2xl">Visit Us</h2>
+                        <p class="mt-2 text-sm text-navy-600 sm:text-base">
+                            Online enquiries are not available at the moment. Please visit our campus or call us using the details on this page.
+                        </p>
+                        @endif
 
                         @if (session('enquiry_success'))
                             <div class="mt-6 rounded-2xl border border-green-200 bg-green-50 p-5 text-green-900">
@@ -112,6 +119,7 @@
                             </div>
                         @endif
 
+                        @if ($enquiriesEnabled ?? true)
                         <form action="{{ route('contact.enquiry') }}" method="POST" class="mt-8 space-y-5">
                             @csrf
 
@@ -205,6 +213,7 @@
                                 By submitting, you agree to be contacted by {{ $institute['name'] }} regarding your enquiry.
                             </p>
                         </form>
+                        @endif
                     </div>
                 </div>
             </div>

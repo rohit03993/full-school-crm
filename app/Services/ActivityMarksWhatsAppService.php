@@ -152,6 +152,10 @@ class ActivityMarksWhatsAppService
         string $testName,
         string $sessionDate,
     ): WhatsAppCampaign {
+        if (! \App\Support\FeatureGate::enabled(\App\Enums\LicenseFeature::WhatsApp)) {
+            throw new \RuntimeException('WhatsApp module is not enabled.');
+        }
+
         $template = WhatsAppTemplate::query()
             ->whereKey($templateId)
             ->where('is_active', true)

@@ -1,10 +1,12 @@
 @php
+    use App\Enums\LicenseFeature;
     use App\Filament\Pages\CallQueuePage;
     use App\Filament\Pages\Dashboard;
     use App\Filament\Pages\FollowUpsPage;
     use App\Filament\Pages\StudentSearchPage;
     use App\Filament\Resources\Enquiries\EnquiryResource;
     use App\Support\CrmNavBadges;
+    use App\Support\FeatureGate;
 
     $dueCount = CrmNavBadges::followUpsDue();
     $currentPath = trim(request()->path(), '/');
@@ -15,18 +17,21 @@
             'url' => Dashboard::getUrl(),
             'icon' => 'heroicon-o-home',
             'active' => $currentPath === 'admin' || str_ends_with($currentPath, '/admin'),
+            'visible' => true,
         ],
         [
             'label' => 'Search',
             'url' => StudentSearchPage::getUrl(),
             'icon' => 'heroicon-o-magnifying-glass',
             'active' => str_contains($currentPath, 'student-search-page'),
+            'visible' => true,
         ],
         [
             'label' => 'Leads',
             'url' => EnquiryResource::getUrl('index'),
             'icon' => 'heroicon-o-inbox-stack',
             'active' => str_contains($currentPath, 'enquiries'),
+            'visible' => FeatureGate::enabled(LicenseFeature::Enquiries),
         ],
         [
             'label' => 'Follow-ups',
@@ -34,14 +39,18 @@
             'icon' => 'heroicon-o-bell-alert',
             'active' => str_contains($currentPath, 'follow-ups-page'),
             'badge' => $dueCount > 0 ? $dueCount : null,
+            'visible' => FeatureGate::enabled(LicenseFeature::Enquiries),
         ],
         [
             'label' => 'Calls',
             'url' => CallQueuePage::getUrl(),
             'icon' => 'heroicon-o-phone',
             'active' => str_contains($currentPath, 'call-queue-page'),
+            'visible' => FeatureGate::enabled(LicenseFeature::Calls),
         ],
     ];
+
+    $tabs = array_values(array_filter($tabs, fn (array $tab): bool => $tab['visible']));
 @endphp
 
 <div class="fi-mobile-bottom-nav lg:hidden">

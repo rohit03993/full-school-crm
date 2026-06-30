@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Services\PalDigitalTemplateSyncService;
 use App\Services\PalDigitalWhatsAppService;
@@ -36,6 +37,11 @@ class ManageWhatsAppSettings extends Page
     protected static function requiredCrmPermission(): CrmPermission
     {
         return CrmPermission::WhatsappSettings;
+    }
+
+    protected static function requiredLicenseFeature(): ?LicenseFeature
+    {
+        return LicenseFeature::WhatsApp;
     }
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCog8Tooth;

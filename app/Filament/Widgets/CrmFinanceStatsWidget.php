@@ -3,16 +3,26 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Pages\BatchAttendancePage;
-use App\Enums\CrmPermission;
 use App\Filament\Widgets\Concerns\VisibleWithCrmPermission;
+use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Services\CrmDashboardService;
+use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Support\Facades\Auth;
 
 class CrmFinanceStatsWidget extends StatsOverviewWidget
 {
     use VisibleWithCrmPermission;
+
+    public static function canView(): bool
+    {
+        return FeatureGate::enabled(LicenseFeature::Fees)
+            && CrmAccess::can(Auth::user(), CrmPermission::DashboardFinanceStats);
+    }
 
     protected static function crmPermissionForWidget(): CrmPermission
     {

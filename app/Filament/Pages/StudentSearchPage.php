@@ -4,7 +4,9 @@ namespace App\Filament\Pages;
 
 use App\Enums\LeadSource;
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use App\Filament\Forms\EnquiryFormSchema;
 use App\Services\EnquiryService;
 use App\Services\StudentSearchService;
@@ -219,6 +221,17 @@ class StudentSearchPage extends Page
 
             $this->isSearching = false;
             $this->lookedUpMobile = $mobile;
+
+            if (! FeatureGate::enabled(LicenseFeature::Enquiries)) {
+                Notification::make()
+                    ->title('Student not found')
+                    ->body('This mobile is not registered yet. The leads module is not enabled — contact your software provider if you need enquiry tracking.')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
             $this->showEnquiryForm = true;
             $this->form->fill($this->quickEnquiryDefaults($mobile));
 

@@ -40,6 +40,8 @@ class LicenseService
 
     public function isSignatureValid(): bool
     {
+        $this->ensureDefaultLicense();
+
         $payload = Setting::getValue(self::PAYLOAD_KEY);
         $signature = Setting::getValue(self::SIGNATURE_KEY);
 
@@ -120,7 +122,9 @@ class LicenseService
             'expires_at_label' => $expiresAt?->format('d M Y'),
             'days_remaining' => $daysRemaining,
             'level' => $level,
-            'plan_label' => $this->plan()->label(),
+            'plan_label' => count($this->sanitizeFeatures(
+                is_array($this->current()['features'] ?? null) ? $this->current()['features'] : []
+            )).' modules enabled',
             'show_warning' => in_array($level, ['warning', 'critical'], true),
         ];
     }
@@ -136,6 +140,8 @@ class LicenseService
      */
     public function enabledFeatureKeys(): array
     {
+        $this->ensureDefaultLicense();
+
         if (! $this->isActive()) {
             return [];
         }
@@ -215,12 +221,9 @@ class LicenseService
             return;
         }
 
-        $plan = LicensePlan::tryFrom((string) config('license.default_plan', LicensePlan::FullResults->value))
-            ?? LicensePlan::FullResults;
-
         $this->save([
-            'plan' => $plan->value,
-            'features' => $this->featuresForPlan($plan),
+            'plan' => LicensePlan::Custom->value,
+            'features' => LicenseFeature::values(),
             'expires_at' => now()
                 ->addDays((int) config('license.default_valid_days', 365))
                 ->toDateString(),

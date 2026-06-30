@@ -27,6 +27,10 @@ class AttendanceWhatsAppService
     public function maybeQueueAfterBatchAttendance(Batch $batch, string $date, array $marks, User $staff): ?int
     {
         try {
+            if (! \App\Support\FeatureGate::enabled(\App\Enums\LicenseFeature::WhatsApp)) {
+                return null;
+            }
+
             if (! Setting::getValue('whatsapp.attendance_autosend_enabled')) {
                 return null;
             }

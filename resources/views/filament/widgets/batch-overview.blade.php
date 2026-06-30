@@ -4,16 +4,24 @@
             <div>
                 <h3 class="text-base font-bold text-gray-950 dark:text-white">Today by batch</h3>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Students, attendance, and pending fees — {{ $overview['date_label'] }}
+                    @if ($showAttendance && $showFees)
+                        Students, attendance, and pending fees — {{ $overview['date_label'] }}
+                    @elseif ($showAttendance)
+                        Students and attendance — {{ $overview['date_label'] }}
+                    @else
+                        Students and pending fees — {{ $overview['date_label'] }}
+                    @endif
                 </p>
             </div>
-            <a
-                href="{{ $attendanceUrl }}"
-                wire:navigate
-                class="inline-flex items-center rounded-xl bg-primary-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-primary-500"
-            >
-                Mark attendance
-            </a>
+            @if ($showAttendance)
+                <a
+                    href="{{ $attendanceUrl }}"
+                    wire:navigate
+                    class="inline-flex items-center rounded-xl bg-primary-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-primary-500"
+                >
+                    Mark attendance
+                </a>
+            @endif
         </div>
 
         @if (($overview['rows'] ?? []) === [])
@@ -25,10 +33,14 @@
                         <tr>
                             <th class="px-4 py-2.5">Batch</th>
                             <th class="px-4 py-2.5 text-center">Students</th>
-                            <th class="px-4 py-2.5 text-center">Present</th>
-                            <th class="px-4 py-2.5 text-center">Absent</th>
-                            <th class="px-4 py-2.5 text-center">Not marked</th>
-                            <th class="px-4 py-2.5 text-right">Pending fees</th>
+                            @if ($showAttendance)
+                                <th class="px-4 py-2.5 text-center">Present</th>
+                                <th class="px-4 py-2.5 text-center">Absent</th>
+                                <th class="px-4 py-2.5 text-center">Not marked</th>
+                            @endif
+                            @if ($showFees)
+                                <th class="px-4 py-2.5 text-right">Pending fees</th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-white/10">
@@ -36,22 +48,26 @@
                             <tr class="bg-white dark:bg-gray-900">
                                 <td class="px-4 py-2.5 font-medium text-gray-950 dark:text-white">{{ $row['label'] }}</td>
                                 <td class="px-4 py-2.5 text-center text-gray-700 dark:text-gray-300">{{ $row['students'] }}</td>
-                                <td class="px-4 py-2.5 text-center">
-                                    <span class="font-semibold text-emerald-700 dark:text-emerald-400">{{ $row['present_today'] }}</span>
-                                </td>
-                                <td class="px-4 py-2.5 text-center text-red-700 dark:text-red-400">{{ $row['absent_today'] }}</td>
-                                <td class="px-4 py-2.5 text-center">
-                                    @if ($row['not_marked_today'] > 0)
-                                        <span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-                                            {{ $row['not_marked_today'] }}
-                                        </span>
-                                    @else
-                                        <span class="text-gray-400">0</span>
-                                    @endif
-                                </td>
-                                <td class="px-4 py-2.5 text-right font-semibold text-amber-700 dark:text-amber-400">
-                                    ₹{{ number_format((float) $row['pending_fees'], 0) }}
-                                </td>
+                                @if ($showAttendance)
+                                    <td class="px-4 py-2.5 text-center">
+                                        <span class="font-semibold text-emerald-700 dark:text-emerald-400">{{ $row['present_today'] }}</span>
+                                    </td>
+                                    <td class="px-4 py-2.5 text-center text-red-700 dark:text-red-400">{{ $row['absent_today'] }}</td>
+                                    <td class="px-4 py-2.5 text-center">
+                                        @if ($row['not_marked_today'] > 0)
+                                            <span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                                                {{ $row['not_marked_today'] }}
+                                            </span>
+                                        @else
+                                            <span class="text-gray-400">0</span>
+                                        @endif
+                                    </td>
+                                @endif
+                                @if ($showFees)
+                                    <td class="px-4 py-2.5 text-right font-semibold text-amber-700 dark:text-amber-400">
+                                        ₹{{ number_format((float) $row['pending_fees'], 0) }}
+                                    </td>
+                                @endif
                             </tr>
                         @endforeach
                     </tbody>
@@ -59,10 +75,14 @@
                         <tr>
                             <td class="px-4 py-2.5">All batches</td>
                             <td class="px-4 py-2.5 text-center">{{ $overview['totals']['students'] }}</td>
-                            <td class="px-4 py-2.5 text-center text-emerald-700 dark:text-emerald-400">{{ $overview['totals']['present_today'] }}</td>
-                            <td class="px-4 py-2.5 text-center text-red-700 dark:text-red-400">{{ $overview['totals']['absent_today'] }}</td>
-                            <td class="px-4 py-2.5 text-center">{{ $overview['totals']['not_marked_today'] }}</td>
-                            <td class="px-4 py-2.5 text-right text-amber-700 dark:text-amber-400">₹{{ number_format((float) $overview['totals']['pending_fees'], 0) }}</td>
+                            @if ($showAttendance)
+                                <td class="px-4 py-2.5 text-center text-emerald-700 dark:text-emerald-400">{{ $overview['totals']['present_today'] }}</td>
+                                <td class="px-4 py-2.5 text-center text-red-700 dark:text-red-400">{{ $overview['totals']['absent_today'] }}</td>
+                                <td class="px-4 py-2.5 text-center">{{ $overview['totals']['not_marked_today'] }}</td>
+                            @endif
+                            @if ($showFees)
+                                <td class="px-4 py-2.5 text-right text-amber-700 dark:text-amber-400">₹{{ number_format((float) $overview['totals']['pending_fees'], 0) }}</td>
+                            @endif
                         </tr>
                     </tfoot>
                 </table>
