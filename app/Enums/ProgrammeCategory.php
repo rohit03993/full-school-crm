@@ -8,6 +8,7 @@ enum ProgrammeCategory: string
     case Coaching = 'coaching';
     case College = 'college';
     case Certificate = 'certificate';
+    case Hospitality = 'hospitality';
     case Custom = 'custom';
 
     public function label(): string
@@ -17,6 +18,7 @@ enum ProgrammeCategory: string
             self::Coaching => 'Coaching',
             self::College => 'College',
             self::Certificate => 'Certificate',
+            self::Hospitality => 'Hotel Management',
             self::Custom => 'Custom',
         };
     }
@@ -28,6 +30,7 @@ enum ProgrammeCategory: string
             self::Coaching => 'heroicon-m-academic-cap',
             self::College => 'heroicon-m-building-office-2',
             self::Certificate => 'heroicon-m-document-check',
+            self::Hospitality => 'heroicon-m-building-storefront',
             self::Custom => 'heroicon-m-squares-2x2',
         };
     }
@@ -39,6 +42,7 @@ enum ProgrammeCategory: string
             self::Coaching => 'purple',
             self::College => 'info',
             self::Certificate => 'success',
+            self::Hospitality => 'amber',
             self::Custom => 'gray',
         };
     }

@@ -7,6 +7,7 @@ enum InstituteType: string
     case School = 'school';
     case Coaching = 'coaching';
     case College = 'college';
+    case Hospitality = 'hospitality';
 
     public function label(): string
     {
@@ -14,6 +15,7 @@ enum InstituteType: string
             self::School => 'School',
             self::Coaching => 'Coaching Institute',
             self::College => 'College / University',
+            self::Hospitality => 'Hotel Management Institute',
         };
     }
 
@@ -23,6 +25,7 @@ enum InstituteType: string
             self::School => 'Class-based programmes, sections, and term exams.',
             self::Coaching => 'Competitive exam batches, mock tests, and test series.',
             self::College => 'Degree programmes, semesters, and internal assessments.',
+            self::Hospitality => 'Hotel management programmes, practicals, workshops, and internal assessments.',
         };
     }
 
@@ -32,6 +35,7 @@ enum InstituteType: string
             self::School => 'Class / Programme',
             self::Coaching => 'Coaching Programme',
             self::College => 'Degree / Programme',
+            self::Hospitality => 'Hotel Management Programme',
         };
     }
 
@@ -41,6 +45,7 @@ enum InstituteType: string
             self::School => 'Class / Section',
             self::Coaching => 'Batch',
             self::College => 'Semester / Section',
+            self::Hospitality => 'Batch / Section',
         };
     }
 
@@ -50,6 +55,7 @@ enum InstituteType: string
             self::School => ProgrammeCategory::School,
             self::Coaching => ProgrammeCategory::Coaching,
             self::College => ProgrammeCategory::College,
+            self::Hospitality => ProgrammeCategory::Hospitality,
         };
     }
 
@@ -59,6 +65,7 @@ enum InstituteType: string
             self::School => MeetingFor::School,
             self::Coaching => MeetingFor::Coaching,
             self::College => MeetingFor::College,
+            self::Hospitality => MeetingFor::General,
         };
     }
 

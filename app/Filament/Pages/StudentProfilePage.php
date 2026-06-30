@@ -562,6 +562,19 @@ class StudentProfilePage extends Page
         $discount = max(0, (float) ($this->discountAmount ?? 0));
         $miscTotal = FeePlanCalculator::sumAmounts($this->miscFees);
         $netFee = max(0, $courseFee - $discount + $miscTotal);
+        $course = $this->activeAdmission?->enquiry?->course;
+
+        if ($course) {
+            $course->loadMissing('installmentTemplates');
+            $templatePlan = FeePlanCalculator::planFromCourseTemplates($course, $netFee);
+
+            if ($templatePlan !== []) {
+                $this->installmentPlan = $templatePlan;
+                $this->useInstallmentPlan = true;
+
+                return;
+            }
+        }
 
         $this->installmentPlan = FeePlanCalculator::defaultTwoPartPlan($netFee);
         $this->useInstallmentPlan = true;
@@ -595,6 +608,19 @@ class StudentProfilePage extends Page
         $netFee = max(0, $courseFee - $discount + $miscTotal);
 
         if ($this->installmentPlan === [] && $netFee > 0) {
+            $course = $this->activeAdmission?->enquiry?->course;
+
+            if ($course) {
+                $course->loadMissing('installmentTemplates');
+                $templatePlan = FeePlanCalculator::planFromCourseTemplates($course, $netFee);
+
+                if ($templatePlan !== []) {
+                    $this->installmentPlan = $templatePlan;
+
+                    return;
+                }
+            }
+
             $this->installmentPlan = [FeePlanCalculator::singleFullFeeRow($netFee)];
         }
     }

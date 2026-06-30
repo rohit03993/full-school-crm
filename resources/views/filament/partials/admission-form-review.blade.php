@@ -108,7 +108,7 @@
     @if ($admission->course_fee !== null)
         <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
             <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Fee Summary</p>
-            @include('filament.pages.partials.student-profile-admission-fees', [
+            @include('filament.partials.admission-fee-review-summary', [
                 'activeAdmission' => $admission,
             ])
         </div>

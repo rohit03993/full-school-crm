@@ -327,4 +327,45 @@ class FeePlanCalculator
             'due_date' => now()->toDateString(),
         ];
     }
+
+    /**
+     * @return array<int, array{label: string, amount: string, due_date: ?string}>
+     */
+    public static function planFromCourseTemplates(\App\Models\Course $course, float $netFee, ?\Illuminate\Support\Carbon $baseDate = null): array
+    {
+        $course->loadMissing('installmentTemplates');
+        $templates = $course->installmentTemplates->sortBy('sort_order')->values();
+
+        if ($templates->isEmpty() || $netFee <= 0) {
+            return [];
+        }
+
+        $base = ($baseDate ?? now())->copy()->startOfDay();
+        $lastIndex = $templates->count() - 1;
+        $allocated = 0.0;
+        $rows = [];
+
+        foreach ($templates as $index => $template) {
+            $amount = $index === $lastIndex
+                ? round($netFee - $allocated, 2)
+                : round($netFee * ((float) $template->percentage / 100), 2);
+
+            $allocated += $amount;
+
+            $rows[] = [
+                'label' => filled($template->label)
+                    ? (string) $template->label
+                    : self::installmentLabel($index + 1),
+                'amount' => (string) max(0, $amount),
+                'due_date' => $base->copy()
+                    ->addDays(max(0, (int) $template->due_days_after_enrollment))
+                    ->toDateString(),
+            ];
+        }
+
+        return array_map(
+            fn (array $row): array => $row,
+            self::sortInstallmentPlanByDueDate($rows),
+        );
+    }
 }

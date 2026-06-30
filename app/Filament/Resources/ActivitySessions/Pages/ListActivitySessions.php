@@ -10,13 +10,14 @@ use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
 use App\Filament\Resources\ActivityTypes\ActivityTypeResource;
 use App\Models\ActivityType;
 use App\Models\Batch;
-use App\Support\EduExamLabels;
+use App\Services\ResultDeclarationService;
 use App\Support\ExamTestGroupMatrix;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Schema as DbSchema;
 
 class ListActivitySessions extends ListRecords
 {
@@ -42,16 +43,35 @@ class ListActivitySessions extends ListRecords
 
     public function content(Schema $schema): Schema
     {
+        if (! $this->activitySchemaReady()) {
+            return $schema->components([
+                View::make('filament.resources.activity-sessions.schema-repair-notice'),
+            ]);
+        }
+
+        $matrix = ExamTestGroupMatrix::build($this->batchFilter, $this->activityTypeFilter);
+
         return $schema->components([
             View::make('filament.resources.activity-sessions.exam-test-groups-list')
                 ->viewData(fn (): array => [
-                    'matrix' => ExamTestGroupMatrix::build($this->batchFilter, $this->activityTypeFilter),
+                    'matrix' => $matrix,
                     'batchOptions' => Batch::query()->orderBy('name')->pluck('name', 'id')->all(),
                     'activityTypeOptions' => ActivityType::query()->enabled()->ordered()->pluck('name', 'id')->all(),
                     'importMarksUrl' => BulkActivityMarksImportPage::getUrl(),
                     'reviewPageBaseUrl' => TestMarksReviewPage::getUrl(),
+                    'declarationStatuses' => collect($matrix['rows'] ?? [])
+                        ->mapWithKeys(fn (array $row): array => [
+                            (string) ($row['group_key'] ?? '') => ResultDeclarationService::statusMetaForGroupKey((string) ($row['group_key'] ?? '')),
+                        ])
+                        ->all(),
                 ]),
         ]);
+    }
+
+    protected function activitySchemaReady(): bool
+    {
+        return DbSchema::hasTable('activity_types')
+            && DbSchema::hasTable('activity_sessions');
     }
 
     protected function getHeaderActions(): array
@@ -66,7 +86,7 @@ class ListActivitySessions extends ListRecords
                 ->url(BulkActivityMarksImportPage::getUrl());
         }
 
-        if (! ActivityType::query()->enabled()->exists()) {
+        if ($this->activitySchemaReady() && ! ActivityType::query()->enabled()->exists()) {
             if (ActivityTypeResource::canAccess()) {
                 $actions[] = Action::make('setupActivityTypes')
                     ->label('Set up exam types first')

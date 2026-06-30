@@ -2,7 +2,7 @@
     <div class="overflow-hidden rounded-2xl border border-primary-500/20 bg-gradient-to-r from-primary-500/5 to-white shadow-sm ring-1 ring-gray-950/5 dark:from-primary-500/10 dark:to-gray-900 dark:ring-white/10">
         <div class="px-4 py-5 sm:px-6">
             <h2 class="text-base font-bold text-gray-950 dark:text-white">How test marks work</h2>
-            <ol class="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+            <ol class="mt-3 grid gap-3 text-sm sm:grid-cols-4">
                 <li class="rounded-xl bg-white/80 px-3 py-3 ring-1 ring-gray-200 dark:bg-gray-900/80 dark:ring-white/10">
                     <p class="text-[10px] font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400">Step 1 · Setup (once)</p>
                     <p class="mt-1 text-gray-700 dark:text-gray-300">
@@ -19,6 +19,12 @@
                     <p class="text-[10px] font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400">Step 3 · Review</p>
                     <p class="mt-1 text-gray-700 dark:text-gray-300">
                         Tests appear in the table below. <strong>View sheet</strong> to see scores · <strong>Upload again</strong> on a row to update marks for that test.
+                    </p>
+                </li>
+                <li class="rounded-xl bg-white/80 px-3 py-3 ring-1 ring-gray-200 dark:bg-gray-900/80 dark:ring-white/10">
+                    <p class="text-[10px] font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400">Step 4 · Declare</p>
+                    <p class="mt-1 text-gray-700 dark:text-gray-300">
+                        <strong>View sheet</strong> → <strong>Publish results online</strong> for the student portal · Super Admin can <strong>issue PDF marksheets</strong>.
                     </p>
                 </li>
             </ol>
@@ -68,6 +74,7 @@
                         <th class="px-4 py-2.5">Exam type</th>
                         <th class="px-4 py-2.5">Batch</th>
                         <th class="px-4 py-2.5">Date</th>
+                        <th class="px-4 py-2.5">Result</th>
                         @foreach ($matrix['subjects'] as $subject)
                             <th class="px-4 py-2.5 text-center">{{ $subject }}</th>
                         @endforeach
@@ -84,6 +91,24 @@
                             <td class="px-4 py-2.5 text-gray-600 dark:text-gray-400">{{ $row['batch'] ?? '—' }}</td>
                             <td class="whitespace-nowrap px-4 py-2.5 text-gray-600 dark:text-gray-400">
                                 {{ $row['date']?->format('d M Y') ?? '—' }}
+                            </td>
+                            @php
+                                $status = $declarationStatuses[$row['group_key'] ?? ''] ?? ['label' => '—', 'color' => 'gray'];
+                                $badgeClass = match ($status['color'] ?? 'gray') {
+                                    'success' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
+                                    'info' => 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300',
+                                    'warning' => 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300',
+                                    default => 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400',
+                                };
+                            @endphp
+                            <td class="px-4 py-2.5">
+                                @if (($row['tracks_marks'] ?? true) && filled($row['group_key'] ?? null))
+                                    <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {{ $badgeClass }}">
+                                        {{ $status['label'] ?? '—' }}
+                                    </span>
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
                             </td>
                             @foreach ($matrix['subjects'] as $subject)
                                 @php

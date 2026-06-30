@@ -7,9 +7,11 @@ use App\Services\SiteContentService;
 use App\Services\SiteImageService;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
+use App\Support\SiteLogo;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -79,9 +81,13 @@ class ManageSiteContent extends Page
                         ->icon(Heroicon::OutlinedPhoto)
                         ->schema([
                             Section::make('Logo & Favicon')
-                                ->description('Max 350 KB per image. Use the editor to crop after upload.')
+                                ->description('Logo uses a fixed website header frame — drag and zoom to position your image inside it. Favicon stays square.')
                                 ->schema([
-                                    $this->imageUpload('logo', 'Institute Logo', 'site/logo'),
+                                    Placeholder::make('logo_frame_hint')
+                                        ->label('Header logo frame')
+                                        ->content('Fixed size '.SiteLogo::ASPECT_RATIO.' ('.SiteLogo::DISPLAY_MAX_WIDTH.'×'.SiteLogo::DISPLAY_HEIGHT.' px on site). Upload, then use the crop editor: zoom out so the full logo is visible, drag to position, and save.')
+                                        ->columnSpanFull(),
+                                    $this->logoUpload(),
                                     $this->imageUpload('favicon', 'Favicon', 'site/favicon')
                                         ->imageEditorAspectRatioOptions(['1:1' => 'Square']),
                                 ])
@@ -245,6 +251,30 @@ class ManageSiteContent extends Page
                 ])
                 ->columnSpanFull(),
         ]);
+    }
+
+    protected function logoUpload(): FileUpload
+    {
+        return FileUpload::make('logo')
+            ->label('Institute Logo')
+            ->image()
+            ->maxSize(SiteImageService::MAX_KILOBYTES)
+            ->imageEditor()
+            ->imageEditorMode(2)
+            ->imageEditorViewportWidth(SiteLogo::EXPORT_WIDTH)
+            ->imageEditorViewportHeight(SiteLogo::EXPORT_HEIGHT)
+            ->imageEditorAspectRatioOptions([
+                SiteLogo::ASPECT_RATIO => 'Website header ('.SiteLogo::ASPECT_RATIO.')',
+            ])
+            ->imageEditorEmptyFillColor('#ffffff')
+            ->imageAspectRatio(SiteLogo::ASPECT_RATIO)
+            ->automaticallyOpenImageEditorForAspectRatio()
+            ->disk(SiteImageService::DISK)
+            ->directory('site/logo')
+            ->visibility('public')
+            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->helperText('Only for the website header. After upload, open the editor: pinch/zoom out, then drag the image inside the frame. The saved file is always the same size.')
+            ->columnSpanFull();
     }
 
     protected function imageUpload(string $name, string $label, string $directory): FileUpload

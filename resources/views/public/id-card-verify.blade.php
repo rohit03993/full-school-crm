@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Verify Student — {{ config('institute.name') }}</title>
-    @vite(['resources/css/app.css'])
+    @include('partials.vite-assets', ['assets' => ['resources/css/app.css']])
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
     <main class="mx-auto flex min-h-screen max-w-lg items-center px-4 py-10">

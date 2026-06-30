@@ -8,13 +8,17 @@ use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use App\Filament\Pages\BulkActivityMarksImportPage;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Pages\FeesDashboardPage;
+use App\Filament\Pages\MyAccountPage;
 use App\Filament\Pages\TestMarksReviewPage;
 use App\Support\InstituteSettings;
 use App\Support\CrmNavigation;
+use Filament\Navigation\MenuItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
 use Filament\Widgets\AccountWidget;
@@ -34,6 +38,12 @@ class RohitPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login(\App\Filament\Auth\Login::class)
+            ->userMenuItems([
+                'profile' => MenuItem::make()
+                    ->label('My account')
+                    ->icon(Heroicon::OutlinedUserCircle)
+                    ->url(fn (): string => MyAccountPage::getUrl()),
+            ])
             ->brandName(fn (): string => InstituteSettings::brandName())
             ->brandLogo(fn (): ?string => InstituteSettings::panelLogoUrl())
             ->colors([
@@ -54,8 +64,10 @@ class RohitPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
+                FeesDashboardPage::class,
                 BulkActivityMarksImportPage::class,
                 TestMarksReviewPage::class,
+                MyAccountPage::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([

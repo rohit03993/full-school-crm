@@ -15,6 +15,7 @@ use App\Http\Controllers\StudentPortal\HomeworkController;
 use App\Http\Controllers\StudentPortal\IdCardDownloadController as PortalIdCardDownloadController;
 use App\Http\Controllers\StudentPortal\ReceiptDownloadController as PortalReceiptDownloadController;
 use App\Http\Controllers\Admin\HomeworkFileController;
+use App\Http\Controllers\Admin\MarksheetDownloadController;
 use App\Http\Middleware\EnsureStudentPortalAuth;
 use Illuminate\Support\Facades\Route;
 
@@ -39,6 +40,10 @@ Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
         ->name('admin.homework.preview');
     Route::get('homework-assignments/{homeworkAssignment}/download', [HomeworkFileController::class, 'download'])
         ->name('admin.homework.download');
+    Route::get('marksheets/{marksheet}/preview', [MarksheetDownloadController::class, 'preview'])
+        ->name('admin.marksheets.preview');
+    Route::get('marksheets/{marksheet}/download', [MarksheetDownloadController::class, 'download'])
+        ->name('admin.marksheets.download');
 });
 
 Route::get('/verify/{enrollment}', IdCardVerifyController::class)->name('id-card.verify');

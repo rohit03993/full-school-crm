@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Courses\Pages;
 
 use App\Enums\CourseStatus;
 use App\Filament\Concerns\ShowsCrmPageHint;
+use App\Filament\Resources\Courses\Concerns\SyncsCourseInstallmentTemplates;
 use App\Filament\Resources\Courses\CourseResource;
 use App\Models\Course;
 use Filament\Actions\Action;
@@ -14,6 +15,7 @@ use Filament\Resources\Pages\EditRecord;
 class EditCourse extends EditRecord
 {
     use ShowsCrmPageHint;
+    use SyncsCourseInstallmentTemplates;
 
     protected static string $resource = CourseResource::class;
 
@@ -64,5 +66,19 @@ class EditCourse extends EditRecord
     protected function getRedirectUrl(): string
     {
         return $this->getResource()::getUrl('index');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        return $this->mutateFormDataBeforeFillForInstallmentTemplates($data, $this->record);
+    }
+
+    protected function afterSave(): void
+    {
+        $this->syncCourseInstallmentTemplates($this->record, $this->form->getState());
     }
 }

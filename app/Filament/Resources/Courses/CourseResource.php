@@ -14,6 +14,7 @@ use App\Filament\Resources\Courses\Pages\EditCourse;
 use App\Filament\Resources\Courses\Pages\ListCourses;
 use App\Filament\Support\CrmTable;
 use App\Models\Course;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -133,6 +134,38 @@ class CourseResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
+                Section::make('Default installment plan')
+                    ->description('Optional. When staff convert a student to this course, these rows auto-fill the admission installment schedule (percentages should total 100%).')
+                    ->schema([
+                        Repeater::make('installment_templates')
+                            ->label('Installments')
+                            ->schema([
+                                TextInput::make('label')
+                                    ->required()
+                                    ->maxLength(100)
+                                    ->placeholder('e.g. Admission fee'),
+                                TextInput::make('percentage')
+                                    ->label('Share (%)')
+                                    ->numeric()
+                                    ->required()
+                                    ->minValue(0.01)
+                                    ->maxValue(100)
+                                    ->step(0.01)
+                                    ->suffix('%'),
+                                TextInput::make('due_days_after_enrollment')
+                                    ->label('Due days after enrollment')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->minValue(0)
+                                    ->helperText('0 = due on enrollment date'),
+                            ])
+                            ->columns(3)
+                            ->columnSpanFull()
+                            ->defaultItems(0)
+                            ->addActionLabel('Add installment'),
+                    ])
+                    ->collapsed()
+                    ->columnSpanFull(),
             ]);
     }
 

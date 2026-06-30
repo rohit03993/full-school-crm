@@ -34,18 +34,27 @@
     {{-- Main nav --}}
     <div class="border-b border-navy-100/80 bg-white/95 shadow-sm shadow-navy-900/5 backdrop-blur-md">
         <div class="relative mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8 lg:py-4">
-            <a href="{{ route('home') }}" class="group flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3 lg:flex-none">
+            <a href="{{ route('home') }}" class="group flex min-w-0 flex-1 items-center lg:flex-none">
                 @if (! empty($institute['logo_url']))
-                    <img src="{{ $institute['logo_url'] }}" alt="{{ $institute['name'] }}" class="h-10 w-10 shrink-0 rounded-xl object-cover shadow-lg sm:h-12 sm:w-12">
+                    <div
+                        class="flex h-12 shrink-0 items-center justify-start sm:h-14"
+                        style="width: min(100%, {{ \App\Support\SiteLogo::DISPLAY_MAX_WIDTH }}px); aspect-ratio: {{ \App\Support\SiteLogo::ASPECT_WIDTH }} / {{ \App\Support\SiteLogo::ASPECT_HEIGHT }};"
+                    >
+                        <img
+                            src="{{ $institute['logo_url'] }}"
+                            alt="{{ $institute['name'] }}"
+                            class="h-full w-full object-contain object-left"
+                        >
+                    </div>
                 @else
                     <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-xs font-bold text-white shadow-lg shadow-brand-500/30 sm:h-12 sm:w-12 sm:text-sm">
                         {{ $initials }}
                     </div>
+                    <div class="min-w-0 leading-tight">
+                        <div class="truncate font-display text-base font-bold text-navy-900 sm:text-xl">{{ $institute['name'] }}</div>
+                        <div class="hidden truncate text-xs font-medium text-navy-500 sm:block">{{ $institute['tagline'] }}</div>
+                    </div>
                 @endif
-                <div class="min-w-0 leading-tight">
-                    <div class="truncate font-display text-base font-bold text-navy-900 sm:text-xl">{{ $institute['name'] }}</div>
-                    <div class="hidden truncate text-xs font-medium text-navy-500 sm:block">{{ $institute['tagline'] }}</div>
-                </div>
             </a>
 
             <nav class="hidden items-center gap-1 lg:flex">

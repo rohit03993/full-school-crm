@@ -12,6 +12,7 @@ use App\Filament\Support\CrmTable;
 use App\Models\AcademicSession;
 use App\Models\Course;
 use App\Models\Student;
+use App\Services\FeesDashboardService;
 use App\Support\CrmNavigation;
 use App\Support\InstituteProfile;
 use Filament\Actions\Action;
@@ -56,6 +57,7 @@ class StudentResource extends Resource
             ->with([
                 'activeEnrollment.course',
                 'activeEnrollment.academicSession',
+                'activeEnrollment.feeStructure.installments',
                 'activeBatchStudent.batch',
             ]);
     }
@@ -92,6 +94,32 @@ class StudentResource extends Resource
                     ->label('Course')
                     ->placeholder('—')
                     ->limit(30)
+                    ->toggleable(),
+                TextColumn::make('activeEnrollment.feeStructure.pending_amount')
+                    ->label('Fee pending')
+                    ->money('INR')
+                    ->placeholder('—')
+                    ->sortable()
+                    ->color(fn ($state): string => (float) ($state ?? 0) > 0 ? 'warning' : 'success'),
+                TextColumn::make('fee_next_due')
+                    ->label('Next due')
+                    ->state(function (Student $record): ?string {
+                        $date = app(FeesDashboardService::class)->nextDueDateForStudent($record);
+
+                        return $date?->format('d M Y');
+                    })
+                    ->placeholder('—')
+                    ->toggleable(),
+                TextColumn::make('fee_status')
+                    ->label('Fee status')
+                    ->badge()
+                    ->state(function (Student $record): ?string {
+                        return app(FeesDashboardService::class)->feeStatusForStudent($record)['label'] ?? null;
+                    })
+                    ->color(function (Student $record): string {
+                        return app(FeesDashboardService::class)->feeStatusForStudent($record)['color'] ?? 'gray';
+                    })
+                    ->placeholder('—')
                     ->toggleable(),
                 TextColumn::make('activeEnrollment.academicSession.name')
                     ->label('Session')

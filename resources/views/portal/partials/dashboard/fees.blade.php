@@ -3,6 +3,8 @@
         $netFee = (float) $fees->net_fee;
         $paidAmount = (float) $fees->paid_amount;
         $pendingAmount = (float) $fees->pending_amount;
+        $installments = $installments ?? collect();
+        $miscCharges = $miscCharges ?? collect();
     @endphp
 
     <div class="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
@@ -48,9 +50,66 @@
                 ])>₹{{ number_format($pendingAmount, 0) }}</p>
             </div>
         </div>
+
+        @if ($miscCharges->isNotEmpty())
+            <div class="mt-4 rounded-xl border border-navy-100 p-3">
+                <p class="text-[10px] font-bold uppercase tracking-wide text-navy-500">Miscellaneous</p>
+                <ul class="mt-2 space-y-1 text-sm text-navy-700">
+                    @foreach ($miscCharges as $charge)
+                        <li class="flex justify-between gap-3">
+                            <span>{{ $charge->label }}</span>
+                            <span class="font-semibold">₹{{ number_format((float) $charge->amount, 2) }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
     </section>
 
     <section class="portal-card overflow-hidden">
+        <div class="border-b border-navy-100 px-4 py-3.5 sm:px-5">
+            <h2 class="font-display text-lg font-bold text-navy-900">Installment schedule</h2>
+            <p class="mt-0.5 text-sm text-navy-500">What is due and when</p>
+        </div>
+
+        @if ($installments->isEmpty())
+            <div class="px-4 py-8 text-center sm:px-5">
+                <p class="text-sm text-navy-600">Installment details will appear here once scheduled.</p>
+            </div>
+        @else
+            <ul class="divide-y divide-navy-100">
+                @foreach ($installments as $installment)
+                    @php
+                        $status = $installment->statusLabel();
+                    @endphp
+                    <li class="p-4 sm:p-5">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p class="font-semibold text-navy-900">{{ $installment->label }}</p>
+                                <p class="mt-0.5 text-sm text-navy-600">
+                                    Due {{ $installment->due_date?->format('d M Y') ?? 'On enrollment' }}
+                                    · Paid ₹{{ number_format((float) $installment->paid_amount, 2) }}
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <p class="text-sm font-bold text-navy-900">₹{{ number_format((float) $installment->pending_amount, 2) }} due</p>
+                                <span @class([
+                                    'rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                                    'bg-emerald-100 text-emerald-800' => $status === 'Paid',
+                                    'bg-red-100 text-red-800' => $status === 'Overdue',
+                                    'bg-amber-100 text-amber-900' => $status === 'Partial',
+                                    'bg-navy-100 text-navy-700' => $status === 'Pending',
+                                ])>{{ $status }}</span>
+                            </div>
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </section>
+    </div>
+
+    <section class="portal-card overflow-hidden mt-4">
         <div class="border-b border-navy-100 px-4 py-3.5 sm:px-5">
             <h2 class="font-display text-lg font-bold text-navy-900">Payment history</h2>
             <p class="mt-0.5 text-sm text-navy-500">{{ $payments->count() }} payment{{ $payments->count() === 1 ? '' : 's' }} on record</p>
@@ -70,6 +129,9 @@
                                 <p class="font-mono text-sm font-bold text-brand-700">{{ $payment->receipt_number }}</p>
                                 <p class="mt-1 text-sm text-navy-600">
                                     {{ $payment->payment_date->format('d M Y') }} · {{ $payment->payment_mode->label() }}
+                                    @if ($payment->feeInstallment)
+                                        · {{ $payment->feeInstallment->label }}
+                                    @endif
                                 </p>
                                 <p class="mt-1.5 text-xl font-bold text-emerald-700">₹{{ number_format((float) $payment->amount, 2) }}</p>
                             </div>
@@ -86,7 +148,6 @@
             </ul>
         @endif
     </section>
-    </div>
 @elseif ($student->activeEnrollment)
     <section class="portal-card p-5 text-sm leading-relaxed text-navy-600">
         Fee details are being set up. Contact the office for payment queries.
