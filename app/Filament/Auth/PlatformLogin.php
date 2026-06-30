@@ -16,7 +16,7 @@ class PlatformLogin extends Login
 
     public function authenticate(): ?\Filament\Auth\Http\Responses\Contracts\LoginResponse
     {
-        $response = parent::authenticate();
+        $response = BaseLogin::authenticate();
 
         $user = auth()->user();
 

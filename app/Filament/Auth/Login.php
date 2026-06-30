@@ -3,6 +3,7 @@
 namespace App\Filament\Auth;
 
 use Filament\Auth\Pages\Login as BaseLogin;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Illuminate\Validation\ValidationException;
@@ -45,7 +46,7 @@ class Login extends BaseLogin
 
         $user = auth()->user();
 
-        if ($user?->isPlatformOperator()) {
+        if (Filament::getCurrentPanel()?->getId() === 'admin' && $user?->isPlatformOperator()) {
             auth()->logout();
 
             throw ValidationException::withMessages([
