@@ -16,6 +16,7 @@ use App\Http\Controllers\StudentPortal\IdCardDownloadController as PortalIdCardD
 use App\Http\Controllers\StudentPortal\ReceiptDownloadController as PortalReceiptDownloadController;
 use App\Http\Controllers\Admin\HomeworkFileController;
 use App\Http\Controllers\Admin\MarksheetDownloadController;
+use App\Http\Middleware\EnsurePortalLicensed;
 use App\Http\Middleware\EnsureStudentPortalAuth;
 use Illuminate\Support\Facades\Route;
 
@@ -56,7 +57,7 @@ Route::post('/contact/enquiry', [ContactController::class, 'store'])
     ->middleware('throttle:10,1')
     ->name('contact.enquiry');
 
-Route::prefix('portal')->name('portal.')->group(function () {
+Route::prefix('portal')->name('portal.')->middleware(EnsurePortalLicensed::class)->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])
         ->middleware('throttle:10,1')

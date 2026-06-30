@@ -4,8 +4,10 @@ namespace App\Filament\Pages;
 
 use App\Filament\Concerns\FinishesAttendanceSave;
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Enums\BatchStatus;
 use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use App\Models\ActivityType;
 use App\Models\Batch;
 use App\Models\BatchStudent;
@@ -46,6 +48,10 @@ class SessionAttendancePage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Attendance)) {
+            return false;
+        }
+
         return CrmAccess::can(Auth::user(), CrmPermission::AttendanceWorkshops);
     }
 

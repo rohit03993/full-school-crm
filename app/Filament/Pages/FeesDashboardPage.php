@@ -3,10 +3,12 @@
 namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Services\FeesDashboardService;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
+use App\Support\FeatureGate;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
@@ -44,6 +46,10 @@ class FeesDashboardPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Fees)) {
+            return false;
+        }
+
         return CrmAccess::canAny(Auth::user(), CrmPermission::FeesCollect, CrmPermission::FeesAdjustStructure);
     }
 

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ActivityTypes;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Filament\Concerns\RequiresAnyCrmPermission;
 use App\Filament\Resources\ActivityTypes\Pages\CreateActivityType;
@@ -42,6 +43,11 @@ class ActivityTypeResource extends Resource
             CrmPermission::MarksImport,
             CrmPermission::AcademicsManage,
         ];
+    }
+
+    protected static function requiredLicenseFeature(): ?LicenseFeature
+    {
+        return LicenseFeature::Marks;
     }
 
     protected static ?string $model = ActivityType::class;

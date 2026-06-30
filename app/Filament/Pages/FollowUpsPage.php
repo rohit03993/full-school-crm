@@ -3,8 +3,10 @@
 namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Services\FollowUpWorklistService;
 use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
 use Filament\Pages\Page;
@@ -29,6 +31,10 @@ class FollowUpsPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Enquiries)) {
+            return false;
+        }
+
         return CrmAccess::can(Auth::user(), CrmPermission::LeadsViewAssigned);
     }
 

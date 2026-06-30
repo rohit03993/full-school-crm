@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\HomeworkAssignments;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresAnyCrmPermission;
 use App\Filament\Resources\HomeworkAssignments\Pages\CreateHomeworkAssignment;
 use App\Filament\Resources\HomeworkAssignments\Pages\ListHomeworkAssignments;
@@ -41,6 +42,11 @@ class HomeworkAssignmentResource extends Resource
     protected static function anyCrmPermissions(): array
     {
         return [CrmPermission::HomeworkManage];
+    }
+
+    protected static function requiredLicenseFeature(): ?LicenseFeature
+    {
+        return LicenseFeature::Homework;
     }
 
     protected static ?string $model = HomeworkAssignment::class;

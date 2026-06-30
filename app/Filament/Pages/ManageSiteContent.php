@@ -3,6 +3,8 @@
 namespace App\Filament\Pages;
 
 use App\Enums\RoleName;
+use App\Enums\LicenseFeature;
+use App\Support\FeatureGate;
 use App\Services\SiteContentService;
 use App\Services\SiteImageService;
 use App\Support\CrmHint;
@@ -53,6 +55,10 @@ class ManageSiteContent extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Website)) {
+            return false;
+        }
+
         return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
     }
 

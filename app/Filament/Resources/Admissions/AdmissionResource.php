@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Admissions;
 
 use App\Enums\AdmissionStatus;
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Support\CrmNavBadges;
 use App\Filament\Pages\StudentProfilePage;
@@ -28,6 +29,11 @@ class AdmissionResource extends Resource
     protected static function requiredCrmPermission(): CrmPermission
     {
         return CrmPermission::AdmissionsView;
+    }
+
+    protected static function requiredLicenseFeature(): ?LicenseFeature
+    {
+        return LicenseFeature::Admissions;
     }
 
     protected static ?string $model = Admission::class;

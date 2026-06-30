@@ -59,6 +59,7 @@ class StaffResource extends Resource
     {
         return parent::getEloquentQuery()
             ->with(['roles', 'staffProfile'])
+            ->where('is_platform_operator', false)
             ->whereHas('roles', fn (Builder $query) => $query->whereIn('name', array_merge(
                 [RoleName::SuperAdmin->value],
                 StaffJobRole::values(),

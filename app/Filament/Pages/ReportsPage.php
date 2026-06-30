@@ -5,8 +5,10 @@ namespace App\Filament\Pages;
 use App\Models\ActivityType;
 use App\Enums\CrmPermission;
 use App\Enums\LeadSource;
-use App\Support\CrmAccess;
+use App\Enums\LicenseFeature;
 use App\Enums\ReportType;
+use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use App\Models\Batch;
 use App\Models\Course;
 use App\Models\Student;
@@ -53,6 +55,10 @@ class ReportsPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Reports)) {
+            return false;
+        }
+
         return CrmAccess::can(Auth::user(), CrmPermission::ReportsView);
     }
 

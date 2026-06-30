@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Enquiries;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Enums\LeadSource;
 use App\Enums\VisitStatus;
@@ -43,6 +44,11 @@ class EnquiryResource extends Resource
     protected static function requiredCrmPermission(): CrmPermission
     {
         return CrmPermission::LeadsViewAll;
+    }
+
+    protected static function requiredLicenseFeature(): ?LicenseFeature
+    {
+        return LicenseFeature::Enquiries;
     }
 
     protected static ?string $model = Enquiry::class;

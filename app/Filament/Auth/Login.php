@@ -39,6 +39,23 @@ class Login extends BaseLogin
         ]);
     }
 
+    public function authenticate(): ?\Filament\Auth\Http\Responses\Contracts\LoginResponse
+    {
+        $response = parent::authenticate();
+
+        $user = auth()->user();
+
+        if ($user?->isPlatformOperator()) {
+            auth()->logout();
+
+            throw ValidationException::withMessages([
+                'data.login' => 'Use the vendor console URL to sign in as platform operator.',
+            ]);
+        }
+
+        return $response;
+    }
+
     /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>

@@ -3,8 +3,10 @@
 namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Services\InstituteVisitsService;
 use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
 use App\Support\CrmPagination;
@@ -54,6 +56,10 @@ class CampusVisitsPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Enquiries)) {
+            return false;
+        }
+
         return CrmAccess::can(Auth::user(), CrmPermission::VisitsViewAll);
     }
 

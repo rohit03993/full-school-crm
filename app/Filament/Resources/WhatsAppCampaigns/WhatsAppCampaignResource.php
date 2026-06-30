@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\WhatsAppCampaigns;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Enums\WhatsAppAudienceType;
 use App\Enums\WhatsAppCampaignStatus;
@@ -43,6 +44,11 @@ class WhatsAppCampaignResource extends Resource
     protected static function requiredCrmPermission(): CrmPermission
     {
         return CrmPermission::WhatsappCampaigns;
+    }
+
+    protected static function requiredLicenseFeature(): ?LicenseFeature
+    {
+        return LicenseFeature::WhatsApp;
     }
 
     protected static ?string $model = WhatsAppCampaign::class;

@@ -4,12 +4,14 @@ namespace App\Filament\Pages;
 
 use App\Filament\Pages\BulkActivityMarksImportPage;
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
+use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use App\Models\StudentMarksheet;
 use App\Models\WhatsAppTemplate;
 use App\Services\ActivityMarksWhatsAppService;
 use App\Services\ResultDeclarationService;
-use App\Support\CrmAccess;
 use App\Support\CrmHint;
 use App\Support\ExamTestGroupMatrix;
 use Filament\Actions\Action;
@@ -28,6 +30,10 @@ class TestMarksReviewPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Results)) {
+            return false;
+        }
+
         return CrmAccess::can(Auth::user(), CrmPermission::MarksImport);
     }
 

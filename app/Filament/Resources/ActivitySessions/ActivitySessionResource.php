@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ActivitySessions;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresAnyCrmPermission;
 use App\Filament\Forms\ActivitySessionFormSchema;
 use App\Filament\Pages\ActivityAttendancePage;
@@ -38,6 +39,11 @@ class ActivitySessionResource extends Resource
         return [
             CrmPermission::MarksImport,
         ];
+    }
+
+    protected static function requiredLicenseFeature(): ?LicenseFeature
+    {
+        return LicenseFeature::Marks;
     }
     protected static ?string $model = ActivitySession::class;
 

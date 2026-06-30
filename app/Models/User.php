@@ -24,6 +24,7 @@ class User extends Authenticatable implements FilamentUser
         'password',
         'mobile',
         'is_active',
+        'is_platform_operator',
     ];
 
     protected $hidden = [
@@ -37,6 +38,7 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'is_platform_operator' => 'boolean',
         ];
     }
 
@@ -45,8 +47,21 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasOne(StaffProfile::class);
     }
 
+    public function isPlatformOperator(): bool
+    {
+        return (bool) $this->is_platform_operator;
+    }
+
     public function canAccessPanel(Panel $panel): bool
     {
+        if ($panel->getId() === 'platform') {
+            return $this->is_active && $this->isPlatformOperator();
+        }
+
+        if ($this->isPlatformOperator()) {
+            return false;
+        }
+
         return CrmAccess::hasPanelAccess($this);
     }
 

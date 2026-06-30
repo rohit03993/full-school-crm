@@ -4,8 +4,10 @@ namespace App\Filament\Pages;
 
 use App\Enums\CallStatus;
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Enums\VisitStatus;
 use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use App\Services\CallReportService;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
@@ -34,6 +36,10 @@ class CallReportPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Calls)) {
+            return false;
+        }
+
         return CrmAccess::canAny(Auth::user(), CrmPermission::LeadsCall, CrmPermission::ReportsView);
     }
 

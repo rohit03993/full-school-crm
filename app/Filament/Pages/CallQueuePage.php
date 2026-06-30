@@ -4,8 +4,10 @@ namespace App\Filament\Pages;
 
 use App\Filament\Concerns\HandlesLogCallModal;
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Models\Student;
 use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use App\Services\CallLogService;
 use App\Services\CallQueueService;
 use App\Support\CrmHint;
@@ -34,6 +36,10 @@ class CallQueuePage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Calls)) {
+            return false;
+        }
+
         return CrmAccess::can(Auth::user(), CrmPermission::LeadsCall);
     }
 

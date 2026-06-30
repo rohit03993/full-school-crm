@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Enums\RoleName;
 use App\Filament\Pages\FirstRunSetup;
+use App\Filament\Pages\LicenseExpiredPage;
 use App\Support\InstituteOnboarding;
 use Closure;
 use Illuminate\Http\Request;
@@ -24,8 +25,9 @@ class EnsureInstituteOnboardingComplete
         }
 
         $setupPath = trim(parse_url(FirstRunSetup::getUrl(), PHP_URL_PATH) ?? '', '/');
+        $licenseExpiredPath = trim(parse_url(LicenseExpiredPage::getUrl(), PHP_URL_PATH) ?? '', '/');
 
-        if ($request->is($setupPath) || $request->is('admin/logout')) {
+        if ($request->is($setupPath, $licenseExpiredPath, 'admin/logout')) {
             return $next($request);
         }
 

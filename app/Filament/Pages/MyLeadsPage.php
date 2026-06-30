@@ -3,8 +3,10 @@
 namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use App\Services\MyLeadsService;
 use App\Support\CrmHint;
 use App\Support\CrmNavBadges;
@@ -39,6 +41,10 @@ class MyLeadsPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Enquiries)) {
+            return false;
+        }
+
         $user = Auth::user();
 
         if (! $user || $user->hasRole(RoleName::SuperAdmin->value)) {

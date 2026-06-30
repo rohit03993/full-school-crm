@@ -4,10 +4,12 @@ namespace App\Filament\Pages;
 
 use App\Filament\Concerns\FinishesAttendanceSave;
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
 use App\Models\BatchStudent;
 use App\Services\ActivityAttendanceService;
 use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use App\Support\CrmHint;
 use App\Support\EduExamLabels;
 use Filament\Notifications\Notification;
@@ -27,6 +29,10 @@ class ActivityAttendancePage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Marks) && ! FeatureGate::enabled(LicenseFeature::Attendance)) {
+            return false;
+        }
+
         return CrmAccess::canAny(
             Auth::user(),
             CrmPermission::MarksImport,
