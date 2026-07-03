@@ -4,12 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#102a43">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>@yield('title', 'Student Portal') — {{ $institute['name'] ?? config('app.name') }}</title>
+
+    <x-pwa.head context="portal" :app-name="($institute['name'] ?? config('app.name')).' Portal'" />
 
     @if (! empty($institute['favicon_url']))
         <link rel="icon" href="{{ $institute['favicon_url'] }}" type="image/png">
+    @else
+        <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
     @endif
 
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -136,5 +138,7 @@
             window.portalNavRefresh = setActive;
         })();
     </script>
+
+    <x-pwa.install-prompt context="portal" />
 </body>
 </html>

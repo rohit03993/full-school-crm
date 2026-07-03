@@ -49,6 +49,19 @@ class ManualBatchAttendanceTest extends TestCase
         $this->assertSame('08:30:00', $attendance->checked_in_at?->format('H:i:s'));
     }
 
+    public function test_manual_in_method_returns_result(): void
+    {
+        $this->travelTo('2026-06-20 08:30:00');
+
+        [$student, , $staff] = $this->createEnrolledStudent('ROLL-IN2');
+
+        $result = app(ManualBatchAttendanceService::class)->manualIn($student, '2026-06-20', $staff);
+
+        $this->assertTrue($result['ok']);
+        $this->assertArrayHasKey('whatsapp', $result);
+        $this->assertIsArray($result['whatsapp']);
+    }
+
     public function test_manual_out_records_checkout(): void
     {
         $this->travelTo('2026-06-20 16:00:00');
@@ -57,7 +70,9 @@ class ManualBatchAttendanceTest extends TestCase
 
         $service = app(ManualBatchAttendanceService::class);
         $service->save($batch, '2026-06-20', [$student->id => AttendanceStatus::Present->value], $staff);
-        $service->manualOut($student->fresh(), '2026-06-20', $staff);
+        $result = $service->manualOut($student->fresh(), '2026-06-20', $staff);
+
+        $this->assertTrue($result['ok']);
 
         $attendance = Attendance::query()->first();
 

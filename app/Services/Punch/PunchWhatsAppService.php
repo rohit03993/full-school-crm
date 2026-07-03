@@ -8,8 +8,9 @@ use App\Models\Student;
 use App\Models\User;
 use App\Models\WhatsAppTemplate;
 use App\Services\WhatsAppCampaignService;
-use App\Support\FeatureGate;
 use App\Enums\LicenseFeature;
+use App\Support\FeatureGate;
+use App\Support\PunchWhatsAppOutcome;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -27,31 +28,51 @@ class PunchWhatsAppService
         string $state,
         ?User $staff = null,
     ): bool {
+        return $this->outcomeForPunch($student, $enrollmentNumber, $date, $punchTime, $state, $staff)['queued'];
+    }
+
+    /**
+     * @return array{queued: bool, message: string}
+     */
+    public function outcomeForPunch(
+        Student $student,
+        string $enrollmentNumber,
+        string $date,
+        string $punchTime,
+        string $state,
+        ?User $staff = null,
+    ): array {
         try {
             if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
-                return false;
+                return PunchWhatsAppOutcome::skipped('WhatsApp is not enabled on your licence.');
             }
 
             if (! $this->punchAutosendEnabled()) {
-                return false;
+                return PunchWhatsAppOutcome::skipped('Turn on punch WhatsApp in Settings → WhatsApp Settings.');
             }
 
             $isManual = $staff !== null;
             $template = $this->templateForState($state, $isManual);
 
-            if (! $template || blank($student->mobile)) {
-                return false;
+            if (! $template) {
+                $label = $isManual ? 'Manual '.$state : 'Biometric '.$state;
+
+                return PunchWhatsAppOutcome::skipped("No {$label} WhatsApp template selected in Settings.");
+            }
+
+            if (blank($student->mobile)) {
+                return PunchWhatsAppOutcome::skipped('Student has no parent mobile number on file.');
             }
 
             if ($this->alreadySent($enrollmentNumber, $date, $punchTime, $state, (string) $student->mobile)) {
-                return false;
+                return PunchWhatsAppOutcome::skipped('WhatsApp for this exact punch was already queued.');
             }
 
             $punchAt = Carbon::parse($date.' '.(strlen($punchTime) === 5 ? $punchTime.':00' : $punchTime));
             $staff ??= User::query()->where('is_active', true)->first();
 
             if (! $staff) {
-                return false;
+                return PunchWhatsAppOutcome::skipped('No active staff user to queue the campaign.');
             }
 
             $channelLabel = $isManual ? 'Manual' : 'Biometric';
@@ -86,11 +107,11 @@ class PunchWhatsAppService
                 'sent_at' => now(),
             ]);
 
-            return true;
+            return PunchWhatsAppOutcome::queued('Parent WhatsApp queued — runs when the queue worker is active.');
         } catch (\Throwable $e) {
             Log::warning('Punch WhatsApp failed: '.$e->getMessage());
 
-            return false;
+            return PunchWhatsAppOutcome::skipped('Could not queue WhatsApp: '.$e->getMessage());
         }
     }
 

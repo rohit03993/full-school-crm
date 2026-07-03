@@ -282,7 +282,7 @@ class AttendancePage extends Page
 
         foreach ($this->roster as $row) {
             $this->marks[$row->student_id] = $existing[$row->student_id]
-                ?? AttendanceStatus::Present->value;
+                ?? AttendanceStatus::Absent->value;
         }
     }
 
@@ -317,7 +317,15 @@ class AttendancePage extends Page
         $body = "{$stats['saved']} record(s) saved for {$batch->name} · ".$this->formatAttendanceDate($date);
 
         if ($stats['in_punches'] > 0) {
-            $body .= " · {$stats['in_punches']} check-in (IN) with parent WhatsApp if enabled.";
+            $body .= " · {$stats['in_punches']} check-in (IN).";
+        }
+
+        if ($stats['whatsapp_queued'] > 0) {
+            $body .= " · {$stats['whatsapp_queued']} parent WhatsApp queued.";
+        }
+
+        if ($stats['whatsapp_skipped'] > 0) {
+            $body .= " · {$stats['whatsapp_skipped']} WhatsApp not sent (check Settings, mobile, or template).";
         }
 
         if ($stats['no_roll'] > 0) {
@@ -328,10 +336,40 @@ class AttendancePage extends Page
             ->title('Attendance saved')
             ->body($body)
             ->success()
-            ->duration(8000)
+            ->duration(10000)
             ->send();
 
         $this->loadRoster();
+    }
+
+    public function markManualInForStudent(
+        ManualBatchAttendanceService $manualBatch,
+        int $studentId,
+    ): void {
+        $date = $this->filters['date'] ?? now()->toDateString();
+        $student = Student::query()->find($studentId);
+
+        if (! $student) {
+            Notification::make()->title('Student not found')->danger()->send();
+
+            return;
+        }
+
+        $result = $manualBatch->manualIn($student, $date, Auth::user());
+
+        if (! $result['ok']) {
+            Notification::make()
+                ->title('Cannot check in')
+                ->body($result['message'])
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->marks[$studentId] = AttendanceStatus::Present->value;
+        $this->loadRoster();
+        $this->notifyManualPunchResult('Check-in (IN) saved', $student->name, $result);
     }
 
     public function markManualOutForStudent(
@@ -347,10 +385,12 @@ class AttendancePage extends Page
             return;
         }
 
-        if (! $manualBatch->manualOut($student, $date, Auth::user())) {
+        $result = $manualBatch->manualOut($student, $date, Auth::user());
+
+        if (! $result['ok']) {
             Notification::make()
                 ->title('Cannot check out')
-                ->body('Student needs an active enrollment roll number.')
+                ->body($result['message'])
                 ->warning()
                 ->send();
 
@@ -358,12 +398,32 @@ class AttendancePage extends Page
         }
 
         $this->loadRoster();
+        $this->notifyManualPunchResult('Check-out (OUT) saved', $student->name, $result);
+    }
 
-        Notification::make()
-            ->title('Check-out (OUT) saved')
-            ->body("OUT recorded for {$student->name}. Parent WhatsApp queued if enabled.")
-            ->success()
-            ->send();
+    /**
+     * @param  array{ok: bool, message: string, whatsapp: array{queued: bool, message: string}|null}  $result
+     */
+    private function notifyManualPunchResult(string $title, string $studentName, array $result): void
+    {
+        $body = "{$studentName}: {$result['message']}";
+
+        if ($whatsapp = $result['whatsapp'] ?? null) {
+            $body .= ' '.$whatsapp['message'];
+        }
+
+        $notification = Notification::make()
+            ->title($title)
+            ->body($body)
+            ->duration(10000);
+
+        if (($result['whatsapp']['queued'] ?? false) === true) {
+            $notification->success()->send();
+
+            return;
+        }
+
+        $notification->warning()->send();
     }
 
     /**
@@ -419,7 +479,7 @@ class AttendancePage extends Page
             return;
         }
 
-        $processor->handleManualPunch(
+        $result = $processor->handleManualPunch(
             $enrollment->student,
             $roll,
             $date,
@@ -434,11 +494,15 @@ class AttendancePage extends Page
             $this->loadRoster();
         }
 
-        Notification::make()
-            ->title('Manual punch saved')
-            ->body("{$state} recorded for {$enrollment->student->name} at {$time}. Parent WhatsApp queued if enabled.")
-            ->success()
-            ->send();
+        $this->notifyManualPunchResult(
+            'Manual punch saved',
+            $enrollment->student->name,
+            [
+                'ok' => true,
+                'message' => "{$state} recorded at {$time}.",
+                'whatsapp' => $result['whatsapp'],
+            ],
+        );
     }
 
     protected function formatAttendanceDate(string $date): string

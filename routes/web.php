@@ -4,6 +4,8 @@ use App\Http\Controllers\Admin\DocumentDownloadController;
 use App\Http\Controllers\Admin\IdCardDownloadController;
 use App\Http\Controllers\Admin\PaymentProofDownloadController;
 use App\Http\Controllers\Admin\ReceiptDownloadController;
+use App\Http\Controllers\Pwa\ManifestController;
+use App\Http\Controllers\Pwa\PwaIconController;
 use App\Http\Controllers\PublicSite\ContactController;
 use App\Http\Controllers\PublicSite\IdCardVerifyController;
 use App\Http\Controllers\PublicSite\CourseController;
@@ -19,6 +21,15 @@ use App\Http\Controllers\Admin\MarksheetDownloadController;
 use App\Http\Middleware\EnsurePortalLicensed;
 use App\Http\Middleware\EnsureStudentPortalAuth;
 use Illuminate\Support\Facades\Route;
+
+Route::prefix('pwa')->name('pwa.')->group(function (): void {
+    Route::get('/manifest/{context}', ManifestController::class)
+        ->where('context', 'public|portal|admin')
+        ->name('manifest');
+    Route::get('/icon/{size}', PwaIconController::class)
+        ->where('size', '192|512')
+        ->name('icon');
+});
 
 Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
     Route::get('documents/{document}/download', [DocumentDownloadController::class, 'download'])

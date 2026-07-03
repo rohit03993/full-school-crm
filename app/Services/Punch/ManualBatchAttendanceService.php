@@ -19,8 +19,66 @@ class ManualBatchAttendanceService
     ) {}
 
     /**
+     * @return array{
+     *     ok: bool,
+     *     message: string,
+     *     whatsapp: array{queued: bool, message: string}|null
+     * }
+     */
+    public function manualIn(Student $student, string $date, User $staff): array
+    {
+        $roll = $this->rollForStudent($student);
+
+        if ($roll === null) {
+            return [
+                'ok' => false,
+                'message' => 'Add an active enrollment roll number before check-in.',
+                'whatsapp' => null,
+            ];
+        }
+
+        $time = now()->format('H:i:s');
+        $result = $this->processor->handleManualPunch($student, $roll, $date, $time, 'IN', $staff);
+
+        return [
+            'ok' => true,
+            'message' => "Check-in (IN) saved at {$time}.",
+            'whatsapp' => $result['whatsapp'],
+        ];
+    }
+
+    /**
+     * @return array{
+     *     ok: bool,
+     *     message: string,
+     *     whatsapp: array{queued: bool, message: string}|null
+     * }
+     */
+    public function manualOut(Student $student, string $date, User $staff): array
+    {
+        $roll = $this->rollForStudent($student);
+
+        if ($roll === null) {
+            return [
+                'ok' => false,
+                'message' => 'Add an active enrollment roll number before check-out.',
+                'whatsapp' => null,
+            ];
+        }
+
+        $time = now()->format('H:i:s');
+        $result = $this->processor->handleManualPunch($student, $roll, $date, $time, 'OUT', $staff);
+
+        return [
+            'ok' => true,
+            'message' => "Check-out (OUT) saved at {$time}.",
+            'whatsapp' => $result['whatsapp'],
+        ];
+    }
+
+    /**
      * @param  array<int, string>  $marks  student_id => attendance status value
-     * @return array{saved: int, in_punches: int, no_roll: int}
+     * @return array{saved: int, in_punches: int, no_roll: int, whatsapp_queued: int, whatsapp_skipped: int}
      */
     public function save(Batch $batch, string $date, array $marks, User $staff): array
     {
@@ -30,7 +88,13 @@ class ManualBatchAttendanceService
             ->pluck('student_id')
             ->all();
 
-        $stats = ['saved' => 0, 'in_punches' => 0, 'no_roll' => 0];
+        $stats = [
+            'saved' => 0,
+            'in_punches' => 0,
+            'no_roll' => 0,
+            'whatsapp_queued' => 0,
+            'whatsapp_skipped' => 0,
+        ];
 
         DB::transaction(function () use ($batch, $date, $marks, $staff, $activeStudentIds, &$stats): void {
             foreach ($marks as $studentId => $statusValue) {
@@ -62,7 +126,7 @@ class ManualBatchAttendanceService
                         continue;
                     }
 
-                    $this->processor->handleManualPunch(
+                    $result = $this->processor->handleManualPunch(
                         $student,
                         $roll,
                         $date,
@@ -71,6 +135,7 @@ class ManualBatchAttendanceService
                         $staff,
                     );
                     $stats['in_punches']++;
+                    $this->tallyWhatsapp($stats, $result['whatsapp']);
                 } else {
                     $this->markStatusOnly($batch, $student, $date, $status, $staff);
                 }
@@ -80,26 +145,6 @@ class ManualBatchAttendanceService
         });
 
         return $stats;
-    }
-
-    public function manualOut(Student $student, string $date, User $staff): bool
-    {
-        $roll = $this->rollForStudent($student);
-
-        if ($roll === null) {
-            return false;
-        }
-
-        $this->processor->handleManualPunch(
-            $student,
-            $roll,
-            $date,
-            now()->format('H:i:s'),
-            'OUT',
-            $staff,
-        );
-
-        return true;
     }
 
     private function rollForStudent(Student $student): ?string
@@ -126,5 +171,18 @@ class ManualBatchAttendanceService
                 'punch_source' => 'roll_call',
             ],
         );
+    }
+
+    /**
+     * @param  array{saved: int, in_punches: int, no_roll: int, whatsapp_queued: int, whatsapp_skipped: int}  $stats
+     * @param  array{queued: bool, message: string}  $whatsapp
+     */
+    private function tallyWhatsapp(array &$stats, array $whatsapp): void
+    {
+        if ($whatsapp['queued']) {
+            $stats['whatsapp_queued']++;
+        } else {
+            $stats['whatsapp_skipped']++;
+        }
     }
 }

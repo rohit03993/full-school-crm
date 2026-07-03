@@ -1,5 +1,4 @@
-import './bootstrap';
-import { initPwaInstall } from './pwa-install';
+import { initPwaInstall } from '../pwa-install';
 
 document.addEventListener('DOMContentLoaded', () => {
     initPwaInstall();

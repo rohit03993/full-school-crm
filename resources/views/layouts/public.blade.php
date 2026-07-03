@@ -9,8 +9,12 @@
 
     <title>{{ isset($title) ? $title.' — ' : '' }}{{ $institute['name'] ?? config('institute.name') }}</title>
 
+    <x-pwa.head context="public" :app-name="$institute['name'] ?? null" />
+
     @if (! empty($institute['favicon_url']))
         <link rel="icon" href="{{ $institute['favicon_url'] }}" type="image/png">
+    @else
+        <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
     @endif
 
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -27,5 +31,6 @@
 
     @include('components.public.footer')
     @include('components.public.mobile-action-bar')
+    <x-pwa.install-prompt context="public" />
 </body>
 </html>

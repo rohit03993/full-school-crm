@@ -70,6 +70,9 @@
                         {{ $link['label'] }}
                     </a>
                 @endforeach
+                <x-pwa.install-button class="ml-2 hidden rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm font-semibold text-brand-800 hover:bg-brand-100 lg:inline-flex">
+                    Install app
+                </x-pwa.install-button>
                 <a
                     href="{{ route('contact') }}"
                     class="ml-3 inline-flex min-h-[44px] items-center rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-6 py-2.5 text-sm font-bold text-navy-950 shadow-md shadow-brand-500/25 transition hover:from-brand-400 hover:to-brand-500"
@@ -102,6 +105,9 @@
                                 {{ $link['label'] }}
                             </a>
                         @endforeach
+                        <x-pwa.install-button class="mt-2 flex min-h-[48px] w-full items-center justify-center rounded-xl border border-navy-200 bg-navy-50 px-4 text-base font-semibold text-navy-800 touch-manipulation active:bg-navy-100">
+                            Install app
+                        </x-pwa.install-button>
                         <a
                             href="{{ route('contact') }}"
                             class="mt-2 flex min-h-[48px] items-center justify-center rounded-xl bg-brand-500 px-4 text-base font-bold text-navy-950 touch-manipulation active:bg-brand-600"

@@ -26,6 +26,11 @@
                     <li><a href="{{ route('courses') }}" class="transition hover:text-brand-400">Courses</a></li>
                     <li><a href="{{ route('home') }}#gallery" class="transition hover:text-brand-400">Gallery</a></li>
                     <li><a href="{{ route('contact') }}" class="transition hover:text-brand-400">Contact</a></li>
+                    <li>
+                        <x-pwa.install-button class="text-left transition hover:text-brand-400">
+                            Install app
+                        </x-pwa.install-button>
+                    </li>
                 </ul>
             </div>
 

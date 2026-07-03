@@ -6,8 +6,12 @@
     <meta name="theme-color" content="#0a1929">
     <title>Student Portal — {{ $institute['name'] ?? config('app.name') }}</title>
 
+    <x-pwa.head context="portal" :app-name="($institute['name'] ?? config('app.name')).' Portal'" />
+
     @if (! empty($institute['favicon_url']))
         <link rel="icon" href="{{ $institute['favicon_url'] }}" type="image/png">
+    @else
+        <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
     @endif
 
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -78,5 +82,7 @@
             this.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
         });
     </script>
+
+    <x-pwa.install-prompt context="portal" />
 </body>
 </html>

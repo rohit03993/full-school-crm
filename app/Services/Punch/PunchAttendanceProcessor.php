@@ -29,7 +29,7 @@ class PunchAttendanceProcessor
                 $handled = $this->handleQueueItem($item);
                 $stats['processed']++;
                 $stats['synced'] += $handled['synced'] ? 1 : 0;
-                $stats['notified'] += $handled['notified'] ? 1 : 0;
+                $stats['notified'] += $handled['whatsapp']['queued'] ? 1 : 0;
             }
         }
 
@@ -41,7 +41,7 @@ class PunchAttendanceProcessor
                 $handled = $this->handleMachinePunch($punch);
                 $stats['processed']++;
                 $stats['synced'] += $handled['synced'] ? 1 : 0;
-                $stats['notified'] += $handled['notified'] ? 1 : 0;
+                $stats['notified'] += $handled['whatsapp']['queued'] ? 1 : 0;
 
                 Setting::setValue('attendance.last_processed_punch_log_id', (string) $punch->id, 'attendance');
             }
@@ -51,7 +51,7 @@ class PunchAttendanceProcessor
     }
 
     /**
-     * @return array{synced: bool, notified: bool}
+     * @return array{synced: bool, whatsapp: array{queued: bool, message: string}}
      */
     public function handleManualPunch(
         Student $student,
@@ -137,7 +137,7 @@ class PunchAttendanceProcessor
     }
 
     /**
-     * @return array{synced: bool, notified: bool}
+     * @return array{synced: bool, whatsapp: array{queued: bool, message: string}}
      */
     private function applyPunchEffects(
         Student $student,
@@ -148,7 +148,6 @@ class PunchAttendanceProcessor
         ?User $staff = null,
     ): array {
         $synced = false;
-        $notified = false;
 
         if ($state === 'IN') {
             $this->sync->syncFromPunch($student, $date, $state, $time, $staff ? 'manual' : 'biometric', $staff?->id);
@@ -158,9 +157,9 @@ class PunchAttendanceProcessor
             $synced = true;
         }
 
-        $notified = $this->whatsapp->maybeSendForPunch($student, $roll, $date, $time, $state, $staff);
+        $whatsapp = $this->whatsapp->outcomeForPunch($student, $roll, $date, $time, $state, $staff);
 
-        return ['synced' => $synced, 'notified' => $notified];
+        return ['synced' => $synced, 'whatsapp' => $whatsapp];
     }
 
     private function resolveState(string $roll, string $date, string $time): string
