@@ -1,5 +1,10 @@
-@if (file_exists(public_path('build/manifest.json')))
-    @vite($assets)
-@else
-    {{-- Server deploy without `npm run build` — avoid Vite 500; run npm ci && npm run build for full styling --}}
+@php
+    use App\Support\ViteManifest;
+
+    $entries = is_array($assets ?? null) ? $assets : [];
+    $canLoad = $entries !== [] && ViteManifest::hasEntries($entries);
+@endphp
+
+@if ($canLoad)
+    @vite($entries)
 @endif

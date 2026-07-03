@@ -30,13 +30,13 @@ class PwaManifestService
             'theme_color' => '#102a43',
             'icons' => [
                 [
-                    'src' => route('pwa.icon', ['size' => 192]),
+                    'src' => url('/pwa/icon/192'),
                     'sizes' => '192x192',
                     'type' => 'image/png',
                     'purpose' => 'any',
                 ],
                 [
-                    'src' => route('pwa.icon', ['size' => 512]),
+                    'src' => url('/pwa/icon/512'),
                     'sizes' => '512x512',
                     'type' => 'image/png',
                     'purpose' => 'any maskable',

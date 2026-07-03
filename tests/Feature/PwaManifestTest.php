@@ -47,7 +47,7 @@ class PwaManifestTest extends TestCase
     {
         $this->get(route('home'))
             ->assertOk()
-            ->assertSee(route('pwa.manifest', ['context' => 'public']), false);
+            ->assertSee('/pwa/manifest/public', false);
     }
 
     public function test_service_worker_file_exists(): void

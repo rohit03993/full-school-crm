@@ -5,8 +5,8 @@
 
 @php
     $appName ??= \App\Support\InstituteSettings::brandName();
-    $manifestUrl = route('pwa.manifest', ['context' => $context]);
-    $icon192 = route('pwa.icon', ['size' => 192]);
+    $manifestUrl = url('/pwa/manifest/'.$context);
+    $icon192 = url('/pwa/icon/192');
 @endphp
 
 <meta name="crm-pwa-context" content="{{ $context }}">
