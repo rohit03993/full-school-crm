@@ -77,6 +77,54 @@ class PunchAttendanceSyncTest extends TestCase
         $this->assertSame(AttendanceStatus::Present, Attendance::query()->first()?->status);
     }
 
+    public function test_card_punch_after_manual_in_counts_as_out(): void
+    {
+        if (! Schema::hasTable('punch_logs')) {
+            $this->createPunchLogsTable();
+        }
+
+        $this->travelTo('2026-06-20 08:30:00');
+
+        [$student] = $this->createEnrolledStudent('ROLL-MIX');
+        $staff = User::factory()->create(['is_active' => true]);
+
+        app(\App\Services\Punch\ManualBatchAttendanceService::class)->manualIn($student, '2026-06-20', $staff);
+
+        $this->travelTo('2026-06-20 17:00:00');
+
+        DB::table('punch_logs')->insert([
+            'employee_id' => 'ROLL-MIX',
+            'punch_date' => '2026-06-20',
+            'punch_time' => '17:00:00',
+            'device_name' => 'Gate-1',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Setting::setValue('attendance.last_processed_punch_log_id', '0', 'attendance');
+        Setting::flushValueCache();
+
+        app(PunchAttendanceProcessor::class)->processPending();
+
+        $attendance = Attendance::query()->first();
+
+        $this->assertNotNull($attendance->checked_in_at);
+        $this->assertNotNull($attendance->checked_out_at);
+        $this->assertSame('08:30:00', $attendance->checked_in_at->format('H:i:s'));
+        $this->assertSame('17:00:00', $attendance->checked_out_at->format('H:i:s'));
+
+        $dayRow = app(\App\Services\Punch\LivePunchDashboardService::class)->studentDayRow('ROLL-MIX', '2026-06-20', $student->fresh());
+
+        $this->assertSame('OUT', $dayRow['current_state']);
+        $this->assertTrue($dayRow['pairs'][0]['is_manual_in'] ?? false);
+        $this->assertSame('Gate-1', $dayRow['pairs'][0]['device_out'] ?? null);
+
+        $label = \App\Support\AttendanceSourceLabel::forRecord($attendance->fresh(), $student->fresh(['activeEnrollment']));
+
+        $this->assertStringContainsString('Manual IN', $label);
+        $this->assertStringContainsString('Gate-1 OUT', $label);
+    }
+
     /**
      * @return array{0: Student, 1: Batch}
      */

@@ -82,6 +82,47 @@ class StudentCounterServiceTest extends TestCase
         $this->assertSame('Walk-in for Marketing', $profile['lead_sources']['latest_intent']);
     }
 
+    public function test_direct_admission_source_shows_correct_headline_without_walk_in_label(): void
+    {
+        $student = Student::query()->create([
+            'name' => 'Direct Student',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2010-01-01',
+            'gender' => Gender::Male,
+            'mobile' => '9876543299',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        $course = Course::query()->create([
+            'name' => 'IIT JEE',
+            'code' => 'JEE-DIR',
+            'programme_category' => 'coaching',
+            'duration' => 1,
+            'duration_type' => 'years',
+            'fee' => 155000,
+            'status' => CourseStatus::Active,
+        ]);
+
+        Enquiry::query()->create([
+            'student_id' => $student->id,
+            'enquiry_number' => 'CRM-ENQ-2026-000201',
+            'course_id' => $course->id,
+            'lead_source' => LeadSource::DirectAdmission,
+            'meeting_for' => 'enquiry',
+            'visit_type' => 'first_visit',
+            'latest_visit_status' => 'joined',
+            'created_at' => now(),
+        ]);
+
+        $profile = app(StudentCounterService::class)->profile($student->fresh());
+
+        $this->assertSame(0, $profile['lead_sources']['walk_in_count']);
+        $this->assertSame(1, $profile['lead_sources']['direct_admission_count']);
+        $this->assertSame('Direct admission', $profile['lead_sources']['headline']);
+        $this->assertSame('Enrolled directly by staff', $profile['lead_sources']['detail']);
+        $this->assertSame('Direct admission', $profile['lead_sources']['latest_intent']);
+    }
+
     public function test_admission_in_progress_uses_admission_counters(): void
     {
         $student = Student::query()->create([

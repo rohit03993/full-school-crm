@@ -82,6 +82,10 @@
                         'callingAssignment' => $profile['calling_assignment'] ?? null,
                     ])
 
+                    @include('filament.pages.partials.student-meeting-assignment-banner', [
+                        'meetingAssignment' => $profile['meeting_assignment'] ?? null,
+                    ])
+
                     @include('filament.pages.partials.student-last-call-summary', ['record' => $record])
                 </div>
             </div>

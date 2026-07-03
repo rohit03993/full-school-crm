@@ -100,6 +100,11 @@ class AttendancePage extends Page
      */
     public array $marks = [];
 
+    /**
+     * @var array<int, array{status: string, checked_in_at: ?string, checked_out_at: ?string, is_inside: bool}>
+     */
+    public array $attendanceSnapshot = [];
+
     public bool $rosterLoaded = false;
 
     /**
@@ -259,6 +264,7 @@ class AttendancePage extends Page
         if (! $batchId || ! $date) {
             $this->roster = new Collection;
             $this->marks = [];
+            $this->attendanceSnapshot = [];
             $this->rosterLoaded = false;
 
             return;
@@ -276,14 +282,75 @@ class AttendancePage extends Page
             ->with('student')
             ->get();
 
-        $existing = app(AttendanceService::class)->marksForBatchDate($batch, $date);
+        $attendance = app(AttendanceService::class);
+        $existing = $attendance->marksForBatchDate($batch, $date);
+        $this->attendanceSnapshot = $attendance->punchSnapshotForBatchDate($batch, $date);
 
         $this->marks = [];
 
         foreach ($this->roster as $row) {
-            $this->marks[$row->student_id] = $existing[$row->student_id]
-                ?? AttendanceStatus::Absent->value;
+            if (isset($existing[$row->student_id])) {
+                $this->marks[$row->student_id] = $existing[$row->student_id];
+            }
         }
+    }
+
+    public function checkInAllStudents(ManualBatchAttendanceService $manualBatch): void
+    {
+        $date = $this->filters['date'] ?? null;
+
+        if (! $date || $this->roster->isEmpty()) {
+            Notification::make()->title('Load students first')->warning()->send();
+
+            return;
+        }
+
+        $checkedIn = 0;
+        $failed = 0;
+        $whatsappQueued = 0;
+
+        foreach ($this->roster as $row) {
+            $student = $row->student;
+
+            if (! $student) {
+                continue;
+            }
+
+            if (($this->attendanceSnapshot[$student->id]['checked_in_at'] ?? null) !== null) {
+                continue;
+            }
+
+            $result = $manualBatch->manualIn($student, $date, Auth::user());
+
+            if ($result['ok']) {
+                $checkedIn++;
+                $this->marks[$student->id] = AttendanceStatus::Present->value;
+
+                if (($result['whatsapp']['queued'] ?? false) === true) {
+                    $whatsappQueued++;
+                }
+            } else {
+                $failed++;
+            }
+        }
+
+        $this->loadRoster();
+
+        $body = "{$checkedIn} student(s) checked in.";
+
+        if ($whatsappQueued > 0) {
+            $body .= " {$whatsappQueued} parent WhatsApp queued.";
+        }
+
+        if ($failed > 0) {
+            $body .= " {$failed} could not check in (missing roll number?).";
+        }
+
+        Notification::make()
+            ->title($checkedIn > 0 ? 'Bulk check-in complete' : 'No students checked in')
+            ->body($body)
+            ->success()
+            ->send();
     }
 
     public function markAllPresent(): void
@@ -427,7 +494,7 @@ class AttendancePage extends Page
     }
 
     /**
-     * @return list<array{date: string, label: string, present: int, absent: int, leave: int, total: int}>
+     * @return list<array{date: string, label: string, checked_in: int, checked_out: int, total: int}>
      */
     public function markedDateSummaries(): array
     {
@@ -651,8 +718,7 @@ class AttendancePage extends Page
                 ->viewData(fn (): array => [
                     'rosterLoaded' => $this->rosterLoaded,
                     'roster' => $this->roster,
-                    'marks' => $this->marks,
-                    'statuses' => AttendanceStatus::cases(),
+                    'attendanceSnapshot' => $this->attendanceSnapshot,
                 ])
                 ->visible(fn (): bool => $this->viewMode === 'manual'),
         ]);

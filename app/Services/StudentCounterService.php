@@ -98,9 +98,11 @@ class StudentCounterService
 
         $websiteCount = $enquiries->where('lead_source', LeadSource::Website)->count();
         $walkInCount = $enquiries->where('lead_source', LeadSource::WalkIn)->count();
+        $directAdmissionCount = $enquiries->where('lead_source', LeadSource::DirectAdmission)->count();
 
         $meetingForCounts = $enquiries
             ->filter(fn (Enquiry $enquiry): bool => filled($enquiry->meeting_for))
+            ->reject(fn (Enquiry $enquiry): bool => $enquiry->lead_source?->isSystemEnrollment() ?? false)
             ->groupBy(fn (Enquiry $enquiry): string => (string) $enquiry->meeting_for)
             ->map(fn ($group): int => $group->count())
             ->all();
@@ -116,17 +118,19 @@ class StudentCounterService
         return [
             'website_count' => $websiteCount,
             'walk_in_count' => $walkInCount,
+            'direct_admission_count' => $directAdmissionCount,
             'meeting_for_counts' => $meetingForCounts,
             'first_source' => $firstSource,
             'latest_source' => $latestSource,
             'latest_meeting_for' => $latestMeetingFor,
             'latest_intent' => $this->latestIntentLabel($latest),
-            'headline' => $this->leadSourceHeadline($websiteCount, $walkInCount, $latestSource),
+            'headline' => $this->leadSourceHeadline($websiteCount, $walkInCount, $directAdmissionCount, $latestSource),
             'detail' => $this->leadSourceDetail(
                 $firstSource,
                 $latestSource,
                 $websiteCount,
                 $walkInCount,
+                $directAdmissionCount,
                 $meetingForCounts,
             ),
         ];
@@ -136,6 +140,10 @@ class StudentCounterService
     {
         if (! $enquiry) {
             return null;
+        }
+
+        if ($enquiry->lead_source?->isSystemEnrollment()) {
+            return $enquiry->lead_source->label();
         }
 
         $source = $enquiry->lead_source?->label();
@@ -148,8 +156,14 @@ class StudentCounterService
         return $meetingFor ?? $source;
     }
 
-    protected function leadSourceHeadline(int $websiteCount, int $walkInCount, ?LeadSource $latestSource): string
+    protected function leadSourceHeadline(int $websiteCount, int $walkInCount, int $directAdmissionCount, ?LeadSource $latestSource): string
     {
+        if ($directAdmissionCount > 0 && $websiteCount === 0 && $walkInCount === 0) {
+            return $directAdmissionCount === 1
+                ? 'Direct admission'
+                : "{$directAdmissionCount} direct admissions";
+        }
+
         if ($websiteCount > 0 && $walkInCount > 0) {
             return 'Website + Walk-in lead';
         }
@@ -170,13 +184,20 @@ class StudentCounterService
         ?LeadSource $latestSource,
         int $websiteCount,
         int $walkInCount,
+        int $directAdmissionCount,
         array $meetingForCounts,
     ): ?string {
-        if ($websiteCount === 0 && $walkInCount === 0 && $meetingForCounts === []) {
+        if ($websiteCount === 0 && $walkInCount === 0 && $directAdmissionCount === 0 && $meetingForCounts === []) {
             return null;
         }
 
         $parts = [];
+
+        if ($directAdmissionCount > 0) {
+            $parts[] = $directAdmissionCount === 1
+                ? 'Enrolled directly by staff'
+                : "{$directAdmissionCount} direct admissions";
+        }
 
         if ($websiteCount > 0) {
             $parts[] = $websiteCount === 1 ? '1 website enquiry' : "{$websiteCount} website enquiries";

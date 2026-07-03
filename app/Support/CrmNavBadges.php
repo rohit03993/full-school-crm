@@ -68,4 +68,34 @@ class CrmNavBadges
         Cache::forget('crm.nav.admissions_awaiting_approval');
         Cache::forget('crm.nav.admissions_pending_verification');
     }
+
+    public static function myMeetingsOpen(?User $staff = null): int
+    {
+        $staff ??= Auth::user();
+
+        if (! $staff) {
+            return 0;
+        }
+
+        return (int) Cache::remember(
+            'crm.nav.my_meetings_open.'.$staff->id,
+            self::CACHE_SECONDS,
+            fn (): int => app(\App\Services\VisitMeetingAssignmentService::class)->openCountForStaff($staff),
+        );
+    }
+
+    public static function flushMeetingBadgeCache(?int $staffUserId = null): void
+    {
+        if ($staffUserId !== null) {
+            Cache::forget('crm.nav.my_meetings_open.'.$staffUserId);
+
+            return;
+        }
+
+        $userId = Auth::id();
+
+        if ($userId) {
+            Cache::forget('crm.nav.my_meetings_open.'.$userId);
+        }
+    }
 }

@@ -10,6 +10,88 @@
 }
 
 @layer components {
+    /* ── Admin sidebar: section hierarchy & brand warmth ── */
+    .fi-main-sidebar.fi-sidebar.fi-sidebar-open {
+        @apply lg:border-e lg:border-gray-200/80 lg:bg-gradient-to-b lg:from-slate-50 lg:via-white lg:to-amber-50/50;
+        @apply dark:lg:border-white/10 dark:lg:from-gray-950 dark:lg:via-gray-900 dark:lg:to-gray-900;
+    }
+
+    .fi-sidebar-nav {
+        @apply gap-y-4 px-4 py-6;
+    }
+
+    .fi-sidebar-nav-groups {
+        @apply -mx-0.5 gap-y-5;
+    }
+
+    /* Ungrouped items (e.g. Dashboard) */
+    .fi-sidebar-nav-groups > .fi-sidebar-group:not(.fi-collapsible) {
+        @apply mb-1 border-b border-gray-200/70 pb-3 dark:border-white/10;
+    }
+
+    .fi-sidebar-nav-groups > .fi-sidebar-group:not(.fi-collapsible) .fi-sidebar-item.fi-active > .fi-sidebar-item-btn {
+        @apply bg-primary-50 ring-1 ring-primary-500/20 dark:bg-primary-500/10 dark:ring-primary-500/25;
+    }
+
+    /* Section headings */
+    .fi-sidebar-nav-groups > .fi-sidebar-group.fi-collapsible + .fi-sidebar-group.fi-collapsible {
+        @apply border-t border-gray-200/60 pt-4 dark:border-white/10;
+    }
+
+    .fi-sidebar-group.fi-collapsible > .fi-sidebar-group-btn {
+        @apply mx-0 mb-1.5 rounded-lg border-s-[3px] border-primary-500 bg-white/90 px-2.5 py-2 shadow-sm ring-1 ring-gray-950/[0.04] transition duration-150;
+        @apply hover:bg-white hover:ring-primary-500/15;
+        @apply dark:border-primary-400 dark:bg-white/[0.05] dark:ring-white/10 dark:hover:bg-white/[0.08];
+    }
+
+    .fi-sidebar-group-label {
+        @apply text-[11px] font-bold uppercase tracking-[0.07em] text-slate-800;
+        @apply dark:text-gray-100;
+    }
+
+    .fi-sidebar-group-btn > .fi-icon {
+        @apply shrink-0 text-primary-600 dark:text-primary-400;
+    }
+
+    .fi-sidebar-group-collapse-btn {
+        @apply text-slate-400 hover:text-slate-600 dark:text-gray-500 dark:hover:text-gray-300;
+    }
+
+    /* Menu links */
+    .fi-sidebar-item-btn {
+        @apply rounded-lg px-2.5 py-2;
+    }
+
+    .fi-sidebar-item-label {
+        @apply text-[13px] font-medium text-slate-600 dark:text-gray-300;
+    }
+
+    .fi-sidebar-item.fi-sidebar-item-has-url > .fi-sidebar-item-btn:hover {
+        @apply bg-white/95 shadow-sm ring-1 ring-gray-950/[0.04];
+        @apply dark:bg-white/[0.06] dark:ring-white/10;
+    }
+
+    .fi-sidebar-item.fi-active > .fi-sidebar-item-btn {
+        @apply border-s-2 border-primary-500 bg-primary-50/95 ps-[calc(0.625rem-2px)] shadow-sm ring-1 ring-primary-500/15;
+        @apply dark:border-primary-400 dark:bg-primary-500/10 dark:ring-primary-500/20;
+    }
+
+    .fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-sidebar-item-label {
+        @apply font-semibold text-primary-900 dark:text-primary-300;
+    }
+
+    .fi-sidebar-item.fi-active > .fi-sidebar-item-btn > .fi-icon {
+        @apply text-primary-600 dark:text-primary-400;
+    }
+
+    .fi-sidebar-item-btn > .fi-icon {
+        @apply text-slate-400 dark:text-gray-500;
+    }
+
+    .fi-sidebar-item.fi-sidebar-item-has-url:hover > .fi-sidebar-item-btn > .fi-icon {
+        @apply text-slate-600 dark:text-gray-300;
+    }
+
     .fi-dashboard-hero-widget .fi-wi-widget {
         @apply overflow-visible;
     }
@@ -103,12 +185,17 @@
         }
 
         .fi-student-profile-tabs .fi-tabs-tab-list {
-            @apply mx-0 grid overflow-hidden pb-0;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            @apply mx-0 flex flex-nowrap gap-1 overflow-x-auto pb-1 scroll-smooth;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+
+        .fi-student-profile-tabs .fi-tabs-tab-list::-webkit-scrollbar {
+            display: none;
         }
 
         .fi-student-profile-tabs .fi-tabs-tab {
-            @apply w-full;
+            @apply min-w-[5.5rem] shrink-0;
         }
 
         .fi-tabs-tab {
@@ -475,24 +562,54 @@
     }
 
     .fi-student-profile-tabs {
-        @apply mt-1;
+        @apply mt-2;
+    }
+
+    .fi-student-profile-tabs .fi-tabs {
+        @apply gap-0;
     }
 
     .fi-student-profile-tabs .fi-tabs-tab-list {
-        @apply grid gap-1.5 overflow-hidden rounded-2xl bg-gray-50/80 p-2 ring-1 ring-gray-200/80 dark:bg-white/5 dark:ring-white/10;
-        grid-template-columns: repeat(auto-fill, minmax(8.75rem, 1fr));
+        @apply flex flex-nowrap gap-1 overflow-x-auto rounded-2xl border border-gray-200/80 bg-gradient-to-b from-gray-50 to-gray-100/80 p-1.5 shadow-sm dark:border-white/10 dark:from-gray-900 dark:to-gray-950/80;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .fi-student-profile-tabs .fi-tabs-tab-list::-webkit-scrollbar {
+        display: none;
     }
 
     .fi-student-profile-tabs .fi-tabs-tab {
-        @apply min-w-0 w-full justify-center rounded-xl px-2 py-2.5 text-xs font-semibold text-gray-600 transition sm:px-3 sm:text-sm dark:text-gray-400;
+        @apply relative min-w-[6.5rem] shrink-0 flex-col gap-1 rounded-xl border border-transparent px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 transition-all duration-200 sm:min-w-[7.5rem] sm:flex-row sm:gap-2 sm:py-2.5 sm:text-xs sm:normal-case sm:tracking-normal dark:text-gray-400;
+    }
+
+    .fi-student-profile-tabs .fi-tabs-tab .fi-icon {
+        @apply h-4 w-4 shrink-0 opacity-70 transition-opacity;
+    }
+
+    .fi-student-profile-tabs .fi-tabs-tab:hover {
+        @apply border-gray-200/60 bg-white/60 text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200;
+    }
+
+    .fi-student-profile-tabs .fi-tabs-tab:hover .fi-icon {
+        @apply opacity-100;
     }
 
     .fi-student-profile-tabs .fi-tabs-tab[aria-selected='true'] {
-        @apply bg-white text-primary-700 shadow-sm ring-1 ring-gray-200/80 dark:bg-gray-900 dark:text-primary-400 dark:ring-white/10;
+        @apply border-primary-200/80 bg-white text-primary-700 shadow-md ring-1 ring-primary-500/10 dark:border-primary-500/30 dark:bg-gray-900 dark:text-primary-400 dark:ring-primary-400/20;
+    }
+
+    .fi-student-profile-tabs .fi-tabs-tab[aria-selected='true']::before {
+        content: '';
+        @apply absolute inset-x-2 top-0 h-0.5 rounded-full bg-primary-500 dark:bg-primary-400;
+    }
+
+    .fi-student-profile-tabs .fi-tabs-tab[aria-selected='true'] .fi-icon {
+        @apply text-primary-600 opacity-100 dark:text-primary-400;
     }
 
     .fi-student-profile-tabs .fi-tabs-panel {
-        @apply pt-4 sm:pt-5;
+        @apply mt-4 rounded-2xl border border-gray-200/60 bg-white p-4 shadow-sm sm:p-5 dark:border-white/10 dark:bg-gray-900/50;
     }
 
     .crm-pwa-install-trigger {

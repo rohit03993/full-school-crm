@@ -37,19 +37,24 @@ class PunchAttendanceSyncService
             ->first();
 
         if ($state === 'IN') {
-            Attendance::query()->updateOrCreate(
-                [
+            if ($existing) {
+                $existing->update([
+                    'status' => AttendanceStatus::Present,
+                    'checked_in_at' => $checkedInAt,
+                    'punch_source' => $existing->punch_source ?? $source,
+                    'marked_by_user_id' => $markedByUserId ?? $existing->marked_by_user_id ?? $staffId,
+                ]);
+            } else {
+                Attendance::query()->create([
                     'batch_id' => $batchId,
                     'student_id' => $student->id,
                     'attendance_date' => $date,
-                ],
-                [
                     'status' => AttendanceStatus::Present,
                     'checked_in_at' => $checkedInAt,
                     'punch_source' => $source,
-                    'marked_by_user_id' => $markedByUserId ?? $existing?->marked_by_user_id ?? $staffId,
-                ],
-            );
+                    'marked_by_user_id' => $markedByUserId ?? $staffId,
+                ]);
+            }
 
             return;
         }

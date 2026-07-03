@@ -70,5 +70,47 @@ class AdjustFeeStructureFormSchemaTest extends TestCase
         ]);
 
         $this->assertSame(10000.0, $resolved['discount_amount']);
+        $this->assertSame('Sibling discount', $resolved['reason']);
+    }
+
+    public function test_installment_only_save_uses_default_reason(): void
+    {
+        $feeStructure = new FeeStructure([
+            'course_fee' => 120000,
+            'discount_amount' => 5000,
+            'net_fee' => 115000,
+            'paid_amount' => 0,
+            'pending_amount' => 115000,
+        ]);
+
+        $resolved = AdjustFeeStructureFormSchema::resolveForSave($feeStructure, [
+            'course_fee' => 120000,
+            'additional_discount' => 0,
+            'reschedule_installments' => true,
+            'installment_plan' => [
+                ['label' => 'Term 1', 'amount' => 115000, 'due_date' => null],
+            ],
+            'reason' => '',
+        ]);
+
+        $this->assertSame(5000.0, $resolved['discount_amount']);
+        $this->assertSame(AdjustFeeStructureFormSchema::INSTALLMENT_ONLY_REASON, $resolved['reason']);
+    }
+
+    public function test_requires_reason_when_additional_discount_entered(): void
+    {
+        $feeStructure = new FeeStructure([
+            'course_fee' => 100000,
+            'discount_amount' => 0,
+            'net_fee' => 100000,
+        ]);
+
+        $this->assertTrue(AdjustFeeStructureFormSchema::requiresReasonFromGet($feeStructure, [
+            'additional_discount' => 2000,
+        ]));
+
+        $this->assertFalse(AdjustFeeStructureFormSchema::requiresReasonFromGet($feeStructure, [
+            'additional_discount' => 0,
+        ]));
     }
 }

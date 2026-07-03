@@ -75,10 +75,13 @@ class PunchAttendanceProcessor
                 'punch_date' => $date,
                 'punch_time' => $time,
                 'device_name' => 'Manual',
-                'verify_type_char' => 'M',
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
+
+            if ($this->columnExists($this->logs->punchTable(), 'verify_type_char')) {
+                $payload['verify_type_char'] = 'M';
+            }
 
             if ($this->columnExists($this->logs->punchTable(), 'is_manual')) {
                 $payload['is_manual'] = 1;
@@ -95,6 +98,10 @@ class PunchAttendanceProcessor
      */
     private function handleMachinePunch(object $punch): array
     {
+        if ($this->isManualPunchRow($punch)) {
+            return ['synced' => false, 'notified' => false];
+        }
+
         $roll = $this->logs->normalizeRoll((string) ($punch->employee_id ?? ''));
         $date = (string) $punch->punch_date;
         $time = (string) $punch->punch_time;
@@ -172,5 +179,14 @@ class PunchAttendanceProcessor
     private function columnExists(string $table, string $column): bool
     {
         return DB::getSchemaBuilder()->hasColumn($table, $column);
+    }
+
+    private function isManualPunchRow(object $punch): bool
+    {
+        if (isset($punch->is_manual) && (int) $punch->is_manual === 1) {
+            return true;
+        }
+
+        return isset($punch->device_name) && strcasecmp((string) $punch->device_name, 'Manual') === 0;
     }
 }

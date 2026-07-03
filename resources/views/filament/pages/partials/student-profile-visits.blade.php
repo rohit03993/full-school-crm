@@ -12,11 +12,18 @@
                             {{ $visit->visit_date?->format('d M Y') }}
                         </p>
                         <span class="shrink-0 rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-semibold text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
-                            {{ $visit->status?->label() }}
+                            {{ $visit->displayStatusLabel() }}
                         </span>
                     </div>
                     <p class="mt-1 truncate text-xs font-medium text-gray-600 dark:text-gray-400">
-                        {{ $visit->enquiry?->course?->name ?? 'General visit' }}
+                        @if ($visit->isCampusVisit())
+                            Campus visit
+                            @if ($visit->campus_purpose)
+                                · {{ $visit->campus_purpose->label() }}
+                            @endif
+                        @else
+                            {{ $visit->enquiry?->course?->name ?? 'General visit' }}
+                        @endif
                     </p>
                     <p class="mt-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $visit->discussion_summary }}</p>
                     @if ($visit->remarks)

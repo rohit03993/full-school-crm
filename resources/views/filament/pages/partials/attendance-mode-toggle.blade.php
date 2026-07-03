@@ -30,7 +30,7 @@
                     </div>
                 @else
                     <span class="inline-flex items-center rounded-full bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-800 ring-1 ring-sky-500/20 dark:text-sky-200">
-                        Manual P / A / L · WhatsApp on save
+                        Manual IN / OUT · WhatsApp on each tap
                     </span>
                 @endif
             </div>
@@ -95,7 +95,7 @@
                             'text-primary-100' => $viewMode === 'manual',
                             'text-gray-500 dark:text-gray-400' => $viewMode !== 'manual',
                         ])>
-                            Manual batch · mark IN / A / L · OUT per student · IN/OUT WhatsApp
+                            Manual batch · tap IN / OUT per student · parent WhatsApp on each action
                         </p>
                     </div>
                 </div>

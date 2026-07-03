@@ -50,8 +50,35 @@ class StudentBulkImportService
      * @param  list<list<string|null>>  $rows
      * @return list<array<string, mixed>>
      */
-    public function buildPreview(array $columnMapping, array $rows, ?int $academicSessionScopeId = null): array
-    {
+    public function buildPreview(
+        array $columnMapping,
+        array $rows,
+        ?int $academicSessionScopeId = null,
+        ?int $fixedBatchId = null,
+    ): array {
+        $fixedBatch = null;
+
+        if ($fixedBatchId) {
+            $fixedBatch = Batch::query()
+                ->with(['course', 'academicSession'])
+                ->find($fixedBatchId);
+
+            if (! $fixedBatch) {
+                throw ValidationException::withMessages([
+                    'batch_id' => 'Selected batch was not found. Choose another batch and preview again.',
+                ]);
+            }
+
+            if (
+                $academicSessionScopeId
+                && (int) $fixedBatch->academic_session_id !== $academicSessionScopeId
+            ) {
+                throw ValidationException::withMessages([
+                    'batch_id' => 'Selected batch does not belong to the chosen academic session.',
+                ]);
+            }
+        }
+
         $preview = [];
         $seenRolls = [];
         $seenMobiles = [];
@@ -93,7 +120,7 @@ class StudentBulkImportService
             $rowNumber = $index + 2;
             $data = $this->mapRow($columnMapping, $row);
             $warnings = $this->mobileImportWarnings($data);
-            $errors = $this->validateRowData($data);
+            $errors = $this->validateRowData($data, requireBatchFromSpreadsheet: $fixedBatch === null);
             $data = $this->stripImportMeta($data);
 
             $rollKey = strtoupper(trim((string) ($data[StudentImportFields::ROLL_NUMBER] ?? '')));
@@ -120,7 +147,10 @@ class StudentBulkImportService
             $resolvedBatch = null;
             $batchLabel = trim((string) ($data[StudentImportFields::BATCH_SECTION] ?? ''));
 
-            if ($batchLabel !== '' && $errors === []) {
+            if ($fixedBatch && $errors === []) {
+                $resolvedBatch = $fixedBatch;
+                $data[StudentImportFields::BATCH_SECTION] = $fixedBatch->name;
+            } elseif ($batchLabel !== '' && $errors === []) {
                 $resolvedBatch = $this->batchResolver->resolve($batchLabel, $academicSessionScopeId);
 
                 if (! $resolvedBatch) {
@@ -356,7 +386,7 @@ class StudentBulkImportService
                     $rowBatch,
                     $existingStudent,
                     $item,
-                ): string {
+                ): array {
                     return $this->importRow(
                         $staff,
                         $batch,
@@ -367,7 +397,7 @@ class StudentBulkImportService
                     );
                 });
 
-                if ($result === 'created') {
+                if ($result['outcome'] === 'created') {
                     $chunk['created']++;
                 } else {
                     $chunk['updated']++;
@@ -606,12 +636,17 @@ class StudentBulkImportService
         ?int $academicSessionScopeId,
         string $originalFilename,
         array $preview,
+        ?int $fixedBatchId = null,
     ): StudentImportBatch {
+        $batch = $fixedBatchId
+            ? Batch::query()->find($fixedBatchId)
+            : null;
+
         return StudentImportBatch::query()->create([
             'user_id' => $staff->id,
-            'academic_session_id' => $academicSessionScopeId,
-            'course_id' => null,
-            'batch_id' => null,
+            'academic_session_id' => $academicSessionScopeId ?? $batch?->academic_session_id,
+            'course_id' => $batch?->course_id,
+            'batch_id' => $fixedBatchId,
             'original_filename' => $originalFilename,
             'preview_rows' => $preview,
             'total_rows' => count($preview),
@@ -626,6 +661,121 @@ class StudentBulkImportService
     public function countImportableRows(array $preview, array $duplicateResolutions): int
     {
         return count($this->importablePreviewRows($preview, $duplicateResolutions));
+    }
+
+    /**
+     * Enroll a single student from the All Students → Add Student form.
+     *
+     * @param  array{
+     *     roll_number: string,
+     *     name: string,
+     *     father_name?: string|null,
+     *     mobile?: string|null,
+     *     date_of_birth?: string|null,
+     *     gender?: string|null,
+     * }  $input
+     */
+    public function enrollOne(User $staff, Batch $batch, array $input): Student
+    {
+        $batch->loadMissing(['course', 'academicSession']);
+
+        $course = $batch->course ?? Course::query()->findOrFail($batch->course_id);
+
+        if ((float) $course->fee <= 0) {
+            throw ValidationException::withMessages([
+                'batch_id' => 'This course has no fee set. Update the course fee before enrolling students.',
+            ]);
+        }
+
+        $data = [
+            StudentImportFields::ROLL_NUMBER => strtoupper(trim((string) $input['roll_number'])),
+            StudentImportFields::NAME => trim((string) $input['name']),
+            StudentImportFields::FATHER_NAME => filled($input['father_name'] ?? null)
+                ? trim((string) $input['father_name'])
+                : null,
+            StudentImportFields::MOBILE => '',
+            StudentImportFields::DATE_OF_BIRTH => $input['date_of_birth'] ?? null,
+            StudentImportFields::GENDER => $input['gender'] ?? null,
+            StudentImportFields::BATCH_SECTION => $batch->name,
+        ];
+
+        if (filled($input['mobile'] ?? null)) {
+            $normalizedMobile = IndianMobileNumber::normalize((string) $input['mobile']);
+
+            if ($normalizedMobile === null) {
+                throw ValidationException::withMessages([
+                    'mobile' => 'Enter a valid 10-digit Indian mobile number.',
+                ]);
+            }
+
+            $data[StudentImportFields::MOBILE] = $normalizedMobile;
+        }
+
+        $errors = $this->validateRowData($data);
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($this->directEnrollmentFieldErrors($data, $errors));
+        }
+
+        $rollNumber = (string) $data[StudentImportFields::ROLL_NUMBER];
+
+        if (
+            Enrollment::query()
+                ->where('enrollment_number', $rollNumber)
+                ->exists()
+        ) {
+            throw ValidationException::withMessages([
+                'roll_number' => 'This roll number is already assigned to another student.',
+            ]);
+        }
+
+        $warnings = $this->mobileImportWarnings($data);
+        $data = $this->stripImportMeta($data);
+
+        $existingStudent = filled($data[StudentImportFields::MOBILE])
+            ? $this->mobiles->findStudentByNumber($data[StudentImportFields::MOBILE])
+            : null;
+
+        return DB::transaction(function () use ($staff, $batch, $data, $existingStudent, $warnings): Student {
+            $result = $this->importRow(
+                $staff,
+                null,
+                $data,
+                $batch,
+                $existingStudent,
+                $warnings,
+                LeadSource::DirectAdmission,
+                'Direct admission — enrolled by staff',
+                'Added from Students → Add Student',
+                'Direct Student Enrollment',
+            );
+
+            return $result['student']->fresh(['activeEnrollment.course', 'activeBatchStudent.batch']);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  list<string>  $errors
+     * @return array<string, string>
+     */
+    protected function directEnrollmentFieldErrors(array $data, array $errors): array
+    {
+        $mapped = [];
+
+        foreach ($errors as $error) {
+            if (str_contains($error, 'Roll number')) {
+                $mapped['roll_number'] = $error;
+            } elseif (str_contains($error, 'Student name')) {
+                $mapped['name'] = $error;
+            } elseif (str_contains($error, 'Batch')) {
+                $mapped['batch_id'] = $error;
+            } else {
+                $mapped['name'] = $error;
+            }
+        }
+
+        return $mapped;
     }
 
     /**
@@ -683,11 +833,15 @@ class StudentBulkImportService
      * @param  array<string, mixed>  $data
      * @return list<string>
      */
-    protected function validateRowData(array $data): array
+    protected function validateRowData(array $data, bool $requireBatchFromSpreadsheet = true): array
     {
         $errors = [];
 
-        foreach (StudentImportFields::required() as $field) {
+        $required = $requireBatchFromSpreadsheet
+            ? StudentImportFields::required()
+            : StudentImportFields::requiredWithoutBatchColumn();
+
+        foreach ($required as $field) {
             if (blank($data[$field] ?? null)) {
                 $errors[] = StudentImportFields::labels()[$field].' is required.';
             }
@@ -745,15 +899,20 @@ class StudentBulkImportService
 
     /**
      * @param  array<string, mixed>  $data
+     * @return array{student: Student, outcome: 'created'|'updated'}
      */
     protected function importRow(
         User $staff,
-        StudentImportBatch $importBatch,
+        ?StudentImportBatch $importBatch,
         array $data,
         Batch $batch,
         ?Student $existingStudent,
         array $mobileWarnings = [],
-    ): string {
+        LeadSource $leadSource = LeadSource::BulkImport,
+        string $discussionSummary = 'Bulk import — enrolled student',
+        string $visitRemarks = 'Imported via Students & Admissions → Import Students',
+        string $auditAction = 'Bulk Import Enrollment',
+    ): array {
         $course = $batch->course ?? Course::query()->findOrFail($batch->course_id);
         $session = $batch->academicSession ?? AcademicSession::query()->findOrFail($batch->academic_session_id);
 
@@ -784,7 +943,10 @@ class StudentBulkImportService
 
             $this->batches->assign($student, $batch, $staff);
 
-            return $created ? 'created' : 'updated';
+            return [
+                'student' => $student,
+                'outcome' => $created ? 'created' : 'updated',
+            ];
         }
 
         if ($student->admissions()->exists()) {
@@ -796,7 +958,14 @@ class StudentBulkImportService
         $enquiry = $student->enquiries()->first();
 
         if (! $enquiry) {
-            $enquiry = $this->createEnquiry($student, $course, $staff);
+            $enquiry = $this->createEnquiry(
+                $student,
+                $course,
+                $staff,
+                $leadSource,
+                $discussionSummary,
+                $visitRemarks,
+            );
         } else {
             $enquiry->update(['course_id' => $course->id]);
         }
@@ -809,20 +978,30 @@ class StudentBulkImportService
             $importBatch,
             (string) $data[StudentImportFields::ROLL_NUMBER],
             $staff,
+            $auditAction,
         );
 
         $this->batches->assign($student, $batch, $staff);
 
-        return $created ? 'created' : 'updated';
+        return [
+            'student' => $student,
+            'outcome' => $created ? 'created' : 'updated',
+        ];
     }
 
-    protected function createEnquiry(Student $student, Course $course, User $staff): Enquiry
-    {
+    protected function createEnquiry(
+        Student $student,
+        Course $course,
+        User $staff,
+        LeadSource $leadSource = LeadSource::BulkImport,
+        string $discussionSummary = 'Bulk import — enrolled student',
+        string $remarks = 'Imported via Students & Admissions → Import Students',
+    ): Enquiry {
         $enquiry = Enquiry::query()->create([
             'student_id' => $student->id,
             'enquiry_number' => $this->numberGenerator->generate(NumberSequenceType::Enquiry),
             'course_id' => $course->id,
-            'lead_source' => LeadSource::BulkImport,
+            'lead_source' => $leadSource,
             'meeting_for' => MeetingForOptions::defaultValue(),
             'visit_type' => VisitType::FirstVisit,
             'latest_visit_status' => VisitStatus::Joined,
@@ -834,8 +1013,8 @@ class StudentBulkImportService
             'enquiry_id' => $enquiry->id,
             'visit_date' => now()->toDateString(),
             'staff_user_id' => $staff->id,
-            'discussion_summary' => 'Bulk import — enrolled student',
-            'remarks' => 'Imported via Students & Admissions → Import Students',
+            'discussion_summary' => $discussionSummary,
+            'remarks' => $remarks,
             'status' => VisitStatus::Joined,
         ]);
 
@@ -847,16 +1026,17 @@ class StudentBulkImportService
         Enquiry $enquiry,
         Course $course,
         AcademicSession $session,
-        StudentImportBatch $importBatch,
+        ?StudentImportBatch $importBatch,
         string $rollNumber,
         User $staff,
+        string $auditAction = 'Bulk Import Enrollment',
     ): Enrollment {
         $courseFee = $this->resolvedCourseFee($course);
 
         $admission = Admission::query()->create([
             'student_id' => $student->id,
             'enquiry_id' => $enquiry->id,
-            'import_batch_id' => $importBatch->id,
+            'import_batch_id' => $importBatch?->id,
             'admission_number' => $this->numberGenerator->generate(NumberSequenceType::Admission),
             'course_fee' => $courseFee,
             'discount_amount' => 0,
@@ -891,13 +1071,13 @@ class StudentBulkImportService
         $this->feeStructures->createFromAdmission($enrollment, $admission, $staff);
 
         $this->audit->log(
-            action: 'Bulk Import Enrollment',
+            action: $auditAction,
             auditable: $enrollment,
             newValues: [
                 'enrollment_number' => $enrollment->enrollment_number,
                 'academic_session_id' => $session->id,
                 'course_id' => $course->id,
-                'import_batch_id' => $importBatch->id,
+                'import_batch_id' => $importBatch?->id,
             ],
             user: $staff,
         );

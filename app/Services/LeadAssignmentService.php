@@ -136,11 +136,7 @@ class LeadAssignmentService
      */
     public static function activeStaffOptions(): array
     {
-        return User::query()
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->all();
+        return \App\Support\StaffOptions::assignableStaffOptions();
     }
 
     protected function flushCaches(?int ...$staffUserIds): void

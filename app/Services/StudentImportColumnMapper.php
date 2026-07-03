@@ -70,14 +70,18 @@ class StudentImportColumnMapper
      * @param  array<int, string>  $columnMapping
      * @return list<string>
      */
-    public function missingRequiredFields(array $columnMapping): array
+    public function missingRequiredFields(array $columnMapping, bool $requireBatchColumn = true): array
     {
         $mapped = array_values(array_filter(
             $columnMapping,
             fn (string $field): bool => $field !== StudentImportFields::SKIP,
         ));
 
-        return array_values(array_diff(StudentImportFields::required(), $mapped));
+        $required = $requireBatchColumn
+            ? StudentImportFields::required()
+            : StudentImportFields::requiredWithoutBatchColumn();
+
+        return array_values(array_diff($required, $mapped));
     }
 
     protected function normalizeHeader(?string $header): string

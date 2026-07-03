@@ -6,7 +6,7 @@
 <div class="fi-section overflow-hidden rounded-2xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
     <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-5">
         <h3 class="text-sm font-bold text-gray-950 dark:text-white">Marked dates</h3>
-        <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Tap a row to edit that day</p>
+        <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Tap a row to open that day</p>
     </div>
 
     @if ($summaries === [])
@@ -15,13 +15,12 @@
         </p>
     @else
         <div class="overflow-x-auto">
-            <table class="w-full min-w-[32rem] text-left text-sm">
+            <table class="w-full min-w-[24rem] text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
                     <tr>
                         <th class="px-4 py-2 font-medium">Date</th>
-                        <th class="px-4 py-2 font-medium text-center">Present</th>
-                        <th class="px-4 py-2 font-medium text-center">Absent</th>
-                        <th class="px-4 py-2 font-medium text-center">Leave</th>
+                        <th class="px-4 py-2 font-medium text-center">IN</th>
+                        <th class="px-4 py-2 font-medium text-center">OUT</th>
                         <th class="px-4 py-2 font-medium text-center">Total</th>
                         <th class="px-4 py-2 font-medium"></th>
                     </tr>
@@ -37,14 +36,11 @@
                             <td class="px-4 py-2.5 font-medium text-gray-900 dark:text-white">
                                 {{ $row['label'] }}
                             </td>
-                            <td class="px-4 py-2.5 text-center text-success-600 dark:text-success-400">
-                                {{ $row['present'] }}
+                            <td class="px-4 py-2.5 text-center font-semibold text-emerald-600 dark:text-emerald-400">
+                                {{ $row['checked_in'] }}
                             </td>
-                            <td class="px-4 py-2.5 text-center text-danger-600 dark:text-danger-400">
-                                {{ $row['absent'] }}
-                            </td>
-                            <td class="px-4 py-2.5 text-center text-warning-600 dark:text-warning-400">
-                                {{ $row['leave'] }}
+                            <td class="px-4 py-2.5 text-center font-semibold text-rose-600 dark:text-rose-400">
+                                {{ $row['checked_out'] }}
                             </td>
                             <td class="px-4 py-2.5 text-center text-gray-700 dark:text-gray-300">
                                 {{ $row['total'] }}

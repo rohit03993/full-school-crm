@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\CampusVisitOutcome;
+use App\Enums\CampusVisitPurpose;
 use App\Enums\VisitStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +19,8 @@ class Visit extends Model
         'remarks',
         'next_follow_up_date',
         'status',
+        'campus_purpose',
+        'campus_outcome',
     ];
 
     protected function casts(): array
@@ -25,7 +29,27 @@ class Visit extends Model
             'visit_date' => 'date',
             'next_follow_up_date' => 'date',
             'status' => VisitStatus::class,
+            'campus_purpose' => CampusVisitPurpose::class,
+            'campus_outcome' => CampusVisitOutcome::class,
         ];
+    }
+
+    public function isCampusVisit(): bool
+    {
+        return $this->campus_purpose !== null || $this->campus_outcome !== null;
+    }
+
+    public function displayStatusLabel(): string
+    {
+        if ($this->campus_outcome) {
+            return $this->campus_outcome->label();
+        }
+
+        if ($this->campus_purpose) {
+            return $this->campus_purpose->label();
+        }
+
+        return $this->status?->label() ?? '—';
     }
 
     public function student(): BelongsTo

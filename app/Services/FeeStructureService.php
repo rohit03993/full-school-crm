@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Filament\Forms\AdjustFeeStructureFormSchema;
 use App\Models\Admission;
 use App\Models\Enrollment;
 use App\Models\FeeMiscCharge;
@@ -101,10 +102,17 @@ class FeeStructureService
             ? app(AdmissionFeePlanService::class)->normalizeInstallmentPlan($data['installment_plan'] ?? [])
             : [];
 
-        if ($reason === '') {
+        $previousDiscount = round((float) $feeStructure->discount_amount, 2);
+        $discountChanged = abs($discount - $previousDiscount) > 0.01;
+
+        if ($discountChanged && $reason === '') {
             throw ValidationException::withMessages([
-                'reason' => 'A reason is required when changing fees after enrollment.',
+                'reason' => 'Please enter why this discount is being given.',
             ]);
+        }
+
+        if ($reason === '') {
+            $reason = AdjustFeeStructureFormSchema::INSTALLMENT_ONLY_REASON;
         }
 
         if ($discount > $courseFee) {

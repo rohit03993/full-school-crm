@@ -392,6 +392,13 @@ class StudentSearchPage extends Page
 
         $enquiry = $enquiryService->create($data, Auth::user(), LeadSource::WalkIn);
 
+        app(\App\Services\VisitMeetingAssignmentService::class)->assignFromFormData(
+            $enquiry->student,
+            $enquiry,
+            Auth::user(),
+            $data,
+        );
+
         Notification::make()
             ->title('Enquiry created')
             ->body("Enquiry {$enquiry->enquiry_number} saved successfully.")

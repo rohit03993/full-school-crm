@@ -49,11 +49,13 @@
                                     'inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1',
                                     'bg-emerald-500/15 text-emerald-700 ring-emerald-500/20 dark:text-emerald-400' => $enquiry->lead_source?->value === 'website',
                                     'bg-sky-500/15 text-sky-800 ring-sky-500/20 dark:text-sky-400' => $enquiry->lead_source?->value === 'walk_in',
-                                    'bg-gray-500/10 text-gray-600 ring-gray-500/10 dark:text-gray-400' => ! in_array($enquiry->lead_source?->value, ['website', 'walk_in'], true),
+                                    'bg-primary-500/15 text-primary-800 ring-primary-500/20 dark:text-primary-300' => $enquiry->lead_source?->value === 'direct_admission',
+                                    'bg-violet-500/15 text-violet-800 ring-violet-500/20 dark:text-violet-300' => $enquiry->lead_source?->value === 'bulk_import',
+                                    'bg-gray-500/10 text-gray-600 ring-gray-500/10 dark:text-gray-400' => ! in_array($enquiry->lead_source?->value, ['website', 'walk_in', 'direct_admission', 'bulk_import'], true),
                                 ])>
                                     {{ $enquiry->lead_source?->label() ?? 'Lead' }}
                                 </span>
-                                @if ($enquiry->meeting_for)
+                                @if ($enquiry->meeting_for && ! $enquiry->lead_source?->isSystemEnrollment())
                                     @include('filament.pages.partials.meeting-for-badge', [
                                         'value' => $enquiry->meeting_for,
                                         'size' => 'sm',

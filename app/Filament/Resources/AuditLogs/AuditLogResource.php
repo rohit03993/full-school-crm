@@ -125,15 +125,11 @@ class AuditLogResource extends Resource
                         TextEntry::make('reason')->placeholder('—'),
                         TextEntry::make('old_values')
                             ->label('Previous values')
-                            ->formatStateUsing(fn (?array $state): string => $state
-                                ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-                                : '—')
+                            ->formatStateUsing(fn (mixed $state): string => static::formatAuditJson($state))
                             ->columnSpanFull(),
                         TextEntry::make('new_values')
                             ->label('New values')
-                            ->formatStateUsing(fn (?array $state): string => $state
-                                ? json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-                                : '—')
+                            ->formatStateUsing(fn (mixed $state): string => static::formatAuditJson($state))
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
@@ -146,5 +142,22 @@ class AuditLogResource extends Resource
             'index' => ListAuditLogs::route('/'),
             'view' => Pages\ViewAuditLog::route('/{record}'),
         ];
+    }
+
+    protected static function formatAuditJson(mixed $state): string
+    {
+        if ($state === null || $state === '' || $state === []) {
+            return '—';
+        }
+
+        if (is_array($state)) {
+            return json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '—';
+        }
+
+        if (is_bool($state)) {
+            return $state ? 'true' : 'false';
+        }
+
+        return (string) $state;
     }
 }

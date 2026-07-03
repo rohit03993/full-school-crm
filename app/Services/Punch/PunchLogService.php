@@ -58,7 +58,10 @@ class PunchLogService
         }
 
         $table = $this->punchTable();
-        $select = 'employee_id, punch_date, punch_time, 0 as is_manual';
+        $isManualColumn = Schema::hasColumn($table, 'is_manual');
+        $select = $isManualColumn
+            ? 'employee_id, punch_date, punch_time, is_manual'
+            : 'employee_id, punch_date, punch_time, 0 as is_manual';
 
         if (Schema::hasColumn($table, 'device_name')) {
             $select .= ', device_name';
@@ -68,12 +71,27 @@ class PunchLogService
             $select .= ', area_name';
         }
 
-        return DB::table($table)
+        $query = DB::table($table)
             ->selectRaw($select)
             ->where('employee_id', $this->normalizeRoll($roll))
-            ->where('punch_date', $date)
+            ->where('punch_date', $date);
+
+        if ($isManualColumn) {
+            $query->where(fn ($builder) => $builder->whereNull('is_manual')->orWhere('is_manual', 0));
+        } elseif (Schema::hasColumn($table, 'device_name')) {
+            $query->where(fn ($builder) => $builder->whereNull('device_name')->orWhere('device_name', '!=', 'Manual'));
+        }
+
+        return $query
             ->orderBy('punch_time')
-            ->get();
+            ->get()
+            ->map(function (object $row) use ($isManualColumn): object {
+                if (! $isManualColumn) {
+                    $row->is_manual = 0;
+                }
+
+                return $row;
+            });
     }
 
     /**
@@ -125,8 +143,17 @@ class PunchLogService
             return collect();
         }
 
-        return DB::table($this->punchTable())
-            ->where('id', '>', $lastId)
+        $table = $this->punchTable();
+        $query = DB::table($table)
+            ->where('id', '>', $lastId);
+
+        if (Schema::hasColumn($table, 'is_manual')) {
+            $query->where(fn ($builder) => $builder->whereNull('is_manual')->orWhere('is_manual', 0));
+        } elseif (Schema::hasColumn($table, 'device_name')) {
+            $query->where(fn ($builder) => $builder->whereNull('device_name')->orWhere('device_name', '!=', 'Manual'));
+        }
+
+        return $query
             ->orderBy('id')
             ->limit($limit)
             ->get();

@@ -2,25 +2,28 @@
 
 namespace App\Filament\Forms;
 
+use App\Enums\CampusVisitOutcome;
+use App\Enums\CampusVisitPurpose;
 use App\Enums\Gender;
 use App\Enums\LeadSource;
 use App\Support\MeetingForOptions;
 use App\Enums\StudentCategory;
 use App\Enums\VisitStatus;
 use App\Enums\VisitType;
-use App\Enums\RoleName;
 use App\Models\Course;
 use App\Models\User;
 use App\Services\CustomFieldService;
 use App\Support\CustomFieldFormBuilder;
 use App\Support\DefaultCourse;
 use App\Support\InstituteProfile;
+use App\Support\StaffOptions;
 use Filament\Support\Icons\Heroicon;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Support\Collection;
@@ -61,6 +64,7 @@ class EnquiryFormSchema
                 ->label('Note')
                 ->placeholder('Walk-in, fees question, batch timing…')
                 ->rows(2),
+            ...self::meetingAssignmentFields(),
         ];
     }
 
@@ -118,6 +122,7 @@ class EnquiryFormSchema
                         ->placeholder('e.g. Walk-in, asked about fees & batch timing')
                         ->rows(2)
                         ->columnSpan(['default' => 1, 'sm' => 2]),
+                    ...self::meetingAssignmentFields(),
                 ])
                 ->compact(),
             Section::make('More details')
@@ -193,6 +198,7 @@ class EnquiryFormSchema
                 ->label('Quick Note')
                 ->rows(2)
                 ->placeholder('Reason for this enquiry'),
+            ...self::meetingAssignmentFields(),
             ...CustomFieldFormBuilder::flatComponents(CustomFieldService::ENTITY_ENQUIRY),
         ];
     }
@@ -200,7 +206,19 @@ class EnquiryFormSchema
     /**
      * @return array<int, \Filament\Forms\Components\Component>
      */
-    public static function visitActionFields(int $staffUserId, Collection $enquiries): array
+    public static function visitActionFields(int $staffUserId, Collection $enquiries, bool $forEnrolled = false): array
+    {
+        return $forEnrolled
+            ? self::visitActionFieldsForEnrolled($enquiries)
+            : self::visitActionFieldsForLead($staffUserId, $enquiries);
+    }
+
+    /**
+     * Lead / enquiry pipeline visit.
+     *
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    public static function visitActionFieldsForLead(int $staffUserId, Collection $enquiries): array
     {
         return [
             Select::make('enquiry_id')
@@ -217,13 +235,8 @@ class EnquiryFormSchema
                 ->default(now())
                 ->required()
                 ->native(false),
-            Select::make('staff_user_id')
-                ->label('Staff')
-                ->options(self::staffOptions())
-                ->default($staffUserId)
-                ->required()
-                ->native(false),
             Textarea::make('discussion_summary')
+                ->label('Discussion summary')
                 ->required()
                 ->rows(3)
                 ->columnSpanFull(),
@@ -233,10 +246,106 @@ class EnquiryFormSchema
             DatePicker::make('next_follow_up_date')
                 ->native(false),
             Select::make('status')
+                ->label('Lead status')
                 ->options(self::visitStatusOptions())
                 ->default(VisitStatus::Interested->value)
                 ->required()
                 ->native(false),
+            ...self::meetingAssignmentFields(),
+        ];
+    }
+
+    /**
+     * Enrolled student campus visit — no lead pipeline fields.
+     *
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    public static function visitActionFieldsForEnrolled(Collection $enquiries): array
+    {
+        $fields = [
+            DatePicker::make('visit_date')
+                ->label('Visit date')
+                ->default(now())
+                ->required()
+                ->native(false),
+            Select::make('campus_purpose')
+                ->label('Visit purpose')
+                ->options(CampusVisitPurpose::options())
+                ->default(CampusVisitPurpose::General->value)
+                ->required()
+                ->native(false),
+            ...self::enrolledVisitMeetingFields(),
+        ];
+
+        if ($enquiries->count() > 1) {
+            array_unshift($fields, Select::make('enquiry_id')
+                ->label('Related course record')
+                ->options(
+                    $enquiries->mapWithKeys(fn ($enquiry) => [
+                        $enquiry->id => $enquiry->enquiry_number.' — '.$enquiry->course?->name,
+                    ]),
+                )
+                ->required()
+                ->native(false)
+                ->default($enquiries->first()?->id));
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Enrolled campus visit — handoff notes only (no separate visit / internal remarks).
+     *
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    public static function enrolledVisitMeetingFields(): array
+    {
+        return [
+            Toggle::make('assign_meeting')
+                ->label('Assign meeting to staff')
+                ->helperText('The selected staff will get a notification and can view handoff notes on the student profile.')
+                ->live()
+                ->columnSpanFull(),
+            Select::make('meeting_assign_to_user_id')
+                ->label('Meet with')
+                ->options(self::staffOptions())
+                ->searchable()
+                ->required(fn (Get $get): bool => (bool) $get('assign_meeting'))
+                ->visible(fn (Get $get): bool => (bool) $get('assign_meeting'))
+                ->native(false),
+            Textarea::make('meeting_handoff_notes')
+                ->label('Handoff notes')
+                ->placeholder('Why they are here, what to discuss with them…')
+                ->required(fn (Get $get): bool => (bool) $get('assign_meeting'))
+                ->rows(3)
+                ->columnSpanFull(),
+        ];
+    }
+
+    /**
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    public static function meetingAssignmentFields(): array
+    {
+        return [
+            Toggle::make('assign_meeting')
+                ->label('Assign meeting to staff')
+                ->helperText('The selected staff will get a notification and can view handoff notes on the student profile.')
+                ->live()
+                ->columnSpanFull(),
+            Select::make('meeting_assign_to_user_id')
+                ->label('Meet with')
+                ->options(self::staffOptions())
+                ->searchable()
+                ->required(fn (Get $get): bool => (bool) $get('assign_meeting'))
+                ->visible(fn (Get $get): bool => (bool) $get('assign_meeting'))
+                ->native(false),
+            Textarea::make('meeting_handoff_notes')
+                ->label('Handoff notes')
+                ->placeholder('Why they are here, what to discuss with them…')
+                ->rows(2)
+                ->visible(fn (Get $get): bool => (bool) $get('assign_meeting'))
+                ->columnSpanFull(),
         ];
     }
 
@@ -441,18 +550,18 @@ class EnquiryFormSchema
     }
 
     /**
+     * @return array<string, string>
+     */
+    public static function visitStatusOptionsForSelect(): array
+    {
+        return self::visitStatusOptions();
+    }
+
+    /**
      * @return array<int, string>
      */
     protected static function staffOptions(): array
     {
-        return User::query()
-            ->where('is_active', true)
-            ->whereHas('roles', fn ($query) => $query->whereIn('name', [
-                RoleName::Staff->value,
-                RoleName::SuperAdmin->value,
-            ]))
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->all();
+        return StaffOptions::assignableStaffOptions();
     }
 }

@@ -7,6 +7,7 @@ use App\Enums\StudentImportDuplicateResolution;
 use App\Support\CrmAccess;
 use App\Exports\StudentImportTemplateExport;
 use App\Models\AcademicSession;
+use App\Models\Batch;
 use App\Models\StudentImportBatch;
 use App\Services\StudentBulkImportService;
 use App\Services\StudentImportColumnMapper;
@@ -51,7 +52,11 @@ class BulkStudentImportPage extends Page
 
     public int $step = 1;
 
+    public string $importMode = 'spreadsheet';
+
     public ?int $academicSessionId = null;
+
+    public ?int $selectedBatchId = null;
 
     public ?int $importBatchId = null;
 
@@ -144,7 +149,28 @@ class BulkStudentImportPage extends Page
 
     public function updatedAcademicSessionId(): void
     {
-        //
+        if ($this->selectedBatchId === null) {
+            return;
+        }
+
+        $stillValid = Batch::query()
+            ->whereKey($this->selectedBatchId)
+            ->when(
+                filled($this->academicSessionId),
+                fn ($query) => $query->where('academic_session_id', $this->academicSessionId),
+            )
+            ->exists();
+
+        if (! $stillValid) {
+            $this->selectedBatchId = null;
+        }
+    }
+
+    public function updatedImportMode(): void
+    {
+        if ($this->importMode === 'spreadsheet') {
+            $this->selectedBatchId = null;
+        }
     }
 
     public function parseFileAndContinue(
@@ -154,6 +180,8 @@ class BulkStudentImportPage extends Page
         $this->validate([
             'academicSessionId' => 'nullable|exists:academic_sessions,id',
             'uploadFile' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240',
+            'importMode' => 'required|in:spreadsheet,single_batch',
+            'selectedBatchId' => 'required_if:importMode,single_batch|nullable|exists:batches,id',
         ]);
 
         $this->discardPreviewBatch();
@@ -186,9 +214,12 @@ class BulkStudentImportPage extends Page
 
         $this->validate([
             'academicSessionId' => 'nullable|exists:academic_sessions,id',
+            'importMode' => 'required|in:spreadsheet,single_batch',
+            'selectedBatchId' => 'required_if:importMode,single_batch|nullable|exists:batches,id',
         ]);
 
-        $missing = app(StudentImportColumnMapper::class)->missingRequiredFields($this->columnMapping);
+        $requireBatchColumn = $this->importMode !== 'single_batch';
+        $missing = app(StudentImportColumnMapper::class)->missingRequiredFields($this->columnMapping, $requireBatchColumn);
 
         if ($missing !== []) {
             Notification::make()
@@ -217,6 +248,7 @@ class BulkStudentImportPage extends Page
                 $this->columnMapping,
                 $rows,
                 filled($this->academicSessionId) ? (int) $this->academicSessionId : null,
+                $this->importMode === 'single_batch' ? (int) $this->selectedBatchId : null,
             );
 
             foreach ($preview as $row) {
@@ -232,6 +264,7 @@ class BulkStudentImportPage extends Page
                 filled($this->academicSessionId) ? (int) $this->academicSessionId : null,
                 $this->originalFilename,
                 $preview,
+                $this->importMode === 'single_batch' ? (int) $this->selectedBatchId : null,
             );
 
             $this->importBatchId = $previewBatch->id;
@@ -450,6 +483,7 @@ class BulkStudentImportPage extends Page
 
         $this->reset([
             'step',
+            'importMode',
             'uploadFile',
             'storedFilePath',
             'originalFilename',
@@ -465,9 +499,11 @@ class BulkStudentImportPage extends Page
             'importRunningTotals',
             'isImporting',
             'previewStatusFilter',
+            'selectedBatchId',
         ]);
 
         $this->step = 1;
+        $this->importMode = 'spreadsheet';
         $this->academicSessionId = AcademicSession::current()?->id;
     }
 
@@ -613,6 +649,8 @@ class BulkStudentImportPage extends Page
                 'original_filename' => $this->originalFilename,
                 'academic_session_id' => $this->academicSessionId,
                 'column_mapping' => $this->columnMapping,
+                'import_mode' => $this->importMode,
+                'selected_batch_id' => $this->selectedBatchId,
             ],
         ]);
     }
@@ -634,6 +672,8 @@ class BulkStudentImportPage extends Page
         }
 
         $this->academicSessionId = $data['academic_session_id'] ?? $this->academicSessionId;
+        $this->importMode = $data['import_mode'] ?? $this->importMode;
+        $this->selectedBatchId = $data['selected_batch_id'] ?? $this->selectedBatchId;
 
         if ($this->columnMapping === [] && is_array($data['column_mapping'] ?? null)) {
             $this->columnMapping = $data['column_mapping'];
@@ -658,12 +698,33 @@ class BulkStudentImportPage extends Page
             ->all();
     }
 
+    /**
+     * @return array<int, string>
+     */
+    public function batchOptions(): array
+    {
+        return Batch::query()
+            ->with('course')
+            ->when(
+                filled($this->academicSessionId),
+                fn ($query) => $query->where('academic_session_id', $this->academicSessionId),
+            )
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (Batch $batch): array => [
+                $batch->id => trim($batch->name.' — '.($batch->course?->name ?? 'Course')),
+            ])
+            ->all();
+    }
+
     public function content(Schema $schema): Schema
     {
         return $schema->components([
             View::make('filament.pages.partials.bulk-student-import')
                 ->viewData(fn (): array => [
                     'step' => $this->step,
+                    'importMode' => $this->importMode,
+                    'batchOptions' => $this->batchOptions(),
                     'sessionOptions' => $this->sessionOptions(),
                     'fileHeaders' => $this->fileHeaders,
                     'fileRows' => $this->fileRows,

@@ -14,6 +14,6 @@
 @else
     @include('filament.pages.partials.fast-batch-attendance-roster', [
         'roster' => $roster,
-        'marks' => $marks,
+        'attendanceSnapshot' => $attendanceSnapshot ?? [],
     ])
 @endif

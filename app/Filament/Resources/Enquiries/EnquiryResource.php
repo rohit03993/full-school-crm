@@ -106,6 +106,8 @@ class EnquiryResource extends Resource
                     ->color(fn (LeadSource $state): string => match ($state) {
                         LeadSource::Website => 'success',
                         LeadSource::WalkIn => 'info',
+                        LeadSource::DirectAdmission => 'warning',
+                        LeadSource::BulkImport => 'gray',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (LeadSource $state): string => $state->label()),

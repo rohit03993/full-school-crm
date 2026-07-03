@@ -2,6 +2,9 @@
 
 namespace App\Support;
 
+use Filament\Navigation\NavigationGroup;
+use Filament\Support\Icons\Heroicon;
+
 /**
  * Sidebar group names and order — keep menu paths in hints/docs aligned with these labels.
  *
@@ -28,20 +31,40 @@ class CrmNavigation
     public const GROUP_WEBSITE = 'Website';
 
     /**
+     * @return array<int, NavigationGroup>
+     */
+    public static function navigationGroups(): array
+    {
+        return [
+            NavigationGroup::make(self::GROUP_LEADS)
+                ->icon(Heroicon::OutlinedChatBubbleLeftRight),
+            NavigationGroup::make(self::GROUP_CALLS)
+                ->icon(Heroicon::OutlinedPhone),
+            NavigationGroup::make(self::GROUP_MESSAGING)
+                ->icon(Heroicon::OutlinedChatBubbleOvalLeftEllipsis),
+            NavigationGroup::make(self::GROUP_STUDENTS)
+                ->icon(Heroicon::OutlinedAcademicCap),
+            NavigationGroup::make(self::GROUP_ACADEMICS)
+                ->icon(Heroicon::OutlinedBookOpen),
+            NavigationGroup::make(self::GROUP_REPORTS)
+                ->icon(Heroicon::OutlinedChartBar),
+            NavigationGroup::make(self::GROUP_SETTINGS)
+                ->icon(Heroicon::OutlinedCog6Tooth),
+            NavigationGroup::make(self::GROUP_ADMIN)
+                ->icon(Heroicon::OutlinedShieldCheck),
+            NavigationGroup::make(self::GROUP_WEBSITE)
+                ->icon(Heroicon::OutlinedGlobeAlt),
+        ];
+    }
+
+    /**
      * @return array<int, string>
      */
     public static function groups(): array
     {
-        return [
-            self::GROUP_LEADS,
-            self::GROUP_CALLS,
-            self::GROUP_MESSAGING,
-            self::GROUP_STUDENTS,
-            self::GROUP_ACADEMICS,
-            self::GROUP_REPORTS,
-            self::GROUP_SETTINGS,
-            self::GROUP_ADMIN,
-            self::GROUP_WEBSITE,
-        ];
+        return array_map(
+            fn (NavigationGroup $group): string => (string) $group->getLabel(),
+            self::navigationGroups(),
+        );
     }
 }

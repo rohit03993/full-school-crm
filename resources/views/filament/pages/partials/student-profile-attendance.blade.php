@@ -79,7 +79,7 @@
                                     {{ $record->checked_out_at?->format('H:i') ?? '—' }}
                                 </td>
                                 <td class="px-4 py-2.5 text-xs text-gray-600 dark:text-gray-300">
-                                    {{ \App\Support\AttendanceSourceLabel::for($record->punch_source) }}
+                                    {{ \App\Support\AttendanceSourceLabel::forRecord($record, $student) }}
                                 </td>
                             </tr>
                         @endforeach

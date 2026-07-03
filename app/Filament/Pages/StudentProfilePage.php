@@ -50,9 +50,15 @@ use App\Services\PenaltyCalculationService;
 use App\Services\ReceiptService;
 use App\Services\StorageCleanupService;
 use App\Services\StudentCounterService;
+use App\Services\StudentProfileDeleteService;
 use App\Services\StudentUpdateService;
 use App\Services\WhatsAppCampaignService;
+use App\Services\VisitMeetingAssignmentService;
 use App\Services\VisitService;
+use App\Enums\ProfilePhase;
+use App\Enums\CampusVisitOutcome;
+use App\Enums\CampusVisitPurpose;
+use App\Enums\VisitStatus;
 use App\Support\FeePlanCalculator;
 use App\Support\FeePlanSubmissionGuard;
 use App\Support\CrmHint;
@@ -210,6 +216,14 @@ class StudentProfilePage extends Page
     /**
      * @var array<string, mixed>|null
      */
+    public bool $showCloseMeetingModal = false;
+
+    public string $closeMeetingNotes = '';
+
+    public string $closeMeetingStatus = '';
+
+    public string $closeMeetingCampusOutcome = '';
+
     protected ?array $cachedProfileSummary = null;
 
     /**
@@ -250,6 +264,8 @@ class StudentProfilePage extends Page
             if (str_starts_with($tab, 'activity_')) {
                 $this->profileTab = 'activities';
                 $this->activitySubTab = substr($tab, strlen('activity_'));
+            } elseif ($tab === 'documents') {
+                $this->profileTab = 'admission';
             } elseif (in_array($tab, $this->validProfileTabs(), true)) {
                 $this->profileTab = $tab;
             }
@@ -300,7 +316,6 @@ class StudentProfilePage extends Page
             'calls' => $this->loadCallsTab(),
             'messages' => $this->loadMessagesTab(),
             'admission' => $this->loadAdmissionTab(),
-            'documents' => $this->loadDocumentsTab(),
             'fees' => $this->loadFeesTab(),
             'receipts' => $this->loadReceiptsTab(),
             'attendance' => $this->loadAttendanceTab(),
@@ -314,7 +329,7 @@ class StudentProfilePage extends Page
      */
     protected function validProfileTabs(): array
     {
-        $tabs = ['overview', 'documents'];
+        $tabs = ['overview'];
 
         if ($this->licensed(LicenseFeature::Enquiries)) {
             $tabs[] = 'visits';
@@ -401,6 +416,8 @@ class StudentProfilePage extends Page
             $this->cachedProfileSummary = app(StudentCounterService::class)->profile($this->record);
             $this->cachedProfileSummary['calling_assignment'] = app(LeadAssignmentService::class)
                 ->profileCallingAssignment($this->record, Auth::user());
+            $this->cachedProfileSummary['meeting_assignment'] = app(VisitMeetingAssignmentService::class)
+                ->profileMeetingAssignment($this->record, Auth::user());
         }
 
         return $this->cachedProfileSummary;
@@ -552,6 +569,25 @@ class StudentProfilePage extends Page
                 'due_date' => $row->due_date?->toDateString(),
             ])->values()->all();
         }
+
+        $this->loadDocumentsForProfile();
+    }
+
+    protected function loadDocumentsForProfile(): void
+    {
+        if ($this->documentsTabLoaded) {
+            return;
+        }
+
+        $this->documentsTabLoaded = true;
+
+        $admissionIds = $this->record->admissions()->pluck('id');
+
+        $this->documents = Document::query()
+            ->where('documentable_type', Admission::class)
+            ->whereIn('documentable_id', $admissionIds)
+            ->latest()
+            ->get();
     }
 
     public function addMiscFeeRow(): void
@@ -735,6 +771,31 @@ class StudentProfilePage extends Page
         return CrmAccess::can(Auth::user(), $permission);
     }
 
+    protected function canDeleteProfile(): bool
+    {
+        return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
+    }
+
+    protected function deleteProfileLabel(): string
+    {
+        $phase = $this->profileSummary()['phase'] ?? ProfilePhase::Lead;
+
+        return match ($phase) {
+            ProfilePhase::Enrolled, ProfilePhase::ActiveStudent => 'Delete student',
+            default => 'Delete visitor',
+        };
+    }
+
+    protected function deleteProfileModalHeading(): string
+    {
+        $phase = $this->profileSummary()['phase'] ?? ProfilePhase::Lead;
+
+        return match ($phase) {
+            ProfilePhase::Enrolled, ProfilePhase::ActiveStudent => 'Delete student permanently?',
+            default => 'Delete visitor permanently?',
+        };
+    }
+
     public function getCanManageAdmissionFeePlanProperty(): bool
     {
         return $this->activeAdmission?->canAdjustFees()
@@ -786,21 +847,10 @@ class StudentProfilePage extends Page
         $this->saveAdmissionFeePlan($admissions);
     }
 
+    /** @deprecated Merged into admission tab */
     public function loadDocumentsTab(): void
     {
-        if ($this->documentsTabLoaded) {
-            return;
-        }
-
-        $this->documentsTabLoaded = true;
-
-        $admissionIds = $this->record->admissions()->pluck('id');
-
-        $this->documents = Document::query()
-            ->where('documentable_type', Admission::class)
-            ->whereIn('documentable_id', $admissionIds)
-            ->latest()
-            ->get();
+        $this->loadDocumentsForProfile();
     }
 
     public function loadFeesTab(): void
@@ -1155,6 +1205,57 @@ class StudentProfilePage extends Page
         $this->cachedProfileSummary = null;
     }
 
+    public function openCloseMeetingModal(): void
+    {
+        $assignment = app(VisitMeetingAssignmentService::class)->profileMeetingAssignment($this->record, Auth::user());
+
+        if (! ($assignment['can_close'] ?? false)) {
+            return;
+        }
+
+        $this->closeMeetingNotes = '';
+        $this->closeMeetingStatus = VisitStatus::Interested->value;
+        $this->closeMeetingCampusOutcome = CampusVisitOutcome::Resolved->value;
+        $this->showCloseMeetingModal = true;
+    }
+
+    public function cancelCloseMeetingModal(): void
+    {
+        $this->showCloseMeetingModal = false;
+    }
+
+    public function submitCloseMeeting(VisitMeetingAssignmentService $assignments): void
+    {
+        $open = app(VisitMeetingAssignmentService::class)->openForStudent($this->record);
+
+        if (! $open) {
+            Notification::make()->title('No open meeting')->warning()->send();
+
+            return;
+        }
+
+        $isEnrolled = $this->record->activeEnrollment !== null;
+
+        $assignments->close(
+            $open,
+            Auth::user(),
+            $this->closeMeetingNotes,
+            $isEnrolled ? null : VisitStatus::from($this->closeMeetingStatus),
+            $isEnrolled ? CampusVisitOutcome::from($this->closeMeetingCampusOutcome) : null,
+        );
+
+        $this->showCloseMeetingModal = false;
+        $this->visitsTabLoaded = false;
+        $this->loadVisitsTab();
+        $this->refreshRecord();
+
+        Notification::make()
+            ->title('Meeting closed')
+            ->body('Notes saved and assignment cleared.')
+            ->success()
+            ->send();
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -1164,29 +1265,75 @@ class StudentProfilePage extends Page
                 ->color('gray')
                 ->button()
                 ->outlined(),
+            Action::make('closeMeeting')
+                ->label('Close the meeting')
+                ->icon('heroicon-o-check-circle')
+                ->button()
+                ->color('success')
+                ->action(fn () => $this->openCloseMeetingModal())
+                ->visible(fn (): bool => (bool) ($this->profileSummary()['meeting_assignment']['can_close'] ?? false)),
             Action::make('addVisit')
                 ->label('Add Visit')
                 ->icon('heroicon-o-plus-circle')
                 ->button()
                 ->color('primary')
-                ->form(EnquiryFormSchema::visitActionFields(
+                ->form(fn (): array => EnquiryFormSchema::visitActionFields(
                     Auth::id(),
                     $this->record->enquiries,
+                    $this->record->activeEnrollment !== null,
                 ))
-                ->action(function (array $data) {
-                    $enquiry = Enquiry::query()->findOrFail($data['enquiry_id']);
+                ->action(function (array $data): void {
+                    $isEnrolled = $this->record->activeEnrollment !== null;
+                    $assignMeeting = (bool) ($data['assign_meeting'] ?? false);
+                    $visitLogged = false;
 
-                    app(VisitService::class)->add(
+                    if ($isEnrolled) {
+                        $enquiry = isset($data['enquiry_id'])
+                            ? Enquiry::query()->findOrFail($data['enquiry_id'])
+                            : $this->record->enquiries()->latest()->first();
+
+                        if (! $assignMeeting) {
+                            $purpose = CampusVisitPurpose::from($data['campus_purpose']);
+
+                            app(VisitService::class)->addCampusVisit(
+                                $this->record,
+                                $enquiry,
+                                [
+                                    'visit_date' => $data['visit_date'],
+                                    'campus_purpose' => $purpose->value,
+                                    'discussion_summary' => $purpose->label(),
+                                ],
+                                Auth::user(),
+                            );
+                            $visitLogged = true;
+                        }
+                    } else {
+                        $enquiry = Enquiry::query()->findOrFail($data['enquiry_id']);
+
+                        app(VisitService::class)->add(
+                            $this->record,
+                            $enquiry,
+                            [
+                                'visit_date' => $data['visit_date'],
+                                'discussion_summary' => $data['discussion_summary'],
+                                'remarks' => $data['remarks'] ?? null,
+                                'next_follow_up_date' => $data['next_follow_up_date'] ?? null,
+                                'status' => $data['status'],
+                            ],
+                            Auth::user(),
+                        );
+                        $visitLogged = true;
+                    }
+
+                    $enquiryForAssignment = isset($data['enquiry_id'])
+                        ? Enquiry::query()->find($data['enquiry_id'])
+                        : $this->record->enquiries()->latest()->first();
+
+                    $assignment = app(VisitMeetingAssignmentService::class)->assignFromFormData(
                         $this->record,
-                        $enquiry,
-                        [
-                            'visit_date' => $data['visit_date'],
-                            'discussion_summary' => $data['discussion_summary'],
-                            'remarks' => $data['remarks'] ?? null,
-                            'next_follow_up_date' => $data['next_follow_up_date'] ?? null,
-                            'status' => $data['status'],
-                        ],
+                        $enquiryForAssignment,
                         Auth::user(),
+                        $data,
                     );
 
                     $this->visitsTabLoaded = false;
@@ -1194,13 +1341,17 @@ class StudentProfilePage extends Page
                     $this->refreshRecord();
 
                     Notification::make()
-                        ->title('Visit added')
+                        ->title(match (true) {
+                            $visitLogged && $assignment !== null => 'Visit logged & meeting assigned',
+                            $assignment !== null => 'Meeting assigned',
+                            default => 'Visit added',
+                        })
                         ->success()
                         ->send();
                 })
                 ->visible(fn (): bool => $this->licensed(LicenseFeature::Enquiries)
                     && $this->userCan(CrmPermission::LeadsCall)
-                    && $this->record->enquiries->isNotEmpty()),
+                    && ($this->record->activeEnrollment !== null || $this->record->enquiries->isNotEmpty())),
             Action::make('addEnquiry')
                 ->label('Add Enquiry')
                 ->icon('heroicon-o-document-plus')
@@ -1209,11 +1360,18 @@ class StudentProfilePage extends Page
                 ->outlined()
                 ->form(EnquiryFormSchema::forExistingStudent(Auth::id()))
                 ->action(function (array $data) {
-                    app(EnquiryService::class)->createForExistingStudent(
+                    $enquiry = app(EnquiryService::class)->createForExistingStudent(
                         $this->record,
                         $data,
                         Auth::user(),
                         LeadSource::WalkIn,
+                    );
+
+                    app(VisitMeetingAssignmentService::class)->assignFromFormData(
+                        $this->record,
+                        $enquiry,
+                        Auth::user(),
+                        $data,
                     );
 
                     $this->refreshRecord();
@@ -1475,8 +1633,8 @@ class StudentProfilePage extends Page
                 ->icon('heroicon-o-calculator')
                 ->color('warning')
                 ->button()
-                ->modalHeading('Adjust fee structure')
-                ->modalDescription('Admin only. Fee changes, installment reschedules, and reasons are stored in fee history and the audit log.')
+                ->modalHeading('Adjust fees & installments')
+                ->modalDescription('Add discount only when needed — that requires a reason. Updating installment dates and amounts does not.')
                 ->fillForm(function (): array {
                     $feeStructure = $this->record->activeEnrollment?->feeStructure;
 
@@ -1527,7 +1685,24 @@ class StudentProfilePage extends Page
                 ])
                 ->modalSubmitAction(function (Action $action): Action {
                     return $action
-                        ->label('Save fee changes')
+                        ->label(function (): string {
+                            $mounted = $this->mountedActionsData[0] ?? [];
+                            $feeStructure = $this->record->activeEnrollment?->feeStructure;
+
+                            if (! is_array($mounted) || ! $feeStructure) {
+                                return 'Save';
+                            }
+
+                            if (AdjustFeeStructureFormSchema::requiresReasonFromGet($feeStructure, $mounted)) {
+                                return 'Apply discount & save';
+                            }
+
+                            if ($mounted['reschedule_installments'] ?? false) {
+                                return 'Save installments';
+                            }
+
+                            return 'Save';
+                        })
                         ->disabled(function (): bool {
                             $mounted = $this->mountedActionsData[0] ?? [];
                             $feeStructure = $this->record->activeEnrollment?->feeStructure;
@@ -1565,8 +1740,16 @@ class StudentProfilePage extends Page
                     $this->loadFeesTab();
 
                     Notification::make()
-                        ->title('Fees updated')
-                        ->body('Fee structure revised and history recorded.')
+                        ->title(
+                            AdjustFeeStructureFormSchema::requiresReason($feeStructure, $data)
+                                ? 'Discount applied'
+                                : 'Installments updated'
+                        )
+                        ->body(
+                            AdjustFeeStructureFormSchema::requiresReason($feeStructure, $data)
+                                ? 'Fee structure revised and recorded in history.'
+                                : 'Payment schedule saved. No discount reason was needed.'
+                        )
                         ->success()
                         ->send();
                 })
@@ -1689,6 +1872,29 @@ class StudentProfilePage extends Page
                         ->send();
                 })
                 ->visible(fn (): bool => $this->userCan(CrmPermission::StudentsEdit)),
+            Action::make('deleteProfile')
+                ->label(fn (): string => $this->deleteProfileLabel())
+                ->icon('heroicon-o-trash')
+                ->color('danger')
+                ->outlined()
+                ->requiresConfirmation()
+                ->modalHeading(fn (): string => $this->deleteProfileModalHeading())
+                ->modalDescription('This permanently removes this person, including visits, calls, fees, attendance, and documents. This cannot be undone.')
+                ->modalSubmitActionLabel('Delete permanently')
+                ->action(function (): void {
+                    $name = $this->record->name;
+
+                    app(StudentProfileDeleteService::class)->delete($this->record, Auth::user());
+
+                    Notification::make()
+                        ->title('Profile deleted')
+                        ->body("{$name} was permanently removed.")
+                        ->success()
+                        ->send();
+
+                    $this->redirect(StudentSearchPage::getUrl(), navigate: true);
+                })
+                ->visible(fn (): bool => $this->canDeleteProfile()),
         ];
     }
 
@@ -1729,6 +1935,16 @@ class StudentProfilePage extends Page
                     'logCallModalMode' => 'profile',
                     'logCallLeadName' => $this->record->name,
                     'logCallLeadPhone' => $this->record->mobile,
+                ]),
+            View::make('filament.pages.partials.close-meeting-modal')
+                ->viewData(fn (): array => [
+                    'showCloseMeetingModal' => $this->showCloseMeetingModal,
+                    'closeMeetingNotes' => $this->closeMeetingNotes,
+                    'closeMeetingStatus' => $this->closeMeetingStatus,
+                    'closeMeetingCampusOutcome' => $this->closeMeetingCampusOutcome,
+                    'isEnrolledStudent' => $this->record->activeEnrollment !== null,
+                    'visitStatusOptions' => EnquiryFormSchema::visitStatusOptionsForSelect(),
+                    'campusOutcomeOptions' => CampusVisitOutcome::options(),
                 ]),
             View::make('filament.pages.partials.student-id-card-preview-modal')
                 ->viewData(fn (): array => [
@@ -1786,7 +2002,7 @@ class StudentProfilePage extends Page
                                 ]),
                         ]),
                     'admission' => Tab::make('Admission')
-                        ->icon('heroicon-o-document-text')
+                        ->icon('heroicon-o-clipboard-document-list')
                         ->visible(fn (): bool => $this->licensed(LicenseFeature::Admissions))
                         ->schema([
                             View::make('filament.pages.partials.student-profile-admission')
@@ -1794,13 +2010,6 @@ class StudentProfilePage extends Page
                                     'admissionTabLoaded' => $this->admissionTabLoaded,
                                     'activeAdmission' => $this->activeAdmission,
                                     'record' => $this->record,
-                                ]),
-                        ]),
-                    'documents' => Tab::make('Documents')
-                        ->icon('heroicon-o-folder')
-                        ->schema([
-                            View::make('filament.pages.partials.student-profile-documents')
-                                ->viewData(fn (): array => [
                                     'documentsTabLoaded' => $this->documentsTabLoaded,
                                     'documents' => $this->documents,
                                 ]),
@@ -1848,6 +2057,7 @@ class StudentProfilePage extends Page
                                     'activeBatch' => $this->activeBatch,
                                     'attendanceRecords' => $this->attendanceRecords,
                                     'attendancePercentage' => $this->attendancePercentage,
+                                    'student' => $this->record,
                                 ]),
                         ]),
                     'homework' => Tab::make('Homework')

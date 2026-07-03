@@ -48,4 +48,17 @@ class StudentImportFields
             self::BATCH_SECTION,
         ];
     }
+
+    /**
+     * Required when all rows are assigned to one CRM batch (no batch column in file).
+     *
+     * @return list<string>
+     */
+    public static function requiredWithoutBatchColumn(): array
+    {
+        return [
+            self::ROLL_NUMBER,
+            self::NAME,
+        ];
+    }
 }

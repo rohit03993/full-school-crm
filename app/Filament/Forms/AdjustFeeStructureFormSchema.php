@@ -16,6 +16,8 @@ use Illuminate\Support\HtmlString;
 
 class AdjustFeeStructureFormSchema
 {
+    public const INSTALLMENT_ONLY_REASON = 'Installment schedule updated';
+
     /**
      * @return array<int, \Filament\Forms\Components\Component>
      */
@@ -90,6 +92,19 @@ class AdjustFeeStructureFormSchema
                 ->live(debounce: 300)
                 ->afterStateUpdated($rebalanceInstallments)
                 ->disabled($maxAdditionalDiscount <= 0),
+            Textarea::make('reason')
+                ->label('Reason for discount')
+                ->rows(2)
+                ->maxLength(1000)
+                ->placeholder('e.g. Scholarship approved, sibling concession, director waiver')
+                ->helperText('Required only when you add discount above.')
+                ->visible(fn (Get $get): bool => self::requiresReasonFromGet($feeStructure, [
+                    'additional_discount' => $get('additional_discount'),
+                ]))
+                ->required(fn (Get $get): bool => self::requiresReasonFromGet($feeStructure, [
+                    'additional_discount' => $get('additional_discount'),
+                ]))
+                ->columnSpanFull(),
             Placeholder::make('new_net_fee_preview')
                 ->label('After this change')
                 ->content(function (Get $get) use ($feeStructure, $miscTotal, $currentNet, $currentDiscount, $paid): string {
@@ -105,17 +120,14 @@ class AdjustFeeStructureFormSchema
                         .' · Total discount ₹'.number_format($newTotalDiscount, 2);
                 })
                 ->columnSpanFull(),
-            Textarea::make('reason')
-                ->label('Reason for change')
-                ->required()
-                ->rows(3)
-                ->maxLength(1000)
-                ->helperText('Required before saving. Scroll down if needed to review installments, then click Save fee changes.')
+            Placeholder::make('installments_section_heading')
+                ->label('')
+                ->content(new HtmlString('<p class="text-sm font-bold text-gray-950 dark:text-white">Payment schedule</p><p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Update due dates and amounts for the balance still due. No reason needed for schedule-only changes.</p>'))
                 ->columnSpanFull(),
             Toggle::make('reschedule_installments')
-                ->label('Reschedule remaining installments')
-                ->helperText('Rebuild the payment schedule for the new balance still due. Paid installments are kept on record.')
-                ->default($pending > 0)
+                ->label('Update pending installments')
+                ->helperText('Rebuild rows for the balance still due. Paid installments stay locked.')
+                ->default(false)
                 ->live()
                 ->afterStateUpdated(function (bool $state, Get $get, Set $set) use ($feeStructure, $miscTotal, $rebalanceInstallments): void {
                     if (! $state) {
@@ -209,10 +221,48 @@ class AdjustFeeStructureFormSchema
         return [
             'course_fee' => $feeStructure->course_fee,
             'additional_discount' => 0,
-            'reschedule_installments' => (float) $feeStructure->pending_amount > 0,
+            'reschedule_installments' => false,
             'installment_plan' => self::pendingInstallmentPlan($feeStructure),
             'reason' => '',
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function requiresReason(FeeStructure $feeStructure, array $data): bool
+    {
+        return abs(self::resolveDiscountAmount($feeStructure, $data) - (float) $feeStructure->discount_amount) > 0.01;
+    }
+
+    /**
+     * @param  array<string, mixed>  $mounted
+     */
+    public static function requiresReasonFromGet(FeeStructure $feeStructure, array $mounted): bool
+    {
+        return max(0, (float) ($mounted['additional_discount'] ?? 0)) > 0.01;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function resolveReason(FeeStructure $feeStructure, array $data): string
+    {
+        $reason = trim((string) ($data['reason'] ?? ''));
+
+        if ($reason !== '') {
+            return $reason;
+        }
+
+        if (self::requiresReason($feeStructure, $data)) {
+            return '';
+        }
+
+        if ((bool) ($data['reschedule_installments'] ?? false)) {
+            return self::INSTALLMENT_ONLY_REASON;
+        }
+
+        return self::INSTALLMENT_ONLY_REASON;
     }
 
     /**
@@ -229,6 +279,7 @@ class AdjustFeeStructureFormSchema
         return array_merge($data, [
             'course_fee' => $courseFee,
             'discount_amount' => $discount,
+            'reason' => self::resolveReason($feeStructure, $data),
         ]);
     }
 

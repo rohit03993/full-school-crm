@@ -61,4 +61,9 @@ class CrmCacheInvalidator
         CrmDashboardService::flushAllCaches();
         CrmNavBadges::flushAdmissionBadgeCache();
     }
+
+    public static function afterMeetingAssignmentChange(int $staffUserId): void
+    {
+        CrmNavBadges::flushMeetingBadgeCache($staffUserId);
+    }
 }

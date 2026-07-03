@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Forms\AdjustFeeStructureFormSchema;
 use App\Enums\CourseStatus;
 use App\Enums\Gender;
 use App\Enums\LeadSource;
@@ -76,6 +77,53 @@ class FeeStructureHistoryTest extends TestCase
         $this->assertSame(40000.0, (float) $updated->pending_amount);
         $this->assertCount(2, $updated->installments);
         $this->assertSame(20000.0, (float) $updated->installments->first()->pending_amount);
+    }
+
+    public function test_installment_reschedule_does_not_require_discount_reason(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->createAdminUser();
+        $staff = $this->createStaffUser();
+        $student = $this->createEnrolledStudent($staff);
+        $feeStructure = $student->activeEnrollment->feeStructure;
+
+        $updated = app(FeeStructureService::class)->updateByAdmin($feeStructure, [
+            'course_fee' => 50000,
+            'discount_amount' => 0,
+            'reason' => '',
+            'reschedule_installments' => true,
+            'installment_plan' => [
+                ['label' => 'Term 1', 'amount' => 25000, 'due_date' => now()->addMonth()->toDateString()],
+                ['label' => 'Term 2', 'amount' => 25000, 'due_date' => now()->addMonths(2)->toDateString()],
+            ],
+        ], $admin);
+
+        $this->assertSame(50000.0, (float) $updated->net_fee);
+        $this->assertCount(2, $updated->installments);
+
+        $this->assertDatabaseHas('fee_structure_history', [
+            'fee_structure_id' => $feeStructure->id,
+            'reason' => AdjustFeeStructureFormSchema::INSTALLMENT_ONLY_REASON,
+        ]);
+    }
+
+    public function test_discount_change_still_requires_reason(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->createAdminUser();
+        $staff = $this->createStaffUser();
+        $student = $this->createEnrolledStudent($staff);
+        $feeStructure = $student->activeEnrollment->feeStructure;
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+
+        app(FeeStructureService::class)->updateByAdmin($feeStructure, [
+            'course_fee' => 50000,
+            'discount_amount' => 5000,
+            'reason' => '',
+        ], $admin);
     }
 
     protected function createStaffUser(): User

@@ -14,6 +14,7 @@ enum LeadSource: string
     case Banner = 'banner';
     case Newspaper = 'newspaper';
     case BulkImport = 'bulk_import';
+    case DirectAdmission = 'direct_admission';
     case Other = 'other';
 
     public function label(): string
@@ -29,7 +30,13 @@ enum LeadSource: string
             self::Banner => 'Banner',
             self::Newspaper => 'Newspaper',
             self::BulkImport => 'Bulk Import',
+            self::DirectAdmission => 'Direct admission',
             self::Other => 'Other',
         };
+    }
+
+    public function isSystemEnrollment(): bool
+    {
+        return in_array($this, [self::BulkImport, self::DirectAdmission], true);
     }
 }

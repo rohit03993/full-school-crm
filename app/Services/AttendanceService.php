@@ -127,7 +127,37 @@ class AttendanceService
     }
 
     /**
-     * @return list<array{date: string, label: string, present: int, absent: int, leave: int, total: int}>
+     * @return array<int, array{
+     *     status: string,
+     *     checked_in_at: ?string,
+     *     checked_out_at: ?string,
+     *     is_inside: bool
+     * }>
+     */
+    public function punchSnapshotForBatchDate(Batch $batch, string $date): array
+    {
+        return Attendance::query()
+            ->where('batch_id', $batch->id)
+            ->whereDate('attendance_date', $date)
+            ->get()
+            ->mapWithKeys(function (Attendance $row): array {
+                $checkedIn = $row->checked_in_at?->format('H:i');
+                $checkedOut = $row->checked_out_at?->format('H:i');
+
+                return [
+                    $row->student_id => [
+                        'status' => $row->status->value,
+                        'checked_in_at' => $checkedIn,
+                        'checked_out_at' => $checkedOut,
+                        'is_inside' => $checkedIn !== null && $checkedOut === null,
+                    ],
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * @return list<array{date: string, label: string, checked_in: int, checked_out: int, total: int}>
      */
     public function markedDateSummariesForBatch(Batch $batch, int $limit = 30): array
     {
@@ -142,9 +172,8 @@ class AttendanceService
                 return [
                     'date' => $date,
                     'label' => Carbon::parse($date)->format('d M Y'),
-                    'present' => $group->where('status', AttendanceStatus::Present)->count(),
-                    'absent' => $group->where('status', AttendanceStatus::Absent)->count(),
-                    'leave' => $group->where('status', AttendanceStatus::Leave)->count(),
+                    'checked_in' => $group->where('status', AttendanceStatus::Present)->count(),
+                    'checked_out' => $group->whereNotNull('checked_out_at')->count(),
                     'total' => $group->count(),
                 ];
             })

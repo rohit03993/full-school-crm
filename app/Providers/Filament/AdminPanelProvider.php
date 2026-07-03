@@ -53,7 +53,8 @@ class AdminPanelProvider extends PanelProvider
             ->spa()
             ->sidebarCollapsibleOnDesktop()
             ->collapsibleNavigationGroups()
-            ->navigationGroups(CrmNavigation::groups())
+            ->navigationGroups(CrmNavigation::navigationGroups())
+            ->databaseNotifications()
             ->maxContentWidth(Width::Full);
 
         if (file_exists(public_path('build/manifest.json'))) {

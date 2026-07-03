@@ -6,7 +6,10 @@
         4 => ['label' => 'Results', 'hint' => 'Import summary'],
     ];
 
-    $requiredColumns = ['Roll number', 'Student name', 'Batch name'];
+    $singleBatchMode = ($importMode ?? 'spreadsheet') === 'single_batch';
+    $requiredColumns = $singleBatchMode
+        ? ['Roll number', 'Student name']
+        : ['Roll number', 'Student name', 'Batch name'];
     $optionalColumns = ['Primary mobile', "Father's name", 'Date of birth', 'Gender'];
 @endphp
 
@@ -55,23 +58,15 @@
 
     {{-- Stepper --}}
     <div class="overflow-hidden rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 sm:p-5">
-        <nav aria-label="Import progress" class="relative isolate grid gap-3 sm:grid-cols-4">
+        <nav aria-label="Import progress" class="grid gap-4 sm:grid-cols-4 sm:gap-3">
             @foreach ($steps as $number => $meta)
                 @php
                     $isComplete = $step > $number;
                     $isCurrent = $step === $number;
                 @endphp
-                <div class="relative flex items-start gap-3">
-                    @if ($number < count($steps))
-                        <span @class([
-                            'pointer-events-none absolute left-8 top-4 z-0 hidden h-px w-[calc(100%-2rem)] sm:block',
-                            'bg-primary-300 dark:bg-primary-600' => $isComplete,
-                            'bg-gray-200 dark:bg-white/10' => ! $isComplete,
-                        ]) aria-hidden="true"></span>
-                    @endif
-
+                <div class="flex items-start gap-3">
                     <span @class([
-                        'relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ring-2',
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ring-2',
                         'bg-primary-600 text-white ring-primary-600' => $isCurrent,
                         'bg-emerald-500 text-white ring-emerald-500' => $isComplete,
                         'bg-gray-100 text-gray-500 ring-gray-200 dark:bg-white/10 dark:text-gray-400 dark:ring-white/10' => ! $isCurrent && ! $isComplete,
@@ -101,7 +96,7 @@
 
     @if ($step === 1)
         <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <div class="border-b border-gray-100 bg-gradient-to-r from-primary-500/10 via-primary-500/5 to-transparent px-4 py-4 dark:border-white/10 sm:px-6">
+            <div class="bg-gradient-to-r from-primary-500/10 via-primary-500/5 to-transparent px-4 py-4 dark:from-primary-500/10 sm:px-6">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="flex items-start gap-3">
                         <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-sm">
@@ -112,7 +107,11 @@
                         <div>
                             <h2 class="text-lg font-bold text-gray-950 dark:text-white">Import enrolled students</h2>
                             <p class="mt-1 max-w-xl text-sm text-gray-600 dark:text-gray-400">
-                                Upload a spreadsheet with roll number, student name, and batch name (e.g. Class (Course) column). Course and session come from the matched CRM batch — create batches under Academics first.
+                                @if ($singleBatchMode)
+                                    Upload a spreadsheet with roll number and student name. Every row will be enrolled into the batch you select below.
+                                @else
+                                    Upload a spreadsheet with roll number, student name, and batch name (e.g. Class (Course) column). Course and session come from the matched CRM batch — create batches under Academics first.
+                                @endif
                             </p>
                         </div>
                     </div>
@@ -131,6 +130,34 @@
 
             <div class="fi-crm-form grid gap-6 border-t border-transparent p-4 pt-6 sm:p-6 sm:pt-6 lg:grid-cols-5">
                 <div class="space-y-5 lg:col-span-3">
+                    <fieldset class="space-y-3">
+                        <legend class="text-sm font-medium text-gray-700 dark:text-gray-300">Batch assignment</legend>
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 transition hover:border-primary-300 dark:border-white/10 dark:bg-white/5 dark:hover:border-primary-500/40">
+                            <input
+                                type="radio"
+                                wire:model.live="importMode"
+                                value="spreadsheet"
+                                class="mt-1 text-primary-600 focus:ring-primary-500"
+                            >
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-950 dark:text-white">Batch name in spreadsheet</span>
+                                <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">Each row can go to a different CRM batch (batch column required).</span>
+                            </span>
+                        </label>
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 transition hover:border-primary-300 dark:border-white/10 dark:bg-white/5 dark:hover:border-primary-500/40">
+                            <input
+                                type="radio"
+                                wire:model.live="importMode"
+                                value="single_batch"
+                                class="mt-1 text-primary-600 focus:ring-primary-500"
+                            >
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-950 dark:text-white">One batch for entire file</span>
+                                <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">No batch column needed — pick the CRM batch below.</span>
+                            </span>
+                        </label>
+                    </fieldset>
+
                     <x-crm.select-input
                         label="Limit batch lookup to session (optional)"
                         for="import-session"
@@ -143,10 +170,31 @@
                         @endforeach
                     </x-crm.select-input>
 
-                    <div class="rounded-xl border border-primary-200 bg-primary-50/60 px-4 py-3 text-sm text-primary-950 dark:border-primary-500/30 dark:bg-primary-500/10 dark:text-primary-100">
-                        <p class="font-semibold">Batch names must exist in CRM</p>
-                        <p class="mt-1">Create batches under <span class="font-semibold">Academics → Batches</span> with the same names as your Excel column (e.g. <span class="font-mono text-xs">12th JEE Batch C (2026-27)</span>). Each batch already links to its course and session.</p>
-                    </div>
+                    @if ($singleBatchMode)
+                        <x-crm.select-input
+                            label="Assign all students to batch"
+                            for="import-batch"
+                            hint="Required for single-batch import. Course and session come from this batch."
+                            wire:model.live="selectedBatchId"
+                        >
+                            <option value="">Select batch…</option>
+                            @foreach ($batchOptions as $id => $label)
+                                <option value="{{ $id }}">{{ $label }}</option>
+                            @endforeach
+                        </x-crm.select-input>
+
+                        @if (empty($batchOptions))
+                            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                                <p class="font-semibold">No batches found</p>
+                                <p class="mt-1">Create a batch under <span class="font-semibold">Academics → Batches</span> for the selected session, then refresh this page.</p>
+                            </div>
+                        @endif
+                    @else
+                        <div class="rounded-xl border border-primary-200 bg-primary-50/60 px-4 py-3 text-sm text-primary-950 dark:border-primary-500/30 dark:bg-primary-500/10 dark:text-primary-100">
+                            <p class="font-semibold">Batch names must exist in CRM</p>
+                            <p class="mt-1">Create batches under <span class="font-semibold">Academics → Batches</span> with the same names as your Excel column (e.g. <span class="font-mono text-xs">12th JEE Batch C (2026-27)</span>). Each batch already links to its course and session.</p>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="lg:col-span-2">

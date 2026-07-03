@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
+use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\StudentImportDuplicateResolution;
 use App\Enums\StudentStatus;
@@ -23,6 +24,30 @@ use Tests\TestCase;
 class StudentBulkImportServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_preview_assigns_fixed_batch_when_spreadsheet_has_no_batch_column(): void
+    {
+        [, , $batch] = $this->seedImportBatch('Class 11 JEE');
+
+        $preview = app(StudentBulkImportService::class)->buildPreview(
+            [
+                0 => StudentImportFields::ROLL_NUMBER,
+                1 => StudentImportFields::NAME,
+            ],
+            [
+                ['701', 'Single Batch Student'],
+                ['702', 'Another Student'],
+            ],
+            $batch->academic_session_id,
+            $batch->id,
+        );
+
+        $this->assertSame('ready', $preview[0]['status']);
+        $this->assertSame($batch->id, $preview[0]['resolved_batch']['id']);
+        $this->assertSame('Class 11 JEE', $preview[0]['data']['batch_section']);
+        $this->assertSame('ready', $preview[1]['status']);
+        $this->assertSame($batch->id, $preview[1]['resolved_batch']['id']);
+    }
 
     public function test_preview_imports_rows_with_missing_or_invalid_mobile_as_ready_with_warnings(): void
     {
@@ -482,6 +507,47 @@ class StudentBulkImportServiceTest extends TestCase
         $this->assertSame(2, $result['created']);
         $this->assertSame($jeeCourse->id, Student::query()->where('name', 'JEE Student')->first()?->activeEnrollment?->course_id);
         $this->assertSame($neetCourse->id, Student::query()->where('name', 'NEET Student')->first()?->activeEnrollment?->course_id);
+    }
+
+    public function test_enroll_one_creates_enrolled_student_with_fee_structure(): void
+    {
+        $staff = $this->createStaffUser();
+        [, $course, $batch] = $this->seedImportBatch();
+
+        $student = app(StudentBulkImportService::class)->enrollOne($staff, $batch, [
+            'roll_number' => 'DIRECT-01',
+            'name' => 'Direct Add Student',
+            'father_name' => 'Mr Direct',
+            'mobile' => '9876501234',
+            'date_of_birth' => '2010-05-15',
+            'gender' => 'male',
+        ]);
+
+        $this->assertSame(StudentStatus::Enrolled, $student->status);
+        $this->assertSame('DIRECT-01', $student->activeEnrollment?->enrollment_number);
+        $this->assertSame($course->id, $student->activeEnrollment?->course_id);
+        $this->assertNotNull($student->activeEnrollment?->feeStructure);
+        $this->assertSame(50000.0, (float) $student->activeEnrollment?->feeStructure?->net_fee);
+        $this->assertSame($batch->id, $student->activeBatchStudent?->batch_id);
+        $this->assertSame(LeadSource::DirectAdmission, $student->enquiries()->first()?->lead_source);
+    }
+
+    public function test_enroll_one_rejects_duplicate_roll_number(): void
+    {
+        $staff = $this->createStaffUser();
+        [, , $batch] = $this->seedImportBatch();
+
+        app(StudentBulkImportService::class)->enrollOne($staff, $batch, [
+            'roll_number' => 'DUP-01',
+            'name' => 'First Student',
+        ]);
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+
+        app(StudentBulkImportService::class)->enrollOne($staff, $batch, [
+            'roll_number' => 'DUP-01',
+            'name' => 'Second Student',
+        ]);
     }
 
     protected function createStaffUser(): User

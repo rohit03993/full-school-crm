@@ -4,10 +4,13 @@ namespace Tests\Feature;
 
 use App\Enums\AdmissionStatus;
 use App\Enums\CourseStatus;
+use App\Enums\CrmPermission;
 use App\Enums\EnrollmentStatus;
 use App\Enums\LeadSource;
 use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
+use App\Filament\Resources\Students\Pages\ListStudents;
 use App\Filament\Resources\Students\StudentResource;
 use App\Models\AcademicSession;
 use App\Models\Admission;
@@ -17,7 +20,10 @@ use App\Models\Enrollment;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\StudentSearchService;
+use App\Support\StaffRolePermissions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -61,6 +67,52 @@ class AllStudentsResourceTest extends TestCase
         $this->actingAs($staff);
 
         $this->assertTrue(StudentResource::canAccess());
+    }
+
+    public function test_admission_officer_can_open_add_student_action(): void
+    {
+        $this->seedAdmissionOfficerPermissions();
+        $staff = $this->createAdmissionOfficerUser();
+
+        Livewire::actingAs($staff)
+            ->test(ListStudents::class)
+            ->assertActionVisible('addStudent');
+    }
+
+    public function test_view_only_staff_cannot_see_add_student_action(): void
+    {
+        $this->seedAdmissionOfficerPermissions();
+
+        $staff = User::factory()->create(['is_active' => true]);
+        $staff->givePermissionTo(CrmPermission::StudentsView->value);
+
+        Livewire::actingAs($staff)
+            ->test(ListStudents::class)
+            ->assertActionDoesNotExist('addStudent');
+    }
+
+    protected function seedAdmissionOfficerPermissions(): void
+    {
+        foreach (StaffRolePermissions::matrix()[StaffJobRole::AdmissionOfficer->value] as $permission) {
+            Permission::query()->firstOrCreate([
+                'name' => $permission->value,
+                'guard_name' => 'web',
+            ]);
+        }
+    }
+
+    protected function createAdmissionOfficerUser(): User
+    {
+        Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);
+        $this->seedAdmissionOfficerPermissions();
+
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole(RoleName::Staff->value);
+        $user->syncPermissions(
+            collect(StaffRolePermissions::permissionNamesForRole(StaffJobRole::AdmissionOfficer))->all(),
+        );
+
+        return $user;
     }
 
     protected function createEnrolledStudent(string $name, string $mobile, string $roll): Student

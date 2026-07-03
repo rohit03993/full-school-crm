@@ -62,4 +62,24 @@
             </div>
         @endif
     @endif
+
+    @if ($admissionTabLoaded)
+        <div class="mt-8 border-t border-gray-200 pt-6 dark:border-white/10">
+            <div class="mb-4 flex items-center gap-2">
+                <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400">
+                    <x-filament::icon icon="heroicon-o-folder" class="h-5 w-5" />
+                </span>
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Documents</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Photo, Aadhaar, marksheets, signature &amp; other uploads</p>
+                </div>
+            </div>
+
+            @if (! $documentsTabLoaded)
+                <p class="text-sm text-gray-500 dark:text-gray-400">Loading documents…</p>
+            @else
+                @include('filament.pages.partials.document-tiles-grid', ['documents' => $documents])
+            @endif
+        </div>
+    @endif
 </div>
