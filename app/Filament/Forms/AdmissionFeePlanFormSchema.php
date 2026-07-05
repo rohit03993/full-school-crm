@@ -60,7 +60,7 @@ class AdmissionFeePlanFormSchema
                     }
 
                     if (empty($get('installment_plan'))) {
-                        $set('installment_plan', [FeePlanCalculator::singleFullFeeRow($net)]);
+                        self::applyCourseTemplateIfNeeded($set, $get, $net);
                     }
                 })
                 ->columnSpanFull(),
@@ -126,7 +126,7 @@ class AdmissionFeePlanFormSchema
                 ->afterStateUpdated(function (DatePicker $component): void {
                     self::resortInstallmentRepeater($component);
                 })
-                ->helperText('Rows reorder automatically by due date and renumber as Installment 1, 2, 3…'),
+                ->helperText('Rows reorder by due date. Custom labels are kept.'),
         ];
     }
 
@@ -335,7 +335,39 @@ class AdmissionFeePlanFormSchema
             return;
         }
 
+        self::applyCourseTemplateIfNeeded($set, $get, $net);
+
+        if (! empty($get('installment_plan'))) {
+            $set('use_installment_plan', true);
+
+            return;
+        }
+
         $set('installment_plan', FeePlanCalculator::defaultTwoPartPlan($net));
         $set('use_installment_plan', true);
+    }
+
+    public static function applyCourseTemplateIfNeeded(callable $set, Get $get, ?float $netFee = null): void
+    {
+        $courseId = $get('course_id');
+
+        if (! $courseId) {
+            return;
+        }
+
+        $course = Course::query()->with('installmentTemplates')->find($courseId);
+
+        if (! $course) {
+            return;
+        }
+
+        $net = $netFee ?? self::resolveNetFee($get);
+        $rows = FeePlanCalculator::planFromCourseTemplates($course, $net);
+
+        if ($rows !== []) {
+            $set('installment_plan', $rows);
+        } elseif (empty($get('installment_plan'))) {
+            $set('installment_plan', [FeePlanCalculator::singleFullFeeRow($net)]);
+        }
     }
 }

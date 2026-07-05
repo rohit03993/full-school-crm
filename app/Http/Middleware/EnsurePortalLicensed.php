@@ -2,8 +2,9 @@
 
 namespace App\Http\Middleware;
 
-use Closure;
+use App\Enums\LicenseFeature;
 use App\Support\FeatureGate;
+use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -14,10 +15,16 @@ class EnsurePortalLicensed
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (! FeatureGate::licenseActive() || ! FeatureGate::enabled(\App\Enums\LicenseFeature::Portal)) {
-            abort(404);
+        if (FeatureGate::licenseActive() && FeatureGate::enabled(LicenseFeature::Portal)) {
+            return $next($request);
         }
 
-        return $next($request);
+        if ($request->routeIs('portal.login', 'portal.login.submit')) {
+            return redirect()
+                ->route('login')
+                ->with('portal_unavailable', 'Student portal is temporarily unavailable. Please contact the institute office.');
+        }
+
+        abort(404);
     }
 }

@@ -68,10 +68,12 @@ class FeePlanCalculator
     }
 
     /**
+     * Sort installment rows by due date while keeping staff-entered labels.
+     *
      * @param  array<int, array{label?: string, amount?: mixed, due_date?: ?string}>  $rows
      * @return array<int, array{label?: string, amount?: mixed, due_date?: ?string}>
      */
-    public static function sortAndRenumberInstallmentPlan(array $rows): array
+    public static function sortInstallmentPlanByDueDate(array $rows): array
     {
         if ($rows === []) {
             return [];
@@ -80,23 +82,21 @@ class FeePlanCalculator
         $rows = array_values($rows);
 
         usort($rows, function (array $a, array $b): int {
-            $dateA = $a['due_date'] ?? null;
-            $dateB = $b['due_date'] ?? null;
-
-            if (! $dateA && ! $dateB) {
-                return 0;
-            }
-
-            if (! $dateA) {
-                return 1;
-            }
-
-            if (! $dateB) {
-                return -1;
-            }
-
-            return strcmp((string) $dateA, (string) $dateB);
+            return self::compareDueDates($a['due_date'] ?? null, $b['due_date'] ?? null);
         });
+
+        return $rows;
+    }
+
+    /**
+     * Sort by due date and assign generic labels (Installment 1, 2, …).
+     *
+     * @param  array<int, array{label?: string, amount?: mixed, due_date?: ?string}>  $rows
+     * @return array<int, array{label?: string, amount?: mixed, due_date?: ?string}>
+     */
+    public static function sortAndRenumberInstallmentPlan(array $rows): array
+    {
+        $rows = self::sortInstallmentPlanByDueDate($rows);
 
         foreach ($rows as $index => &$row) {
             $row['label'] = self::installmentLabel($index + 1);
@@ -104,6 +104,23 @@ class FeePlanCalculator
         unset($row);
 
         return $rows;
+    }
+
+    protected static function compareDueDates(mixed $dateA, mixed $dateB): int
+    {
+        if (! $dateA && ! $dateB) {
+            return 0;
+        }
+
+        if (! $dateA) {
+            return 1;
+        }
+
+        if (! $dateB) {
+            return -1;
+        }
+
+        return strcmp((string) $dateA, (string) $dateB);
     }
 
     /**
@@ -183,7 +200,12 @@ class FeePlanCalculator
 
         foreach ($pairs as $index => $pair) {
             $row = $pair['row'];
-            $row['label'] = self::installmentLabel($index + 1);
+            $label = trim((string) ($row['label'] ?? ''));
+
+            if ($label === '') {
+                $row['label'] = self::installmentLabel($index + 1);
+            }
+
             $sorted[$pair['uuid']] = $row;
         }
 
@@ -199,7 +221,7 @@ class FeePlanCalculator
             return null;
         }
 
-        $sorted = self::sortAndRenumberInstallmentPlan($rows);
+        $sorted = self::sortInstallmentPlanByDueDate($rows);
         $previousDueDate = $sorted[$index - 1]['due_date'] ?? null;
 
         if (! $previousDueDate) {
@@ -214,7 +236,7 @@ class FeePlanCalculator
      */
     public static function assertDueDatesInOrder(array $plan): void
     {
-        $sorted = self::sortAndRenumberInstallmentPlan($plan);
+        $sorted = self::sortInstallmentPlanByDueDate($plan);
         $previous = null;
 
         foreach ($sorted as $index => $row) {
@@ -245,7 +267,7 @@ class FeePlanCalculator
             return now()->toDateString();
         }
 
-        $sorted = self::sortAndRenumberInstallmentPlan($existingRows);
+        $sorted = self::sortInstallmentPlanByDueDate($existingRows);
         $lastRow = $sorted[array_key_last($sorted)];
         $lastDueDate = $lastRow['due_date'] ?? null;
 
@@ -317,7 +339,7 @@ class FeePlanCalculator
     }
 
     /**
-     * @return array{label: string, amount: string, due_date: string}
+     * @return array<int, array{label: string, amount: string, due_date: string}>
      */
     public static function singleFullFeeRow(float $targetTotal): array
     {
@@ -329,7 +351,9 @@ class FeePlanCalculator
     }
 
     /**
-     * @return array<int, array{label: string, amount: string, due_date: ?string}>
+     * Build an installment plan from course-level percentage templates.
+     *
+     * @return array<int, array{label: string, amount: string, due_date: string}>
      */
     public static function planFromCourseTemplates(\App\Models\Course $course, float $netFee, ?\Illuminate\Support\Carbon $baseDate = null): array
     {

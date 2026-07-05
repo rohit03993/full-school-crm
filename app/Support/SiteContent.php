@@ -48,6 +48,15 @@ class SiteContent
         ]);
     }
 
+    protected static function galleryItemSrc(object $item): string
+    {
+        if (isset($item->image_path) && filled($item->image_path)) {
+            return SiteImageService::url($item->image_path) ?? '';
+        }
+
+        return (string) ($item->image_url ?? '');
+    }
+
     protected static function buildInstituteArray(): array
     {
         $g = fn (string $key, mixed $default = null) => Setting::getValue($key, $default);
@@ -82,7 +91,7 @@ class SiteContent
                     'about' => SiteImageService::url($g('site.about_image')) ?? config('institute.images.hero.about'),
                 ],
                 'gallery' => self::galleryItems()->map(fn ($item) => [
-                    'src' => $item->image_url ?? SiteImageService::url($item->image_path ?? null),
+                    'src' => self::galleryItemSrc($item),
                     'alt' => $item->alt,
                     'caption' => $item->caption,
                     'span' => $item->span_class ?? '',

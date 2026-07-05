@@ -15,7 +15,6 @@ use App\Models\Course;
 use App\Models\Student;
 use App\Services\FeesDashboardService;
 use App\Support\CrmNavigation;
-use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Support\InstituteProfile;
 use Filament\Actions\Action;
@@ -200,8 +199,13 @@ class StudentResource extends Resource
             ])
             ->recordUrl(fn (Student $record): string => StudentProfilePage::getUrl(['record' => $record->id]))
             ->emptyStateHeading('No students found')
-            ->emptyStateDescription('Add a student to get started, or use Search Student to look up an existing record.')
-            ->emptyStateActions(self::emptyStateActions());
+            ->emptyStateDescription('Enrolled students appear here. Use Search Student to look up a mobile or roll number.')
+            ->emptyStateActions([
+                Action::make('searchStudent')
+                    ->label('Search Student')
+                    ->icon(Heroicon::OutlinedMagnifyingGlass)
+                    ->url(StudentSearchPage::getUrl()),
+            ]);
     }
 
     public static function getPages(): array
@@ -209,29 +213,6 @@ class StudentResource extends Resource
         return [
             'index' => ListStudents::route('/'),
         ];
-    }
-
-    /**
-     * @return array<int, Action>
-     */
-    protected static function emptyStateActions(): array
-    {
-        $actions = [];
-
-        if (CrmAccess::can(Auth::user(), CrmPermission::StudentsEdit)) {
-            $actions[] = Action::make('addStudent')
-                ->label('Add Student')
-                ->icon(Heroicon::OutlinedUserPlus)
-                ->url(ListStudents::getUrl(['action' => 'addStudent']));
-        }
-
-        $actions[] = Action::make('searchStudent')
-            ->label('Search Student')
-            ->icon(Heroicon::OutlinedMagnifyingGlass)
-            ->url(StudentSearchPage::getUrl())
-            ->color('gray');
-
-        return $actions;
     }
 
     public static function canCreate(): bool

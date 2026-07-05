@@ -180,7 +180,7 @@ class AdmissionFeePlanService
             return [];
         }
 
-        $sorted = FeePlanCalculator::sortAndRenumberInstallmentPlan(array_map(
+        $sorted = FeePlanCalculator::sortInstallmentPlanByDueDate(array_map(
             fn (array $row): array => [
                 'label' => $row['label'],
                 'amount' => (string) $row['amount'],

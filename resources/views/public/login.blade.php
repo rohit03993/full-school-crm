@@ -6,9 +6,15 @@
             <div class="text-center">
                 <p class="text-sm font-semibold uppercase tracking-wider text-brand-600">Sign in</p>
                 <h1 class="mt-3 font-display text-3xl font-bold text-navy-900 sm:text-4xl">Login to your account</h1>
-                <p class="mt-4 text-base text-navy-600">
-                    Choose how you want to sign in — staff use the CRM; students use the portal.
+            <p class="mt-4 text-base text-navy-600">
+                Choose how you want to sign in — staff use the CRM; students use the portal.
+            </p>
+
+            @if (session('portal_unavailable'))
+                <p class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    {{ session('portal_unavailable') }}
                 </p>
+            @endif
             </div>
 
             <div class="mt-12 grid gap-6 sm:grid-cols-2">
@@ -44,7 +50,7 @@
                         View fees, marks, admission status, receipts, and ID card.
                     </p>
                     <p class="mt-4 text-sm font-semibold text-brand-700 group-hover:text-brand-800">
-                        Mobile + password →
+                        Student mobile + password (not roll number) →
                     </p>
                 </a>
             </div>

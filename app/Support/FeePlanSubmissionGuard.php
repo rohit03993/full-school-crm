@@ -69,14 +69,25 @@ class FeePlanSubmissionGuard
      */
     public static function canSubmitAdjustFees(array $data, FeeStructure $feeStructure): bool
     {
+        $feeStructure->loadMissing('miscCharges');
+        $miscTotal = $feeStructure->miscChargesTotal();
+        $previousNet = round((float) ($feeStructure->net_fee ?? max(
+            0,
+            (float) $feeStructure->course_fee - (float) $feeStructure->discount_amount + $miscTotal,
+        )), 2);
+        $newNet = AdjustFeeStructureFormSchema::previewNetFromMounted($feeStructure, $data, $miscTotal);
+        $paid = round((float) $feeStructure->paid_amount, 2);
+        $newPending = round(max(0, $newNet - $paid), 2);
+
+        if ($newPending > 0 && abs($newNet - $previousNet) > 0.01 && ! ($data['reschedule_installments'] ?? false)) {
+            return false;
+        }
+
         if (! ($data['reschedule_installments'] ?? false)) {
             return true;
         }
 
-        $feeStructure->loadMissing('miscCharges');
-        $miscTotal = $feeStructure->miscChargesTotal();
-        $net = AdjustFeeStructureFormSchema::previewNetFromMounted($feeStructure, $data, $miscTotal);
-        $target = round(max(0, $net - (float) $feeStructure->paid_amount), 2);
+        $target = round(max(0, $newNet - $paid), 2);
 
         if ($target <= 0) {
             return true;
@@ -90,14 +101,30 @@ class FeePlanSubmissionGuard
      */
     public static function assertAdjustFees(array $data, FeeStructure $feeStructure, ?Action $action = null): void
     {
+        $feeStructure->loadMissing('miscCharges');
+        $miscTotal = $feeStructure->miscChargesTotal();
+        $previousNet = round((float) ($feeStructure->net_fee ?? max(
+            0,
+            (float) $feeStructure->course_fee - (float) $feeStructure->discount_amount + $miscTotal,
+        )), 2);
+        $newNet = AdjustFeeStructureFormSchema::previewNetFromMounted($feeStructure, $data, $miscTotal);
+        $paid = round((float) $feeStructure->paid_amount, 2);
+        $newPending = round(max(0, $newNet - $paid), 2);
+
+        if ($newPending > 0 && abs($newNet - $previousNet) > 0.01 && ! ($data['reschedule_installments'] ?? false)) {
+            self::halt(
+                $action,
+                'Reschedule installments required',
+                'Turn on “Reschedule remaining installments” when the balance due changes so installment rows match the new amount.',
+                'reschedule_installments',
+            );
+        }
+
         if (! ($data['reschedule_installments'] ?? false)) {
             return;
         }
 
-        $feeStructure->loadMissing('miscCharges');
-        $miscTotal = $feeStructure->miscChargesTotal();
-        $net = AdjustFeeStructureFormSchema::previewNetFromMounted($feeStructure, $data, $miscTotal);
-        $target = round(max(0, $net - (float) $feeStructure->paid_amount), 2);
+        $target = round(max(0, $newNet - $paid), 2);
 
         if ($target <= 0) {
             return;

@@ -90,10 +90,10 @@ class FeeInstallmentService
             );
         }
 
-        $this->syncInstallmentOrderAndLabels($feeStructure);
+        $this->syncInstallmentSortOrder($feeStructure);
     }
 
-    public function syncInstallmentOrderAndLabels(FeeStructure $feeStructure): void
+    public function syncInstallmentSortOrder(FeeStructure $feeStructure): void
     {
         $installments = $feeStructure->installments()->get();
 
@@ -106,9 +106,14 @@ class FeeInstallmentService
         foreach ($sorted as $index => $installment) {
             $installment->updateQuietly([
                 'sort_order' => $index + 1,
-                'label' => FeePlanCalculator::installmentLabel($index + 1),
             ]);
         }
+    }
+
+    /** @deprecated Use syncInstallmentSortOrder() */
+    public function syncInstallmentOrderAndLabels(FeeStructure $feeStructure): void
+    {
+        $this->syncInstallmentSortOrder($feeStructure);
     }
 
     public function applyPayment(FeeInstallment $installment, float $amount): void

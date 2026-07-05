@@ -32,6 +32,9 @@ class ViewAdmission extends ViewRecord
             'documents',
             'enrollment',
             'approvedBy',
+            'miscFees',
+            'installmentPlans',
+            'discountSetBy',
         ]);
 
         $this->discountAmount = (string) ($this->record->discount_amount ?? 0);

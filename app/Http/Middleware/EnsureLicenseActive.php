@@ -32,10 +32,6 @@ class EnsureLicenseActive
             return $next($request);
         }
 
-        if ($request->expectsJson()) {
-            abort(403, 'License expired. Contact your software provider to renew.');
-        }
-
         return redirect()->to(LicenseExpiredPage::getUrl());
     }
 }

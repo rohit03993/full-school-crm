@@ -152,7 +152,7 @@
                 </div>
                 <div class="divide-y divide-gray-100 dark:divide-white/10">
                     @foreach ($pendingPenalties as $penalty)
-                        <div class="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                        <div class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6" wire:key="penalty-{{ $penalty->id }}">
                             <div>
                                 <p class="font-semibold text-red-700 dark:text-red-300">{{ $penalty->penalty_type->label() }}</p>
                                 <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
@@ -161,23 +161,82 @@
                                     · {{ $penalty->description }}
                                 </p>
                             </div>
-                            <p class="text-lg font-bold text-red-700 dark:text-red-300">₹{{ number_format((float) $penalty->penalty_amount, 2) }}</p>
+                            <div class="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+                                <p class="text-lg font-bold text-red-700 dark:text-red-300">₹{{ number_format((float) $penalty->penalty_amount, 2) }}</p>
+                                @if ($canWaivePenalty ?? false)
+                                    <div class="w-full sm:w-auto" x-data="{ open: false, reason: '' }">
+                                        <button type="button" @click="open = !open" class="text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400">
+                                            Waive
+                                        </button>
+                                        <div x-show="open" x-cloak class="mt-2 w-full min-w-[220px] rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-gray-900">
+                                            <textarea x-model="reason" rows="2" class="w-full rounded-lg border-gray-300 text-sm dark:border-white/10 dark:bg-white/5" placeholder="Reason for waiver"></textarea>
+                                            <button
+                                                type="button"
+                                                class="mt-2 text-xs font-semibold text-danger-600 hover:underline"
+                                                @click="$wire.waivePenalty({{ $penalty->id }}, reason); open = false; reason = ''"
+                                            >
+                                                Confirm waive
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
                         </div>
                     @endforeach
                 </div>
                 <p class="border-t border-gray-100 px-4 py-3 text-xs text-gray-500 dark:border-white/10 sm:px-6">
                     Late fees are calculated daily after {{ config('fees.late_fee.grace_days') }} day grace period.
-                    Super Admin can waive from Institute Setup support flow (contact admin).
+                    @if (! ($canWaivePenalty ?? false))
+                        Contact Super Admin to waive a late fee.
+                    @endif
                 </p>
             </div>
         @endif
 
-        @if ((float) $fees->pending_amount > 0 && ($canCollectFees ?? false))
-            <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-950 dark:text-emerald-200 sm:px-5">
-                <p class="font-semibold">Collect fee</p>
-                <p class="mt-1">Use the green <strong>Add Payment</strong> button at the top of this page to record cash, online or UPI payments.</p>
+        @if (isset($feeStructureHistory) && $feeStructureHistory->isNotEmpty())
+            <div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+                <div class="border-b border-gray-100 px-4 py-3 dark:border-white/10 sm:px-6">
+                    <h3 class="text-base font-semibold text-gray-950 dark:text-white">Fee change history</h3>
+                </div>
+                <div class="divide-y divide-gray-100 dark:divide-white/10">
+                    @foreach ($feeStructureHistory as $entry)
+                        <div class="px-4 py-4 sm:px-6">
+                            <p class="text-sm font-semibold text-gray-950 dark:text-white">
+                                Net ₹{{ number_format((float) $entry->old_net_fee, 2) }}
+                                → ₹{{ number_format((float) $entry->new_net_fee, 2) }}
+                                <span class="font-normal text-gray-500 dark:text-gray-400">· {{ $entry->changed_at?->format('d M Y') }}</span>
+                            </p>
+                            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                                Course fee ₹{{ number_format((float) $entry->old_course_fee, 2) }} → ₹{{ number_format((float) $entry->new_course_fee, 2) }}
+                                · Discount ₹{{ number_format((float) $entry->old_discount, 2) }} → ₹{{ number_format((float) $entry->new_discount, 2) }}
+                                @if ($entry->changedBy)
+                                    · {{ $entry->changedBy->name }}
+                                @endif
+                            </p>
+                            @if ($entry->reason)
+                                <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">{{ $entry->reason }}</p>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
             </div>
-        @elseif ((float) $fees->pending_amount > 0)
+        @endif
+
+        @php
+            $collectible = (float) $fees->totalCollectiblePending();
+        @endphp
+        @if ($collectible > 0 && ($canCollectFees ?? false))
+            <div class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-950 dark:text-emerald-200 sm:px-5">
+                <p class="font-semibold">Collect payment</p>
+                <p class="mt-1">
+                    Outstanding total <strong>₹{{ number_format($collectible, 2) }}</strong>
+                    @if ((float) $fees->pending_amount <= 0 && $pendingPenalties->isNotEmpty())
+                        (late fees only — fee balance is cleared)
+                    @endif
+                    · Use <strong>Add Payment</strong> at the top of this page.
+                </p>
+            </div>
+        @elseif ($collectible > 0)
             <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 sm:px-5">
                 <p class="font-semibold">Pending fees</p>
                 <p class="mt-1">Only staff with fee collection permission can record payments. Contact your accountant or admin.</p>

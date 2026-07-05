@@ -24,7 +24,7 @@ trait SyncsCourseInstallmentTemplates
         return $data;
     }
 
-    /**
+  /**
      * @param  array<string, mixed>  $data
      */
     protected function syncCourseInstallmentTemplates(Course $course, array $data): void

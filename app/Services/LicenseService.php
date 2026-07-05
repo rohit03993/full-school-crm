@@ -42,14 +42,7 @@ class LicenseService
     {
         $this->ensureDefaultLicense();
 
-        $payload = Setting::getValue(self::PAYLOAD_KEY);
-        $signature = Setting::getValue(self::SIGNATURE_KEY);
-
-        if (! is_array($payload) || ! is_string($signature) || $signature === '') {
-            return false;
-        }
-
-        return hash_equals($this->sign($payload), $signature);
+        return $this->hasValidStoredSignature();
     }
 
     public function isActive(): bool
@@ -217,20 +210,39 @@ class LicenseService
 
     public function ensureDefaultLicense(): void
     {
-        if (Setting::query()->where('key', self::PAYLOAD_KEY)->exists()) {
+        if (! Setting::query()->where('key', self::PAYLOAD_KEY)->exists()) {
+            $this->bootstrapFullLicense('Auto-created default license');
+
             return;
         }
 
+        $signature = Setting::getValue(self::SIGNATURE_KEY);
+
+        if (! is_string($signature) || $signature === '') {
+            $this->bootstrapFullLicense('Auto-repaired missing license signature');
+        }
+    }
+
+    public function repairFullLicense(string $notes = 'Repaired by crm:repair-license'): void
+    {
+        $this->bootstrapFullLicense($notes);
+    }
+
+    protected function bootstrapFullLicense(string $notes): void
+    {
+        $payload = Setting::getValue(self::PAYLOAD_KEY);
+        $current = is_array($payload) ? $payload : [];
+
         $this->save([
-            'plan' => LicensePlan::Custom->value,
+            'plan' => $current['plan'] ?? LicensePlan::Custom->value,
             'features' => LicenseFeature::values(),
             'expires_at' => now()
                 ->addDays((int) config('license.default_valid_days', 365))
                 ->toDateString(),
-            'annual_price_inr' => null,
-            'client_name' => config('institute.name'),
-            'notes' => 'Auto-created default license',
-            'max_students' => null,
+            'annual_price_inr' => $current['annual_price_inr'] ?? null,
+            'client_name' => $current['client_name'] ?? config('institute.name'),
+            'notes' => $notes,
+            'max_students' => $current['max_students'] ?? null,
         ]);
     }
 
@@ -308,6 +320,18 @@ class LicenseService
         }
 
         return $appKey !== '' ? $appKey : 'school-crm-license';
+    }
+
+    private function hasValidStoredSignature(): bool
+    {
+        $payload = Setting::getValue(self::PAYLOAD_KEY);
+        $signature = Setting::getValue(self::SIGNATURE_KEY);
+
+        if (! is_array($payload) || ! is_string($signature) || $signature === '') {
+            return false;
+        }
+
+        return hash_equals($this->sign($payload), $signature);
     }
 
     /**
