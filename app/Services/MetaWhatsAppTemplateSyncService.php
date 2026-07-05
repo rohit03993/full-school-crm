@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\MetaWhatsAppTemplate;
+use App\Models\WhatsAppTemplate;
 use App\Support\MetaWhatsAppTemplateParser;
 use App\Support\WhatsAppTemplateParamMappingInferrer;
 
@@ -66,6 +67,23 @@ class MetaWhatsAppTemplateSyncService
                         'id' => $item['id'] ?? null,
                     ],
                     'param_mappings' => $inferredMappings,
+                    'is_active' => true,
+                    'synced_at' => now(),
+                ],
+            );
+
+            WhatsAppTemplate::query()->updateOrCreate(
+                ['name' => $name],
+                [
+                    'description' => 'Synced from Meta ('.$language.')',
+                    'param_count' => $paramCount,
+                    'body' => $parsed['body'],
+                    'param_mappings' => $inferredMappings,
+                    'provider_meta' => [
+                        'body_variables' => $bodyVariables,
+                        'meta_language' => $language,
+                        'source' => 'meta',
+                    ],
                     'is_active' => true,
                     'synced_at' => now(),
                 ],

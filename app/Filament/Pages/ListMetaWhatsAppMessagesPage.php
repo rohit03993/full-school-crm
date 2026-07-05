@@ -54,6 +54,7 @@ class ListMetaWhatsAppMessagesPage extends Page
             View::make('filament.pages.partials.meta-whatsapp-messages')
                 ->viewData(fn (): array => [
                     'messages' => MetaWhatsAppMessage::query()
+                        ->with('student:id,name')
                         ->latest('id')
                         ->paginate($this->perPage),
                 ]),

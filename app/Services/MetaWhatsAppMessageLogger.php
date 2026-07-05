@@ -22,10 +22,11 @@ class MetaWhatsAppMessageLogger
         ?string $statusDetail = null,
         ?array $payload = null,
         ?int $studentId = null,
+        ?string $bodyPreview = null,
     ): MetaWhatsAppMessage {
-        $preview = $templateName;
+        $preview = $bodyPreview ?? $templateName;
 
-        if ($bodyParams !== []) {
+        if ($bodyPreview === null && $bodyParams !== []) {
             $preview .= ' · '.implode(' · ', $bodyParams);
         }
 
@@ -34,8 +35,8 @@ class MetaWhatsAppMessageLogger
             'direction' => MetaWhatsAppMessageDirection::Outbound->value,
             'phone' => $this->normalizePhone($phone),
             'student_id' => $studentId ?? $this->guessStudentId($phone),
-            'template_name' => $templateName,
-            'language' => $language,
+            'template_name' => $templateName !== '' ? $templateName : null,
+            'language' => $language !== '' ? $language : null,
             'body_preview' => mb_substr($preview, 0, 500),
             'status' => $status->value,
             'status_detail' => $statusDetail,

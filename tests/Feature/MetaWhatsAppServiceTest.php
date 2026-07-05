@@ -137,6 +137,10 @@ class MetaWhatsAppServiceTest extends TestCase
             'language' => 'en',
             'param_count' => 2,
         ]);
+        $this->assertDatabaseHas('whatsapp_templates', [
+            'name' => 'parent_checkin',
+            'param_count' => 2,
+        ]);
         $this->assertDatabaseMissing('meta_whatsapp_templates', [
             'name' => 'draft_template',
         ]);

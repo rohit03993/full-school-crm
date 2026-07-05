@@ -438,4 +438,67 @@ class MetaWhatsAppService
 
         return $fallbackBody !== '' ? $fallbackBody : 'Unknown Meta API error';
     }
+
+    /**
+     * @return array{status: string, response?: mixed, error?: string, message_id?: string}
+     */
+    public function sendText(string $phone, string $text): array
+    {
+        if (! $this->isConfigured()) {
+            return ['status' => 'failed', 'error' => 'Meta WhatsApp is not configured.'];
+        }
+
+        $destination = $this->destinationE164($phone);
+
+        if (! $destination) {
+            return ['status' => 'failed', 'error' => 'Invalid Indian mobile number.'];
+        }
+
+        $text = trim($text);
+
+        if ($text === '') {
+            return ['status' => 'failed', 'error' => 'Message text is required.'];
+        }
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to' => $destination,
+            'type' => 'text',
+            'text' => [
+                'preview_url' => false,
+                'body' => mb_substr($text, 0, 4096),
+            ],
+        ];
+
+        $url = $this->graphUrl($this->phoneNumberId().'/messages');
+
+        try {
+            $response = Http::timeout(30)
+                ->withToken((string) $this->accessToken())
+                ->acceptJson()
+                ->post($url, $payload);
+
+            $data = $response->json();
+
+            if ($response->successful() && is_array($data)) {
+                $messageId = data_get($data, 'messages.0.id');
+
+                return [
+                    'status' => 'success',
+                    'response' => $data,
+                    'message_id' => is_string($messageId) ? $messageId : null,
+                ];
+            }
+
+            return [
+                'status' => 'failed',
+                'error' => $this->parseApiError($data, $response->body()),
+                'response' => $data,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Meta WhatsApp text exception', ['error' => $e->getMessage()]);
+
+            return ['status' => 'failed', 'error' => $e->getMessage()];
+        }
+    }
 }

@@ -51,8 +51,12 @@ use App\Services\ReceiptService;
 use App\Services\StorageCleanupService;
 use App\Services\StudentCounterService;
 use App\Services\StudentUpdateService;
-use App\Services\WhatsAppCampaignService;
+use App\Services\MetaWhatsAppInboxService;
+use App\Services\StudentWhatsAppThreadService;
+use App\Services\WhatsAppProviderResolver;
+use App\Support\StudentWhatsAppThreadItem;
 use App\Services\VisitService;
+use App\Services\WhatsAppCampaignService;
 use App\Support\FeePlanCalculator;
 use App\Support\FeePlanSubmissionGuard;
 use App\Support\CrmHint;
@@ -145,6 +149,19 @@ class StudentProfilePage extends Page
      * @var Collection<int, \App\Models\WhatsAppCampaignRecipient>
      */
     public Collection $whatsappMessages;
+
+    /**
+     * @var Collection<int, StudentWhatsAppThreadItem>
+     */
+    public Collection $messageThread;
+
+    public string $metaReplyText = '';
+
+    public bool $metaSessionOpen = false;
+
+    public bool $metaRoutingActive = false;
+
+    public string $whatsappProviderLabel = 'Pal Digital';
 
     /**
      * @var Collection<int, \App\Models\HomeworkAssignment>
@@ -241,6 +258,7 @@ class StudentProfilePage extends Page
         $this->visits = new Collection;
         $this->calls = new Collection;
         $this->whatsappMessages = new Collection;
+        $this->messageThread = new Collection;
         $this->homeworkAssignments = new Collection;
         $this->documents = new Collection;
         $this->payments = new Collection;
@@ -466,11 +484,55 @@ class StudentProfilePage extends Page
         }
 
         $this->messagesTabLoaded = true;
+
+        $threadService = app(StudentWhatsAppThreadService::class);
+        $resolver = app(WhatsAppProviderResolver::class);
+
+        $this->messageThread = $threadService->threadForStudent($this->record);
+        $this->metaSessionOpen = $threadService->sessionOpenForStudent($this->record);
+        $this->metaRoutingActive = $resolver->metaOverridesPalDigital();
+        $this->whatsappProviderLabel = $resolver->activeProviderLabel();
+
         $this->whatsappMessages = $this->record->whatsappMessages()
             ->with(['campaign.template'])
             ->orderByDesc('created_at')
             ->limit(CrmPagination::PER_PAGE)
             ->get();
+    }
+
+    public function sendMetaReply(): void
+    {
+        if (! $this->licensed(LicenseFeature::WhatsApp)) {
+            Notification::make()->title('WhatsApp module is not enabled')->warning()->send();
+
+            return;
+        }
+
+        $result = app(MetaWhatsAppInboxService::class)->sendReply(
+            $this->record,
+            $this->metaReplyText,
+            Auth::user(),
+        );
+
+        if ($result['status'] !== 'success') {
+            Notification::make()
+                ->title('Could not send reply')
+                ->body((string) ($result['error'] ?? 'Unknown error'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->metaReplyText = '';
+        $this->messagesTabLoaded = false;
+        $this->loadMessagesTab();
+
+        Notification::make()
+            ->title('Reply sent')
+            ->body('Your message was delivered via Meta WhatsApp.')
+            ->success()
+            ->send();
     }
 
     public function sendWhatsAppMessage(): void
@@ -1786,7 +1848,10 @@ class StudentProfilePage extends Page
                                 ->viewData(fn (): array => [
                                     'record' => $this->record,
                                     'messagesTabLoaded' => $this->messagesTabLoaded,
-                                    'whatsappMessages' => $this->whatsappMessages,
+                                    'messageThread' => $this->messageThread,
+                                    'metaSessionOpen' => $this->metaSessionOpen,
+                                    'metaRoutingActive' => $this->metaRoutingActive,
+                                    'whatsappProviderLabel' => $this->whatsappProviderLabel,
                                 ]),
                         ]),
                     'admission' => Tab::make('Admission')

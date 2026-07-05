@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
-use App\Support\MetaWhatsAppTemplateParser;
-use App\Support\WhatsAppTemplateParamMappingInferrer;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\HtmlString;
 
@@ -14,6 +12,7 @@ class MetaWhatsAppSettingsService
 {
     public function __construct(
         protected MetaWhatsAppService $meta,
+        protected MetaWhatsAppDashboardService $dashboard,
     ) {}
 
     /**
@@ -127,6 +126,27 @@ class MetaWhatsAppSettingsService
         return (bool) Setting::getValue('meta_whatsapp.enabled', false);
     }
 
+    public function renderDashboardStats(): HtmlString
+    {
+        $stats = $this->dashboard->stats();
+
+        return new HtmlString(
+            '<div class="crm-meta-wa-log__stats">'
+            .$this->statCard((string) $stats['total'], 'Logged messages', 'total')
+            .$this->statCard((string) $stats['outbound'], 'Sent out', 'out')
+            .$this->statCard((string) $stats['inbound'], 'Parent replies', 'in')
+            .$this->statCard((string) $stats['delivered'], 'Delivered / read', 'delivered')
+            .'</div>'
+        );
+    }
+
+    protected function statCard(string $value, string $label, string $variant): string
+    {
+        return '<div class="crm-meta-wa-stat crm-meta-wa-stat--'.e($variant).'">'
+            .'<span class="crm-meta-wa-stat__value">'.e($value).'</span>'
+            .'<span class="crm-meta-wa-stat__label">'.e($label).'</span></div>';
+    }
+
     public function renderRoutingBanner(): HtmlString
     {
         if (! $this->isEnabled()) {
@@ -209,6 +229,7 @@ class MetaWhatsAppSettingsService
     public function renderRecentMessagesTable(): HtmlString
     {
         $messages = MetaWhatsAppMessage::query()
+            ->with('student:id,name')
             ->latest('id')
             ->limit(15)
             ->get();
@@ -218,26 +239,31 @@ class MetaWhatsAppSettingsService
         }
 
         $rows = $messages->map(function (MetaWhatsAppMessage $message): string {
-            $direction = e($message->direction);
+            $direction = $message->direction === 'inbound' ? 'Parent' : 'School';
+            $directionClass = $message->direction === 'inbound' ? 'crm-wa-pill--in' : 'crm-wa-pill--out';
             $phone = e($message->phone);
-            $status = e($message->status);
+            $status = e(ucfirst($message->status));
             $preview = e(mb_substr((string) ($message->body_preview ?? ''), 0, 80));
             $time = e($message->created_at?->format('d M H:i') ?? '');
+            $student = $message->student
+                ? e($message->student->name)
+                : '<span class="text-gray-400">—</span>';
 
             return '<tr class="border-b border-gray-100 dark:border-gray-800">'
-                .'<td class="py-2 pr-3">'.$time.'</td>'
-                .'<td class="py-2 pr-3">'.$direction.'</td>'
-                .'<td class="py-2 pr-3">'.$phone.'</td>'
-                .'<td class="py-2 pr-3">'.$status.'</td>'
+                .'<td class="py-2 pr-3 whitespace-nowrap">'.$time.'</td>'
+                .'<td class="py-2 pr-3"><span class="crm-wa-pill '.$directionClass.'">'.e($direction).'</span></td>'
+                .'<td class="py-2 pr-3">'.$student.'</td>'
+                .'<td class="py-2 pr-3 font-mono text-xs">'.$phone.'</td>'
+                .'<td class="py-2 pr-3 capitalize">'.$status.'</td>'
                 .'<td class="py-2 text-xs text-gray-500">'.$preview.'</td>'
                 .'</tr>';
         })->implode('');
 
         return new HtmlString(
-            '<div class="overflow-x-auto"><table class="min-w-full text-sm">'
-            .'<thead><tr class="text-left text-xs uppercase text-gray-500">'
-            .'<th class="py-2 pr-3">When</th><th class="py-2 pr-3">Dir</th><th class="py-2 pr-3">Phone</th><th class="py-2 pr-3">Status</th><th class="py-2">Preview</th>'
-            .'</tr></thead><tbody>'.$rows.'</tbody></table></div>'
+            '<div class="overflow-x-auto rounded-xl border border-gray-200/70 dark:border-white/10"><table class="min-w-full text-sm">'
+            .'<thead class="bg-gray-50 dark:bg-white/5"><tr class="text-left text-xs uppercase text-gray-500">'
+            .'<th class="px-3 py-2">When</th><th class="px-3 py-2">From</th><th class="px-3 py-2">Student</th><th class="px-3 py-2">Phone</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">Preview</th>'
+            .'</tr></thead><tbody class="divide-y divide-gray-100 dark:divide-white/10">'.$rows.'</tbody></table></div>'
         );
     }
 

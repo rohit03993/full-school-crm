@@ -77,6 +77,13 @@ class ManageMetaWhatsAppSettings extends Page
     {
         return $schema->components([
             CrmHint::placeholder('setup.meta_whatsapp'),
+            Section::make('Overview')
+                ->schema([
+                    Placeholder::make('dashboard_stats')
+                        ->label('')
+                        ->content(fn (MetaWhatsAppSettingsService $settings): \Illuminate\Support\HtmlString => $settings->renderDashboardStats())
+                        ->columnSpanFull(),
+                ]),
             Section::make('Status')
                 ->description('Enable when credentials are saved. Pal Digital WhatsApp settings and automations are not changed by this toggle.')
                 ->schema([
