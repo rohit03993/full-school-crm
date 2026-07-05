@@ -246,6 +246,7 @@ class StudentProfilePage extends Page
             'enquiries.meetingWith',
             'activeEnrollment.course',
             'activeEnrollment.feeStructure',
+            'activeEnrollment.admission.enquiry',
             'activeBatchStudent.batch.trainer',
             'lastCall.staff',
         ])->loadCount([
@@ -1215,10 +1216,21 @@ class StudentProfilePage extends Page
             'enquiries.course',
             'activeEnrollment.course',
             'activeEnrollment.feeStructure',
+            'activeEnrollment.admission.enquiry',
             'activeBatchStudent.batch.trainer',
         ]);
 
         $this->cachedProfileSummary = null;
+    }
+
+    protected function resolveVisitEnquiry(array $data): ?Enquiry
+    {
+        if (isset($data['enquiry_id'])) {
+            return Enquiry::query()->find($data['enquiry_id']);
+        }
+
+        return $this->record->enquiries->first()
+            ?? $this->record->activeEnrollment?->admission?->enquiry;
     }
 
     protected function getHeaderActions(): array
@@ -1230,39 +1242,57 @@ class StudentProfilePage extends Page
                 ->color('gray')
                 ->button()
                 ->outlined(),
-            Action::make('logVisit')
-                ->label('Log visit')
+            Action::make('addVisit')
+                ->label('Add Visit')
                 ->icon('heroicon-o-plus-circle')
                 ->button()
                 ->color('primary')
-                ->modalHeading('Log visit')
-                ->form(fn (): array => EnquiryFormSchema::walkInLogVisitFields(
-                    $this->record->enquiries->count() > 1 ? $this->record->enquiries : null,
+                ->modalHeading('Add Visit')
+                ->form(fn (): array => EnquiryFormSchema::addVisitFormFields(
+                    $this->record->enquiries,
+                    $this->record->activeEnrollment !== null,
                 ))
                 ->action(function (array $data): void {
-                    $enquiry = isset($data['enquiry_id'])
-                        ? Enquiry::query()->findOrFail($data['enquiry_id'])
-                        : $this->record->enquiries->first();
+                    $enquiry = $this->resolveVisitEnquiry($data);
 
-                    app(VisitMeetingAssignmentService::class)->assignFromFormData(
-                        $this->record,
-                        $enquiry,
-                        Auth::user(),
-                        $data,
-                    );
+                    if (! $enquiry) {
+                        Notification::make()
+                            ->title('No enquiry found')
+                            ->body('Add an enquiry for this student before logging a visit.')
+                            ->warning()
+                            ->send();
+
+                        return;
+                    }
+
+                    try {
+                        app(VisitMeetingAssignmentService::class)->assignFromFormData(
+                            $this->record,
+                            $enquiry,
+                            Auth::user(),
+                            $data,
+                        );
+                    } catch (\Illuminate\Validation\ValidationException $exception) {
+                        Notification::make()
+                            ->title('Could not add visit')
+                            ->body(collect($exception->errors())->flatten()->first() ?? 'Please check the form.')
+                            ->danger()
+                            ->send();
+
+                        return;
+                    }
 
                     $this->refreshRecord();
 
                     Notification::make()
-                        ->title('Visit logged')
+                        ->title('Visit added')
                         ->body('Staff assigned with your handoff notes.')
                         ->success()
                         ->send();
                 })
                 ->visible(fn (): bool => $this->licensed(LicenseFeature::Enquiries)
                     && $this->userCan(CrmPermission::LeadsCall)
-                    && $this->record->enquiries->isNotEmpty()
-                    && app(VisitMeetingAssignmentService::class)->openForStudent($this->record) === null),
+                    && ($this->record->enquiries->isNotEmpty() || $this->record->activeEnrollment !== null)),
             Action::make('addEnquiry')
                 ->label('Add Enquiry')
                 ->icon('heroicon-o-document-plus')

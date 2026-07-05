@@ -302,15 +302,15 @@ class EnquiryFormSchema
     }
 
     /**
-     * Walk-in visit log — today's date, assign staff, handoff notes.
+     * Add Visit on student profile — today's date, assign staff, handoff notes.
      *
      * @return array<int, \Filament\Forms\Components\Component>
      */
-    public static function walkInLogVisitFields(?Collection $enquiries = null): array
+    public static function addVisitFormFields(Collection $enquiries, bool $forEnrolled = false): array
     {
         $fields = [];
 
-        if ($enquiries !== null && $enquiries->count() > 1) {
+        if ($enquiries->count() > 1) {
             $fields[] = Select::make('enquiry_id')
                 ->label('Enquiry / Course')
                 ->options(
@@ -323,7 +323,7 @@ class EnquiryFormSchema
                 ->default($enquiries->first()?->id);
         }
 
-        return array_merge($fields, [
+        $core = [
             DatePicker::make('visit_date')
                 ->label('Visit date')
                 ->default(now())
@@ -331,6 +331,18 @@ class EnquiryFormSchema
                 ->dehydrated()
                 ->required()
                 ->native(false),
+        ];
+
+        if ($forEnrolled) {
+            $core[] = Select::make('campus_purpose')
+                ->label('Visit purpose')
+                ->options(CampusVisitPurpose::options())
+                ->default(CampusVisitPurpose::General->value)
+                ->required()
+                ->native(false);
+        }
+
+        return array_merge($fields, $core, [
             Select::make('meeting_assign_to_user_id')
                 ->label('Assign to')
                 ->options(self::staffOptions())
@@ -344,6 +356,16 @@ class EnquiryFormSchema
                 ->rows(3)
                 ->columnSpanFull(),
         ]);
+    }
+
+    /**
+     * Walk-in visit log — today's date, assign staff, handoff notes.
+     *
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    public static function walkInLogVisitFields(?Collection $enquiries = null): array
+    {
+        return self::addVisitFormFields($enquiries ?? collect(), false);
     }
 
     /**
