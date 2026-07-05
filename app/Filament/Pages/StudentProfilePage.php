@@ -1231,13 +1231,13 @@ class StudentProfilePage extends Page
                 ->color('gray')
                 ->button()
                 ->outlined(),
-            Action::make('assignMeeting')
-                ->label('Assign meeting')
-                ->icon('heroicon-o-user-plus')
+            Action::make('logVisit')
+                ->label('Log visit')
+                ->icon('heroicon-o-plus-circle')
                 ->button()
                 ->color('primary')
-                ->modalHeading('Assign meeting')
-                ->form(fn (): array => EnquiryFormSchema::meetingAssignmentOnlyFields(
+                ->modalHeading('Log visit')
+                ->form(fn (): array => EnquiryFormSchema::walkInLogVisitFields(
                     $this->record->enquiries->count() > 1 ? $this->record->enquiries : null,
                 ))
                 ->action(function (array $data): void {
@@ -1255,8 +1255,8 @@ class StudentProfilePage extends Page
                     $this->refreshRecord();
 
                     Notification::make()
-                        ->title('Meeting assigned')
-                        ->body('The selected staff will be notified.')
+                        ->title('Visit logged')
+                        ->body('Staff assigned with your handoff notes.')
                         ->success()
                         ->send();
                 })
@@ -1264,45 +1264,6 @@ class StudentProfilePage extends Page
                     && $this->userCan(CrmPermission::LeadsCall)
                     && $this->record->enquiries->isNotEmpty()
                     && app(VisitMeetingAssignmentService::class)->openForStudent($this->record) === null),
-            Action::make('logVisit')
-                ->label('Log visit')
-                ->icon('heroicon-o-clipboard-document-list')
-                ->button()
-                ->color('gray')
-                ->outlined()
-                ->modalHeading('Log visit')
-                ->form(EnquiryFormSchema::visitActionFields(
-                    Auth::id(),
-                    $this->record->enquiries,
-                ))
-                ->action(function (array $data): void {
-                    $enquiry = Enquiry::query()->findOrFail($data['enquiry_id']);
-
-                    app(VisitService::class)->add(
-                        $this->record,
-                        $enquiry,
-                        [
-                            'visit_date' => $data['visit_date'],
-                            'discussion_summary' => $data['discussion_summary'],
-                            'remarks' => $data['remarks'] ?? null,
-                            'next_follow_up_date' => $data['next_follow_up_date'] ?? null,
-                            'status' => $data['status'],
-                        ],
-                        Auth::user(),
-                    );
-
-                    $this->visitsTabLoaded = false;
-                    $this->loadVisitsTab();
-                    $this->refreshRecord();
-
-                    Notification::make()
-                        ->title('Visit logged')
-                        ->success()
-                        ->send();
-                })
-                ->visible(fn (): bool => $this->licensed(LicenseFeature::Enquiries)
-                    && $this->userCan(CrmPermission::LeadsCall)
-                    && $this->record->enquiries->isNotEmpty()),
             Action::make('addEnquiry')
                 ->label('Add Enquiry')
                 ->icon('heroicon-o-document-plus')

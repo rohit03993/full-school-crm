@@ -302,11 +302,11 @@ class EnquiryFormSchema
     }
 
     /**
-     * Assign meeting only — staff + handoff (student profile action).
+     * Walk-in visit log — today's date, assign staff, handoff notes.
      *
      * @return array<int, \Filament\Forms\Components\Component>
      */
-    public static function meetingAssignmentOnlyFields(?Collection $enquiries = null): array
+    public static function walkInLogVisitFields(?Collection $enquiries = null): array
     {
         $fields = [];
 
@@ -324,8 +324,15 @@ class EnquiryFormSchema
         }
 
         return array_merge($fields, [
+            DatePicker::make('visit_date')
+                ->label('Visit date')
+                ->default(now())
+                ->disabled()
+                ->dehydrated()
+                ->required()
+                ->native(false),
             Select::make('meeting_assign_to_user_id')
-                ->label('Meet with')
+                ->label('Assign to')
                 ->options(self::staffOptions())
                 ->searchable()
                 ->required()
@@ -337,6 +344,14 @@ class EnquiryFormSchema
                 ->rows(3)
                 ->columnSpanFull(),
         ]);
+    }
+
+    /**
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    public static function meetingAssignmentOnlyFields(?Collection $enquiries = null): array
+    {
+        return self::walkInLogVisitFields($enquiries);
     }
 
     /**
