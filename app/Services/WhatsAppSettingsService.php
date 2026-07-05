@@ -102,6 +102,22 @@ class WhatsAppSettingsService
         };
     }
 
+    public function renderActiveProviderNotice(): HtmlString
+    {
+        $resolver = app(WhatsAppProviderResolver::class);
+
+        if ($resolver->metaOverridesPalDigital()) {
+            return new HtmlString(
+                '<div class="rounded-lg border border-info-200 bg-info-50 p-3 dark:border-info-500/30 dark:bg-info-500/10">'
+                .'<p class="text-sm font-medium text-info-800 dark:text-info-200">Meta WhatsApp routing is active</p>'
+                .'<p class="mt-1 text-sm text-info-700 dark:text-info-300">Campaigns and automations send through Meta, not Pal Digital. Turn off Meta WhatsApp → Connection & Setup → <strong>Meta WhatsApp enabled</strong> to use Pal Digital again.</p>'
+                .'</div>'
+            );
+        }
+
+        return new HtmlString('');
+    }
+
     /**
      * @param  array<string, mixed>  $data
      * @return array{ok: bool, message?: string, ignored_invalid_key_field?: bool}

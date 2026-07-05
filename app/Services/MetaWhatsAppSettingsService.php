@@ -127,6 +127,25 @@ class MetaWhatsAppSettingsService
         return (bool) Setting::getValue('meta_whatsapp.enabled', false);
     }
 
+    public function renderRoutingBanner(): HtmlString
+    {
+        if (! $this->isEnabled()) {
+            return new HtmlString(
+                '<p class="text-sm text-gray-500">Meta routing is <strong>off</strong>. Pal Digital handles all WhatsApp sends.</p>'
+            );
+        }
+
+        if (! $this->meta->isConfigured()) {
+            return new HtmlString(
+                '<p class="text-sm text-warning-700 dark:text-warning-400">Meta is enabled but credentials are incomplete — Pal Digital will still be used if configured.</p>'
+            );
+        }
+
+        return new HtmlString(
+            '<p class="text-sm text-success-700 dark:text-success-400">Meta routing is <strong>active</strong>. Campaigns and automations send through Meta Cloud API. Pal Digital is bypassed.</p>'
+        );
+    }
+
     public function renderAccessTokenStatus(): HtmlString
     {
         if (! $this->hasStoredAccessToken()) {

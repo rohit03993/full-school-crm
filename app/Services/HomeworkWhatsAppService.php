@@ -9,7 +9,7 @@ use App\Models\Student;
 class HomeworkWhatsAppService
 {
     public function __construct(
-        protected PalDigitalWhatsAppService $whatsapp,
+        protected WhatsAppDispatchService $whatsapp,
         protected HomeworkAssignmentService $homework,
     ) {}
 

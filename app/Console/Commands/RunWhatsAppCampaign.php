@@ -11,6 +11,7 @@ use App\Models\StudentCall;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
+use App\Services\WhatsAppDispatchService;
 use App\Services\PalDigitalWhatsAppService;
 use App\Services\WhatsAppTemplateParamResolver;
 use Illuminate\Console\Command;
@@ -20,10 +21,10 @@ class RunWhatsAppCampaign extends Command
 {
     protected $signature = 'whatsapp:run-campaign {campaign : Campaign ID} {--batch= : Max recipients per run}';
 
-    protected $description = 'Send pending WhatsApp messages for a campaign via Pal Digital';
+    protected $description = 'Send pending WhatsApp messages for a campaign via the active provider (Meta or Pal Digital)';
 
     public function handle(
-        PalDigitalWhatsAppService $whatsapp,
+        WhatsAppDispatchService $whatsapp,
         WhatsAppTemplateParamResolver $paramResolver,
     ): int {
         set_time_limit(0);
@@ -70,7 +71,7 @@ class RunWhatsAppCampaign extends Command
         }
 
         if (! $whatsapp->isConfigured()) {
-            $this->error('Pal Digital API is not configured.');
+            $this->error($whatsapp->configurationError());
 
             return self::FAILURE;
         }

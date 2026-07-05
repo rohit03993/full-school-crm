@@ -80,9 +80,13 @@ class ManageMetaWhatsAppSettings extends Page
             Section::make('Status')
                 ->description('Enable when credentials are saved. Pal Digital WhatsApp settings and automations are not changed by this toggle.')
                 ->schema([
+                    Placeholder::make('routing_banner')
+                        ->label('')
+                        ->content(fn (MetaWhatsAppSettingsService $settings): \Illuminate\Support\HtmlString => $settings->renderRoutingBanner())
+                        ->columnSpanFull(),
                     Toggle::make('enabled')
                         ->label('Meta WhatsApp enabled')
-                        ->helperText('Phase 1: setup, sync, and test send only. Campaign routing comes in a later phase.')
+                        ->helperText('When on, all campaigns and automations (punch, post-call, homework, marks) send via Meta instead of Pal Digital. Template names must exist in Synced Meta templates.')
                         ->columnSpanFull(),
                 ]),
             Section::make('Meta Cloud API credentials')

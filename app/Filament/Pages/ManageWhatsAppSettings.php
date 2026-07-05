@@ -78,6 +78,11 @@ class ManageWhatsAppSettings extends Page
     {
         return $schema->components([
             CrmHint::placeholder('setup.whatsapp'),
+            Placeholder::make('active_provider_notice')
+                ->label('')
+                ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderActiveProviderNotice())
+                ->columnSpanFull()
+                ->visible(fn (WhatsAppSettingsService $settings): bool => app(\App\Services\WhatsAppProviderResolver::class)->metaOverridesPalDigital()),
             Section::make('Pal Digital / waservice')
                 ->description('Save your integration key once — it stays in the database after logout.')
                 ->schema([
