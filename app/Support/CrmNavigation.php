@@ -18,6 +18,8 @@ class CrmNavigation
 
     public const GROUP_MESSAGING = 'Messaging';
 
+    public const GROUP_META_WHATSAPP = 'Meta WhatsApp';
+
     public const GROUP_STUDENTS = 'Students & Admissions';
 
     public const GROUP_ACADEMICS = 'Academics';
@@ -42,6 +44,8 @@ class CrmNavigation
                 ->icon(Heroicon::OutlinedPhone),
             NavigationGroup::make(self::GROUP_MESSAGING)
                 ->icon(Heroicon::OutlinedChatBubbleOvalLeftEllipsis),
+            NavigationGroup::make(self::GROUP_META_WHATSAPP)
+                ->icon(Heroicon::OutlinedDevicePhoneMobile),
             NavigationGroup::make(self::GROUP_STUDENTS)
                 ->icon(Heroicon::OutlinedAcademicCap),
             NavigationGroup::make(self::GROUP_ACADEMICS)

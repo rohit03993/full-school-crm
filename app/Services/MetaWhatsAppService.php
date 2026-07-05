@@ -1,0 +1,399 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Setting;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
+class MetaWhatsAppService
+{
+    /**
+     * @param  list<string>  $bodyParams
+     * @return array{status: string, response?: mixed, error?: string, message_id?: string}
+     */
+    public function sendTemplate(
+        string $phone,
+        string $templateName,
+        array $bodyParams = [],
+        string $languageCode = 'en',
+        int $expectedParamCount = 0,
+    ): array {
+        if (! $this->isConfigured()) {
+            return ['status' => 'failed', 'error' => 'Meta WhatsApp is not configured. Open Setup → Meta WhatsApp and save credentials.'];
+        }
+
+        $destination = $this->destinationE164($phone);
+
+        if (! $destination) {
+            return ['status' => 'failed', 'error' => 'Invalid Indian mobile number.'];
+        }
+
+        if (blank($templateName)) {
+            return ['status' => 'failed', 'error' => 'Template name is required.'];
+        }
+
+        $bodyParams = self::normalizeBodyParams($bodyParams, $expectedParamCount);
+        $components = $this->buildBodyComponents($bodyParams);
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to' => $destination,
+            'type' => 'template',
+            'template' => [
+                'name' => $templateName,
+                'language' => ['code' => $languageCode],
+            ],
+        ];
+
+        if ($components !== []) {
+            $payload['template']['components'] = $components;
+        }
+
+        $url = $this->graphUrl($this->phoneNumberId().'/messages');
+
+        Log::info('Meta WhatsApp template request', [
+            'url' => $url,
+            'template' => $templateName,
+            'destination' => $destination,
+            'param_count' => count($bodyParams),
+        ]);
+
+        try {
+            $response = Http::timeout(30)
+                ->withToken((string) $this->accessToken())
+                ->acceptJson()
+                ->post($url, $payload);
+
+            $data = $response->json();
+
+            Log::info('Meta WhatsApp template response', [
+                'http_status' => $response->status(),
+                'body' => $data,
+            ]);
+
+            if ($response->successful() && is_array($data)) {
+                $messageId = data_get($data, 'messages.0.id');
+
+                return [
+                    'status' => 'success',
+                    'response' => $data,
+                    'message_id' => is_string($messageId) ? $messageId : null,
+                ];
+            }
+
+            return [
+                'status' => 'failed',
+                'error' => $this->parseApiError($data, $response->body()),
+                'response' => $data,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Meta WhatsApp exception', ['error' => $e->getMessage()]);
+
+            return ['status' => 'failed', 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @param  list<string>  $bodyParams
+     * @return list<array<string, mixed>>
+     */
+    public function buildBodyComponents(array $bodyParams): array
+    {
+        if ($bodyParams === []) {
+            return [];
+        }
+
+        return [
+            [
+                'type' => 'body',
+                'parameters' => array_map(
+                    fn (string $value): array => ['type' => 'text', 'text' => $value],
+                    $bodyParams,
+                ),
+            ],
+        ];
+    }
+
+    /**
+     * @param  list<string>  $bodyParams
+     * @return list<string>
+     */
+    public static function normalizeBodyParams(array $bodyParams, int $expectedParamCount = 0): array
+    {
+        $params = array_values(array_map(
+            fn (mixed $value): string => trim((string) $value),
+            $bodyParams,
+        ));
+
+        if ($expectedParamCount > 0) {
+            $params = array_slice($params, 0, $expectedParamCount);
+            $params = array_pad($params, $expectedParamCount, '');
+        }
+
+        return array_map(
+            fn (string $value): string => $value === '' ? '—' : $value,
+            $params,
+        );
+    }
+
+    /**
+     * @return array{status: string, message: string, display_phone_number?: string, verified_name?: string}
+     */
+    public function validateConnection(): array
+    {
+        if (! $this->isConfigured()) {
+            return ['status' => 'failed', 'message' => 'Phone number ID and access token are required.'];
+        }
+
+        try {
+            $response = Http::timeout(30)
+                ->withToken((string) $this->accessToken())
+                ->acceptJson()
+                ->get($this->graphUrl($this->phoneNumberId()), [
+                    'fields' => 'display_phone_number,verified_name,quality_rating',
+                ]);
+
+            $data = $response->json();
+
+            if (! $response->successful() || ! is_array($data)) {
+                return [
+                    'status' => 'failed',
+                    'message' => $this->parseApiError($data, $response->body()),
+                ];
+            }
+
+            $display = (string) ($data['display_phone_number'] ?? '');
+            $verified = (string) ($data['verified_name'] ?? '');
+
+            $message = trim('Connected to Meta.'.($display !== '' ? " Number: {$display}." : '').($verified !== '' ? " Business: {$verified}." : ''));
+
+            return [
+                'status' => 'success',
+                'message' => $message !== '' ? $message : 'Connected to Meta.',
+                'display_phone_number' => $display !== '' ? $display : null,
+                'verified_name' => $verified !== '' ? $verified : null,
+            ];
+        } catch (\Throwable $e) {
+            return ['status' => 'failed', 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{status: string, items?: list<array<string, mixed>>, error?: string}
+     */
+    public function fetchTemplates(): array
+    {
+        if (! filled($this->accessToken())) {
+            return ['status' => 'failed', 'error' => 'Access token is not configured.'];
+        }
+
+        if (blank($this->wabaId())) {
+            return ['status' => 'failed', 'error' => 'WhatsApp Business Account ID (WABA) is required to sync templates.'];
+        }
+
+        try {
+            $response = Http::timeout(30)
+                ->withToken((string) $this->accessToken())
+                ->acceptJson()
+                ->get($this->graphUrl($this->wabaId().'/message_templates'), [
+                    'limit' => 100,
+                ]);
+
+            $data = $response->json();
+
+            if (! $response->successful() || ! is_array($data)) {
+                return [
+                    'status' => 'failed',
+                    'error' => $this->parseApiError($data, $response->body()),
+                ];
+            }
+
+            $items = collect($data['data'] ?? [])
+                ->filter(fn (mixed $item): bool => is_array($item))
+                ->values()
+                ->all();
+
+            return ['status' => 'success', 'items' => $items];
+        } catch (\Throwable $e) {
+            Log::error('Meta WhatsApp template fetch failed', ['error' => $e->getMessage()]);
+
+            return ['status' => 'failed', 'error' => $e->getMessage()];
+        }
+    }
+
+    public function isConfigured(): bool
+    {
+        return filled($this->phoneNumberId()) && filled($this->accessToken());
+    }
+
+    public function hasStoredAccessToken(): bool
+    {
+        return filled(Setting::getValue('meta_whatsapp.access_token'));
+    }
+
+    public function maskedAccessToken(): ?string
+    {
+        $token = $this->accessToken();
+
+        if (blank($token)) {
+            return null;
+        }
+
+        $token = trim((string) $token);
+
+        if (strlen($token) <= 12) {
+            return str_repeat('•', min(strlen($token), 8));
+        }
+
+        return substr($token, 0, 8).'…'.substr($token, -4);
+    }
+
+    public function phoneNumberId(): ?string
+    {
+        $fromSettings = Setting::getValue('meta_whatsapp.phone_number_id');
+
+        if (filled($fromSettings)) {
+            return trim((string) $fromSettings);
+        }
+
+        $fromEnv = config('meta_whatsapp.phone_number_id');
+
+        return filled($fromEnv) ? trim((string) $fromEnv) : null;
+    }
+
+    public function wabaId(): ?string
+    {
+        $fromSettings = Setting::getValue('meta_whatsapp.waba_id');
+
+        if (filled($fromSettings)) {
+            return trim((string) $fromSettings);
+        }
+
+        $fromEnv = config('meta_whatsapp.waba_id');
+
+        return filled($fromEnv) ? trim((string) $fromEnv) : null;
+    }
+
+    public function defaultLanguage(): string
+    {
+        $fromSettings = Setting::getValue('meta_whatsapp.default_language');
+
+        if (filled($fromSettings)) {
+            return trim((string) $fromSettings);
+        }
+
+        return (string) config('meta_whatsapp.default_language', 'en');
+    }
+
+    public function verifyToken(): ?string
+    {
+        $fromSettings = Setting::getValue('meta_whatsapp.verify_token');
+
+        if (filled($fromSettings)) {
+            return trim((string) $fromSettings);
+        }
+
+        $fromEnv = config('meta_whatsapp.verify_token');
+
+        return filled($fromEnv) ? trim((string) $fromEnv) : null;
+    }
+
+    public function webhookUrl(): string
+    {
+        return url('/webhooks/meta/whatsapp');
+    }
+
+    public function accessToken(): ?string
+    {
+        $fromSettings = Setting::getValue('meta_whatsapp.access_token');
+
+        if (filled($fromSettings)) {
+            return $this->decryptSecret((string) $fromSettings);
+        }
+
+        $fromEnv = config('meta_whatsapp.access_token');
+
+        return filled($fromEnv) ? trim((string) $fromEnv) : null;
+    }
+
+    /**
+     * Meta expects digits only with country code (no plus).
+     */
+    public function destinationE164(string $phone): ?string
+    {
+        if ($phone === '') {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone);
+
+        if (strlen($digits) === 10) {
+            return '91'.$digits;
+        }
+
+        if (strlen($digits) === 12 && str_starts_with($digits, '91')) {
+            return $digits;
+        }
+
+        return null;
+    }
+
+    protected function graphUrl(string $path): string
+    {
+        $version = trim((string) config('meta_whatsapp.graph_version', 'v20.0'), '/');
+        $path = ltrim($path, '/');
+
+        return 'https://graph.facebook.com/'.$version.'/'.$path;
+    }
+
+    protected function decryptSecret(string $value): ?string
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($value);
+        } catch (\Throwable) {
+            return $value;
+        }
+    }
+
+    /**
+     * @param  mixed  $data
+     */
+    protected function parseApiError(mixed $data, string $fallbackBody): string
+    {
+        if (! is_array($data)) {
+            return $fallbackBody !== '' ? $fallbackBody : 'Unknown Meta API error';
+        }
+
+        $error = $data['error'] ?? null;
+
+        if (is_array($error)) {
+            $message = (string) ($error['message'] ?? '');
+            $code = $error['code'] ?? null;
+            $subcode = $error['error_subcode'] ?? null;
+
+            $parts = array_filter([
+                $message !== '' ? $message : null,
+                $code !== null ? '(code '.$code.')' : null,
+                $subcode !== null ? '(subcode '.$subcode.')' : null,
+            ]);
+
+            if ($parts !== []) {
+                return implode(' ', $parts);
+            }
+        }
+
+        if (filled($data['message'] ?? null)) {
+            return (string) $data['message'];
+        }
+
+        return $fallbackBody !== '' ? $fallbackBody : 'Unknown Meta API error';
+    }
+}

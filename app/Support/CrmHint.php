@@ -20,6 +20,7 @@ class CrmHint
         'setup.site_content' => 'Controls the public website: logo, phone number, homepage text, and gallery. Changes go live immediately after Save.',
         'setup.institute_settings' => 'Receipt and ID card PDF branding. Institute name and phone come from Website → Site Content — set logo here for printed documents.',
         'setup.whatsapp' => 'Pal Digital API key, sync templates, then map each attendance action (check-in, check-out, manual Present) to a parent WhatsApp template.',
+        'setup.meta_whatsapp' => 'Connect your school directly to Meta WhatsApp Cloud API. This is separate from Pal Digital — existing automations keep using Pal Digital until you switch them in a later phase.',
         'setup.biometric' => 'EasyTimePro writes punches to punch_logs on the same MySQL server. Match device employee ID to student roll number, then configure parent messages under WhatsApp Settings.',
 
         'courses.list' => 'Add every programme you offer — school classes, coaching courses, or college degrees. Active courses appear on your public website.',

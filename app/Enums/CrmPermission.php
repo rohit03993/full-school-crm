@@ -33,6 +33,7 @@ enum CrmPermission: string
 
     case WhatsappCampaigns = 'crm.whatsapp.campaigns';
     case WhatsappSettings = 'crm.whatsapp.settings';
+    case MetaWhatsappSettings = 'crm.meta_whatsapp.settings';
 
     case ReportsView = 'crm.reports.view';
     case ReportsExport = 'crm.reports.export';
@@ -66,6 +67,7 @@ enum CrmPermission: string
             self::AcademicsManage => 'Manage courses, batches, exam types',
             self::WhatsappCampaigns => 'WhatsApp campaigns',
             self::WhatsappSettings => 'WhatsApp settings',
+            self::MetaWhatsappSettings => 'Meta WhatsApp settings',
             self::ReportsView => 'View reports',
             self::ReportsExport => 'Export reports',
             self::StaffManage => 'Manage staff accounts',

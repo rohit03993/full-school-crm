@@ -69,6 +69,7 @@ class StaffRolePermissions
                 CrmPermission::DashboardOwnerStats,
                 CrmPermission::DashboardFinanceStats,
                 CrmPermission::WhatsappSettings,
+                CrmPermission::MetaWhatsappSettings,
                 CrmPermission::WhatsappCampaigns,
                 CrmPermission::StaffManage,
                 CrmPermission::SettingsManage,
