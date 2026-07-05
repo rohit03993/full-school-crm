@@ -55,6 +55,7 @@ use App\Services\MetaWhatsAppInboxService;
 use App\Services\StudentWhatsAppThreadService;
 use App\Services\WhatsAppProviderResolver;
 use App\Support\StudentWhatsAppThreadItem;
+use App\Services\VisitMeetingAssignmentService;
 use App\Services\VisitService;
 use App\Services\WhatsAppCampaignService;
 use App\Support\FeePlanCalculator;
@@ -1230,6 +1231,40 @@ class StudentProfilePage extends Page
                 ->color('gray')
                 ->button()
                 ->outlined(),
+            Action::make('assignMeeting')
+                ->label('Assign meeting')
+                ->icon('heroicon-o-user-plus')
+                ->button()
+                ->color('primary')
+                ->outlined()
+                ->modalHeading('Assign meeting')
+                ->form(fn (): array => EnquiryFormSchema::meetingAssignmentOnlyFields(
+                    $this->record->enquiries->count() > 1 ? $this->record->enquiries : null,
+                ))
+                ->action(function (array $data): void {
+                    $enquiry = isset($data['enquiry_id'])
+                        ? Enquiry::query()->findOrFail($data['enquiry_id'])
+                        : $this->record->enquiries->first();
+
+                    app(VisitMeetingAssignmentService::class)->assignFromFormData(
+                        $this->record,
+                        $enquiry,
+                        Auth::user(),
+                        $data,
+                    );
+
+                    $this->refreshRecord();
+
+                    Notification::make()
+                        ->title('Meeting assigned')
+                        ->body('The selected staff will be notified.')
+                        ->success()
+                        ->send();
+                })
+                ->visible(fn (): bool => $this->licensed(LicenseFeature::Enquiries)
+                    && $this->userCan(CrmPermission::LeadsCall)
+                    && $this->record->enquiries->isNotEmpty()
+                    && ! app(VisitMeetingAssignmentService::class)->openForStudent($this->record)),
             Action::make('addVisit')
                 ->label('Add Visit')
                 ->icon('heroicon-o-plus-circle')

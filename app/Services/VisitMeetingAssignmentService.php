@@ -299,11 +299,11 @@ class VisitMeetingAssignmentService
      */
     public function assignFromFormData(Student $student, ?Enquiry $enquiry, User $assignedBy, array $data): ?VisitMeetingAssignment
     {
-        if (! ($data['assign_meeting'] ?? false)) {
+        $staffId = (int) ($data['meeting_assign_to_user_id'] ?? 0);
+
+        if ($staffId <= 0 && ! ($data['assign_meeting'] ?? false)) {
             return null;
         }
-
-        $staffId = (int) ($data['meeting_assign_to_user_id'] ?? 0);
 
         if ($staffId <= 0) {
             throw ValidationException::withMessages([

@@ -23,7 +23,6 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Support\Collection;
@@ -251,7 +250,6 @@ class EnquiryFormSchema
                 ->default(VisitStatus::Interested->value)
                 ->required()
                 ->native(false),
-            ...self::meetingAssignmentFields(),
         ];
     }
 
@@ -300,51 +298,68 @@ class EnquiryFormSchema
      */
     public static function enrolledVisitMeetingFields(): array
     {
-        return [
-            Toggle::make('assign_meeting')
-                ->label('Assign meeting to staff')
-                ->helperText('The selected staff will get a notification and can view handoff notes on the student profile.')
-                ->live()
-                ->columnSpanFull(),
+        return self::meetingAssignmentFields();
+    }
+
+    /**
+     * Assign meeting only — staff + handoff (student profile action).
+     *
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    public static function meetingAssignmentOnlyFields(?Collection $enquiries = null): array
+    {
+        $fields = [];
+
+        if ($enquiries !== null && $enquiries->count() > 1) {
+            $fields[] = Select::make('enquiry_id')
+                ->label('Enquiry / Course')
+                ->options(
+                    $enquiries->mapWithKeys(fn ($enquiry) => [
+                        $enquiry->id => $enquiry->enquiry_number.' — '.$enquiry->course?->name,
+                    ]),
+                )
+                ->required()
+                ->native(false)
+                ->default($enquiries->first()?->id);
+        }
+
+        return array_merge($fields, [
             Select::make('meeting_assign_to_user_id')
                 ->label('Meet with')
                 ->options(self::staffOptions())
                 ->searchable()
-                ->required(fn (Get $get): bool => (bool) $get('assign_meeting'))
-                ->visible(fn (Get $get): bool => (bool) $get('assign_meeting'))
+                ->required()
                 ->native(false),
             Textarea::make('meeting_handoff_notes')
                 ->label('Handoff notes')
                 ->placeholder('Why they are here, what to discuss with them…')
-                ->required(fn (Get $get): bool => (bool) $get('assign_meeting'))
+                ->required()
                 ->rows(3)
                 ->columnSpanFull(),
-        ];
+        ]);
     }
 
     /**
+     * Optional assign on enquiry forms — pick staff to show handoff field.
+     *
      * @return array<int, \Filament\Forms\Components\Component>
      */
     public static function meetingAssignmentFields(): array
     {
         return [
-            Toggle::make('assign_meeting')
-                ->label('Assign meeting to staff')
-                ->helperText('The selected staff will get a notification and can view handoff notes on the student profile.')
-                ->live()
-                ->columnSpanFull(),
             Select::make('meeting_assign_to_user_id')
-                ->label('Meet with')
+                ->label('Assign meeting to')
+                ->placeholder('Optional')
                 ->options(self::staffOptions())
                 ->searchable()
-                ->required(fn (Get $get): bool => (bool) $get('assign_meeting'))
-                ->visible(fn (Get $get): bool => (bool) $get('assign_meeting'))
+                ->live()
                 ->native(false),
             Textarea::make('meeting_handoff_notes')
                 ->label('Handoff notes')
                 ->placeholder('Why they are here, what to discuss with them…')
+                ->required(fn (Get $get): bool => filled($get('meeting_assign_to_user_id')))
+                ->visible(fn (Get $get): bool => filled($get('meeting_assign_to_user_id')))
                 ->rows(2)
-                ->visible(fn (Get $get): bool => (bool) $get('assign_meeting'))
                 ->columnSpanFull(),
         ];
     }

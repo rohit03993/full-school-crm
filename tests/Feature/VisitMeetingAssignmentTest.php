@@ -175,13 +175,12 @@ class VisitMeetingAssignmentTest extends TestCase
         $this->assertSame(1, $service->paginateForStaff($counsellor, 'closed')->total());
     }
 
-    public function test_assign_from_form_data_skips_when_toggle_off(): void
+    public function test_assign_from_form_data_skips_when_no_staff_selected(): void
     {
         $reception = $this->createStaffUser('Reception');
-        $counsellor = $this->createStaffUser('Counsellor');
 
         $enquiry = app(EnquiryService::class)->create([
-            'name' => 'Toggle Off',
+            'name' => 'No Assign',
             'mobile' => '9000000305',
             'discussion_summary' => 'Walk-in',
             'visit_status' => VisitStatus::Interested->value,
@@ -191,7 +190,7 @@ class VisitMeetingAssignmentTest extends TestCase
             $enquiry->student,
             $enquiry,
             $reception,
-            ['assign_meeting' => false],
+            [],
         );
 
         $this->assertNull($result);

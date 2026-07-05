@@ -135,7 +135,6 @@ class CampusVisitTest extends TestCase
             $enquiry,
             $reception,
             [
-                'assign_meeting' => true,
                 'meeting_assign_to_user_id' => $counsellor->id,
                 'meeting_handoff_notes' => 'Parent here about fee receipt.',
                 'campus_purpose' => CampusVisitPurpose::Fees->value,
