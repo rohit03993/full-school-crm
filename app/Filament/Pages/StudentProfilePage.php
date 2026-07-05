@@ -1236,7 +1236,6 @@ class StudentProfilePage extends Page
                 ->icon('heroicon-o-user-plus')
                 ->button()
                 ->color('primary')
-                ->outlined()
                 ->modalHeading('Assign meeting')
                 ->form(fn (): array => EnquiryFormSchema::meetingAssignmentOnlyFields(
                     $this->record->enquiries->count() > 1 ? $this->record->enquiries : null,
@@ -1264,17 +1263,19 @@ class StudentProfilePage extends Page
                 ->visible(fn (): bool => $this->licensed(LicenseFeature::Enquiries)
                     && $this->userCan(CrmPermission::LeadsCall)
                     && $this->record->enquiries->isNotEmpty()
-                    && ! app(VisitMeetingAssignmentService::class)->openForStudent($this->record)),
-            Action::make('addVisit')
-                ->label('Add Visit')
-                ->icon('heroicon-o-plus-circle')
+                    && app(VisitMeetingAssignmentService::class)->openForStudent($this->record) === null),
+            Action::make('logVisit')
+                ->label('Log visit')
+                ->icon('heroicon-o-clipboard-document-list')
                 ->button()
-                ->color('primary')
+                ->color('gray')
+                ->outlined()
+                ->modalHeading('Log visit')
                 ->form(EnquiryFormSchema::visitActionFields(
                     Auth::id(),
                     $this->record->enquiries,
                 ))
-                ->action(function (array $data) {
+                ->action(function (array $data): void {
                     $enquiry = Enquiry::query()->findOrFail($data['enquiry_id']);
 
                     app(VisitService::class)->add(
@@ -1295,7 +1296,7 @@ class StudentProfilePage extends Page
                     $this->refreshRecord();
 
                     Notification::make()
-                        ->title('Visit added')
+                        ->title('Visit logged')
                         ->success()
                         ->send();
                 })
