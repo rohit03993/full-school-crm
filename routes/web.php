@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Webhooks\MetaWhatsAppWebhookController;
 use App\Http\Controllers\Admin\DocumentDownloadController;
 use App\Http\Controllers\Admin\IdCardDownloadController;
 use App\Http\Controllers\Admin\PaymentProofDownloadController;
@@ -21,6 +22,9 @@ use App\Http\Controllers\Admin\MarksheetDownloadController;
 use App\Http\Middleware\EnsurePortalLicensed;
 use App\Http\Middleware\EnsureStudentPortalAuth;
 use Illuminate\Support\Facades\Route;
+
+Route::match(['get', 'post'], '/webhooks/meta/whatsapp', MetaWhatsAppWebhookController::class)
+    ->name('webhooks.meta.whatsapp');
 
 Route::prefix('pwa')->name('pwa.')->group(function (): void {
     Route::get('/manifest/{context}', ManifestController::class)

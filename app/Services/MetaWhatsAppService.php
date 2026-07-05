@@ -3,12 +3,17 @@
 namespace App\Services;
 
 use App\Models\Setting;
+use App\Enums\MetaWhatsAppMessageStatus;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class MetaWhatsAppService
 {
+    public function __construct(
+        protected MetaWhatsAppMessageLogger $logger,
+    ) {}
+
     /**
      * @param  list<string>  $bodyParams
      * @return array{status: string, response?: mixed, error?: string, message_id?: string}
@@ -76,6 +81,17 @@ class MetaWhatsAppService
             if ($response->successful() && is_array($data)) {
                 $messageId = data_get($data, 'messages.0.id');
 
+                $this->logger->recordOutbound(
+                    $phone,
+                    is_string($messageId) ? $messageId : null,
+                    $templateName,
+                    $languageCode,
+                    $bodyParams,
+                    MetaWhatsAppMessageStatus::Sent,
+                    null,
+                    is_array($data) ? $data : null,
+                );
+
                 return [
                     'status' => 'success',
                     'response' => $data,
@@ -83,9 +99,22 @@ class MetaWhatsAppService
                 ];
             }
 
+            $error = $this->parseApiError($data, $response->body());
+
+            $this->logger->recordOutbound(
+                $phone,
+                null,
+                $templateName,
+                $languageCode,
+                $bodyParams,
+                MetaWhatsAppMessageStatus::Failed,
+                $error,
+                is_array($data) ? $data : null,
+            );
+
             return [
                 'status' => 'failed',
-                'error' => $this->parseApiError($data, $response->body()),
+                'error' => $error,
                 'response' => $data,
             ];
         } catch (\Throwable $e) {
@@ -296,6 +325,19 @@ class MetaWhatsAppService
         }
 
         $fromEnv = config('meta_whatsapp.verify_token');
+
+        return filled($fromEnv) ? trim((string) $fromEnv) : null;
+    }
+
+    public function appSecret(): ?string
+    {
+        $fromSettings = Setting::getValue('meta_whatsapp.app_secret');
+
+        if (filled($fromSettings)) {
+            return $this->decryptSecret((string) $fromSettings);
+        }
+
+        $fromEnv = config('meta_whatsapp.app_secret');
 
         return filled($fromEnv) ? trim((string) $fromEnv) : null;
     }

@@ -117,9 +117,8 @@ class ManageMetaWhatsAppSettings extends Page
                         ->helperText('ISO code, e.g. en or en_US — must match the template in Meta.'),
                 ])
                 ->columns(2),
-            Section::make('Webhook (Phase 2)')
-                ->description('Use these values in Meta when we add delivery status and inbox in the next phase.')
-                ->collapsed()
+            Section::make('Meta webhook')
+                ->description('Paste callback URL and verify token in Meta → WhatsApp → Configuration. Save app secret here so delivery updates are verified.')
                 ->schema([
                     TextInput::make('verify_token')
                         ->label('Webhook verify token')
@@ -129,13 +128,21 @@ class ManageMetaWhatsAppSettings extends Page
                         ->password()
                         ->revealable()
                         ->placeholder('Leave blank to keep the saved secret')
-                        ->helperText('From Meta app → Basic settings. Used later to verify inbound webhooks.'),
+                        ->helperText('From Meta app → Basic settings. Required to verify webhook POST requests.'),
                     Placeholder::make('webhook_info')
                         ->label('')
                         ->content(fn (MetaWhatsAppSettingsService $settings): \Illuminate\Support\HtmlString => $settings->renderWebhookInfo())
                         ->columnSpanFull(),
                 ])
                 ->columns(2),
+            Section::make('Recent Meta messages')
+                ->description('Last 15 messages sent or received via Meta. Full history is under Meta WhatsApp → Message log.')
+                ->schema([
+                    Placeholder::make('recent_messages_table')
+                        ->label('')
+                        ->content(fn (MetaWhatsAppSettingsService $settings): \Illuminate\Support\HtmlString => $settings->renderRecentMessagesTable())
+                        ->columnSpanFull(),
+                ]),
             Section::make('Synced Meta templates')
                 ->description('Approved templates from your WABA. Pal Digital template list is separate.')
                 ->schema([

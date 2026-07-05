@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\MetaWhatsAppMessage;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
 use App\Support\MetaWhatsAppTemplateParser;
@@ -146,7 +147,7 @@ class MetaWhatsAppSettingsService
             '<div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">'
             .'<p><span class="font-medium text-gray-950 dark:text-white">Callback URL</span><br><code class="text-xs break-all">'.$url.'</code></p>'
             .'<p><span class="font-medium text-gray-950 dark:text-white">Verify token</span><br><code class="text-xs break-all">'.$verify.'</code></p>'
-            .'<p class="text-xs text-gray-500">Webhook delivery status is Phase 2. Sending works once credentials and templates are configured.</p>'
+            .'<p class="text-xs text-gray-500">Subscribe to <strong>messages</strong> in Meta. Delivery updates (sent, delivered, read) and parent replies appear in Message log.</p>'
             .'</div>'
         );
     }
@@ -182,6 +183,41 @@ class MetaWhatsAppSettingsService
             '<div class="overflow-x-auto"><table class="min-w-full text-sm">'
             .'<thead><tr class="text-left text-xs uppercase text-gray-500">'
             .'<th class="py-2 pr-3">Template</th><th class="py-2 pr-3">Lang</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3">Params</th><th class="py-2">Preview</th>'
+            .'</tr></thead><tbody>'.$rows.'</tbody></table></div>'
+        );
+    }
+
+    public function renderRecentMessagesTable(): HtmlString
+    {
+        $messages = MetaWhatsAppMessage::query()
+            ->latest('id')
+            ->limit(15)
+            ->get();
+
+        if ($messages->isEmpty()) {
+            return new HtmlString('<p class="text-sm text-gray-500">No Meta messages logged yet. Send a test message or configure the webhook in Meta.</p>');
+        }
+
+        $rows = $messages->map(function (MetaWhatsAppMessage $message): string {
+            $direction = e($message->direction);
+            $phone = e($message->phone);
+            $status = e($message->status);
+            $preview = e(mb_substr((string) ($message->body_preview ?? ''), 0, 80));
+            $time = e($message->created_at?->format('d M H:i') ?? '');
+
+            return '<tr class="border-b border-gray-100 dark:border-gray-800">'
+                .'<td class="py-2 pr-3">'.$time.'</td>'
+                .'<td class="py-2 pr-3">'.$direction.'</td>'
+                .'<td class="py-2 pr-3">'.$phone.'</td>'
+                .'<td class="py-2 pr-3">'.$status.'</td>'
+                .'<td class="py-2 text-xs text-gray-500">'.$preview.'</td>'
+                .'</tr>';
+        })->implode('');
+
+        return new HtmlString(
+            '<div class="overflow-x-auto"><table class="min-w-full text-sm">'
+            .'<thead><tr class="text-left text-xs uppercase text-gray-500">'
+            .'<th class="py-2 pr-3">When</th><th class="py-2 pr-3">Dir</th><th class="py-2 pr-3">Phone</th><th class="py-2 pr-3">Status</th><th class="py-2">Preview</th>'
             .'</tr></thead><tbody>'.$rows.'</tbody></table></div>'
         );
     }

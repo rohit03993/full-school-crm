@@ -45,6 +45,11 @@ class MetaWhatsAppServiceTest extends TestCase
 
         $this->assertSame('success', $result['status']);
         $this->assertSame('wamid.TEST123', $result['message_id']);
+        $this->assertDatabaseHas('meta_whatsapp_messages', [
+            'wamid' => 'wamid.TEST123',
+            'status' => 'sent',
+            'template_name' => 'parent_checkin',
+        ]);
 
         Http::assertSent(function ($request): bool {
             $json = $request->data();
