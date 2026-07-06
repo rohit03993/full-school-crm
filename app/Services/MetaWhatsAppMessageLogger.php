@@ -5,10 +5,15 @@ namespace App\Services;
 use App\Enums\MetaWhatsAppMessageDirection;
 use App\Enums\MetaWhatsAppMessageStatus;
 use App\Models\MetaWhatsAppMessage;
+use App\Models\MetaWhatsAppTemplate;
 use App\Models\Student;
 
 class MetaWhatsAppMessageLogger
 {
+    public function __construct(
+        protected WhatsAppTemplateParamResolver $paramResolver,
+    ) {}
+
     /**
      * @param  list<string>  $bodyParams
      */
@@ -24,11 +29,7 @@ class MetaWhatsAppMessageLogger
         ?int $studentId = null,
         ?string $bodyPreview = null,
     ): MetaWhatsAppMessage {
-        $preview = $bodyPreview ?? $templateName;
-
-        if ($bodyPreview === null && $bodyParams !== []) {
-            $preview .= ' · '.implode(' · ', $bodyParams);
-        }
+        $preview = $bodyPreview ?? $this->buildOutboundPreview($templateName, $language, $bodyParams);
 
         return MetaWhatsAppMessage::query()->create([
             'wamid' => $wamid,
@@ -81,6 +82,35 @@ class MetaWhatsAppMessageLogger
             'payload' => $payload ?? $message->payload,
             'status_at' => now(),
         ]);
+    }
+
+    /**
+     * @param  list<string>  $bodyParams
+     */
+    protected function buildOutboundPreview(string $templateName, string $language, array $bodyParams): string
+    {
+        $metaTemplate = MetaWhatsAppTemplate::query()
+            ->where('name', $templateName)
+            ->where('is_active', true)
+            ->when($language !== '', fn ($query) => $query->where('language', $language))
+            ->orderByDesc('synced_at')
+            ->first();
+
+        if ($metaTemplate && filled($metaTemplate->body)) {
+            $preview = $this->paramResolver->buildPreview((string) $metaTemplate->body, $bodyParams);
+
+            if (filled($preview)) {
+                return $preview;
+            }
+
+            return (string) $metaTemplate->body;
+        }
+
+        if ($bodyParams !== []) {
+            return implode(' · ', $bodyParams);
+        }
+
+        return $templateName;
     }
 
     protected function shouldIgnoreStatusDowngrade(string $current, string $incoming): bool

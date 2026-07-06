@@ -20,7 +20,27 @@ class WhatsAppTemplateCatalog
      */
     public function selectableTemplates(): Collection
     {
-        return $this->baseQuery()->get();
+        return $this->baseQuery()
+            ->get()
+            ->map(function (WhatsAppTemplate $template): WhatsAppTemplate {
+                $meta = MetaWhatsAppTemplate::query()
+                    ->where('name', $template->name)
+                    ->where('is_active', true)
+                    ->orderByDesc('synced_at')
+                    ->first();
+
+                if ($meta) {
+                    $template->setAttribute('param_count', max((int) $template->param_count, (int) $meta->param_count));
+                    $template->setAttribute('body', $meta->body ?? $template->body);
+                    $template->setAttribute('provider_meta', array_merge(
+                        $template->provider_meta ?? [],
+                        $meta->provider_meta ?? [],
+                        ['meta_language' => $meta->language],
+                    ));
+                }
+
+                return $template;
+            });
     }
 
     /**

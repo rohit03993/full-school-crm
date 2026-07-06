@@ -11,8 +11,6 @@
                 <p class="crm-wa-inbox__title">WhatsApp with parent</p>
                 <p class="crm-wa-inbox__subtitle">
                     <span class="crm-wa-inbox__phone">{{ $record->mobile ?? 'No mobile on file' }}</span>
-                    <span class="crm-wa-inbox__dot" aria-hidden="true">·</span>
-                    <span>Meta Cloud API</span>
                 </p>
             </div>
             @if ($metaRoutingActive)
@@ -21,17 +19,17 @@
                     'crm-wa-pill--open' => $metaSessionOpen,
                     'crm-wa-pill--closed' => ! $metaSessionOpen,
                 ])>
-                    {{ $metaSessionOpen ? '24h window open — free reply allowed' : 'Templates only' }}
+                    {{ $metaSessionOpen ? '24h window open' : 'Templates only' }}
                 </span>
             @endif
         </div>
         @if ($metaRoutingActive && $metaSessionOpen)
             <p class="crm-wa-inbox__hint crm-wa-inbox__hint--success">
-                Parent messaged recently. Use <strong>Quick reply</strong> below for a normal text message, or send an approved template anytime.
+                Parent messaged recently — you can send a <strong>free-text reply</strong> below, or a template anytime.
             </p>
         @elseif ($metaRoutingActive && ! $metaSessionOpen)
             <p class="crm-wa-inbox__hint crm-wa-inbox__hint--banner">
-                Outside the 24-hour window — use an approved <strong>template</strong> until the parent messages again.
+                Outside the 24-hour window — send an approved <strong>template</strong> until the parent messages again.
             </p>
         @endif
         @if (filled($waTemplateSyncHint))
@@ -41,48 +39,18 @@
 
     <div class="crm-wa-inbox__layout">
         <aside class="crm-wa-inbox__compose">
-            @if ($metaRoutingActive && $metaSessionOpen)
-                <section class="crm-wa-inbox__composer crm-wa-inbox__composer--reply crm-wa-inbox__composer--highlight">
-                    <div class="crm-wa-inbox__composer-head">
-                        <h3 class="crm-wa-inbox__composer-title">Quick reply</h3>
-                        <p class="crm-wa-inbox__composer-lead">Send a normal WhatsApp text — no template needed right now.</p>
-                    </div>
-                    <div class="crm-wa-inbox__field">
-                        <label class="crm-wa-inbox__label" for="wa-quick-reply">Your message</label>
-                        <textarea
-                            id="wa-quick-reply"
-                            wire:model.live="metaReplyText"
-                            rows="3"
-                            class="crm-wa-inbox__textarea"
-                            placeholder="Type your reply to the parent…"
-                        ></textarea>
-                    </div>
-                    <button
-                        type="button"
-                        wire:click="sendMetaReply"
-                        wire:loading.attr="disabled"
-                        wire:target="sendMetaReply"
-                        class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--full"
-                        @disabled(! $metaSessionOpen)
-                    >
-                        <span wire:loading.remove wire:target="sendMetaReply">Send reply</span>
-                        <span wire:loading wire:target="sendMetaReply">Sending…</span>
-                    </button>
-                </section>
-            @endif
-
             <section class="crm-wa-inbox__composer">
                 <div class="crm-wa-inbox__composer-head">
                     <h3 class="crm-wa-inbox__composer-title">Send template</h3>
-                    <p class="crm-wa-inbox__composer-lead">Works anytime — pick a Meta-approved template and fill its fields.</p>
+                    <p class="crm-wa-inbox__composer-lead">Pick a template. If it has variables, fill every field marked required.</p>
                 </div>
 
                 @if (blank($record->mobile))
-                    <p class="crm-wa-inbox__hint crm-wa-inbox__hint--danger">Add a mobile number on the student profile before sending WhatsApp.</p>
+                    <p class="crm-wa-inbox__hint crm-wa-inbox__hint--danger">Add a mobile number on the student profile first.</p>
                 @elseif ($waTemplates->isEmpty())
                     <p class="crm-wa-inbox__hint">
-                        No Meta templates synced yet.
-                        Open <strong>{{ \App\Support\CrmNavigation::whatsAppMenu('Connection & Setup') }}</strong> and click <strong>Sync templates</strong>.
+                        No templates synced.
+                        Open <strong>{{ \App\Support\CrmNavigation::whatsAppMenu('Connection & Setup') }}</strong> → <strong>Sync templates</strong>.
                     </p>
                 @else
                     <div class="crm-wa-inbox__field">
@@ -97,9 +65,9 @@
                                 <option value="{{ $template->id }}">
                                     {{ $template->name }}
                                     @if ((int) $template->param_count > 0)
-                                        ({{ (int) $template->param_count }} {{ (int) $template->param_count === 1 ? 'field' : 'fields' }})
+                                        — {{ (int) $template->param_count }} {{ (int) $template->param_count === 1 ? 'variable' : 'variables' }}
                                     @else
-                                        (no variables)
+                                        — no variables
                                     @endif
                                 </option>
                             @endforeach
@@ -109,14 +77,19 @@
                     @if ($sendWhatsAppTemplateId)
                         @if ($sendWhatsAppTemplateParamCount === 0)
                             <p class="crm-wa-inbox__hint crm-wa-inbox__hint--info">
-                                This template has no variables — you can send it as-is.
+                                No variables needed — click send when ready.
                             </p>
                         @else
+                            <p class="crm-wa-inbox__param-intro">
+                                This template needs <strong>{{ $sendWhatsAppTemplateParamCount }}</strong>
+                                {{ $sendWhatsAppTemplateParamCount === 1 ? 'value' : 'values' }}:
+                            </p>
                             <div class="crm-wa-inbox__param-grid">
                                 @foreach ($sendWhatsAppTemplateFields as $field)
-                                    <div class="crm-wa-inbox__field" wire:key="wa-param-{{ $field['index'] }}">
+                                    <div class="crm-wa-inbox__field crm-wa-inbox__field--param" wire:key="wa-param-{{ $field['index'] }}">
                                         <label class="crm-wa-inbox__label" for="wa-param-{{ $field['index'] }}">
                                             {{ $field['label'] }}
+                                            <span class="crm-wa-inbox__required" aria-hidden="true">*</span>
                                         </label>
                                         <input
                                             id="wa-param-{{ $field['index'] }}"
@@ -124,6 +97,7 @@
                                             wire:model.live="sendWhatsAppTemplateParams.{{ $field['index'] }}"
                                             placeholder="{{ $field['placeholder'] }}"
                                             class="crm-wa-inbox__input"
+                                            required
                                         />
                                         <p class="crm-wa-inbox__field-hint">{{ $field['hint'] }}</p>
                                     </div>
@@ -133,13 +107,8 @@
 
                         @if (filled($sendWhatsAppTemplatePreview))
                             <div class="crm-wa-inbox__preview">
-                                <p class="crm-wa-inbox__preview-label">Preview</p>
+                                <p class="crm-wa-inbox__preview-label">What parent will see</p>
                                 <p class="crm-wa-inbox__preview-body">{{ $sendWhatsAppTemplatePreview }}</p>
-                            </div>
-                        @elseif (filled($sendWhatsAppSelectedTemplateName))
-                            <div class="crm-wa-inbox__preview crm-wa-inbox__preview--muted">
-                                <p class="crm-wa-inbox__preview-label">Template</p>
-                                <p class="crm-wa-inbox__preview-body">{{ $sendWhatsAppSelectedTemplateName }}</p>
                             </div>
                         @endif
 
@@ -150,12 +119,41 @@
                             wire:target="sendWhatsAppMessage"
                             class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--full"
                         >
-                            <span wire:loading.remove wire:target="sendWhatsAppMessage">Send template to {{ $record->mobile }}</span>
+                            <span wire:loading.remove wire:target="sendWhatsAppMessage">Send template</span>
                             <span wire:loading wire:target="sendWhatsAppMessage">Sending…</span>
                         </button>
                     @endif
                 @endif
             </section>
+
+            @if ($metaRoutingActive && $metaSessionOpen)
+                <section class="crm-wa-inbox__composer crm-wa-inbox__composer--reply">
+                    <div class="crm-wa-inbox__composer-head">
+                        <h3 class="crm-wa-inbox__composer-title">Quick reply</h3>
+                        <p class="crm-wa-inbox__composer-lead">Plain text — only while the 24h window is open.</p>
+                    </div>
+                    <div class="crm-wa-inbox__field">
+                        <label class="crm-wa-inbox__label" for="wa-quick-reply">Message</label>
+                        <textarea
+                            id="wa-quick-reply"
+                            wire:model.live="metaReplyText"
+                            rows="3"
+                            class="crm-wa-inbox__textarea"
+                            placeholder="Type your reply…"
+                        ></textarea>
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="sendMetaReply"
+                        wire:loading.attr="disabled"
+                        wire:target="sendMetaReply"
+                        class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--full"
+                    >
+                        <span wire:loading.remove wire:target="sendMetaReply">Send reply</span>
+                        <span wire:loading wire:target="sendMetaReply">Sending…</span>
+                    </button>
+                </section>
+            @endif
         </aside>
 
         <section
@@ -165,15 +163,15 @@
         >
             <div class="crm-wa-inbox__thread-head">
                 <h3 class="crm-wa-inbox__thread-title">Conversation</h3>
-                <p class="crm-wa-inbox__thread-meta">{{ count($messageThread) }} message{{ count($messageThread) === 1 ? '' : 's' }}</p>
+                <p class="crm-wa-inbox__thread-meta">{{ count($messageThread) }} messages</p>
             </div>
 
             @if (! $messagesTabLoaded)
-                <p class="crm-wa-inbox__hint crm-wa-inbox__hint--center">Loading conversation…</p>
+                <p class="crm-wa-inbox__hint crm-wa-inbox__hint--center">Loading…</p>
             @elseif ($messageThread === [])
                 <div class="crm-wa-inbox__empty">
                     <p class="font-medium text-gray-700 dark:text-gray-200">No messages yet</p>
-                    <p class="crm-wa-inbox__hint">Parent replies and your sends appear here in order.</p>
+                    <p class="crm-wa-inbox__hint">Sends and parent replies appear here.</p>
                 </div>
             @else
                 <div
@@ -192,9 +190,6 @@
                                 <span>{{ ($message['direction'] ?? '') === 'inbound' ? 'Parent' : 'You' }}</span>
                                 <span>{{ $message['at_label'] ?? '' }}</span>
                             </div>
-                            @if (! empty($message['templateName']))
-                                <p class="crm-wa-bubble__template">{{ $message['templateName'] }}</p>
-                            @endif
                             <p class="crm-wa-bubble__body">{{ $message['body'] ?? '' }}</p>
                             @if (! empty($message['errorMessage']))
                                 <p class="crm-wa-bubble__error">{{ $message['errorMessage'] }}</p>

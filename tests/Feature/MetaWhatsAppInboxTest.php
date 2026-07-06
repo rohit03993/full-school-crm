@@ -18,6 +18,52 @@ class MetaWhatsAppInboxTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_thread_excludes_sent_campaign_rows_when_meta_log_exists(): void
+    {
+        $student = Student::query()->create([
+            'name' => 'Test Student',
+            'mobile' => '9811223344',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $template = \App\Models\WhatsAppTemplate::query()->create([
+            'name' => 'first_try',
+            'body' => 'Hi {{1}}',
+            'param_count' => 0,
+            'is_active' => true,
+        ]);
+
+        $campaign = \App\Models\WhatsAppCampaign::query()->create([
+            'whatsapp_template_id' => $template->id,
+            'name' => 'first_try',
+            'status' => \App\Enums\WhatsAppCampaignStatus::Completed,
+            'total_recipients' => 1,
+        ]);
+
+        \App\Models\WhatsAppCampaignRecipient::query()->create([
+            'whatsapp_campaign_id' => $campaign->id,
+            'student_id' => $student->id,
+            'phone' => '9811223344',
+            'status' => \App\Enums\WhatsAppRecipientStatus::Sent,
+            'message_sent' => 'first_try',
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '919811223344',
+            'student_id' => $student->id,
+            'template_name' => 'first_try',
+            'body_preview' => 'Hi This is the first message',
+            'status' => 'read',
+            'status_at' => now(),
+        ]);
+
+        $thread = app(StudentWhatsAppThreadService::class)->threadForStudent($student);
+
+        $this->assertCount(1, $thread);
+        $this->assertStringContainsString('first message', $thread->first()->body);
+    }
+
     public function test_thread_merges_campaign_and_meta_messages(): void
     {
         $student = Student::query()->create([

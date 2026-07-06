@@ -6,6 +6,7 @@ use App\Enums\MetaWhatsAppMessageDirection;
 use App\Enums\MetaWhatsAppMessageStatus;
 use App\Enums\WhatsAppRecipientStatus;
 use App\Models\MetaWhatsAppMessage;
+use App\Models\MetaWhatsAppTemplate;
 use App\Models\Student;
 use App\Models\WhatsAppCampaignRecipient;
 use App\Support\StudentWhatsAppThreadItem;
@@ -16,6 +17,7 @@ class StudentWhatsAppThreadService
 {
     public function __construct(
         protected MetaWhatsAppService $meta,
+        protected WhatsAppTemplateParamResolver $paramResolver,
     ) {}
 
     /**
@@ -24,6 +26,7 @@ class StudentWhatsAppThreadService
     public function threadForStudent(Student $student, int $limit = 50): Collection
     {
         $phone = $this->normalizePhone((string) $student->mobile);
+        $metaSupported = $this->metaMessagesSupported();
 
         $campaignMessages = WhatsAppCampaignRecipient::query()
             ->where('student_id', $student->id)
@@ -31,20 +34,27 @@ class StudentWhatsAppThreadService
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get()
+            ->filter(function (WhatsAppCampaignRecipient $row) use ($metaSupported): bool {
+                if (! $metaSupported) {
+                    return true;
+                }
+
+                return $row->status !== WhatsAppRecipientStatus::Sent;
+            })
             ->map(fn (WhatsAppCampaignRecipient $row): StudentWhatsAppThreadItem => new StudentWhatsAppThreadItem(
                 key: 'campaign-'.$row->id,
                 source: 'campaign',
                 direction: 'outbound',
-                body: (string) ($row->message_sent ?? $row->campaign?->template?->name ?? 'WhatsApp message'),
+                body: $this->campaignDisplayBody($row),
                 status: (string) ($row->status?->value ?? 'pending'),
                 statusLabel: $row->status?->label() ?? 'Pending',
                 at: $row->created_at,
-                templateName: $row->campaign?->template?->name,
+                templateName: null,
                 provider: 'meta',
                 errorMessage: $row->status?->value === 'failed' ? (string) ($row->error_message ?? '') : null,
             ));
 
-        $metaMessages = $this->metaMessagesSupported()
+        $metaMessages = $metaSupported
             ? $this->loadMetaMessages($student, $phone, $limit)
             : collect();
 
@@ -112,14 +122,102 @@ class StudentWhatsAppThreadService
                     key: 'meta-'.$row->id,
                     source: 'meta',
                     direction: $row->direction,
-                    body: (string) ($row->body_preview ?? ''),
+                    body: $this->metaDisplayBody($row),
                     status: $row->status,
                     statusLabel: $status?->label() ?? ucfirst($row->status),
                     at: $row->status_at ?? $row->created_at,
-                    templateName: $row->template_name,
+                    templateName: null,
                     provider: 'meta',
                 );
             });
+    }
+
+    protected function campaignDisplayBody(WhatsAppCampaignRecipient $row): string
+    {
+        $templateName = (string) ($row->campaign?->template?->name ?? '');
+        $messageSent = trim((string) ($row->message_sent ?? ''));
+
+        if ($messageSent !== '' && ! $this->isTemplateSlug($messageSent, $templateName)) {
+            return $messageSent;
+        }
+
+        $templateBody = trim((string) ($row->campaign?->template?->body ?? ''));
+
+        if ($templateBody !== '') {
+            $params = is_array($row->template_params) ? array_values($row->template_params) : [];
+            $preview = $this->paramResolver->buildPreview($templateBody, $params);
+
+            if (filled($preview)) {
+                return $preview;
+            }
+
+            return $templateBody;
+        }
+
+        $metaBody = $this->metaTemplateBody($templateName);
+
+        if ($metaBody !== null) {
+            return $metaBody;
+        }
+
+        return $messageSent !== '' ? $messageSent : ($templateName !== '' ? $templateName : 'WhatsApp message');
+    }
+
+    protected function metaDisplayBody(MetaWhatsAppMessage $row): string
+    {
+        $preview = trim((string) ($row->body_preview ?? ''));
+        $templateName = (string) ($row->template_name ?? '');
+
+        if ($preview !== '' && ! $this->isTemplateSlug($preview, $templateName)) {
+            return $preview;
+        }
+
+        if ($templateName !== '') {
+            $metaTemplate = $this->metaTemplate($templateName, (string) ($row->language ?? ''));
+
+            if ($metaTemplate && filled($metaTemplate->body)) {
+                return (string) $metaTemplate->body;
+            }
+        }
+
+        return $preview !== '' ? $preview : 'Message';
+    }
+
+    protected function metaTemplateBody(string $templateName): ?string
+    {
+        if ($templateName === '') {
+            return null;
+        }
+
+        $metaTemplate = $this->metaTemplate($templateName, '');
+
+        return filled($metaTemplate?->body) ? (string) $metaTemplate->body : null;
+    }
+
+    protected function metaTemplate(string $name, string $language): ?MetaWhatsAppTemplate
+    {
+        $query = MetaWhatsAppTemplate::query()
+            ->where('name', $name)
+            ->where('is_active', true);
+
+        if ($language !== '') {
+            $match = (clone $query)->where('language', $language)->first();
+
+            if ($match) {
+                return $match;
+            }
+        }
+
+        return $query->orderByDesc('synced_at')->first();
+    }
+
+    protected function isTemplateSlug(string $text, string $templateName): bool
+    {
+        if ($templateName === '') {
+            return false;
+        }
+
+        return strcasecmp(trim($text), trim($templateName)) === 0;
     }
 
     protected function normalizePhone(string $phone): string

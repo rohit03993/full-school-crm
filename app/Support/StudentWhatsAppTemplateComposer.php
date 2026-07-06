@@ -57,8 +57,9 @@ class StudentWhatsAppTemplateComposer
             $fields[] = [
                 'index' => $i,
                 'label' => $this->fieldLabel($bodyVariables[$i] ?? null, $i),
-                'hint' => $this->fieldHint($source, $bodyVariables[$i] ?? null, $sourceOptions),
-                'placeholder' => $this->fieldLabel($bodyVariables[$i] ?? null, $i),
+                'hint' => $this->fieldHint($source, $bodyVariables[$i] ?? null, $sourceOptions, $i),
+                'placeholder' => $this->fieldPlaceholder($bodyVariables[$i] ?? null, $i, $source, $student),
+                'required' => true,
             ];
             $defaults[$i] = $value;
         }
@@ -80,14 +81,25 @@ class StudentWhatsAppTemplateComposer
      */
     public function preview(WhatsAppTemplate $template, array $params): ?string
     {
-        $count = max((int) $template->param_count, count($params));
+        $metaTemplate = MetaWhatsAppTemplate::query()
+            ->where('name', $template->name)
+            ->where('is_active', true)
+            ->orderByDesc('synced_at')
+            ->first();
+
+        $body = $metaTemplate?->body ?? $template->body;
+        $count = max(
+            $metaTemplate ? (int) $metaTemplate->param_count : 0,
+            (int) $template->param_count,
+            count($params),
+        );
         $values = [];
 
         for ($i = 0; $i < $count; $i++) {
             $values[] = (string) ($params[$i] ?? '');
         }
 
-        return $this->resolver->buildPreview($template->body, $values);
+        return $this->resolver->buildPreview($body, $values);
     }
 
     protected function fieldLabel(?string $bodyVariable, int $index): string
@@ -106,16 +118,33 @@ class StudentWhatsAppTemplateComposer
     /**
      * @param  array<string, string>  $sourceOptions
      */
-    protected function fieldHint(?string $source, ?string $bodyVariable, array $sourceOptions): string
+    protected function fieldHint(?string $source, ?string $bodyVariable, array $sourceOptions, int $index): string
     {
         if (filled($source) && isset($sourceOptions[$source])) {
-            return 'Pre-filled from '.$sourceOptions[$source].'. You can edit before sending.';
+            return 'Usually filled from '.$sourceOptions[$source].'. Change if needed.';
         }
 
         if (filled($bodyVariable)) {
-            return 'Enter the value for «'.$bodyVariable.'» as approved in Meta.';
+            return 'Required by Meta — matches «'.$bodyVariable.'» in the approved template.';
         }
 
-        return 'This value is sent to the parent in the order Meta expects.';
+        return 'Required — enter the value Meta expects for position '.($index + 1).'.';
+    }
+
+    protected function fieldPlaceholder(?string $bodyVariable, int $index, ?string $source, Student $student): string
+    {
+        if (filled($source) && $source === 'student.name' && filled($student->name)) {
+            return (string) $student->name;
+        }
+
+        if (filled($bodyVariable)) {
+            $clean = trim(preg_replace('/^\{\{?\d+\}?\}\s*/', '', trim($bodyVariable)) ?? trim($bodyVariable));
+
+            if ($clean !== '') {
+                return 'e.g. '.$clean;
+            }
+        }
+
+        return 'Value for parameter '.($index + 1);
     }
 }
