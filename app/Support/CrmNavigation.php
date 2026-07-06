@@ -8,7 +8,7 @@ use Filament\Support\Icons\Heroicon;
 /**
  * Sidebar group names and order — keep menu paths in hints/docs aligned with these labels.
  *
- * Leads → Calls → Messaging → Students → Academics → Reports → Settings → Admin → Website
+ * Leads → Calls → META WhatsApp → Students → Academics → Reports → Settings → Admin → Website
  */
 class CrmNavigation
 {
@@ -18,7 +18,8 @@ class CrmNavigation
 
     public const GROUP_MESSAGING = 'Messaging';
 
-    public const GROUP_META_WHATSAPP = 'Meta WhatsApp';
+    /** All WhatsApp admin: Meta connection, automations, campaigns, message log. */
+    public const GROUP_META_WHATSAPP = 'META WhatsApp';
 
     public const GROUP_STUDENTS = 'Students & Admissions';
 
@@ -42,8 +43,6 @@ class CrmNavigation
                 ->icon(Heroicon::OutlinedChatBubbleLeftRight),
             NavigationGroup::make(self::GROUP_CALLS)
                 ->icon(Heroicon::OutlinedPhone),
-            NavigationGroup::make(self::GROUP_MESSAGING)
-                ->icon(Heroicon::OutlinedChatBubbleOvalLeftEllipsis),
             NavigationGroup::make(self::GROUP_META_WHATSAPP)
                 ->icon(Heroicon::OutlinedDevicePhoneMobile),
             NavigationGroup::make(self::GROUP_STUDENTS)

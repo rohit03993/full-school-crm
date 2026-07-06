@@ -7,6 +7,7 @@ use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Services\PalDigitalTemplateSyncService;
 use App\Services\PalDigitalWhatsAppService;
+use App\Services\WhatsAppProviderResolver;
 use App\Services\WhatsAppSettingsService;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
@@ -46,13 +47,13 @@ class ManageWhatsAppSettings extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCog8Tooth;
 
-    protected static ?string $navigationLabel = 'WhatsApp Settings';
+    protected static ?string $navigationLabel = 'Automations';
 
-    protected static ?string $title = 'WhatsApp Settings';
+    protected static ?string $title = 'WhatsApp Automations';
 
-    protected static ?int $navigationSort = 60;
+    protected static ?int $navigationSort = 30;
 
-    protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_SETTINGS;
+    protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_META_WHATSAPP;
 
     /**
      * @var array<string, mixed>|null
@@ -82,9 +83,11 @@ class ManageWhatsAppSettings extends Page
                 ->label('')
                 ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderActiveProviderNotice())
                 ->columnSpanFull()
-                ->visible(fn (WhatsAppSettingsService $settings): bool => app(\App\Services\WhatsAppProviderResolver::class)->metaOverridesPalDigital()),
-            Section::make('Pal Digital / waservice')
-                ->description('Save your integration key once — it stays in the database after logout.')
+                ->visible(fn (): bool => app(WhatsAppProviderResolver::class)->metaOverridesPalDigital()),
+            Section::make('Legacy — Pal Digital / waservice')
+                ->description('Only needed when Meta WhatsApp is turned off. Not used for sends while Meta routing is active.')
+                ->collapsed()
+                ->visible(fn (): bool => ! app(WhatsAppProviderResolver::class)->metaOverridesPalDigital())
                 ->schema([
                     Placeholder::make('api_key_status')
                         ->label('')
@@ -113,8 +116,10 @@ class ManageWhatsAppSettings extends Page
                         ->columnSpanFull(),
                 ])
                 ->columns(2),
-            Section::make('Synced templates')
-                ->description('Step 1 — Click Sync templates after saving your API key. Step 2 — Pick templates for each attendance action below.')
+            Section::make('Templates for automations')
+                ->description(fn (): string => app(WhatsAppProviderResolver::class)->metaOverridesPalDigital()
+                    ? 'Templates synced from Meta (Connection & Setup → Sync templates). Pick one for each automation below.'
+                    : 'Step 1 — Save Pal Digital key and click Sync templates. Step 2 — Pick templates for each action below.')
                 ->schema([
                     Placeholder::make('synced_templates_table')
                         ->label('')
@@ -122,7 +127,7 @@ class ManageWhatsAppSettings extends Page
                         ->columnSpanFull(),
                 ]),
             Section::make('Attendance & punch — parent WhatsApp')
-                ->description('Step 3 — Match each real-world action to one Pal Digital template.')
+                ->description('Match each real-world action to one approved Meta template.')
                 ->icon(Heroicon::OutlinedChatBubbleLeftRight)
                 ->schema([
                     Placeholder::make('attendance_automation_guide')
@@ -212,7 +217,7 @@ class ManageWhatsAppSettings extends Page
                         ->minValue(0)
                         ->maxValue(60)
                         ->default(2)
-                        ->helperText('Pause before the next batch — reduces Pal Digital rate-limit risk on large sends.'),
+                        ->helperText('Pause before the next batch — reduces rate-limit risk on large sends.'),
                 ])
                 ->columns(2),
         ]);
@@ -234,14 +239,18 @@ class ManageWhatsAppSettings extends Page
 
         $this->refillWhatsAppForm($settings);
 
-        $body = $settings->hasValidStoredApiKey()
-            ? 'Campaign and automation settings are saved.'
-            : 'Settings saved. Paste a valid wsk. integration key to connect.';
+        $metaActive = app(WhatsAppProviderResolver::class)->metaOverridesPalDigital();
+
+        $body = $metaActive
+            ? 'Automation and campaign settings are saved. Sends route through Meta.'
+            : ($settings->hasValidStoredApiKey()
+                ? 'Campaign and automation settings are saved.'
+                : 'Settings saved. Paste a valid wsk. integration key to connect Pal Digital.');
 
         $body .= $settings->ignoredReplaceKeyNotice((bool) ($result['ignored_invalid_key_field'] ?? false));
 
         Notification::make()
-            ->title('WhatsApp settings saved')
+            ->title($metaActive ? 'Automations saved' : 'WhatsApp settings saved')
             ->body(trim($body))
             ->success()
             ->send();
@@ -350,12 +359,14 @@ class ManageWhatsAppSettings extends Page
                     Action::make('syncTemplates')
                         ->label('Sync templates')
                         ->icon('heroicon-o-arrow-path')
-                        ->action('syncTemplates'),
+                        ->action('syncTemplates')
+                        ->visible(fn (): bool => ! app(WhatsAppProviderResolver::class)->metaOverridesPalDigital()),
                     Action::make('testConnection')
                         ->label('Test connection')
                         ->icon('heroicon-o-signal')
                         ->color('gray')
-                        ->action('testConnection'),
+                        ->action('testConnection')
+                        ->visible(fn (): bool => ! app(WhatsAppProviderResolver::class)->metaOverridesPalDigital()),
                     Action::make('save')
                         ->label('Save settings')
                         ->submit('save')

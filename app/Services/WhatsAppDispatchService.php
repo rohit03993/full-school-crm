@@ -87,7 +87,7 @@ class WhatsAppDispatchService
         if ($metaTemplate === null) {
             return [
                 'status' => 'failed',
-                'error' => 'Template "'.$templateName.'" is not synced in Meta WhatsApp. Open Meta WhatsApp → Sync templates.',
+                'error' => 'Template "'.$templateName.'" is not synced in Meta. Open META WhatsApp → Connection & Setup and click Sync templates.',
                 'provider' => WhatsAppProvider::Meta->value,
             ];
         }

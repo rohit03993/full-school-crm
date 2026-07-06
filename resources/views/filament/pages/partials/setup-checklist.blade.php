@@ -59,9 +59,9 @@
         ],
         [
             'title' => '9. WhatsApp (optional)',
-            'body' => 'Pal Digital integration key, sync templates, campaign batch settings.',
-            'menu' => 'Settings → WhatsApp Settings',
-            'url' => \App\Filament\Pages\ManageWhatsAppSettings::getUrl(),
+            'body' => 'Connect Meta WhatsApp, sync templates, then map punch and campaign automations.',
+            'menu' => 'META WhatsApp → Connection & Setup',
+            'url' => \App\Filament\Pages\ManageMetaWhatsAppSettings::getUrl(),
             'done' => null,
         ],
     ];

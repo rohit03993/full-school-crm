@@ -123,7 +123,7 @@ class RunWhatsAppCampaign extends Command
                 $recipient->update([
                     'status' => WhatsAppRecipientStatus::Failed,
                     'template_params' => $templateParams,
-                    'error_message' => 'Template parameters could not be resolved. Open Setup → WhatsApp Settings, click Sync templates, then resend from marks import step 4.',
+                    'error_message' => 'Template parameters could not be resolved. Open META WhatsApp → Connection & Setup, sync templates, then resend from marks import step 4.',
                 ]);
                 $failed++;
 

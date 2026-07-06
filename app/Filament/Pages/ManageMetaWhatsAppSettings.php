@@ -47,7 +47,7 @@ class ManageMetaWhatsAppSettings extends Page
 
     protected static ?string $navigationLabel = 'Connection & Setup';
 
-    protected static ?string $title = 'Meta WhatsApp';
+    protected static ?string $title = 'Connection & Setup';
 
     protected static ?int $navigationSort = 10;
 
@@ -85,7 +85,7 @@ class ManageMetaWhatsAppSettings extends Page
                         ->columnSpanFull(),
                 ]),
             Section::make('Status')
-                ->description('Enable when credentials are saved. Pal Digital WhatsApp settings and automations are not changed by this toggle.')
+                ->description('Enable when credentials are saved. Automations and campaigns use Meta while this is on.')
                 ->schema([
                     Placeholder::make('routing_banner')
                         ->label('')
@@ -93,7 +93,7 @@ class ManageMetaWhatsAppSettings extends Page
                         ->columnSpanFull(),
                     Toggle::make('enabled')
                         ->label('Meta WhatsApp enabled')
-                        ->helperText('When on, all campaigns and automations (punch, post-call, homework, marks) send via Meta instead of Pal Digital. Template names must exist in Synced Meta templates.')
+                        ->helperText('When on, all campaigns and automations (punch, post-call, homework, marks) send via Meta. Template names must exist under Synced Meta templates below.')
                         ->columnSpanFull(),
                 ]),
             Section::make('Meta Cloud API credentials')
@@ -147,7 +147,7 @@ class ManageMetaWhatsAppSettings extends Page
                 ])
                 ->columns(2),
             Section::make('Recent Meta messages')
-                ->description('Last 15 messages sent or received via Meta. Full history is under Meta WhatsApp → Message log.')
+                ->description('Last 15 messages sent or received via Meta. Full history is under META WhatsApp → Message log.')
                 ->schema([
                     Placeholder::make('recent_messages_table')
                         ->label('')
@@ -155,7 +155,7 @@ class ManageMetaWhatsAppSettings extends Page
                         ->columnSpanFull(),
                 ]),
             Section::make('Synced Meta templates')
-                ->description('Approved templates from your WABA. Pal Digital template list is separate.')
+                ->description('Approved templates from your WABA. Map them to automations under META WhatsApp → Automations.')
                 ->schema([
                     Placeholder::make('synced_templates_table')
                         ->label('')
@@ -163,7 +163,7 @@ class ManageMetaWhatsAppSettings extends Page
                         ->columnSpanFull(),
                 ]),
             Section::make('Test send')
-                ->description('Send one approved template to your phone. Does not affect Pal Digital campaigns.')
+                ->description('Send one approved template to your phone to verify delivery.')
                 ->schema([
                     TextInput::make('test_phone')
                         ->label('Test mobile')
@@ -214,7 +214,7 @@ class ManageMetaWhatsAppSettings extends Page
 
         Notification::make()
             ->title('Meta WhatsApp settings saved')
-            ->body('Credentials saved. Pal Digital WhatsApp is unchanged.'.$settings->ignoredReplaceTokenNotice((bool) ($result['ignored_invalid_token_field'] ?? false)))
+            ->body('Credentials saved.'.$settings->ignoredReplaceTokenNotice((bool) ($result['ignored_invalid_token_field'] ?? false)))
             ->success()
             ->send();
     }

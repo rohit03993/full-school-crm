@@ -35,10 +35,10 @@ class WhatsAppProviderResolver
     public function configurationError(): string
     {
         if ($this->metaSettings->isEnabled()) {
-            return 'Meta WhatsApp is enabled but not configured. Open Meta WhatsApp → Connection & Setup and save credentials, or turn Meta off to use Pal Digital.';
+            return 'Meta WhatsApp is enabled but not configured. Open META WhatsApp → Connection & Setup and save credentials.';
         }
 
-        return 'WhatsApp is not configured. Open Setup → WhatsApp Settings (Pal Digital) or enable Meta WhatsApp.';
+        return 'WhatsApp is not configured. Open META WhatsApp → Connection & Setup, or enable legacy Pal Digital under Automations.';
     }
 
     public function activeProviderLabel(): string

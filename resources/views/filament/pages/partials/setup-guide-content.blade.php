@@ -68,7 +68,7 @@
                         ['Programmes', 'Academics → Courses', 'Classes, degrees, or coaching programmes you offer'],
                         ['Groups of students', 'Academics → Batches', 'Sections, batches, or semesters under a course'],
                         ['Receipt PDF text', 'Settings → Institute Settings', 'Footer line on fee receipts and ID cards'],
-                        ['WhatsApp', 'Settings → WhatsApp Settings', 'Connect your WhatsApp account and sync message templates'],
+                        ['WhatsApp', 'META WhatsApp → Connection & Setup', 'Meta credentials, sync templates, enable routing for campaigns and automations'],
                         ['Staff logins', 'Administration → Staff', 'Name, email, password, and role for each team member'],
                     ] as [$what, $menu, $purpose])
                         <tr>

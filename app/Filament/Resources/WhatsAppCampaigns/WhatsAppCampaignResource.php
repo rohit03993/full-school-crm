@@ -61,9 +61,9 @@ class WhatsAppCampaignResource extends Resource
 
     protected static ?string $pluralModelLabel = 'WhatsApp Campaigns';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 25;
 
-    protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_MESSAGING;
+    protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_META_WHATSAPP;
 
     public static function form(Schema $schema): Schema
     {

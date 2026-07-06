@@ -115,10 +115,16 @@ class InstituteSetup extends Page
                 'icon' => 'heroicon-o-finger-print',
             ],
             [
-                'label' => 'WhatsApp Settings',
-                'description' => 'Pal Digital API, sync templates, map IN/OUT/batch messages to actions.',
+                'label' => 'META WhatsApp — Connection',
+                'description' => 'Meta Cloud API credentials, webhook, sync templates, enable routing.',
+                'url' => ManageMetaWhatsAppSettings::getUrl(),
+                'icon' => 'heroicon-o-device-phone-mobile',
+            ],
+            [
+                'label' => 'META WhatsApp — Automations',
+                'description' => 'Map punch IN/OUT, post-call, and campaign batch settings to approved templates.',
                 'url' => ManageWhatsAppSettings::getUrl(),
-                'icon' => 'heroicon-o-chat-bubble-left-right',
+                'icon' => 'heroicon-o-cog-8-tooth',
             ],
             [
                 'label' => 'Institute Settings',

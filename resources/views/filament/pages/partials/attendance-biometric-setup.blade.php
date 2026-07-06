@@ -95,7 +95,7 @@
                     <p class="font-semibold text-gray-950 dark:text-white">Configure parent WhatsApp</p>
                     <p class="mt-0.5">
                         Choose separate templates for machine punches (<code>punch_logs</code>) and staff manual IN/OUT in
-                        <a href="{{ $whatsappSettingsUrl }}" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Settings → WhatsApp Settings</a>.
+                        <a href="{{ $whatsappSettingsUrl }}" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">META WhatsApp → Automations</a>.
                     </p>
                 </div>
             </li>

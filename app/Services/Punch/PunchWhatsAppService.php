@@ -48,7 +48,7 @@ class PunchWhatsAppService
             }
 
             if (! $this->punchAutosendEnabled()) {
-                return PunchWhatsAppOutcome::skipped('Turn on punch WhatsApp in Settings → WhatsApp Settings.');
+                return PunchWhatsAppOutcome::skipped('Turn on punch WhatsApp in META WhatsApp → Automations.');
             }
 
             $isManual = $staff !== null;
