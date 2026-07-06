@@ -7,6 +7,7 @@ use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Services\WhatsAppCampaignService;
 use App\Support\WhatsAppCampaignFormHelper;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -77,8 +78,19 @@ class CreateWhatsAppCampaign extends CreateRecord
 
     protected function afterCreate(): void
     {
-        if ((bool) data_get($this->form->getRawState(), 'send_immediately', true)) {
+        if (! (bool) data_get($this->form->getRawState(), 'send_immediately', true)) {
+            return;
+        }
+
+        try {
             app(WhatsAppCampaignService::class)->queueCampaign($this->record, Auth::user());
+        } catch (\RuntimeException $exception) {
+            Notification::make()
+                ->title('Campaign saved but not sent')
+                ->body($exception->getMessage())
+                ->danger()
+                ->persistent()
+                ->send();
         }
     }
 

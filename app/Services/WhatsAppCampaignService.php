@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
 use App\Models\WhatsAppTemplate;
+use App\Services\WhatsAppDispatchService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -80,6 +81,12 @@ class WhatsAppCampaignService
 
     public function queueCampaign(WhatsAppCampaign $campaign, User $sender): WhatsAppCampaign
     {
+        $dispatch = app(WhatsAppDispatchService::class);
+
+        if (! $dispatch->isConfigured()) {
+            throw new \RuntimeException($dispatch->configurationError());
+        }
+
         $this->refreshCampaignRecipients($campaign);
 
         $campaign->update([
@@ -95,6 +102,12 @@ class WhatsAppCampaignService
 
     public function sendSingle(Student $student, WhatsAppTemplate $template, User $sender, array $manualParams = []): WhatsAppCampaignRecipient
     {
+        $dispatch = app(WhatsAppDispatchService::class);
+
+        if (! $dispatch->isConfigured()) {
+            throw new \RuntimeException($dispatch->configurationError());
+        }
+
         $campaignVariables = null;
 
         if ($manualParams !== []) {

@@ -72,7 +72,9 @@ class RunWhatsAppCampaign extends Command
         }
 
         if (! $whatsapp->isConfigured()) {
-            $this->error($whatsapp->configurationError());
+            $error = $whatsapp->configurationError();
+            $this->error($error);
+            $this->failPendingRecipients($campaign, $error);
 
             return self::FAILURE;
         }
@@ -245,6 +247,38 @@ class RunWhatsAppCampaign extends Command
 
             return $ids;
         });
+    }
+
+    protected function failPendingRecipients(WhatsAppCampaign $campaign, string $error): void
+    {
+        $failed = WhatsAppCampaignRecipient::query()
+            ->where('whatsapp_campaign_id', $campaign->id)
+            ->whereIn('status', [WhatsAppRecipientStatus::Pending, WhatsAppRecipientStatus::Processing])
+            ->update([
+                'status' => WhatsAppRecipientStatus::Failed,
+                'error_message' => $error,
+            ]);
+
+        if ($failed === 0) {
+            return;
+        }
+
+        $failedCount = WhatsAppCampaignRecipient::query()
+            ->where('whatsapp_campaign_id', $campaign->id)
+            ->where('status', WhatsAppRecipientStatus::Failed)
+            ->count();
+
+        $sentCount = WhatsAppCampaignRecipient::query()
+            ->where('whatsapp_campaign_id', $campaign->id)
+            ->where('status', WhatsAppRecipientStatus::Sent)
+            ->count();
+
+        $campaign->update([
+            'status' => WhatsAppCampaignStatus::Completed,
+            'sent_count' => $sentCount,
+            'failed_count' => $failedCount,
+            'finished_at' => now(),
+        ]);
     }
 
     protected function maybePauseAfterChunk(int $processed): void

@@ -76,13 +76,22 @@ class ViewWhatsAppCampaign extends ViewRecord
                     WhatsAppCampaignStatus::Completed,
                 ], true))
                 ->action(function (): void {
-                    app(WhatsAppCampaignService::class)->queueCampaign($this->record, Auth::user());
+                    try {
+                        app(WhatsAppCampaignService::class)->queueCampaign($this->record, Auth::user());
 
-                    Notification::make()
-                        ->title('Campaign queued')
-                        ->body('Messages are being sent in batches. Check progress on this page.')
-                        ->success()
-                        ->send();
+                        Notification::make()
+                            ->title('Campaign queued')
+                            ->body('Messages are being sent in batches. Check progress on this page.')
+                            ->success()
+                            ->send();
+                    } catch (\RuntimeException $exception) {
+                        Notification::make()
+                            ->title('Cannot send campaign')
+                            ->body($exception->getMessage())
+                            ->danger()
+                            ->persistent()
+                            ->send();
+                    }
 
                     $this->record->refresh();
                 }),

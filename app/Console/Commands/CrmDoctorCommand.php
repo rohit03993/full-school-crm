@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Enums\WhatsAppRecipientStatus;
 use App\Models\WhatsAppCampaign;
+use App\Services\WhatsAppProviderResolver;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
@@ -91,6 +92,20 @@ class CrmDoctorCommand extends Command
         $this->components->info('Queue & WhatsApp campaigns');
         $queueConnection = (string) config('queue.default');
         $this->line("QUEUE_CONNECTION: {$queueConnection}");
+
+        $whatsapp = app(WhatsAppProviderResolver::class)->diagnostics();
+        $this->line('Active provider: '.($whatsapp['active_provider_label'] ?? 'Not configured'));
+        $this->line('Meta enabled: '.($whatsapp['meta_enabled'] ? 'yes' : 'no'));
+        $this->line('Meta configured: '.($whatsapp['meta_configured'] ? 'yes' : 'no'));
+        $this->line('Meta access token saved: '.($whatsapp['meta_has_token'] ? 'yes' : 'no'));
+        $this->line('Pal Digital configured: '.($whatsapp['pal_digital_configured'] ? 'yes' : 'no'));
+
+        if (! ($whatsapp['is_configured'] ?? false)) {
+            $this->components->error((string) ($whatsapp['configuration_error'] ?? 'WhatsApp is not configured.'));
+            $ok = false;
+        } else {
+            $this->line('OK WhatsApp routing is active');
+        }
 
         if ($queueConnection !== 'sync' && Schema::hasTable('jobs')) {
             $pendingJobs = (int) DB::table('jobs')->count();

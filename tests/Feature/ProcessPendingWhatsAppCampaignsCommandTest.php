@@ -26,7 +26,7 @@ class ProcessPendingWhatsAppCampaignsCommandTest extends TestCase
             'services.pal_digital.api_key' => 'wsk.550e8400-e29b-41d4-a716-446655440000.secretpart',
             'services.pal_digital.api_url' => 'https://wa.paldigital.in/api/v1/campaign/t1/api/v2',
         ]);
-        Setting::setValue('whatsapp.enabled', '1', 'whatsapp');
+        Setting::setValue('meta_whatsapp.enabled', '0', 'meta_whatsapp');
 
         Http::fake([
             'https://wa.paldigital.in/*' => Http::response(['status' => 'success'], 200),
