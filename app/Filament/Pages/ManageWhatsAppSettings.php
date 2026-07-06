@@ -117,12 +117,12 @@ class ManageWhatsAppSettings extends Page
                         ->columnSpanFull(),
                 ])
                 ->columns(2),
-            Section::make('Templates for automations')
-                ->description('Templates synced from Meta (Connection & Setup → Sync templates). Pick one for each automation below.')
+            Section::make('Live campaigns for automations')
+                ->description(fn (): string => 'Pick a **live** campaign from '.CrmNavigation::whatsAppMenu('Live campaigns').'. Each campaign links to an approved Meta template.')
                 ->schema([
-                    Placeholder::make('synced_templates_table')
+                    Placeholder::make('live_campaigns_notice')
                         ->label('')
-                        ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderSyncedTemplatesTable())
+                        ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderLiveCampaignsNotice())
                         ->columnSpanFull(),
                 ]),
             Section::make('Attendance & punch — parent WhatsApp')
@@ -141,16 +141,16 @@ class ManageWhatsAppSettings extends Page
                         ->label('')
                         ->content(new HtmlString('<p class="text-sm font-bold text-gray-950 dark:text-white">From biometric device (punch_logs)</p><p class="mt-0.5 text-xs text-gray-500">EasyTimePro writes to MySQL — CRM reads automatically.</p>'))
                         ->columnSpanFull(),
-                    Select::make('punch_in_autosend_template_id')
+                    Select::make('punch_in_autosend_live_campaign_id')
                         ->label('Biometric check-in (IN)')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
                         ->helperText('When student punches IN at the gate/device.'),
-                    Select::make('punch_out_autosend_template_id')
+                    Select::make('punch_out_autosend_live_campaign_id')
                         ->label('Biometric check-out (OUT)')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
@@ -159,31 +159,31 @@ class ManageWhatsAppSettings extends Page
                         ->label('')
                         ->content(new HtmlString('<p class="mt-2 text-sm font-bold text-gray-950 dark:text-white">From staff on Attendance screen</p><p class="mt-0.5 text-xs text-gray-500">Manual IN, Manual OUT, or batch IN/OUT buttons.</p>'))
                         ->columnSpanFull(),
-                    Select::make('punch_manual_in_autosend_template_id')
+                    Select::make('punch_manual_in_autosend_live_campaign_id')
                         ->label('Manual check-in (IN)')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Staff marks IN. Leave blank to reuse Biometric IN template.'),
-                    Select::make('punch_manual_out_autosend_template_id')
+                        ->helperText('Staff marks IN. Leave blank to reuse Biometric IN campaign.'),
+                    Select::make('punch_manual_out_autosend_live_campaign_id')
                         ->label('Manual check-out (OUT)')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Staff marks OUT. Leave blank to reuse Biometric OUT template.'),
+                        ->helperText('Staff marks OUT. Leave blank to reuse Biometric OUT campaign.'),
                     Toggle::make('attendance_autosend_enabled')
                         ->label('Legacy: batch-save template (optional)')
                         ->helperText('Old roll-call Present flow only. Manual IN/OUT on Attendance uses the four punch templates above.')
                         ->columnSpanFull(),
-                    Select::make('attendance_autosend_template_id')
-                        ->label('Fallback attendance template')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                    Select::make('attendance_autosend_live_campaign_id')
+                        ->label('Fallback attendance campaign')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Used when a specific IN/OUT template (machine or manual) is left blank.'),
+                        ->helperText('Used when a specific IN/OUT campaign is left blank.'),
                 ])
                 ->columns(2),
             Section::make('Post-call auto message')
@@ -192,9 +192,9 @@ class ManageWhatsAppSettings extends Page
                 ->schema([
                     Toggle::make('postcall_autosend_enabled')
                         ->label('Enable post-call WhatsApp'),
-                    Select::make('postcall_autosend_template_id')
-                        ->label('Template')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                    Select::make('postcall_autosend_live_campaign_id')
+                        ->label('Live campaign')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false),

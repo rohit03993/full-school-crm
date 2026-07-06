@@ -158,7 +158,7 @@ class ManageMetaWhatsAppSettings extends Page
                         ->columnSpanFull(),
                 ]),
             Section::make('Synced Meta templates')
-                ->description(fn (): string => 'Approved templates from this institute\'s WABA. Map them under '.CrmNavigation::whatsAppMenu('Automations').'.')
+                ->description(fn (): string => 'Create and manage templates under '.CrmNavigation::whatsAppMenu('Templates').'. Map approved templates under '.CrmNavigation::whatsAppMenu('Automations').'.')
                 ->schema([
                     Placeholder::make('synced_templates_table')
                         ->label('')

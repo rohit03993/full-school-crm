@@ -34,16 +34,11 @@ class PostCallWhatsAppService
                 return;
             }
 
-            $templateId = Setting::getValue('whatsapp.postcall_autosend_template_id');
-
-            if (! $templateId) {
-                return;
-            }
-
-            $template = WhatsAppTemplate::query()
-                ->whereKey($templateId)
-                ->where('is_active', true)
-                ->first();
+            $settings = app(WhatsAppSettingsService::class);
+            $template = $settings->resolveAutomationTemplate(
+                Setting::getValue('whatsapp.postcall_autosend_live_campaign_id'),
+                Setting::getValue('whatsapp.postcall_autosend_template_id'),
+            );
 
             if (! $template) {
                 return;

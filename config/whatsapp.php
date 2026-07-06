@@ -26,4 +26,6 @@ return [
 
     'homework_template_name' => env('WHATSAPP_HOMEWORK_TEMPLATE', 'homework_api'),
 
+    'integration_api_key' => env('WHATSAPP_INTEGRATION_API_KEY'),
+
 ];

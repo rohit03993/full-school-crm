@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Webhooks\MetaWhatsAppWebhookController;
+use App\Http\Controllers\Api\AisensyCampaignTriggerController;
 use App\Http\Controllers\Admin\DocumentDownloadController;
 use App\Http\Controllers\Admin\IdCardDownloadController;
 use App\Http\Controllers\Admin\PaymentProofDownloadController;
@@ -25,6 +26,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::match(['get', 'post'], '/webhooks/meta/whatsapp', MetaWhatsAppWebhookController::class)
     ->name('webhooks.meta.whatsapp');
+
+Route::post('/campaign/t1/api/v2', AisensyCampaignTriggerController::class)
+    ->name('api.aisensy.campaign.trigger.legacy');
 
 Route::prefix('pwa')->name('pwa.')->group(function (): void {
     Route::get('/manifest/{context}', ManifestController::class)

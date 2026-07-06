@@ -19,12 +19,23 @@ use App\Models\WhatsAppTemplate;
 use App\Services\AttendanceWhatsAppService;
 use App\Services\WhatsAppTemplateParamResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class AttendanceWhatsAppServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-test-token'), 'meta_whatsapp');
+        Setting::flushValueCache();
+    }
 
     public function test_queues_whatsapp_for_present_students_when_enabled(): void
     {

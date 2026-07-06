@@ -131,46 +131,69 @@ class PunchWhatsAppService
 
     private function templateForState(string $state, bool $isManual): ?WhatsAppTemplate
     {
-        $templateId = $isManual
-            ? $this->manualTemplateIdForState($state)
-            : $this->biometricTemplateIdForState($state);
+        $settings = app(\App\Services\WhatsAppSettingsService::class);
 
-        if (! $templateId) {
-            $templateId = $isManual
-                ? $this->biometricTemplateIdForState($state)
+        $liveCampaignId = $isManual
+            ? $this->manualLiveCampaignIdForState($state)
+            : $this->biometricLiveCampaignIdForState($state);
+
+        if (! $liveCampaignId) {
+            $liveCampaignId = $isManual
+                ? $this->biometricLiveCampaignIdForState($state)
                 : null;
+        }
+
+        if (! $liveCampaignId) {
+            $liveCampaignId = Setting::getValue('whatsapp.attendance_autosend_live_campaign_id');
+        }
+
+        $legacyTemplateId = $this->legacyTemplateIdForState($state, $isManual);
+
+        return $settings->resolveAutomationTemplate(
+            filled($liveCampaignId) ? (string) $liveCampaignId : null,
+            filled($legacyTemplateId) ? (string) $legacyTemplateId : null,
+        );
+    }
+
+    private function biometricLiveCampaignIdForState(string $state): ?string
+    {
+        $id = $state === 'OUT'
+            ? Setting::getValue('whatsapp.punch_out_autosend_live_campaign_id')
+            : Setting::getValue('whatsapp.punch_in_autosend_live_campaign_id');
+
+        return filled($id) ? (string) $id : null;
+    }
+
+    private function manualLiveCampaignIdForState(string $state): ?string
+    {
+        $id = $state === 'OUT'
+            ? Setting::getValue('whatsapp.punch_manual_out_autosend_live_campaign_id')
+            : Setting::getValue('whatsapp.punch_manual_in_autosend_live_campaign_id');
+
+        return filled($id) ? (string) $id : null;
+    }
+
+    private function legacyTemplateIdForState(string $state, bool $isManual): ?string
+    {
+        $templateId = $isManual
+            ? ($state === 'OUT'
+                ? Setting::getValue('whatsapp.punch_manual_out_autosend_template_id')
+                : Setting::getValue('whatsapp.punch_manual_in_autosend_template_id'))
+            : ($state === 'OUT'
+                ? Setting::getValue('whatsapp.punch_out_autosend_template_id')
+                : Setting::getValue('whatsapp.punch_in_autosend_template_id'));
+
+        if (! $templateId && $isManual) {
+            $templateId = $state === 'OUT'
+                ? Setting::getValue('whatsapp.punch_out_autosend_template_id')
+                : Setting::getValue('whatsapp.punch_in_autosend_template_id');
         }
 
         if (! $templateId) {
             $templateId = Setting::getValue('whatsapp.attendance_autosend_template_id');
         }
 
-        if (! $templateId) {
-            return null;
-        }
-
-        return WhatsAppTemplate::query()
-            ->whereKey($templateId)
-            ->where('is_active', true)
-            ->first();
-    }
-
-    private function biometricTemplateIdForState(string $state): ?string
-    {
-        $id = $state === 'OUT'
-            ? Setting::getValue('whatsapp.punch_out_autosend_template_id')
-            : Setting::getValue('whatsapp.punch_in_autosend_template_id');
-
-        return filled($id) ? (string) $id : null;
-    }
-
-    private function manualTemplateIdForState(string $state): ?string
-    {
-        $id = $state === 'OUT'
-            ? Setting::getValue('whatsapp.punch_manual_out_autosend_template_id')
-            : Setting::getValue('whatsapp.punch_manual_in_autosend_template_id');
-
-        return filled($id) ? (string) $id : null;
+        return filled($templateId) ? (string) $templateId : null;
     }
 
     private function alreadySent(string $roll, string $date, string $time, string $state, string $phone): bool

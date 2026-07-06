@@ -6,6 +6,7 @@ use App\Filament\Pages\AttendancePage;
 use App\Filament\Pages\ManageAttendanceBiometricPage;
 use App\Models\Setting;
 use App\Models\WhatsAppTemplate;
+use App\Support\CrmNavigation;
 use Illuminate\Support\HtmlString;
 
 class WhatsAppSettingsService
@@ -23,14 +24,14 @@ class WhatsAppSettingsService
             'pal_digital_api_key' => '',
             'pal_digital_api_url' => Setting::getValue('pal_digital.api_url', config('services.pal_digital.api_url')),
             'postcall_autosend_enabled' => (bool) Setting::getValue('whatsapp.postcall_autosend_enabled', false),
-            'postcall_autosend_template_id' => Setting::getValue('whatsapp.postcall_autosend_template_id'),
+            'postcall_autosend_live_campaign_id' => Setting::getValue('whatsapp.postcall_autosend_live_campaign_id'),
             'attendance_autosend_enabled' => (bool) Setting::getValue('whatsapp.attendance_autosend_enabled', false),
-            'attendance_autosend_template_id' => Setting::getValue('whatsapp.attendance_autosend_template_id'),
+            'attendance_autosend_live_campaign_id' => Setting::getValue('whatsapp.attendance_autosend_live_campaign_id'),
             'punch_autosend_enabled' => (bool) Setting::getValue('whatsapp.punch_autosend_enabled', true),
-            'punch_in_autosend_template_id' => Setting::getValue('whatsapp.punch_in_autosend_template_id'),
-            'punch_out_autosend_template_id' => Setting::getValue('whatsapp.punch_out_autosend_template_id'),
-            'punch_manual_in_autosend_template_id' => Setting::getValue('whatsapp.punch_manual_in_autosend_template_id'),
-            'punch_manual_out_autosend_template_id' => Setting::getValue('whatsapp.punch_manual_out_autosend_template_id'),
+            'punch_in_autosend_live_campaign_id' => Setting::getValue('whatsapp.punch_in_autosend_live_campaign_id'),
+            'punch_out_autosend_live_campaign_id' => Setting::getValue('whatsapp.punch_out_autosend_live_campaign_id'),
+            'punch_manual_in_autosend_live_campaign_id' => Setting::getValue('whatsapp.punch_manual_in_autosend_live_campaign_id'),
+            'punch_manual_out_autosend_live_campaign_id' => Setting::getValue('whatsapp.punch_manual_out_autosend_live_campaign_id'),
             'campaign_batch_size' => (int) Setting::getValue('whatsapp.campaign_batch_size', config('whatsapp.batch_size', 10)),
             'campaign_batch_delay_seconds' => (int) Setting::getValue(
                 'whatsapp.campaign_next_batch_delay_seconds',
@@ -189,8 +190,8 @@ class WhatsAppSettingsService
             'whatsapp',
         );
         Setting::setValue(
-            'whatsapp.postcall_autosend_template_id',
-            filled($data['postcall_autosend_template_id'] ?? null) ? (string) $data['postcall_autosend_template_id'] : '',
+            'whatsapp.postcall_autosend_live_campaign_id',
+            filled($data['postcall_autosend_live_campaign_id'] ?? null) ? (string) $data['postcall_autosend_live_campaign_id'] : '',
             'whatsapp',
         );
         Setting::setValue(
@@ -199,8 +200,8 @@ class WhatsAppSettingsService
             'whatsapp',
         );
         Setting::setValue(
-            'whatsapp.attendance_autosend_template_id',
-            filled($data['attendance_autosend_template_id'] ?? null) ? (string) $data['attendance_autosend_template_id'] : '',
+            'whatsapp.attendance_autosend_live_campaign_id',
+            filled($data['attendance_autosend_live_campaign_id'] ?? null) ? (string) $data['attendance_autosend_live_campaign_id'] : '',
             'whatsapp',
         );
         Setting::setValue(
@@ -209,23 +210,23 @@ class WhatsAppSettingsService
             'whatsapp',
         );
         Setting::setValue(
-            'whatsapp.punch_in_autosend_template_id',
-            filled($data['punch_in_autosend_template_id'] ?? null) ? (string) $data['punch_in_autosend_template_id'] : '',
+            'whatsapp.punch_in_autosend_live_campaign_id',
+            filled($data['punch_in_autosend_live_campaign_id'] ?? null) ? (string) $data['punch_in_autosend_live_campaign_id'] : '',
             'whatsapp',
         );
         Setting::setValue(
-            'whatsapp.punch_out_autosend_template_id',
-            filled($data['punch_out_autosend_template_id'] ?? null) ? (string) $data['punch_out_autosend_template_id'] : '',
+            'whatsapp.punch_out_autosend_live_campaign_id',
+            filled($data['punch_out_autosend_live_campaign_id'] ?? null) ? (string) $data['punch_out_autosend_live_campaign_id'] : '',
             'whatsapp',
         );
         Setting::setValue(
-            'whatsapp.punch_manual_in_autosend_template_id',
-            filled($data['punch_manual_in_autosend_template_id'] ?? null) ? (string) $data['punch_manual_in_autosend_template_id'] : '',
+            'whatsapp.punch_manual_in_autosend_live_campaign_id',
+            filled($data['punch_manual_in_autosend_live_campaign_id'] ?? null) ? (string) $data['punch_manual_in_autosend_live_campaign_id'] : '',
             'whatsapp',
         );
         Setting::setValue(
-            'whatsapp.punch_manual_out_autosend_template_id',
-            filled($data['punch_manual_out_autosend_template_id'] ?? null) ? (string) $data['punch_manual_out_autosend_template_id'] : '',
+            'whatsapp.punch_manual_out_autosend_live_campaign_id',
+            filled($data['punch_manual_out_autosend_live_campaign_id'] ?? null) ? (string) $data['punch_manual_out_autosend_live_campaign_id'] : '',
             'whatsapp',
         );
         Setting::setValue(
@@ -252,6 +253,39 @@ class WhatsAppSettingsService
         }
 
         return ' The replace-key box had invalid text (not a wsk. key) — it was cleared and your saved key was kept.';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function liveCampaignOptions(): array
+    {
+        return \App\Models\WhatsAppLiveCampaign::query()
+            ->with('metaTemplate')
+            ->where('status', \App\Enums\WhatsAppLiveCampaignStatus::Live)
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (\App\Models\WhatsAppLiveCampaign $campaign): array => [
+                $campaign->id => $campaign->name.' → '.($campaign->metaTemplate?->name ?? 'template'),
+            ])
+            ->all();
+    }
+
+    public function resolveAutomationTemplate(?string $liveCampaignId, ?string $legacyTemplateId = null): ?WhatsAppTemplate
+    {
+        $templateId = app(WhatsAppLiveCampaignService::class)->whatsAppTemplateIdForCampaign(
+            filled($liveCampaignId) ? (int) $liveCampaignId : null,
+        );
+
+        if ($templateId) {
+            return WhatsAppTemplate::query()->whereKey($templateId)->where('is_active', true)->first();
+        }
+
+        if (filled($legacyTemplateId)) {
+            return WhatsAppTemplate::query()->whereKey($legacyTemplateId)->where('is_active', true)->first();
+        }
+
+        return null;
     }
 
     /**
@@ -307,6 +341,28 @@ class WhatsAppSettingsService
             .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Staff marks A or L</td>'
             .'<td class="px-4 py-3 text-gray-500 dark:text-gray-400">Not sent automatically</td></tr>'
             .'</tbody></table></div></div>'
+        );
+    }
+
+    public function renderLiveCampaignsNotice(): HtmlString
+    {
+        $liveCount = \App\Models\WhatsAppLiveCampaign::query()
+            ->where('status', \App\Enums\WhatsAppLiveCampaignStatus::Live)
+            ->count();
+
+        if ($liveCount === 0) {
+            return new HtmlString(
+                '<p class="text-sm text-warning-600 dark:text-warning-400">No live campaigns yet. Create templates under '
+                .e(CrmNavigation::whatsAppMenu('Templates'))
+                .', then create campaigns under '
+                .e(CrmNavigation::whatsAppMenu('Live campaigns'))
+                .' and click <strong>Go live</strong>.</p>'
+            );
+        }
+
+        return new HtmlString(
+            '<p class="text-sm text-gray-600 dark:text-gray-300">'
+            .$liveCount.' live campaign(s) available. Each automation below must pick one of these — the linked template and student name mapping are used when sending.</p>'
         );
     }
 

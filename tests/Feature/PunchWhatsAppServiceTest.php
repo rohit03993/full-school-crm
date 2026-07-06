@@ -11,11 +11,22 @@ use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppTemplate;
 use App\Services\Punch\PunchWhatsAppService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 use Tests\TestCase;
 
 class PunchWhatsAppServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-test-token'), 'meta_whatsapp');
+        Setting::flushValueCache();
+    }
 
     public function test_biometric_in_uses_machine_template(): void
     {

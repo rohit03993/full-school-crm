@@ -211,6 +211,43 @@ class MetaWhatsAppService
     }
 
     /**
+     * @param  array<string, mixed>  $body
+     * @return array{status: string, data?: array<string, mixed>, error?: string}
+     */
+    public function createMessageTemplate(array $body): array
+    {
+        if (! filled($this->accessToken())) {
+            return ['status' => 'failed', 'error' => 'Access token is not configured.'];
+        }
+
+        if (blank($this->wabaId())) {
+            return ['status' => 'failed', 'error' => 'WhatsApp Business Account ID (WABA) is required to create templates.'];
+        }
+
+        try {
+            $response = Http::timeout(60)
+                ->withToken((string) $this->accessToken())
+                ->acceptJson()
+                ->post($this->graphUrl($this->wabaId().'/message_templates'), $body);
+
+            $data = $response->json();
+
+            if ($response->successful() && is_array($data)) {
+                return ['status' => 'success', 'data' => $data];
+            }
+
+            return [
+                'status' => 'failed',
+                'error' => $this->parseApiError($data, $response->body()),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Meta WhatsApp template create failed', ['error' => $e->getMessage()]);
+
+            return ['status' => 'failed', 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
      * @return array{status: string, items?: list<array<string, mixed>>, error?: string}
      */
     public function fetchTemplates(): array

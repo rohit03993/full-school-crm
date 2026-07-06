@@ -131,18 +131,96 @@ class MetaWhatsAppServiceTest extends TestCase
         $result = app(MetaWhatsAppTemplateSyncService::class)->sync();
 
         $this->assertSame('success', $result['status']);
-        $this->assertSame(1, $result['synced']);
+        $this->assertSame(2, $result['synced']);
+        $this->assertSame(1, $result['approved']);
         $this->assertDatabaseHas('meta_whatsapp_templates', [
             'name' => 'parent_checkin',
             'language' => 'en',
             'param_count' => 2,
+            'status' => 'APPROVED',
+        ]);
+        $this->assertDatabaseHas('meta_whatsapp_templates', [
+            'name' => 'draft_template',
+            'language' => 'en',
+            'status' => 'PENDING',
         ]);
         $this->assertDatabaseHas('whatsapp_templates', [
             'name' => 'parent_checkin',
             'param_count' => 2,
         ]);
-        $this->assertDatabaseMissing('meta_whatsapp_templates', [
+        $this->assertDatabaseMissing('whatsapp_templates', [
             'name' => 'draft_template',
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_create_message_template_posts_to_meta(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.waba_id' => 'waba-1',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/waba-1/message_templates' => Http::response([
+                'id' => 'tpl-123',
+                'status' => 'PENDING',
+                'category' => 'UTILITY',
+            ], 200),
+        ]);
+
+        $payload = \App\Support\MetaWhatsAppTemplateBuilder::buildCreatePayload(
+            'parent_checkin',
+            'en',
+            'UTILITY',
+            'Hello {{1}}, checked in at {{2}}.',
+            bodyExamplesCsv: 'Rohit, 9 AM',
+        );
+
+        $result = app(MetaWhatsAppService::class)->createMessageTemplate($payload);
+
+        $this->assertSame('success', $result['status']);
+        $this->assertSame('PENDING', $result['data']['status']);
+
+        Http::assertSent(function ($request): bool {
+            $json = $request->data();
+
+            return $request->url() === 'https://graph.facebook.com/v20.0/waba-1/message_templates'
+                && $json['name'] === 'parent_checkin'
+                && $json['components'][0]['text'] === 'Hello {{1}}, checked in at {{2}}.';
+        });
+    }
+
+    public function test_submit_service_stores_pending_template(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.waba_id' => 'waba-1',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/waba-1/message_templates' => Http::response([
+                'id' => 'tpl-123',
+                'status' => 'PENDING',
+                'category' => 'UTILITY',
+            ], 200),
+        ]);
+
+        $template = app(\App\Services\MetaWhatsAppTemplateSubmitService::class)->submit([
+            'name' => 'parent_checkin',
+            'language' => 'en',
+            'category' => 'UTILITY',
+            'body_text' => 'Hello {{1}}, checked in at {{2}}.',
+            'body_examples_csv' => 'Rohit, 9 AM',
+        ]);
+
+        $this->assertSame('PENDING', $template->status);
+        $this->assertSame(2, $template->param_count);
+        $this->assertDatabaseHas('meta_whatsapp_templates', [
+            'name' => 'parent_checkin',
+            'status' => 'PENDING',
         ]);
     }
 }

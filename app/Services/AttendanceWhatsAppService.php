@@ -35,16 +35,11 @@ class AttendanceWhatsAppService
                 return null;
             }
 
-            $templateId = Setting::getValue('whatsapp.attendance_autosend_template_id');
-
-            if (! $templateId) {
-                return null;
-            }
-
-            $template = WhatsAppTemplate::query()
-                ->whereKey($templateId)
-                ->where('is_active', true)
-                ->first();
+            $settings = app(WhatsAppSettingsService::class);
+            $template = $settings->resolveAutomationTemplate(
+                Setting::getValue('whatsapp.attendance_autosend_live_campaign_id'),
+                Setting::getValue('whatsapp.attendance_autosend_template_id'),
+            );
 
             if (! $template) {
                 return null;
