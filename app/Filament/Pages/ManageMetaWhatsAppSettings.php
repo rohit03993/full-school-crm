@@ -11,6 +11,7 @@ use App\Services\MetaWhatsAppSettingsService;
 use App\Services\MetaWhatsAppTemplateSyncService;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
+use App\Support\CrmNotification;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -25,6 +26,7 @@ use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Icons\Heroicon;
 use UnitEnum;
 
@@ -182,10 +184,27 @@ class ManageMetaWhatsAppSettings extends Page
                             ->all())
                         ->searchable()
                         ->native(false)
+                        ->live()
+                        ->afterStateUpdated(function (?string $state, Set $set): void {
+                            if (blank($state)) {
+                                return;
+                            }
+
+                            $language = MetaWhatsAppTemplate::query()
+                                ->where('name', $state)
+                                ->where('is_active', true)
+                                ->orderByDesc('synced_at')
+                                ->value('language');
+
+                            if (filled($language)) {
+                                $set('test_template_language', $language);
+                            }
+                        })
                         ->nullable(),
                     TextInput::make('test_template_language')
                         ->label('Template language')
-                        ->default('en'),
+                        ->default('en')
+                        ->helperText('Must match Meta exactly — e.g. en_US, not en. Auto-filled when you pick a template.'),
                     TextInput::make('test_template_param_1')
                         ->label('Parameter 1'),
                     TextInput::make('test_template_param_2')
@@ -249,12 +268,12 @@ class ManageMetaWhatsAppSettings extends Page
         $result = $sync->sync();
         $this->refillForm($settings);
 
-        Notification::make()
-            ->title($result['synced'].' Meta template(s) synced')
-            ->body($result['message'].$settings->ignoredReplaceTokenNotice((bool) ($saved['ignored_invalid_token_field'] ?? false)))
-            ->success($result['status'] === 'success')
-            ->warning($result['status'] !== 'success')
-            ->send();
+        CrmNotification::sendOutcome(
+            $result['synced'].' Meta template(s) synced',
+            $result['message'].$settings->ignoredReplaceTokenNotice((bool) ($saved['ignored_invalid_token_field'] ?? false)),
+            $result['status'] === 'success',
+            warningOnFailure: true,
+        );
     }
 
     public function testConnection(
@@ -276,12 +295,11 @@ class ManageMetaWhatsAppSettings extends Page
         $result = $meta->validateConnection();
         $this->refillForm($settings);
 
-        Notification::make()
-            ->title($result['status'] === 'success' ? 'Meta connection OK' : 'Connection check failed')
-            ->body($result['message'].$settings->ignoredReplaceTokenNotice((bool) ($saved['ignored_invalid_token_field'] ?? false)))
-            ->success($result['status'] === 'success')
-            ->danger($result['status'] !== 'success')
-            ->send();
+        CrmNotification::sendOutcome(
+            $result['status'] === 'success' ? 'Meta connection OK' : 'Connection check failed',
+            $result['message'].$settings->ignoredReplaceTokenNotice((bool) ($saved['ignored_invalid_token_field'] ?? false)),
+            $result['status'] === 'success',
+        );
     }
 
     public function sendTestMessage(
@@ -317,8 +335,22 @@ class ManageMetaWhatsAppSettings extends Page
 
         $template = MetaWhatsAppTemplate::query()
             ->where('name', $templateName)
-            ->where('language', $language)
-            ->first();
+            ->where('is_active', true)
+            ->when(
+                filled($language),
+                fn ($query) => $query->where('language', $language),
+            )
+            ->orderByDesc('synced_at')
+            ->first()
+            ?? MetaWhatsAppTemplate::query()
+                ->where('name', $templateName)
+                ->where('is_active', true)
+                ->orderByDesc('synced_at')
+                ->first();
+
+        if ($template) {
+            $language = $template->language;
+        }
 
         $params = $settings->testTemplateParams();
         $result = $meta->sendTemplate(
@@ -331,14 +363,13 @@ class ManageMetaWhatsAppSettings extends Page
 
         $this->refillForm($settings);
 
-        Notification::make()
-            ->title($result['status'] === 'success' ? 'Test message sent' : 'Test send failed')
-            ->body($result['status'] === 'success'
+        CrmNotification::sendOutcome(
+            $result['status'] === 'success' ? 'Test message sent' : 'Test send failed',
+            $result['status'] === 'success'
                 ? 'Check WhatsApp on '.$phone.'. Message ID: '.($result['message_id'] ?? 'n/a')
-                : (string) ($result['error'] ?? 'Unknown error'))
-            ->success($result['status'] === 'success')
-            ->danger($result['status'] !== 'success')
-            ->send();
+                : (string) ($result['error'] ?? 'Unknown error'),
+            $result['status'] === 'success',
+        );
     }
 
     protected function refillForm(MetaWhatsAppSettingsService $settings): void

@@ -11,6 +11,7 @@ use App\Services\WhatsAppProviderResolver;
 use App\Services\WhatsAppSettingsService;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
+use App\Support\CrmNotification;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -288,12 +289,12 @@ class ManageWhatsAppSettings extends Page
 
         $body = $result['message'].$settings->ignoredReplaceKeyNotice((bool) ($saved['ignored_invalid_key_field'] ?? false));
 
-        Notification::make()
-            ->title($result['synced'].' template(s) synced')
-            ->body(trim($body))
-            ->success($result['status'] === 'success')
-            ->warning($result['status'] !== 'success')
-            ->send();
+        CrmNotification::sendOutcome(
+            $result['synced'].' template(s) synced',
+            trim($body),
+            $result['status'] === 'success',
+            warningOnFailure: true,
+        );
     }
 
     public function testConnection(
@@ -328,12 +329,11 @@ class ManageWhatsAppSettings extends Page
 
         $body = $result['message'].$settings->ignoredReplaceKeyNotice((bool) ($saved['ignored_invalid_key_field'] ?? false));
 
-        Notification::make()
-            ->title($result['status'] === 'success' ? 'Connection OK' : 'Connection check failed')
-            ->body(trim($body))
-            ->success($result['status'] === 'success')
-            ->danger($result['status'] !== 'success')
-            ->send();
+        CrmNotification::sendOutcome(
+            $result['status'] === 'success' ? 'Connection OK' : 'Connection check failed',
+            trim($body),
+            $result['status'] === 'success',
+        );
     }
 
     protected function refillWhatsAppForm(WhatsAppSettingsService $settings): void

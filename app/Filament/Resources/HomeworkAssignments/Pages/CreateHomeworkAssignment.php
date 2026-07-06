@@ -6,7 +6,7 @@ use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\HomeworkAssignments\HomeworkAssignmentResource;
 use App\Models\HomeworkAssignment;
 use App\Services\HomeworkAssignmentService;
-use Filament\Notifications\Notification;
+use App\Support\CrmNotification;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -45,12 +45,12 @@ class CreateHomeworkAssignment extends CreateRecord
         ]);
 
         if ($assignment->whatsapp_sent_count > 0 || $assignment->whatsapp_failed_count > 0) {
-            Notification::make()
-                ->title('WhatsApp notifications')
-                ->body($assignment->whatsapp_sent_count.' sent, '.$assignment->whatsapp_failed_count.' failed.')
-                ->success($assignment->whatsapp_failed_count === 0)
-                ->warning($assignment->whatsapp_failed_count > 0)
-                ->send();
+            CrmNotification::sendOutcome(
+                'WhatsApp notifications',
+                $assignment->whatsapp_sent_count.' sent, '.$assignment->whatsapp_failed_count.' failed.',
+                $assignment->whatsapp_failed_count === 0,
+                warningOnFailure: true,
+            );
         }
 
         return $assignment;
