@@ -40,7 +40,8 @@ class StudentWhatsAppThreadService
                 statusLabel: $row->status?->label() ?? 'Pending',
                 at: $row->created_at,
                 templateName: $row->campaign?->template?->name,
-                provider: data_get($row->provider_response, 'provider', 'pal_digital'),
+                provider: 'meta',
+                errorMessage: $row->status?->value === 'failed' ? (string) ($row->error_message ?? '') : null,
             ));
 
         $metaMessages = $this->metaMessagesSupported()

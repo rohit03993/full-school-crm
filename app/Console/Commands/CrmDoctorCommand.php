@@ -99,7 +99,6 @@ class CrmDoctorCommand extends Command
         $this->line('Meta enabled: '.($whatsapp['meta_enabled'] ? 'yes' : 'no'));
         $this->line('Meta configured: '.($whatsapp['meta_configured'] ? 'yes' : 'no'));
         $this->line('Meta access token saved: '.($whatsapp['meta_has_token'] ? 'yes' : 'no'));
-        $this->line('Pal Digital configured: '.($whatsapp['pal_digital_configured'] ? 'yes' : 'no'));
 
         if (! ($whatsapp['is_configured'] ?? false)) {
             $this->components->error((string) ($whatsapp['configuration_error'] ?? 'WhatsApp is not configured.'));
@@ -114,7 +113,7 @@ class CrmDoctorCommand extends Command
             if ($orphaned !== []) {
                 $sample = implode(', ', array_slice($orphaned, 0, 5));
                 $this->components->warn(
-                    'Pal-only templates not on Meta: '.$sample.'. Sync templates in Connection & Setup — campaigns using old names will fail.'
+                    'Legacy templates not on Meta: '.$sample.'. Sync templates in Connection & Setup.'
                 );
             }
 

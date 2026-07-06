@@ -10,17 +10,12 @@ class WhatsAppProviderResolver
     public function __construct(
         protected MetaWhatsAppService $meta,
         protected MetaWhatsAppSettingsService $metaSettings,
-        protected PalDigitalWhatsAppService $palDigital,
     ) {}
 
     public function activeProvider(): ?WhatsAppProvider
     {
-        if ($this->metaSettings->isEnabled() && $this->meta->isConfigured()) {
+        if ($this->isMetaActive()) {
             return WhatsAppProvider::Meta;
-        }
-
-        if ($this->palDigital->isConfigured()) {
-            return WhatsAppProvider::PalDigital;
         }
 
         return null;
@@ -28,7 +23,7 @@ class WhatsAppProviderResolver
 
     public function isConfigured(): bool
     {
-        return $this->activeProvider() !== null;
+        return $this->isMetaActive();
     }
 
     public function configurationError(): string
@@ -40,14 +35,10 @@ class WhatsAppProviderResolver
         }
 
         if (! $this->metaSettings->isEnabled() && $this->meta->isConfigured()) {
-            return 'Meta credentials are saved but WhatsApp routing is off. Open '.$menu.' and turn on WhatsApp enabled, then save.';
+            return 'Meta credentials are saved but WhatsApp is off. Open '.$menu.', turn on WhatsApp enabled, then save.';
         }
 
-        if ($this->palDigital->isConfigured()) {
-            return 'Pal Digital API is configured but Meta routing is off. Either turn on WhatsApp enabled in '.$menu.' or use Pal Digital automations only.';
-        }
-
-        return 'No WhatsApp provider is active. Open '.$menu.', save Meta credentials, turn on WhatsApp enabled, and sync templates.';
+        return 'WhatsApp is not set up. Open '.$menu.', save Meta credentials, turn on WhatsApp enabled, and sync templates.';
     }
 
     /**
@@ -55,19 +46,13 @@ class WhatsAppProviderResolver
      */
     public function diagnostics(): array
     {
-        $metaEnabled = $this->metaSettings->isEnabled();
-        $metaConfigured = $this->meta->isConfigured();
-        $palConfigured = $this->palDigital->isConfigured();
-        $provider = $this->activeProvider();
-
         return [
-            'active_provider' => $provider?->value,
+            'active_provider' => $this->activeProvider()?->value,
             'active_provider_label' => $this->activeProviderLabel(),
-            'meta_enabled' => $metaEnabled,
-            'meta_configured' => $metaConfigured,
+            'meta_enabled' => $this->metaSettings->isEnabled(),
+            'meta_configured' => $this->meta->isConfigured(),
             'meta_has_token' => $this->metaSettings->hasStoredAccessToken(),
             'meta_phone_number_id' => filled($this->meta->phoneNumberId()),
-            'pal_digital_configured' => $palConfigured,
             'is_configured' => $this->isConfigured(),
             'configuration_error' => $this->isConfigured() ? null : $this->configurationError(),
         ];
@@ -78,8 +63,14 @@ class WhatsAppProviderResolver
         return $this->activeProvider()?->label() ?? 'Not configured';
     }
 
+    public function isMetaActive(): bool
+    {
+        return $this->metaSettings->isEnabled() && $this->meta->isConfigured();
+    }
+
+    /** @deprecated Use isMetaActive() */
     public function metaOverridesPalDigital(): bool
     {
-        return $this->activeProvider() === WhatsAppProvider::Meta;
+        return $this->isMetaActive();
     }
 }

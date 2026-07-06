@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Student;
 use App\Models\User;
+use App\Models\MetaWhatsAppTemplate;
 use App\Models\WhatsAppTemplate;
 use App\Services\WhatsAppTemplateParamResolver;
 
@@ -27,9 +28,20 @@ class StudentWhatsAppTemplateComposer
     {
         $template->ensureParamMappings();
 
+        $metaTemplate = MetaWhatsAppTemplate::query()
+            ->where('name', $template->name)
+            ->where('is_active', true)
+            ->orderByDesc('synced_at')
+            ->first();
+
         $sources = $template->resolvedParamMappings();
-        $paramCount = max((int) $template->param_count, count($sources));
-        $bodyVariables = data_get($template->provider_meta, 'body_variables', []);
+        $paramCount = max(
+            $metaTemplate ? (int) $metaTemplate->param_count : 0,
+            (int) $template->param_count,
+            count($sources),
+        );
+        $body = $metaTemplate?->body ?? $template->body;
+        $bodyVariables = data_get($metaTemplate?->provider_meta ?? $template->provider_meta, 'body_variables', []);
         $bodyVariables = is_array($bodyVariables) ? array_values($bodyVariables) : [];
         $sourceOptions = WhatsAppTemplateParamResolver::sourceOptions();
 
@@ -57,8 +69,8 @@ class StudentWhatsAppTemplateComposer
             'param_count' => $paramCount,
             'fields' => $fields,
             'defaults' => $defaults,
-            'preview_body' => $this->resolver->buildPreview($template->body, $defaultValues),
-            'template_body' => $template->body,
+            'preview_body' => $this->resolver->buildPreview($body, $defaultValues),
+            'template_body' => $body,
             'template_name' => $template->name,
         ];
     }

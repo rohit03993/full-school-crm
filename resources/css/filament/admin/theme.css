@@ -798,7 +798,15 @@
     }
 
     .crm-wa-inbox__composer--reply {
-        @apply border-primary-200/70 bg-primary-50/40 dark:border-primary-500/20 dark:bg-primary-500/5;
+        @apply border-emerald-200/80 bg-emerald-50/50 dark:border-emerald-500/25 dark:bg-emerald-500/10;
+    }
+
+    .crm-wa-inbox__composer--highlight {
+        @apply ring-2 ring-emerald-500/30;
+    }
+
+    .crm-wa-inbox__hint--success {
+        @apply mt-3 rounded-xl border border-emerald-200/80 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100;
     }
 
     .crm-wa-inbox__composer-row {
@@ -819,6 +827,10 @@
 
     .crm-wa-inbox__send-btn {
         @apply inline-flex min-h-11 items-center justify-center rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    .crm-wa-inbox__send-btn--reply {
+        @apply bg-emerald-600 hover:bg-emerald-500;
     }
 
     .crm-wa-inbox__send-btn--secondary {
@@ -850,11 +862,23 @@
     }
 
     .crm-wa-bubble--out {
-        @apply self-end rounded-br-md bg-primary-600 text-white;
+        @apply self-end rounded-br-md border border-emerald-200/80 bg-[#d9fdd3] text-gray-900 dark:border-emerald-600/40 dark:bg-emerald-950/60 dark:text-emerald-50;
+    }
+
+    .crm-wa-bubble--failed {
+        @apply ring-2 ring-danger-400/50;
+    }
+
+    .crm-wa-bubble__error {
+        @apply mt-2 rounded-lg bg-danger-50 px-2 py-1.5 text-xs leading-relaxed text-danger-800 dark:bg-danger-500/15 dark:text-danger-200;
     }
 
     .crm-wa-bubble__meta {
-        @apply mb-1 flex items-center justify-between gap-3 text-[11px] font-medium uppercase tracking-wide opacity-70;
+        @apply mb-1 flex items-center justify-between gap-3 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400;
+    }
+
+    .crm-wa-bubble--out .crm-wa-bubble__meta {
+        @apply text-emerald-800/70 dark:text-emerald-200/70;
     }
 
     .crm-wa-bubble__template {
@@ -866,7 +890,15 @@
     }
 
     .crm-wa-bubble__footer {
-        @apply mt-2 flex items-center justify-between gap-2 text-[11px];
+        @apply mt-2 flex items-center justify-end gap-2 text-[11px];
+    }
+
+    .crm-wa-status--ok {
+        @apply text-emerald-700 dark:text-emerald-300;
+    }
+
+    .crm-wa-status--bad {
+        @apply font-semibold text-danger-600 dark:text-danger-400;
     }
 
     .crm-wa-bubble__provider {

@@ -104,26 +104,45 @@ class WhatsAppTemplateParamResolver
         ?Enquiry $enquiry = null,
         ?WhatsAppCampaign $campaign = null,
     ): array {
-        $params = array_map(
-            fn (?string $source): string => filled($source)
-                ? $this->resolve($source, $student, $sender, $enquiry, $campaign)
-                : '',
-            $sources,
-        );
-
         $manual = $campaign?->campaignVariable('_manual', []);
+        $manual = is_array($manual) ? $manual : [];
 
-        if (! is_array($manual)) {
-            return $params;
+        $slotCount = max(count($sources), count($manual));
+
+        if ($slotCount < 1) {
+            return [];
+        }
+
+        $params = [];
+
+        for ($i = 0; $i < $slotCount; $i++) {
+            $source = $sources[$i] ?? null;
+            $params[$i] = filled($source)
+                ? $this->resolve($source, $student, $sender, $enquiry, $campaign)
+                : '';
         }
 
         foreach ($manual as $index => $value) {
-            if (filled($value) && array_key_exists((int) $index, $params)) {
+            if (filled($value)) {
                 $params[(int) $index] = (string) $value;
             }
         }
 
-        return $params;
+        return array_values($params);
+    }
+
+    /**
+     * @param  list<string>  $params
+     */
+    public function hasResolvableParams(array $params, ?WhatsAppCampaign $campaign = null): bool
+    {
+        $manual = $campaign?->campaignVariable('_manual', []);
+
+        if (is_array($manual) && collect($manual)->contains(fn (mixed $value): bool => filled($value))) {
+            return true;
+        }
+
+        return collect($params)->contains(fn (string $value): bool => trim($value) !== '' && $value !== '—');
     }
 
     public function buildPreview(?string $body, array $templateParams): ?string

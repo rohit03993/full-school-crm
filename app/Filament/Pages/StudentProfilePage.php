@@ -591,9 +591,9 @@ class StudentProfilePage extends Page
             return null;
         }
 
-        return 'Only Meta-synced templates can be sent. Old Pal Digital names like «'
+        return 'Only Meta-synced templates can be sent. Templates like «'
             .implode('», «', array_slice($orphaned, 0, 3))
-            .'» are hidden — open Connection & Setup and click Sync templates.';
+            .'» are from an old import — open Connection & Setup and click Sync templates.';
     }
 
     public function loadMessagesTab(): void

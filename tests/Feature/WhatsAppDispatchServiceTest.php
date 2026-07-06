@@ -15,18 +15,9 @@ class WhatsAppDispatchServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_uses_pal_digital_when_meta_is_disabled(): void
+    public function test_returns_not_configured_when_meta_is_off(): void
     {
-        config([
-            'services.pal_digital.api_key' => 'wsk.550e8400-e29b-41d4-a716-446655440000.secretpart',
-            'services.pal_digital.api_url' => 'https://wa.paldigital.in/api/v1/campaign/t1/api/v2',
-        ]);
-
-        Http::fake([
-            'https://wa.paldigital.in/api/v1/campaign/t1/api/v2' => Http::response(['success' => true], 200),
-        ]);
-
-        $result = app(WhatsAppDispatchService::class)->send(
+        $result = app(\App\Services\WhatsAppDispatchService::class)->send(
             '9811223344',
             ['Rohit'],
             'parent_checkin',
@@ -34,8 +25,8 @@ class WhatsAppDispatchServiceTest extends TestCase
             1,
         );
 
-        $this->assertSame('success', $result['status']);
-        $this->assertSame(WhatsAppProvider::PalDigital->value, $result['provider']);
+        $this->assertSame('failed', $result['status']);
+        $this->assertStringContainsString('not set up', strtolower((string) $result['error']));
     }
 
     public function test_uses_meta_when_meta_is_enabled_and_configured(): void

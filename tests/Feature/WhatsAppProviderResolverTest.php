@@ -21,7 +21,7 @@ class WhatsAppProviderResolverTest extends TestCase
         $resolver = app(WhatsAppProviderResolver::class);
 
         $this->assertFalse($resolver->isConfigured());
-        $this->assertStringContainsString('routing is off', $resolver->configurationError());
+        $this->assertStringContainsString('WhatsApp is off', $resolver->configurationError());
 
         $diagnostics = $resolver->diagnostics();
         $this->assertTrue($diagnostics['meta_configured']);

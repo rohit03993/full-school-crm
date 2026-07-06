@@ -20,8 +20,8 @@ class MetaWhatsAppInboxService
      */
     public function sendReply(Student $student, string $text, ?User $sender = null): array
     {
-        if (! $this->resolver->metaOverridesPalDigital()) {
-            return ['status' => 'failed', 'error' => 'Meta WhatsApp routing is not active.'];
+        if (! $this->resolver->isMetaActive()) {
+            return ['status' => 'failed', 'error' => 'WhatsApp is not enabled. Open Connection & Setup and turn on WhatsApp.'];
         }
 
         if (blank($student->mobile)) {

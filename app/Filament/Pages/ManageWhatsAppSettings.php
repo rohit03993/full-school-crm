@@ -86,9 +86,9 @@ class ManageWhatsAppSettings extends Page
                 ->columnSpanFull()
                 ->visible(fn (): bool => app(WhatsAppProviderResolver::class)->metaOverridesPalDigital()),
             Section::make('Legacy — Pal Digital / waservice')
-                ->description('Only needed when Meta WhatsApp is turned off. Not used for sends while Meta routing is active.')
+                ->description('Deprecated — this CRM sends WhatsApp only via Meta Cloud API.')
                 ->collapsed()
-                ->visible(fn (): bool => ! app(WhatsAppProviderResolver::class)->metaOverridesPalDigital())
+                ->visible(false)
                 ->schema([
                     Placeholder::make('api_key_status')
                         ->label('')
@@ -118,9 +118,7 @@ class ManageWhatsAppSettings extends Page
                 ])
                 ->columns(2),
             Section::make('Templates for automations')
-                ->description(fn (): string => app(WhatsAppProviderResolver::class)->metaOverridesPalDigital()
-                    ? 'Templates synced from Meta (Connection & Setup → Sync templates). Pick one for each automation below.'
-                    : 'Step 1 — Save Pal Digital key and click Sync templates. Step 2 — Pick templates for each action below.')
+                ->description('Templates synced from Meta (Connection & Setup → Sync templates). Pick one for each automation below.')
                 ->schema([
                     Placeholder::make('synced_templates_table')
                         ->label('')

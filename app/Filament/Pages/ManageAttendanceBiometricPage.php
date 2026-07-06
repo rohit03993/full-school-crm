@@ -42,7 +42,7 @@ class ManageAttendanceBiometricPage extends Page
                 ->viewData(fn (AttendanceBiometricStatusService $status): array => [
                     'status' => $status->status(),
                     'rollHint' => $status->rollMappingHint(),
-                    'whatsappSettingsUrl' => ManageWhatsAppSettings::getUrl(),
+                    'whatsappSettingsUrl' => ManageMetaWhatsAppSettings::getUrl(),
                     'attendanceUrl' => AttendancePage::getUrl(),
                 ]),
         ]);

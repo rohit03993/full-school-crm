@@ -11,8 +11,8 @@ use App\Models\StudentCall;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
-use App\Support\CrmNavigation;
-use App\Services\PalDigitalWhatsAppService;
+use App\Models\MetaWhatsAppTemplate;
+use App\Services\MetaWhatsAppService;
 use App\Services\WhatsAppDispatchService;
 use App\Services\WhatsAppTemplateParamResolver;
 use Illuminate\Console\Command;
@@ -22,7 +22,7 @@ class RunWhatsAppCampaign extends Command
 {
     protected $signature = 'whatsapp:run-campaign {campaign : Campaign ID} {--batch= : Max recipients per run}';
 
-    protected $description = 'Send pending WhatsApp messages for a campaign via the active provider (Meta or Pal Digital)';
+    protected $description = 'Send pending WhatsApp messages for a campaign via Meta Cloud API';
 
     public function handle(
         WhatsAppDispatchService $whatsapp,
@@ -117,16 +117,18 @@ class RunWhatsAppCampaign extends Command
                 $campaign,
             );
 
-            $templateParams = PalDigitalWhatsAppService::normalizeTemplateParams(
+            $expectedParamCount = $this->expectedTemplateParamCount($template, $campaign);
+
+            $templateParams = MetaWhatsAppService::normalizeBodyParams(
                 $templateParams,
-                (int) $template->param_count,
+                $expectedParamCount,
             );
 
-            if (collect($templateParams)->every(fn (string $value): bool => $value === '—')) {
+            if (! $paramResolver->hasResolvableParams($templateParams, $campaign)) {
                 $recipient->update([
                     'status' => WhatsAppRecipientStatus::Failed,
                     'template_params' => $templateParams,
-                    'error_message' => 'Template parameters could not be resolved. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').', sync templates, then resend from marks import step 4.',
+                    'error_message' => 'Fill in the template fields before sending, or map template variables under WhatsApp → Connection & Setup.',
                 ]);
                 $failed++;
 
@@ -141,21 +143,23 @@ class RunWhatsAppCampaign extends Command
                 $templateParams,
                 $template->name,
                 (string) ($student->name ?? 'User'),
-                (int) $template->param_count,
+                $expectedParamCount,
                 $languageCode,
             );
 
             $recipient->template_params = $templateParams;
             $recipient->message_sent = $paramResolver->buildPreview($template->body, $templateParams);
+            $recipient->provider_response = [
+                'provider' => $result['provider'] ?? 'meta',
+                'response' => $result['response'] ?? null,
+            ];
 
             if ($result['status'] === 'success') {
                 $recipient->status = WhatsAppRecipientStatus::Sent;
-                $recipient->provider_response = $result['response'] ?? null;
                 $recipient->error_message = null;
                 $sent++;
             } else {
                 $recipient->status = WhatsAppRecipientStatus::Failed;
-                $recipient->provider_response = $result['response'] ?? null;
                 $recipient->error_message = $result['error'] ?? 'Unknown error';
                 $failed++;
             }
@@ -252,6 +256,25 @@ class RunWhatsAppCampaign extends Command
 
             return $ids;
         });
+    }
+
+    protected function expectedTemplateParamCount(\App\Models\WhatsAppTemplate $template, WhatsAppCampaign $campaign): int
+    {
+        $manual = $campaign->campaignVariable('_manual', []);
+        $manualCount = is_array($manual) ? count($manual) : 0;
+
+        $metaTemplate = MetaWhatsAppTemplate::query()
+            ->where('name', $template->name)
+            ->where('is_active', true)
+            ->orderByDesc('synced_at')
+            ->first();
+
+        return max(
+            (int) $template->param_count,
+            $metaTemplate ? (int) $metaTemplate->param_count : 0,
+            $manualCount,
+            count($template->paramSources()),
+        );
     }
 
     protected function failPendingRecipients(WhatsAppCampaign $campaign, string $error): void

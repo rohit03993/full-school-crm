@@ -99,7 +99,7 @@ class StudentProfileMessagesTabTest extends TestCase
             'sendWhatsAppSelectedTemplateName' => null,
         ])->render();
 
-        $this->assertStringContainsString('Pick a template, fill only the fields it needs', $html);
+        $this->assertStringContainsString('Meta-approved template', $html);
     }
 
     protected function createSuperAdmin(): User

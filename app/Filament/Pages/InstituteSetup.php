@@ -123,7 +123,7 @@ class InstituteSetup extends Page
             [
                 'label' => 'WhatsApp — Automations',
                 'description' => 'Map punch IN/OUT, post-call, and campaign batch settings to approved templates.',
-                'url' => ManageWhatsAppSettings::getUrl(),
+                'url' => ManageMetaWhatsAppSettings::getUrl(),
                 'icon' => 'heroicon-o-cog-8-tooth',
             ],
             [
