@@ -4,6 +4,9 @@
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
+        $lastThreadKey = $messageThread === []
+            ? 'empty'
+            : ($messageThread[array_key_last($messageThread)]['key'] ?? 'empty');
     @endphp
 
     <div class="crm-wa-inbox__toolbar">
@@ -106,11 +109,11 @@
 
     <div
         class="crm-wa-inbox__thread"
-        wire:key="wa-thread-{{ $messageThread->count() }}-{{ $messageThread->last()?->key ?? 'empty' }}"
+        wire:key="wa-thread-{{ count($messageThread) }}-{{ $lastThreadKey }}"
     >
         @if (! $messagesTabLoaded)
             <p class="crm-wa-inbox__hint">Loading conversation…</p>
-        @elseif ($messageThread->isEmpty())
+        @elseif ($messageThread === [])
             <div class="crm-wa-inbox__empty">
                 <p class="font-medium text-gray-700 dark:text-gray-200">No WhatsApp messages yet</p>
                 <p class="crm-wa-inbox__hint">Template sends and parent replies will appear here.</p>
@@ -124,28 +127,28 @@
                 @foreach ($messageThread as $message)
                     <div @class([
                         'crm-wa-bubble',
-                        'crm-wa-bubble--in' => $message->isInbound(),
-                        'crm-wa-bubble--out' => $message->isOutbound(),
+                        'crm-wa-bubble--in' => ($message['direction'] ?? '') === 'inbound',
+                        'crm-wa-bubble--out' => ($message['direction'] ?? '') === 'outbound',
                     ])>
                         <div class="crm-wa-bubble__meta">
-                            <span>{{ $message->isInbound() ? 'Parent' : 'School' }}</span>
-                            <span>{{ $message->at?->format('d M, h:i A') }}</span>
+                            <span>{{ ($message['direction'] ?? '') === 'inbound' ? 'Parent' : 'School' }}</span>
+                            <span>{{ $message['at_label'] ?? '' }}</span>
                         </div>
-                        @if ($message->templateName)
-                            <p class="crm-wa-bubble__template">{{ $message->templateName }}</p>
+                        @if (! empty($message['templateName']))
+                            <p class="crm-wa-bubble__template">{{ $message['templateName'] }}</p>
                         @endif
-                        <p class="crm-wa-bubble__body">{{ $message->body }}</p>
+                        <p class="crm-wa-bubble__body">{{ $message['body'] ?? '' }}</p>
                         <div class="crm-wa-bubble__footer">
                             <span @class([
                                 'crm-wa-status font-medium',
-                                'crm-wa-status--ok' => in_array($message->status, ['sent', 'delivered', 'read', 'received'], true),
-                                'crm-wa-status--warn' => in_array($message->status, ['pending', 'processing', 'queued'], true),
-                                'crm-wa-status--bad' => $message->status === 'failed',
+                                'crm-wa-status--ok' => in_array($message['status'] ?? '', ['sent', 'delivered', 'read', 'received'], true),
+                                'crm-wa-status--warn' => in_array($message['status'] ?? '', ['pending', 'processing', 'queued'], true),
+                                'crm-wa-status--bad' => ($message['status'] ?? '') === 'failed',
                             ])>
-                                {{ $message->statusLabel }}
+                                {{ $message['statusLabel'] ?? '' }}
                             </span>
-                            @if ($message->provider)
-                                <span class="crm-wa-bubble__provider">{{ strtoupper($message->provider) }}</span>
+                            @if (! empty($message['provider']))
+                                <span class="crm-wa-bubble__provider">{{ strtoupper($message['provider']) }}</span>
                             @endif
                         </div>
                     </div>

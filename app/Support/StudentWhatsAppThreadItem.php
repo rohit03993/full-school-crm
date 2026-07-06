@@ -27,4 +27,23 @@ readonly class StudentWhatsAppThreadItem
     {
         return $this->direction === 'outbound';
     }
+
+    /**
+     * @return array{key: string, source: string, direction: string, body: string, status: string, statusLabel: string, at: ?string, at_label: ?string, templateName: ?string, provider: ?string}
+     */
+    public function toArray(): array
+    {
+        return [
+            'key' => $this->key,
+            'source' => $this->source,
+            'direction' => $this->direction,
+            'body' => $this->body,
+            'status' => $this->status,
+            'statusLabel' => $this->statusLabel,
+            'at' => $this->at?->toIso8601String(),
+            'at_label' => $this->at?->format('d M, h:i A'),
+            'templateName' => $this->templateName,
+            'provider' => $this->provider,
+        ];
+    }
 }

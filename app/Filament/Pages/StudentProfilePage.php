@@ -151,9 +151,9 @@ class StudentProfilePage extends Page
     public Collection $whatsappMessages;
 
     /**
-     * @var Collection<int, StudentWhatsAppThreadItem>
+     * @var array<int, array{key: string, source: string, direction: string, body: string, status: string, statusLabel: string, at: ?string, at_label: ?string, templateName: ?string, provider: ?string}>
      */
-    public Collection $messageThread;
+    public array $messageThread = [];
 
     public string $metaReplyText = '';
 
@@ -259,7 +259,7 @@ class StudentProfilePage extends Page
         $this->visits = new Collection;
         $this->calls = new Collection;
         $this->whatsappMessages = new Collection;
-        $this->messageThread = new Collection;
+        $this->messageThread = [];
         $this->homeworkAssignments = new Collection;
         $this->documents = new Collection;
         $this->payments = new Collection;
@@ -489,7 +489,10 @@ class StudentProfilePage extends Page
         $threadService = app(StudentWhatsAppThreadService::class);
         $resolver = app(WhatsAppProviderResolver::class);
 
-        $this->messageThread = $threadService->threadForStudent($this->record);
+        $this->messageThread = $threadService->threadForStudent($this->record)
+            ->map(fn (StudentWhatsAppThreadItem $item): array => $item->toArray())
+            ->values()
+            ->all();
         $this->metaSessionOpen = $threadService->sessionOpenForStudent($this->record);
         $this->metaRoutingActive = $resolver->metaOverridesPalDigital();
         $this->whatsappProviderLabel = $resolver->activeProviderLabel();
@@ -1878,6 +1881,7 @@ class StudentProfilePage extends Page
                                     'metaSessionOpen' => $this->metaSessionOpen,
                                     'metaRoutingActive' => $this->metaRoutingActive,
                                     'whatsappProviderLabel' => $this->whatsappProviderLabel,
+                                    'metaReplyText' => $this->metaReplyText,
                                 ]),
                         ]),
                     'admission' => Tab::make('Admission')
