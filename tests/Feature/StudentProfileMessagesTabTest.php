@@ -74,6 +74,32 @@ class StudentProfileMessagesTabTest extends TestCase
             ->assertStatus(200);
     }
 
+    public function test_messages_blade_requires_template_id_in_view_data(): void
+    {
+        $student = Student::query()->create([
+            'name' => 'Kapil',
+            'mobile' => '8320936488',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $html = view('filament.pages.partials.student-profile-messages', [
+            'record' => $student,
+            'messagesTabLoaded' => true,
+            'messageThread' => [],
+            'metaSessionOpen' => false,
+            'metaRoutingActive' => false,
+            'whatsappProviderLabel' => 'Meta WhatsApp',
+            'metaReplyText' => '',
+            'sendWhatsAppTemplateId' => null,
+            'sendWhatsAppTemplateFields' => [],
+            'sendWhatsAppTemplateParamCount' => 0,
+            'sendWhatsAppTemplatePreview' => null,
+            'sendWhatsAppSelectedTemplateName' => null,
+        ])->render();
+
+        $this->assertStringContainsString('Pick a template, fill only the fields it needs', $html);
+    }
+
     protected function createSuperAdmin(): User
     {
         $role = Role::findOrCreate(RoleName::SuperAdmin->value);

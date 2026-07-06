@@ -558,6 +558,27 @@ class StudentProfilePage extends Page
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    protected function whatsAppMessagesViewData(): array
+    {
+        return [
+            'record' => $this->record,
+            'messagesTabLoaded' => $this->messagesTabLoaded,
+            'messageThread' => $this->messageThread,
+            'metaSessionOpen' => $this->metaSessionOpen,
+            'metaRoutingActive' => $this->metaRoutingActive,
+            'whatsappProviderLabel' => $this->whatsappProviderLabel,
+            'metaReplyText' => $this->metaReplyText,
+            'sendWhatsAppTemplateId' => $this->sendWhatsAppTemplateId,
+            'sendWhatsAppTemplateFields' => $this->sendWhatsAppTemplateFields,
+            'sendWhatsAppTemplateParamCount' => $this->sendWhatsAppTemplateParamCount,
+            'sendWhatsAppTemplatePreview' => $this->sendWhatsAppTemplatePreview,
+            'sendWhatsAppSelectedTemplateName' => $this->sendWhatsAppSelectedTemplateName,
+        ];
+    }
+
     public function loadMessagesTab(): void
     {
         if ($this->messagesTabLoaded) {
@@ -1986,19 +2007,7 @@ class StudentProfilePage extends Page
                         ->visible(fn (): bool => $this->licensed(LicenseFeature::WhatsApp))
                         ->schema([
                             View::make('filament.pages.partials.student-profile-messages')
-                                ->viewData(fn (): array => [
-                                    'record' => $this->record,
-                                    'messagesTabLoaded' => $this->messagesTabLoaded,
-                                    'messageThread' => $this->messageThread,
-                                    'metaSessionOpen' => $this->metaSessionOpen,
-                                    'metaRoutingActive' => $this->metaRoutingActive,
-                                    'whatsappProviderLabel' => $this->whatsappProviderLabel,
-                                    'metaReplyText' => $this->metaReplyText,
-                                    'sendWhatsAppTemplateFields' => $this->sendWhatsAppTemplateFields,
-                                    'sendWhatsAppTemplateParamCount' => $this->sendWhatsAppTemplateParamCount,
-                                    'sendWhatsAppTemplatePreview' => $this->sendWhatsAppTemplatePreview,
-                                    'sendWhatsAppSelectedTemplateName' => $this->sendWhatsAppSelectedTemplateName,
-                                ]),
+                                ->viewData(fn (): array => $this->whatsAppMessagesViewData()),
                         ]),
                     'admission' => Tab::make('Admission')
                         ->icon('heroicon-o-document-text')
