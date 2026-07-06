@@ -27,6 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('crm:cleanup')->dailyAt('03:00');
         $schedule->command('crm:process-late-fees')->dailyAt('00:30');
         $schedule->command('attendance:process-punches')->everyMinute();
+        $schedule->command('crm:process-queue')->everyMinute()->withoutOverlapping();
+        $schedule->command('whatsapp:process-pending')->everyMinute()->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

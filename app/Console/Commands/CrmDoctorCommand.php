@@ -2,9 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\WhatsAppCampaignStatus;
+use App\Enums\WhatsAppRecipientStatus;
+use App\Models\WhatsAppCampaign;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -80,6 +85,48 @@ class CrmDoctorCommand extends Command
         if (! class_exists(\App\Jobs\RunWhatsAppCampaignJob::class)) {
             $this->components->error('Cannot autoload App\\Jobs\\RunWhatsAppCampaignJob');
             $ok = false;
+        }
+
+        $this->newLine();
+        $this->components->info('Queue & WhatsApp campaigns');
+        $queueConnection = (string) config('queue.default');
+        $this->line("QUEUE_CONNECTION: {$queueConnection}");
+
+        if ($queueConnection !== 'sync' && Schema::hasTable('jobs')) {
+            $pendingJobs = (int) DB::table('jobs')->count();
+            $failedJobs = Schema::hasTable('failed_jobs')
+                ? (int) DB::table('failed_jobs')->count()
+                : 0;
+
+            $this->line("Pending jobs: {$pendingJobs}");
+            $this->line("Failed jobs: {$failedJobs}");
+
+            if ($pendingJobs > 0) {
+                $this->components->warn(
+                    'Jobs are waiting — run php artisan crm:process-queue (or set up supervisor with queue:work).'
+                );
+                $ok = false;
+            }
+
+            if ($failedJobs > 0) {
+                $this->components->warn('Failed jobs found — run php artisan queue:failed to inspect.');
+            }
+        }
+
+        if (Schema::hasTable('whatsapp_campaigns')) {
+            $stuckCampaigns = WhatsAppCampaign::query()
+                ->whereIn('status', [WhatsAppCampaignStatus::Queued, WhatsAppCampaignStatus::Running])
+                ->whereHas('recipients', fn ($query) => $query->where('status', WhatsAppRecipientStatus::Pending))
+                ->count();
+
+            if ($stuckCampaigns > 0) {
+                $this->components->warn(
+                    "{$stuckCampaigns} WhatsApp campaign(s) queued with pending messages — run php artisan whatsapp:process-pending"
+                );
+                $ok = false;
+            } else {
+                $this->line('OK no stuck WhatsApp campaigns');
+            }
         }
 
         $this->newLine();
