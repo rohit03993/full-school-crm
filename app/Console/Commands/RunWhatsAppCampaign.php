@@ -124,11 +124,11 @@ class RunWhatsAppCampaign extends Command
                 $expectedParamCount,
             );
 
-            if (! $paramResolver->hasResolvableParams($templateParams, $campaign)) {
+            if ($expectedParamCount > 0 && ! $paramResolver->hasResolvableParams($templateParams, $campaign)) {
                 $recipient->update([
                     'status' => WhatsAppRecipientStatus::Failed,
                     'template_params' => $templateParams,
-                    'error_message' => 'Fill in the template fields before sending, or map template variables under WhatsApp → Connection & Setup.',
+                    'error_message' => 'Fill in the template fields before sending.',
                 ]);
                 $failed++;
 

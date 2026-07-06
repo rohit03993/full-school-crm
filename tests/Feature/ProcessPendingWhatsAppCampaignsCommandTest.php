@@ -88,6 +88,71 @@ class ProcessPendingWhatsAppCampaignsCommandTest extends TestCase
         ]);
     }
 
+    public function test_zero_param_meta_template_sends_without_fields(): void
+    {
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-token-long-enough'), 'meta_whatsapp');
+
+        config(['meta_whatsapp.graph_version' => 'v20.0']);
+
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response([
+                'messages' => [['id' => 'wamid.ZERO']],
+            ], 200),
+        ]);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $student = Student::query()->create([
+            'name' => 'Kapil',
+            'mobile' => '9876500001',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'hello_world',
+            'param_count' => 0,
+            'is_active' => true,
+            'provider_meta' => ['meta_language' => 'en_US'],
+        ]);
+
+        MetaWhatsAppTemplate::query()->create([
+            'name' => 'hello_world',
+            'language' => 'en_US',
+            'status' => 'APPROVED',
+            'param_count' => 0,
+            'body' => 'Hello World',
+            'is_active' => true,
+            'synced_at' => now(),
+        ]);
+
+        $campaign = WhatsAppCampaign::query()->create([
+            'whatsapp_template_id' => $template->id,
+            'name' => 'hello_world - Kapil',
+            'status' => WhatsAppCampaignStatus::Queued,
+            'total_recipients' => 1,
+            'created_by' => $admin->id,
+            'shot_by' => $admin->id,
+            'shot_at' => now(),
+            'started_at' => now(),
+        ]);
+
+        WhatsAppCampaignRecipient::query()->create([
+            'whatsapp_campaign_id' => $campaign->id,
+            'student_id' => $student->id,
+            'phone' => (string) $student->mobile,
+            'status' => WhatsAppRecipientStatus::Pending,
+        ]);
+
+        $exitCode = Artisan::call('whatsapp:run-campaign', ['campaign' => $campaign->id]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertDatabaseHas('whatsapp_campaign_recipients', [
+            'whatsapp_campaign_id' => $campaign->id,
+            'status' => WhatsAppRecipientStatus::Sent->value,
+        ]);
+    }
+
     public function test_manual_template_params_are_applied_even_without_mappings(): void
     {
         $resolver = app(WhatsAppTemplateParamResolver::class);
@@ -100,11 +165,11 @@ class ProcessPendingWhatsAppCampaignsCommandTest extends TestCase
 
         $campaign = WhatsAppCampaign::query()->create([
             'whatsapp_template_id' => WhatsAppTemplate::query()->create([
-                'name' => 'first_try',
+                'name' => 'tes2',
                 'param_count' => 0,
                 'is_active' => true,
             ])->id,
-            'name' => 'first_try',
+            'name' => 'tes2',
             'status' => WhatsAppCampaignStatus::Queued,
             'total_recipients' => 1,
             'campaign_variables' => ['_manual' => ['Hello parent']],
