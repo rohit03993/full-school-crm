@@ -96,7 +96,7 @@ class MetaWhatsAppTemplateSyncService
             'status' => $synced > 0 ? 'success' : 'warning',
             'synced' => $synced,
             'message' => $synced > 0
-                ? 'Approved Meta templates are ready under Meta WhatsApp. Pal Digital settings are unchanged.'
+                ? "Synced {$synced} approved Meta template(s). Use these exact names in campaigns and student messages."
                 : 'No approved templates returned from Meta. Create and approve templates in Meta Business Manager first.',
         ];
     }

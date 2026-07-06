@@ -11,6 +11,7 @@ use App\Enums\CrmPermission;
 use App\Enums\DocumentType;
 use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
+use App\Enums\WhatsAppRecipientStatus;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Support\CrmPagination;
@@ -58,6 +59,7 @@ use App\Support\StudentWhatsAppThreadItem;
 use App\Support\StudentWhatsAppTemplateComposer;
 use App\Services\VisitMeetingAssignmentService;
 use App\Services\WhatsAppCampaignService;
+use App\Services\WhatsAppTemplateCatalog;
 use App\Support\FeePlanCalculator;
 use App\Support\FeePlanSubmissionGuard;
 use App\Support\CrmHint;
@@ -513,10 +515,7 @@ class StudentProfilePage extends Page
             return;
         }
 
-        $template = WhatsAppTemplate::query()
-            ->whereKey($this->sendWhatsAppTemplateId)
-            ->where('is_active', true)
-            ->first();
+        $template = app(WhatsAppTemplateCatalog::class)->findSelectableTemplate((int) $this->sendWhatsAppTemplateId);
 
         if (! $template) {
             return;
@@ -543,10 +542,7 @@ class StudentProfilePage extends Page
             return;
         }
 
-        $template = WhatsAppTemplate::query()
-            ->whereKey($this->sendWhatsAppTemplateId)
-            ->where('is_active', true)
-            ->first();
+        $template = app(WhatsAppTemplateCatalog::class)->findSelectableTemplate((int) $this->sendWhatsAppTemplateId);
 
         if (! $template) {
             return;
@@ -563,6 +559,8 @@ class StudentProfilePage extends Page
      */
     protected function whatsAppMessagesViewData(): array
     {
+        $catalog = app(WhatsAppTemplateCatalog::class);
+
         return [
             'record' => $this->record,
             'messagesTabLoaded' => $this->messagesTabLoaded,
@@ -571,12 +569,31 @@ class StudentProfilePage extends Page
             'metaRoutingActive' => $this->metaRoutingActive,
             'whatsappProviderLabel' => $this->whatsappProviderLabel,
             'metaReplyText' => $this->metaReplyText,
+            'waTemplates' => $catalog->selectableTemplates(),
+            'waTemplateSyncHint' => $this->whatsAppTemplateSyncHint($catalog),
             'sendWhatsAppTemplateId' => $this->sendWhatsAppTemplateId,
             'sendWhatsAppTemplateFields' => $this->sendWhatsAppTemplateFields,
             'sendWhatsAppTemplateParamCount' => $this->sendWhatsAppTemplateParamCount,
             'sendWhatsAppTemplatePreview' => $this->sendWhatsAppTemplatePreview,
             'sendWhatsAppSelectedTemplateName' => $this->sendWhatsAppSelectedTemplateName,
         ];
+    }
+
+    protected function whatsAppTemplateSyncHint(WhatsAppTemplateCatalog $catalog): ?string
+    {
+        if (! $this->metaRoutingActive) {
+            return null;
+        }
+
+        $orphaned = $catalog->orphanedPalTemplateNames();
+
+        if ($orphaned === []) {
+            return null;
+        }
+
+        return 'Only Meta-synced templates can be sent. Old Pal Digital names like «'
+            .implode('», «', array_slice($orphaned, 0, 3))
+            .'» are hidden — open Connection & Setup and click Sync templates.';
     }
 
     public function loadMessagesTab(): void
@@ -680,13 +697,14 @@ class StudentProfilePage extends Page
             return;
         }
 
-        $template = WhatsAppTemplate::query()
-            ->whereKey($this->sendWhatsAppTemplateId)
-            ->where('is_active', true)
-            ->first();
+        $template = app(WhatsAppTemplateCatalog::class)->findSelectableTemplate((int) $this->sendWhatsAppTemplateId);
 
         if (! $template) {
-            Notification::make()->title('Template not found')->danger()->send();
+            Notification::make()
+                ->title('Template not available')
+                ->body('This template is not synced for Meta. Open Connection & Setup and click Sync templates.')
+                ->danger()
+                ->send();
 
             return;
         }
@@ -707,7 +725,7 @@ class StudentProfilePage extends Page
             }
         }
 
-        app(WhatsAppCampaignService::class)->sendSingle(
+        $recipient = app(WhatsAppCampaignService::class)->sendSingle(
             $this->record,
             $template,
             Auth::user(),
@@ -719,9 +737,20 @@ class StudentProfilePage extends Page
         $this->sendWhatsAppTemplateId = null;
         $this->refreshWhatsAppTemplateComposer();
 
+        if ($recipient->status === WhatsAppRecipientStatus::Failed) {
+            Notification::make()
+                ->title('WhatsApp failed')
+                ->body($recipient->error_message ?: 'Meta rejected the message. Check Delivery log on the campaign page.')
+                ->danger()
+                ->persistent()
+                ->send();
+
+            return;
+        }
+
         Notification::make()
-            ->title('WhatsApp queued')
-            ->body('Your message is being sent. It may take a moment to deliver.')
+            ->title('WhatsApp sent')
+            ->body('Message delivered to '.$this->record->mobile.'.')
             ->success()
             ->send();
     }

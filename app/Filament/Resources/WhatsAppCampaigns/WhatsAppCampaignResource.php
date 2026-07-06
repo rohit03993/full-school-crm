@@ -17,6 +17,7 @@ use App\Models\Course;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppTemplate;
 use App\Services\WhatsAppCampaignService;
+use App\Services\WhatsAppTemplateCatalog;
 use App\Support\WhatsAppCampaignFormHelper;
 use App\Support\WhatsAppCampaignViewHelper;
 use App\Support\CrmNavigation;
@@ -79,15 +80,7 @@ class WhatsAppCampaignResource extends Resource
                         ->helperText('Auto-generated as YYYY-MM-DD-001. Edit if needed.'),
                     Select::make('whatsapp_template_id')
                         ->label('WhatsApp template')
-                        ->options(fn (): array => WhatsAppTemplate::query()
-                            ->where('is_active', true)
-                            ->orderBy('name')
-                            ->get()
-                            ->mapWithKeys(fn (WhatsAppTemplate $template): array => [
-                                $template->id => $template->name.' ('.$template->param_count.' param'
-                                    .($template->param_count === 1 ? '' : 's').')',
-                            ])
-                            ->all())
+                        ->options(fn (): array => app(WhatsAppTemplateCatalog::class)->selectableTemplateOptions())
                         ->searchable()
                         ->preload()
                         ->required()

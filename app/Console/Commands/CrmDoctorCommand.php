@@ -6,6 +6,7 @@ use App\Enums\WhatsAppCampaignStatus;
 use App\Enums\WhatsAppRecipientStatus;
 use App\Models\WhatsAppCampaign;
 use App\Services\WhatsAppProviderResolver;
+use App\Services\WhatsAppTemplateCatalog;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
@@ -105,6 +106,26 @@ class CrmDoctorCommand extends Command
             $ok = false;
         } else {
             $this->line('OK WhatsApp routing is active');
+        }
+
+        if (($whatsapp['meta_enabled'] ?? false) && ($whatsapp['meta_configured'] ?? false)) {
+            $orphaned = app(WhatsAppTemplateCatalog::class)->orphanedPalTemplateNames();
+
+            if ($orphaned !== []) {
+                $sample = implode(', ', array_slice($orphaned, 0, 5));
+                $this->components->warn(
+                    'Pal-only templates not on Meta: '.$sample.'. Sync templates in Connection & Setup — campaigns using old names will fail.'
+                );
+            }
+
+            $metaReady = app(WhatsAppTemplateCatalog::class)->metaReadyTemplateNames();
+
+            if ($metaReady === []) {
+                $this->components->error('No approved Meta templates synced. Open Connection & Setup and click Sync templates.');
+                $ok = false;
+            } else {
+                $this->line('Meta templates ready: '.count($metaReady));
+            }
         }
 
         if ($queueConnection !== 'sync' && Schema::hasTable('jobs')) {

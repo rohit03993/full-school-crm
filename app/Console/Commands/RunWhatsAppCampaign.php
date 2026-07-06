@@ -133,11 +133,16 @@ class RunWhatsAppCampaign extends Command
                 continue;
             }
 
+            $languageCode = data_get($template->provider_meta, 'meta_language');
+            $languageCode = is_string($languageCode) && $languageCode !== '' ? $languageCode : null;
+
             $result = $whatsapp->send(
                 $recipient->phone,
                 $templateParams,
                 $template->name,
                 (string) ($student->name ?? 'User'),
+                (int) $template->param_count,
+                $languageCode,
             );
 
             $recipient->template_params = $templateParams;

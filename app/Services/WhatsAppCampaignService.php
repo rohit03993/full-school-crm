@@ -132,9 +132,9 @@ class WhatsAppCampaignService
             'status' => WhatsAppRecipientStatus::Pending,
         ]);
 
-        RunWhatsAppCampaignJob::dispatch($campaign->id);
+        RunWhatsAppCampaignJob::dispatchSync($campaign->id);
 
-        return $recipient;
+        return $recipient->fresh() ?? $recipient;
     }
 
     /**

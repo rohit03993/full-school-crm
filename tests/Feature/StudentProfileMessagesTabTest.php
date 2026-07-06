@@ -90,6 +90,8 @@ class StudentProfileMessagesTabTest extends TestCase
             'metaRoutingActive' => false,
             'whatsappProviderLabel' => 'Meta WhatsApp',
             'metaReplyText' => '',
+            'waTemplates' => collect(),
+            'waTemplateSyncHint' => null,
             'sendWhatsAppTemplateId' => null,
             'sendWhatsAppTemplateFields' => [],
             'sendWhatsAppTemplateParamCount' => 0,

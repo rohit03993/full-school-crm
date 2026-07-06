@@ -1,9 +1,5 @@
 <div wire:init="loadMessagesTab" class="crm-wa-inbox">
     @php
-        $templates = \App\Models\WhatsAppTemplate::query()
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
         $lastThreadKey = $messageThread === []
             ? 'empty'
             : ($messageThread[array_key_last($messageThread)]['key'] ?? 'empty');
@@ -34,6 +30,9 @@
                 Parents must message you first (or within 24 hours of their last message) before you can send a free-text reply.
             </p>
         @endif
+        @if (filled($waTemplateSyncHint))
+            <p class="crm-wa-inbox__hint crm-wa-inbox__hint--banner">{{ $waTemplateSyncHint }}</p>
+        @endif
     </header>
 
     <div class="crm-wa-inbox__layout">
@@ -46,7 +45,7 @@
 
                 @if (blank($record->mobile))
                     <p class="crm-wa-inbox__hint crm-wa-inbox__hint--danger">Add a mobile number on the student profile before sending WhatsApp.</p>
-                @elseif ($templates->isEmpty())
+                @elseif ($waTemplates->isEmpty())
                     <p class="crm-wa-inbox__hint">
                         No templates synced.
                         @if ($metaRoutingActive)
@@ -64,7 +63,7 @@
                             class="mt-1"
                         >
                             <option value="">Choose template…</option>
-                            @foreach ($templates as $template)
+                            @foreach ($waTemplates as $template)
                                 <option value="{{ $template->id }}">
                                     {{ $template->name }}
                                     @if ((int) $template->param_count > 0)
