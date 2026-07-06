@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\WhatsAppCampaignRecipient;
 use App\Support\StudentWhatsAppThreadItem;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class StudentWhatsAppThreadService
 {
@@ -42,36 +43,9 @@ class StudentWhatsAppThreadService
                 provider: data_get($row->provider_response, 'provider', 'pal_digital'),
             ));
 
-        $metaQuery = MetaWhatsAppMessage::query()
-            ->orderByDesc('created_at')
-            ->limit($limit);
-
-        if ($phone !== '') {
-            $metaQuery->where(function ($query) use ($student, $phone): void {
-                $query->where('student_id', $student->id)
-                    ->orWhere('phone', $phone);
-            });
-        } else {
-            $metaQuery->where('student_id', $student->id);
-        }
-
-        $metaMessages = $metaQuery
-            ->get()
-            ->map(function (MetaWhatsAppMessage $row): StudentWhatsAppThreadItem {
-                $status = MetaWhatsAppMessageStatus::tryFrom($row->status);
-
-                return new StudentWhatsAppThreadItem(
-                    key: 'meta-'.$row->id,
-                    source: 'meta',
-                    direction: $row->direction,
-                    body: (string) ($row->body_preview ?? ''),
-                    status: $row->status,
-                    statusLabel: $status?->label() ?? ucfirst($row->status),
-                    at: $row->status_at ?? $row->created_at,
-                    templateName: $row->template_name,
-                    provider: 'meta',
-                );
-            });
+        $metaMessages = $this->metaMessagesSupported()
+            ? $this->loadMetaMessages($student, $phone, $limit)
+            : collect();
 
         return $campaignMessages
             ->concat($metaMessages)
@@ -83,7 +57,7 @@ class StudentWhatsAppThreadService
 
     public function sessionOpenForStudent(Student $student): bool
     {
-        if (! $this->meta->isConfigured()) {
+        if (! $this->metaMessagesSupported() || ! $this->meta->isConfigured()) {
             return false;
         }
 
@@ -103,6 +77,48 @@ class StudentWhatsAppThreadService
             ->first();
 
         return $lastInbound?->created_at?->gt(now()->subHours(24)) ?? false;
+    }
+
+    protected function metaMessagesSupported(): bool
+    {
+        return Schema::hasTable('meta_whatsapp_messages');
+    }
+
+    /**
+     * @return Collection<int, StudentWhatsAppThreadItem>
+     */
+    protected function loadMetaMessages(Student $student, string $phone, int $limit): Collection
+    {
+        $metaQuery = MetaWhatsAppMessage::query()
+            ->orderByDesc('created_at')
+            ->limit($limit);
+
+        if ($phone !== '') {
+            $metaQuery->where(function ($query) use ($student, $phone): void {
+                $query->where('student_id', $student->id)
+                    ->orWhere('phone', $phone);
+            });
+        } else {
+            $metaQuery->where('student_id', $student->id);
+        }
+
+        return $metaQuery
+            ->get()
+            ->map(function (MetaWhatsAppMessage $row): StudentWhatsAppThreadItem {
+                $status = MetaWhatsAppMessageStatus::tryFrom($row->status);
+
+                return new StudentWhatsAppThreadItem(
+                    key: 'meta-'.$row->id,
+                    source: 'meta',
+                    direction: $row->direction,
+                    body: (string) ($row->body_preview ?? ''),
+                    status: $row->status,
+                    statusLabel: $status?->label() ?? ucfirst($row->status),
+                    at: $row->status_at ?? $row->created_at,
+                    templateName: $row->template_name,
+                    provider: 'meta',
+                );
+            });
     }
 
     protected function normalizePhone(string $phone): string

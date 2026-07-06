@@ -496,14 +496,7 @@ class StudentProfilePage extends Page
         $this->refreshWhatsAppTemplateComposer();
     }
 
-    public function updated($property): void
-    {
-        if (str_starts_with((string) $property, 'sendWhatsAppTemplateParams')) {
-            $this->refreshWhatsAppTemplatePreview();
-        }
-    }
-
-    public function updatedSendWhatsAppTemplateParams(): void
+    public function updatedSendWhatsAppTemplateParams($value, $key = null): void
     {
         $this->refreshWhatsAppTemplatePreview();
     }
@@ -573,22 +566,32 @@ class StudentProfilePage extends Page
 
         $this->messagesTabLoaded = true;
 
-        $threadService = app(StudentWhatsAppThreadService::class);
-        $resolver = app(WhatsAppProviderResolver::class);
+        try {
+            $threadService = app(StudentWhatsAppThreadService::class);
+            $resolver = app(WhatsAppProviderResolver::class);
 
-        $this->messageThread = $threadService->threadForStudent($this->record)
-            ->map(fn (StudentWhatsAppThreadItem $item): array => $item->toArray())
-            ->values()
-            ->all();
-        $this->metaSessionOpen = $threadService->sessionOpenForStudent($this->record);
-        $this->metaRoutingActive = $resolver->metaOverridesPalDigital();
-        $this->whatsappProviderLabel = $resolver->activeProviderLabel();
+            $this->messageThread = $threadService->threadForStudent($this->record)
+                ->map(fn (StudentWhatsAppThreadItem $item): array => $item->toArray())
+                ->values()
+                ->all();
+            $this->metaSessionOpen = $threadService->sessionOpenForStudent($this->record);
+            $this->metaRoutingActive = $resolver->metaOverridesPalDigital();
+            $this->whatsappProviderLabel = $resolver->activeProviderLabel();
 
-        $this->whatsappMessages = $this->record->whatsappMessages()
-            ->with(['campaign.template'])
-            ->orderByDesc('created_at')
-            ->limit(CrmPagination::PER_PAGE)
-            ->get();
+            $this->whatsappMessages = $this->record->whatsappMessages()
+                ->with(['campaign.template'])
+                ->orderByDesc('created_at')
+                ->limit(CrmPagination::PER_PAGE)
+                ->get();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            $this->messageThread = [];
+            $this->metaSessionOpen = false;
+            $this->metaRoutingActive = false;
+            $this->whatsappProviderLabel = 'Unavailable';
+            $this->whatsappMessages = new Collection;
+        }
     }
 
     public function sendMetaReply(): void
