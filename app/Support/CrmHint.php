@@ -22,7 +22,7 @@ class CrmHint
         'setup.meta_whatsapp' => 'Each school stores its own Meta WhatsApp credentials in this CRM (Taskbook uses Taskbook\'s WABA, Folks India uses theirs). When enabled, all sends route through Meta Cloud API — no separate waservice server needed.',
         'setup.whatsapp' => 'Map punch IN/OUT, post-call, and campaign batch settings to approved templates. Sync templates under Connection & Setup first.',
         'meta_whatsapp.messages' => 'Outbound sends and parent replies logged via Meta webhooks. Delivery status updates appear here.',
-        'students.profile.messages' => 'Chat-style thread for template sends and parent replies. When Meta is enabled, free-text replies work within 24 hours of the last parent message.',
+        'students.profile.messages' => 'Send an approved template from the left panel — only the fields that template needs appear. Student name and roll number are pre-filled when possible.',
         'setup.biometric' => 'EasyTimePro writes punches to punch_logs on the same MySQL server. Match device employee ID to student roll number, then configure parent messages under WhatsApp (Pal Digital) → Automations.',
 
         'courses.list' => 'Add every programme you offer — school classes, coaching courses, or college degrees. Active courses appear on your public website.',

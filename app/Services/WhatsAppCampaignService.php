@@ -93,13 +93,20 @@ class WhatsAppCampaignService
         return $campaign->fresh();
     }
 
-    public function sendSingle(Student $student, WhatsAppTemplate $template, User $sender): WhatsAppCampaignRecipient
+    public function sendSingle(Student $student, WhatsAppTemplate $template, User $sender, array $manualParams = []): WhatsAppCampaignRecipient
     {
+        $campaignVariables = null;
+
+        if ($manualParams !== []) {
+            $campaignVariables = ['_manual' => array_values($manualParams)];
+        }
+
         $campaign = WhatsAppCampaign::query()->create([
             'whatsapp_template_id' => $template->id,
             'name' => $template->name.' · '.$student->name,
             'status' => WhatsAppCampaignStatus::Queued,
             'total_recipients' => 1,
+            'campaign_variables' => $campaignVariables,
             'created_by' => $sender->id,
             'shot_by' => $sender->id,
             'shot_at' => now(),

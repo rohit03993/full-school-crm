@@ -55,6 +55,7 @@ use App\Services\MetaWhatsAppInboxService;
 use App\Services\StudentWhatsAppThreadService;
 use App\Services\WhatsAppProviderResolver;
 use App\Support\StudentWhatsAppThreadItem;
+use App\Support\StudentWhatsAppTemplateComposer;
 use App\Services\VisitMeetingAssignmentService;
 use App\Services\WhatsAppCampaignService;
 use App\Support\FeePlanCalculator;
@@ -169,6 +170,18 @@ class StudentProfilePage extends Page
     public Collection $homeworkAssignments;
 
     public ?int $sendWhatsAppTemplateId = null;
+
+    /** @var array<int, string> */
+    public array $sendWhatsAppTemplateParams = [];
+
+    /** @var list<array{index: int, label: string, hint: string, placeholder: string}> */
+    public array $sendWhatsAppTemplateFields = [];
+
+    public int $sendWhatsAppTemplateParamCount = 0;
+
+    public ?string $sendWhatsAppTemplatePreview = null;
+
+    public ?string $sendWhatsAppSelectedTemplateName = null;
 
   /**
      * @var Collection<int, Document>
@@ -478,6 +491,80 @@ class StudentProfilePage extends Page
             ->get();
     }
 
+    public function updatedSendWhatsAppTemplateId(): void
+    {
+        $this->refreshWhatsAppTemplateComposer();
+    }
+
+    public function updated($property): void
+    {
+        if (str_starts_with((string) $property, 'sendWhatsAppTemplateParams')) {
+            $this->refreshWhatsAppTemplatePreview();
+        }
+    }
+
+    public function updatedSendWhatsAppTemplateParams(): void
+    {
+        $this->refreshWhatsAppTemplatePreview();
+    }
+
+    protected function refreshWhatsAppTemplateComposer(): void
+    {
+        $this->sendWhatsAppTemplateFields = [];
+        $this->sendWhatsAppTemplateParams = [];
+        $this->sendWhatsAppTemplateParamCount = 0;
+        $this->sendWhatsAppTemplatePreview = null;
+        $this->sendWhatsAppSelectedTemplateName = null;
+
+        if (! $this->sendWhatsAppTemplateId) {
+            return;
+        }
+
+        $template = WhatsAppTemplate::query()
+            ->whereKey($this->sendWhatsAppTemplateId)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $template) {
+            return;
+        }
+
+        $compose = app(StudentWhatsAppTemplateComposer::class)->compose(
+            $template,
+            $this->record,
+            Auth::user(),
+        );
+
+        $this->sendWhatsAppTemplateFields = $compose['fields'];
+        $this->sendWhatsAppTemplateParams = $compose['defaults'];
+        $this->sendWhatsAppTemplateParamCount = $compose['param_count'];
+        $this->sendWhatsAppTemplatePreview = $compose['preview_body'];
+        $this->sendWhatsAppSelectedTemplateName = $compose['template_name'];
+    }
+
+    protected function refreshWhatsAppTemplatePreview(): void
+    {
+        if (! $this->sendWhatsAppTemplateId) {
+            $this->sendWhatsAppTemplatePreview = null;
+
+            return;
+        }
+
+        $template = WhatsAppTemplate::query()
+            ->whereKey($this->sendWhatsAppTemplateId)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $template) {
+            return;
+        }
+
+        $this->sendWhatsAppTemplatePreview = app(StudentWhatsAppTemplateComposer::class)->preview(
+            $template,
+            $this->sendWhatsAppTemplateParams,
+        );
+    }
+
     public function loadMessagesTab(): void
     {
         if ($this->messagesTabLoaded) {
@@ -580,11 +667,33 @@ class StudentProfilePage extends Page
             return;
         }
 
-        app(WhatsAppCampaignService::class)->sendSingle($this->record, $template, Auth::user());
+        if ($this->sendWhatsAppTemplateParamCount > 0) {
+            for ($i = 0; $i < $this->sendWhatsAppTemplateParamCount; $i++) {
+                if (blank($this->sendWhatsAppTemplateParams[$i] ?? null)) {
+                    $label = $this->sendWhatsAppTemplateFields[$i]['label'] ?? ('Parameter '.($i + 1));
+
+                    Notification::make()
+                        ->title('Fill all template fields')
+                        ->body('Enter a value for «'.$label.'» before sending.')
+                        ->warning()
+                        ->send();
+
+                    return;
+                }
+            }
+        }
+
+        app(WhatsAppCampaignService::class)->sendSingle(
+            $this->record,
+            $template,
+            Auth::user(),
+            $this->sendWhatsAppTemplateParams,
+        );
 
         $this->messagesTabLoaded = false;
         $this->loadMessagesTab();
         $this->sendWhatsAppTemplateId = null;
+        $this->refreshWhatsAppTemplateComposer();
 
         Notification::make()
             ->title('WhatsApp queued')
@@ -1882,6 +1991,10 @@ class StudentProfilePage extends Page
                                     'metaRoutingActive' => $this->metaRoutingActive,
                                     'whatsappProviderLabel' => $this->whatsappProviderLabel,
                                     'metaReplyText' => $this->metaReplyText,
+                                    'sendWhatsAppTemplateFields' => $this->sendWhatsAppTemplateFields,
+                                    'sendWhatsAppTemplateParamCount' => $this->sendWhatsAppTemplateParamCount,
+                                    'sendWhatsAppTemplatePreview' => $this->sendWhatsAppTemplatePreview,
+                                    'sendWhatsAppSelectedTemplateName' => $this->sendWhatsAppSelectedTemplateName,
                                 ]),
                         ]),
                     'admission' => Tab::make('Admission')
