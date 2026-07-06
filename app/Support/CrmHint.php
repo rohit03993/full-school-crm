@@ -69,7 +69,7 @@ class CrmHint
         'activity.attendance' => 'Mark Present or Absent for each student in this batch for this workshop, event, or single-subject session.',
         'activity.marks.import' => 'Enter test name and date, pick exam type, upload Excel. Roll numbers match students automatically.',
         'whatsapp.templates' => 'Create templates here and submit to Meta for approval. Sync refreshes APPROVED / PENDING / REJECTED status. Map {{1}} to student name before bulk campaigns.',
-        'whatsapp.templates.create' => 'Use {{1}} for student name in the body. Meta needs sample values for each variable. After submit, status is PENDING until Meta approves — then Sync from Meta.',
+        'whatsapp.templates.create' => 'Type {{1}}, {{2}}, … in the message body — sample fields for each variable appear automatically (like AiSensy). {{1}} is usually student name.',
         'whatsapp.campaigns.create' => 'Pick template, audience (batch or course), fill message fields, then send or save as draft.',
         'audit.logs' => 'Read-only history of important changes — fees, admissions, profile edits. For Super Admin oversight.',
     ];

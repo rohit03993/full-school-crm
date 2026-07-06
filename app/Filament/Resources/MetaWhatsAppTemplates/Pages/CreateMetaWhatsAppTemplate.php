@@ -5,6 +5,7 @@ namespace App\Filament\Resources\MetaWhatsAppTemplates\Pages;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource;
 use App\Services\MetaWhatsAppTemplateSubmitService;
+use App\Support\MetaWhatsAppTemplateVariableHelper;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +22,31 @@ class CreateMetaWhatsAppTemplate extends CreateRecord
     protected static function crmHintKey(): ?string
     {
         return 'whatsapp.templates.create';
+    }
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        $state = $this->form->getState();
+        $bodyText = (string) ($state['body_text'] ?? '');
+
+        if ($bodyText === '') {
+            return;
+        }
+
+        $this->form->fill([
+            ...$state,
+            'body_variable_samples' => MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
+                $bodyText,
+                $state['body_variable_samples'] ?? [],
+            ),
+        ]);
+    }
+
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        return MetaWhatsAppTemplateResource::normalizeCreateFormData($data);
     }
 
     protected function handleRecordCreation(array $data): Model

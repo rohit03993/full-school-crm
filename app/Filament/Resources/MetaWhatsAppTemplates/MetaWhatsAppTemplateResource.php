@@ -14,6 +14,7 @@ use App\Models\WhatsAppTemplate;
 use App\Services\WhatsAppTemplateParamResolver;
 use App\Support\CrmNavigation;
 use App\Support\MetaWhatsAppTemplateBuilder;
+use App\Support\MetaWhatsAppTemplateVariableHelper;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -23,6 +24,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -109,14 +111,58 @@ class MetaWhatsAppTemplateResource extends Resource
             Textarea::make('body_text')
                 ->label('Message body')
                 ->required()
-                ->rows(5)
-                ->helperText('Use {{1}} for student name, {{2}} for roll number, etc. Meta requires sample values for each variable.')
+                ->rows(8)
+                ->helperText('Type {{1}} for student name, {{2}} for roll number, {{3}} for time, {{4}} for date. Sample fields appear automatically below.')
+                ->live(debounce: 400)
+                ->afterStateUpdated(function (?string $state, Set $set, Get $get): void {
+                    $set(
+                        'body_variable_samples',
+                        MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
+                            (string) $state,
+                            $get('body_variable_samples') ?? [],
+                        ),
+                    );
+                })
                 ->columnSpanFull(),
-            TextInput::make('body_examples_csv')
-                ->label('Sample values')
-                ->helperText('Comma-separated, in order of {{1}}, {{2}}, … — e.g. Rohit Sharma, 12-A-042')
-                ->placeholder('Rohit Sharma, Class 12-A')
-                ->required(fn (Get $get): bool => MetaWhatsAppTemplateBuilder::positionalPlaceholderOrder((string) $get('body_text')) !== [])
+            Section::make('Template variables')
+                ->description('Meta requires one sample value per variable. These are only for approval — real sends use student data from the CRM.')
+                ->schema([
+                    Repeater::make('body_variable_samples')
+                        ->label('')
+                        ->schema([
+                            TextInput::make('index')
+                                ->hidden()
+                                ->dehydrated(),
+                            TextInput::make('label')
+                                ->hidden()
+                                ->dehydrated(),
+                            TextInput::make('example')
+                                ->label(fn (Get $get): string => '{{'.$get('index').'}} — '.($get('label') ?: 'Variable'))
+                                ->required()
+                                ->maxLength(256)
+                                ->live(onBlur: true),
+                        ])
+                        ->addable(false)
+                        ->deletable(false)
+                        ->reorderable(false)
+                        ->columnSpanFull(),
+                    Placeholder::make('body_preview')
+                        ->label('Preview with sample values')
+                        ->content(function (Get $get): HtmlString {
+                            $preview = MetaWhatsAppTemplateVariableHelper::previewBody(
+                                (string) $get('body_text'),
+                                $get('body_variable_samples') ?? [],
+                            );
+
+                            return new HtmlString(
+                                '<div class="whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-gray-100">'
+                                .e($preview)
+                                .'</div>'
+                            );
+                        })
+                        ->columnSpanFull(),
+                ])
+                ->visible(fn (Get $get): bool => MetaWhatsAppTemplateVariableHelper::variableCount((string) $get('body_text')) > 0)
                 ->columnSpanFull(),
             TextInput::make('footer_text')
                 ->label('Footer (optional)')
@@ -218,6 +264,23 @@ class MetaWhatsAppTemplateResource extends Resource
                     ]),
             ])
             ->defaultSort('name');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function normalizeCreateFormData(array $data): array
+    {
+        $samples = $data['body_variable_samples'] ?? [];
+
+        if (is_array($samples) && $samples !== []) {
+            $data['body_examples_csv'] = MetaWhatsAppTemplateVariableHelper::rowsToExamplesCsv($samples);
+        }
+
+        unset($data['body_variable_samples']);
+
+        return $data;
     }
 
     /**
