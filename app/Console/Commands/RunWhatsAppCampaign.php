@@ -11,8 +11,9 @@ use App\Models\StudentCall;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
-use App\Services\WhatsAppDispatchService;
+use App\Support\CrmNavigation;
 use App\Services\PalDigitalWhatsAppService;
+use App\Services\WhatsAppDispatchService;
 use App\Services\WhatsAppTemplateParamResolver;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -123,7 +124,7 @@ class RunWhatsAppCampaign extends Command
                 $recipient->update([
                     'status' => WhatsAppRecipientStatus::Failed,
                     'template_params' => $templateParams,
-                    'error_message' => 'Template parameters could not be resolved. Open META WhatsApp → Connection & Setup, sync templates, then resend from marks import step 4.',
+                    'error_message' => 'Template parameters could not be resolved. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').', sync templates, then resend from marks import step 4.',
                 ]);
                 $failed++;
 

@@ -151,18 +151,18 @@ class MetaWhatsAppSettingsService
     {
         if (! $this->isEnabled()) {
             return new HtmlString(
-                '<p class="text-sm text-gray-500">Meta routing is <strong>off</strong>. Pal Digital handles all WhatsApp sends.</p>'
+                '<p class="text-sm text-gray-500">WhatsApp routing is <strong>off</strong>. Save this institute\'s Meta credentials below and turn on <strong>WhatsApp enabled</strong>.</p>'
             );
         }
 
         if (! $this->meta->isConfigured()) {
             return new HtmlString(
-                '<p class="text-sm text-warning-700 dark:text-warning-400">Meta is enabled but credentials are incomplete — Pal Digital will still be used if configured.</p>'
+                '<p class="text-sm text-warning-700 dark:text-warning-400">WhatsApp is enabled but credentials are incomplete — complete Phone number ID and access token, then save.</p>'
             );
         }
 
         return new HtmlString(
-            '<p class="text-sm text-success-700 dark:text-success-400">Meta routing is <strong>active</strong>. Campaigns and automations send through Meta Cloud API. Pal Digital is bypassed.</p>'
+            '<p class="text-sm text-success-700 dark:text-success-400">WhatsApp routing is <strong>active</strong> for this institute via Meta Cloud API. Campaigns, punch, and automations send from this CRM.</p>'
         );
     }
 

@@ -90,6 +90,6 @@ class WhatsAppDispatchServiceTest extends TestCase
         );
 
         $this->assertSame('failed', $result['status']);
-        $this->assertStringContainsString('not synced in Meta WhatsApp', (string) $result['error']);
+        $this->assertStringContainsString('not synced', (string) $result['error']);
     }
 }

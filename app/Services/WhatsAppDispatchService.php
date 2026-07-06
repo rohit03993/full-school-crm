@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\WhatsAppProvider;
 use App\Models\MetaWhatsAppTemplate;
+use App\Support\CrmNavigation;
 
 class WhatsAppDispatchService
 {
@@ -87,7 +88,7 @@ class WhatsAppDispatchService
         if ($metaTemplate === null) {
             return [
                 'status' => 'failed',
-                'error' => 'Template "'.$templateName.'" is not synced in Meta. Open META WhatsApp → Connection & Setup and click Sync templates.',
+                'error' => 'Template "'.$templateName.'" is not synced. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').' and click Sync templates.',
                 'provider' => WhatsAppProvider::Meta->value,
             ];
         }

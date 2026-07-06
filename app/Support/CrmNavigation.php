@@ -8,7 +8,7 @@ use Filament\Support\Icons\Heroicon;
 /**
  * Sidebar group names and order — keep menu paths in hints/docs aligned with these labels.
  *
- * Leads → Calls → META WhatsApp → Students → Academics → Reports → Settings → Admin → Website
+ * Leads → Calls → WhatsApp (Pal Digital) → Students → Academics → Reports → Settings → Admin → Website
  */
 class CrmNavigation
 {
@@ -18,8 +18,13 @@ class CrmNavigation
 
     public const GROUP_MESSAGING = 'Messaging';
 
-    /** All WhatsApp admin: Meta connection, automations, campaigns, message log. */
-    public const GROUP_META_WHATSAPP = 'META WhatsApp';
+    /** WhatsApp admin: Meta connection, automations, campaigns, message log — per-school in this CRM's database. */
+    public const GROUP_META_WHATSAPP = 'WhatsApp (Pal Digital)';
+
+    public static function whatsAppMenu(string $item): string
+    {
+        return self::GROUP_META_WHATSAPP.' → '.$item;
+    }
 
     public const GROUP_STUDENTS = 'Students & Admissions';
 

@@ -60,7 +60,7 @@
         [
             'title' => '9. WhatsApp (optional)',
             'body' => 'Connect Meta WhatsApp, sync templates, then map punch and campaign automations.',
-            'menu' => 'META WhatsApp → Connection & Setup',
+            'menu' => \App\Support\CrmNavigation::whatsAppMenu('Connection & Setup'),
             'url' => \App\Filament\Pages\ManageMetaWhatsAppSettings::getUrl(),
             'done' => null,
         ],

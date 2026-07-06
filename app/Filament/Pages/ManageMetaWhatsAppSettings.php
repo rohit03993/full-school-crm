@@ -78,6 +78,7 @@ class ManageMetaWhatsAppSettings extends Page
         return $schema->components([
             CrmHint::placeholder('setup.meta_whatsapp'),
             Section::make('Overview')
+                ->description('Credentials and templates are stored only for this institute in this CRM — each school (Taskbook, Folks India, etc.) has its own Meta WhatsApp Business account.')
                 ->schema([
                     Placeholder::make('dashboard_stats')
                         ->label('')
@@ -92,8 +93,8 @@ class ManageMetaWhatsAppSettings extends Page
                         ->content(fn (MetaWhatsAppSettingsService $settings): \Illuminate\Support\HtmlString => $settings->renderRoutingBanner())
                         ->columnSpanFull(),
                     Toggle::make('enabled')
-                        ->label('Meta WhatsApp enabled')
-                        ->helperText('When on, all campaigns and automations (punch, post-call, homework, marks) send via Meta. Template names must exist under Synced Meta templates below.')
+                        ->label('WhatsApp enabled')
+                        ->helperText('When on, all campaigns and automations (punch, post-call, homework, marks) send via Meta for this institute. Template names must exist under Synced Meta templates below.')
                         ->columnSpanFull(),
                 ]),
             Section::make('Meta Cloud API credentials')
@@ -147,7 +148,7 @@ class ManageMetaWhatsAppSettings extends Page
                 ])
                 ->columns(2),
             Section::make('Recent Meta messages')
-                ->description('Last 15 messages sent or received via Meta. Full history is under META WhatsApp → Message log.')
+                ->description(fn (): string => 'Last 15 messages for this institute. Full history is under '.CrmNavigation::whatsAppMenu('Message log').'.')
                 ->schema([
                     Placeholder::make('recent_messages_table')
                         ->label('')
@@ -155,7 +156,7 @@ class ManageMetaWhatsAppSettings extends Page
                         ->columnSpanFull(),
                 ]),
             Section::make('Synced Meta templates')
-                ->description('Approved templates from your WABA. Map them to automations under META WhatsApp → Automations.')
+                ->description(fn (): string => 'Approved templates from this institute\'s WABA. Map them under '.CrmNavigation::whatsAppMenu('Automations').'.')
                 ->schema([
                     Placeholder::make('synced_templates_table')
                         ->label('')
@@ -202,7 +203,7 @@ class ManageMetaWhatsAppSettings extends Page
 
         if (! $result['ok']) {
             Notification::make()
-                ->title('Could not save Meta WhatsApp settings')
+                ->title('Could not save WhatsApp settings')
                 ->body($result['message'] ?? 'Check the credentials.')
                 ->danger()
                 ->send();
@@ -213,7 +214,7 @@ class ManageMetaWhatsAppSettings extends Page
         $this->refillForm($settings);
 
         Notification::make()
-            ->title('Meta WhatsApp settings saved')
+            ->title('WhatsApp settings saved')
             ->body('Credentials saved.'.$settings->ignoredReplaceTokenNotice((bool) ($result['ignored_invalid_token_field'] ?? false)))
             ->success()
             ->send();

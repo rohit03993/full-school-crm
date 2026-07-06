@@ -10,6 +10,7 @@ use App\Models\WhatsAppTemplate;
 use App\Services\WhatsAppCampaignService;
 use App\Enums\LicenseFeature;
 use App\Support\FeatureGate;
+use App\Support\CrmNavigation;
 use App\Support\PunchWhatsAppOutcome;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -48,7 +49,7 @@ class PunchWhatsAppService
             }
 
             if (! $this->punchAutosendEnabled()) {
-                return PunchWhatsAppOutcome::skipped('Turn on punch WhatsApp in META WhatsApp → Automations.');
+                return PunchWhatsAppOutcome::skipped('Turn on punch WhatsApp in '.CrmNavigation::whatsAppMenu('Automations').'.');
             }
 
             $isManual = $staff !== null;

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Setting;
 use App\Enums\MetaWhatsAppMessageStatus;
+use App\Support\CrmNavigation;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -26,7 +27,7 @@ class MetaWhatsAppService
         int $expectedParamCount = 0,
     ): array {
         if (! $this->isConfigured()) {
-            return ['status' => 'failed', 'error' => 'Meta WhatsApp is not configured. Open Setup → Meta WhatsApp and save credentials.'];
+            return ['status' => 'failed', 'error' => 'WhatsApp is not configured. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').' and save credentials.'];
         }
 
         $destination = $this->destinationE164($phone);
@@ -445,7 +446,7 @@ class MetaWhatsAppService
     public function sendText(string $phone, string $text): array
     {
         if (! $this->isConfigured()) {
-            return ['status' => 'failed', 'error' => 'Meta WhatsApp is not configured.'];
+            return ['status' => 'failed', 'error' => 'WhatsApp is not configured. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').' and save credentials.'];
         }
 
         $destination = $this->destinationE164($phone);

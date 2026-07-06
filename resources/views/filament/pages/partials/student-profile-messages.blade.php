@@ -41,9 +41,9 @@
                 <p class="crm-wa-inbox__hint">
                     No templates synced.
                     @if ($metaRoutingActive)
-                        Open <strong>META WhatsApp → Connection &amp; Setup</strong> and click Sync templates.
+                        Open <strong>{{ \App\Support\CrmNavigation::whatsAppMenu('Connection & Setup') }}</strong> and click Sync templates.
                     @else
-                        Open <strong>META WhatsApp → Automations</strong> and sync legacy Pal Digital templates.
+                        Open <strong>{{ \App\Support\CrmNavigation::whatsAppMenu('Automations') }}</strong> and sync templates.
                     @endif
                 </p>
             @else
