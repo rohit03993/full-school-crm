@@ -81,6 +81,8 @@ class PunchWhatsAppServiceTest extends TestCase
         $this->assertNotNull($campaign);
         $this->assertSame($manualTemplate->id, $campaign->whatsapp_template_id);
         $this->assertSame('punch_manual', $campaign->campaignVariable('audience_source'));
+        $this->assertSame(1, $campaign->total_recipients);
+        $this->assertSame(1, $campaign->recipients()->count());
     }
 
     public function test_manual_in_falls_back_to_biometric_template_when_manual_blank(): void

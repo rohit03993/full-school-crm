@@ -89,6 +89,12 @@ class WhatsAppCampaignService
 
         $this->refreshCampaignRecipients($campaign);
 
+        $campaign->refresh();
+
+        if ((int) $campaign->total_recipients < 1) {
+            throw new \RuntimeException('No recipients with mobile numbers for this campaign.');
+        }
+
         $campaign->update([
             'status' => WhatsAppCampaignStatus::Queued,
             'shot_by' => $sender->id,
@@ -243,7 +249,7 @@ class WhatsAppCampaignService
             return;
         }
 
-        if ($campaign->campaignVariable('audience_source') === 'attendance') {
+        if (in_array($campaign->campaignVariable('audience_source'), ['attendance', 'punch_manual', 'punch_biometric'], true)) {
             $this->refreshAttendanceRecipients($campaign);
 
             return;
