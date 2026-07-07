@@ -108,7 +108,7 @@ class MetaWhatsAppInboxService
 
         $preview = MetaWhatsAppInboundMessageParser::previewLabel(
             $messageType,
-            $caption !== '' ? $caption : MetaWhatsAppInboundMessageParser::typeLabel($messageType),
+            null,
             $caption !== '' ? $caption : null,
         );
 

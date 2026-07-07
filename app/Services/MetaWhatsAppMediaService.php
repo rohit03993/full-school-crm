@@ -315,9 +315,15 @@ class MetaWhatsAppMediaService
         }
 
         try {
+            $bytes = $this->readUploadedFileBytes($file);
+
+            if ($bytes === null) {
+                return ['status' => 'failed', 'error' => 'Could not read the uploaded file. Try choosing it again.'];
+            }
+
             $response = Http::timeout(60)
                 ->withToken((string) $this->meta->accessToken())
-                ->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
+                ->attach('file', $bytes, $file->getClientOriginalName())
                 ->post($this->meta->graphUrl($this->meta->phoneNumberId().'/media'), [
                     'messaging_product' => 'whatsapp',
                     'type' => $mimeType,
@@ -343,16 +349,43 @@ class MetaWhatsAppMediaService
 
     public function storeOutboundCopy(MetaWhatsAppMessage $message, UploadedFile $file): void
     {
+        $bytes = $this->readUploadedFileBytes($file);
+
+        if ($bytes === null) {
+            Log::warning('Meta WhatsApp outbound media copy skipped — could not read upload', [
+                'message_id' => $message->id,
+            ]);
+
+            return;
+        }
+
+        if (! Storage::disk(self::DISK)->exists(self::DIRECTORY)) {
+            Storage::disk(self::DISK)->makeDirectory(self::DIRECTORY);
+        }
+
         $extension = $file->getClientOriginalExtension() ?: $this->extensionForMime((string) $file->getMimeType(), (string) $message->message_type);
         $path = self::DIRECTORY.'/out-'.$message->id.'-'.Str::random(8).'.'.$extension;
 
-        Storage::disk(self::DISK)->put($path, file_get_contents($file->getRealPath()));
+        Storage::disk(self::DISK)->put($path, $bytes);
 
         $message->update([
             'media_path' => $path,
             'media_mime_type' => (string) ($file->getMimeType() ?: $message->media_mime_type),
             'media_filename' => $file->getClientOriginalName(),
         ]);
+    }
+
+    protected function readUploadedFileBytes(UploadedFile $file): ?string
+    {
+        $path = $file->getRealPath();
+
+        if (is_string($path) && $path !== '' && is_readable($path)) {
+            $contents = file_get_contents($path);
+
+            return $contents === false ? null : $contents;
+        }
+
+        return null;
     }
 
     protected function mediaIdFromPayload(MetaWhatsAppMessage $message): ?string

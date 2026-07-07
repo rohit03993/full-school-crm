@@ -12,6 +12,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\MetaWhatsAppMediaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -196,6 +197,55 @@ class StudentProfileMessagesTabTest extends TestCase
             ->assertSet('profileTab', 'messages')
             ->assertSee('See this')
             ->assertStatus(200);
+    }
+
+    public function test_messages_tab_can_send_image_attachment(): void
+    {
+        Storage::fake(MetaWhatsAppMediaService::DISK);
+
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::sequence()
+                ->push(['id' => 'uploaded-media-123'])
+                ->push(['messages' => [['id' => 'wamid.OUTIMG']]], 200),
+        ]);
+
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-token'), 'meta_whatsapp');
+
+        $admin = $this->createSuperAdmin();
+
+        $student = Student::query()->create([
+            'name' => 'Kapil',
+            'mobile' => '8320936488',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.IN1',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '918320936488',
+            'student_id' => $student->id,
+            'body_preview' => 'Hi',
+            'message_type' => 'text',
+            'status' => 'received',
+            'status_at' => now()->subMinutes(5),
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(StudentProfilePage::class, ['record' => $student])
+            ->set('profileTab', 'messages')
+            ->set('showMetaReplyAttachment', true)
+            ->set('metaReplyAttachment', UploadedFile::fake()->image('favicon pd.png'))
+            ->call('sendMetaMedia')
+            ->assertStatus(200);
+
+        $this->assertDatabaseHas('meta_whatsapp_messages', [
+            'wamid' => 'wamid.OUTIMG',
+            'student_id' => $student->id,
+            'message_type' => 'image',
+        ]);
     }
 
     public function test_messages_blade_requires_template_id_in_view_data(): void
