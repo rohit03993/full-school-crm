@@ -6,7 +6,7 @@ use App\Enums\LicenseFeature;
 use App\Enums\WhatsAppRecipientStatus;
 use App\Models\Student;
 use App\Services\MetaWhatsAppInboxService;
-use App\Services\StudentWhatsAppTemplateComposer;
+use App\Support\StudentWhatsAppTemplateComposer;
 use App\Services\StudentWhatsAppThreadService;
 use App\Services\WhatsAppCampaignService;
 use App\Services\WhatsAppProviderResolver;

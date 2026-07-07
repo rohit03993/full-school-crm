@@ -238,4 +238,133 @@ class WhatsAppInboxPageTest extends TestCase
 
         return $user;
     }
+
+    public function test_inbox_can_select_manual_in_template_without_error(): void
+    {
+        Http::fake();
+
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-token'), 'meta_whatsapp');
+
+        $admin = $this->createSuperAdmin();
+
+        $student = Student::query()->create([
+            'name' => 'Amit Verma',
+            'mobile' => '8109462946',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $template = \App\Models\WhatsAppTemplate::query()->create([
+            'name' => 'manual_in',
+            'param_count' => 4,
+            'param_mappings' => [null, null, null, null],
+            'body' => 'Hi {{1}}, roll {{2}}, time {{3}}, date {{4}}',
+            'is_active' => true,
+            'provider_meta' => [
+                'body_variables' => ['1', '2', '3', '4'],
+                'meta_language' => 'en',
+            ],
+        ]);
+
+        \App\Models\MetaWhatsAppTemplate::query()->create([
+            'name' => 'manual_in',
+            'language' => 'en',
+            'status' => 'APPROVED',
+            'param_count' => 4,
+            'body' => 'Hi {{1}}, roll {{2}}, time {{3}}, date {{4}}',
+            'is_active' => true,
+            'synced_at' => now(),
+            'provider_meta' => ['body_variables' => ['1', '2', '3', '4']],
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.CHAT1',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '918109462946',
+            'student_id' => $student->id,
+            'body_preview' => 'Hello',
+            'message_type' => 'text',
+            'status' => 'received',
+            'status_at' => now()->subMinutes(5),
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(WhatsAppInboxPage::class)
+            ->call('selectConversation', $student->id)
+            ->set('sendWhatsAppTemplateId', $template->id)
+            ->assertSet('sendWhatsAppTemplateParamCount', 4)
+            ->assertSee('This template needs')
+            ->assertStatus(200);
+    }
+
+    public function test_inbox_can_send_manual_in_template(): void
+    {
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response([
+                'messages' => [['id' => 'wamid.OUT123']],
+            ], 200),
+        ]);
+
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-token'), 'meta_whatsapp');
+
+        $admin = $this->createSuperAdmin();
+
+        $student = Student::query()->create([
+            'name' => 'Amit Verma',
+            'mobile' => '8109462946',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $template = \App\Models\WhatsAppTemplate::query()->create([
+            'name' => 'manual_in',
+            'param_count' => 4,
+            'param_mappings' => [null, null, null, null],
+            'body' => 'Hi {{1}}, roll {{2}}, time {{3}}, date {{4}}',
+            'is_active' => true,
+            'provider_meta' => [
+                'body_variables' => ['1', '2', '3', '4'],
+                'meta_language' => 'en',
+            ],
+        ]);
+
+        \App\Models\MetaWhatsAppTemplate::query()->create([
+            'name' => 'manual_in',
+            'language' => 'en',
+            'status' => 'APPROVED',
+            'param_count' => 4,
+            'body' => 'Hi {{1}}, roll {{2}}, time {{3}}, date {{4}}',
+            'is_active' => true,
+            'synced_at' => now(),
+            'provider_meta' => ['body_variables' => ['1', '2', '3', '4']],
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.CHAT1',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '918109462946',
+            'student_id' => $student->id,
+            'body_preview' => 'Hello',
+            'message_type' => 'text',
+            'status' => 'received',
+            'status_at' => now()->subMinutes(5),
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(WhatsAppInboxPage::class)
+            ->call('selectConversation', $student->id)
+            ->set('sendWhatsAppTemplateId', $template->id)
+            ->set('sendWhatsAppTemplateParams', [
+                0 => 'Amit Verma',
+                1 => 'ROLL-1',
+                2 => '12:06',
+                3 => '07 Jul 2026',
+            ])
+            ->call('sendWhatsAppMessage')
+            ->assertStatus(200);
+    }
 }
