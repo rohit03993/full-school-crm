@@ -6,6 +6,7 @@ use App\Enums\MetaWhatsAppMessageDirection;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Student;
 use App\Models\WhatsAppCampaignRecipient;
+use App\Support\MetaWhatsAppInboundMessageParser;
 use App\Support\MetaWhatsAppConversation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -97,7 +98,12 @@ class MetaWhatsAppConversationService
 
     protected function conversationFromMetaMessage(MetaWhatsAppMessage $message, Student $student): MetaWhatsAppConversation
     {
-        $preview = trim((string) ($message->body_preview ?? ''));
+        $messageType = (string) ($message->message_type ?? 'text');
+        $preview = MetaWhatsAppInboundMessageParser::previewLabel(
+            $messageType,
+            (string) ($message->body_preview ?? ''),
+            (string) ($message->caption ?? ''),
+        );
 
         if ($preview === '' && filled($message->template_name)) {
             $preview = (string) $message->template_name;

@@ -160,6 +160,8 @@ class StudentProfilePage extends Page
 
     public string $metaReplyText = '';
 
+    public ?TemporaryUploadedFile $metaReplyAttachment = null;
+
     public bool $metaSessionOpen = false;
 
     public bool $metaRoutingActive = false;
@@ -662,6 +664,49 @@ class StudentProfilePage extends Page
         Notification::make()
             ->title('Reply sent')
             ->body('Your message was delivered via Meta WhatsApp.')
+            ->success()
+            ->send();
+    }
+
+    public function sendMetaMedia(): void
+    {
+        if (! $this->licensed(LicenseFeature::WhatsApp)) {
+            Notification::make()->title('WhatsApp module is not enabled')->warning()->send();
+
+            return;
+        }
+
+        if (! $this->metaReplyAttachment) {
+            Notification::make()->title('Choose a file first')->warning()->send();
+
+            return;
+        }
+
+        $result = app(MetaWhatsAppInboxService::class)->sendMedia(
+            $this->record,
+            $this->metaReplyAttachment,
+            $this->metaReplyText,
+            Auth::user(),
+        );
+
+        if ($result['status'] !== 'success') {
+            Notification::make()
+                ->title('Could not send attachment')
+                ->body((string) ($result['error'] ?? 'Unknown error'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->metaReplyText = '';
+        $this->metaReplyAttachment = null;
+        $this->messagesTabLoaded = false;
+        $this->loadMessagesTab();
+
+        Notification::make()
+            ->title('Attachment sent')
+            ->body('Your file was delivered via Meta WhatsApp.')
             ->success()
             ->send();
     }

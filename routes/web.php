@@ -3,6 +3,7 @@
 use App\Http\Controllers\Webhooks\MetaWhatsAppWebhookController;
 use App\Http\Controllers\Api\AisensyCampaignTriggerController;
 use App\Http\Controllers\Admin\DocumentDownloadController;
+use App\Http\Controllers\Admin\MetaWhatsAppMediaController;
 use App\Http\Controllers\Admin\IdCardDownloadController;
 use App\Http\Controllers\Admin\PaymentProofDownloadController;
 use App\Http\Controllers\Admin\ReceiptDownloadController;
@@ -44,6 +45,9 @@ Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
         ->name('admin.documents.download');
     Route::get('documents/{document}/preview', [DocumentDownloadController::class, 'preview'])
         ->name('admin.documents.preview');
+
+    Route::get('whatsapp-messages/{message}/media', [MetaWhatsAppMediaController::class, 'show'])
+        ->name('admin.whatsapp-messages.media');
 
     Route::middleware('license.feature:fees')->group(function () {
         Route::get('payments/{payment}/proof/preview', [PaymentProofDownloadController::class, 'preview'])

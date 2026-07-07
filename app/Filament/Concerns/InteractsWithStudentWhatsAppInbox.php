@@ -16,6 +16,7 @@ use App\Support\StudentWhatsAppThreadItem;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 trait InteractsWithStudentWhatsAppInbox
 {
@@ -25,6 +26,8 @@ trait InteractsWithStudentWhatsAppInbox
     public array $messageThread = [];
 
     public string $metaReplyText = '';
+
+    public ?TemporaryUploadedFile $metaReplyAttachment = null;
 
     public bool $metaSessionOpen = false;
 
@@ -206,6 +209,7 @@ trait InteractsWithStudentWhatsAppInbox
         $this->messagesTabLoaded = false;
         $this->messageThread = [];
         $this->metaReplyText = '';
+        $this->metaReplyAttachment = null;
         $this->sendWhatsAppTemplateId = null;
         $this->refreshWhatsAppTemplateComposer();
     }
@@ -248,6 +252,52 @@ trait InteractsWithStudentWhatsAppInbox
         Notification::make()
             ->title('Reply sent')
             ->body('Your message was delivered via Meta WhatsApp.')
+            ->success()
+            ->send();
+    }
+
+    public function sendMetaMedia(): void
+    {
+        $student = $this->whatsAppMessageStudent();
+
+        if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
+            Notification::make()->title('WhatsApp module is not enabled')->warning()->send();
+
+            return;
+        }
+
+        if (! $student || ! $this->metaReplyAttachment) {
+            Notification::make()->title('Choose a file first')->warning()->send();
+
+            return;
+        }
+
+        $result = app(MetaWhatsAppInboxService::class)->sendMedia(
+            $student,
+            $this->metaReplyAttachment,
+            $this->metaReplyText,
+            Auth::user(),
+        );
+
+        if ($result['status'] !== 'success') {
+            Notification::make()
+                ->title('Could not send attachment')
+                ->body((string) ($result['error'] ?? 'Unknown error'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->metaReplyText = '';
+        $this->metaReplyAttachment = null;
+        $this->resetMessagesTab();
+        $this->loadMessagesTab();
+        $this->afterWhatsAppMessageSent();
+
+        Notification::make()
+            ->title('Attachment sent')
+            ->body('Your file was delivered via Meta WhatsApp.')
             ->success()
             ->send();
     }

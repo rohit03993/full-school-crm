@@ -17,6 +17,12 @@ readonly class StudentWhatsAppThreadItem
         public ?string $templateName = null,
         public ?string $provider = null,
         public ?string $errorMessage = null,
+        public string $messageType = 'text',
+        public ?string $mediaUrl = null,
+        public ?string $mediaMimeType = null,
+        public ?string $mediaFilename = null,
+        public ?string $caption = null,
+        public ?string $locationUrl = null,
     ) {}
 
     public function isInbound(): bool
@@ -30,7 +36,7 @@ readonly class StudentWhatsAppThreadItem
     }
 
     /**
-     * @return array{key: string, source: string, direction: string, body: string, status: string, statusLabel: string, at: ?string, at_label: ?string, templateName: ?string, provider: ?string, errorMessage: ?string}
+     * @return array<string, mixed>
      */
     public function toArray(): array
     {
@@ -46,6 +52,12 @@ readonly class StudentWhatsAppThreadItem
             'templateName' => $this->templateName,
             'provider' => $this->provider,
             'errorMessage' => $this->errorMessage,
+            'messageType' => $this->messageType,
+            'mediaUrl' => $this->mediaUrl,
+            'mediaMimeType' => $this->mediaMimeType,
+            'mediaFilename' => $this->mediaFilename,
+            'caption' => $this->caption,
+            'locationUrl' => $this->locationUrl,
         ];
     }
 }

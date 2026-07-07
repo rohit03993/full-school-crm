@@ -902,7 +902,63 @@
     }
 
     .crm-wa-bubble__body {
-        @apply whitespace-pre-wrap text-sm leading-relaxed;
+        @apply whitespace-pre-wrap break-words text-sm leading-relaxed;
+    }
+
+    .crm-wa-bubble__caption {
+        @apply mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed;
+    }
+
+    .crm-wa-bubble__media-fallback {
+        @apply text-sm font-medium text-gray-700 dark:text-gray-200;
+    }
+
+    .crm-wa-bubble__media-trigger {
+        @apply block w-full overflow-hidden rounded-xl;
+    }
+
+    .crm-wa-bubble__image {
+        @apply max-h-72 w-full rounded-xl object-cover;
+    }
+
+    .crm-wa-bubble__video {
+        @apply max-h-72 w-full rounded-xl bg-black;
+    }
+
+    .crm-wa-bubble__audio {
+        @apply w-full min-w-[14rem];
+    }
+
+    .crm-wa-bubble__document {
+        @apply flex items-center gap-3 rounded-xl border border-gray-200/80 bg-white/90 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-white dark:border-white/10 dark:bg-gray-900/80 dark:text-gray-100;
+    }
+
+    .crm-wa-bubble__document-icon {
+        @apply h-5 w-5 shrink-0 text-primary-600 dark:text-primary-300;
+    }
+
+    .crm-wa-bubble__document-name {
+        @apply min-w-0 truncate;
+    }
+
+    .crm-wa-bubble__location {
+        @apply inline-flex items-center gap-2 rounded-xl bg-white/90 px-3 py-2 text-sm font-medium text-sky-700 ring-1 ring-sky-200 hover:bg-white dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20;
+    }
+
+    .crm-wa-bubble__location-icon {
+        @apply h-4 w-4 shrink-0;
+    }
+
+    .crm-wa-bubble__reaction {
+        @apply text-3xl leading-none;
+    }
+
+    .crm-wa-inbox__file {
+        @apply mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-100 dark:text-gray-300 dark:file:bg-primary-500/10 dark:file:text-primary-300;
+    }
+
+    .crm-wa-inbox__composer-actions {
+        @apply grid gap-2;
     }
 
     .crm-wa-bubble__footer {

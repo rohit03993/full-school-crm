@@ -39,6 +39,38 @@ class MetaWhatsAppMessageLogger
             'template_name' => $templateName !== '' ? $templateName : null,
             'language' => $language !== '' ? $language : null,
             'body_preview' => mb_substr($preview, 0, 500),
+            'message_type' => 'text',
+            'status' => $status->value,
+            'status_detail' => $statusDetail,
+            'payload' => $payload,
+            'status_at' => now(),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $mediaAttributes
+     */
+    public function recordOutboundMedia(
+        string $phone,
+        ?string $wamid,
+        array $mediaAttributes,
+        MetaWhatsAppMessageStatus $status,
+        ?string $statusDetail = null,
+        ?array $payload = null,
+        ?int $studentId = null,
+    ): MetaWhatsAppMessage {
+        return MetaWhatsAppMessage::query()->create([
+            'wamid' => $wamid,
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => $this->normalizePhone($phone),
+            'student_id' => $studentId ?? $this->guessStudentId($phone),
+            'body_preview' => mb_substr((string) ($mediaAttributes['body_preview'] ?? 'Media message'), 0, 500),
+            'message_type' => (string) ($mediaAttributes['message_type'] ?? 'document'),
+            'media_id' => $mediaAttributes['media_id'] ?? null,
+            'media_path' => $mediaAttributes['media_path'] ?? null,
+            'media_mime_type' => $mediaAttributes['media_mime_type'] ?? null,
+            'media_filename' => $mediaAttributes['media_filename'] ?? null,
+            'caption' => $mediaAttributes['caption'] ?? null,
             'status' => $status->value,
             'status_detail' => $statusDetail,
             'payload' => $payload,
@@ -51,6 +83,11 @@ class MetaWhatsAppMessageLogger
         ?string $wamid,
         string $bodyPreview,
         ?array $payload = null,
+        string $messageType = 'text',
+        ?string $mediaId = null,
+        ?string $mediaMimeType = null,
+        ?string $mediaFilename = null,
+        ?string $caption = null,
     ): MetaWhatsAppMessage {
         return MetaWhatsAppMessage::query()->create([
             'wamid' => $wamid,
@@ -58,6 +95,11 @@ class MetaWhatsAppMessageLogger
             'phone' => $this->normalizePhone($phone),
             'student_id' => $this->guessStudentId($phone),
             'body_preview' => mb_substr($bodyPreview, 0, 500),
+            'message_type' => $messageType !== '' ? $messageType : 'text',
+            'media_id' => $mediaId,
+            'media_mime_type' => $mediaMimeType,
+            'media_filename' => $mediaFilename,
+            'caption' => $caption,
             'status' => MetaWhatsAppMessageStatus::Received->value,
             'payload' => $payload,
             'status_at' => now(),

@@ -420,7 +420,7 @@ class MetaWhatsAppService
         return null;
     }
 
-    protected function graphUrl(string $path): string
+    public function graphUrl(string $path): string
     {
         $version = trim((string) config('meta_whatsapp.graph_version', 'v20.0'), '/');
         $path = ltrim($path, '/');
@@ -446,7 +446,7 @@ class MetaWhatsAppService
     /**
      * @param  mixed  $data
      */
-    protected function parseApiError(mixed $data, string $fallbackBody): string
+    public function parseApiError(mixed $data, string $fallbackBody): string
     {
         if (! is_array($data)) {
             return $fallbackBody !== '' ? $fallbackBody : 'Unknown Meta API error';
@@ -535,6 +535,80 @@ class MetaWhatsAppService
             ];
         } catch (\Throwable $e) {
             Log::error('Meta WhatsApp text exception', ['error' => $e->getMessage()]);
+
+            return ['status' => 'failed', 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{status: string, response?: mixed, error?: string, message_id?: string}
+     */
+    public function sendMedia(
+        string $phone,
+        string $messageType,
+        string $mediaId,
+        ?string $caption = null,
+        ?string $filename = null,
+    ): array {
+        if (! $this->isConfigured()) {
+            return ['status' => 'failed', 'error' => 'WhatsApp is not configured. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').' and save credentials.'];
+        }
+
+        $destination = $this->destinationE164($phone);
+
+        if (! $destination) {
+            return ['status' => 'failed', 'error' => 'Invalid Indian mobile number.'];
+        }
+
+        $messageType = match ($messageType) {
+            'image', 'video', 'audio', 'document' => $messageType,
+            default => 'document',
+        };
+
+        $mediaPayload = ['id' => $mediaId];
+
+        if ($caption !== null && $caption !== '' && in_array($messageType, ['image', 'video', 'document'], true)) {
+            $mediaPayload['caption'] = mb_substr($caption, 0, 1024);
+        }
+
+        if ($filename !== null && $filename !== '' && $messageType === 'document') {
+            $mediaPayload['filename'] = mb_substr($filename, 0, 240);
+        }
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to' => $destination,
+            'type' => $messageType,
+            $messageType => $mediaPayload,
+        ];
+
+        $url = $this->graphUrl($this->phoneNumberId().'/messages');
+
+        try {
+            $response = Http::timeout(60)
+                ->withToken((string) $this->accessToken())
+                ->acceptJson()
+                ->post($url, $payload);
+
+            $data = $response->json();
+
+            if ($response->successful() && is_array($data)) {
+                $messageId = data_get($data, 'messages.0.id');
+
+                return [
+                    'status' => 'success',
+                    'response' => $data,
+                    'message_id' => is_string($messageId) ? $messageId : null,
+                ];
+            }
+
+            return [
+                'status' => 'failed',
+                'error' => $this->parseApiError($data, $response->body()),
+                'response' => $data,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Meta WhatsApp media send exception', ['error' => $e->getMessage()]);
 
             return ['status' => 'failed', 'error' => $e->getMessage()];
         }

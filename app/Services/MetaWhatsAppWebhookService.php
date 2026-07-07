@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\MetaWhatsAppMessageStatus;
+use App\Support\MetaWhatsAppInboundMessageParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -11,6 +12,7 @@ class MetaWhatsAppWebhookService
     public function __construct(
         protected MetaWhatsAppService $meta,
         protected MetaWhatsAppMessageLogger $logger,
+        protected MetaWhatsAppMediaService $media,
     ) {}
 
     public function verifySubscription(Request $request): ?string
@@ -126,19 +128,27 @@ class MetaWhatsAppWebhookService
 
             $from = (string) ($message['from'] ?? '');
             $wamid = (string) ($message['id'] ?? '');
-            $type = (string) ($message['type'] ?? 'text');
-            $preview = match ($type) {
-                'text' => (string) data_get($message, 'text.body', ''),
-                'button' => (string) data_get($message, 'button.text', '[button]'),
-                'interactive' => '[interactive message]',
-                default => '['.$type.' message]',
-            };
+            $parsed = MetaWhatsAppInboundMessageParser::parse($message);
 
             if ($from === '') {
                 continue;
             }
 
-            $this->logger->recordInbound($from, $wamid !== '' ? $wamid : null, $preview, $message);
+            $record = $this->logger->recordInbound(
+                $from,
+                $wamid !== '' ? $wamid : null,
+                $parsed['body_preview'],
+                $message,
+                $parsed['message_type'],
+                $parsed['media_id'],
+                $parsed['media_mime_type'],
+                $parsed['media_filename'],
+                $parsed['caption'],
+            );
+
+            if (MetaWhatsAppInboundMessageParser::isMediaType($parsed['message_type'])) {
+                $this->media->downloadInboundMedia($record);
+            }
         }
     }
 }

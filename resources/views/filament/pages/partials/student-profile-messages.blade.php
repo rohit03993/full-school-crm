@@ -144,19 +144,45 @@
                             wire:model.live="metaReplyText"
                             rows="3"
                             class="crm-wa-inbox__textarea"
-                            placeholder="Type your reply…"
+                            placeholder="Type your reply… emojis work too 🙂"
                         ></textarea>
                     </div>
-                    <button
-                        type="button"
-                        wire:click="sendMetaReply"
-                        wire:loading.attr="disabled"
-                        wire:target="sendMetaReply"
-                        class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--full"
-                    >
-                        <span wire:loading.remove wire:target="sendMetaReply">Send reply</span>
-                        <span wire:loading wire:target="sendMetaReply">Sending…</span>
-                    </button>
+                    <div class="crm-wa-inbox__field">
+                        <label class="crm-wa-inbox__label" for="wa-quick-attachment">Photo, video, or file</label>
+                        <input
+                            id="wa-quick-attachment"
+                            type="file"
+                            wire:model="metaReplyAttachment"
+                            accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                            class="crm-wa-inbox__file"
+                        />
+                        <p class="crm-wa-inbox__field-hint">Images, videos, voice notes, and PDFs — like WhatsApp. Max 16 MB for video, 5 MB for images.</p>
+                        <div wire:loading wire:target="metaReplyAttachment,sendMetaMedia" class="crm-wa-inbox__hint">Uploading…</div>
+                    </div>
+                    <div class="crm-wa-inbox__composer-actions">
+                        @if ($metaReplyAttachment)
+                            <button
+                                type="button"
+                                wire:click="sendMetaMedia"
+                                wire:loading.attr="disabled"
+                                wire:target="sendMetaMedia,metaReplyAttachment"
+                                class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--full"
+                            >
+                                <span wire:loading.remove wire:target="sendMetaMedia,metaReplyAttachment">Send attachment</span>
+                                <span wire:loading wire:target="sendMetaMedia,metaReplyAttachment">Sending…</span>
+                            </button>
+                        @endif
+                        <button
+                            type="button"
+                            wire:click="sendMetaReply"
+                            wire:loading.attr="disabled"
+                            wire:target="sendMetaReply"
+                            class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--full"
+                        >
+                            <span wire:loading.remove wire:target="sendMetaReply">Send reply</span>
+                            <span wire:loading wire:target="sendMetaReply">Sending…</span>
+                        </button>
+                    </div>
                 </section>
             @endif
         </aside>
@@ -195,7 +221,7 @@
                                 <span>{{ ($message['direction'] ?? '') === 'inbound' ? 'Parent' : 'You' }}</span>
                                 <span>{{ $message['at_label'] ?? '' }}</span>
                             </div>
-                            <p class="crm-wa-bubble__body">{{ $message['body'] ?? '' }}</p>
+                            @include('filament.pages.partials.whatsapp-message-bubble', ['message' => $message])
                             @if (! empty($message['errorMessage']))
                                 <p class="crm-wa-bubble__error">{{ $message['errorMessage'] }}</p>
                             @endif

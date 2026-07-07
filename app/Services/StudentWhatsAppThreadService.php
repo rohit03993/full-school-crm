@@ -9,6 +9,7 @@ use App\Models\MetaWhatsAppMessage;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Student;
 use App\Models\WhatsAppCampaignRecipient;
+use App\Support\MetaWhatsAppInboundMessageParser;
 use App\Support\StudentWhatsAppThreadItem;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -18,6 +19,7 @@ class StudentWhatsAppThreadService
     public function __construct(
         protected MetaWhatsAppService $meta,
         protected WhatsAppTemplateParamResolver $paramResolver,
+        protected MetaWhatsAppMediaService $media,
     ) {}
 
     /**
@@ -116,18 +118,35 @@ class StudentWhatsAppThreadService
         return $metaQuery
             ->get()
             ->map(function (MetaWhatsAppMessage $row): StudentWhatsAppThreadItem {
+                if (Schema::hasColumn('meta_whatsapp_messages', 'message_type')) {
+                    $row = $this->media->ensureStored($row);
+                }
+
                 $status = MetaWhatsAppMessageStatus::tryFrom($row->status);
+                $messageType = Schema::hasColumn('meta_whatsapp_messages', 'message_type')
+                    ? (string) ($row->message_type ?: 'text')
+                    : 'text';
+                $caption = trim((string) ($row->caption ?? ''));
+                $body = $this->metaDisplayBody($row);
+                $mediaUrl = $this->media->mediaUrl($row);
+                $locationUrl = $messageType === 'location' ? $this->locationUrlFromPayload($row) : null;
 
                 return new StudentWhatsAppThreadItem(
                     key: 'meta-'.$row->id,
                     source: 'meta',
                     direction: $row->direction,
-                    body: $this->metaDisplayBody($row),
+                    body: $body,
                     status: $row->status,
                     statusLabel: $status?->label() ?? ucfirst($row->status),
                     at: $row->status_at ?? $row->created_at,
                     templateName: null,
                     provider: 'meta',
+                    messageType: $messageType,
+                    mediaUrl: $mediaUrl,
+                    mediaMimeType: $row->media_mime_type,
+                    mediaFilename: $row->media_filename,
+                    caption: $caption !== '' ? $caption : null,
+                    locationUrl: $locationUrl,
                 );
             });
     }
@@ -165,8 +184,14 @@ class StudentWhatsAppThreadService
 
     protected function metaDisplayBody(MetaWhatsAppMessage $row): string
     {
+        $messageType = (string) ($row->message_type ?? 'text');
+        $caption = trim((string) ($row->caption ?? ''));
         $preview = trim((string) ($row->body_preview ?? ''));
         $templateName = (string) ($row->template_name ?? '');
+
+        if (MetaWhatsAppInboundMessageParser::isMediaType($messageType) || in_array($messageType, ['sticker', 'location', 'reaction'], true)) {
+            return MetaWhatsAppInboundMessageParser::previewLabel($messageType, $preview, $caption);
+        }
 
         if ($preview !== '' && ! $this->isTemplateSlug($preview, $templateName)) {
             return $preview;
@@ -181,6 +206,19 @@ class StudentWhatsAppThreadService
         }
 
         return $preview !== '' ? $preview : 'Message';
+    }
+
+    protected function locationUrlFromPayload(MetaWhatsAppMessage $row): ?string
+    {
+        $payload = is_array($row->payload) ? $row->payload : [];
+        $latitude = data_get($payload, 'location.latitude');
+        $longitude = data_get($payload, 'location.longitude');
+
+        if (! is_numeric($latitude) || ! is_numeric($longitude)) {
+            return null;
+        }
+
+        return 'https://www.google.com/maps?q='.rawurlencode($latitude.','.$longitude);
     }
 
     protected function metaTemplateBody(string $templateName): ?string
