@@ -34,8 +34,35 @@ class InspectWhatsAppMediaCommand extends Command
         }
 
         $mediaDir = storage_path('app/private/'.MetaWhatsAppMediaService::DIRECTORY);
-        $this->line('Storage dir: '.$mediaDir.' · writable: '.(is_dir($mediaDir) && is_writable($mediaDir) ? 'yes' : 'no'));
+        $privateDir = storage_path('app/private');
+        $mediaWritable = is_dir($mediaDir) && is_writable($mediaDir);
+        $privateWritable = is_dir($privateDir) && is_writable($privateDir);
+
+        $this->line('Storage dir: '.$mediaDir.' · writable: '.($mediaWritable ? 'yes' : 'no'));
+        $this->line('Private storage: '.$privateDir.' · writable: '.($privateWritable ? 'yes' : 'no'));
         $this->line('Meta configured: '.($meta->isConfigured() ? 'yes' : 'no'));
+        $this->line('Webhook URL: '.$meta->webhookUrl());
+        $this->line('Inbound trace log: '.storage_path('logs/whatsapp-inbound.log'));
+
+        if ($meta->isConfigured()) {
+            $connection = $meta->validateConnection();
+            $displayNumber = (string) ($connection['display_phone_number'] ?? '');
+
+            if ($displayNumber !== '') {
+                $this->line('Meta business number: '.$displayNumber.' (parents must message this number)');
+            } elseif (($connection['status'] ?? '') === 'failed') {
+                $this->line('Meta connection check failed: '.($connection['message'] ?? 'unknown error'));
+            }
+        }
+
+        if (! $mediaWritable) {
+            $this->newLine();
+            $this->components->warn('WhatsApp media cannot be saved until storage is writable. On the server (as root):');
+            $this->line('  mkdir -p '.$mediaDir);
+            $this->line('  chown -R folksindia:folksindia '.$privateDir);
+            $this->line('  chmod -R 775 '.$privateDir);
+            $this->newLine();
+        }
 
         $studentId = $this->option('student');
         $limit = max(1, (int) $this->option('limit'));
@@ -89,7 +116,19 @@ class InspectWhatsAppMediaCommand extends Command
         );
 
         if ($mediaRows->isEmpty()) {
-            $this->warn('None of these rows look like image/file messages. Parent may have sent text only, or payload was not stored.');
+            $this->newLine();
+            $this->components->warn('Meta delivered these as plain TEXT messages (payload type = text), not image/file webhooks.');
+            $this->line('The CRM cannot show photos that were never received with a media_id.');
+            $this->line('Ask the parent to send a fresh photo to your WhatsApp Business number after storage is writable.');
+            $this->line('Then run: tail -5 storage/logs/whatsapp-inbound.log');
+            $this->line('You should see "type":"image" and a media_id when a real photo arrives.');
+
+            $sample = $rows->first();
+            if ($sample && is_array($sample->payload)) {
+                $this->newLine();
+                $this->line('Latest payload sample (id '.$sample->id.'):');
+                $this->line(json_encode($sample->payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            }
         } else {
             $missing = $mediaRows->filter(fn (MetaWhatsAppMessage $row): bool => $media->needsMediaDownload($row))->count();
             if ($missing > 0) {

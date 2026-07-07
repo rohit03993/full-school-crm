@@ -37,8 +37,17 @@ class CrmDoctorCommand extends Command
             storage_path('framework/sessions'),
             storage_path('framework/views'),
             storage_path('app'),
+            storage_path('app/private'),
+            storage_path('app/private/whatsapp-media'),
             base_path('bootstrap/cache'),
         ] as $path) {
+            if (! is_dir($path)) {
+                $this->components->warn("Missing directory: {$path}");
+                $ok = false;
+
+                continue;
+            }
+
             if (! is_writable($path)) {
                 $this->components->error("Not writable: {$path}");
                 $ok = false;

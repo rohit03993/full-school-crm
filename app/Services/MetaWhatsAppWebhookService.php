@@ -135,6 +135,14 @@ class MetaWhatsAppWebhookService
                 continue;
             }
 
+            Log::info('Meta WhatsApp inbound message received', [
+                'wamid' => $wamid,
+                'from' => $from,
+                'type' => $parsed['message_type'],
+                'media_id' => $parsed['media_id'],
+                'preview' => mb_substr($parsed['body_preview'], 0, 80),
+            ]);
+
             $record = $this->logger->recordInbound(
                 $from,
                 $wamid !== '' ? $wamid : null,
