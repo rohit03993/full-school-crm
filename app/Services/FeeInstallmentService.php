@@ -38,7 +38,7 @@ class FeeInstallmentService
         }
 
         return collect([
-            $this->createInstallment($feeStructure, 'Full fee', $netFee, null, 1),
+            $this->createInstallment($feeStructure, FeePlanCalculator::installmentLabel(1), $netFee, null, 1),
         ]);
     }
 

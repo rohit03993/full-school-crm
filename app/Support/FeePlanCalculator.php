@@ -67,6 +67,67 @@ class FeePlanCalculator
         return 'Installment '.$number;
     }
 
+    public static function displayInstallmentLabel(string $label, int $sortOrder): string
+    {
+        $trimmed = trim($label);
+
+        if ($trimmed === '' || in_array($trimmed, ['Full fee', 'Balance due'], true)) {
+            return self::installmentLabel(max(1, $sortOrder));
+        }
+
+        return $trimmed;
+    }
+
+    /**
+     * Spread a new pending total across existing rows (keeps due dates and labels).
+     *
+     * @param  array<int, array{label?: string, amount?: mixed, due_date?: ?string}>  $rows
+     * @return array<int, array{label?: string, amount?: mixed, due_date?: ?string}>
+     */
+    public static function rebalancePlanToTarget(array $rows, float $targetTotal): array
+    {
+        if ($targetTotal <= 0) {
+            return [];
+        }
+
+        if ($rows === []) {
+            return self::singleFullFeeRow($targetTotal);
+        }
+
+        $rows = array_values($rows);
+        $currentSum = self::sumAmounts($rows);
+
+        if (abs($currentSum - $targetTotal) <= 0.01) {
+            return $rows;
+        }
+
+        if (count($rows) === 1) {
+            $rows[0]['amount'] = (string) round($targetTotal, 2);
+
+            return $rows;
+        }
+
+        $allocated = 0.0;
+        $lastIndex = count($rows) - 1;
+
+        foreach ($rows as $index => &$row) {
+            if ($index === $lastIndex) {
+                $amount = round($targetTotal - $allocated, 2);
+            } elseif ($currentSum > 0) {
+                $amount = round($targetTotal * ((float) ($row['amount'] ?? 0) / $currentSum), 2);
+                $allocated += $amount;
+            } else {
+                $amount = round($targetTotal / count($rows), 2);
+                $allocated += $amount;
+            }
+
+            $row['amount'] = (string) max(0, $amount);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
     /**
      * Sort installment rows by due date while keeping staff-entered labels.
      *
@@ -287,10 +348,25 @@ class FeePlanCalculator
         $remaining = self::remaining($targetTotal, $existingRows);
 
         return [
-            'label' => self::installmentLabel($nextIndex + 1),
+            'label' => self::installmentLabel(self::nextInstallmentNumberFromRows($existingRows, $nextIndex)),
             'amount' => $remaining > 0 ? (string) round($remaining, 2) : '',
             'due_date' => self::nextDueDate($existingRows),
         ];
+    }
+
+    public static function nextInstallmentNumberFromRows(array $rows, int $fallbackIndex = 0): int
+    {
+        $max = 0;
+
+        foreach ($rows as $row) {
+            $label = (string) ($row['label'] ?? '');
+
+            if (preg_match('/Installment\s+(\d+)/i', $label, $matches)) {
+                $max = max($max, (int) $matches[1]);
+            }
+        }
+
+        return $max > 0 ? $max + 1 : max(1, $fallbackIndex + 1);
     }
 
     /**

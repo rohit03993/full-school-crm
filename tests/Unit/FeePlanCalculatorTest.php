@@ -98,4 +98,34 @@ class FeePlanCalculatorTest extends TestCase
         $this->assertSame('15000', $filled['a1b2c3d4']['amount']);
         $this->assertSame('85000', $filled['e5f6g7h8']['amount']);
     }
+
+    public function test_display_installment_label_normalizes_legacy_full_fee(): void
+    {
+        $this->assertSame('Installment 1', FeePlanCalculator::displayInstallmentLabel('Full fee', 1));
+        $this->assertSame('Term 2', FeePlanCalculator::displayInstallmentLabel('Term 2', 2));
+    }
+
+    public function test_rebalance_plan_to_target_keeps_multiple_rows(): void
+    {
+        $rows = [
+            ['label' => 'Installment 3', 'amount' => '60000', 'due_date' => '2026-09-10'],
+            ['label' => 'Installment 4', 'amount' => '50000', 'due_date' => '2026-10-10'],
+        ];
+
+        $rebalanced = FeePlanCalculator::rebalancePlanToTarget($rows, 170000);
+
+        $this->assertCount(2, $rebalanced);
+        $this->assertSame(170000.0, FeePlanCalculator::sumAmounts($rebalanced));
+        $this->assertSame('Installment 3', $rebalanced[0]['label']);
+    }
+
+    public function test_next_installment_number_continues_from_existing_rows(): void
+    {
+        $rows = [
+            ['label' => 'Installment 3', 'amount' => '10000'],
+            ['label' => 'Installment 4', 'amount' => '20000'],
+        ];
+
+        $this->assertSame(5, FeePlanCalculator::nextInstallmentNumberFromRows($rows, 0));
+    }
 }

@@ -11,9 +11,11 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\HtmlString;
 
 class AdjustFeeStructureFormSchema
@@ -53,17 +55,13 @@ class AdjustFeeStructureFormSchema
             $plan = $get('installment_plan') ?? [];
 
             if ($plan === [] && $target > 0) {
-                $set('installment_plan', [[
-                    'label' => 'Balance due',
-                    'amount' => (string) $target,
-                    'due_date' => null,
-                ]]);
+                $set('installment_plan', FeePlanCalculator::singleFullFeeRow($target));
 
                 return;
             }
 
             if ($plan !== []) {
-                $set('installment_plan', FeePlanCalculator::fillBalanceOnLastRow($plan, $target));
+                $set('installment_plan', FeePlanCalculator::rebalancePlanToTarget($plan, $target));
             }
         };
 
@@ -96,181 +94,192 @@ class AdjustFeeStructureFormSchema
                     '<p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">'
                     .'Course catalog fee is now <strong>₹'.number_format($catalogCourseFee, 2).'</strong> '
                     .'but this student is on <strong>₹'.number_format($studentCourseFee, 2).'</strong>. '
-                    .'Use <strong>Apply catalog fee</strong> below or turn on <strong>Change listed course fee</strong>.</p>'
+                    .'Use <strong>Apply catalog fee</strong> in the footer or open the discount tab.</p>'
                 ))
                 ->visible($catalogDiffers)
                 ->columnSpanFull(),
-            Section::make('Discount')
-                ->compact()
-                ->schema([
-                    Select::make('discount_mode')
-                        ->label('Type')
-                        ->options([
-                            'amount' => 'Fixed amount (₹)',
-                            'percent' => 'Percentage (%)',
+            Tabs::make('adjustFeeTabs')
+                ->tabs([
+                    Tab::make('discount')
+                        ->label('Give discount')
+                        ->icon(Heroicon::OutlinedTag)
+                        ->schema([
+                            Select::make('discount_mode')
+                                ->label('Type')
+                                ->options([
+                                    'amount' => 'Fixed amount (₹)',
+                                    'percent' => 'Percentage (%)',
+                                ])
+                                ->default('amount')
+                                ->live()
+                                ->native(false),
+                            TextInput::make('discount_adjustment')
+                                ->label(fn (Get $get): string => ($get('discount_mode') ?? 'amount') === 'percent'
+                                    ? 'Extra discount (%)'
+                                    : 'Extra discount (₹)')
+                                ->numeric()
+                                ->default(0)
+                                ->step(0.01)
+                                ->helperText(fn (Get $get): string => ($get('discount_mode') ?? 'amount') === 'percent'
+                                    ? '% off course fee, added to existing discount.'
+                                    : 'Positive adds discount. Negative reduces it.')
+                                ->live(debounce: 300)
+                                ->afterStateUpdated($rebalanceInstallments),
+                            Hidden::make('additional_discount')
+                                ->default(0)
+                                ->dehydrated(false),
+                            Placeholder::make('new_net_fee_preview')
+                                ->label('After change')
+                                ->content(function (Get $get) use ($feeStructure, $miscTotal, $currentNet, $paid): string {
+                                    $mounted = self::mountedSliceFromGet($get);
+                                    $newNet = self::previewNetFromMounted($feeStructure, $mounted, $miscTotal);
+                                    $newPending = round(max(0, $newNet - $paid), 2);
+                                    $newTotalDiscount = self::resolveDiscountAmount($feeStructure, $mounted);
+
+                                    return 'Net ₹'.number_format($newNet, 2)
+                                        .' (was ₹'.number_format($currentNet, 2).')'
+                                        .' · Balance ₹'.number_format($newPending, 2)
+                                        .' · Total discount ₹'.number_format($newTotalDiscount, 2);
+                                })
+                                ->columnSpanFull(),
+                            Textarea::make('reason')
+                                ->label('Reason for discount')
+                                ->required(fn (Get $get): bool => self::requiresReasonFromGet($feeStructure, self::mountedSliceFromGet($get)))
+                                ->visible(fn (Get $get): bool => self::requiresReasonFromGet($feeStructure, self::mountedSliceFromGet($get)))
+                                ->rows(2)
+                                ->maxLength(1000)
+                                ->placeholder('e.g. Sibling discount, staff concession')
+                                ->columnSpanFull(),
+                            Placeholder::make('installments_tab_hint')
+                                ->label('')
+                                ->content('Balance changed — open the Installments tab to review the pending schedule.')
+                                ->visible(function (Get $get) use ($feeStructure, $miscTotal, $currentNet, $paid): bool {
+                                    if (! (bool) $get('reschedule_installments')) {
+                                        return false;
+                                    }
+
+                                    $newNet = self::previewNet($feeStructure, $get, $miscTotal);
+
+                                    return round(max(0, $newNet - $paid), 2) > 0
+                                        && abs($newNet - $currentNet) > 0.01;
+                                })
+                                ->extraAttributes(['class' => 'text-sm font-medium text-primary-600 dark:text-primary-400'])
+                                ->columnSpanFull(),
+                            Toggle::make('edit_course_fee')
+                                ->label('Change listed course fee')
+                                ->helperText('Only when this student’s agreed fee should differ from what is on file.')
+                                ->live()
+                                ->default($catalogDiffers)
+                                ->columnSpanFull(),
+                            TextInput::make('course_fee')
+                                ->label('Course fee')
+                                ->numeric()
+                                ->prefix('₹')
+                                ->default($feeStructure->course_fee)
+                                ->minValue(0)
+                                ->step(0.01)
+                                ->live(debounce: 300)
+                                ->afterStateUpdated($rebalanceInstallments)
+                                ->visible(fn (Get $get): bool => (bool) $get('edit_course_fee'))
+                                ->columnSpanFull(),
                         ])
-                        ->default('amount')
-                        ->live()
-                        ->native(false),
-                    TextInput::make('discount_adjustment')
-                        ->label(fn (Get $get): string => ($get('discount_mode') ?? 'amount') === 'percent'
-                            ? 'Extra discount (%)'
-                            : 'Extra discount (₹)')
-                        ->numeric()
-                        ->default(0)
-                        ->step(0.01)
-                        ->helperText(fn (Get $get): string => ($get('discount_mode') ?? 'amount') === 'percent'
-                            ? '% off course fee, added to existing discount.'
-                            : 'Positive adds discount. Negative reduces it.')
-                        ->live(debounce: 300)
-                        ->afterStateUpdated($rebalanceInstallments),
-                    Hidden::make('additional_discount')
-                        ->default(0)
-                        ->dehydrated(false),
-                    Placeholder::make('new_net_fee_preview')
-                        ->label('After change')
-                        ->content(function (Get $get) use ($feeStructure, $miscTotal, $currentNet, $paid): string {
-                            $mounted = self::mountedSliceFromGet($get);
-                            $newNet = self::previewNetFromMounted($feeStructure, $mounted, $miscTotal);
-                            $newPending = round(max(0, $newNet - $paid), 2);
-                            $newTotalDiscount = self::resolveDiscountAmount($feeStructure, $mounted);
+                        ->columns(2),
+                    Tab::make('installments')
+                        ->label('Installments')
+                        ->icon(Heroicon::OutlinedCalendarDays)
+                        ->schema([
+                            Toggle::make('reschedule_installments')
+                                ->label('Reschedule remaining installments')
+                                ->helperText('Turn on to edit the payment schedule for the balance still due. Settled installments stay locked.')
+                                ->default(false)
+                                ->live()
+                                ->afterStateUpdated(function (bool $state, Get $get, Set $set) use ($feeStructure, $miscTotal, $rebalanceInstallments): void {
+                                    if (! $state) {
+                                        return;
+                                    }
 
-                            return 'Net ₹'.number_format($newNet, 2)
-                                .' (was ₹'.number_format($currentNet, 2).')'
-                                .' · Balance ₹'.number_format($newPending, 2)
-                                .' · Total discount ₹'.number_format($newTotalDiscount, 2);
-                        })
-                        ->columnSpanFull(),
-                    Textarea::make('reason')
-                        ->label('Reason for discount')
-                        ->required(fn (Get $get): bool => self::requiresReasonFromGet($feeStructure, self::mountedSliceFromGet($get)))
-                        ->visible(fn (Get $get): bool => self::requiresReasonFromGet($feeStructure, self::mountedSliceFromGet($get)))
-                        ->rows(2)
-                        ->maxLength(1000)
-                        ->placeholder('e.g. Sibling discount, staff concession')
-                        ->columnSpanFull(),
-                    Toggle::make('edit_course_fee')
-                        ->label('Change listed course fee')
-                        ->helperText('Usually only needed when the agreed course fee differs from the catalog.')
-                        ->live()
-                        ->default($catalogDiffers)
-                        ->columnSpanFull(),
-                    TextInput::make('course_fee')
-                        ->label('Course fee')
-                        ->numeric()
-                        ->prefix('₹')
-                        ->default($feeStructure->course_fee)
-                        ->minValue(0)
-                        ->step(0.01)
-                        ->live(debounce: 300)
-                        ->afterStateUpdated($rebalanceInstallments)
-                        ->visible(fn (Get $get): bool => (bool) $get('edit_course_fee'))
-                        ->columnSpanFull(),
-                ])
-                ->columns(2)
-                ->columnSpanFull(),
-            Section::make('Installment schedule')
-                ->compact()
-                ->collapsed(fn (): bool => $pending <= 0)
-                ->schema([
-                    Toggle::make('reschedule_installments')
-                        ->label('Reschedule remaining installments')
-                        ->helperText('Turn on when the balance due changes. Paid installments stay locked.')
-                        ->default(false)
-                        ->live()
-                        ->afterStateUpdated(function (bool $state, Get $get, Set $set) use ($feeStructure, $miscTotal, $rebalanceInstallments): void {
-                            if (! $state) {
-                                return;
-                            }
+                                    $target = self::scheduleTarget($feeStructure, $get, $miscTotal);
 
-                            $target = self::scheduleTarget($feeStructure, $get, $miscTotal);
+                                    if ($target <= 0) {
+                                        $set('installment_plan', []);
 
-                            if ($target <= 0) {
-                                $set('installment_plan', []);
+                                        return;
+                                    }
 
-                                return;
-                            }
+                                    $plan = $get('installment_plan') ?? [];
 
-                            $plan = $get('installment_plan') ?? [];
+                                    if ($plan === []) {
+                                        $set('installment_plan', FeePlanCalculator::singleFullFeeRow($target));
 
-                            if ($plan === []) {
-                                $set('installment_plan', [[
-                                    'label' => 'Balance due',
-                                    'amount' => (string) $target,
-                                    'due_date' => null,
-                                ]]);
+                                        return;
+                                    }
 
-                                return;
-                            }
+                                    $rebalanceInstallments($get, $set);
+                                })
+                                ->columnSpanFull(),
+                            Placeholder::make('reschedule_required_warning')
+                                ->label('')
+                                ->content('Fee or discount changed — review pending rows so they total the new balance.')
+                                ->visible(function (Get $get) use ($feeStructure, $miscTotal, $currentNet, $paid): bool {
+                                    $newNet = self::previewNet($feeStructure, $get, $miscTotal);
 
-                            $rebalanceInstallments($get, $set);
-                        })
-                        ->columnSpanFull(),
-                    Placeholder::make('reschedule_required_warning')
-                        ->label('')
-                        ->content('Balance is changing — installment reschedule is on so rows match the new amount.')
-                        ->visible(function (Get $get) use ($feeStructure, $miscTotal, $currentNet, $paid): bool {
-                            $newNet = self::previewNet($feeStructure, $get, $miscTotal);
+                                    return round(max(0, $newNet - $paid), 2) > 0
+                                        && abs($newNet - $currentNet) > 0.01
+                                        && (bool) $get('reschedule_installments');
+                                })
+                                ->extraAttributes(['class' => 'text-sm font-medium text-amber-700 dark:text-amber-300'])
+                                ->columnSpanFull(),
+                            Placeholder::make('paid_installments_snapshot')
+                                ->label('Settled installments')
+                                ->content(fn (): HtmlString => new HtmlString(self::paidInstallmentsHtml($feeStructure)))
+                                ->visible(fn (): bool => self::paidInstallmentsSummary($feeStructure) !== '')
+                                ->columnSpanFull(),
+                            Placeholder::make('installment_allocation_summary')
+                                ->label('Allocation')
+                                ->content(function (Get $get) use ($feeStructure, $miscTotal): string {
+                                    $target = self::scheduleTarget($feeStructure, $get, $miscTotal);
 
-                            return round(max(0, $newNet - $paid), 2) > 0
-                                && abs($newNet - $currentNet) > 0.01
-                                && (bool) $get('reschedule_installments');
-                        })
-                        ->extraAttributes(['class' => 'text-sm font-medium text-amber-700 dark:text-amber-300'])
-                        ->columnSpanFull(),
-                    Placeholder::make('paid_installments_snapshot')
-                        ->label('Paid (locked)')
-                        ->content(fn (): HtmlString => new HtmlString(
-                            '<div class="space-y-1 text-sm">'.collect(explode("\n", self::paidInstallmentsSummary($feeStructure)))
-                                ->filter()
-                                ->map(fn (string $line): string => '<p>'.e($line).'</p>')
-                                ->implode('').'</div>',
-                        ))
-                        ->visible(fn (): bool => self::paidInstallmentsSummary($feeStructure) !== '')
-                        ->columnSpanFull(),
-                    Placeholder::make('installment_allocation_summary')
-                        ->label('Allocation')
-                        ->content(function (Get $get) use ($feeStructure, $miscTotal): string {
-                            $target = self::scheduleTarget($feeStructure, $get, $miscTotal);
+                                    return FeePlanCalculator::formatSummary($target, $get('installment_plan') ?? []);
+                                })
+                                ->visible(fn (Get $get): bool => (bool) $get('reschedule_installments'))
+                                ->columnSpanFull(),
+                            Placeholder::make('installment_unallocated_warning')
+                                ->label('')
+                                ->content(function (Get $get) use ($feeStructure, $miscTotal): string {
+                                    $target = self::scheduleTarget($feeStructure, $get, $miscTotal);
 
-                            return FeePlanCalculator::formatSummary($target, $get('installment_plan') ?? []);
-                        })
-                        ->visible(fn (Get $get): bool => (bool) $get('reschedule_installments'))
-                        ->columnSpanFull(),
-                    Placeholder::make('installment_unallocated_warning')
-                        ->label('')
-                        ->content(function (Get $get) use ($feeStructure, $miscTotal): string {
-                            $target = self::scheduleTarget($feeStructure, $get, $miscTotal);
+                                    return FeePlanCalculator::unallocatedWarningMessage($target, $get('installment_plan') ?? []) ?? '';
+                                })
+                                ->visible(function (Get $get) use ($feeStructure, $miscTotal): bool {
+                                    if (! $get('reschedule_installments')) {
+                                        return false;
+                                    }
 
-                            return FeePlanCalculator::unallocatedWarningMessage($target, $get('installment_plan') ?? []) ?? '';
-                        })
-                        ->visible(function (Get $get) use ($feeStructure, $miscTotal): bool {
-                            if (! $get('reschedule_installments')) {
-                                return false;
-                            }
+                                    $target = self::scheduleTarget($feeStructure, $get, $miscTotal);
 
-                            $target = self::scheduleTarget($feeStructure, $get, $miscTotal);
+                                    return FeePlanCalculator::unallocatedWarningMessage($target, $get('installment_plan') ?? []) !== null;
+                                })
+                                ->extraAttributes(['class' => 'text-sm font-medium text-danger-600 dark:text-danger-400'])
+                                ->columnSpanFull(),
+                            AdmissionFeePlanFormSchema::configureInstallmentRepeater(
+                                Repeater::make('installment_plan')
+                                    ->label('Pending installments')
+                                    ->columns(3)
+                                    ->columnSpanFull()
+                                    ->defaultItems(0)
+                                    ->visible(fn (Get $get): bool => (bool) $get('reschedule_installments'))
+                                    ->live(),
+                                function (Repeater $component) use ($feeStructure, $miscTotal): float {
+                                    $mounted = $component->getLivewire()->mountedActionsData[0] ?? [];
 
-                            return FeePlanCalculator::unallocatedWarningMessage($target, $get('installment_plan') ?? []) !== null;
-                        })
-                        ->extraAttributes(['class' => 'text-sm font-medium text-danger-600 dark:text-danger-400'])
-                        ->columnSpanFull(),
-                    AdmissionFeePlanFormSchema::configureInstallmentRepeater(
-                        Repeater::make('installment_plan')
-                            ->label('Pending rows')
-                            ->columns(3)
-                            ->columnSpanFull()
-                            ->defaultItems(0)
-                            ->visible(fn (Get $get): bool => (bool) $get('reschedule_installments'))
-                            ->live(),
-                        function (Repeater $component) use ($feeStructure, $miscTotal): float {
-                            return self::scheduleTargetFromMounted(
-                                $feeStructure,
-                                $component->getLivewire()->mountedActionsData[0] ?? [],
-                                $miscTotal,
-                            );
-                        },
-                    ),
+                                    return self::scheduleTargetFromMounted(
+                                        $feeStructure,
+                                        is_array($mounted) ? $mounted : [],
+                                        $miscTotal,
+                                    );
+                                },
+                            ),
+                        ]),
                 ])
                 ->columnSpanFull(),
         ];
@@ -400,31 +409,23 @@ class AdjustFeeStructureFormSchema
             ])
             ->values();
 
-        $allocatedOnRows = round((float) $unpaid->sum('pending_amount'), 2);
-
         if ($unpaid->isEmpty()) {
-            return [[
-                'label' => 'Balance due',
-                'amount' => (string) $pendingTotal,
-                'due_date' => null,
-            ]];
+            return FeePlanCalculator::singleFullFeeRow($pendingTotal);
         }
 
-        if (abs($allocatedOnRows - $pendingTotal) > 0.01) {
-            $first = $unpaid->first();
-
-            return [[
-                'label' => $first?->label ?: 'Balance due',
-                'amount' => (string) $pendingTotal,
-                'due_date' => $first?->due_date?->toDateString(),
-            ]];
-        }
-
-        return $unpaid->map(fn ($row): array => [
-            'label' => $row->label,
+        $rows = $unpaid->map(fn ($row): array => [
+            'label' => FeePlanCalculator::displayInstallmentLabel((string) $row->label, (int) $row->sort_order),
             'amount' => (string) $row->pending_amount,
             'due_date' => $row->due_date?->toDateString(),
         ])->all();
+
+        $allocatedOnRows = round((float) $unpaid->sum('pending_amount'), 2);
+
+        if (abs($allocatedOnRows - $pendingTotal) > 0.01) {
+            return FeePlanCalculator::rebalancePlanToTarget($rows, $pendingTotal);
+        }
+
+        return $rows;
     }
 
     public static function paidInstallmentsSummary(FeeStructure $feeStructure): string
@@ -440,18 +441,36 @@ class AdjustFeeStructureFormSchema
             ])
             ->map(function ($row): string {
                 $due = $row->due_date?->format('d M Y') ?? 'TBD';
+                $label = FeePlanCalculator::displayInstallmentLabel((string) $row->label, (int) $row->sort_order);
 
                 return sprintf(
-                    '• %s — due %s — paid ₹%s',
-                    $row->label,
+                    '%s — due %s — paid ₹%s of ₹%s',
+                    $label,
                     $due,
                     number_format((float) $row->paid_amount, 2),
+                    number_format((float) $row->amount, 2),
                 );
             })
             ->values()
             ->all();
 
         return implode("\n", $lines);
+    }
+
+    public static function paidInstallmentsHtml(FeeStructure $feeStructure): string
+    {
+        $summary = self::paidInstallmentsSummary($feeStructure);
+
+        if ($summary === '') {
+            return '';
+        }
+
+        return '<div class="space-y-1 text-sm">'
+            .collect(explode("\n", $summary))
+                ->filter()
+                ->map(fn (string $line): string => '<p class="flex items-start gap-2"><span class="text-emerald-600">✓</span><span>'.e($line).'</span></p>')
+                ->implode('')
+            .'</div>';
     }
 
     public static function previewNet(FeeStructure $feeStructure, Get $get, float $miscTotal): float

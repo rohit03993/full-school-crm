@@ -60,7 +60,7 @@ class PaymentWorkflowTest extends TestCase
 
         $this->assertSame(45000.0, (float) $feeStructure->pending_amount);
         $this->assertCount(1, $feeStructure->installments);
-        $this->assertSame('Full fee', $feeStructure->installments->first()->label);
+        $this->assertSame('Installment 1', $feeStructure->installments->first()->label);
 
         $payment = $paymentService->add(
             $feeStructure,

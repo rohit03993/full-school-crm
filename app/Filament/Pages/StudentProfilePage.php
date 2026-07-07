@@ -1881,13 +1881,9 @@ class StudentProfilePage extends Page
                             $plan = $livewire->mountedActionsData[0]['installment_plan'] ?? [];
 
                             if ($plan === [] && $target > 0) {
-                                $livewire->mountedActionsData[0]['installment_plan'] = [[
-                                    'label' => 'Balance due',
-                                    'amount' => (string) $target,
-                                    'due_date' => null,
-                                ]];
+                                $livewire->mountedActionsData[0]['installment_plan'] = FeePlanCalculator::singleFullFeeRow($target);
                             } elseif ($plan !== []) {
-                                $livewire->mountedActionsData[0]['installment_plan'] = FeePlanCalculator::fillBalanceOnLastRow($plan, $target);
+                                $livewire->mountedActionsData[0]['installment_plan'] = FeePlanCalculator::rebalancePlanToTarget($plan, $target);
                             }
                         }),
                     Action::make('fillAdjustInstallmentBalance')
