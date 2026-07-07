@@ -83,11 +83,15 @@ class PaymentService
 
         $installment = $this->resolveInstallment($feeStructure, $data['fee_installment_id'] ?? null);
         $flexible = FeePaymentPolicy::usesFlexibleAllocation();
+        $installmentPending = $installment ? round((float) $installment->pending_amount, 2) : 0.0;
+        $usesInstallmentAllocation = $installment !== null || $feeStructure->installments->isNotEmpty();
 
-        if (! $flexible && $installment && $feePaymentAmount > round((float) $installment->pending_amount, 2)) {
+        if ($usesInstallmentAllocation && $installment && $feePaymentAmount > $installmentPending + 0.01) {
+            // Overpayment is always cascaded to future installments.
+        } elseif (! $flexible && $installment && $feePaymentAmount > $installmentPending) {
             throw ValidationException::withMessages([
                 'amount' => "Amount cannot exceed pending for {$installment->label} (₹"
-                    .number_format((float) $installment->pending_amount, 2).').',
+                    .number_format($installmentPending, 2).').',
             ]);
         }
 
@@ -115,11 +119,15 @@ class PaymentService
             $penaltyPaymentAmount = round($amount - $feePaymentAmount, 2);
 
             $installment = $this->resolveInstallment($locked, $data['fee_installment_id'] ?? null);
+            $installmentPending = $installment ? round((float) $installment->pending_amount, 2) : 0.0;
+            $usesInstallmentAllocation = $installment !== null || $locked->installments->isNotEmpty();
 
-            if (! $flexible && $installment && $feePaymentAmount > round((float) $installment->pending_amount, 2)) {
+            if ($usesInstallmentAllocation && $installment && $feePaymentAmount > $installmentPending + 0.01) {
+                // Overpayment is always cascaded to future installments.
+            } elseif (! $flexible && $installment && $feePaymentAmount > $installmentPending) {
                 throw ValidationException::withMessages([
                     'amount' => "Amount cannot exceed pending for {$installment->label} (₹"
-                        .number_format((float) $installment->pending_amount, 2).').',
+                        .number_format($installmentPending, 2).').',
                 ]);
             }
 
@@ -163,22 +171,22 @@ class PaymentService
                 'pending_amount' => $newPending,
             ]);
 
-            if ($feePaymentAmount > 0 && ($installment || $locked->installments->isNotEmpty())) {
-                if ($flexible) {
-                    $allocationResult = $this->installments->allocatePayment(
-                        $locked,
-                        $installment,
-                        $feePaymentAmount,
-                        $shortfallHandling,
-                    );
+            if ($feePaymentAmount > 0 && $usesInstallmentAllocation) {
+                $allocationResult = $this->installments->allocatePayment(
+                    $locked,
+                    $installment,
+                    $feePaymentAmount,
+                    $flexible ? $shortfallHandling : null,
+                );
 
-                    if ($allocationResult['shortfall_allocation']) {
-                        $payment->update([
-                            'shortfall_allocation' => $allocationResult['shortfall_allocation'],
-                        ]);
-                    }
-                } elseif ($installment) {
-                    $this->installments->applyPayment($installment, $feePaymentAmount);
+                $allocationNote = $allocationResult['surplus_allocation']
+                    ?? $allocationResult['shortfall_allocation']
+                    ?? null;
+
+                if ($allocationNote) {
+                    $payment->update([
+                        'shortfall_allocation' => $allocationNote,
+                    ]);
                 }
             }
 

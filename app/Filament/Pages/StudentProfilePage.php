@@ -1790,6 +1790,8 @@ class StudentProfilePage extends Page
                 ->icon('heroicon-o-banknotes')
                 ->color('success')
                 ->button()
+                ->modalHeading('Add payment')
+                ->modalWidth('lg')
                 ->form(function (): array {
                     $feeStructure = $this->record->activeEnrollment?->feeStructure;
 
@@ -1831,7 +1833,11 @@ class StudentProfilePage extends Page
                     $this->loadFeesTab();
                     $this->refreshRecord();
 
-                    $body = "Receipt {$payment->receipt_number} · ₹".number_format((float) $payment->amount, 2).' · PDF generated';
+                    $body = "Receipt {$payment->receipt_number} · ₹".number_format((float) $payment->amount, 0).' · PDF generated';
+
+                    if ($payment->shortfallSummary()) {
+                        $body .= ' · '.$payment->shortfallSummary();
+                    }
 
                     if (Payment::query()->where('fee_structure_id', $feeStructure->id)->count() === 1) {
                         $body .= ' · ID card generated';

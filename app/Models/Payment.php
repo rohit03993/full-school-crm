@@ -127,7 +127,32 @@ class Payment extends Model
             PaymentShortfallAction::NewInstallment->value => "{$amount} balance scheduled as {$target}"
                 .(filled($allocation['target_due_date'] ?? null) ? ' · due '.date('d M Y', strtotime((string) $allocation['target_due_date'])) : ''),
             PaymentShortfallAction::CarryForward->value => "{$amount} balance added to {$target}",
+            PaymentShortfallAction::SurplusForward->value => $this->surplusForwardSummary($allocation),
             default => "{$amount} installment balance adjusted",
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $allocation
+     */
+    protected function surplusForwardSummary(array $allocation): string
+    {
+        $amount = '₹'.number_format((float) ($allocation['amount'] ?? 0), 0);
+        $source = $allocation['source_label'] ?? 'selected installment';
+        $targets = collect($allocation['targets'] ?? [])
+            ->map(function (array $target): string {
+                $label = $target['label'] ?? 'installment';
+                $applied = '₹'.number_format((float) ($target['amount'] ?? 0), 0);
+
+                return "{$label} ({$applied})";
+            })
+            ->filter()
+            ->implode(', ');
+
+        if ($targets === '') {
+            return "{$amount} extra applied to upcoming installments after clearing {$source}.";
+        }
+
+        return "{$amount} extra after clearing {$source} applied to: {$targets}.";
     }
 }

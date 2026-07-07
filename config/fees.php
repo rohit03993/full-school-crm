@@ -23,10 +23,12 @@ return [
     | Payment allocation across installments
     |--------------------------------------------------------------------------
     |
-    | strict   — payment cannot exceed the selected installment pending amount
-    | flexible — underpay rolls shortfall to the next installment; overpay
-    |            carries forward (FeesCRM-style)
+    | strict   — partial underpay stays on the installment unless flexible shortfall UI is used
+    | flexible — underpay can roll shortfall to the next installment or a new row
     | auto     — same as flexible (default)
+    |
+    | Overpayment on any mode automatically clears the selected installment and reduces
+    | future installments, with a note saved on the payment receipt.
     |
     */
 

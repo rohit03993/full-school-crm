@@ -7,6 +7,7 @@ use App\Enums\PaymentShortfallAction;
 use App\Models\FeeInstallment;
 use App\Models\FeeStructure;
 use App\Support\FeePaymentPolicy;
+use App\Support\FeePlanCalculator;
 use App\Support\PaymentShortfallHelper;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
@@ -14,18 +15,20 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
 
 class AddPaymentFormSchema
 {
     /**
-     * @return array<int, \Filament\Forms\Components\Component>
+     * @return array<int, \Filament\Forms\Components\Component|\Filament\Schemas\Components\Component>
      */
     public static function fields(FeeStructure $feeStructure): array
     {
         $feeStructure->loadMissing('installments');
-        $pending = (float) $feeStructure->pending_amount;
+        $pending = round((float) $feeStructure->pending_amount, 2);
         $payableInstallments = $feeStructure->installments
             ->filter(fn (FeeInstallment $row): bool => (float) $row->pending_amount > 0)
             ->values();
@@ -33,35 +36,86 @@ class AddPaymentFormSchema
         $defaultInstallment = $payableInstallments->first();
         $flexible = FeePaymentPolicy::usesFlexibleAllocation();
         $collector = Auth::user()?->loadMissing('staffProfile');
+        $format = fn (float $amount): string => FeePlanCalculator::formatRupeeAmount($amount);
 
-        $fields = [
-            Placeholder::make('collected_by_display')
-                ->label('Collected by')
-                ->content($collector?->staffCollectorLabel() ?? 'Logged-in staff')
-                ->helperText('Saved automatically — no need to select staff.'),
-            Placeholder::make('pending_amount_display')
-                ->label('Pending fee')
-                ->content('₹'.number_format($pending, 2)),
+        $installmentLine = $defaultInstallment
+            ? $defaultInstallment->label.' · ₹'.$format((float) $defaultInstallment->pending_amount).' due'
+            .($defaultInstallment->due_date ? ' · '.$defaultInstallment->due_date->format('d M Y') : '')
+            : 'No installment schedule';
+
+        return [
+            Placeholder::make('payment_snapshot')
+                ->label('')
+                ->content(new HtmlString(
+                    '<div class="grid gap-2 text-sm sm:grid-cols-3">'
+                    .'<div class="rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-500/10">'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Balance due</p>'
+                    .'<p class="mt-0.5 text-base font-bold text-amber-900 dark:text-amber-100">₹'.$format($pending).'</p></div>'
+                    .'<div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5 sm:col-span-2">'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Against</p>'
+                    .'<p class="mt-0.5 font-semibold text-gray-950 dark:text-white">'.e($installmentLine).'</p>'
+                    .'<p class="mt-0.5 text-xs text-gray-500">Collected by '.e($collector?->staffCollectorLabel() ?? 'logged-in staff').'</p>'
+                    .'</div></div>'
+                ))
+                ->columnSpanFull(),
+            Section::make('Payment details')
+                ->compact()
+                ->columns(2)
+                ->schema(self::paymentDetailFields(
+                    $feeStructure,
+                    $payableInstallments,
+                    $defaultInstallment,
+                    $pending,
+                    $flexible,
+                )),
+            Section::make('Proof')
+                ->compact()
+                ->schema([
+                    FileUpload::make('proof_image')
+                        ->label('Payment proof')
+                        ->helperText('JPG, PNG or PDF · max 5 MB')
+                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+                        ->maxSize(5120)
+                        ->required()
+                        ->disk('local')
+                        ->directory('temp-payment-proofs')
+                        ->visibility('private')
+                        ->columnSpanFull(),
+                ]),
         ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, FeeInstallment>  $payableInstallments
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    protected static function paymentDetailFields(
+        FeeStructure $feeStructure,
+        $payableInstallments,
+        ?FeeInstallment $defaultInstallment,
+        float $pending,
+        bool $flexible,
+    ): array {
+        $fields = [];
 
         if ($payableInstallments->count() > 1) {
             $fields[] = Select::make('fee_installment_id')
                 ->label('Installment')
                 ->options($payableInstallments->mapWithKeys(function (FeeInstallment $row): array {
                     $due = $row->due_date?->format('d M Y') ?? 'No due date';
-                    $label = "{$row->label} · ₹".number_format((float) $row->pending_amount, 2)." pending · Due {$due}";
 
-                    return [$row->id => $label];
+                    return [$row->id => "{$row->label} · ₹".FeePlanCalculator::formatRupeeAmount((float) $row->pending_amount)." · {$due}"];
                 }))
                 ->default($defaultInstallment?->id)
                 ->required()
                 ->native(false)
                 ->live()
+                ->columnSpanFull()
                 ->afterStateUpdated(function (mixed $state, callable $set) use ($payableInstallments): void {
                     $installment = $payableInstallments->firstWhere('id', (int) $state);
 
                     if ($installment) {
-                        $set('amount', (string) round((float) $installment->pending_amount, 2));
+                        $set('amount', (string) FeePlanCalculator::toWholeRupeeAmount((float) $installment->pending_amount));
                     }
 
                     $set('shortfall_action', null);
@@ -70,9 +124,6 @@ class AddPaymentFormSchema
         } elseif ($defaultInstallment) {
             $fields[] = Hidden::make('fee_installment_id')
                 ->default($defaultInstallment->id);
-            $fields[] = Placeholder::make('installment_display')
-                ->label('Installment')
-                ->content($defaultInstallment->label.' · ₹'.number_format((float) $defaultInstallment->pending_amount, 2).' pending');
         }
 
         $fields[] = DatePicker::make('payment_date')
@@ -89,27 +140,34 @@ class AddPaymentFormSchema
             ->minValue(0.01)
             ->live(debounce: 300)
             ->default(fn (): ?string => $defaultInstallment
-                ? (string) round((float) $defaultInstallment->pending_amount, 2)
-                : ($pending > 0 ? (string) round($pending, 2) : null))
-            ->maxValue(function (Get $get) use ($feeStructure, $payableInstallments, $pending, $flexible): float {
-                if ($flexible || $payableInstallments->count() <= 1) {
-                    return $pending;
-                }
+                ? (string) FeePlanCalculator::toWholeRupeeAmount((float) $defaultInstallment->pending_amount)
+                : ($pending > 0 ? (string) FeePlanCalculator::toWholeRupeeAmount($pending) : null))
+            ->maxValue($pending)
+            ->step(1)
+            ->helperText('You may pay more than one installment; extra reduces future dues automatically.');
 
+        $fields[] = Placeholder::make('surplus_notice')
+            ->label('Extra amount')
+            ->content(function (Get $get) use ($payableInstallments, $defaultInstallment): string {
                 $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
 
-                return min($pending, (float) ($installment?->pending_amount ?? $pending));
+                return PaymentShortfallHelper::surplusForwardPreview(
+                    (float) ($get('amount') ?? 0),
+                    $installment,
+                    $payableInstallments,
+                ) ?? '';
             })
-            ->step(0.01)
-            ->helperText(fn (): string => $flexible
-                ? 'Enter less than the installment due to see balance options below.'
-                : ($payableInstallments->count() > 1
-                    ? 'Cannot exceed the selected installment pending amount.'
-                    : 'Cannot exceed pending amount.'));
+            ->visible(function (Get $get) use ($payableInstallments, $defaultInstallment): bool {
+                $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
+
+                return PaymentShortfallHelper::surplusAmount((float) ($get('amount') ?? 0), $installment) > 0;
+            })
+            ->extraAttributes(['class' => 'text-sm font-medium text-primary-600 dark:text-primary-400'])
+            ->columnSpanFull();
 
         if ($flexible && $defaultInstallment) {
             $fields[] = Placeholder::make('shortfall_notice')
-                ->label('Installment balance')
+                ->label('Remaining on this installment')
                 ->content(function (Get $get) use ($payableInstallments, $defaultInstallment): string {
                     $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
                     $shortfall = PaymentShortfallHelper::shortfallAmount((float) ($get('amount') ?? 0), $installment);
@@ -118,7 +176,7 @@ class AddPaymentFormSchema
                         return '';
                     }
 
-                    return 'Remaining ₹'.number_format($shortfall, 2).' from '.$installment->label.' is unpaid. Choose how to schedule it below.';
+                    return '₹'.FeePlanCalculator::formatRupeeAmount($shortfall).' from '.$installment->label.' stays unpaid. Choose how to schedule it below.';
                 })
                 ->visible(function (Get $get) use ($payableInstallments, $defaultInstallment): bool {
                     $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
@@ -210,16 +268,6 @@ class AddPaymentFormSchema
             ->maxLength(100)
             ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Upi->value)
             ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Upi->value);
-
-        $fields[] = FileUpload::make('proof_image')
-            ->label('Payment proof')
-            ->helperText('Voucher image, screenshot or UPI proof · JPG, PNG or PDF · max 5 MB')
-            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
-            ->maxSize(5120)
-            ->required()
-            ->disk('local')
-            ->directory('temp-payment-proofs')
-            ->visibility('private');
 
         return $fields;
     }

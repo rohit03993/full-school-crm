@@ -148,9 +148,11 @@ class FeeInstallmentService
         $amount = round($amount, 2);
         $remaining = $amount;
         $shortfallAllocation = null;
+        $surplusAllocation = null;
+        $surplusTargets = [];
 
         if ($remaining <= 0) {
-            return ['shortfall_allocation' => null];
+            return ['shortfall_allocation' => null, 'surplus_allocation' => null];
         }
 
         $installments = $feeStructure->installments()
@@ -161,7 +163,7 @@ class FeeInstallmentService
             ->get();
 
         if ($installments->isEmpty()) {
-            return ['shortfall_allocation' => null];
+            return ['shortfall_allocation' => null, 'surplus_allocation' => null];
         }
 
         if ($startInstallment) {
@@ -172,6 +174,7 @@ class FeeInstallmentService
             }
         }
 
+        $sourceInstallment = $installments->first();
         $isFirst = true;
 
         foreach ($installments as $installment) {
@@ -179,11 +182,25 @@ class FeeInstallmentService
                 break;
             }
 
+            $pendingBefore = round((float) $installment->pending_amount, 2);
+
             [$remaining, $allocation] = $this->processFlexibleInstallmentPayment(
                 $installment,
                 $remaining,
                 $isFirst ? $shortfallHandling : null,
             );
+
+            if (! $isFirst) {
+                $applied = round($pendingBefore - (float) $installment->fresh()->pending_amount, 2);
+
+                if ($applied > 0.01) {
+                    $surplusTargets[] = [
+                        'installment_id' => $installment->id,
+                        'label' => $installment->label,
+                        'amount' => $applied,
+                    ];
+                }
+            }
 
             if ($allocation !== null) {
                 $shortfallAllocation = $allocation;
@@ -198,7 +215,22 @@ class FeeInstallmentService
             ]);
         }
 
-        return ['shortfall_allocation' => $shortfallAllocation];
+        if ($surplusTargets !== [] && $sourceInstallment) {
+            $surplusTotal = round(collect($surplusTargets)->sum('amount'), 2);
+
+            $surplusAllocation = [
+                'action' => PaymentShortfallAction::SurplusForward->value,
+                'amount' => $surplusTotal,
+                'source_installment_id' => $sourceInstallment->id,
+                'source_label' => $sourceInstallment->label,
+                'targets' => $surplusTargets,
+            ];
+        }
+
+        return [
+            'shortfall_allocation' => $shortfallAllocation,
+            'surplus_allocation' => $surplusAllocation,
+        ];
     }
 
     /**

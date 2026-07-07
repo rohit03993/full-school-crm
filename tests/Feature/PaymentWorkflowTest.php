@@ -152,18 +152,18 @@ class PaymentWorkflowTest extends TestCase
         );
     }
 
-    public function test_strict_mode_rejects_payment_above_selected_installment_pending(): void
+    public function test_strict_mode_overpayment_cascades_without_shortfall_prompt(): void
     {
         Storage::fake('local');
         config(['fees.payment.allocation' => 'strict']);
 
         [$student, $feeStructure, $staff] = $this->createEnrolledStudentWithInstallments();
 
-        $firstInstallment = $feeStructure->installments()->orderBy('sort_order')->first();
+        $installments = $feeStructure->installments()->orderBy('sort_order')->orderBy('id')->get();
+        $firstInstallment = $installments->first();
+        $secondInstallment = $installments->last();
 
-        $this->expectException(ValidationException::class);
-
-        app(PaymentService::class)->add(
+        $payment = app(PaymentService::class)->add(
             $feeStructure,
             $student,
             [
@@ -176,6 +176,11 @@ class PaymentWorkflowTest extends TestCase
             UploadedFile::fake()->image('voucher.jpg'),
             $staff,
         );
+
+        $secondInstallment->refresh();
+
+        $this->assertSame(15000.0, (float) $secondInstallment->pending_amount);
+        $this->assertSame(PaymentShortfallAction::SurplusForward->value, $payment->shortfall_allocation['action']);
     }
 
     public function test_flexible_partial_payment_rolls_shortfall_to_next_installment(): void
@@ -247,6 +252,39 @@ class PaymentWorkflowTest extends TestCase
         $this->assertSame(0.0, (float) $firstInstallment->pending_amount);
         $this->assertSame(20000.0, (float) $secondInstallment->pending_amount);
         $this->assertSame(20000.0, (float) $feeStructure->pending_amount);
+    }
+
+    public function test_strict_mode_still_allows_overpayment_to_carry_forward(): void
+    {
+        Storage::fake('local');
+        config(['fees.payment.allocation' => 'strict']);
+
+        [$student, $feeStructure, $staff] = $this->createEnrolledStudentWithInstallments();
+
+        $installments = $feeStructure->installments()->orderBy('sort_order')->orderBy('id')->get();
+        $firstInstallment = $installments->first();
+        $secondInstallment = $installments->last();
+
+        $payment = app(PaymentService::class)->add(
+            $feeStructure,
+            $student,
+            [
+                'payment_date' => now()->toDateString(),
+                'amount' => 30000,
+                'payment_mode' => PaymentMode::Cash->value,
+                'voucher_number' => 'VCH-STRICT-OVER',
+                'fee_installment_id' => $firstInstallment->id,
+            ],
+            UploadedFile::fake()->image('voucher.jpg'),
+            $staff,
+        );
+
+        $secondInstallment->refresh();
+
+        $this->assertSame(20000.0, (float) $secondInstallment->pending_amount);
+        $this->assertNotNull($payment->shortfall_allocation);
+        $this->assertSame(PaymentShortfallAction::SurplusForward->value, $payment->shortfall_allocation['action']);
+        $this->assertStringContainsString('extra after clearing', $payment->shortfallSummary() ?? '');
     }
 
     public function test_partial_payment_can_create_new_installment_for_shortfall(): void
