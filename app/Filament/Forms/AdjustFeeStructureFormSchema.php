@@ -35,34 +35,26 @@ class AdjustFeeStructureFormSchema
         $currentNet = round((float) $feeStructure->net_fee, 2);
         $currentDiscount = round((float) $feeStructure->discount_amount, 2);
         $studentCourseFee = round((float) $feeStructure->course_fee, 2);
-        $catalogCourseFee = round((float) ($feeStructure->enrollment?->course?->fee ?? 0), 2);
-        $catalogDiffers = $catalogCourseFee > 0 && abs($catalogCourseFee - $studentCourseFee) > 0.01;
+        $format = fn (float $amount): string => FeePlanCalculator::formatRupeeAmount($amount);
 
-        $rebalanceInstallments = function (Get $get, Set $set) use ($feeStructure, $miscTotal, $studentCourseFee): void {
+        $onDiscountChanged = function (Get $get, Set $set) use ($feeStructure, $miscTotal): void {
             $mounted = self::mountedSliceFromGet($get);
             $newDiscount = self::resolveDiscountAmount($feeStructure, $mounted);
 
-            if (abs($newDiscount - (float) $feeStructure->discount_amount) > 0.01
-                || round((float) ($get('course_fee') ?? $studentCourseFee), 2) !== $studentCourseFee) {
-                $set('reschedule_installments', true);
-            }
-
-            if (! (bool) $get('reschedule_installments')) {
+            if (abs($newDiscount - (float) $feeStructure->discount_amount) <= 0.01) {
                 return;
             }
 
+            $set('reschedule_installments', true);
             $target = self::scheduleTarget($feeStructure, $get, $miscTotal);
-            $plan = $get('installment_plan') ?? [];
 
-            if ($plan === [] && $target > 0) {
-                $set('installment_plan', FeePlanCalculator::singleFullFeeRow($target));
+            if ($target <= 0) {
+                $set('installment_plan', []);
 
                 return;
             }
 
-            if ($plan !== []) {
-                $set('installment_plan', FeePlanCalculator::rebalancePlanToTarget($plan, $target));
-            }
+            $set('installment_plan', self::pendingInstallmentPlan($feeStructure, $target));
         };
 
         return [
@@ -72,31 +64,21 @@ class AdjustFeeStructureFormSchema
                     '<div class="grid gap-3 text-sm sm:grid-cols-3">'
                     .'<div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5">'
                     .'<p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Net fee</p>'
-                    .'<p class="mt-0.5 text-base font-bold text-gray-950 dark:text-white">₹'.number_format($currentNet, 2).'</p>'
-                    .'<p class="mt-0.5 text-xs text-gray-500">Course ₹'.number_format($studentCourseFee, 2)
-                    .' · Discount ₹'.number_format($currentDiscount, 2)
-                    .($miscTotal > 0 ? ' · Misc ₹'.number_format($miscTotal, 2) : '')
+                    .'<p class="mt-0.5 text-base font-bold text-gray-950 dark:text-white">₹'.$format($currentNet).'</p>'
+                    .'<p class="mt-0.5 text-xs text-gray-500">Course ₹'.$format($studentCourseFee)
+                    .' · Discount ₹'.$format($currentDiscount)
+                    .($miscTotal > 0 ? ' · Misc ₹'.$format($miscTotal) : '')
                     .'</p></div>'
                     .'<div class="rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">'
                     .'<p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Paid</p>'
-                    .'<p class="mt-0.5 text-base font-bold text-emerald-800 dark:text-emerald-200">₹'.number_format($paid, 2).'</p>'
+                    .'<p class="mt-0.5 text-base font-bold text-emerald-800 dark:text-emerald-200">₹'.$format($paid).'</p>'
                     .'<p class="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-300/80">Already collected — fixed</p></div>'
                     .'<div class="rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-500/10">'
                     .'<p class="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Balance due</p>'
-                    .'<p class="mt-0.5 text-base font-bold text-amber-900 dark:text-amber-100">₹'.number_format($pending, 2).'</p>'
+                    .'<p class="mt-0.5 text-base font-bold text-amber-900 dark:text-amber-100">₹'.$format($pending).'</p>'
                     .'<p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/80">Pending installments</p></div>'
                     .'</div>'
                 ))
-                ->columnSpanFull(),
-            Placeholder::make('catalog_fee_hint')
-                ->label('')
-                ->content(new HtmlString(
-                    '<p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">'
-                    .'Course catalog fee is now <strong>₹'.number_format($catalogCourseFee, 2).'</strong> '
-                    .'but this student is on <strong>₹'.number_format($studentCourseFee, 2).'</strong>. '
-                    .'Use <strong>Apply catalog fee</strong> in the footer or open the discount tab.</p>'
-                ))
-                ->visible($catalogDiffers)
                 ->columnSpanFull(),
             Tabs::make('adjustFeeTabs')
                 ->tabs([
@@ -104,6 +86,8 @@ class AdjustFeeStructureFormSchema
                         ->label('Give discount')
                         ->icon(Heroicon::OutlinedTag)
                         ->schema([
+                            Hidden::make('course_fee')
+                                ->default($feeStructure->course_fee),
                             Select::make('discount_mode')
                                 ->label('Type')
                                 ->options([
@@ -119,12 +103,12 @@ class AdjustFeeStructureFormSchema
                                     : 'Extra discount (₹)')
                                 ->numeric()
                                 ->default(0)
-                                ->step(0.01)
+                                ->step(fn (Get $get): int|float => ($get('discount_mode') ?? 'amount') === 'percent' ? 0.01 : 1)
                                 ->helperText(fn (Get $get): string => ($get('discount_mode') ?? 'amount') === 'percent'
                                     ? '% off course fee, added to existing discount.'
-                                    : 'Positive adds discount. Negative reduces it.')
+                                    : 'Whole rupees only. Positive adds discount. Negative reduces it.')
                                 ->live(debounce: 300)
-                                ->afterStateUpdated($rebalanceInstallments),
+                                ->afterStateUpdated($onDiscountChanged),
                             Hidden::make('additional_discount')
                                 ->default(0)
                                 ->dehydrated(false),
@@ -136,10 +120,10 @@ class AdjustFeeStructureFormSchema
                                     $newPending = round(max(0, $newNet - $paid), 2);
                                     $newTotalDiscount = self::resolveDiscountAmount($feeStructure, $mounted);
 
-                                    return 'Net ₹'.number_format($newNet, 2)
-                                        .' (was ₹'.number_format($currentNet, 2).')'
-                                        .' · Balance ₹'.number_format($newPending, 2)
-                                        .' · Total discount ₹'.number_format($newTotalDiscount, 2);
+                                    return 'Net ₹'.$format($newNet)
+                                        .' (was ₹'.$format($currentNet).')'
+                                        .' · Balance ₹'.$format($newPending)
+                                        .' · Total discount ₹'.$format($newTotalDiscount);
                                 })
                                 ->columnSpanFull(),
                             Textarea::make('reason')
@@ -165,23 +149,6 @@ class AdjustFeeStructureFormSchema
                                 })
                                 ->extraAttributes(['class' => 'text-sm font-medium text-primary-600 dark:text-primary-400'])
                                 ->columnSpanFull(),
-                            Toggle::make('edit_course_fee')
-                                ->label('Change listed course fee')
-                                ->helperText('Only when this student’s agreed fee should differ from what is on file.')
-                                ->live()
-                                ->default($catalogDiffers)
-                                ->columnSpanFull(),
-                            TextInput::make('course_fee')
-                                ->label('Course fee')
-                                ->numeric()
-                                ->prefix('₹')
-                                ->default($feeStructure->course_fee)
-                                ->minValue(0)
-                                ->step(0.01)
-                                ->live(debounce: 300)
-                                ->afterStateUpdated($rebalanceInstallments)
-                                ->visible(fn (Get $get): bool => (bool) $get('edit_course_fee'))
-                                ->columnSpanFull(),
                         ])
                         ->columns(2),
                     Tab::make('installments')
@@ -193,7 +160,7 @@ class AdjustFeeStructureFormSchema
                                 ->helperText('Turn on to edit the payment schedule for the balance still due. Settled installments stay locked.')
                                 ->default(false)
                                 ->live()
-                                ->afterStateUpdated(function (bool $state, Get $get, Set $set) use ($feeStructure, $miscTotal, $rebalanceInstallments): void {
+                                ->afterStateUpdated(function (bool $state, Get $get, Set $set) use ($feeStructure, $miscTotal): void {
                                     if (! $state) {
                                         return;
                                     }
@@ -209,12 +176,8 @@ class AdjustFeeStructureFormSchema
                                     $plan = $get('installment_plan') ?? [];
 
                                     if ($plan === []) {
-                                        $set('installment_plan', FeePlanCalculator::singleFullFeeRow($target));
-
-                                        return;
+                                        $set('installment_plan', self::pendingInstallmentPlan($feeStructure, $target));
                                     }
-
-                                    $rebalanceInstallments($get, $set);
                                 })
                                 ->columnSpanFull(),
                             Placeholder::make('reschedule_required_warning')
@@ -261,7 +224,7 @@ class AdjustFeeStructureFormSchema
                                 })
                                 ->extraAttributes(['class' => 'text-sm font-medium text-danger-600 dark:text-danger-400'])
                                 ->columnSpanFull(),
-                            AdmissionFeePlanFormSchema::configureInstallmentRepeater(
+                            AdmissionFeePlanFormSchema::configureAdjustFeeInstallmentRepeater(
                                 Repeater::make('installment_plan')
                                     ->label('Pending installments')
                                     ->columns(3)
@@ -293,27 +256,15 @@ class AdjustFeeStructureFormSchema
         $feeStructure->loadMissing(['installments', 'enrollment.course', 'miscCharges']);
 
         $studentCourseFee = round((float) $feeStructure->course_fee, 2);
-        $catalogCourseFee = round((float) ($feeStructure->enrollment?->course?->fee ?? 0), 2);
-        $catalogDiffers = $catalogCourseFee > 0 && abs($catalogCourseFee - $studentCourseFee) > 0.01;
-        $courseFeeForForm = $catalogDiffers ? $catalogCourseFee : $studentCourseFee;
-        $discount = round((float) $feeStructure->discount_amount, 2);
-        $miscTotal = $feeStructure->miscChargesTotal();
-        $paid = round((float) $feeStructure->paid_amount, 2);
-        $projectedPending = round(max(0, $courseFeeForForm - $discount + $miscTotal - $paid), 2);
         $currentPending = round((float) $feeStructure->pending_amount, 2);
-        $balanceWillChange = abs($projectedPending - $currentPending) > 0.01;
 
         return [
-            'course_fee' => $courseFeeForForm,
-            'edit_course_fee' => $catalogDiffers,
+            'course_fee' => $studentCourseFee,
             'discount_mode' => 'amount',
             'discount_adjustment' => 0,
             'additional_discount' => 0,
-            'reschedule_installments' => $catalogDiffers || $balanceWillChange,
-            'installment_plan' => self::pendingInstallmentPlan(
-                $feeStructure,
-                $catalogDiffers || $balanceWillChange ? $projectedPending : null,
-            ),
+            'reschedule_installments' => $currentPending > 0,
+            'installment_plan' => self::pendingInstallmentPlan($feeStructure),
             'reason' => '',
         ];
     }
@@ -426,7 +377,7 @@ class AdjustFeeStructureFormSchema
 
         $rows = $unpaid->map(fn ($row): array => [
             'label' => FeePlanCalculator::displayInstallmentLabel((string) $row->label, (int) $row->sort_order),
-            'amount' => (string) $row->pending_amount,
+            'amount' => FeePlanCalculator::normalizeRowAmount($row->pending_amount),
             'due_date' => $row->due_date?->toDateString(),
         ])->all();
 
@@ -458,8 +409,8 @@ class AdjustFeeStructureFormSchema
                     '%s — due %s — paid ₹%s of ₹%s',
                     $label,
                     $due,
-                    number_format((float) $row->paid_amount, 2),
-                    number_format((float) $row->amount, 2),
+                    FeePlanCalculator::formatRupeeAmount((float) $row->paid_amount),
+                    FeePlanCalculator::formatRupeeAmount((float) $row->amount),
                 );
             })
             ->values()

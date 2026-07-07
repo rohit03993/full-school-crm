@@ -17,27 +17,47 @@ class FeePlanCalculator
         return round($targetTotal - self::sumAmounts($rows), 2);
     }
 
+    public static function formatRupeeAmount(float $amount): string
+    {
+        return number_format((int) round($amount), 0);
+    }
+
+    public static function toWholeRupeeAmount(float $amount): int
+    {
+        return (int) round($amount);
+    }
+
+    public static function normalizeRowAmount(mixed $amount): string
+    {
+        if ($amount === null || $amount === '') {
+            return '';
+        }
+
+        return (string) self::toWholeRupeeAmount((float) $amount);
+    }
+
     public static function isFullyAllocated(float $targetTotal, array $rows): bool
     {
-        return abs(self::remaining($targetTotal, $rows)) <= 0.01;
+        return abs(self::remaining($targetTotal, $rows)) < 1;
     }
 
     public static function formatSummary(float $targetTotal, array $rows): string
     {
         $allocated = self::sumAmounts($rows);
         $remaining = self::remaining($targetTotal, $rows);
+        $target = self::toWholeRupeeAmount($targetTotal);
 
         $lines = [
-            'To schedule: ₹'.number_format($targetTotal, 2),
-            'Allocated: ₹'.number_format($allocated, 2),
+            'To schedule: ₹'.self::formatRupeeAmount($target),
+            'Allocated: ₹'.self::formatRupeeAmount($allocated),
         ];
 
-        if (abs($remaining) <= 0.01) {
-            $lines[] = 'Remaining: ₹0.00 ✓';
+        if (abs($remaining) < 1) {
+            $lines[] = 'Remaining: ₹0 ✓';
         } elseif ($remaining > 0) {
-            $lines[] = 'Remaining: ₹'.number_format($remaining, 2);
+            $lines[] = 'Still to enter: ₹'.self::formatRupeeAmount($remaining);
         } else {
-            $lines[] = 'Over by: ₹'.number_format(abs($remaining), 2);
+            $lines[] = 'Entered over by: ₹'.self::formatRupeeAmount(abs($remaining));
         }
 
         return implode(' · ', $lines);
@@ -51,15 +71,15 @@ class FeePlanCalculator
 
         $remaining = self::remaining($targetTotal, $rows);
 
-        if (abs($remaining) <= 0.01) {
+        if (abs($remaining) < 1) {
             return null;
         }
 
         if ($remaining > 0) {
-            return '₹'.number_format($remaining, 2).' still unallocated — add a row or use Fill balance on last row.';
+            return '₹'.self::formatRupeeAmount($remaining).' still to enter — add rows or use Fill balance on last row.';
         }
 
-        return 'Installments exceed the balance by ₹'.number_format(abs($remaining), 2).' — reduce amounts.';
+        return 'Installments exceed the balance by ₹'.self::formatRupeeAmount(abs($remaining)).' — reduce amounts.';
     }
 
     public static function installmentLabel(int $number): string
@@ -102,26 +122,27 @@ class FeePlanCalculator
         }
 
         if (count($rows) === 1) {
-            $rows[0]['amount'] = (string) round($targetTotal, 2);
+            $rows[0]['amount'] = (string) self::toWholeRupeeAmount($targetTotal);
 
             return $rows;
         }
 
-        $allocated = 0.0;
+        $target = self::toWholeRupeeAmount($targetTotal);
+        $allocated = 0;
         $lastIndex = count($rows) - 1;
 
         foreach ($rows as $index => &$row) {
             if ($index === $lastIndex) {
-                $amount = round($targetTotal - $allocated, 2);
+                $amount = max(0, $target - $allocated);
             } elseif ($currentSum > 0) {
-                $amount = round($targetTotal * ((float) ($row['amount'] ?? 0) / $currentSum), 2);
+                $amount = (int) floor($target * ((float) ($row['amount'] ?? 0) / $currentSum));
                 $allocated += $amount;
             } else {
-                $amount = round($targetTotal / count($rows), 2);
+                $amount = (int) floor($target / count($rows));
                 $allocated += $amount;
             }
 
-            $row['amount'] = (string) max(0, $amount);
+            $row['amount'] = (string) $amount;
         }
         unset($row);
 
@@ -214,7 +235,7 @@ class FeePlanCalculator
             return $rows;
         }
 
-        $rows[$emptyIndices[0]]['amount'] = (string) round(max(0, $remaining), 2);
+        $rows[$emptyIndices[0]]['amount'] = (string) self::toWholeRupeeAmount(max(0, $remaining));
 
         return $rows;
     }
@@ -343,13 +364,19 @@ class FeePlanCalculator
      * @param  array<int, array{label?: string, amount?: mixed, due_date?: ?string}>  $existingRows
      * @return array{label: string, amount: string, due_date: string}
      */
-    public static function newInstallmentRow(array $existingRows, float $targetTotal, int $nextIndex = 0): array
-    {
+    public static function newInstallmentRow(
+        array $existingRows,
+        float $targetTotal,
+        int $nextIndex = 0,
+        bool $prefillRemaining = true,
+    ): array {
         $remaining = self::remaining($targetTotal, $existingRows);
 
         return [
             'label' => self::installmentLabel(self::nextInstallmentNumberFromRows($existingRows, $nextIndex)),
-            'amount' => $remaining > 0 ? (string) round($remaining, 2) : '',
+            'amount' => $prefillRemaining && $remaining > 0
+                ? (string) self::toWholeRupeeAmount($remaining)
+                : '',
             'due_date' => self::nextDueDate($existingRows),
         ];
     }
@@ -383,7 +410,7 @@ class FeePlanCalculator
         $otherRows = $rows;
         unset($otherRows[$lastKey]);
         $otherTotal = self::sumAmounts($otherRows);
-        $rows[$lastKey]['amount'] = (string) round(max(0, $targetTotal - $otherTotal), 2);
+        $rows[$lastKey]['amount'] = (string) max(0, self::toWholeRupeeAmount($targetTotal - $otherTotal));
 
         return $rows;
     }
@@ -419,11 +446,11 @@ class FeePlanCalculator
      */
     public static function singleFullFeeRow(float $targetTotal): array
     {
-        return [
+        return [[
             'label' => self::installmentLabel(1),
-            'amount' => (string) round($targetTotal, 2),
+            'amount' => (string) self::toWholeRupeeAmount($targetTotal),
             'due_date' => now()->toDateString(),
-        ];
+        ]];
     }
 
     /**

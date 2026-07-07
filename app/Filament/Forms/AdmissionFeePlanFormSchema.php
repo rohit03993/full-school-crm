@@ -276,6 +276,55 @@ class AdmissionFeePlanFormSchema
             });
     }
 
+    /**
+     * Adjust-fees modal: whole rupee amounts, manual entry, allocation shown separately.
+     */
+    public static function configureAdjustFeeInstallmentRepeater(Repeater $repeater, Closure $resolveTarget): Repeater
+    {
+        return $repeater
+            ->schema([
+                TextInput::make('label')
+                    ->required()
+                    ->maxLength(100)
+                    ->placeholder('Installment 1'),
+                TextInput::make('amount')
+                    ->label('Amount (₹)')
+                    ->numeric()
+                    ->minValue(1)
+                    ->step(1)
+                    ->placeholder('Whole rupees'),
+                DatePicker::make('due_date')
+                    ->label('Due date')
+                    ->native(false)
+                    ->live()
+                    ->afterStateUpdated(function (DatePicker $component): void {
+                        self::resortInstallmentRepeater($component);
+                    }),
+            ])
+            ->helperText('Enter whole rupee amounts yourself. The allocation line above shows what is left or if you entered too much.')
+            ->addActionLabel('Add row')
+            ->addAction(function (Action $action) use ($resolveTarget): Action {
+                return $action->action(function (Repeater $component) use ($resolveTarget): void {
+                    $newUuid = $component->generateUuid();
+                    $items = $component->getRawState();
+                    $existing = array_values($component->getState() ?? []);
+                    $target = $resolveTarget($component);
+                    $newRow = FeePlanCalculator::newInstallmentRow($existing, $target, count($existing), false);
+
+                    if ($newUuid) {
+                        $items[$newUuid] = $newRow;
+                    } else {
+                        $items[] = $newRow;
+                    }
+
+                    $component->rawState($items);
+                    $component->collapsed(false, shouldMakeComponentCollapsible: false);
+                    $component->callAfterStateUpdated();
+                    $component->shouldPartiallyRenderAfterActionsCalled() ? $component->partiallyRender() : null;
+                });
+            });
+    }
+
     public static function resolveNetFee(Get $get): float
     {
         return self::resolveNetFeeFromArray([

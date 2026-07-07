@@ -33,7 +33,8 @@ class FeePlanCalculatorTest extends TestCase
         ]);
 
         $this->assertNotNull($message);
-        $this->assertStringContainsString('64,980.00', $message);
+        $this->assertStringContainsString('64,980', $message);
+        $this->assertStringNotContainsString('.00', $message);
     }
 
     public function test_is_fully_allocated_within_one_paisa(): void
