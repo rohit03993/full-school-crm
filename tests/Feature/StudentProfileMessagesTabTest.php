@@ -265,7 +265,9 @@ class StudentProfileMessagesTabTest extends TestCase
             'whatsappProviderLabel' => 'Meta WhatsApp',
             'metaReplyText' => '',
             'showMetaReplyAttachment' => false,
-            'waTemplates' => collect(),
+            'waTemplates' => collect([
+                (object) ['id' => 1, 'name' => 'manual_in', 'param_count' => 0],
+            ]),
             'waTemplateSyncHint' => null,
             'sendWhatsAppTemplateId' => null,
             'sendWhatsAppTemplateFields' => [],

@@ -295,7 +295,7 @@ class WhatsAppInboxPageTest extends TestCase
             ->call('selectConversation', $student->id)
             ->set('sendWhatsAppTemplateId', $template->id)
             ->assertSet('sendWhatsAppTemplateParamCount', 4)
-            ->assertSee('This template needs')
+            ->assertSee('Send template')
             ->assertStatus(200);
     }
 
