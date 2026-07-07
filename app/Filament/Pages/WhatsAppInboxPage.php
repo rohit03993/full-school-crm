@@ -15,15 +15,12 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
-use Livewire\WithFileUploads;
 use UnitEnum;
 
 class WhatsAppInboxPage extends Page
 {
     use InteractsWithStudentWhatsAppInbox;
     use RequiresCrmPermission;
-    use WithFileUploads;
 
     protected static function requiredCrmPermission(): CrmPermission
     {
@@ -145,7 +142,9 @@ class WhatsAppInboxPage extends Page
                     'chatStudent' => $this->whatsAppMessageStudent(),
                     'metaRoutingActive' => $this->metaRoutingActive,
                     'metaSessionOpen' => $this->metaSessionOpen,
-                    'messagesViewData' => $this->selectedStudentId ? $this->whatsAppMessagesViewData() : null,
+                    'messagesViewData' => ($this->selectedStudentId && $this->messagesTabLoaded)
+                        ? $this->whatsAppMessagesViewData()
+                        : null,
                 ]),
         ]);
     }

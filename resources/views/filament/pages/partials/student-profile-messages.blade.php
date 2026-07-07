@@ -1,5 +1,7 @@
 <div
-    wire:init="loadMessagesTab"
+    @unless ($compactInbox ?? false)
+        wire:init="loadMessagesTab"
+    @endunless
     @class(['crm-wa-inbox', 'crm-wa-inbox--compact' => $compactInbox ?? false])
 >
     @php
@@ -147,6 +149,7 @@
                             placeholder="Type your reply… emojis work too 🙂"
                         ></textarea>
                     </div>
+                    @unless ($compactInbox ?? false)
                     <div class="crm-wa-inbox__field">
                         <label class="crm-wa-inbox__label" for="wa-quick-attachment">Photo, video, or file</label>
                         <input
@@ -183,6 +186,21 @@
                             <span wire:loading wire:target="sendMetaReply">Sending…</span>
                         </button>
                     </div>
+                    @else
+                    <p class="crm-wa-inbox__hint crm-wa-inbox__hint--info">
+                        To send a photo or file, use <strong>Open student profile</strong> above → Messages tab.
+                    </p>
+                    <button
+                        type="button"
+                        wire:click="sendMetaReply"
+                        wire:loading.attr="disabled"
+                        wire:target="sendMetaReply"
+                        class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--full"
+                    >
+                        <span wire:loading.remove wire:target="sendMetaReply">Send reply</span>
+                        <span wire:loading wire:target="sendMetaReply">Sending…</span>
+                    </button>
+                    @endunless
                 </section>
             @endif
         </aside>

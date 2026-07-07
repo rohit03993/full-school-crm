@@ -117,38 +117,48 @@ class StudentWhatsAppThreadService
 
         return $metaQuery
             ->get()
-            ->map(function (MetaWhatsAppMessage $row): StudentWhatsAppThreadItem {
-                if (Schema::hasColumn('meta_whatsapp_messages', 'message_type')) {
-                    $row = $this->media->prepareForThreadDisplay($row);
+            ->map(function (MetaWhatsAppMessage $row): ?StudentWhatsAppThreadItem {
+                try {
+                    if (Schema::hasColumn('meta_whatsapp_messages', 'message_type')) {
+                        $row = $this->media->prepareForThreadDisplay($row);
+                    }
+
+                    $status = MetaWhatsAppMessageStatus::tryFrom($row->status);
+                    $messageType = Schema::hasColumn('meta_whatsapp_messages', 'message_type')
+                        ? (string) ($row->message_type ?: 'text')
+                        : 'text';
+                    $caption = Schema::hasColumn('meta_whatsapp_messages', 'caption')
+                        ? trim((string) ($row->caption ?? ''))
+                        : '';
+                    $body = $this->metaDisplayBody($row);
+                    $mediaUrl = $this->media->mediaUrl($row);
+                    $locationUrl = $messageType === 'location' ? $this->locationUrlFromPayload($row) : null;
+
+                    return new StudentWhatsAppThreadItem(
+                        key: 'meta-'.$row->id,
+                        source: 'meta',
+                        direction: $row->direction,
+                        body: $body,
+                        status: $row->status,
+                        statusLabel: $status?->label() ?? ucfirst($row->status),
+                        at: $row->status_at ?? $row->created_at,
+                        templateName: null,
+                        provider: 'meta',
+                        messageType: $messageType,
+                        mediaUrl: $mediaUrl,
+                        mediaMimeType: $row->media_mime_type,
+                        mediaFilename: $row->media_filename,
+                        caption: $caption !== '' ? $caption : null,
+                        locationUrl: $locationUrl,
+                    );
+                } catch (\Throwable $exception) {
+                    report($exception);
+
+                    return null;
                 }
-
-                $status = MetaWhatsAppMessageStatus::tryFrom($row->status);
-                $messageType = Schema::hasColumn('meta_whatsapp_messages', 'message_type')
-                    ? (string) ($row->message_type ?: 'text')
-                    : 'text';
-                $caption = trim((string) ($row->caption ?? ''));
-                $body = $this->metaDisplayBody($row);
-                $mediaUrl = $this->media->mediaUrl($row);
-                $locationUrl = $messageType === 'location' ? $this->locationUrlFromPayload($row) : null;
-
-                return new StudentWhatsAppThreadItem(
-                    key: 'meta-'.$row->id,
-                    source: 'meta',
-                    direction: $row->direction,
-                    body: $body,
-                    status: $row->status,
-                    statusLabel: $status?->label() ?? ucfirst($row->status),
-                    at: $row->status_at ?? $row->created_at,
-                    templateName: null,
-                    provider: 'meta',
-                    messageType: $messageType,
-                    mediaUrl: $mediaUrl,
-                    mediaMimeType: $row->media_mime_type,
-                    mediaFilename: $row->media_filename,
-                    caption: $caption !== '' ? $caption : null,
-                    locationUrl: $locationUrl,
-                );
-            });
+            })
+            ->filter()
+            ->values();
     }
 
     protected function campaignDisplayBody(WhatsAppCampaignRecipient $row): string
@@ -184,8 +194,12 @@ class StudentWhatsAppThreadService
 
     protected function metaDisplayBody(MetaWhatsAppMessage $row): string
     {
-        $messageType = (string) ($row->message_type ?? 'text');
-        $caption = trim((string) ($row->caption ?? ''));
+        $messageType = Schema::hasColumn('meta_whatsapp_messages', 'message_type')
+            ? (string) ($row->message_type ?? 'text')
+            : 'text';
+        $caption = Schema::hasColumn('meta_whatsapp_messages', 'caption')
+            ? trim((string) ($row->caption ?? ''))
+            : '';
         $preview = trim((string) ($row->body_preview ?? ''));
         $templateName = (string) ($row->template_name ?? '');
 

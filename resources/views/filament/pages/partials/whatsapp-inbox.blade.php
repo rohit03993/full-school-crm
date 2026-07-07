@@ -102,7 +102,13 @@
                     </a>
                 </div>
 
-                @include('filament.pages.partials.student-profile-messages', $messagesViewData ?? [])
+                @if ($messagesViewData)
+                    @include('filament.pages.partials.student-profile-messages', $messagesViewData)
+                @else
+                    <div class="crm-wa-global-inbox__placeholder">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Loading conversation…</p>
+                    </div>
+                @endif
             @endif
         </section>
     </div>
