@@ -38,6 +38,7 @@ use App\Services\AttendanceService;
 use App\Services\BatchService;
 use App\Services\CallLogService;
 use App\Services\ConvertToAdmissionPresenter;
+use App\Services\CourseFeeSyncService;
 use App\Services\DocumentService;
 use App\Services\EnquiryService;
 use App\Services\EnrollmentRollNumberService;
@@ -302,6 +303,8 @@ class StudentProfilePage extends Page
         if (! in_array($this->profileTab, $this->validProfileTabs(), true)) {
             $this->profileTab = 'overview';
         }
+
+        $this->syncCatalogCourseFeeIfNeeded();
     }
 
     public static function getRoutePath(Panel $panel): string
@@ -1126,6 +1129,7 @@ class StudentProfilePage extends Page
             return;
         }
 
+        $this->syncCatalogCourseFeeIfNeeded();
         $this->feesTabLoaded = true;
         $this->record->loadMissing([
             'activeEnrollment.course',
@@ -1469,6 +1473,38 @@ class StudentProfilePage extends Page
         ]);
 
         $this->cachedProfileSummary = null;
+    }
+
+    protected function syncCatalogCourseFeeIfNeeded(): bool
+    {
+        if (! $this->userCan(CrmPermission::FeesAdjustStructure)) {
+            return false;
+        }
+
+        $enrollment = $this->record->activeEnrollment;
+
+        if (! $enrollment?->feeStructure || ! $enrollment->course) {
+            return false;
+        }
+
+        $synced = app(CourseFeeSyncService::class)->syncToCatalogIfNeeded(
+            $enrollment->feeStructure,
+            $enrollment->course,
+            Auth::user(),
+        );
+
+        if (! $synced) {
+            return false;
+        }
+
+        $this->record->load([
+            'activeEnrollment.course',
+            'activeEnrollment.feeStructure.installments',
+            'activeEnrollment.feeStructure.miscCharges',
+        ]);
+        $this->cachedProfileSummary = null;
+
+        return true;
     }
 
     protected function resolveVisitEnquiry(array $data): ?Enquiry

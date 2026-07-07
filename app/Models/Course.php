@@ -6,6 +6,7 @@ use App\Enums\CourseStatus;
 use App\Enums\ProgrammeCategory;
 use App\Enums\DurationType;
 use App\Support\DefaultCourse;
+use App\Services\CourseFeeSyncService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -43,6 +44,17 @@ class Course extends Model
             if ($course->programme_category === null) {
                 $course->programme_category = ProgrammeCategory::Custom;
             }
+        });
+
+        static::updated(function (Course $course): void {
+            if (! $course->wasChanged('fee')) {
+                return;
+            }
+
+            app(CourseFeeSyncService::class)->syncCourseToActiveEnrollments(
+                $course,
+                auth()->user(),
+            );
         });
     }
 

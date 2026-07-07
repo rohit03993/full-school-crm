@@ -290,19 +290,30 @@ class AdjustFeeStructureFormSchema
      */
     public static function initialState(FeeStructure $feeStructure): array
     {
-        $feeStructure->loadMissing(['installments', 'enrollment.course']);
+        $feeStructure->loadMissing(['installments', 'enrollment.course', 'miscCharges']);
 
         $studentCourseFee = round((float) $feeStructure->course_fee, 2);
         $catalogCourseFee = round((float) ($feeStructure->enrollment?->course?->fee ?? 0), 2);
+        $catalogDiffers = $catalogCourseFee > 0 && abs($catalogCourseFee - $studentCourseFee) > 0.01;
+        $courseFeeForForm = $catalogDiffers ? $catalogCourseFee : $studentCourseFee;
+        $discount = round((float) $feeStructure->discount_amount, 2);
+        $miscTotal = $feeStructure->miscChargesTotal();
+        $paid = round((float) $feeStructure->paid_amount, 2);
+        $projectedPending = round(max(0, $courseFeeForForm - $discount + $miscTotal - $paid), 2);
+        $currentPending = round((float) $feeStructure->pending_amount, 2);
+        $balanceWillChange = abs($projectedPending - $currentPending) > 0.01;
 
         return [
-            'course_fee' => $feeStructure->course_fee,
-            'edit_course_fee' => $catalogCourseFee > 0 && abs($catalogCourseFee - $studentCourseFee) > 0.01,
+            'course_fee' => $courseFeeForForm,
+            'edit_course_fee' => $catalogDiffers,
             'discount_mode' => 'amount',
             'discount_adjustment' => 0,
             'additional_discount' => 0,
-            'reschedule_installments' => false,
-            'installment_plan' => self::pendingInstallmentPlan($feeStructure),
+            'reschedule_installments' => $catalogDiffers || $balanceWillChange,
+            'installment_plan' => self::pendingInstallmentPlan(
+                $feeStructure,
+                $catalogDiffers || $balanceWillChange ? $projectedPending : null,
+            ),
             'reason' => '',
         ];
     }
@@ -390,11 +401,11 @@ class AdjustFeeStructureFormSchema
      *
      * @return list<array{label: string, amount: string, due_date: ?string}>
      */
-    public static function pendingInstallmentPlan(FeeStructure $feeStructure): array
+    public static function pendingInstallmentPlan(FeeStructure $feeStructure, ?float $pendingOverride = null): array
     {
         $feeStructure->loadMissing('installments');
 
-        $pendingTotal = round((float) $feeStructure->pending_amount, 2);
+        $pendingTotal = round($pendingOverride ?? (float) $feeStructure->pending_amount, 2);
 
         if ($pendingTotal <= 0) {
             return [];

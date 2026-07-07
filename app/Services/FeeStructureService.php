@@ -131,6 +131,17 @@ class FeeStructureService
         }
 
         $newPending = round($newNet - $paid, 2);
+        $oldPending = round((float) $feeStructure->pending_amount, 2);
+
+        if (! $reschedule && abs($newPending - $oldPending) > 0.01) {
+            $reschedule = true;
+        }
+
+        if ($reschedule && $newPending > 0 && $installmentPlan === []) {
+            $installmentPlan = app(AdmissionFeePlanService::class)->normalizeInstallmentPlan(
+                AdjustFeeStructureFormSchema::pendingInstallmentPlan($feeStructure, $newPending),
+            );
+        }
 
         if ($reschedule && $newPending > 0) {
             app(AdmissionFeePlanService::class)->assertInstallmentPlanValid($installmentPlan, $newPending);
