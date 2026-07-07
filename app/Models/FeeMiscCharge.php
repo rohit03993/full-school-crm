@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\FeeMiscChargeKind;
 use App\Enums\FeeMiscChargeStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -79,5 +80,16 @@ class FeeMiscCharge extends Model
         return $this->isSeparateCharge()
             && in_array($this->status, [FeeMiscChargeStatus::Pending, FeeMiscChargeStatus::Partial], true)
             && $this->pendingAmount() > 0;
+    }
+
+    /**
+     * @param  Builder<FeeMiscCharge>  $query
+     * @return Builder<FeeMiscCharge>
+     */
+    public function scopeSeparatePayable(Builder $query): Builder
+    {
+        return $query
+            ->whereIn('kind', [FeeMiscChargeKind::Separate, FeeMiscChargeKind::GstPenalty])
+            ->where('status', '!=', FeeMiscChargeStatus::Cancelled);
     }
 }

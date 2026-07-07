@@ -18,12 +18,13 @@ use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Actions;
-use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
@@ -44,6 +45,22 @@ class BulkMiscChargePage extends Page
      */
     public ?array $data = [];
 
+    /**
+     * @var Collection<int, array<string, mixed>>
+     */
+    public Collection $recentChargeSummaries;
+
+    /**
+     * @var Collection<int, array<string, mixed>>
+     */
+    public Collection $scopeChargeSummaries;
+
+    public function boot(): void
+    {
+        $this->recentChargeSummaries = collect();
+        $this->scopeChargeSummaries = collect();
+    }
+
     public static function canAccess(): bool
     {
         if (! FeatureGate::enabled(LicenseFeature::Fees)) {
@@ -53,7 +70,7 @@ class BulkMiscChargePage extends Page
         return CrmAccess::can(Auth::user(), CrmPermission::FeesAdjustStructure);
     }
 
-    public function mount(): void
+    public function mount(FeeMiscChargeService $miscCharges): void
     {
         $this->form->fill([
             'scope' => 'batch',
@@ -64,6 +81,8 @@ class BulkMiscChargePage extends Page
             'amount' => null,
             'due_date' => null,
         ]);
+
+        $this->refreshChargeSummaries($miscCharges);
     }
 
     public function defaultForm(Schema $schema): Schema
@@ -98,14 +117,16 @@ class BulkMiscChargePage extends Page
                         ->searchable()
                         ->native(false)
                         ->visible(fn (callable $get): bool => $get('scope') === 'batch')
-                        ->required(fn (callable $get): bool => $get('scope') === 'batch'),
+                        ->required(fn (callable $get): bool => $get('scope') === 'batch')
+                        ->live(),
                     Select::make('academic_session_id')
                         ->label('Academic session (optional)')
                         ->options(fn (): array => AcademicSession::query()->orderByDesc('start_date')->pluck('name', 'id')->all())
                         ->searchable()
                         ->native(false)
                         ->visible(fn (callable $get): bool => $get('scope') === 'course')
-                        ->placeholder('All sessions'),
+                        ->placeholder('All sessions')
+                        ->live(),
                 ])
                 ->columns(2),
             Section::make('Charge details')
@@ -129,6 +150,76 @@ class BulkMiscChargePage extends Page
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();
+    }
+
+    public function updatedDataScope(): void
+    {
+        $this->loadScopeChargeSummaries();
+    }
+
+    public function updatedDataCourseId(): void
+    {
+        $this->loadScopeChargeSummaries();
+    }
+
+    public function updatedDataBatchId(): void
+    {
+        $this->loadScopeChargeSummaries();
+    }
+
+    public function updatedDataAcademicSessionId(): void
+    {
+        $this->loadScopeChargeSummaries();
+    }
+
+    public function refreshChargeSummaries(?FeeMiscChargeService $miscCharges = null): void
+    {
+        $miscCharges ??= app(FeeMiscChargeService::class);
+
+        $this->recentChargeSummaries = $miscCharges->recentSeparateChargeSummaries();
+        $this->loadScopeChargeSummaries($miscCharges);
+    }
+
+    protected function loadScopeChargeSummaries(?FeeMiscChargeService $miscCharges = null): void
+    {
+        $miscCharges ??= app(FeeMiscChargeService::class);
+        $data = $this->data ?? [];
+        $scope = (string) ($data['scope'] ?? 'batch');
+        $courseId = (int) ($data['course_id'] ?? 0);
+
+        if ($courseId <= 0) {
+            $this->scopeChargeSummaries = collect();
+
+            return;
+        }
+
+        if ($scope === 'batch') {
+            $batchId = (int) ($data['batch_id'] ?? 0);
+
+            if ($batchId <= 0) {
+                $this->scopeChargeSummaries = collect();
+
+                return;
+            }
+
+            $batch = Batch::query()->find($batchId);
+            $this->scopeChargeSummaries = $batch
+                ? $miscCharges->scopeSeparateChargeSummariesForBatch($batch)
+                : collect();
+
+            return;
+        }
+
+        $course = Course::query()->find($courseId);
+
+        if (! $course) {
+            $this->scopeChargeSummaries = collect();
+
+            return;
+        }
+
+        $sessionId = filled($data['academic_session_id'] ?? null) ? (int) $data['academic_session_id'] : null;
+        $this->scopeChargeSummaries = $miscCharges->scopeSeparateChargeSummariesForCourse($course, $sessionId);
     }
 
     public function submit(FeeMiscChargeService $miscCharges): void
@@ -159,6 +250,8 @@ class BulkMiscChargePage extends Page
             'amount' => null,
             'due_date' => null,
         ]);
+
+        $this->refreshChargeSummaries($miscCharges);
     }
 
     public function content(Schema $schema): Schema
@@ -173,6 +266,11 @@ class BulkMiscChargePage extends Page
                             ->label('Add charge to students')
                             ->submit('submit'),
                     ]),
+                ]),
+            View::make('filament.pages.partials.bulk-misc-charge-history')
+                ->viewData(fn (): array => [
+                    'recentChargeSummaries' => $this->recentChargeSummaries,
+                    'scopeChargeSummaries' => $this->scopeChargeSummaries,
                 ]),
         ]);
     }

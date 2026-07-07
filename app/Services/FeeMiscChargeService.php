@@ -12,6 +12,7 @@ use App\Models\FeeMiscCharge;
 use App\Models\FeeStructure;
 use App\Models\Student;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -292,5 +293,181 @@ class FeeMiscChargeService
         }
 
         return $charge;
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     label: string,
+     *     amount: float,
+     *     due_date: ?string,
+     *     student_count: int,
+     *     pending_total: float,
+     *     paid_total: float,
+     *     added_at: \Illuminate\Support\Carbon|null,
+     *     added_by: ?string,
+     * }>
+     */
+    public function recentSeparateChargeSummaries(int $limit = 30): Collection
+    {
+        return $this->summarizeCharges(
+            FeeMiscCharge::query()
+                ->separatePayable()
+                ->with('addedBy')
+                ->orderByDesc('created_at')
+                ->limit(500)
+                ->get(),
+            fn (FeeMiscCharge $charge): string => implode('|', [
+                $charge->label,
+                number_format((float) $charge->amount, 2, '.', ''),
+                $charge->due_date?->toDateString() ?? '',
+                $charge->created_at?->format('Y-m-d H:i') ?? '',
+                (string) $charge->added_by_user_id,
+            ]),
+        )->take($limit)->values();
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     label: string,
+     *     amount: float,
+     *     due_date: ?string,
+     *     student_count: int,
+     *     pending_total: float,
+     *     paid_total: float,
+     *     added_at: \Illuminate\Support\Carbon|null,
+     *     added_by: ?string,
+     * }>
+     */
+    public function scopeSeparateChargeSummariesForBatch(Batch $batch): Collection
+    {
+        $feeStructureIds = $this->activeFeeStructureIdsForBatch($batch);
+
+        if ($feeStructureIds === []) {
+            return collect();
+        }
+
+        return $this->summarizeCharges(
+            FeeMiscCharge::query()
+                ->separatePayable()
+                ->whereIn('fee_structure_id', $feeStructureIds)
+                ->with('addedBy')
+                ->orderByDesc('created_at')
+                ->get(),
+            fn (FeeMiscCharge $charge): string => implode('|', [
+                $charge->label,
+                number_format((float) $charge->amount, 2, '.', ''),
+                $charge->due_date?->toDateString() ?? '',
+            ]),
+        )->values();
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     label: string,
+     *     amount: float,
+     *     due_date: ?string,
+     *     student_count: int,
+     *     pending_total: float,
+     *     paid_total: float,
+     *     added_at: \Illuminate\Support\Carbon|null,
+     *     added_by: ?string,
+     * }>
+     */
+    public function scopeSeparateChargeSummariesForCourse(Course $course, ?int $academicSessionId = null): Collection
+    {
+        $feeStructureIds = $this->activeFeeStructureIdsForCourse($course, $academicSessionId);
+
+        if ($feeStructureIds === []) {
+            return collect();
+        }
+
+        return $this->summarizeCharges(
+            FeeMiscCharge::query()
+                ->separatePayable()
+                ->whereIn('fee_structure_id', $feeStructureIds)
+                ->with('addedBy')
+                ->orderByDesc('created_at')
+                ->get(),
+            fn (FeeMiscCharge $charge): string => implode('|', [
+                $charge->label,
+                number_format((float) $charge->amount, 2, '.', ''),
+                $charge->due_date?->toDateString() ?? '',
+            ]),
+        )->values();
+    }
+
+    /**
+     * @return list<int>
+     */
+    protected function activeFeeStructureIdsForBatch(Batch $batch): array
+    {
+        return Enrollment::query()
+            ->where('is_active', true)
+            ->where('course_id', $batch->course_id)
+            ->whereHas('student.activeBatchStudent', fn ($query) => $query
+                ->where('batch_id', $batch->id)
+                ->where('is_active', true))
+            ->whereHas('feeStructure')
+            ->with('feeStructure:id,enrollment_id')
+            ->get()
+            ->map(fn (Enrollment $enrollment): int => (int) $enrollment->feeStructure->id)
+            ->all();
+    }
+
+    /**
+     * @return list<int>
+     */
+    protected function activeFeeStructureIdsForCourse(Course $course, ?int $academicSessionId = null): array
+    {
+        $query = Enrollment::query()
+            ->where('is_active', true)
+            ->where('course_id', $course->id)
+            ->whereHas('feeStructure');
+
+        if ($academicSessionId) {
+            $query->where('academic_session_id', $academicSessionId);
+        }
+
+        return $query
+            ->with('feeStructure:id,enrollment_id')
+            ->get()
+            ->map(fn (Enrollment $enrollment): int => (int) $enrollment->feeStructure->id)
+            ->all();
+    }
+
+    /**
+     * @param  Collection<int, FeeMiscCharge>  $charges
+     * @return Collection<int, array{
+     *     label: string,
+     *     amount: float,
+     *     due_date: ?string,
+     *     student_count: int,
+     *     pending_total: float,
+     *     paid_total: float,
+     *     added_at: \Illuminate\Support\Carbon|null,
+     *     added_by: ?string,
+     * }>
+     */
+    protected function summarizeCharges(Collection $charges, callable $groupKey): Collection
+    {
+        return $charges
+            ->groupBy($groupKey)
+            ->map(function (Collection $group): array {
+                /** @var FeeMiscCharge $first */
+                $first = $group->first();
+
+                return [
+                    'label' => (string) $first->label,
+                    'amount' => (float) $first->amount,
+                    'due_date' => $first->due_date?->toDateString(),
+                    'student_count' => $group->count(),
+                    'pending_total' => round((float) $group->sum(fn (FeeMiscCharge $charge): float => $charge->pendingAmount()), 2),
+                    'paid_total' => round((float) $group->sum(fn (FeeMiscCharge $charge): float => (float) $charge->paid_amount), 2),
+                    'added_at' => $first->created_at,
+                    'added_by' => $first->addedBy?->name,
+                ];
+            })
+            ->sortByDesc(fn (array $row) => $row['added_at']?->timestamp ?? 0)
+            ->values();
     }
 }

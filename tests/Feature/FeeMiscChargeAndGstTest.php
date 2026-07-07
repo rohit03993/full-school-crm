@@ -68,6 +68,29 @@ class FeeMiscChargeAndGstTest extends TestCase
         $this->assertSame(3000.0, $feeStructure->fresh()->separateMiscChargesPendingTotal());
     }
 
+    public function test_recent_misc_charge_summaries_group_bulk_rows(): void
+    {
+        $staff = $this->createStaff();
+        $student = $this->createEnrolledStudent($staff);
+        $feeStructure = $student->activeEnrollment->feeStructure;
+
+        app(FeeMiscChargeService::class)->addSeparateCharge(
+            $feeStructure,
+            'Exam fee',
+            2500,
+            null,
+            $staff,
+        );
+
+        $summaries = app(FeeMiscChargeService::class)->recentSeparateChargeSummaries();
+
+        $this->assertCount(1, $summaries);
+        $this->assertSame('Exam fee', $summaries->first()['label']);
+        $this->assertSame(2500.0, $summaries->first()['amount']);
+        $this->assertSame(1, $summaries->first()['student_count']);
+        $this->assertSame(2500.0, $summaries->first()['pending_total']);
+    }
+
     public function test_staff_can_add_and_pay_separate_misc_charge(): void
     {
         $staff = $this->createStaff();
