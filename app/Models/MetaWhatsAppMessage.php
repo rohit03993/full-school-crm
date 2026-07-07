@@ -18,6 +18,10 @@ class MetaWhatsAppMessage extends Model
         'language',
         'body_preview',
         'message_type',
+        'conversation_category',
+        'message_source',
+        'estimated_cost_inr',
+        'whatsapp_campaign_recipient_id',
         'media_id',
         'media_path',
         'media_mime_type',
@@ -34,6 +38,7 @@ class MetaWhatsAppMessage extends Model
         return [
             'payload' => 'array',
             'status_at' => 'datetime',
+            'estimated_cost_inr' => 'float',
         ];
     }
 

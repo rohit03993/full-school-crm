@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\MetaWhatsAppMessageDirection;
 use App\Enums\MetaWhatsAppMessageStatus;
+use App\Enums\WhatsAppMessageSource;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Student;
@@ -12,10 +13,18 @@ class MetaWhatsAppMessageLogger
 {
     public function __construct(
         protected WhatsAppTemplateParamResolver $paramResolver,
+        protected MetaWhatsAppCostEstimator $costEstimator,
     ) {}
 
     /**
      * @param  list<string>  $bodyParams
+     * @param  array{
+     *     student_id?: int|null,
+     *     message_source?: string|null,
+     *     whatsapp_campaign_recipient_id?: int|null,
+     *     conversation_category?: string|null,
+     *     estimated_cost_inr?: float|null,
+     * }  $context
      */
     public function recordOutbound(
         string $phone,
@@ -28,18 +37,24 @@ class MetaWhatsAppMessageLogger
         ?array $payload = null,
         ?int $studentId = null,
         ?string $bodyPreview = null,
+        array $context = [],
     ): MetaWhatsAppMessage {
         $preview = $bodyPreview ?? $this->buildOutboundPreview($templateName, $language, $bodyParams);
+        $estimate = $this->costEstimator->estimateForTemplate($templateName, $language !== '' ? $language : null);
 
         return MetaWhatsAppMessage::query()->create([
             'wamid' => $wamid,
             'direction' => MetaWhatsAppMessageDirection::Outbound->value,
             'phone' => $this->normalizePhone($phone),
-            'student_id' => $studentId ?? $this->guessStudentId($phone),
+            'student_id' => $context['student_id'] ?? $studentId ?? $this->guessStudentId($phone),
             'template_name' => $templateName !== '' ? $templateName : null,
             'language' => $language !== '' ? $language : null,
             'body_preview' => mb_substr($preview, 0, 500),
             'message_type' => 'text',
+            'conversation_category' => $context['conversation_category'] ?? $estimate['category'],
+            'message_source' => $context['message_source'] ?? WhatsAppMessageSource::Automation->value,
+            'estimated_cost_inr' => $context['estimated_cost_inr'] ?? $estimate['cost_inr'],
+            'whatsapp_campaign_recipient_id' => $context['whatsapp_campaign_recipient_id'] ?? null,
             'status' => $status->value,
             'status_detail' => $statusDetail,
             'payload' => $payload,
@@ -49,6 +64,13 @@ class MetaWhatsAppMessageLogger
 
     /**
      * @param  array<string, mixed>  $mediaAttributes
+     * @param  array{
+     *     student_id?: int|null,
+     *     message_source?: string|null,
+     *     whatsapp_campaign_recipient_id?: int|null,
+     *     conversation_category?: string|null,
+     *     estimated_cost_inr?: float|null,
+     * }  $context
      */
     public function recordOutboundMedia(
         string $phone,
@@ -58,19 +80,63 @@ class MetaWhatsAppMessageLogger
         ?string $statusDetail = null,
         ?array $payload = null,
         ?int $studentId = null,
+        array $context = [],
     ): MetaWhatsAppMessage {
+        $estimate = $this->costEstimator->estimateForSessionMedia();
+
         return MetaWhatsAppMessage::query()->create([
             'wamid' => $wamid,
             'direction' => MetaWhatsAppMessageDirection::Outbound->value,
             'phone' => $this->normalizePhone($phone),
-            'student_id' => $studentId ?? $this->guessStudentId($phone),
+            'student_id' => $context['student_id'] ?? $studentId ?? $this->guessStudentId($phone),
             'body_preview' => mb_substr((string) ($mediaAttributes['body_preview'] ?? 'Media message'), 0, 500),
             'message_type' => (string) ($mediaAttributes['message_type'] ?? 'document'),
+            'conversation_category' => $context['conversation_category'] ?? $estimate['category'],
+            'message_source' => $context['message_source'] ?? WhatsAppMessageSource::Profile->value,
+            'estimated_cost_inr' => $context['estimated_cost_inr'] ?? $estimate['cost_inr'],
+            'whatsapp_campaign_recipient_id' => $context['whatsapp_campaign_recipient_id'] ?? null,
             'media_id' => $mediaAttributes['media_id'] ?? null,
             'media_path' => $mediaAttributes['media_path'] ?? null,
             'media_mime_type' => $mediaAttributes['media_mime_type'] ?? null,
             'media_filename' => $mediaAttributes['media_filename'] ?? null,
             'caption' => $mediaAttributes['caption'] ?? null,
+            'status' => $status->value,
+            'status_detail' => $statusDetail,
+            'payload' => $payload,
+            'status_at' => now(),
+        ]);
+    }
+
+    /**
+     * @param  array{
+     *     student_id?: int|null,
+     *     message_source?: string|null,
+     *     whatsapp_campaign_recipient_id?: int|null,
+     * }  $context
+     */
+    public function recordOutboundText(
+        string $phone,
+        ?string $wamid,
+        string $bodyPreview,
+        MetaWhatsAppMessageStatus $status,
+        ?string $statusDetail = null,
+        ?array $payload = null,
+        ?int $studentId = null,
+        array $context = [],
+    ): MetaWhatsAppMessage {
+        $estimate = $this->costEstimator->estimateForSessionReply();
+
+        return MetaWhatsAppMessage::query()->create([
+            'wamid' => $wamid,
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => $this->normalizePhone($phone),
+            'student_id' => $context['student_id'] ?? $studentId ?? $this->guessStudentId($phone),
+            'body_preview' => mb_substr($bodyPreview, 0, 500),
+            'message_type' => 'text',
+            'conversation_category' => $estimate['category'],
+            'message_source' => $context['message_source'] ?? WhatsAppMessageSource::Inbox->value,
+            'estimated_cost_inr' => $estimate['cost_inr'],
+            'whatsapp_campaign_recipient_id' => $context['whatsapp_campaign_recipient_id'] ?? null,
             'status' => $status->value,
             'status_detail' => $statusDetail,
             'payload' => $payload,

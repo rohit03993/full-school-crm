@@ -26,4 +26,25 @@ return [
 
     'app_secret' => env('META_WHATSAPP_APP_SECRET'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | India per-message rates (INR) — Meta WhatsApp pricing fallback
+    |--------------------------------------------------------------------------
+    |
+    | Used when estimating cost on each logged message. Analytics also pulls
+    | official totals from Meta pricing_analytics when WABA ID is configured.
+    | Override per institute via settings (meta_whatsapp.pricing_rates).
+    |
+    */
+    'pricing_currency' => env('META_WHATSAPP_PRICING_CURRENCY', 'INR'),
+
+    'pricing_rates_inr' => [
+        'MARKETING' => (float) env('META_WHATSAPP_RATE_MARKETING_INR', 0.7846),
+        'UTILITY' => (float) env('META_WHATSAPP_RATE_UTILITY_INR', 0.3500),
+        'AUTHENTICATION' => (float) env('META_WHATSAPP_RATE_AUTH_INR', 0.3500),
+        'AUTHENTICATION_INTERNATIONAL' => (float) env('META_WHATSAPP_RATE_AUTH_INTL_INR', 2.3000),
+        'SERVICE' => (float) env('META_WHATSAPP_RATE_SERVICE_INR', 0.0000),
+        'UNKNOWN' => (float) env('META_WHATSAPP_RATE_UNKNOWN_INR', 0.3500),
+    ],
+
 ];

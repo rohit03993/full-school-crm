@@ -15,9 +15,12 @@ class WhatsAppCampaignRecipient extends Model
         'student_id',
         'student_call_id',
         'phone',
+        'wamid',
+        'meta_whatsapp_message_id',
         'status',
         'template_params',
         'message_sent',
+        'estimated_cost_inr',
         'provider_response',
         'error_message',
     ];
@@ -28,6 +31,7 @@ class WhatsAppCampaignRecipient extends Model
             'status' => WhatsAppRecipientStatus::class,
             'template_params' => 'array',
             'provider_response' => 'array',
+            'estimated_cost_inr' => 'float',
         ];
     }
 

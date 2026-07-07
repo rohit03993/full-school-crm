@@ -25,6 +25,7 @@ class MetaWhatsAppService
         array $bodyParams = [],
         string $languageCode = 'en',
         int $expectedParamCount = 0,
+        array $logContext = [],
     ): array {
         if (! $this->isConfigured()) {
             return ['status' => 'failed', 'error' => 'WhatsApp is not configured. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').' and save credentials.'];
@@ -91,6 +92,9 @@ class MetaWhatsAppService
                     MetaWhatsAppMessageStatus::Sent,
                     null,
                     is_array($data) ? $data : null,
+                    $logContext['student_id'] ?? null,
+                    null,
+                    $logContext,
                 );
 
                 return [
@@ -111,6 +115,9 @@ class MetaWhatsAppService
                 MetaWhatsAppMessageStatus::Failed,
                 $error,
                 is_array($data) ? $data : null,
+                $logContext['student_id'] ?? null,
+                null,
+                $logContext,
             );
 
             return [

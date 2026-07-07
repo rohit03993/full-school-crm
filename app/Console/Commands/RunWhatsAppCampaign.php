@@ -4,8 +4,10 @@ namespace App\Console\Commands;
 
 use App\Enums\WhatsAppAutoStatus;
 use App\Enums\WhatsAppCampaignStatus;
+use App\Enums\WhatsAppMessageSource;
 use App\Enums\WhatsAppRecipientStatus;
 use App\Jobs\RunWhatsAppCampaignJob;
+use App\Models\MetaWhatsAppMessage;
 use App\Models\Setting;
 use App\Models\StudentCall;
 use App\Models\User;
@@ -13,6 +15,7 @@ use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
 use App\Models\MetaWhatsAppTemplate;
 use App\Services\MetaWhatsAppService;
+use App\Services\WhatsAppAnalyticsService;
 use App\Services\WhatsAppDispatchService;
 use App\Services\WhatsAppTemplateParamResolver;
 use Illuminate\Console\Command;
@@ -27,6 +30,7 @@ class RunWhatsAppCampaign extends Command
     public function handle(
         WhatsAppDispatchService $whatsapp,
         WhatsAppTemplateParamResolver $paramResolver,
+        WhatsAppAnalyticsService $analytics,
     ): int {
         set_time_limit(0);
 
@@ -145,6 +149,11 @@ class RunWhatsAppCampaign extends Command
                 (string) ($student->name ?? 'User'),
                 $expectedParamCount,
                 $languageCode,
+                [
+                    'message_source' => WhatsAppMessageSource::Campaign->value,
+                    'whatsapp_campaign_recipient_id' => $recipient->id,
+                    'student_id' => $student->id,
+                ],
             );
 
             $recipient->template_params = $templateParams;
@@ -157,6 +166,19 @@ class RunWhatsAppCampaign extends Command
             if ($result['status'] === 'success') {
                 $recipient->status = WhatsAppRecipientStatus::Sent;
                 $recipient->error_message = null;
+
+                if (filled($result['message_id'] ?? null)) {
+                    $metaMessage = MetaWhatsAppMessage::query()
+                        ->where('wamid', (string) $result['message_id'])
+                        ->first();
+
+                    if ($metaMessage) {
+                        $recipient->wamid = (string) $result['message_id'];
+                        $recipient->meta_whatsapp_message_id = $metaMessage->id;
+                        $recipient->estimated_cost_inr = $metaMessage->estimated_cost_inr;
+                    }
+                }
+
                 $sent++;
             } else {
                 $recipient->status = WhatsAppRecipientStatus::Failed;
@@ -194,6 +216,8 @@ class RunWhatsAppCampaign extends Command
             'sent_count' => $sentCount,
             'failed_count' => $failedCount,
         ]);
+
+        $analytics->refreshCampaignCostTotals($campaign->fresh() ?? $campaign);
 
         $remaining = WhatsAppCampaignRecipient::query()
             ->where('whatsapp_campaign_id', $campaign->id)

@@ -48,7 +48,7 @@ class WhatsAppCampaignViewHelper
             ['label' => 'Recipients', 'value' => (string) $total, 'tone' => 'text-gray-950 dark:text-white'],
             ['label' => 'Sent', 'value' => (string) $sent, 'tone' => 'text-success-600 dark:text-success-400'],
             ['label' => 'Failed', 'value' => (string) $failed, 'tone' => $failed > 0 ? 'text-danger-600 dark:text-danger-400' : 'text-gray-500 dark:text-gray-400'],
-            ['label' => 'Pending', 'value' => (string) $pending, 'tone' => $pending > 0 ? 'text-warning-600 dark:text-warning-400' : 'text-gray-500 dark:text-gray-400'],
+            ['label' => 'Est. cost', 'value' => '₹'.number_format((float) $campaign->estimated_total_cost_inr, 2), 'tone' => 'text-primary-700 dark:text-primary-300'],
         ];
 
         $cardHtml = collect($cards)->map(fn (array $card): string => '<div class="rounded-xl border border-gray-200 bg-white p-4 text-center shadow-sm dark:border-white/10 dark:bg-white/5">'

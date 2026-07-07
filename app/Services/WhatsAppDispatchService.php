@@ -45,6 +45,7 @@ class WhatsAppDispatchService
         ?string $userName = null,
         int $expectedParamCount = 0,
         ?string $languageCode = null,
+        array $logContext = [],
     ): array {
         $provider = $this->activeProvider();
 
@@ -67,7 +68,7 @@ class WhatsAppDispatchService
         }
 
         return match ($provider) {
-            WhatsAppProvider::Meta => $this->sendViaMeta($phone, $templateName, $templateParams, $languageCode, $expectedParamCount),
+            WhatsAppProvider::Meta => $this->sendViaMeta($phone, $templateName, $templateParams, $languageCode, $expectedParamCount, $logContext),
             WhatsAppProvider::PalDigital => $this->sendViaPalDigital($phone, $templateName, $templateParams, $userName, $expectedParamCount),
         };
     }
@@ -82,6 +83,7 @@ class WhatsAppDispatchService
         array $templateParams,
         ?string $languageCode,
         int $expectedParamCount,
+        array $logContext = [],
     ): array {
         $metaTemplate = $this->resolveMetaTemplate($templateName, $languageCode);
 
@@ -103,6 +105,7 @@ class WhatsAppDispatchService
             $templateParams,
             $metaTemplate->language,
             $paramCount,
+            $logContext,
         );
 
         $result['provider'] = WhatsAppProvider::Meta->value;

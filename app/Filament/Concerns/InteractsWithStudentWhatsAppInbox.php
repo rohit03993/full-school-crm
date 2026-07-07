@@ -3,6 +3,7 @@
 namespace App\Filament\Concerns;
 
 use App\Enums\LicenseFeature;
+use App\Enums\WhatsAppMessageSource;
 use App\Enums\WhatsAppRecipientStatus;
 use App\Models\Student;
 use App\Services\MetaWhatsAppInboxService;
@@ -265,6 +266,7 @@ trait InteractsWithStudentWhatsAppInbox
             $student,
             $this->metaReplyText,
             Auth::user(),
+            WhatsAppMessageSource::Inbox,
         );
 
         if ($result['status'] !== 'success') {
@@ -310,6 +312,7 @@ trait InteractsWithStudentWhatsAppInbox
             $this->metaReplyAttachment,
             $this->metaReplyText,
             Auth::user(),
+            WhatsAppMessageSource::Inbox,
         );
 
         if ($result['status'] !== 'success') {

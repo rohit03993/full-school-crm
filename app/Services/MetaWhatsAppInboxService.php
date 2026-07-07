@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\MetaWhatsAppMessageStatus;
+use App\Enums\WhatsAppMessageSource;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\MetaWhatsAppInboundMessageParser;
@@ -21,8 +22,12 @@ class MetaWhatsAppInboxService
     /**
      * @return array{status: string, error?: string, message_id?: string}
      */
-    public function sendReply(Student $student, string $text, ?User $sender = null): array
-    {
+    public function sendReply(
+        Student $student,
+        string $text,
+        ?User $sender = null,
+        WhatsAppMessageSource $source = WhatsAppMessageSource::Profile,
+    ): array {
         if (! $this->resolver->isMetaActive()) {
             return ['status' => 'failed', 'error' => 'WhatsApp is not enabled. Open Connection & Setup and turn on WhatsApp.'];
         }
@@ -47,17 +52,15 @@ class MetaWhatsAppInboxService
         $result = $this->meta->sendText((string) $student->mobile, $text);
 
         if ($result['status'] === 'success') {
-            $this->logger->recordOutbound(
+            $this->logger->recordOutboundText(
                 (string) $student->mobile,
                 $result['message_id'] ?? null,
-                '',
-                '',
-                [],
+                $text,
                 MetaWhatsAppMessageStatus::Sent,
                 $sender?->name ? 'Reply by '.$sender->name : 'Session reply',
                 is_array($result['response'] ?? null) ? $result['response'] : null,
                 $student->id,
-                $text,
+                ['message_source' => $source->value],
             );
         }
 
@@ -67,8 +70,13 @@ class MetaWhatsAppInboxService
     /**
      * @return array{status: string, error?: string, message_id?: string}
      */
-    public function sendMedia(Student $student, UploadedFile $file, ?string $caption = null, ?User $sender = null): array
-    {
+    public function sendMedia(
+        Student $student,
+        UploadedFile $file,
+        ?string $caption = null,
+        ?User $sender = null,
+        WhatsAppMessageSource $source = WhatsAppMessageSource::Profile,
+    ): array {
         if (! $this->resolver->isMetaActive()) {
             return ['status' => 'failed', 'error' => 'WhatsApp is not enabled. Open Connection & Setup and turn on WhatsApp.'];
         }
@@ -127,6 +135,7 @@ class MetaWhatsAppInboxService
             $sender?->name ? 'Media by '.$sender->name : 'Session media reply',
             is_array($result['response'] ?? null) ? $result['response'] : null,
             $student->id,
+            ['message_source' => $source->value],
         );
 
         $this->media->storeOutboundCopy($logged, $file);
