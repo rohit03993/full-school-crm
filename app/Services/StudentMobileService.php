@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Enums\RoleName;
 use App\Models\Student;
+use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 class StudentMobileService
@@ -24,12 +26,17 @@ class StudentMobileService
         return $normalized;
     }
 
-    public function validateForUpdate(Student $student, string $mobile, ?string $alternateMobile = null): array
-    {
+    public function validateForUpdate(
+        Student $student,
+        string $mobile,
+        ?string $alternateMobile = null,
+        ?User $actor = null,
+    ): array {
         $mobile = $this->normalize($mobile, 'mobile') ?? '';
         $alternateMobile = filled($alternateMobile)
             ? $this->normalize($alternateMobile, 'alternate_mobile')
             : null;
+        $relaxUniqueness = $this->actorMayRelaxUniqueness($actor);
 
         if ($mobile === '') {
             throw ValidationException::withMessages([
@@ -43,13 +50,13 @@ class StudentMobileService
             ]);
         }
 
-        if ($this->numberUsedByOtherStudent($mobile, $student->id)) {
+        if (! $relaxUniqueness && $this->numberUsedByOtherStudent($mobile, $student->id)) {
             throw ValidationException::withMessages([
                 'mobile' => 'This mobile is already registered to another student.',
             ]);
         }
 
-        if ($alternateMobile !== null && $this->numberUsedByOtherStudent($alternateMobile, $student->id)) {
+        if ($alternateMobile !== null && ! $relaxUniqueness && $this->numberUsedByOtherStudent($alternateMobile, $student->id)) {
             throw ValidationException::withMessages([
                 'alternate_mobile' => 'This number is already used by another student.',
             ]);
@@ -103,5 +110,10 @@ class StudentMobileService
                     ->orWhere('alternate_mobile', $number);
             })
             ->exists();
+    }
+
+    protected function actorMayRelaxUniqueness(?User $actor): bool
+    {
+        return $actor?->hasRole(RoleName::SuperAdmin->value) ?? false;
     }
 }

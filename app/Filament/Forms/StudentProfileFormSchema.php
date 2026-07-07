@@ -5,6 +5,7 @@ namespace App\Filament\Forms;
 use App\Enums\BatchStatus;
 use App\Enums\DocumentType;
 use App\Enums\Gender;
+use App\Enums\RoleName;
 use App\Enums\StudentCategory;
 use App\Models\Admission;
 use App\Models\Batch;
@@ -24,6 +25,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rule;
 
@@ -138,10 +140,12 @@ class StudentProfileFormSchema
                         ->required()
                         ->maxLength(10)
                         ->rule('regex:/^[6-9]\d{9}$/')
-                        ->rules([
-                            Rule::unique('students', 'mobile')->ignore($studentId),
-                        ])
-                        ->helperText(CrmHint::field('mobile_unique')),
+                        ->rules(fn (): array => Auth::user()?->hasRole(RoleName::SuperAdmin->value)
+                            ? []
+                            : [Rule::unique('students', 'mobile')->ignore($studentId)])
+                        ->helperText(fn (): string => Auth::user()?->hasRole(RoleName::SuperAdmin->value)
+                            ? 'Super Admin can reuse numbers across students when needed.'
+                            : CrmHint::field('mobile_unique')),
                     TextInput::make('alternate_mobile')
                         ->label('Alternate mobile')
                         ->tel()

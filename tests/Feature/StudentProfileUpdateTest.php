@@ -105,6 +105,32 @@ class StudentProfileUpdateTest extends TestCase
         app(StudentMobileService::class)->validateForUpdate($student, '9811000001', '9811000011');
     }
 
+    public function test_super_admin_can_reuse_another_students_mobile_as_alternate(): void
+    {
+        $admin = $this->createSuperAdminUser();
+
+        Student::query()->create([
+            'name' => 'Other Student',
+            'mobile' => '9811000011',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        $student = Student::query()->create([
+            'name' => 'Current Student',
+            'mobile' => '9811000001',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        $updated = app(StudentUpdateService::class)->update($student, [
+            'name' => 'Current Student',
+            'mobile' => '9811000001',
+            'alternate_mobile' => '9811000011',
+            'category' => 'general',
+        ], $admin);
+
+        $this->assertSame('9811000011', $updated->alternate_mobile);
+    }
+
     protected function createStaffUser(): User
     {
         Role::findOrCreate(RoleName::Staff->value);
@@ -114,6 +140,19 @@ class StudentProfileUpdateTest extends TestCase
         ]);
 
         $user->assignRole(RoleName::Staff->value);
+
+        return $user;
+    }
+
+    protected function createSuperAdminUser(): User
+    {
+        Role::findOrCreate(RoleName::SuperAdmin->value);
+
+        $user = User::factory()->create([
+            'is_active' => true,
+        ]);
+
+        $user->assignRole(RoleName::SuperAdmin->value);
 
         return $user;
     }

@@ -1463,6 +1463,122 @@ class StudentProfilePage extends Page
         return $admission;
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function saveEditedStudentProfile(
+        array $data,
+        StudentUpdateService $studentUpdates,
+        EnrollmentPlacementService $placement,
+        EnrollmentRollNumberService $rollNumbers,
+        DocumentService $documents,
+        IdCardService $idCards,
+    ): void {
+        $regenerateIdCard = (bool) ($data['regenerate_id_card'] ?? false);
+        unset($data['regenerate_id_card']);
+
+        $documentFields = [
+            'photo' => DocumentType::Photo,
+            'aadhaar' => DocumentType::Aadhaar,
+            'marksheet' => DocumentType::Marksheet,
+            'signature' => DocumentType::Signature,
+        ];
+
+        $photoUpdated = false;
+        $documentsUpdated = false;
+        $admission = $this->resolveAdmissionForDocuments();
+
+        if ($admission) {
+            foreach ($documentFields as $field => $type) {
+                if (filled($data[$field] ?? null)) {
+                    $documents->storeFromFilamentUpload(
+                        $admission,
+                        $type,
+                        $data[$field],
+                        Auth::user(),
+                    );
+                    $documentsUpdated = true;
+
+                    if ($field === 'photo') {
+                        $photoUpdated = true;
+                    }
+                }
+
+                unset($data[$field]);
+            }
+
+            if ($documentsUpdated) {
+                app(StorageCleanupService::class)->pruneLivewireTempFiles(0);
+                $this->documentsTabLoaded = false;
+            }
+        }
+
+        $rollNumber = $data['enrollment_number'] ?? null;
+        $courseId = isset($data['course_id']) ? (int) $data['course_id'] : null;
+        $batchId = filled($data['batch_id'] ?? null) ? (int) $data['batch_id'] : null;
+        $currentBatchId = $this->record->activeBatchStudent?->batch_id;
+        unset($data['enrollment_number'], $data['course_id'], $data['batch_id']);
+
+        $this->record = $studentUpdates->update($this->record, $data, Auth::user());
+
+        $enrollment = $this->record->activeEnrollment;
+        $rollNumberChanged = false;
+        $idCardRegenerated = false;
+        $placementChanged = false;
+
+        if ($enrollment && $courseId && $courseId !== (int) $enrollment->course_id) {
+            $placement->updateCourse($enrollment, $courseId, Auth::user());
+            $placementChanged = true;
+            $enrollment = $this->record->fresh()->activeEnrollment;
+        }
+
+        if ($enrollment && $batchId && $batchId !== (int) $currentBatchId) {
+            $placement->updateBatch($this->record->fresh(), $batchId, Auth::user());
+            $placementChanged = true;
+        }
+
+        if ($enrollment && filled($rollNumber)) {
+            $normalized = strtoupper(trim($rollNumber));
+
+            if ($normalized !== $enrollment->enrollment_number) {
+                $rollNumbers->update($enrollment, $normalized, Auth::user());
+                $rollNumberChanged = true;
+            }
+        }
+
+        if ($photoUpdated && $regenerateIdCard && $enrollment?->hasIdCard() && $enrollment->canGenerateIdCard()) {
+            $idCards->generateForEnrollment($enrollment, Auth::user(), regenerate: true);
+            $idCardRegenerated = true;
+        }
+
+        if ($photoUpdated || $documentsUpdated || $rollNumberChanged || $placementChanged) {
+            $this->refreshRecord();
+        }
+
+        if ($placementChanged) {
+            $this->feesTabLoaded = false;
+            $this->attendanceTabLoaded = false;
+        }
+
+        $body = match (true) {
+            $idCardRegenerated && $rollNumberChanged => 'Profile, documents, and roll number saved. ID card regenerated with the new photo.',
+            $idCardRegenerated => 'Profile and documents saved. ID card regenerated with the new photo.',
+            $rollNumberChanged && $photoUpdated => 'Profile, photo, and roll number saved successfully.',
+            $rollNumberChanged => 'Profile and roll number saved successfully.',
+            $placementChanged && $photoUpdated => 'Profile, class/batch, and photo saved successfully.',
+            $placementChanged => 'Profile and class/batch saved successfully.',
+            $photoUpdated => 'Photo updated. Turn on “Regenerate ID card” to refresh the PDF, or use Regenerate on the profile.',
+            $documentsUpdated => 'Documents updated successfully.',
+            default => 'Profile details saved successfully.',
+        };
+
+        Notification::make()
+            ->title('Student updated')
+            ->body($body)
+            ->success()
+            ->send();
+    }
+
     protected function refreshRecord(): void
     {
         $this->record->refresh()->load([
@@ -2002,108 +2118,22 @@ class StudentProfilePage extends Page
                     DocumentService $documents,
                     IdCardService $idCards,
                 ): void {
-                    $regenerateIdCard = (bool) ($data['regenerate_id_card'] ?? false);
-                    unset($data['regenerate_id_card']);
-
-                    $documentFields = [
-                        'photo' => DocumentType::Photo,
-                        'aadhaar' => DocumentType::Aadhaar,
-                        'marksheet' => DocumentType::Marksheet,
-                        'signature' => DocumentType::Signature,
-                    ];
-
-                    $photoUpdated = false;
-                    $documentsUpdated = false;
-                    $admission = $this->resolveAdmissionForDocuments();
-
-                    if ($admission) {
-                        foreach ($documentFields as $field => $type) {
-                            if (filled($data[$field] ?? null)) {
-                                $documents->storeFromFilamentUpload(
-                                    $admission,
-                                    $type,
-                                    $data[$field],
-                                    Auth::user(),
-                                );
-                                $documentsUpdated = true;
-
-                                if ($field === 'photo') {
-                                    $photoUpdated = true;
-                                }
-                            }
-
-                            unset($data[$field]);
-                        }
-
-                        if ($documentsUpdated) {
-                            app(StorageCleanupService::class)->pruneLivewireTempFiles(0);
-                            $this->documentsTabLoaded = false;
-                        }
+                    try {
+                        $this->saveEditedStudentProfile(
+                            $data,
+                            $studentUpdates,
+                            $placement,
+                            $rollNumbers,
+                            $documents,
+                            $idCards,
+                        );
+                    } catch (\Illuminate\Validation\ValidationException $exception) {
+                        Notification::make()
+                            ->title('Could not save profile')
+                            ->body(collect($exception->errors())->flatten()->first() ?? 'Please check the form.')
+                            ->danger()
+                            ->send();
                     }
-
-                    $rollNumber = $data['enrollment_number'] ?? null;
-                    $courseId = isset($data['course_id']) ? (int) $data['course_id'] : null;
-                    $batchId = filled($data['batch_id'] ?? null) ? (int) $data['batch_id'] : null;
-                    unset($data['enrollment_number'], $data['course_id'], $data['batch_id']);
-
-                    $this->record = $studentUpdates->update($this->record, $data, Auth::user());
-
-                    $enrollment = $this->record->activeEnrollment;
-                    $rollNumberChanged = false;
-                    $idCardRegenerated = false;
-                    $placementChanged = false;
-
-                    if ($enrollment && $courseId && $courseId !== (int) $enrollment->course_id) {
-                        $placement->updateCourse($enrollment, $courseId, Auth::user());
-                        $placementChanged = true;
-                        $enrollment = $this->record->fresh()->activeEnrollment;
-                    }
-
-                    if ($enrollment && $batchId) {
-                        $placement->updateBatch($this->record->fresh(), $batchId, Auth::user());
-                        $placementChanged = true;
-                    }
-
-                    if ($enrollment && filled($rollNumber)) {
-                        $normalized = strtoupper(trim($rollNumber));
-
-                        if ($normalized !== $enrollment->enrollment_number) {
-                            $rollNumbers->update($enrollment, $normalized, Auth::user());
-                            $rollNumberChanged = true;
-                        }
-                    }
-
-                    if ($photoUpdated && $regenerateIdCard && $enrollment?->hasIdCard() && $enrollment->canGenerateIdCard()) {
-                        $idCards->generateForEnrollment($enrollment, Auth::user(), regenerate: true);
-                        $idCardRegenerated = true;
-                    }
-
-                    if ($photoUpdated || $documentsUpdated || $rollNumberChanged || $placementChanged) {
-                        $this->refreshRecord();
-                    }
-
-                    if ($placementChanged) {
-                        $this->feesTabLoaded = false;
-                        $this->attendanceTabLoaded = false;
-                    }
-
-                    $body = match (true) {
-                        $idCardRegenerated && $rollNumberChanged => 'Profile, documents, and roll number saved. ID card regenerated with the new photo.',
-                        $idCardRegenerated => 'Profile and documents saved. ID card regenerated with the new photo.',
-                        $rollNumberChanged && $photoUpdated => 'Profile, photo, and roll number saved successfully.',
-                        $rollNumberChanged => 'Profile and roll number saved successfully.',
-                        $placementChanged && $photoUpdated => 'Profile, class/batch, and photo saved successfully.',
-                        $placementChanged => 'Profile and class/batch saved successfully.',
-                        $photoUpdated => 'Photo updated. Turn on “Regenerate ID card” to refresh the PDF, or use Regenerate on the profile.',
-                        $documentsUpdated => 'Documents updated successfully.',
-                        default => 'Profile details saved successfully.',
-                    };
-
-                    Notification::make()
-                        ->title('Student updated')
-                        ->body($body)
-                        ->success()
-                        ->send();
                 })
                 ->visible(fn (): bool => $this->userCan(CrmPermission::StudentsEdit)),
         ];

@@ -91,7 +91,13 @@ class EnrollmentPlacementService
         $batch = Batch::query()
             ->whereKey($batchId)
             ->where('status', BatchStatus::Active)
-            ->firstOrFail();
+            ->first();
+
+        if (! $batch) {
+            throw ValidationException::withMessages([
+                'batch_id' => 'The selected batch is no longer available. Choose another batch or leave it unassigned.',
+            ]);
+        }
 
         $this->batches->assign($student, $batch, $staff);
     }

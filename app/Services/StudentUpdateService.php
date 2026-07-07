@@ -25,6 +25,7 @@ class StudentUpdateService
                 $student,
                 (string) ($data['mobile'] ?? $student->mobile),
                 $data['alternate_mobile'] ?? null,
+                $staff,
             );
 
             $oldValues = $student->only([
@@ -54,7 +55,9 @@ class StudentUpdateService
                 'city' => $data['city'] ?? null,
                 'state' => $data['state'] ?? null,
                 'pincode' => $data['pincode'] ?? null,
-                'category' => $data['category'] ?? $student->category?->value ?? 'general',
+                'category' => filled($data['category'] ?? null)
+                    ? $data['category']
+                    : ($student->category?->value ?? 'general'),
             ];
 
             if (filled($phones['mobile'])) {
