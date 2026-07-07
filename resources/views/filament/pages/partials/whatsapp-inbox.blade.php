@@ -81,9 +81,18 @@
                 </div>
             @else
                 <div class="crm-wa-global-inbox__chat-head">
-                    <div>
+                    <div class="crm-wa-global-inbox__chat-head-main">
                         <p class="crm-wa-global-inbox__chat-name">{{ $chatStudent->name }}</p>
                         <p class="crm-wa-global-inbox__chat-phone">{{ $chatStudent->mobile }}</p>
+                        @if ($metaRoutingActive ?? false)
+                            <span @class([
+                                'crm-wa-pill crm-wa-global-inbox__session-pill',
+                                'crm-wa-pill--open' => $metaSessionOpen ?? false,
+                                'crm-wa-pill--closed' => ! ($metaSessionOpen ?? false),
+                            ])>
+                                {{ ($metaSessionOpen ?? false) ? '24h window open' : 'Templates only' }}
+                            </span>
+                        @endif
                     </div>
                     <a
                         href="{{ \App\Filament\Pages\StudentProfilePage::getUrl(['record' => $chatStudent->id]).'?tab=messages' }}"

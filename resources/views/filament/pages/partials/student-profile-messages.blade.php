@@ -1,4 +1,7 @@
-<div wire:init="loadMessagesTab" class="crm-wa-inbox">
+<div
+    wire:init="loadMessagesTab"
+    @class(['crm-wa-inbox', 'crm-wa-inbox--compact' => $compactInbox ?? false])
+>
     @php
         $lastThreadKey = $messageThread === []
             ? 'empty'

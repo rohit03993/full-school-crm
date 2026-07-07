@@ -125,6 +125,8 @@ class WhatsAppInboxPage extends Page
                     'conversations' => $this->conversations,
                     'selectedStudentId' => $this->selectedStudentId,
                     'chatStudent' => $this->whatsAppMessageStudent(),
+                    'metaRoutingActive' => $this->metaRoutingActive,
+                    'metaSessionOpen' => $this->metaSessionOpen,
                     'messagesViewData' => $this->selectedStudentId ? $this->whatsAppMessagesViewData() : null,
                 ]),
         ]);
