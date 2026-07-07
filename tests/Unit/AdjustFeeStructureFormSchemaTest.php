@@ -152,4 +152,19 @@ class AdjustFeeStructureFormSchemaTest extends TestCase
             'additional_discount' => 0,
         ]));
     }
+
+    public function test_resolve_new_misc_charges_filters_empty_rows(): void
+    {
+        $rows = AdjustFeeStructureFormSchema::resolveNewMiscCharges([
+            'new_misc_charges' => [
+                ['label' => 'Exam fee', 'amount' => 2000, 'due_date' => '2026-08-01'],
+                ['label' => '', 'amount' => 0],
+            ],
+        ]);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('Exam fee', $rows[0]['label']);
+        $this->assertSame(2000.0, $rows[0]['amount']);
+        $this->assertSame('2026-08-01', $rows[0]['due_date']);
+    }
 }

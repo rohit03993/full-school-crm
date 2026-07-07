@@ -19,7 +19,6 @@ use App\Models\Attendance;
 use App\Models\Batch;
 use App\Filament\Concerns\HandlesLogCallModal;
 use App\Filament\Forms\AdjustFeeStructureFormSchema;
-use App\Filament\Forms\AddMiscChargeFormSchema;
 use App\Filament\Forms\AddPaymentFormSchema;
 use App\Filament\Forms\ConvertToAdmissionFormSchema;
 use App\Filament\Forms\EnquiryFormSchema;
@@ -1927,44 +1926,6 @@ class StudentProfilePage extends Page
                 })
                 ->visible(fn (): bool => $this->userCan(CrmPermission::AttendanceMark)
                     && $this->record->activeEnrollment !== null),
-            Action::make('addMiscCharge')
-                ->label('Add Misc Charge')
-                ->icon('heroicon-o-plus-circle')
-                ->color('gray')
-                ->outlined()
-                ->button()
-                ->modalHeading('Add miscellaneous charge')
-                ->modalWidth('md')
-                ->form(AddMiscChargeFormSchema::fields())
-                ->action(function (array $data, FeeMiscChargeService $miscCharges): void {
-                    abort_unless($this->userCan(CrmPermission::FeesAdjustStructure), 403);
-
-                    $feeStructure = $this->record->activeEnrollment?->feeStructure;
-
-                    if (! $feeStructure) {
-                        return;
-                    }
-
-                    $miscCharges->addSeparateCharge(
-                        $feeStructure,
-                        (string) $data['label'],
-                        (float) $data['amount'],
-                        filled($data['due_date'] ?? null) ? (string) $data['due_date'] : null,
-                        Auth::user(),
-                    );
-
-                    $this->feesTabLoaded = false;
-                    $this->loadFeesTab();
-
-                    Notification::make()
-                        ->title('Misc charge added')
-                        ->body('Student can pay this separately from tuition installments.')
-                        ->success()
-                        ->send();
-                })
-                ->visible(fn (): bool => $this->licensed(LicenseFeature::Fees)
-                    && $this->userCan(CrmPermission::FeesAdjustStructure)
-                    && $this->record->activeEnrollment?->feeStructure !== null),
             Action::make('payMiscCharge')
                 ->label('Pay misc')
                 ->icon('heroicon-o-banknotes')
@@ -2114,7 +2075,7 @@ class StudentProfilePage extends Page
                 ->color('warning')
                 ->button()
                 ->modalHeading('Adjust fee structure')
-                ->modalDescription('Change discount or reschedule installments. Reason is only needed when discount changes.')
+                ->modalDescription('Change discount, add misc charges, or reschedule installments. Reason is only needed when discount changes.')
                 ->modalWidth('2xl')
                 ->fillForm(function (): array {
                     $feeStructure = $this->record->activeEnrollment?->feeStructure;
@@ -2185,7 +2146,7 @@ class StudentProfilePage extends Page
                         FeePlanSubmissionGuard::assertAdjustFees($data, $feeStructure, $action);
                     }
                 })
-                ->action(function (array $data, FeeStructureService $fees): void {
+                ->action(function (array $data, FeeStructureService $fees, FeeMiscChargeService $miscCharges): void {
                     abort_unless($this->userCan(CrmPermission::FeesAdjustStructure), 403);
 
                     $feeStructure = $this->record->activeEnrollment?->feeStructure;
@@ -2194,18 +2155,39 @@ class StudentProfilePage extends Page
                         return;
                     }
 
+                    $newMiscCharges = AdjustFeeStructureFormSchema::resolveNewMiscCharges($data);
+
                     $fees->updateByAdmin(
                         $feeStructure,
                         AdjustFeeStructureFormSchema::resolveForSave($feeStructure, $data),
                         Auth::user(),
                     );
+
+                    foreach ($newMiscCharges as $row) {
+                        $miscCharges->addSeparateCharge(
+                            $feeStructure,
+                            $row['label'],
+                            $row['amount'],
+                            $row['due_date'],
+                            Auth::user(),
+                        );
+                    }
+
                     $this->refreshRecord();
                     $this->feesTabLoaded = false;
                     $this->loadFeesTab();
 
+                    $body = 'Fee structure saved.';
+
+                    if ($newMiscCharges !== []) {
+                        $body = count($newMiscCharges) === 1
+                            ? '1 misc charge added. Student can pay it via Add Payment.'
+                            : count($newMiscCharges).' misc charges added. Student can pay them via Add Payment.';
+                    }
+
                     Notification::make()
                         ->title('Fees updated')
-                        ->body('Fee structure revised and history recorded.')
+                        ->body($body)
                         ->success()
                         ->send();
                 })

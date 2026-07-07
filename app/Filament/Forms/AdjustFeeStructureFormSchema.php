@@ -2,6 +2,8 @@
 
 namespace App\Filament\Forms;
 
+use App\Enums\FeeMiscChargeStatus;
+use App\Models\FeeMiscCharge;
 use App\Models\FeeStructure;
 use App\Support\FeePlanCalculator;
 use Filament\Forms\Components\Hidden;
@@ -32,6 +34,8 @@ class AdjustFeeStructureFormSchema
         $paid = round((float) $feeStructure->paid_amount, 2);
         $pending = round((float) $feeStructure->pending_amount, 2);
         $miscTotal = $feeStructure->miscChargesTotal();
+        $separateMiscTotal = $feeStructure->separateMiscChargesTotal();
+        $separateMiscPending = $feeStructure->separateMiscChargesPendingTotal();
         $currentNet = round((float) $feeStructure->net_fee, 2);
         $currentDiscount = round((float) $feeStructure->discount_amount, 2);
         $studentCourseFee = round((float) $feeStructure->course_fee, 2);
@@ -61,20 +65,24 @@ class AdjustFeeStructureFormSchema
             Placeholder::make('fee_snapshot')
                 ->label('')
                 ->content(new HtmlString(
-                    '<div class="grid gap-3 text-sm sm:grid-cols-3">'
+                    '<div class="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">'
                     .'<div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5">'
-                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Net fee</p>'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Net tuition fee</p>'
                     .'<p class="mt-0.5 text-base font-bold text-gray-950 dark:text-white">₹'.$format($currentNet).'</p>'
                     .'<p class="mt-0.5 text-xs text-gray-500">Course ₹'.$format($studentCourseFee)
                     .' · Discount ₹'.$format($currentDiscount)
-                    .($miscTotal > 0 ? ' · Misc ₹'.$format($miscTotal) : '')
+                    .($miscTotal > 0 ? ' · In plan misc ₹'.$format($miscTotal) : '')
                     .'</p></div>'
+                    .'<div class="rounded-lg bg-violet-50 px-3 py-2 dark:bg-violet-500/10">'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-300">Misc charges</p>'
+                    .'<p class="mt-0.5 text-base font-bold text-violet-950 dark:text-violet-50">₹'.$format($separateMiscTotal).'</p>'
+                    .'<p class="mt-0.5 text-xs text-violet-800/80 dark:text-violet-200">Pending ₹'.$format($separateMiscPending).' · paid separately</p></div>'
                     .'<div class="rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">'
-                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Paid</p>'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Tuition paid</p>'
                     .'<p class="mt-0.5 text-base font-bold text-emerald-800 dark:text-emerald-200">₹'.$format($paid).'</p>'
                     .'<p class="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-300/80">Already collected — fixed</p></div>'
                     .'<div class="rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-500/10">'
-                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Balance due</p>'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Tuition balance</p>'
                     .'<p class="mt-0.5 text-base font-bold text-amber-900 dark:text-amber-100">₹'.$format($pending).'</p>'
                     .'<p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/80">Pending installments</p></div>'
                     .'</div>'
@@ -243,6 +251,23 @@ class AdjustFeeStructureFormSchema
                                 },
                             ),
                         ]),
+                    Tab::make('misc')
+                        ->label('Misc charges')
+                        ->icon(Heroicon::OutlinedPlusCircle)
+                        ->schema([
+                            Placeholder::make('existing_misc_charges')
+                                ->label('Current charges')
+                                ->content(fn (): HtmlString => new HtmlString(self::separateMiscChargesHtml($feeStructure)))
+                                ->columnSpanFull(),
+                            Repeater::make('new_misc_charges')
+                                ->label('Add new charges')
+                                ->helperText('Exam fees, materials, etc. — collected separately from tuition installments.')
+                                ->schema(AddMiscChargeFormSchema::fields())
+                                ->addActionLabel('Add charge')
+                                ->defaultItems(0)
+                                ->reorderable(false)
+                                ->columnSpanFull(),
+                        ]),
                 ])
                 ->columnSpanFull(),
         ];
@@ -265,8 +290,40 @@ class AdjustFeeStructureFormSchema
             'additional_discount' => 0,
             'reschedule_installments' => $currentPending > 0,
             'installment_plan' => self::pendingInstallmentPlan($feeStructure),
+            'new_misc_charges' => [],
             'reason' => '',
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<array{label: string, amount: float, due_date: ?string}>
+     */
+    public static function resolveNewMiscCharges(array $data): array
+    {
+        $rows = [];
+
+        foreach ($data['new_misc_charges'] ?? [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $label = trim((string) ($row['label'] ?? ''));
+            $amount = round((float) ($row['amount'] ?? 0), 2);
+            $dueDate = filled($row['due_date'] ?? null) ? (string) $row['due_date'] : null;
+
+            if ($label === '' && $amount <= 0) {
+                continue;
+            }
+
+            $rows[] = [
+                'label' => $label,
+                'amount' => $amount,
+                'due_date' => $dueDate,
+            ];
+        }
+
+        return $rows;
     }
 
     /**
@@ -432,6 +489,51 @@ class AdjustFeeStructureFormSchema
                 ->filter()
                 ->map(fn (string $line): string => '<p class="flex items-start gap-2"><span class="text-emerald-600">✓</span><span>'.e($line).'</span></p>')
                 ->implode('')
+            .'</div>';
+    }
+
+    public static function separateMiscChargesHtml(FeeStructure $feeStructure): string
+    {
+        $feeStructure->loadMissing('miscCharges');
+
+        $charges = $feeStructure->separateMiscCharges()
+            ->reject(fn (FeeMiscCharge $charge): bool => $charge->status === FeeMiscChargeStatus::Cancelled)
+            ->values();
+
+        if ($charges->isEmpty()) {
+            return '<p class="text-sm text-gray-500 dark:text-gray-400">No separate misc charges yet. Add rows below.</p>';
+        }
+
+        $lines = $charges->map(function (FeeMiscCharge $charge): string {
+            $pending = $charge->pendingAmount();
+            $status = $charge->status->label();
+            $due = $charge->due_date?->format('d M Y');
+
+            $line = sprintf(
+                '%s — ₹%s total',
+                $charge->label,
+                FeePlanCalculator::formatRupeeAmount((float) $charge->amount),
+            );
+
+            if ((float) $charge->paid_amount > 0) {
+                $line .= ' · paid ₹'.FeePlanCalculator::formatRupeeAmount((float) $charge->paid_amount);
+            }
+
+            if ($pending > 0) {
+                $line .= ' · pending ₹'.FeePlanCalculator::formatRupeeAmount($pending);
+            }
+
+            $line .= ' · '.$status;
+
+            if ($due) {
+                $line .= ' · due '.$due;
+            }
+
+            return $line;
+        });
+
+        return '<div class="space-y-1 text-sm">'
+            .$lines->map(fn (string $line): string => '<p class="text-gray-700 dark:text-gray-300">'.e($line).'</p>')->implode('')
             .'</div>';
     }
 

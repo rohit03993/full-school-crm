@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Enums\CourseStatus;
+use App\Enums\FeeMiscChargeKind;
+use App\Enums\FeeMiscChargeStatus;
 use App\Enums\Gender;
 use App\Enums\LeadSource;
 use App\Enums\RoleName;
@@ -33,6 +35,52 @@ class StudentProfileAdjustFeesModalTest extends TestCase
         Livewire::test(StudentProfilePage::class, ['record' => $student])
             ->callAction('adjustFees')
             ->assertStatus(200);
+    }
+
+    public function test_adjust_fees_modal_can_add_misc_charge(): void
+    {
+        $admin = $this->createSuperAdmin();
+        $student = $this->createEnrolledStudentWithFees($admin);
+        $feeStructure = $student->activeEnrollment->feeStructure;
+
+        $this->actingAs($admin);
+
+        Livewire::test(StudentProfilePage::class, ['record' => $student])
+            ->callAction('adjustFees', data: [
+                'course_fee' => (float) $feeStructure->course_fee,
+                'discount_mode' => 'amount',
+                'discount_adjustment' => 0,
+                'reschedule_installments' => false,
+                'installment_plan' => [],
+                'new_misc_charges' => [
+                    [
+                        'label' => 'Exam fee',
+                        'amount' => 1500,
+                        'due_date' => null,
+                    ],
+                ],
+                'reason' => '',
+            ])
+            ->assertNotified();
+
+        $charge = $feeStructure->fresh()->miscCharges
+            ->first(fn ($row) => $row->label === 'Exam fee');
+
+        $this->assertNotNull($charge);
+        $this->assertSame(FeeMiscChargeKind::Separate, $charge->kind);
+        $this->assertSame(FeeMiscChargeStatus::Pending, $charge->status);
+        $this->assertSame(1500.0, (float) $charge->amount);
+    }
+
+    public function test_add_misc_charge_header_action_is_not_available(): void
+    {
+        $admin = $this->createSuperAdmin();
+        $student = $this->createEnrolledStudentWithFees($admin);
+
+        $this->actingAs($admin);
+
+        Livewire::test(StudentProfilePage::class, ['record' => $student])
+            ->assertActionDoesNotExist('addMiscCharge');
     }
 
     protected function createSuperAdmin(): User
