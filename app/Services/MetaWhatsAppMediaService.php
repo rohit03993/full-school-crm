@@ -7,6 +7,7 @@ use App\Support\MetaWhatsAppInboundMessageParser;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -26,7 +27,29 @@ class MetaWhatsAppMediaService
             return null;
         }
 
-        return route('admin.whatsapp-messages.media', ['message' => $message->id]);
+        if (! Storage::disk(self::DISK)->exists((string) $message->media_path)) {
+            return null;
+        }
+
+        try {
+            return route('admin.whatsapp-messages.media', ['message' => $message->id]);
+        } catch (\Throwable $exception) {
+            Log::warning('Meta WhatsApp media route unavailable', [
+                'message_id' => $message->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    public function prepareForThreadDisplay(MetaWhatsAppMessage $message): MetaWhatsAppMessage
+    {
+        if (! Schema::hasColumn('meta_whatsapp_messages', 'message_type')) {
+            return $message;
+        }
+
+        return $this->hydrateMediaFieldsFromPayload($message);
     }
 
     public function ensureStored(MetaWhatsAppMessage $message): MetaWhatsAppMessage
@@ -54,8 +77,13 @@ class MetaWhatsAppMediaService
 
     public function hydrateMediaFieldsFromPayload(MetaWhatsAppMessage $message): MetaWhatsAppMessage
     {
+        if (! Schema::hasColumn('meta_whatsapp_messages', 'message_type')) {
+            return $message;
+        }
+
         if (MetaWhatsAppInboundMessageParser::isMediaType((string) ($message->message_type ?? 'text'))
-            && filled($message->media_id)) {
+            && filled($message->media_id)
+            && ! MetaWhatsAppInboundMessageParser::isPlaceholderPreview((string) ($message->body_preview ?? ''))) {
             return $message;
         }
 
@@ -71,16 +99,25 @@ class MetaWhatsAppMediaService
             return $message;
         }
 
-        $message->update([
-            'message_type' => $parsed['message_type'],
-            'media_id' => $parsed['media_id'] ?? $message->media_id,
-            'media_mime_type' => $parsed['media_mime_type'] ?? $message->media_mime_type,
-            'media_filename' => $parsed['media_filename'] ?? $message->media_filename,
-            'caption' => $parsed['caption'] ?? $message->caption,
-            'body_preview' => MetaWhatsAppInboundMessageParser::isPlaceholderPreview((string) ($message->body_preview ?? ''))
-                ? $parsed['body_preview']
-                : $message->body_preview,
-        ]);
+        try {
+            $message->update([
+                'message_type' => $parsed['message_type'],
+                'media_id' => $parsed['media_id'] ?? $message->media_id,
+                'media_mime_type' => $parsed['media_mime_type'] ?? $message->media_mime_type,
+                'media_filename' => $parsed['media_filename'] ?? $message->media_filename,
+                'caption' => $parsed['caption'] ?? $message->caption,
+                'body_preview' => MetaWhatsAppInboundMessageParser::isPlaceholderPreview((string) ($message->body_preview ?? ''))
+                    ? $parsed['body_preview']
+                    : $message->body_preview,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('Meta WhatsApp media metadata hydrate failed', [
+                'message_id' => $message->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return $message;
+        }
 
         return $message->fresh() ?? $message;
     }

@@ -119,7 +119,7 @@ class StudentWhatsAppThreadService
             ->get()
             ->map(function (MetaWhatsAppMessage $row): StudentWhatsAppThreadItem {
                 if (Schema::hasColumn('meta_whatsapp_messages', 'message_type')) {
-                    $row = $this->media->ensureStored($row);
+                    $row = $this->media->prepareForThreadDisplay($row);
                 }
 
                 $status = MetaWhatsAppMessageStatus::tryFrom($row->status);

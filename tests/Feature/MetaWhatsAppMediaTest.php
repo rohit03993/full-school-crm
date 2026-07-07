@@ -113,6 +113,47 @@ class MetaWhatsAppMediaTest extends TestCase
         $this->assertStringContainsString('Homework photo', $item->body);
     }
 
+    public function test_thread_load_does_not_download_missing_media_from_meta(): void
+    {
+        Http::fake();
+
+        $student = Student::query()->create([
+            'name' => 'Kapil',
+            'mobile' => '9811223344',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.PENDINGIMG',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919811223344',
+            'student_id' => $student->id,
+            'body_preview' => '[image message]',
+            'message_type' => 'image',
+            'media_id' => 'media-pending',
+            'status' => 'received',
+            'payload' => [
+                'type' => 'image',
+                'image' => [
+                    'id' => 'media-pending',
+                    'mime_type' => 'image/jpeg',
+                    'caption' => 'Pending photo',
+                ],
+            ],
+            'status_at' => now(),
+        ]);
+
+        $item = app(StudentWhatsAppThreadService::class)
+            ->threadForStudent($student)
+            ->first();
+
+        $this->assertNotNull($item);
+        $this->assertSame('image', $item->messageType);
+        $this->assertNull($item->mediaUrl);
+        $this->assertStringContainsString('Pending photo', $item->body);
+        Http::assertNothingSent();
+    }
+
     public function test_text_message_with_emoji_keeps_body(): void
     {
         $parsed = MetaWhatsAppInboundMessageParser::parse([
