@@ -51,4 +51,20 @@ return [
         'cooldown_days' => (int) env('FEE_REMINDER_COOLDOWN_DAYS', 7),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Coaching: cash vs online fee agreement + GST on online overage
+    |--------------------------------------------------------------------------
+    |
+    | When enabled in Settings → Fee Settings, staff record how much of the net
+    | tuition fee the student agreed to pay in cash vs online. If online tuition
+    | payments exceed the online plan, GST is charged on the excess only.
+    |
+    */
+
+    'online_allowance_gst' => [
+        'enabled' => env('FEE_ONLINE_ALLOWANCE_GST_ENABLED', false),
+        'percentage' => (float) env('FEE_GST_PENALTY_PERCENTAGE', 18),
+    ],
+
 ];

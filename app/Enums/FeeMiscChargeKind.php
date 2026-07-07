@@ -2,15 +2,17 @@
 
 namespace App\Enums;
 
-enum FeePenaltyType: string
+enum FeeMiscChargeKind: string
 {
-    case LateFee = 'late_fee';
+    case Bundled = 'bundled';
+    case Separate = 'separate';
     case GstPenalty = 'gst_penalty';
 
     public function label(): string
     {
         return match ($this) {
-            self::LateFee => 'Late fee',
+            self::Bundled => 'Included in fee plan',
+            self::Separate => 'Additional charge',
             self::GstPenalty => 'GST penalty',
         };
     }

@@ -12,9 +12,11 @@ class Payment extends Model
     protected $fillable = [
         'fee_structure_id',
         'fee_installment_id',
+        'fee_misc_charge_id',
         'student_id',
         'payment_date',
         'amount',
+        'tuition_amount',
         'shortfall_allocation',
         'payment_mode',
         'voucher_number',
@@ -34,6 +36,7 @@ class Payment extends Model
         return [
             'payment_date' => 'date',
             'amount' => 'decimal:2',
+            'tuition_amount' => 'decimal:2',
             'shortfall_allocation' => 'array',
             'payment_mode' => PaymentMode::class,
             'corrected_at' => 'datetime',
@@ -48,6 +51,27 @@ class Payment extends Model
     public function feeInstallment(): BelongsTo
     {
         return $this->belongsTo(FeeInstallment::class);
+    }
+
+    public function feeMiscCharge(): BelongsTo
+    {
+        return $this->belongsTo(FeeMiscCharge::class);
+    }
+
+    public function isMiscPayment(): bool
+    {
+        return $this->fee_misc_charge_id !== null;
+    }
+
+    public function isTuitionPayment(): bool
+    {
+        return $this->fee_misc_charge_id === null;
+    }
+
+    public function countsAsOnlineTuition(): bool
+    {
+        return $this->isTuitionPayment()
+            && in_array($this->payment_mode, [PaymentMode::Online, PaymentMode::Upi], true);
     }
 
     public function student(): BelongsTo

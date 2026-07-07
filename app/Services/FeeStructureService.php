@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Filament\Forms\AdjustFeeStructureFormSchema;
+use App\Enums\FeeMiscChargeKind;
+use App\Enums\FeeMiscChargeStatus;
 use App\Models\Admission;
 use App\Models\Enrollment;
 use App\Models\FeeMiscCharge;
@@ -54,7 +56,20 @@ class FeeStructureService
                     'fee_structure_id' => $feeStructure->id,
                     'label' => $miscFee->label,
                     'amount' => $miscFee->amount,
+                    'kind' => FeeMiscChargeKind::Bundled,
+                    'status' => FeeMiscChargeStatus::Bundled,
                     'sort_order' => $miscFee->sort_order ?: $index + 1,
+                ]);
+            }
+
+            if (
+                isset($admission->planned_cash_amount, $admission->planned_online_amount)
+                && $admission->planned_cash_amount !== null
+                && $admission->planned_online_amount !== null
+            ) {
+                $feeStructure->update([
+                    'planned_cash_amount' => $admission->planned_cash_amount,
+                    'planned_online_amount' => $admission->planned_online_amount,
                 ]);
             }
 

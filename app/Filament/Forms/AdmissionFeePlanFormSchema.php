@@ -4,6 +4,7 @@ namespace App\Filament\Forms;
 
 use App\Models\Course;
 use App\Support\FeePlanCalculator;
+use App\Support\FeeSettings;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -44,6 +45,7 @@ class AdmissionFeePlanFormSchema
                 ->afterStateUpdated(function (mixed $state, callable $set, Get $get): void {
                     ConvertToAdmissionFormSchema::syncFeeDisplays($set, $get('course_id'), $get('discount_amount'), $state);
                 }),
+            ...self::onlineAllowanceFields(),
             Toggle::make('use_installment_plan')
                 ->label('Split into installments')
                 ->helperText('When off, the full net fee is due as one installment after enrollment.')
@@ -418,5 +420,35 @@ class AdmissionFeePlanFormSchema
         } elseif (empty($get('installment_plan'))) {
             $set('installment_plan', [FeePlanCalculator::singleFullFeeRow($net)]);
         }
+    }
+
+    /**
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    public static function onlineAllowanceFields(): array
+    {
+        if (! FeeSettings::onlineAllowanceGstEnabled()) {
+            return [];
+        }
+
+        return [
+            Placeholder::make('online_allowance_help')
+                ->label('Cash vs online agreement')
+                ->content('Split the net tuition fee below. If the student pays more than the online amount via UPI/online, GST is charged on the excess.')
+                ->columnSpanFull(),
+            TextInput::make('planned_cash_amount')
+                ->label('Agreed cash (₹)')
+                ->numeric()
+                ->minValue(0)
+                ->step(1)
+                ->live(debounce: 300),
+            TextInput::make('planned_online_amount')
+                ->label('Agreed online (₹)')
+                ->numeric()
+                ->minValue(0)
+                ->step(1)
+                ->live(debounce: 300)
+                ->helperText(fn (Get $get): string => 'Must equal net fee (₹'.number_format(self::resolveNetFee($get), 2).') with cash combined.'),
+        ];
     }
 }

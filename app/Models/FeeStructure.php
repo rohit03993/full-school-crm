@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\FeeMiscChargeKind;
+use App\Enums\FeeMiscChargeStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +19,8 @@ class FeeStructure extends Model
         'net_fee',
         'paid_amount',
         'pending_amount',
+        'planned_cash_amount',
+        'planned_online_amount',
         'set_by_user_id',
     ];
 
@@ -28,6 +32,8 @@ class FeeStructure extends Model
             'net_fee' => 'decimal:2',
             'paid_amount' => 'decimal:2',
             'pending_amount' => 'decimal:2',
+            'planned_cash_amount' => 'decimal:2',
+            'planned_online_amount' => 'decimal:2',
         ];
     }
 
@@ -82,11 +88,35 @@ class FeeStructure extends Model
 
     public function miscChargesTotal(): float
     {
-        if ($this->relationLoaded('miscCharges')) {
-            return round((float) $this->miscCharges->sum('amount'), 2);
-        }
+        $charges = $this->relationLoaded('miscCharges')
+            ? $this->miscCharges
+            : $this->miscCharges()->get();
 
-        return round((float) $this->miscCharges()->sum('amount'), 2);
+        return round((float) $charges
+            ->filter(fn (FeeMiscCharge $charge): bool => $charge->isBundledInNetFee())
+            ->sum('amount'), 2);
+    }
+
+    public function separateMiscChargesPendingTotal(): float
+    {
+        return round((float) $this->miscCharges()
+            ->whereIn('kind', [
+                FeeMiscChargeKind::Separate->value,
+                FeeMiscChargeKind::GstPenalty->value,
+            ])
+            ->where('status', FeeMiscChargeStatus::Pending->value)
+            ->sum('amount'), 2);
+    }
+
+    public function hasOnlineAllowancePlan(): bool
+    {
+        return $this->planned_cash_amount !== null
+            && $this->planned_online_amount !== null;
+    }
+
+    public function tuitionBaseForAllowance(): float
+    {
+        return round((float) $this->net_fee, 2);
     }
 
     public function pendingPenaltiesTotal(): float
@@ -98,7 +128,12 @@ class FeeStructure extends Model
 
     public function totalCollectiblePending(): float
     {
-        return round((float) $this->pending_amount + $this->pendingPenaltiesTotal(), 2);
+        return round(
+            (float) $this->pending_amount
+            + $this->pendingPenaltiesTotal()
+            + $this->separateMiscChargesPendingTotal(),
+            2,
+        );
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\NumberSequenceType;
 use App\Enums\PaymentMode;
 use App\Enums\PaymentShortfallAction;
+use App\Models\FeeMiscCharge;
 use App\Models\FeeStructure;
 use App\Models\Payment;
 use App\Models\Student;
@@ -30,6 +31,8 @@ class PaymentService
         protected FeeInstallmentService $installments,
         protected PenaltyCalculationService $penalties,
         protected AccountingLedgerService $ledger,
+        protected FeeMiscChargeService $miscCharges,
+        protected OnlineAllowanceGstService $onlineAllowanceGst,
     ) {}
 
     /**
@@ -153,6 +156,7 @@ class PaymentService
                 'student_id' => $student->id,
                 'payment_date' => $data['payment_date'],
                 'amount' => $amount,
+                'tuition_amount' => $feePaymentAmount,
                 'shortfall_allocation' => null,
                 'payment_mode' => $mode,
                 'voucher_number' => $data['voucher_number'] ?? null,
@@ -194,6 +198,8 @@ class PaymentService
                 $this->penalties->applyPendingPayments($locked, $penaltyPaymentAmount);
             }
 
+            $this->onlineAllowanceGst->applyAfterTuitionPayment($payment, $locked->fresh(), $feePaymentAmount);
+
             $staff->loadMissing('staffProfile');
 
             $this->audit->log(
@@ -222,7 +228,96 @@ class PaymentService
 
             CrmCacheInvalidator::afterPayment();
 
-            return $payment->fresh(['addedBy.staffProfile', 'feeStructure.enrollment.course', 'feeInstallment', 'student']);
+            return $payment->fresh(['addedBy.staffProfile', 'feeStructure.enrollment.course', 'feeInstallment', 'feeMiscCharge', 'student']);
+        });
+    }
+
+    /**
+     * @param  array{
+     *     payment_date: string,
+     *     amount: float|int|string,
+     *     payment_mode: string,
+     *     voucher_number?: string|null,
+     *     transaction_id?: string|null,
+     *     utr_number?: string|null,
+     * }  $data
+     */
+    public function addMisc(
+        FeeStructure $feeStructure,
+        Student $student,
+        FeeMiscCharge $charge,
+        array $data,
+        UploadedFile|string $proof,
+        User $staff,
+    ): Payment {
+        Gate::forUser($staff)->authorize('create', Payment::class);
+
+        if (! $charge->isPayableSeparately()) {
+            throw ValidationException::withMessages([
+                'fee_misc_charge_id' => 'This charge is not payable.',
+            ]);
+        }
+
+        if ($charge->fee_structure_id !== $feeStructure->id) {
+            throw ValidationException::withMessages([
+                'fee_misc_charge_id' => 'Charge does not belong to this fee record.',
+            ]);
+        }
+
+        $amount = round((float) $data['amount'], 2);
+        $expected = round((float) $charge->amount, 2);
+
+        if (abs($amount - $expected) > 0.01) {
+            throw ValidationException::withMessages([
+                'amount' => 'Miscellaneous charges must be paid in full (₹'.number_format($expected, 2).').',
+            ]);
+        }
+
+        $mode = PaymentMode::from($data['payment_mode']);
+        $this->validateModeFields($mode, $data);
+
+        return DB::transaction(function () use ($feeStructure, $student, $charge, $data, $proof, $staff, $amount, $mode): Payment {
+            $receiptNumber = $this->numberGenerator->generate(NumberSequenceType::Receipt);
+
+            $payment = Payment::query()->create([
+                'fee_structure_id' => $feeStructure->id,
+                'fee_misc_charge_id' => $charge->id,
+                'student_id' => $student->id,
+                'payment_date' => $data['payment_date'],
+                'amount' => $amount,
+                'tuition_amount' => 0,
+                'payment_mode' => $mode,
+                'voucher_number' => $data['voucher_number'] ?? null,
+                'transaction_id' => $data['transaction_id'] ?? null,
+                'utr_number' => $data['utr_number'] ?? null,
+                'proof_image_path' => $this->storeProof($proof, $student->id, $receiptNumber),
+                'receipt_number' => $receiptNumber,
+                'added_by_user_id' => $staff->id,
+            ]);
+
+            $this->miscCharges->markPaid($charge->fresh());
+
+            $staff->loadMissing('staffProfile');
+
+            $this->audit->log(
+                action: 'Misc Charge Payment Added',
+                auditable: $payment,
+                newValues: [
+                    'receipt_number' => $payment->receipt_number,
+                    'amount' => $amount,
+                    'misc_charge' => $charge->label,
+                    'payment_mode' => $mode->value,
+                    'collected_by' => $staff->staffCollectorLabel(),
+                ],
+                user: $staff,
+            );
+
+            $payment = $this->receipts->generateForPayment($payment, $staff);
+            $this->ledger->postPayment($payment, 0, 0, $staff);
+
+            CrmCacheInvalidator::afterPayment();
+
+            return $payment->fresh(['addedBy.staffProfile', 'feeMiscCharge', 'student']);
         });
     }
 

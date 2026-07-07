@@ -7,6 +7,7 @@ use App\Models\AdmissionInstallmentPlan;
 use App\Models\AdmissionMiscFee;
 use App\Models\User;
 use App\Support\FeePlanCalculator;
+use App\Support\FeeSettings;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -54,6 +55,17 @@ class AdmissionFeePlanService
             $this->assertInstallmentPlanValid($installmentPlan, $netFee);
         }
 
+        $plannedCash = null;
+        $plannedOnline = null;
+
+        if (FeeSettings::onlineAllowanceGstEnabled()) {
+            if (isset($data['planned_cash_amount'], $data['planned_online_amount'])) {
+                $plannedCash = round((float) $data['planned_cash_amount'], 2);
+                $plannedOnline = round((float) $data['planned_online_amount'], 2);
+                app(OnlineAllowanceGstService::class)->assertAllowanceSplitValid($netFee, $plannedCash, $plannedOnline);
+            }
+        }
+
         return DB::transaction(function () use (
             $admission,
             $discount,
@@ -62,6 +74,8 @@ class AdmissionFeePlanService
             $miscFees,
             $installmentPlan,
             $staff,
+            $plannedCash,
+            $plannedOnline,
         ): Admission {
             $previousDiscount = round((float) $admission->discount_amount, 2);
 
@@ -69,6 +83,8 @@ class AdmissionFeePlanService
                 'discount_amount' => $discount,
                 'discount_set_by_user_id' => $staff && $discount > 0 ? $staff->id : null,
                 'net_fee' => $netFee,
+                'planned_cash_amount' => $plannedCash,
+                'planned_online_amount' => $plannedOnline,
                 'use_installment_plan' => $useInstallmentPlan,
             ]);
 

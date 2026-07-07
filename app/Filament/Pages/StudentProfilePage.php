@@ -19,13 +19,16 @@ use App\Models\Attendance;
 use App\Models\Batch;
 use App\Filament\Concerns\HandlesLogCallModal;
 use App\Filament\Forms\AdjustFeeStructureFormSchema;
+use App\Filament\Forms\AddMiscChargeFormSchema;
 use App\Filament\Forms\AddPaymentFormSchema;
 use App\Filament\Forms\ConvertToAdmissionFormSchema;
 use App\Filament\Forms\EnquiryFormSchema;
+use App\Filament\Forms\PayMiscChargeFormSchema;
 use App\Filament\Forms\StudentProfileFormSchema;
 use App\Models\Admission;
 use App\Models\Document;
 use App\Models\Enquiry;
+use App\Models\FeeMiscCharge;
 use App\Models\FeePenalty;
 use App\Models\Payment;
 use App\Models\Student;
@@ -44,6 +47,7 @@ use App\Services\EnquiryService;
 use App\Services\EnrollmentPlacementService;
 use App\Services\EnrollmentRollNumberService;
 use App\Services\FeeInstallmentService;
+use App\Services\FeeMiscChargeService;
 use App\Services\FeeStructureService;
 use App\Services\HomeworkAssignmentService;
 use App\Services\IdCardService;
@@ -1152,6 +1156,27 @@ class StudentProfilePage extends Page
         $this->loadPayments();
     }
 
+    public function openPayMiscCharge(int $chargeId): void
+    {
+        $this->mountAction('payMiscCharge', ['chargeId' => $chargeId]);
+    }
+
+    public function cancelMiscCharge(int $chargeId, FeeMiscChargeService $miscCharges): void
+    {
+        abort_unless($this->userCan(CrmPermission::FeesAdjustStructure), 403);
+
+        $charge = $miscCharges->resolveForStudent($this->record, $chargeId);
+        $miscCharges->cancelCharge($charge, Auth::user());
+
+        $this->feesTabLoaded = false;
+        $this->loadFeesTab();
+
+        Notification::make()
+            ->title('Misc charge cancelled')
+            ->success()
+            ->send();
+    }
+
     public function waivePenalty(int $penaltyId, string $reason, PenaltyCalculationService $penalties): void
     {
         abort_unless($this->userCan(CrmPermission::FeesWaivePenalty), 403);
@@ -1902,6 +1927,101 @@ class StudentProfilePage extends Page
                 })
                 ->visible(fn (): bool => $this->userCan(CrmPermission::AttendanceMark)
                     && $this->record->activeEnrollment !== null),
+            Action::make('addMiscCharge')
+                ->label('Add Misc Charge')
+                ->icon('heroicon-o-plus-circle')
+                ->color('gray')
+                ->outlined()
+                ->button()
+                ->modalHeading('Add miscellaneous charge')
+                ->modalWidth('md')
+                ->form(AddMiscChargeFormSchema::fields())
+                ->action(function (array $data, FeeMiscChargeService $miscCharges): void {
+                    abort_unless($this->userCan(CrmPermission::FeesAdjustStructure), 403);
+
+                    $feeStructure = $this->record->activeEnrollment?->feeStructure;
+
+                    if (! $feeStructure) {
+                        return;
+                    }
+
+                    $miscCharges->addSeparateCharge(
+                        $feeStructure,
+                        (string) $data['label'],
+                        (float) $data['amount'],
+                        filled($data['due_date'] ?? null) ? (string) $data['due_date'] : null,
+                        Auth::user(),
+                    );
+
+                    $this->feesTabLoaded = false;
+                    $this->loadFeesTab();
+
+                    Notification::make()
+                        ->title('Misc charge added')
+                        ->body('Student can pay this separately from tuition installments.')
+                        ->success()
+                        ->send();
+                })
+                ->visible(fn (): bool => $this->licensed(LicenseFeature::Fees)
+                    && $this->userCan(CrmPermission::FeesAdjustStructure)
+                    && $this->record->activeEnrollment?->feeStructure !== null),
+            Action::make('payMiscCharge')
+                ->label('Pay misc')
+                ->icon('heroicon-o-banknotes')
+                ->modalHeading('Pay miscellaneous charge')
+                ->modalWidth('lg')
+                ->arguments(['chargeId' => 0])
+                ->fillForm(fn (array $arguments): array => ['fee_misc_charge_id' => (int) ($arguments['chargeId'] ?? 0)])
+                ->form(function (array $arguments): array {
+                    $charge = FeeMiscCharge::query()->find((int) ($arguments['chargeId'] ?? 0));
+
+                    if (! $charge) {
+                        return [];
+                    }
+
+                    return PayMiscChargeFormSchema::fields($charge);
+                })
+                ->action(function (array $data, array $arguments, PaymentService $payments): void {
+                    abort_unless($this->userCan(CrmPermission::FeesCollect), 403);
+
+                    $feeStructure = $this->record->activeEnrollment?->feeStructure;
+                    $charge = app(FeeMiscChargeService::class)->resolveForStudent(
+                        $this->record,
+                        (int) ($arguments['chargeId'] ?? $data['fee_misc_charge_id'] ?? 0),
+                    );
+
+                    if (! $feeStructure) {
+                        return;
+                    }
+
+                    $proof = $data['proof_image'] ?? null;
+
+                    if (is_array($proof)) {
+                        $proof = $proof[0] ?? null;
+                    }
+
+                    $payment = $payments->addMisc(
+                        $feeStructure,
+                        $this->record,
+                        $charge,
+                        $data,
+                        (string) $proof,
+                        Auth::user(),
+                    );
+
+                    app(StorageCleanupService::class)->pruneLivewireTempFiles(0);
+                    $this->feesTabLoaded = false;
+                    $this->receiptsTabLoaded = false;
+                    $this->loadFeesTab();
+                    $this->refreshRecord();
+
+                    Notification::make()
+                        ->title('Misc charge paid')
+                        ->body("Receipt {$payment->receipt_number} · ₹".number_format((float) $payment->amount, 0))
+                        ->success()
+                        ->send();
+                })
+                ->visible(false),
             Action::make('addPayment')
                 ->label('Add Payment')
                 ->icon('heroicon-o-banknotes')

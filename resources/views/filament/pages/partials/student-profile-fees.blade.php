@@ -1,8 +1,13 @@
 @php
+    use App\Enums\FeeMiscChargeKind;
+    use App\Enums\FeeMiscChargeStatus;
+
     $enrollment = $record->activeEnrollment;
     $course = $enrollment?->course;
     $fees = $enrollment?->feeStructure;
     $miscCharges = $fees?->miscCharges ?? collect();
+    $bundledMisc = $miscCharges->filter(fn ($c) => $c->kind === FeeMiscChargeKind::Bundled);
+    $separateMisc = $miscCharges->filter(fn ($c) => $c->kind !== FeeMiscChargeKind::Bundled);
     $pendingPenalties = $penalties->filter(fn ($p) => $p->status === \App\Enums\FeePenaltyStatus::Pending);
 @endphp
 
@@ -79,16 +84,26 @@
                         </dd>
                     </div>
                 @endif
-                @if ($miscCharges->isNotEmpty())
+                @if ($bundledMisc->isNotEmpty())
                     <div class="sm:col-span-2 lg:col-span-3">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Miscellaneous</dt>
+                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">In fee plan (misc)</dt>
                         <dd class="mt-1 space-y-1">
-                            @foreach ($miscCharges as $charge)
+                            @foreach ($bundledMisc as $charge)
                                 <div class="flex justify-between gap-4 text-sm">
                                     <span>{{ $charge->label }}</span>
                                     <span class="font-medium">₹{{ number_format((float) $charge->amount, 2) }}</span>
                                 </div>
                             @endforeach
+                        </dd>
+                    </div>
+                @endif
+                @if ($fees->hasOnlineAllowancePlan())
+                    <div class="sm:col-span-2 lg:col-span-3">
+                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Cash / online agreement</dt>
+                        <dd class="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                            Cash ₹{{ number_format((float) $fees->planned_cash_amount, 2) }}
+                            · Online ₹{{ number_format((float) $fees->planned_online_amount, 2) }}
+                            <span class="text-xs text-gray-500">(GST on online overage applies)</span>
                         </dd>
                     </div>
                 @endif
@@ -103,6 +118,9 @@
                 <div>
                     <dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Pending</dt>
                     <dd class="mt-0.5 text-lg font-semibold text-amber-700 dark:text-amber-400">₹{{ number_format((float) $fees->pending_amount, 2) }}</dd>
+                    @if ($fees->separateMiscChargesPendingTotal() > 0)
+                        <p class="mt-1 text-xs text-gray-500">+ ₹{{ number_format($fees->separateMiscChargesPendingTotal(), 2) }} misc / GST charges</p>
+                    @endif
                 </div>
             </dl>
         </div>
@@ -138,6 +156,49 @@
                                 <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $statusClass }}">
                                     {{ $status }}
                                 </span>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        @if ($separateMisc->isNotEmpty())
+            <div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+                <div class="border-b border-gray-100 px-4 py-3 dark:border-white/10 sm:px-6">
+                    <h3 class="text-base font-semibold text-gray-950 dark:text-white">Additional charges (pay separately)</h3>
+                    <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Exam fees, materials, GST penalties — not part of tuition installments.</p>
+                </div>
+                <div class="divide-y divide-gray-100 dark:divide-white/10">
+                    @foreach ($separateMisc as $charge)
+                        @php
+                            $statusLabel = $charge->status->label();
+                            $statusClass = match ($charge->status) {
+                                FeeMiscChargeStatus::Paid => 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
+                                FeeMiscChargeStatus::Cancelled => 'bg-gray-500/10 text-gray-600 dark:text-gray-400',
+                                default => 'bg-amber-500/15 text-amber-900 dark:text-amber-200',
+                            };
+                        @endphp
+                        <div class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6" wire:key="misc-{{ $charge->id }}">
+                            <div>
+                                <p class="font-semibold text-gray-950 dark:text-white">{{ $charge->label }}</p>
+                                <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
+                                    ₹{{ number_format((float) $charge->amount, 2) }}
+                                    @if ($charge->due_date)
+                                        · Due {{ $charge->due_date->format('d M Y') }}
+                                    @endif
+                                </p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $statusClass }}">{{ $statusLabel }}</span>
+                                @if ($charge->isPayableSeparately())
+                                    <button type="button" wire:click="openPayMiscCharge({{ $charge->id }})" class="fi-btn fi-btn-size-sm inline-flex items-center gap-1 rounded-lg bg-success-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-success-500">
+                                        Pay
+                                    </button>
+                                    <button type="button" wire:click="cancelMiscCharge({{ $charge->id }})" wire:confirm="Cancel this charge?" class="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400">
+                                        Cancel
+                                    </button>
+                                @endif
                             </div>
                         </div>
                     @endforeach
