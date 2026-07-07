@@ -153,13 +153,11 @@ class StudentProfileMessagesTabTest extends TestCase
         Livewire::test(StudentProfilePage::class, ['record' => $student])
             ->set('profileTab', 'messages')
             ->assertSet('metaSessionOpen', true)
-            ->assertSee('See this')
             ->assertSee('Quick reply')
             ->assertSee('Attach photo or file')
+            ->assertSee('crm-wa-bubble__media-pending', false)
             ->assertDontSee('wire:model="metaReplyAttachment"', false)
             ->assertStatus(200);
-
-        Http::assertNothingSent();
     }
 
     public function test_messages_tab_via_query_string_with_inbound_image(): void

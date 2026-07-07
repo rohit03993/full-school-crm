@@ -611,6 +611,16 @@ class StudentProfilePage extends Page
         $this->showMetaReplyAttachment = true;
     }
 
+    public function refreshThreadMedia(): void
+    {
+        if ($this->profileTab !== 'messages' || ! $this->messagesTabLoaded) {
+            return;
+        }
+
+        $this->messagesTabLoaded = false;
+        $this->loadMessagesTab();
+    }
+
     protected function whatsAppTemplateSyncHint(WhatsAppTemplateCatalog $catalog): ?string
     {
         if (! $this->metaRoutingActive) {

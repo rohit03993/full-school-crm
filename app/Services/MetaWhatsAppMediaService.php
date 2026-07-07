@@ -122,7 +122,58 @@ class MetaWhatsAppMediaService
         return $message->fresh() ?? $message;
     }
 
-    public function downloadInboundMedia(MetaWhatsAppMessage $message): ?MetaWhatsAppMessage
+    /**
+     * Download missing inbound media for messages already in the thread (AiSensy-style lazy fetch).
+     *
+     * @param  iterable<MetaWhatsAppMessage>  $messages
+     */
+    public function syncPendingDownloads(iterable $messages, int $limit = 5, int $timeoutSeconds = 12): int
+    {
+        if (! $this->meta->isConfigured()) {
+            return 0;
+        }
+
+        $synced = 0;
+
+        foreach ($messages as $message) {
+            if ($synced >= $limit) {
+                break;
+            }
+
+            if (! $message instanceof MetaWhatsAppMessage) {
+                continue;
+            }
+
+            $message = $this->hydrateMediaFieldsFromPayload($message);
+
+            if (! MetaWhatsAppInboundMessageParser::isMediaType((string) ($message->message_type ?? 'text'))) {
+                continue;
+            }
+
+            if (filled($message->media_path) && Storage::disk(self::DISK)->exists((string) $message->media_path)) {
+                continue;
+            }
+
+            $mediaId = (string) ($message->media_id ?: $this->mediaIdFromPayload($message) ?: '');
+
+            if ($mediaId === '') {
+                continue;
+            }
+
+            if (blank($message->media_id)) {
+                $message->update(['media_id' => $mediaId]);
+                $message = $message->fresh() ?? $message;
+            }
+
+            if ($this->downloadInboundMedia($message, $timeoutSeconds) !== null) {
+                $synced++;
+            }
+        }
+
+        return $synced;
+    }
+
+    public function downloadInboundMedia(MetaWhatsAppMessage $message, int $timeoutSeconds = 30): ?MetaWhatsAppMessage
     {
         $mediaId = (string) ($message->media_id ?? '');
 
@@ -130,8 +181,12 @@ class MetaWhatsAppMediaService
             return null;
         }
 
+        if (filled($message->media_path) && Storage::disk(self::DISK)->exists((string) $message->media_path)) {
+            return $message;
+        }
+
         try {
-            $metaResponse = Http::timeout(30)
+            $metaResponse = Http::timeout($timeoutSeconds)
                 ->withToken((string) $this->meta->accessToken())
                 ->acceptJson()
                 ->get($this->meta->graphUrl($mediaId));
@@ -153,7 +208,7 @@ class MetaWhatsAppMediaService
                 return null;
             }
 
-            $binaryResponse = Http::timeout(60)
+            $binaryResponse = Http::timeout(max($timeoutSeconds, 20))
                 ->withToken((string) $this->meta->accessToken())
                 ->get($downloadUrl);
 

@@ -12,18 +12,33 @@
         <button type="button" class="crm-wa-bubble__media-trigger js-media-preview-trigger" data-crm-preview-image="{{ $mediaUrl }}" data-crm-preview-title="{{ $messageType === 'sticker' ? 'Sticker' : 'Photo' }}">
             <img src="{{ $mediaUrl }}" alt="{{ $messageType === 'sticker' ? 'Sticker' : 'Photo' }}" class="crm-wa-bubble__image" loading="lazy" />
         </button>
+    @elseif ($message['mediaPending'] ?? false)
+        <div class="crm-wa-bubble__media-pending">
+            <div class="crm-wa-bubble__media-pending-icon" aria-hidden="true">📷</div>
+            <p class="crm-wa-bubble__media-pending-label">Loading photo…</p>
+        </div>
     @else
         <p class="crm-wa-bubble__media-fallback">{{ $body !== '' ? $body : '📷 Photo' }}</p>
     @endif
 @elseif ($messageType === 'video')
     @if ($mediaUrl)
         <video src="{{ $mediaUrl }}" class="crm-wa-bubble__video" controls playsinline preload="metadata"></video>
+    @elseif ($message['mediaPending'] ?? false)
+        <div class="crm-wa-bubble__media-pending">
+            <div class="crm-wa-bubble__media-pending-icon" aria-hidden="true">🎬</div>
+            <p class="crm-wa-bubble__media-pending-label">Loading video…</p>
+        </div>
     @else
         <p class="crm-wa-bubble__media-fallback">{{ $body !== '' ? $body : '🎬 Video' }}</p>
     @endif
 @elseif ($messageType === 'audio')
     @if ($mediaUrl)
         <audio src="{{ $mediaUrl }}" class="crm-wa-bubble__audio" controls preload="metadata"></audio>
+    @elseif ($message['mediaPending'] ?? false)
+        <div class="crm-wa-bubble__media-pending">
+            <div class="crm-wa-bubble__media-pending-icon" aria-hidden="true">🎤</div>
+            <p class="crm-wa-bubble__media-pending-label">Loading voice note…</p>
+        </div>
     @else
         <p class="crm-wa-bubble__media-fallback">{{ $body !== '' ? $body : '🎤 Voice message' }}</p>
     @endif
@@ -33,6 +48,11 @@
             <x-filament::icon icon="heroicon-o-document-arrow-down" class="crm-wa-bubble__document-icon" />
             <span class="crm-wa-bubble__document-name">{{ $message['mediaFilename'] ?? 'Document' }}</span>
         </a>
+    @elseif ($message['mediaPending'] ?? false)
+        <div class="crm-wa-bubble__media-pending">
+            <div class="crm-wa-bubble__media-pending-icon" aria-hidden="true">📄</div>
+            <p class="crm-wa-bubble__media-pending-label">Loading file…</p>
+        </div>
     @else
         <p class="crm-wa-bubble__media-fallback">{{ $body !== '' ? $body : '📄 Document' }}</p>
     @endif

@@ -3,6 +3,9 @@
         $lastThreadKey = $messageThread === []
             ? 'empty'
             : ($messageThread[array_key_last($messageThread)]['key'] ?? 'empty');
+        $hasPendingMedia = collect($messageThread)->contains(
+            fn (array $message): bool => (bool) ($message['mediaPending'] ?? false),
+        );
     @endphp
 
     @unless ($compactInbox ?? false)
@@ -213,6 +216,9 @@
         <section
             class="crm-wa-inbox__thread"
             wire:key="wa-thread-{{ count($messageThread) }}-{{ $lastThreadKey }}"
+            @if ($hasPendingMedia)
+                wire:poll.8s="refreshThreadMedia"
+            @endif
             aria-label="WhatsApp conversation"
         >
             <div class="crm-wa-inbox__thread-head">

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\MetaWhatsAppMessageStatus;
+use App\Jobs\DownloadMetaWhatsAppMediaJob;
 use App\Support\MetaWhatsAppInboundMessageParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -147,7 +148,11 @@ class MetaWhatsAppWebhookService
             );
 
             if (MetaWhatsAppInboundMessageParser::isMediaType($parsed['message_type'])) {
-                $this->media->downloadInboundMedia($record);
+                $stored = $this->media->downloadInboundMedia($record);
+
+                if ($stored === null || blank($stored->media_path)) {
+                    DownloadMetaWhatsAppMediaJob::dispatch($record->id)->delay(now()->addSeconds(30));
+                }
             }
         }
     }

@@ -115,8 +115,17 @@ class StudentWhatsAppThreadService
             $metaQuery->where('student_id', $student->id);
         }
 
-        return $metaQuery
-            ->get()
+        $rows = $metaQuery->get();
+
+        if ($rows->isNotEmpty()) {
+            $this->media->syncPendingDownloads($rows);
+            $rows = MetaWhatsAppMessage::query()
+                ->whereIn('id', $rows->pluck('id'))
+                ->orderByDesc('created_at')
+                ->get();
+        }
+
+        return $rows
             ->map(function (MetaWhatsAppMessage $row): ?StudentWhatsAppThreadItem {
                 try {
                     if (Schema::hasColumn('meta_whatsapp_messages', 'message_type')) {
@@ -133,6 +142,9 @@ class StudentWhatsAppThreadService
                     $body = $this->metaDisplayBody($row);
                     $mediaUrl = $this->media->mediaUrl($row);
                     $locationUrl = $messageType === 'location' ? $this->locationUrlFromPayload($row) : null;
+                    $mediaPending = MetaWhatsAppInboundMessageParser::isMediaType($messageType)
+                        && $mediaUrl === null
+                        && filled($row->media_id ?? $this->mediaIdFromRowPayload($row));
 
                     return new StudentWhatsAppThreadItem(
                         key: 'meta-'.$row->id,
@@ -150,6 +162,8 @@ class StudentWhatsAppThreadService
                         mediaFilename: $row->media_filename,
                         caption: $caption !== '' ? $caption : null,
                         locationUrl: $locationUrl,
+                        mediaPending: $mediaPending,
+                        metaMessageId: $row->id,
                     );
                 } catch (\Throwable $exception) {
                     report($exception);
@@ -220,6 +234,24 @@ class StudentWhatsAppThreadService
         }
 
         return $preview !== '' ? $preview : 'Message';
+    }
+
+    protected function mediaIdFromRowPayload(MetaWhatsAppMessage $row): ?string
+    {
+        if (filled($row->media_id)) {
+            return (string) $row->media_id;
+        }
+
+        $payload = is_array($row->payload) ? $row->payload : [];
+        $type = (string) ($row->message_type ?? $payload['type'] ?? '');
+
+        if ($type === '') {
+            return null;
+        }
+
+        $mediaId = (string) data_get($payload, "{$type}.id", '');
+
+        return $mediaId !== '' ? $mediaId : null;
     }
 
     protected function locationUrlFromPayload(MetaWhatsAppMessage $row): ?string

@@ -135,13 +135,61 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertSet('selectedStudentId', $student->id)
             ->assertSet('metaSessionOpen', true)
             ->assertSee('Amit Verma')
-            ->assertSee('See this')
             ->assertSee('Quick reply')
             ->assertSee('Open student profile')
             ->assertDontSee('wire:model="metaReplyAttachment"', false)
             ->assertStatus(200);
+    }
 
-        Http::assertNothingSent();
+    public function test_inbound_parent_image_downloads_on_thread_open(): void
+    {
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::sequence()
+                ->push(['url' => 'https://cdn.example.com/parent.jpg', 'mime_type' => 'image/jpeg'])
+                ->push('parent-image-bytes', 200),
+            'https://cdn.example.com/*' => Http::response('parent-image-bytes', 200),
+        ]);
+        Storage::fake(MetaWhatsAppMediaService::DISK);
+
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-token'), 'meta_whatsapp');
+
+        $admin = $this->createSuperAdmin();
+
+        $student = Student::query()->create([
+            'name' => 'Amit Verma',
+            'mobile' => '9876543210',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.IMAGEIN3',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919876543210',
+            'student_id' => $student->id,
+            'body_preview' => 'See this',
+            'message_type' => 'image',
+            'caption' => 'See this',
+            'media_id' => 'media-parent-image',
+            'status' => 'received',
+            'payload' => [
+                'type' => 'image',
+                'image' => [
+                    'id' => 'media-parent-image',
+                    'mime_type' => 'image/jpeg',
+                    'caption' => 'See this',
+                ],
+            ],
+            'status_at' => now()->subMinutes(10),
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(WhatsAppInboxPage::class)
+            ->call('selectConversation', $student->id)
+            ->assertSee('crm-wa-bubble__image', false)
+            ->assertStatus(200);
     }
 
     public function test_inbound_parent_image_with_stored_file_renders_preview(): void

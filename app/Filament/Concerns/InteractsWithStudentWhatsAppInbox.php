@@ -195,6 +195,16 @@ trait InteractsWithStudentWhatsAppInbox
         $this->showMetaReplyAttachment = true;
     }
 
+    public function refreshThreadMedia(): void
+    {
+        if (! $this->messagesTabLoaded) {
+            return;
+        }
+
+        $this->messagesTabLoaded = false;
+        $this->loadMessagesTab();
+    }
+
     public function loadMessagesTab(): void
     {
         $student = $this->whatsAppMessageStudent();

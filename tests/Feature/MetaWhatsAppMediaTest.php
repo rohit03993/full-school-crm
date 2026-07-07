@@ -113,7 +113,58 @@ class MetaWhatsAppMediaTest extends TestCase
         $this->assertStringContainsString('Homework photo', $item->body);
     }
 
-    public function test_thread_load_does_not_download_missing_media_from_meta(): void
+    public function test_thread_load_syncs_pending_media_when_meta_configured(): void
+    {
+        Storage::fake(MetaWhatsAppMediaService::DISK);
+
+        Setting::setValue('meta_whatsapp.phone_number_id', '123456789', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-token'), 'meta_whatsapp');
+
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::sequence()
+                ->push(['url' => 'https://cdn.example.com/photo.jpg', 'mime_type' => 'image/jpeg'])
+                ->push('fake-image-binary', 200),
+            'https://cdn.example.com/*' => Http::response('fake-image-binary', 200),
+        ]);
+
+        $student = Student::query()->create([
+            'name' => 'Kapil',
+            'mobile' => '9811223344',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.PENDINGIMG',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919811223344',
+            'student_id' => $student->id,
+            'body_preview' => 'Pending photo',
+            'message_type' => 'image',
+            'media_id' => 'media-pending',
+            'status' => 'received',
+            'payload' => [
+                'type' => 'image',
+                'image' => [
+                    'id' => 'media-pending',
+                    'mime_type' => 'image/jpeg',
+                    'caption' => 'Pending photo',
+                ],
+            ],
+            'status_at' => now(),
+        ]);
+
+        $item = app(StudentWhatsAppThreadService::class)
+            ->threadForStudent($student)
+            ->first();
+
+        $this->assertNotNull($item);
+        $this->assertSame('image', $item->messageType);
+        $this->assertNotNull($item->mediaUrl);
+        $this->assertFalse($item->mediaPending);
+        $this->assertStringContainsString('Pending photo', $item->body);
+    }
+
+    public function test_thread_load_skips_meta_download_when_not_configured(): void
     {
         Http::fake();
 
@@ -128,7 +179,7 @@ class MetaWhatsAppMediaTest extends TestCase
             'direction' => MetaWhatsAppMessageDirection::Inbound->value,
             'phone' => '919811223344',
             'student_id' => $student->id,
-            'body_preview' => '[image message]',
+            'body_preview' => 'Pending photo',
             'message_type' => 'image',
             'media_id' => 'media-pending',
             'status' => 'received',
@@ -150,7 +201,7 @@ class MetaWhatsAppMediaTest extends TestCase
         $this->assertNotNull($item);
         $this->assertSame('image', $item->messageType);
         $this->assertNull($item->mediaUrl);
-        $this->assertStringContainsString('Pending photo', $item->body);
+        $this->assertTrue($item->mediaPending);
         Http::assertNothingSent();
     }
 
