@@ -56,7 +56,7 @@ class ViewAdmission extends ViewRecord
                 ->icon('heroicon-o-user')
                 ->url(fn (): string => StudentProfilePage::getUrl([
                     'record' => $this->record->student_id,
-                ]).'?tab=admission'),
+                ]).'?tab=documents'),
             Action::make('approve')
                 ->label('Approve Admission')
                 ->color('success')

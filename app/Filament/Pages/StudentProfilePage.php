@@ -286,6 +286,10 @@ class StudentProfilePage extends Page
 
         $tab = request()->query('tab');
 
+        if ($tab === 'admission') {
+            $tab = 'documents';
+        }
+
         if (is_string($tab)) {
             if (str_starts_with($tab, 'activity_')) {
                 $this->profileTab = 'activities';
@@ -339,7 +343,6 @@ class StudentProfilePage extends Page
             'visits' => $this->loadVisitsTab(),
             'calls' => $this->loadCallsTab(),
             'messages' => $this->loadMessagesTab(),
-            'admission' => $this->loadAdmissionTab(),
             'documents' => $this->loadDocumentsTab(),
             'fees' => $this->loadFeesTab(),
             'receipts' => $this->loadReceiptsTab(),
@@ -366,10 +369,6 @@ class StudentProfilePage extends Page
 
         if ($this->licensed(LicenseFeature::WhatsApp)) {
             $tabs[] = 'messages';
-        }
-
-        if ($this->licensed(LicenseFeature::Admissions)) {
-            $tabs[] = 'admission';
         }
 
         if ($this->licensed(LicenseFeature::Fees) && $this->record->activeEnrollment !== null) {
@@ -1022,6 +1021,10 @@ class StudentProfilePage extends Page
 
     public function loadDocumentsTab(): void
     {
+        if ($this->licensed(LicenseFeature::Admissions)) {
+            $this->loadAdmissionTab();
+        }
+
         if ($this->documentsTabLoaded) {
             return;
         }
@@ -1607,9 +1610,10 @@ class StudentProfilePage extends Page
                     );
 
                     $this->refreshRecord();
-                    $this->profileTab = 'admission';
+                    $this->profileTab = 'documents';
                     $this->admissionTabLoaded = false;
-                    $this->loadAdmissionTab();
+                    $this->documentsTabLoaded = false;
+                    $this->loadDocumentsTab();
 
                     Notification::make()
                         ->title('Converted to admission')
@@ -2038,22 +2042,15 @@ class StudentProfilePage extends Page
                             View::make('filament.pages.partials.student-profile-messages')
                                 ->viewData(fn (): array => $this->whatsAppMessagesViewData()),
                         ]),
-                    'admission' => Tab::make('Admission')
-                        ->icon('heroicon-o-document-text')
-                        ->visible(fn (): bool => $this->licensed(LicenseFeature::Admissions))
-                        ->schema([
-                            View::make('filament.pages.partials.student-profile-admission')
-                                ->viewData(fn (): array => [
-                                    'admissionTabLoaded' => $this->admissionTabLoaded,
-                                    'activeAdmission' => $this->activeAdmission,
-                                    'record' => $this->record,
-                                ]),
-                        ]),
                     'documents' => Tab::make('Documents')
                         ->icon('heroicon-o-folder')
                         ->schema([
                             View::make('filament.pages.partials.student-profile-documents')
                                 ->viewData(fn (): array => [
+                                    'showAdmissionSection' => $this->licensed(LicenseFeature::Admissions),
+                                    'admissionTabLoaded' => $this->admissionTabLoaded,
+                                    'activeAdmission' => $this->activeAdmission,
+                                    'record' => $this->record,
                                     'documentsTabLoaded' => $this->documentsTabLoaded,
                                     'documents' => $this->documents,
                                 ]),

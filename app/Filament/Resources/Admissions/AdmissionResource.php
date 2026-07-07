@@ -136,7 +136,7 @@ class AdmissionResource extends Resource
                     ->icon(Heroicon::OutlinedUser)
                     ->url(fn (Admission $record): string => StudentProfilePage::getUrl([
                         'record' => $record->student_id,
-                    ]).'?tab=admission'),
+                    ]).'?tab=documents'),
             ])
             ->recordUrl(
                 fn (Admission $record): string => static::getUrl('view', ['record' => $record]),
