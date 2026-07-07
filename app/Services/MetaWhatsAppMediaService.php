@@ -81,9 +81,7 @@ class MetaWhatsAppMediaService
             return $message;
         }
 
-        if (MetaWhatsAppInboundMessageParser::isMediaType((string) ($message->message_type ?? 'text'))
-            && filled($message->media_id)
-            && ! MetaWhatsAppInboundMessageParser::isPlaceholderPreview((string) ($message->body_preview ?? ''))) {
+        if (filled($message->media_path) && Storage::disk(self::DISK)->exists((string) $message->media_path)) {
             return $message;
         }
 
@@ -99,17 +97,39 @@ class MetaWhatsAppMediaService
             return $message;
         }
 
+        $updates = [];
+
+        if ((string) ($message->message_type ?? 'text') !== $parsed['message_type']) {
+            $updates['message_type'] = $parsed['message_type'];
+        }
+
+        if (blank($message->media_id) && filled($parsed['media_id'])) {
+            $updates['media_id'] = $parsed['media_id'];
+        }
+
+        if (blank($message->media_mime_type) && filled($parsed['media_mime_type'])) {
+            $updates['media_mime_type'] = $parsed['media_mime_type'];
+        }
+
+        if (blank($message->media_filename) && filled($parsed['media_filename'])) {
+            $updates['media_filename'] = $parsed['media_filename'];
+        }
+
+        if (blank($message->caption) && filled($parsed['caption'])) {
+            $updates['caption'] = $parsed['caption'];
+        }
+
+        if (MetaWhatsAppInboundMessageParser::isPlaceholderPreview((string) ($message->body_preview ?? ''))
+            && filled($parsed['body_preview'])) {
+            $updates['body_preview'] = $parsed['body_preview'];
+        }
+
+        if ($updates === []) {
+            return $message;
+        }
+
         try {
-            $message->update([
-                'message_type' => $parsed['message_type'],
-                'media_id' => $parsed['media_id'] ?? $message->media_id,
-                'media_mime_type' => $parsed['media_mime_type'] ?? $message->media_mime_type,
-                'media_filename' => $parsed['media_filename'] ?? $message->media_filename,
-                'caption' => $parsed['caption'] ?? $message->caption,
-                'body_preview' => MetaWhatsAppInboundMessageParser::isPlaceholderPreview((string) ($message->body_preview ?? ''))
-                    ? $parsed['body_preview']
-                    : $message->body_preview,
-            ]);
+            $message->update($updates);
         } catch (\Throwable $exception) {
             Log::warning('Meta WhatsApp media metadata hydrate failed', [
                 'message_id' => $message->id,
@@ -122,12 +142,31 @@ class MetaWhatsAppMediaService
         return $message->fresh() ?? $message;
     }
 
+    public function needsMediaDownload(MetaWhatsAppMessage $message): bool
+    {
+        if (! Schema::hasColumn('meta_whatsapp_messages', 'message_type')) {
+            return false;
+        }
+
+        $message = $this->hydrateMediaFieldsFromPayload($message);
+
+        if (filled($message->media_path) && Storage::disk(self::DISK)->exists((string) $message->media_path)) {
+            return false;
+        }
+
+        if (! MetaWhatsAppInboundMessageParser::isMediaType((string) ($message->message_type ?? 'text'))) {
+            return false;
+        }
+
+        return filled($message->media_id) || filled($this->mediaIdFromPayload($message));
+    }
+
     /**
      * Download missing inbound media for messages already in the thread (AiSensy-style lazy fetch).
      *
      * @param  iterable<MetaWhatsAppMessage>  $messages
      */
-    public function syncPendingDownloads(iterable $messages, int $limit = 5, int $timeoutSeconds = 12): int
+    public function syncPendingDownloads(iterable $messages, int $limit = 10, int $timeoutSeconds = 12): int
     {
         if (! $this->meta->isConfigured()) {
             return 0;
@@ -144,15 +183,11 @@ class MetaWhatsAppMediaService
                 continue;
             }
 
+            if (! $this->needsMediaDownload($message)) {
+                continue;
+            }
+
             $message = $this->hydrateMediaFieldsFromPayload($message);
-
-            if (! MetaWhatsAppInboundMessageParser::isMediaType((string) ($message->message_type ?? 'text'))) {
-                continue;
-            }
-
-            if (filled($message->media_path) && Storage::disk(self::DISK)->exists((string) $message->media_path)) {
-                continue;
-            }
 
             $mediaId = (string) ($message->media_id ?: $this->mediaIdFromPayload($message) ?: '');
 
@@ -226,7 +261,19 @@ class MetaWhatsAppMediaService
             $filename = $this->buildStoredFilename($message, $extension);
             $path = self::DIRECTORY.'/'.$filename;
 
-            Storage::disk(self::DISK)->put($path, $binaryResponse->body());
+            if (! Storage::disk(self::DISK)->exists(self::DIRECTORY)) {
+                Storage::disk(self::DISK)->makeDirectory(self::DIRECTORY);
+            }
+
+            if (! Storage::disk(self::DISK)->put($path, $binaryResponse->body())) {
+                Log::warning('Meta WhatsApp media storage write failed', [
+                    'message_id' => $message->id,
+                    'media_id' => $mediaId,
+                    'path' => $path,
+                ]);
+
+                return null;
+            }
 
             $message->update([
                 'media_id' => $mediaId,

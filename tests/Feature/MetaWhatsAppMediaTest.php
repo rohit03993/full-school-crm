@@ -113,6 +113,53 @@ class MetaWhatsAppMediaTest extends TestCase
         $this->assertStringContainsString('Homework photo', $item->body);
     }
 
+    public function test_hydrate_fixes_text_row_when_payload_contains_image(): void
+    {
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::sequence()
+                ->push(['url' => 'https://cdn.example.com/photo.jpg', 'mime_type' => 'image/jpeg'])
+                ->push('fake-image-binary', 200),
+            'https://cdn.example.com/*' => Http::response('fake-image-binary', 200),
+        ]);
+        Storage::fake(MetaWhatsAppMediaService::DISK);
+
+        Setting::setValue('meta_whatsapp.phone_number_id', '123456789', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-token'), 'meta_whatsapp');
+
+        $student = Student::query()->create([
+            'name' => 'Amit Verma',
+            'mobile' => '9811223344',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.MISCLASS',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919811223344',
+            'student_id' => $student->id,
+            'body_preview' => 'See this',
+            'message_type' => 'text',
+            'status' => 'received',
+            'payload' => [
+                'type' => 'image',
+                'image' => [
+                    'id' => 'media-misclass',
+                    'mime_type' => 'image/jpeg',
+                    'caption' => 'See this',
+                ],
+            ],
+            'status_at' => now(),
+        ]);
+
+        $item = app(StudentWhatsAppThreadService::class)
+            ->threadForStudent($student)
+            ->first();
+
+        $this->assertNotNull($item);
+        $this->assertSame('image', $item->messageType);
+        $this->assertNotNull($item->mediaUrl);
+    }
+
     public function test_thread_load_syncs_pending_media_when_meta_configured(): void
     {
         Storage::fake(MetaWhatsAppMediaService::DISK);

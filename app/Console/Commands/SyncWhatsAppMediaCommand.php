@@ -28,7 +28,6 @@ class SyncWhatsAppMediaCommand extends Command
         $studentId = $this->option('student');
 
         $query = MetaWhatsAppMessage::query()
-            ->whereNotNull('media_id')
             ->where(function ($builder): void {
                 $builder->whereNull('media_path')->orWhere('media_path', '');
             })
@@ -38,18 +37,20 @@ class SyncWhatsAppMediaCommand extends Command
             $query->where('student_id', (int) $studentId);
         }
 
-        $messages = $query->limit($limit)->get()
-            ->filter(fn (MetaWhatsAppMessage $message): bool => MetaWhatsAppInboundMessageParser::isMediaType((string) ($message->message_type ?? 'text')));
+        $candidates = $query->limit($limit * 5)->get()
+            ->filter(fn (MetaWhatsAppMessage $message): bool => $media->needsMediaDownload($message))
+            ->take($limit)
+            ->values();
 
-        if ($messages->isEmpty()) {
+        if ($candidates->isEmpty()) {
             $this->info('No pending WhatsApp media to sync.');
 
             return self::SUCCESS;
         }
 
-        $this->info('Syncing '.$messages->count().' WhatsApp media file(s)…');
+        $this->info('Syncing '.$candidates->count().' WhatsApp media file(s)…');
 
-        $synced = $media->syncPendingDownloads($messages, $messages->count(), 30);
+        $synced = $media->syncPendingDownloads($candidates, $candidates->count(), 30);
 
         $this->info("Stored {$synced} media file(s).");
 
