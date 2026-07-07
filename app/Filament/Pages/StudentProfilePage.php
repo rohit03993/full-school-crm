@@ -2180,6 +2180,7 @@ class StudentProfilePage extends Page
                                     'activeBatch' => $this->activeBatch,
                                     'attendanceRecords' => $this->attendanceRecords,
                                     'attendancePercentage' => $this->attendancePercentage,
+                                    'student' => $this->record,
                                 ]),
                         ]),
                     'homework' => Tab::make('Homework')
