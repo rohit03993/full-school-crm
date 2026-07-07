@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\NumberSequenceType;
 use App\Models\Document;
 use App\Models\Enrollment;
+use App\Models\MetaWhatsAppMessage;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -69,6 +70,16 @@ class StudentDataResetService
             ->each(function (Enrollment $enrollment): void {
                 $this->storage->deleteStoredFile($enrollment->id_card_path);
             });
+
+        if (Schema::hasTable('meta_whatsapp_messages')) {
+            MetaWhatsAppMessage::query()
+                ->whereNotNull('media_path')
+                ->select(['media_path'])
+                ->cursor()
+                ->each(function (MetaWhatsAppMessage $message): void {
+                    $this->storage->deleteStoredFile($message->media_path);
+                });
+        }
     }
 
     /**
@@ -77,6 +88,12 @@ class StudentDataResetService
     protected function tablesToClear(): array
     {
         return [
+            'accounting_journal_lines',
+            'accounting_journal_entries',
+            'fee_reminder_logs',
+            'meta_whatsapp_messages',
+            'attendance_punch_whatsapp_logs',
+            'homework_views',
             'whatsapp_campaign_recipients',
             'whatsapp_campaigns',
             'payments',
