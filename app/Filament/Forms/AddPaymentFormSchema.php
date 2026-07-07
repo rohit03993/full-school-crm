@@ -137,12 +137,12 @@ class AddPaymentFormSchema
             ->label('Amount (₹)')
             ->numeric()
             ->required()
-            ->minValue(0.01)
+            ->minValue(1)
             ->live(debounce: 300)
             ->default(fn (): ?string => $defaultInstallment
                 ? (string) FeePlanCalculator::toWholeRupeeAmount((float) $defaultInstallment->pending_amount)
                 : ($pending > 0 ? (string) FeePlanCalculator::toWholeRupeeAmount($pending) : null))
-            ->maxValue($pending)
+            ->maxValue(FeePlanCalculator::toWholeRupeeAmount($pending))
             ->step(1)
             ->helperText('You may pay more than one installment; extra reduces future dues automatically.');
 
