@@ -208,37 +208,9 @@ class FeeMiscChargeService
 
     public function cancelCharge(FeeMiscCharge $charge, User $staff, ?string $reason = null): FeeMiscCharge
     {
-        if ($charge->kind === FeeMiscChargeKind::Bundled) {
-            throw ValidationException::withMessages([
-                'charge' => 'Charges included in the original fee plan cannot be cancelled here.',
-            ]);
-        }
-
-        if (! in_array($charge->status, [FeeMiscChargeStatus::Pending, FeeMiscChargeStatus::Partial], true)) {
-            throw ValidationException::withMessages([
-                'charge' => 'Only unpaid or partially paid charges can be cancelled.',
-            ]);
-        }
-
-        if ((float) $charge->paid_amount > 0) {
-            throw ValidationException::withMessages([
-                'charge' => 'Cannot cancel a charge that already has payments recorded.',
-            ]);
-        }
-
-        $charge->update([
-            'status' => FeeMiscChargeStatus::Cancelled,
+        throw ValidationException::withMessages([
+            'charge' => 'Misc charges cannot be cancelled. Use Adjust Fees to correct the fee plan if a charge was added in error.',
         ]);
-
-        $this->audit->log(
-            action: 'Misc Charge Cancelled',
-            auditable: $charge,
-            oldValues: ['status' => FeeMiscChargeStatus::Pending->value],
-            newValues: ['status' => FeeMiscChargeStatus::Cancelled->value, 'reason' => $reason],
-            user: $staff,
-        );
-
-        return $charge->fresh();
     }
 
     public function applyPayment(FeeMiscCharge $charge, float $amount): FeeMiscCharge

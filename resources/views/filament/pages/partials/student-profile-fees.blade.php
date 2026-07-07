@@ -8,20 +8,31 @@
     $miscCharges = $fees?->miscCharges ?? collect();
     $bundledMisc = $miscCharges->filter(fn ($c) => $c->kind === FeeMiscChargeKind::Bundled);
     $separateMisc = $miscCharges->filter(fn ($c) => $c->kind !== FeeMiscChargeKind::Bundled);
+    $activeMisc = $separateMisc->reject(fn ($c) => $c->status === FeeMiscChargeStatus::Cancelled);
+    $archivedMisc = $separateMisc->filter(fn ($c) => $c->status === FeeMiscChargeStatus::Cancelled);
     $pendingPenalties = $penalties->filter(fn ($p) => $p->status === \App\Enums\FeePenaltyStatus::Pending);
 @endphp
 
 <div wire:init="loadFeesTab">
 @if (! $feesTabLoaded)
-    <p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">Loading fees…</p>
+    <div class="flex items-center justify-center py-12">
+        <div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+            <svg class="h-5 w-5 animate-spin text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            Loading fees…
+        </div>
+    </div>
 @elseif (! $enrollment)
-    <div class="fi-section rounded-xl px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-        No active enrollment yet. Approve admission to activate fees.
+    <div class="rounded-2xl border border-dashed border-gray-200 px-6 py-10 text-center dark:border-white/10">
+        <p class="text-sm font-medium text-gray-700 dark:text-gray-300">No active enrollment</p>
+        <p class="mt-1 text-xs text-gray-500">Approve admission to activate fees.</p>
     </div>
 @elseif (! $fees)
-    <div class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-200">
-        <p class="font-semibold">Fee structure pending</p>
-        <p class="mt-0.5 text-xs">Approve the admission to create the fee record.</p>
+    <div class="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 to-orange-50 px-5 py-4 dark:border-amber-500/20 dark:from-amber-950/40 dark:to-orange-950/20">
+        <p class="font-semibold text-amber-900 dark:text-amber-100">Fee structure pending</p>
+        <p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/80">Approve the admission to create the fee record.</p>
     </div>
 @else
     @php
@@ -35,91 +46,117 @@
         $netTuition = (float) $fees->net_fee;
         $courseFee = (float) $fees->course_fee;
         $discount = (float) $fees->discount_amount;
+        $tuitionPct = $netTuition > 0 ? min(100, round($tuitionPaid / $netTuition * 100)) : 0;
     @endphp
 
-    <div class="space-y-3">
-        {{-- Summary --}}
-        <div class="fi-section overflow-hidden rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
-            <div class="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                <div class="min-w-0">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+    <div class="space-y-4">
+        {{-- Financial overview --}}
+        <div class="overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg ring-1 ring-white/10">
+            <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-medium uppercase tracking-wider text-slate-400">
                         {{ \App\Support\StudentLabels::rollNumberLabel() }} {{ $enrollment->enrollment_number }}
-                        <span class="text-gray-300 dark:text-gray-600">·</span>
+                        <span class="text-slate-600">·</span>
                         {{ $course?->name ?? 'Course' }}
                     </p>
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Tuition: ₹{{ number_format($courseFee, 0) }}
-                        @if ($discount > 0)
-                            − ₹{{ number_format($discount, 0) }} discount
-                        @endif
-                        = <span class="font-semibold text-gray-800 dark:text-gray-200">₹{{ number_format($netTuition, 0) }} net</span>
-                        @if ($fees->hasOnlineAllowancePlan())
-                            · Cash ₹{{ number_format((float) $fees->planned_cash_amount, 0) }} / Online ₹{{ number_format((float) $fees->planned_online_amount, 0) }}
-                        @endif
+                    <p class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+                        ₹{{ number_format($netTuition, 0) }}
+                        <span class="text-base font-medium text-slate-400">net tuition</span>
                     </p>
-                </div>
-                @if ($collectible > 0)
-                    <div class="shrink-0 text-right">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-300">Total due now</p>
-                        <p class="text-xl font-bold text-orange-700 dark:text-orange-300">₹{{ number_format($collectible, 0) }}</p>
+                    @if ($discount > 0 || $fees->hasOnlineAllowancePlan())
+                        <p class="mt-1 text-xs text-slate-400">
+                            Course ₹{{ number_format($courseFee, 0) }}
+                            @if ($discount > 0)
+                                · Discount −₹{{ number_format($discount, 0) }}
+                            @endif
+                            @if ($fees->hasOnlineAllowancePlan())
+                                · Cash ₹{{ number_format((float) $fees->planned_cash_amount, 0) }} / Online ₹{{ number_format((float) $fees->planned_online_amount, 0) }}
+                            @endif
+                        </p>
+                    @endif
+
+                    <div class="mt-4">
+                        <div class="mb-1.5 flex items-center justify-between text-xs">
+                            <span class="text-slate-400">Tuition collected</span>
+                            <span class="font-semibold text-emerald-400">{{ $tuitionPct }}%</span>
+                        </div>
+                        <div class="h-2 overflow-hidden rounded-full bg-slate-700/80">
+                            <div
+                                class="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-500"
+                                style="width: {{ $tuitionPct }}%"
+                            ></div>
+                        </div>
+                        <p class="mt-1.5 text-xs text-slate-400">
+                            ₹{{ number_format($tuitionPaid, 0) }} paid · ₹{{ number_format($tuitionPending, 0) }} remaining
+                        </p>
                     </div>
-                @else
-                    <span class="inline-flex shrink-0 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:text-emerald-300">All cleared</span>
-                @endif
-            </div>
+                </div>
 
-            <div class="grid grid-cols-2 divide-x divide-y divide-gray-100 dark:divide-white/10 lg:grid-cols-4 lg:divide-y-0">
-                <div class="px-4 py-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Tuition paid</p>
-                    <p class="mt-0.5 text-lg font-bold text-emerald-700 dark:text-emerald-400">₹{{ number_format($tuitionPaid, 0) }}</p>
-                    <p class="text-[11px] text-gray-500">of ₹{{ number_format($netTuition, 0) }}</p>
-                </div>
-                <div class="px-4 py-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Tuition pending</p>
-                    <p class="mt-0.5 text-lg font-bold text-amber-700 dark:text-amber-400">₹{{ number_format($tuitionPending, 0) }}</p>
-                </div>
-                <div class="px-4 py-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Misc charges</p>
-                    <p class="mt-0.5 text-lg font-bold text-violet-700 dark:text-violet-400">₹{{ number_format($miscPending, 0) }} <span class="text-sm font-medium text-gray-500">due</span></p>
-                    <p class="text-[11px] text-gray-500">₹{{ number_format($miscPaid, 0) }} paid of ₹{{ number_format($miscTotal, 0) }}</p>
-                </div>
-                <div class="px-4 py-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Late fees</p>
-                    <p class="mt-0.5 text-lg font-bold {{ $penaltyPending > 0 ? 'text-red-700 dark:text-red-400' : 'text-gray-400' }}">
-                        ₹{{ number_format($penaltyPending, 0) }}
-                    </p>
-                </div>
-            </div>
-
-            @if ($collectible > 0)
-                <div class="border-t border-gray-100 bg-gray-50/80 px-4 py-2 text-xs text-gray-600 dark:border-white/10 dark:bg-white/[0.02] dark:text-gray-400 sm:px-5">
-                    @if ($canCollectFees ?? false)
-                        Use <strong class="text-gray-900 dark:text-white">Add Payment</strong> for tuition or misc.
-                        Adjust fees via <strong class="text-gray-900 dark:text-white">Adjust Fees</strong>.
+                <div class="shrink-0 sm:text-right">
+                    @if ($collectible > 0)
+                        <p class="text-[11px] font-medium uppercase tracking-wider text-orange-300">Balance due</p>
+                        <p class="mt-1 text-3xl font-bold text-orange-300">₹{{ number_format($collectible, 0) }}</p>
+                        @if ($canCollectFees ?? false)
+                            <p class="mt-2 max-w-[220px] text-[11px] leading-relaxed text-slate-400 sm:ml-auto">
+                                Record payments with <span class="text-white">Add Payment</span>. Change plan via <span class="text-white">Adjust Fees</span>.
+                            </p>
+                        @endif
                     @else
-                        Contact staff with fee collection permission to record payments.
+                        <div class="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-3 py-1.5 ring-1 ring-emerald-400/30">
+                            <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                            <span class="text-sm font-semibold text-emerald-300">All cleared</span>
+                        </div>
                     @endif
                 </div>
-            @endif
+            </div>
+
+            <div class="grid grid-cols-2 border-t border-white/10 sm:grid-cols-4">
+                <div class="border-white/10 px-4 py-3 sm:border-r">
+                    <p class="text-[10px] font-medium uppercase tracking-wider text-slate-500">Tuition paid</p>
+                    <p class="mt-0.5 text-lg font-bold text-emerald-400">₹{{ number_format($tuitionPaid, 0) }}</p>
+                </div>
+                <div class="border-t border-white/10 px-4 py-3 sm:border-r sm:border-t-0">
+                    <p class="text-[10px] font-medium uppercase tracking-wider text-slate-500">Tuition due</p>
+                    <p class="mt-0.5 text-lg font-bold text-amber-300">₹{{ number_format($tuitionPending, 0) }}</p>
+                </div>
+                <div class="border-white/10 px-4 py-3 sm:border-r">
+                    <p class="text-[10px] font-medium uppercase tracking-wider text-slate-500">Misc charges</p>
+                    <p class="mt-0.5 text-lg font-bold text-violet-300">₹{{ number_format($miscPending, 0) }}</p>
+                    <p class="text-[10px] text-slate-500">₹{{ number_format($miscPaid, 0) }} / ₹{{ number_format($miscTotal, 0) }}</p>
+                </div>
+                <div class="border-t border-white/10 px-4 py-3 sm:border-t-0">
+                    <p class="text-[10px] font-medium uppercase tracking-wider text-slate-500">Late fees</p>
+                    <p @class([
+                        'mt-0.5 text-lg font-bold',
+                        'text-red-400' => $penaltyPending > 0,
+                        'text-slate-500' => $penaltyPending <= 0,
+                    ])>₹{{ number_format($penaltyPending, 0) }}</p>
+                </div>
+            </div>
         </div>
 
         @if ($fees->discountEntries->isNotEmpty() || $bundledMisc->isNotEmpty() || ($discount > 0 && $fees->discountSetBy))
-            <details class="fi-section group rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
-                <summary class="cursor-pointer list-none px-4 py-2.5 text-sm font-semibold text-gray-800 marker:content-none dark:text-gray-200 sm:px-5">
-                    <span class="flex items-center justify-between gap-2">
-                        Fee details & discount history
-                        <span class="text-xs font-normal text-gray-500 group-open:hidden">Show</span>
-                        <span class="hidden text-xs font-normal text-gray-500 group-open:inline">Hide</span>
-                    </span>
+            <details class="group overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3.5 marker:content-none">
+                    <div class="flex items-center gap-3">
+                        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-500/10 text-primary-600 dark:text-primary-400">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        </span>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-900 dark:text-white">Fee breakdown & discounts</p>
+                            <p class="text-xs text-gray-500">Course fee, concessions, bundled items</p>
+                        </div>
+                    </div>
+                    <span class="text-xs text-gray-400 group-open:hidden">Expand</span>
                 </summary>
-                <div class="space-y-3 border-t border-gray-100 px-4 py-3 text-sm dark:border-white/10 sm:px-5">
+                <div class="space-y-3 border-t border-gray-100 px-5 py-4 text-sm dark:border-white/10">
                     @if ($discount > 0 && $fees->discountSetBy)
                         <p class="text-xs text-gray-500">Total discount ₹{{ number_format($discount, 2) }} · granted by {{ $fees->discountSetBy->name }}</p>
                     @endif
                     @if ($fees->discountEntries->isNotEmpty())
                         <div class="space-y-1.5">
                             @foreach ($fees->discountEntries as $entry)
-                                <div class="flex flex-wrap items-center justify-between gap-2 rounded-md bg-gray-50 px-2.5 py-1.5 text-xs dark:bg-white/5">
+                                <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2 text-xs dark:bg-white/5">
                                     <span @class([
                                         'font-semibold',
                                         'text-emerald-700 dark:text-emerald-400' => $entry->isIncrease(),
@@ -139,11 +176,11 @@
                     @if ($bundledMisc->isNotEmpty())
                         <div>
                             <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Included in net fee</p>
-                            <ul class="mt-1 space-y-0.5 text-xs">
+                            <ul class="mt-2 space-y-1 text-xs">
                                 @foreach ($bundledMisc as $charge)
-                                    <li class="flex justify-between gap-4">
-                                        <span>{{ $charge->label }}</span>
-                                        <span class="font-medium">₹{{ number_format((float) $charge->amount, 2) }}</span>
+                                    <li class="flex justify-between gap-4 rounded-md px-2 py-1 hover:bg-gray-50 dark:hover:bg-white/5">
+                                        <span class="text-gray-700 dark:text-gray-300">{{ $charge->label }}</span>
+                                        <span class="font-medium text-gray-900 dark:text-white">₹{{ number_format((float) $charge->amount, 2) }}</span>
                                     </li>
                                 @endforeach
                             </ul>
@@ -154,39 +191,49 @@
         @endif
 
         @if ($installments->isNotEmpty())
-            <div class="fi-section overflow-hidden rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
-                <div class="border-b border-gray-100 px-4 py-2 dark:border-white/10 sm:px-5">
-                    <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Installments</h3>
+            <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <div class="flex items-center gap-3 border-b border-gray-100 px-5 py-3.5 dark:border-white/10">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </span>
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Payment schedule</h3>
+                        <p class="text-xs text-gray-500">{{ $installments->count() }} installments · sorted by due date</p>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[520px] text-left text-xs">
-                        <thead class="bg-gray-50/80 text-[10px] uppercase tracking-wide text-gray-500 dark:bg-white/[0.03]">
-                            <tr>
-                                <th class="px-4 py-2 font-semibold sm:px-5">Label</th>
-                                <th class="px-4 py-2 font-semibold">Due</th>
-                                <th class="px-4 py-2 font-semibold text-right">Paid</th>
-                                <th class="px-4 py-2 font-semibold text-right">Pending</th>
-                                <th class="px-4 py-2 font-semibold">Status</th>
+                    <table class="w-full min-w-[540px] text-left text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-100 bg-gray-50/60 text-[10px] uppercase tracking-wider text-gray-500 dark:border-white/10 dark:bg-white/[0.02]">
+                                <th class="px-5 py-2.5 font-semibold">Installment</th>
+                                <th class="px-4 py-2.5 font-semibold">Due date</th>
+                                <th class="px-4 py-2.5 font-semibold text-right">Paid</th>
+                                <th class="px-4 py-2.5 font-semibold text-right">Balance</th>
+                                <th class="px-4 py-2.5 font-semibold">Status</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-white/10">
+                        <tbody class="divide-y divide-gray-100 dark:divide-white/5">
                             @foreach ($installments as $installment)
                                 @php
                                     $status = $installment->statusLabel();
                                     $statusClass = match ($status) {
-                                        'Paid' => 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
-                                        'Overdue' => 'bg-red-500/15 text-red-800 dark:text-red-300',
-                                        'Partial' => 'bg-amber-500/15 text-amber-900 dark:text-amber-200',
-                                        default => 'bg-gray-500/10 text-gray-600 dark:text-gray-400',
+                                        'Paid' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
+                                        'Overdue' => 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300',
+                                        'Partial' => 'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200',
+                                        default => 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400',
                                     };
+                                    $isPaid = $status === 'Paid';
                                 @endphp
-                                <tr class="hover:bg-gray-50/50 dark:hover:bg-white/[0.02]">
-                                    <td class="px-4 py-2.5 font-medium text-gray-950 dark:text-white sm:px-5">{{ $installment->label }}</td>
-                                    <td class="px-4 py-2.5 text-gray-600 dark:text-gray-400">{{ $installment->due_date?->format('d M Y') ?? '—' }}</td>
-                                    <td class="px-4 py-2.5 text-right text-emerald-700 dark:text-emerald-400">₹{{ number_format((float) $installment->paid_amount, 0) }}</td>
-                                    <td class="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">₹{{ number_format((float) $installment->pending_amount, 0) }}</td>
-                                    <td class="px-4 py-2.5">
-                                        <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $statusClass }}">{{ $status }}</span>
+                                <tr @class([
+                                    'transition-colors hover:bg-gray-50/80 dark:hover:bg-white/[0.02]',
+                                    'opacity-60' => $isPaid,
+                                ])>
+                                    <td class="px-5 py-3 font-medium text-gray-900 dark:text-white">{{ $installment->label }}</td>
+                                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ $installment->due_date?->format('d M Y') ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-right font-medium text-emerald-600 dark:text-emerald-400">₹{{ number_format((float) $installment->paid_amount, 0) }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">₹{{ number_format((float) $installment->pending_amount, 0) }}</td>
+                                    <td class="px-4 py-3">
+                                        <span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $statusClass }}">{{ $status }}</span>
                                     </td>
                                 </tr>
                             @endforeach
@@ -196,53 +243,63 @@
             </div>
         @endif
 
-        @if ($separateMisc->isNotEmpty())
-            <div class="fi-section overflow-hidden rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
-                <div class="border-b border-gray-100 px-4 py-2 dark:border-white/10 sm:px-5">
-                    <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Misc charges <span class="font-normal text-gray-500">(pay separately)</span></h3>
+        @if ($activeMisc->isNotEmpty())
+            <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <div class="flex items-center gap-3 border-b border-gray-100 px-5 py-3.5 dark:border-white/10">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </span>
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Additional charges</h3>
+                        <p class="text-xs text-gray-500">Hostel, materials, and other fees — paid separately from tuition</p>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[560px] text-left text-xs">
-                        <thead class="bg-gray-50/80 text-[10px] uppercase tracking-wide text-gray-500 dark:bg-white/[0.03]">
-                            <tr>
-                                <th class="px-4 py-2 font-semibold sm:px-5">Charge</th>
-                                <th class="px-4 py-2 font-semibold text-right">Total</th>
-                                <th class="px-4 py-2 font-semibold text-right">Paid</th>
-                                <th class="px-4 py-2 font-semibold text-right">Pending</th>
-                                <th class="px-4 py-2 font-semibold">Status</th>
-                                <th class="px-4 py-2 font-semibold text-right">Action</th>
+                    <table class="w-full min-w-[520px] text-left text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-100 bg-gray-50/60 text-[10px] uppercase tracking-wider text-gray-500 dark:border-white/10 dark:bg-white/[0.02]">
+                                <th class="px-5 py-2.5 font-semibold">Charge</th>
+                                <th class="px-4 py-2.5 font-semibold text-right">Amount</th>
+                                <th class="px-4 py-2.5 font-semibold text-right">Paid</th>
+                                <th class="px-4 py-2.5 font-semibold text-right">Due</th>
+                                <th class="px-4 py-2.5 font-semibold">Status</th>
+                                <th class="px-4 py-2.5 font-semibold text-right"></th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-white/10">
-                            @foreach ($separateMisc as $charge)
+                        <tbody class="divide-y divide-gray-100 dark:divide-white/5">
+                            @foreach ($activeMisc as $charge)
                                 @php
                                     $statusLabel = $charge->status->label();
                                     $chargePaid = (float) $charge->paid_amount;
                                     $chargePending = $charge->pendingAmount();
                                     $statusClass = match ($charge->status) {
-                                        FeeMiscChargeStatus::Paid => 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
-                                        FeeMiscChargeStatus::Partial => 'bg-sky-500/15 text-sky-800 dark:text-sky-300',
-                                        FeeMiscChargeStatus::Cancelled => 'bg-gray-500/10 text-gray-600 dark:text-gray-400',
-                                        default => 'bg-amber-500/15 text-amber-900 dark:text-amber-200',
+                                        FeeMiscChargeStatus::Paid => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
+                                        FeeMiscChargeStatus::Partial => 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300',
+                                        default => 'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200',
                                     };
                                 @endphp
-                                <tr class="hover:bg-gray-50/50 dark:hover:bg-white/[0.02]" wire:key="misc-{{ $charge->id }}">
-                                    <td class="px-4 py-2.5 sm:px-5">
-                                        <p class="font-medium text-gray-950 dark:text-white">{{ $charge->label }}</p>
+                                <tr class="transition-colors hover:bg-gray-50/80 dark:hover:bg-white/[0.02]" wire:key="misc-{{ $charge->id }}">
+                                    <td class="px-5 py-3">
+                                        <p class="font-medium text-gray-900 dark:text-white">{{ $charge->label }}</p>
                                         @if ($charge->due_date)
-                                            <p class="text-[10px] text-gray-500">Due {{ $charge->due_date->format('d M Y') }}</p>
+                                            <p class="mt-0.5 text-[11px] text-gray-500">Due {{ $charge->due_date->format('d M Y') }}</p>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-2.5 text-right">₹{{ number_format((float) $charge->amount, 0) }}</td>
-                                    <td class="px-4 py-2.5 text-right text-emerald-700 dark:text-emerald-400">₹{{ number_format($chargePaid, 0) }}</td>
-                                    <td class="px-4 py-2.5 text-right font-semibold text-amber-700 dark:text-amber-300">₹{{ number_format($chargePending, 0) }}</td>
-                                    <td class="px-4 py-2.5">
-                                        <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $statusClass }}">{{ $statusLabel }}</span>
+                                    <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">₹{{ number_format((float) $charge->amount, 0) }}</td>
+                                    <td class="px-4 py-3 text-right font-medium text-emerald-600 dark:text-emerald-400">₹{{ number_format($chargePaid, 0) }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-amber-700 dark:text-amber-300">₹{{ number_format($chargePending, 0) }}</td>
+                                    <td class="px-4 py-3">
+                                        <span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $statusClass }}">{{ $statusLabel }}</span>
                                     </td>
-                                    <td class="px-4 py-2.5 text-right">
-                                        @if ($charge->isPayableSeparately())
-                                            <button type="button" wire:click="openPayMiscCharge({{ $charge->id }})" class="text-[11px] font-semibold text-success-600 hover:underline dark:text-success-400">Pay</button>
-                                            <button type="button" wire:click="cancelMiscCharge({{ $charge->id }})" wire:confirm="Cancel this charge?" class="ml-2 text-[11px] text-gray-400 hover:text-gray-600">Cancel</button>
+                                    <td class="px-4 py-3 text-right">
+                                        @if ($charge->isPayableSeparately() && ($canCollectFees ?? false))
+                                            <button
+                                                type="button"
+                                                wire:click="openPayMiscCharge({{ $charge->id }})"
+                                                class="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-500"
+                                            >
+                                                Pay
+                                            </button>
                                         @endif
                                     </td>
                                 </tr>
@@ -253,29 +310,50 @@
             </div>
         @endif
 
-        @if ($pendingPenalties->isNotEmpty())
-            <div class="fi-section overflow-hidden rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
-                <div class="border-b border-gray-100 px-4 py-2 dark:border-white/10 sm:px-5">
-                    <h3 class="text-sm font-semibold text-red-700 dark:text-red-400">Late fees</h3>
+        @if ($archivedMisc->isNotEmpty())
+            <details class="overflow-hidden rounded-2xl bg-gray-50 ring-1 ring-gray-200 dark:bg-gray-900/50 dark:ring-white/10">
+                <summary class="cursor-pointer list-none px-5 py-3 text-xs text-gray-500 marker:content-none">
+                    {{ $archivedMisc->count() }} archived charge{{ $archivedMisc->count() === 1 ? '' : 's' }} (historical)
+                </summary>
+                <div class="divide-y divide-gray-200 border-t border-gray-200 dark:divide-white/10 dark:border-white/10">
+                    @foreach ($archivedMisc as $charge)
+                        <div class="flex items-center justify-between gap-4 px-5 py-2.5 text-xs text-gray-500">
+                            <span>{{ $charge->label }}</span>
+                            <span>₹{{ number_format((float) $charge->amount, 0) }} · Cancelled</span>
+                        </div>
+                    @endforeach
                 </div>
-                <div class="divide-y divide-gray-100 dark:divide-white/10">
+            </details>
+        @endif
+
+        @if ($pendingPenalties->isNotEmpty())
+            <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-red-200/60 dark:bg-gray-900 dark:ring-red-500/20">
+                <div class="flex items-center gap-3 border-b border-red-100 px-5 py-3.5 dark:border-red-500/20">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:text-red-400">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </span>
+                    <div>
+                        <h3 class="text-sm font-semibold text-red-800 dark:text-red-300">Late fees</h3>
+                        <p class="text-xs text-red-600/70 dark:text-red-400/70">Outstanding penalty charges</p>
+                    </div>
+                </div>
+                <div class="divide-y divide-gray-100 dark:divide-white/5">
                     @foreach ($pendingPenalties as $penalty)
-                        <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs sm:px-5" wire:key="penalty-{{ $penalty->id }}">
+                        <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3" wire:key="penalty-{{ $penalty->id }}">
                             <div class="min-w-0">
-                                <span class="font-semibold text-red-700 dark:text-red-300">{{ $penalty->penalty_type->label() }}</span>
-                                <span class="text-gray-500">
-                                    · {{ $penalty->feeInstallment?->label ?? 'Installment' }}
-                                    · {{ $penalty->days_late }}d late
-                                </span>
+                                <p class="text-sm font-semibold text-red-800 dark:text-red-300">{{ $penalty->penalty_type->label() }}</p>
+                                <p class="text-xs text-gray-500">
+                                    {{ $penalty->feeInstallment?->label ?? 'Installment' }} · {{ $penalty->days_late }} days late
+                                </p>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-red-700 dark:text-red-300">₹{{ number_format((float) $penalty->penalty_amount, 0) }}</span>
+                            <div class="flex items-center gap-3">
+                                <span class="text-lg font-bold text-red-700 dark:text-red-300">₹{{ number_format((float) $penalty->penalty_amount, 0) }}</span>
                                 @if ($canWaivePenalty ?? false)
                                     <div class="relative" x-data="{ open: false, reason: '' }">
-                                        <button type="button" @click="open = !open" class="text-[11px] font-semibold text-primary-600 hover:underline">Waive</button>
-                                        <div x-show="open" x-cloak class="absolute z-10 mt-1 w-52 rounded-lg border bg-white p-2 shadow-lg dark:border-white/10 dark:bg-gray-900">
-                                            <textarea x-model="reason" rows="2" class="w-full rounded border-gray-300 text-xs dark:border-white/10 dark:bg-white/5" placeholder="Reason"></textarea>
-                                            <button type="button" class="mt-1 text-[11px] font-semibold text-danger-600" @click="$wire.waivePenalty({{ $penalty->id }}, reason); open = false; reason = ''">Confirm</button>
+                                        <button type="button" @click="open = !open" class="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5">Waive</button>
+                                        <div x-show="open" x-cloak class="absolute right-0 z-10 mt-1 w-56 rounded-xl border bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900">
+                                            <textarea x-model="reason" rows="2" class="w-full rounded-lg border-gray-200 text-xs dark:border-white/10 dark:bg-white/5" placeholder="Reason for waiver"></textarea>
+                                            <button type="button" class="mt-2 w-full rounded-lg bg-red-600 py-1.5 text-xs font-semibold text-white hover:bg-red-500" @click="$wire.waivePenalty({{ $penalty->id }}, reason); open = false; reason = ''">Confirm waiver</button>
                                         </div>
                                     </div>
                                 @endif
@@ -286,27 +364,50 @@
             </div>
         @endif
 
-        <div class="fi-section overflow-hidden rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
-            <div class="border-b border-gray-100 px-4 py-2 dark:border-white/10 sm:px-5">
-                <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Payment history</h3>
+        <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+            <div class="flex items-center gap-3 border-b border-gray-100 px-5 py-3.5 dark:border-white/10">
+                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </span>
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Payment history</h3>
+                    <p class="text-xs text-gray-500">{{ $payments->count() }} receipt{{ $payments->count() === 1 ? '' : 's' }} on record</p>
+                </div>
             </div>
             @if ($payments->isEmpty())
-                <p class="px-4 py-4 text-center text-xs text-gray-500 sm:px-5">No payments yet.</p>
+                <p class="px-5 py-8 text-center text-sm text-gray-500">No payments recorded yet.</p>
             @else
-                <div class="divide-y divide-gray-100 dark:divide-white/10">
+                <div class="divide-y divide-gray-100 dark:divide-white/5">
                     @foreach ($payments as $payment)
-                        <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-xs sm:px-5">
-                            <div class="min-w-0">
-                                <span class="font-mono font-bold text-primary-600 dark:text-primary-400">{{ $payment->receipt_number }}</span>
-                                <span class="text-gray-500">
-                                    · {{ $payment->payment_date->format('d M Y') }}
-                                    · {{ $payment->payment_mode->label() }}
-                                    @if ($payment->feeMiscCharge) · {{ $payment->feeMiscCharge->label }} @endif
-                                    @if ($payment->feeInstallment) · {{ $payment->feeInstallment->label }} @endif
-                                </span>
+                        @php
+                            $modeLabel = $payment->payment_mode->label();
+                            $modeClass = match (true) {
+                                str_contains(strtolower($modeLabel), 'cash') => 'bg-lime-100 text-lime-800 dark:bg-lime-500/15 dark:text-lime-300',
+                                str_contains(strtolower($modeLabel), 'online') || str_contains(strtolower($modeLabel), 'upi') => 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300',
+                                default => 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300',
+                            };
+                            $description = $payment->feeMiscCharge?->label ?? $payment->feeInstallment?->label;
+                        @endphp
+                        <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-gray-50/80 dark:hover:bg-white/[0.02]">
+                            <div class="flex min-w-0 flex-1 items-start gap-3">
+                                <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 dark:bg-white/5">
+                                    <svg class="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="font-mono text-sm font-bold text-primary-600 dark:text-primary-400">{{ $payment->receipt_number }}</span>
+                                        <span class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $modeClass }}">{{ $modeLabel }}</span>
+                                    </div>
+                                    <p class="mt-0.5 text-xs text-gray-500">
+                                        {{ $payment->payment_date->format('d M Y') }}
+                                        @if ($description)
+                                            · {{ $description }}
+                                        @endif
+                                    </p>
+                                </div>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-emerald-700 dark:text-emerald-400">₹{{ number_format((float) $payment->amount, 0) }}</span>
+                            <div class="flex items-center gap-3">
+                                <span class="text-base font-bold text-emerald-600 dark:text-emerald-400">₹{{ number_format((float) $payment->amount, 0) }}</span>
                                 @if ($payment->hasReceiptPdf())
                                     <x-crm.media-preview-button
                                         :url="$payment->receiptPreviewUrl()"
@@ -324,13 +425,13 @@
         </div>
 
         @if (isset($feeStructureHistory) && $feeStructureHistory->isNotEmpty())
-            <details class="fi-section rounded-xl ring-1 ring-gray-950/5 dark:ring-white/10">
-                <summary class="cursor-pointer list-none px-4 py-2.5 text-sm font-semibold text-gray-800 marker:content-none dark:text-gray-200 sm:px-5">
+            <details class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <summary class="cursor-pointer list-none px-5 py-3.5 text-sm font-semibold text-gray-800 marker:content-none dark:text-gray-200">
                     Fee change history ({{ $feeStructureHistory->count() }})
                 </summary>
                 <div class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/10 dark:border-white/10">
                     @foreach ($feeStructureHistory as $entry)
-                        <div class="px-4 py-2.5 text-xs sm:px-5">
+                        <div class="px-5 py-3 text-xs">
                             <p class="font-semibold text-gray-900 dark:text-white">
                                 Net ₹{{ number_format((float) $entry->old_net_fee, 0) }} → ₹{{ number_format((float) $entry->new_net_fee, 0) }}
                                 <span class="font-normal text-gray-500">· {{ $entry->changed_at?->format('d M Y') }}</span>

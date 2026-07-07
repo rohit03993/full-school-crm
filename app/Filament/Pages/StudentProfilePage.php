@@ -1146,7 +1146,15 @@ class StudentProfilePage extends Page
         ]);
         $feeStructure = $this->record->activeEnrollment?->feeStructure;
 
-        $this->installments = $feeStructure?->installments ?? new Collection;
+        $this->installments = $feeStructure
+            ? $feeStructure->installments
+                ->sortBy(fn (\App\Models\FeeInstallment $row): array => [
+                    $row->due_date?->timestamp ?? PHP_INT_MAX,
+                    $row->sort_order,
+                    $row->id,
+                ])
+                ->values()
+            : new Collection;
         $this->penalties = $feeStructure?->penalties ?? new Collection;
         $this->feeStructureHistory = $feeStructure
             ? $feeStructure->history()->with('changedBy')->orderByDesc('changed_at')->limit(20)->get()
@@ -1157,22 +1165,6 @@ class StudentProfilePage extends Page
     public function openPayMiscCharge(int $chargeId): void
     {
         $this->mountAction('addPayment', ['miscChargeId' => $chargeId]);
-    }
-
-    public function cancelMiscCharge(int $chargeId, FeeMiscChargeService $miscCharges): void
-    {
-        abort_unless($this->userCan(CrmPermission::FeesAdjustStructure), 403);
-
-        $charge = $miscCharges->resolveForStudent($this->record, $chargeId);
-        $miscCharges->cancelCharge($charge, Auth::user());
-
-        $this->feesTabLoaded = false;
-        $this->loadFeesTab();
-
-        Notification::make()
-            ->title('Misc charge cancelled')
-            ->success()
-            ->send();
     }
 
     public function waivePenalty(int $penaltyId, string $reason, PenaltyCalculationService $penalties): void
