@@ -92,7 +92,20 @@
                 <div class="mt-4 grid gap-3 sm:grid-cols-2">
                     <div class="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 dark:border-white/10 dark:bg-white/5">
                         <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Course fee</p>
-                        <p class="mt-0.5 text-lg font-bold text-gray-950 dark:text-white">{{ $course?->formatted_fee ?? '—' }}</p>
+                        @php
+                            $studentCourseFee = $fees ? (float) $fees->course_fee : null;
+                            $catalogFee = $course ? (float) $course->fee : null;
+                        @endphp
+                        <p class="mt-0.5 text-lg font-bold text-gray-950 dark:text-white">
+                            @if ($studentCourseFee !== null)
+                                ₹{{ number_format($studentCourseFee, 2) }}
+                            @else
+                                {{ $course?->formatted_fee ?? '—' }}
+                            @endif
+                        </p>
+                        @if ($studentCourseFee !== null && $catalogFee !== null && abs($studentCourseFee - $catalogFee) > 0.01)
+                            <p class="mt-0.5 text-xs text-amber-700 dark:text-amber-300">Catalog: {{ $course->formatted_fee }}</p>
+                        @endif
                     </div>
                     <div class="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 dark:border-white/10 dark:bg-white/5">
                         <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Batch / section</p>

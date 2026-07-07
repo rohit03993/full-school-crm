@@ -1817,7 +1817,8 @@ class StudentProfilePage extends Page
                 ->color('warning')
                 ->button()
                 ->modalHeading('Adjust fee structure')
-                ->modalDescription('Admin only. Fee changes, installment reschedules, and reasons are stored in fee history and the audit log.')
+                ->modalDescription('Change discount or reschedule installments. Reason is only needed when discount changes.')
+                ->modalWidth('2xl')
                 ->fillForm(function (): array {
                     $feeStructure = $this->record->activeEnrollment?->feeStructure;
 
@@ -1837,6 +1838,58 @@ class StudentProfilePage extends Page
                     return AdjustFeeStructureFormSchema::fields($feeStructure);
                 })
                 ->extraModalFooterActions([
+                    Action::make('applyCatalogCourseFee')
+                        ->label(function (): string {
+                            $course = $this->record->activeEnrollment?->course;
+                            $fee = $course ? (float) $course->fee : 0;
+
+                            return $fee > 0
+                                ? 'Apply catalog fee (₹'.number_format($fee, 0).')'
+                                : 'Apply catalog fee';
+                        })
+                        ->color('gray')
+                        ->visible(function (): bool {
+                            $feeStructure = $this->record->activeEnrollment?->feeStructure;
+                            $course = $this->record->activeEnrollment?->course;
+
+                            if (! $feeStructure || ! $course) {
+                                return false;
+                            }
+
+                            return (float) $course->fee > 0
+                                && abs((float) $course->fee - (float) $feeStructure->course_fee) > 0.01;
+                        })
+                        ->action(function (Action $action): void {
+                            $livewire = $action->getLivewire();
+                            $course = $livewire->record->activeEnrollment?->course;
+                            $feeStructure = $livewire->record->activeEnrollment?->feeStructure;
+
+                            if (! $course || ! $feeStructure) {
+                                return;
+                            }
+
+                            $livewire->mountedActionsData[0]['course_fee'] = (float) $course->fee;
+                            $livewire->mountedActionsData[0]['edit_course_fee'] = true;
+                            $livewire->mountedActionsData[0]['reschedule_installments'] = true;
+
+                            $miscTotal = $feeStructure->loadMissing('miscCharges')->miscChargesTotal();
+                            $target = AdjustFeeStructureFormSchema::scheduleTargetFromMounted(
+                                $feeStructure,
+                                $livewire->mountedActionsData[0],
+                                $miscTotal,
+                            );
+                            $plan = $livewire->mountedActionsData[0]['installment_plan'] ?? [];
+
+                            if ($plan === [] && $target > 0) {
+                                $livewire->mountedActionsData[0]['installment_plan'] = [[
+                                    'label' => 'Balance due',
+                                    'amount' => (string) $target,
+                                    'due_date' => null,
+                                ]];
+                            } elseif ($plan !== []) {
+                                $livewire->mountedActionsData[0]['installment_plan'] = FeePlanCalculator::fillBalanceOnLastRow($plan, $target);
+                            }
+                        }),
                     Action::make('fillAdjustInstallmentBalance')
                         ->label('Fill balance on last row')
                         ->color('gray')
