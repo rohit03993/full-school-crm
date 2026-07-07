@@ -101,9 +101,47 @@ class WhatsAppCampaignService
             'shot_at' => now(),
         ]);
 
-        RunWhatsAppCampaignJob::dispatch($campaign->id);
+        $this->runCampaignNow($campaign);
 
         return $campaign->fresh();
+    }
+
+    protected function runCampaignNow(WhatsAppCampaign $campaign): void
+    {
+        $inlineLimit = (int) config('whatsapp.inline_campaign_recipient_limit', 50);
+        $total = (int) $campaign->total_recipients;
+        $batchSize = max(1, min(50, (int) config('whatsapp.batch_size', 10)));
+        $maxRuns = max(1, (int) ceil($total / $batchSize)) + 2;
+
+        if ($total > $inlineLimit) {
+            RunWhatsAppCampaignJob::dispatch($campaign->id);
+
+            return;
+        }
+
+        $runs = 0;
+
+        while ($runs < $maxRuns) {
+            RunWhatsAppCampaignJob::dispatchSync($campaign->id);
+            $campaign->refresh();
+
+            if ($campaign->status === WhatsAppCampaignStatus::Completed) {
+                return;
+            }
+
+            $pending = $campaign->recipients()
+                ->whereIn('status', [
+                    WhatsAppRecipientStatus::Pending,
+                    WhatsAppRecipientStatus::Processing,
+                ])
+                ->exists();
+
+            if (! $pending) {
+                return;
+            }
+
+            $runs++;
+        }
     }
 
     public function sendSingle(Student $student, WhatsAppTemplate $template, User $sender, array $manualParams = []): WhatsAppCampaignRecipient
@@ -138,7 +176,7 @@ class WhatsAppCampaignService
             'status' => WhatsAppRecipientStatus::Pending,
         ]);
 
-        RunWhatsAppCampaignJob::dispatchSync($campaign->id);
+        $this->runCampaignNow($campaign);
 
         return $recipient->fresh() ?? $recipient;
     }

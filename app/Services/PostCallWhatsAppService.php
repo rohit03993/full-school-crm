@@ -7,14 +7,12 @@ use App\Enums\CallStatus;
 use App\Enums\WhatsAppAutoStatus;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Enums\WhatsAppRecipientStatus;
-use App\Jobs\RunWhatsAppCampaignJob;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
-use App\Models\WhatsAppTemplate;
 use Illuminate\Support\Facades\Log;
 
 class PostCallWhatsAppService
@@ -72,7 +70,18 @@ class PostCallWhatsAppService
 
             $call->update(['whatsapp_auto_status' => WhatsAppAutoStatus::Queued]);
 
-            RunWhatsAppCampaignJob::dispatch($campaign->id);
+            $this->campaigns->queueCampaign($campaign, $staff);
+
+            $campaign->refresh();
+            $recipient = $campaign->recipients()->first();
+
+            $call->update([
+                'whatsapp_auto_status' => match ($recipient?->status) {
+                    WhatsAppRecipientStatus::Sent => WhatsAppAutoStatus::Success,
+                    WhatsAppRecipientStatus::Failed => WhatsAppAutoStatus::Failed,
+                    default => WhatsAppAutoStatus::Queued,
+                },
+            ]);
         } catch (\Throwable $e) {
             $call->update(['whatsapp_auto_status' => WhatsAppAutoStatus::Failed]);
             Log::warning('Post-call WhatsApp failed: '.$e->getMessage());

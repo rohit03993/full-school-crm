@@ -6,7 +6,9 @@ use App\Models\AttendancePunchWhatsappLog;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
+use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppTemplate;
+use App\Enums\WhatsAppRecipientStatus;
 use App\Services\WhatsAppCampaignService;
 use App\Enums\LicenseFeature;
 use App\Support\FeatureGate;
@@ -96,7 +98,14 @@ class PunchWhatsAppService
                 ],
             ], $staff);
 
-            $this->campaigns->queueCampaign($campaign, $staff);
+            $campaign = $this->campaigns->queueCampaign($campaign, $staff);
+
+            $recipient = $campaign->recipients()->first();
+            $logStatus = match ($recipient?->status) {
+                WhatsAppRecipientStatus::Sent => 'sent',
+                WhatsAppRecipientStatus::Failed => 'failed',
+                default => 'queued',
+            };
 
             AttendancePunchWhatsappLog::query()->create([
                 'student_id' => $student->id,
@@ -105,11 +114,11 @@ class PunchWhatsAppService
                 'punch_date' => $date,
                 'punch_time' => $punchAt->format('H:i:s'),
                 'phone' => (string) $student->mobile,
-                'status' => 'queued',
+                'status' => $logStatus,
                 'sent_at' => now(),
             ]);
 
-            return PunchWhatsAppOutcome::queued('Parent WhatsApp queued — runs when the queue worker is active.');
+            return $this->outcomeFromCampaign($campaign);
         } catch (\Throwable $e) {
             Log::warning('Punch WhatsApp failed: '.$e->getMessage());
 
@@ -195,6 +204,21 @@ class PunchWhatsAppService
         }
 
         return filled($templateId) ? (string) $templateId : null;
+    }
+
+    private function outcomeFromCampaign(WhatsAppCampaign $campaign): array
+    {
+        $recipient = $campaign->recipients()->first();
+
+        if ($recipient?->status === WhatsAppRecipientStatus::Sent) {
+            return PunchWhatsAppOutcome::queued('Parent WhatsApp sent.');
+        }
+
+        if ($recipient?->status === WhatsAppRecipientStatus::Failed) {
+            return PunchWhatsAppOutcome::skipped('Parent WhatsApp failed: '.($recipient->error_message ?? 'Meta rejected the message.'));
+        }
+
+        return PunchWhatsAppOutcome::queued('Parent WhatsApp is being sent.');
     }
 
     private function alreadySent(string $roll, string $date, string $time, string $state, string $phone): bool

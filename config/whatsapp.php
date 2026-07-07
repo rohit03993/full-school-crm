@@ -18,6 +18,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Inline campaign processing (no queue worker required)
+    |--------------------------------------------------------------------------
+    |
+    | Campaigns with at most this many recipients run immediately in the
+    | current request (attendance punch, post-call, small bulk sends).
+    |
+    */
+
+    'inline_campaign_recipient_limit' => (int) env('WHATSAPP_INLINE_CAMPAIGN_LIMIT', 50),
+
+    /*
+    |--------------------------------------------------------------------------
     | Homework WhatsApp (Pal Digital live API campaign name)
     |--------------------------------------------------------------------------
     |
