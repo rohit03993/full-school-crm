@@ -38,6 +38,11 @@ class WhatsAppTemplateParamResolver
             'attendance.date' => 'Attendance date',
             'attendance.time' => 'Attendance check-in time',
             'attendance.status' => 'Attendance status (per student)',
+            'fee.pending_amount' => 'Pending fee amount (per student)',
+            'fee.due_date' => 'Installment due date (per student)',
+            'fee.installment_label' => 'Installment label (per student)',
+            'fee.days_overdue' => 'Days overdue (per student)',
+            'fee.penalty_pending' => 'Pending late fee (per student)',
         ];
     }
 
@@ -89,6 +94,11 @@ class WhatsAppTemplateParamResolver
                 '_student_attendance_status.'.$student->id,
                 '',
             ),
+            'fee.pending_amount' => (string) data_get($this->studentFeeContext($campaign, $student), 'pending_amount', ''),
+            'fee.due_date' => (string) data_get($this->studentFeeContext($campaign, $student), 'due_date', ''),
+            'fee.installment_label' => (string) data_get($this->studentFeeContext($campaign, $student), 'installment_label', ''),
+            'fee.days_overdue' => (string) data_get($this->studentFeeContext($campaign, $student), 'days_overdue', ''),
+            'fee.penalty_pending' => (string) data_get($this->studentFeeContext($campaign, $student), 'penalty_pending', ''),
             default => '',
         };
     }
@@ -235,5 +245,21 @@ class WhatsAppTemplateParamResolver
             ?? null;
 
         return filled($summary) ? (string) $summary : '';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function studentFeeContext(?WhatsAppCampaign $campaign, Student $student): array
+    {
+        $context = $campaign?->campaignVariable('_student_fee_context', []);
+
+        if (! is_array($context)) {
+            return [];
+        }
+
+        $row = $context[$student->id] ?? $context[(string) $student->id] ?? null;
+
+        return is_array($row) ? $row : [];
     }
 }

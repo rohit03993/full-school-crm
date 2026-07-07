@@ -200,6 +200,23 @@ class ManageWhatsAppSettings extends Page
                         ->native(false),
                 ])
                 ->columns(2),
+            Section::make('Fee reminders')
+                ->description('Daily WhatsApp to parents with overdue installments. Uses an approved Meta template only — create and approve `fee_reminder` (or similar) under WhatsApp → Templates, then link a live campaign.')
+                ->icon(Heroicon::OutlinedBanknotes)
+                ->schema([
+                    Toggle::make('fee_reminder_autosend_enabled')
+                        ->label('Send daily fee reminders')
+                        ->helperText('Runs at 09:00 via scheduler (`crm:send-fee-reminders`). Same student is not reminded again within the cooldown in config/fees.php.')
+                        ->columnSpanFull(),
+                    Select::make('fee_reminder_live_campaign_id')
+                        ->label('Fee reminder live campaign')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Map template variables: student name, pending amount, due date, institute name.'),
+                ])
+                ->columns(2),
             Section::make('Campaign processing')
                 ->description('For large campaigns (50+ students): batch size 10–20 and 2–5 second delay between batches is recommended.')
                 ->schema([

@@ -104,7 +104,7 @@ class PenaltyCalculationService
             return null;
         }
 
-        return FeePenalty::query()->updateOrCreate(
+        $penalty = FeePenalty::query()->updateOrCreate(
             [
                 'fee_installment_id' => $installment->id,
                 'penalty_type' => FeePenaltyType::LateFee,
@@ -120,6 +120,12 @@ class PenaltyCalculationService
                 'description' => "Late fee for {$daysLate} day(s) after grace (due {$installment->due_date->format('d M Y')})",
             ],
         );
+
+        if ($penalty->wasRecentlyCreated) {
+            app(AccountingLedgerService::class)->postPenaltyAccrual($penalty);
+        }
+
+        return $penalty;
     }
 
     public function waive(FeePenalty $penalty, User $admin, string $reason): FeePenalty

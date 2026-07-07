@@ -34,4 +34,19 @@ return [
         'allocation' => env('FEE_PAYMENT_ALLOCATION', 'auto'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Automated WhatsApp fee reminders
+    |--------------------------------------------------------------------------
+    |
+    | Requires an approved Meta template mapped in WhatsApp → Automations.
+    | Scheduled via `crm:send-fee-reminders` (daily).
+    |
+    */
+
+    'reminder' => [
+        'min_days_overdue' => (int) env('FEE_REMINDER_MIN_DAYS_OVERDUE', 1),
+        'cooldown_days' => (int) env('FEE_REMINDER_COOLDOWN_DAYS', 7),
+    ],
+
 ];

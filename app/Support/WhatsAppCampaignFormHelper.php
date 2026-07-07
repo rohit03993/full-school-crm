@@ -24,6 +24,11 @@ class WhatsAppCampaignFormHelper
         'course.name',
         'institute.name',
         'institute.phone',
+        'fee.pending_amount',
+        'fee.due_date',
+        'fee.installment_label',
+        'fee.days_overdue',
+        'fee.penalty_pending',
         'caller.name',
         'caller.mobile',
     ];

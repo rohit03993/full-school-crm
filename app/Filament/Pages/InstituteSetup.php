@@ -7,7 +7,6 @@ use App\Filament\Resources\AcademicSessions\AcademicSessionResource;
 use App\Filament\Resources\ActivityTypes\ActivityTypeResource;
 use App\Filament\Resources\Courses\CourseResource;
 use App\Models\AcademicSession;
-use App\Support\CrmHint;
 use App\Support\CrmNavigation;
 use App\Support\InstituteOnboarding;
 use App\Support\InstituteSettings;
@@ -115,6 +114,18 @@ class InstituteSetup extends Page
                 'icon' => 'heroicon-o-finger-print',
             ],
             [
+                'label' => 'Fees dashboard',
+                'description' => 'Collections, defaulters, and overdue installments.',
+                'url' => FeesDashboardPage::getUrl(),
+                'icon' => 'heroicon-o-banknotes',
+            ],
+            [
+                'label' => 'Accounting ledger',
+                'description' => 'Double-entry journal from fee receipts and late-fee accruals.',
+                'url' => AccountingLedgerPage::getUrl(),
+                'icon' => 'heroicon-o-calculator',
+            ],
+            [
                 'label' => 'WhatsApp — Connection & Setup',
                 'description' => 'This institute\'s Meta credentials, webhook, sync templates, enable routing.',
                 'url' => ManageMetaWhatsAppSettings::getUrl(),
@@ -122,8 +133,8 @@ class InstituteSetup extends Page
             ],
             [
                 'label' => 'WhatsApp — Automations',
-                'description' => 'Map punch IN/OUT, post-call, and campaign batch settings to approved templates.',
-                'url' => ManageMetaWhatsAppSettings::getUrl(),
+                'description' => 'Map punch IN/OUT, post-call, fee reminders, and campaign batch settings to approved templates.',
+                'url' => ManageWhatsAppSettings::getUrl(),
                 'icon' => 'heroicon-o-cog-8-tooth',
             ],
             [

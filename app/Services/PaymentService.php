@@ -29,6 +29,7 @@ class PaymentService
         protected IdCardService $idCards,
         protected FeeInstallmentService $installments,
         protected PenaltyCalculationService $penalties,
+        protected AccountingLedgerService $ledger,
     ) {}
 
     /**
@@ -204,6 +205,8 @@ class PaymentService
             );
 
             $payment = $this->receipts->generateForPayment($payment, $staff);
+
+            $this->ledger->postPayment($payment, $feePaymentAmount, $penaltyPaymentAmount, $staff);
 
             if ($this->idCards->shouldGenerateForFirstPayment($payment)) {
                 $this->idCards->generateForEnrollment($locked->enrollment, $staff);

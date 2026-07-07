@@ -25,6 +25,8 @@ class WhatsAppSettingsService
             'pal_digital_api_url' => Setting::getValue('pal_digital.api_url', config('services.pal_digital.api_url')),
             'postcall_autosend_enabled' => (bool) Setting::getValue('whatsapp.postcall_autosend_enabled', false),
             'postcall_autosend_live_campaign_id' => Setting::getValue('whatsapp.postcall_autosend_live_campaign_id'),
+            'fee_reminder_autosend_enabled' => (bool) Setting::getValue('whatsapp.fee_reminder_autosend_enabled', false),
+            'fee_reminder_live_campaign_id' => Setting::getValue('whatsapp.fee_reminder_live_campaign_id'),
             'attendance_autosend_enabled' => (bool) Setting::getValue('whatsapp.attendance_autosend_enabled', false),
             'attendance_autosend_live_campaign_id' => Setting::getValue('whatsapp.attendance_autosend_live_campaign_id'),
             'punch_autosend_enabled' => (bool) Setting::getValue('whatsapp.punch_autosend_enabled', true),
@@ -192,6 +194,16 @@ class WhatsAppSettingsService
         Setting::setValue(
             'whatsapp.postcall_autosend_live_campaign_id',
             filled($data['postcall_autosend_live_campaign_id'] ?? null) ? (string) $data['postcall_autosend_live_campaign_id'] : '',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.fee_reminder_autosend_enabled',
+            ! empty($data['fee_reminder_autosend_enabled']) ? '1' : '0',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.fee_reminder_live_campaign_id',
+            filled($data['fee_reminder_live_campaign_id'] ?? null) ? (string) $data['fee_reminder_live_campaign_id'] : '',
             'whatsapp',
         );
         Setting::setValue(

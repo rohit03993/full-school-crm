@@ -29,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('crm:cleanup')->dailyAt('03:00');
         $schedule->command('crm:process-late-fees')->dailyAt('00:30');
+        $schedule->command('crm:send-fee-reminders')->dailyAt('09:00');
         $schedule->command('attendance:process-punches')->everyMinute();
         $schedule->command('crm:process-queue')->everyMinute()->withoutOverlapping();
         $schedule->command('whatsapp:process-pending')->everyMinute()->withoutOverlapping();

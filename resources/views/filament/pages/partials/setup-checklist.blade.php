@@ -59,9 +59,23 @@
         ],
         [
             'title' => '9. WhatsApp (optional)',
-            'body' => 'Connect Meta WhatsApp, sync templates, then map punch and campaign automations.',
+            'body' => 'Connect Meta WhatsApp, approve templates, create live campaigns, then map punch, post-call, and fee reminder automations.',
             'menu' => \App\Support\CrmNavigation::whatsAppMenu('Connection & Setup'),
             'url' => \App\Filament\Pages\ManageMetaWhatsAppSettings::getUrl(),
+            'done' => null,
+        ],
+        [
+            'title' => '10. Fee reminders (optional)',
+            'body' => 'Approve a fee_reminder template in Meta, go live, then enable daily reminders under WhatsApp → Automations.',
+            'menu' => \App\Support\CrmNavigation::whatsAppMenu('Automations'),
+            'url' => \App\Filament\Pages\ManageWhatsAppSettings::getUrl(),
+            'done' => null,
+        ],
+        [
+            'title' => '11. Accounting ledger',
+            'body' => 'Fee receipts and late-fee accruals post automatically. Review balances under Students → Accounting ledger.',
+            'menu' => 'Students → Accounting ledger',
+            'url' => \App\Filament\Pages\AccountingLedgerPage::getUrl(),
             'done' => null,
         ],
     ];

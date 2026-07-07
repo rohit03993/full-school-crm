@@ -77,6 +77,22 @@ class WhatsAppTemplateParamMappingInferrer
         'marks_summary' => 'activity.marks_summary',
         'all_marks' => 'activity.marks_summary',
         'marks' => 'activity.marks_summary',
+        'pending_amount' => 'fee.pending_amount',
+        'pending_fee' => 'fee.pending_amount',
+        'fee_amount' => 'fee.pending_amount',
+        'amount_due' => 'fee.pending_amount',
+        'due_amount' => 'fee.pending_amount',
+        'due_date' => 'fee.due_date',
+        'installment_due_date' => 'fee.due_date',
+        'fee_due_date' => 'fee.due_date',
+        'installment' => 'fee.installment_label',
+        'installment_label' => 'fee.installment_label',
+        'installment_name' => 'fee.installment_label',
+        'days_overdue' => 'fee.days_overdue',
+        'overdue_days' => 'fee.days_overdue',
+        'late_fee' => 'fee.penalty_pending',
+        'penalty_amount' => 'fee.penalty_pending',
+        'penalty_pending' => 'fee.penalty_pending',
         'homework_title' => 'homework.title',
         'homework_link' => 'homework.portal_link',
         'portal_link' => 'homework.portal_link',
@@ -96,6 +112,10 @@ class WhatsAppTemplateParamMappingInferrer
         }
 
         if (self::looksPositionalOnly($bodyVariables)) {
+            if ($templateName && self::looksLikeFeeReminderTemplateName($templateName)) {
+                return self::feeReminderDefaults($paramCount);
+            }
+
             if ($templateName && self::looksLikeMarksTemplateName($templateName)) {
                 return self::marksDefaults($paramCount);
             }
@@ -145,6 +165,43 @@ class WhatsAppTemplateParamMappingInferrer
         }
 
         return false;
+    }
+
+    public static function looksLikeFeeReminderTemplateName(string $name): bool
+    {
+        $normalized = strtolower(trim($name));
+
+        foreach (['fee_reminder', 'fee_due', 'fees_due', 'payment_reminder', 'due_fee'] as $needle) {
+            if (str_contains($normalized, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string|null>
+     */
+    public static function feeReminderDefaults(int $paramCount): array
+    {
+        $defaults = [
+            0 => 'student.name',
+            1 => 'fee.pending_amount',
+            2 => 'fee.due_date',
+            3 => 'institute.name',
+            4 => 'fee.installment_label',
+            5 => 'fee.days_overdue',
+            6 => 'fee.penalty_pending',
+        ];
+
+        $sources = [];
+
+        for ($i = 0; $i < $paramCount; $i++) {
+            $sources[] = $defaults[$i] ?? null;
+        }
+
+        return $sources;
     }
 
     /**
