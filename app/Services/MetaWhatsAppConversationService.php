@@ -98,11 +98,16 @@ class MetaWhatsAppConversationService
 
     protected function conversationFromMetaMessage(MetaWhatsAppMessage $message, Student $student): MetaWhatsAppConversation
     {
-        $messageType = (string) ($message->message_type ?? 'text');
+        $messageType = Schema::hasColumn('meta_whatsapp_messages', 'message_type')
+            ? (string) ($message->message_type ?? 'text')
+            : 'text';
+        $caption = Schema::hasColumn('meta_whatsapp_messages', 'caption')
+            ? (string) ($message->caption ?? '')
+            : '';
         $preview = MetaWhatsAppInboundMessageParser::previewLabel(
             $messageType,
             (string) ($message->body_preview ?? ''),
-            (string) ($message->caption ?? ''),
+            $caption,
         );
 
         if ($preview === '' && filled($message->template_name)) {

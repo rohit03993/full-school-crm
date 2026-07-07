@@ -14,7 +14,6 @@ use App\Services\WhatsAppTemplateCatalog;
 use App\Support\FeatureGate;
 use App\Support\StudentWhatsAppThreadItem;
 use Filament\Notifications\Notification;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
@@ -49,14 +48,11 @@ trait InteractsWithStudentWhatsAppInbox
 
     public ?string $sendWhatsAppSelectedTemplateName = null;
 
-    public Collection $whatsappMessages;
-
     abstract protected function whatsAppMessageStudent(): ?Student;
 
     protected function initializeWhatsAppInboxState(): void
     {
         $this->messageThread = [];
-        $this->whatsappMessages = new Collection;
     }
 
     public function updatedSendWhatsAppTemplateId(): void
@@ -127,26 +123,48 @@ trait InteractsWithStudentWhatsAppInbox
      */
     protected function whatsAppMessagesViewData(): array
     {
-        $student = $this->whatsAppMessageStudent();
-        $catalog = app(WhatsAppTemplateCatalog::class);
+        try {
+            $student = $this->whatsAppMessageStudent();
+            $catalog = app(WhatsAppTemplateCatalog::class);
 
-        return [
-            'record' => $student,
-            'compactInbox' => $this->whatsAppInboxCompactLayout(),
-            'messagesTabLoaded' => $this->messagesTabLoaded,
-            'messageThread' => $this->messageThread,
-            'metaSessionOpen' => $this->metaSessionOpen,
-            'metaRoutingActive' => $this->metaRoutingActive,
-            'whatsappProviderLabel' => $this->whatsappProviderLabel,
-            'metaReplyText' => $this->metaReplyText,
-            'waTemplates' => $catalog->selectableTemplates(),
-            'waTemplateSyncHint' => $this->whatsAppTemplateSyncHint($catalog),
-            'sendWhatsAppTemplateId' => $this->sendWhatsAppTemplateId,
-            'sendWhatsAppTemplateFields' => $this->sendWhatsAppTemplateFields,
-            'sendWhatsAppTemplateParamCount' => $this->sendWhatsAppTemplateParamCount,
-            'sendWhatsAppTemplatePreview' => $this->sendWhatsAppTemplatePreview,
-            'sendWhatsAppSelectedTemplateName' => $this->sendWhatsAppSelectedTemplateName,
-        ];
+            return [
+                'record' => $student,
+                'compactInbox' => $this->whatsAppInboxCompactLayout(),
+                'messagesTabLoaded' => $this->messagesTabLoaded,
+                'messageThread' => $this->messageThread,
+                'metaSessionOpen' => $this->metaSessionOpen,
+                'metaRoutingActive' => $this->metaRoutingActive,
+                'whatsappProviderLabel' => $this->whatsappProviderLabel,
+                'metaReplyText' => $this->metaReplyText,
+                'waTemplates' => $catalog->selectableTemplates(),
+                'waTemplateSyncHint' => $this->whatsAppTemplateSyncHint($catalog),
+                'sendWhatsAppTemplateId' => $this->sendWhatsAppTemplateId,
+                'sendWhatsAppTemplateFields' => $this->sendWhatsAppTemplateFields,
+                'sendWhatsAppTemplateParamCount' => $this->sendWhatsAppTemplateParamCount,
+                'sendWhatsAppTemplatePreview' => $this->sendWhatsAppTemplatePreview,
+                'sendWhatsAppSelectedTemplateName' => $this->sendWhatsAppSelectedTemplateName,
+            ];
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return [
+                'record' => $this->whatsAppMessageStudent(),
+                'compactInbox' => $this->whatsAppInboxCompactLayout(),
+                'messagesTabLoaded' => true,
+                'messageThread' => [],
+                'metaSessionOpen' => false,
+                'metaRoutingActive' => false,
+                'whatsappProviderLabel' => 'Unavailable',
+                'metaReplyText' => $this->metaReplyText,
+                'waTemplates' => collect(),
+                'waTemplateSyncHint' => null,
+                'sendWhatsAppTemplateId' => null,
+                'sendWhatsAppTemplateFields' => [],
+                'sendWhatsAppTemplateParamCount' => 0,
+                'sendWhatsAppTemplatePreview' => null,
+                'sendWhatsAppSelectedTemplateName' => null,
+            ];
+        }
     }
 
     protected function whatsAppTemplateSyncHint(WhatsAppTemplateCatalog $catalog): ?string
@@ -187,12 +205,6 @@ trait InteractsWithStudentWhatsAppInbox
             $this->metaSessionOpen = $threadService->sessionOpenForStudent($student);
             $this->metaRoutingActive = $resolver->metaOverridesPalDigital();
             $this->whatsappProviderLabel = $resolver->activeProviderLabel();
-
-            $this->whatsappMessages = $student->whatsappMessages()
-                ->with(['campaign.template'])
-                ->orderByDesc('created_at')
-                ->limit(50)
-                ->get();
         } catch (\Throwable $exception) {
             report($exception);
 
@@ -200,7 +212,6 @@ trait InteractsWithStudentWhatsAppInbox
             $this->metaSessionOpen = false;
             $this->metaRoutingActive = false;
             $this->whatsappProviderLabel = 'Unavailable';
-            $this->whatsappMessages = new Collection;
         }
     }
 

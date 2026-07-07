@@ -14,7 +14,7 @@
             <div class="crm-wa-inbox__toolbar-copy">
                 <p class="crm-wa-inbox__title">WhatsApp with parent</p>
                 <p class="crm-wa-inbox__subtitle">
-                    <span class="crm-wa-inbox__phone">{{ $record->mobile ?? 'No mobile on file' }}</span>
+                    <span class="crm-wa-inbox__phone">{{ $record?->mobile ?? 'No mobile on file' }}</span>
                 </p>
             </div>
             @if ($metaRoutingActive)
@@ -50,7 +50,7 @@
                     <p class="crm-wa-inbox__composer-lead">Pick a template. If it has variables, fill every field marked required.</p>
                 </div>
 
-                @if (blank($record->mobile))
+                @if (blank($record?->mobile))
                     <p class="crm-wa-inbox__hint crm-wa-inbox__hint--danger">Add a mobile number on the student profile first.</p>
                 @elseif ($waTemplates->isEmpty())
                     <p class="crm-wa-inbox__hint">

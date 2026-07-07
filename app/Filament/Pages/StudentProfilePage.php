@@ -149,11 +149,6 @@ class StudentProfilePage extends Page
     public Collection $calls;
 
     /**
-     * @var Collection<int, \App\Models\WhatsAppCampaignRecipient>
-     */
-    public Collection $whatsappMessages;
-
-    /**
      * @var array<int, array{key: string, source: string, direction: string, body: string, status: string, statusLabel: string, at: ?string, at_label: ?string, templateName: ?string, provider: ?string}>
      */
     public array $messageThread = [];
@@ -275,7 +270,6 @@ class StudentProfilePage extends Page
 
         $this->visits = new Collection;
         $this->calls = new Collection;
-        $this->whatsappMessages = new Collection;
         $this->messageThread = [];
         $this->homeworkAssignments = new Collection;
         $this->documents = new Collection;
@@ -560,24 +554,45 @@ class StudentProfilePage extends Page
      */
     protected function whatsAppMessagesViewData(): array
     {
-        $catalog = app(WhatsAppTemplateCatalog::class);
+        try {
+            $catalog = app(WhatsAppTemplateCatalog::class);
 
-        return [
-            'record' => $this->record,
-            'messagesTabLoaded' => $this->messagesTabLoaded,
-            'messageThread' => $this->messageThread,
-            'metaSessionOpen' => $this->metaSessionOpen,
-            'metaRoutingActive' => $this->metaRoutingActive,
-            'whatsappProviderLabel' => $this->whatsappProviderLabel,
-            'metaReplyText' => $this->metaReplyText,
-            'waTemplates' => $catalog->selectableTemplates(),
-            'waTemplateSyncHint' => $this->whatsAppTemplateSyncHint($catalog),
-            'sendWhatsAppTemplateId' => $this->sendWhatsAppTemplateId,
-            'sendWhatsAppTemplateFields' => $this->sendWhatsAppTemplateFields,
-            'sendWhatsAppTemplateParamCount' => $this->sendWhatsAppTemplateParamCount,
-            'sendWhatsAppTemplatePreview' => $this->sendWhatsAppTemplatePreview,
-            'sendWhatsAppSelectedTemplateName' => $this->sendWhatsAppSelectedTemplateName,
-        ];
+            return [
+                'record' => $this->record,
+                'messagesTabLoaded' => $this->messagesTabLoaded,
+                'messageThread' => $this->messageThread,
+                'metaSessionOpen' => $this->metaSessionOpen,
+                'metaRoutingActive' => $this->metaRoutingActive,
+                'whatsappProviderLabel' => $this->whatsappProviderLabel,
+                'metaReplyText' => $this->metaReplyText,
+                'waTemplates' => $catalog->selectableTemplates(),
+                'waTemplateSyncHint' => $this->whatsAppTemplateSyncHint($catalog),
+                'sendWhatsAppTemplateId' => $this->sendWhatsAppTemplateId,
+                'sendWhatsAppTemplateFields' => $this->sendWhatsAppTemplateFields,
+                'sendWhatsAppTemplateParamCount' => $this->sendWhatsAppTemplateParamCount,
+                'sendWhatsAppTemplatePreview' => $this->sendWhatsAppTemplatePreview,
+                'sendWhatsAppSelectedTemplateName' => $this->sendWhatsAppSelectedTemplateName,
+            ];
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return [
+                'record' => $this->record,
+                'messagesTabLoaded' => true,
+                'messageThread' => [],
+                'metaSessionOpen' => false,
+                'metaRoutingActive' => false,
+                'whatsappProviderLabel' => 'Unavailable',
+                'metaReplyText' => $this->metaReplyText,
+                'waTemplates' => collect(),
+                'waTemplateSyncHint' => null,
+                'sendWhatsAppTemplateId' => null,
+                'sendWhatsAppTemplateFields' => [],
+                'sendWhatsAppTemplateParamCount' => 0,
+                'sendWhatsAppTemplatePreview' => null,
+                'sendWhatsAppSelectedTemplateName' => null,
+            ];
+        }
     }
 
     protected function whatsAppTemplateSyncHint(WhatsAppTemplateCatalog $catalog): ?string
@@ -616,12 +631,6 @@ class StudentProfilePage extends Page
             $this->metaSessionOpen = $threadService->sessionOpenForStudent($this->record);
             $this->metaRoutingActive = $resolver->metaOverridesPalDigital();
             $this->whatsappProviderLabel = $resolver->activeProviderLabel();
-
-            $this->whatsappMessages = $this->record->whatsappMessages()
-                ->with(['campaign.template'])
-                ->orderByDesc('created_at')
-                ->limit(CrmPagination::PER_PAGE)
-                ->get();
         } catch (\Throwable $exception) {
             report($exception);
 
@@ -629,7 +638,6 @@ class StudentProfilePage extends Page
             $this->metaSessionOpen = false;
             $this->metaRoutingActive = false;
             $this->whatsappProviderLabel = 'Unavailable';
-            $this->whatsappMessages = new Collection;
         }
     }
 

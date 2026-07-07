@@ -51,6 +51,40 @@ class WhatsAppInboxPageTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_selecting_conversation_renders_message_panel(): void
+    {
+        Http::fake();
+
+        $admin = $this->createSuperAdmin();
+
+        $student = Student::query()->create([
+            'name' => 'Kapil',
+            'mobile' => '8320936486',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.CHAT1',
+            'direction' => 'outbound',
+            'phone' => '918320936486',
+            'student_id' => $student->id,
+            'body_preview' => 'Dear Parent, attendance update for Kapil.',
+            'message_type' => 'text',
+            'status' => 'sent',
+            'status_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(WhatsAppInboxPage::class)
+            ->call('selectConversation', $student->id)
+            ->assertSet('selectedStudentId', $student->id)
+            ->assertSee('Dear Parent, attendance update for Kapil.')
+            ->assertStatus(200);
+
+        Http::assertNothingSent();
+    }
+
     protected function createSuperAdmin(): User
     {
         $role = Role::findOrCreate(RoleName::SuperAdmin->value);

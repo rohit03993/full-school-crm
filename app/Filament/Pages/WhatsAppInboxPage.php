@@ -85,18 +85,33 @@ class WhatsAppInboxPage extends Page
     {
         $this->inboxLoaded = true;
 
-        $this->conversations = app(MetaWhatsAppConversationService::class)
-            ->recentConversations($this->search)
-            ->map(fn (MetaWhatsAppConversation $conversation): array => $conversation->toArray())
-            ->values()
-            ->all();
+        try {
+            $this->conversations = app(MetaWhatsAppConversationService::class)
+                ->recentConversations($this->search)
+                ->map(fn (MetaWhatsAppConversation $conversation): array => $conversation->toArray())
+                ->values()
+                ->all();
+        } catch (\Throwable $exception) {
+            report($exception);
+            $this->conversations = [];
+        }
     }
 
     public function selectConversation(int $studentId): void
     {
-        $this->selectedStudentId = $studentId;
-        $this->resetMessagesTab();
-        $this->loadMessagesTab();
+        try {
+            $this->selectedStudentId = $studentId;
+            $this->resetMessagesTab();
+            $this->loadMessagesTab();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Could not open chat')
+                ->body('Please refresh the page. If this continues, run migrations on the server.')
+                ->danger()
+                ->send();
+        }
     }
 
     protected function whatsAppMessageStudent(): ?Student
