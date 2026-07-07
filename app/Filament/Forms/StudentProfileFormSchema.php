@@ -2,14 +2,17 @@
 
 namespace App\Filament\Forms;
 
+use App\Enums\BatchStatus;
 use App\Enums\DocumentType;
 use App\Enums\Gender;
 use App\Enums\StudentCategory;
 use App\Models\Admission;
+use App\Models\Batch;
+use App\Models\Enrollment;
 use App\Services\CustomFieldService;
-use App\Models\Document;
 use App\Support\CrmHint;
 use App\Support\CustomFieldFormBuilder;
+use App\Support\InstituteProfile;
 use App\Support\StudentLabels;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
@@ -19,6 +22,8 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rule;
 
@@ -32,44 +37,85 @@ class StudentProfileFormSchema
         ?int $studentId = null,
         ?Admission $admission = null,
         bool $hasIdCard = false,
+        ?Enrollment $enrollment = null,
     ): array {
         $sections = [];
 
         if ($admission !== null) {
             $photo = $admission->documentForType(DocumentType::Photo);
-            $documentSchema = [
-                Placeholder::make('current_photo_preview')
+            $documentSchema = [];
+
+            if ($photo !== null && $photo->isImage()) {
+                $documentSchema[] = Placeholder::make('current_photo_preview')
                     ->label('Current photo')
-                    ->visible($photo !== null && $photo->isImage())
                     ->content(fn (): HtmlString => new HtmlString(
-                        '<img src="'.e($photo?->previewUrl()).'" alt="Current student photo" class="h-28 w-24 rounded-xl object-cover ring-1 ring-gray-200 dark:ring-white/10" />'
-                    )),
-                self::documentUpload('photo', 'Student photo', true),
-            ];
+                        '<img src="'.e($photo->previewUrl()).'" alt="Current student photo" class="h-24 w-20 rounded-lg object-cover ring-1 ring-gray-200 dark:ring-white/10" />'
+                    ))
+                    ->columnSpanFull();
+            }
 
             foreach ([
-                [DocumentType::Aadhaar, 'Aadhaar card'],
-                [DocumentType::Marksheet, 'Marksheet'],
-                [DocumentType::Signature, 'Signature'],
-            ] as [$type, $label]) {
-                $documentSchema[] = self::documentUpload($type->value, $label);
+                ['photo', 'Student photo', true],
+                ['aadhaar', 'Aadhaar', false],
+                ['marksheet', 'Marksheet', false],
+                ['signature', 'Signature', false],
+            ] as [$name, $label, $imageOnly]) {
+                $documentSchema[] = self::documentUpload($name, $label, $imageOnly);
             }
 
             if ($hasIdCard) {
                 $documentSchema[] = Toggle::make('regenerate_id_card')
                     ->label('Regenerate ID card with new photo')
                     ->helperText(CrmHint::field('regenerate_id_card'))
-                    ->default(true);
+                    ->default(true)
+                    ->columnSpanFull();
             }
 
             $sections[] = Section::make('Photo & documents')
-                ->description('Upload or replace files used on the dossier, admission, and ID card.')
+                ->description('Optional — replace only the files you need.')
+                ->compact()
+                ->columns(2)
                 ->schema($documentSchema);
         }
 
+        if ($hasActiveEnrollment && $enrollment) {
+            $sections[] = Section::make('Class & batch')
+                ->description('Course fee updates follow the catalog when you change course.')
+                ->compact()
+                ->columns(2)
+                ->schema([
+                    Select::make('course_id')
+                        ->label('Course')
+                        ->options(InstituteProfile::activeCourseOptions())
+                        ->default($enrollment->course_id)
+                        ->required()
+                        ->searchable()
+                        ->native(false)
+                        ->live()
+                        ->afterStateUpdated(fn (Set $set): mixed => $set('batch_id', null)),
+                    Select::make('batch_id')
+                        ->label('Batch')
+                        ->options(fn (Get $get): array => self::batchOptions(
+                            (int) ($get('course_id') ?: $enrollment->course_id),
+                            $enrollment->academic_session_id,
+                        ))
+                        ->searchable()
+                        ->native(false)
+                        ->placeholder('No batch assigned')
+                        ->helperText('Only batches for this course and session are listed.'),
+                    TextInput::make('enrollment_number')
+                        ->label(StudentLabels::rollNumberLabel())
+                        ->required()
+                        ->maxLength(50)
+                        ->helperText('Must be unique. ID card and receipts refresh if changed.')
+                        ->extraInputAttributes(['class' => 'font-mono uppercase'])
+                        ->columnSpanFull(),
+                ]);
+        }
+
         $sections = array_merge($sections, [
-            Section::make('Personal Details')
-                ->description('Complete the profile when you have more information from the student.')
+            Section::make('Personal details')
+                ->compact()
                 ->columns(2)
                 ->schema([
                     TextInput::make('name')
@@ -77,10 +123,10 @@ class StudentProfileFormSchema
                         ->maxLength(255)
                         ->columnSpanFull(),
                     TextInput::make('father_name')
-                        ->label("Father's Name")
+                        ->label("Father's name")
                         ->maxLength(255),
                     DatePicker::make('date_of_birth')
-                        ->label('Date of Birth')
+                        ->label('Date of birth')
                         ->maxDate(now()->subDay())
                         ->native(false),
                     Select::make('gender')
@@ -97,25 +143,16 @@ class StudentProfileFormSchema
                         ])
                         ->helperText(CrmHint::field('mobile_unique')),
                     TextInput::make('alternate_mobile')
-                        ->label('Alternate Mobile')
+                        ->label('Alternate mobile')
                         ->tel()
                         ->maxLength(10)
-                        ->rule('nullable|regex:/^[6-9]\d{9}$/')
-                        ->helperText('Optional second number. Must not match any other student\'s mobile or alternate number.'),
+                        ->rule('nullable|regex:/^[6-9]\d{9}$/'),
+                    Select::make('category')
+                        ->options(self::categoryOptions())
+                        ->native(false),
                 ]),
-            ...($hasActiveEnrollment ? [
-                Section::make('Academic identity')
-                    ->description('Roll number is issued when admission is approved.')
-                    ->schema([
-                        TextInput::make('enrollment_number')
-                            ->label(StudentLabels::rollNumberLabel())
-                            ->required()
-                            ->maxLength(50)
-                            ->helperText('Must be unique. ID card and receipts regenerate automatically if changed.')
-                            ->extraInputAttributes(['class' => 'font-mono uppercase']),
-                    ]),
-            ] : []),
             Section::make('Address')
+                ->compact()
                 ->columns(2)
                 ->schema([
                     Textarea::make('address')
@@ -129,23 +166,40 @@ class StudentProfileFormSchema
                         ->maxLength(6)
                         ->rule('nullable|digits:6'),
                 ]),
-            Section::make('Category')
-                ->schema([
-                    Select::make('category')
-                        ->options(self::categoryOptions())
-                        ->native(false),
-                ]),
             ...CustomFieldFormBuilder::sections(CustomFieldService::ENTITY_STUDENT),
         ]);
 
         return $sections;
     }
 
+    /**
+     * @return array<int, string>
+     */
+    protected static function batchOptions(int $courseId, ?int $sessionId): array
+    {
+        if ($courseId <= 0) {
+            return [];
+        }
+
+        $query = Batch::query()
+            ->where('status', BatchStatus::Active)
+            ->where('course_id', $courseId)
+            ->orderBy('name');
+
+        if ($sessionId) {
+            $query->where('academic_session_id', $sessionId);
+        }
+
+        return $query
+            ->pluck('name', 'id')
+            ->all();
+    }
+
     protected static function documentUpload(string $name, string $label, bool $imageOnly = false): FileUpload
     {
         $upload = FileUpload::make($name)
             ->label($label)
-            ->helperText(CrmHint::field($name === 'photo' ? 'student_photo' : 'student_documents'))
+            ->helperText($imageOnly ? 'JPG or PNG · max 5 MB' : 'JPG, PNG or PDF · max 5 MB')
             ->maxSize(5120)
             ->disk('local')
             ->directory('temp-student-documents')

@@ -41,6 +41,7 @@ use App\Services\ConvertToAdmissionPresenter;
 use App\Services\CourseFeeSyncService;
 use App\Services\DocumentService;
 use App\Services\EnquiryService;
+use App\Services\EnrollmentPlacementService;
 use App\Services\EnrollmentRollNumberService;
 use App\Services\FeeInstallmentService;
 use App\Services\FeeStructureService;
@@ -1964,6 +1965,7 @@ class StudentProfilePage extends Page
                 ->color('gray')
                 ->outlined()
                 ->modalHeading('Edit student details')
+                ->modalWidth('2xl')
                 ->form(function (): array {
                     $admission = $this->resolveAdmissionForDocuments();
 
@@ -1972,6 +1974,7 @@ class StudentProfilePage extends Page
                         $this->record->id,
                         $admission,
                         $this->record->activeEnrollment?->hasIdCard() ?? false,
+                        $this->record->activeEnrollment,
                     );
                 })
                 ->fillForm(fn (): array => [
@@ -1986,10 +1989,19 @@ class StudentProfilePage extends Page
                     'state' => $this->record->state,
                     'pincode' => $this->record->pincode,
                     'category' => $this->record->category?->value,
+                    'course_id' => $this->record->activeEnrollment?->course_id,
+                    'batch_id' => $this->record->activeBatchStudent?->batch_id,
                     'enrollment_number' => $this->record->activeEnrollment?->enrollment_number,
                     'custom_data' => $this->record->custom_data ?? [],
                 ])
-                ->action(function (array $data, StudentUpdateService $studentUpdates, EnrollmentRollNumberService $rollNumbers, DocumentService $documents, IdCardService $idCards): void {
+                ->action(function (
+                    array $data,
+                    StudentUpdateService $studentUpdates,
+                    EnrollmentPlacementService $placement,
+                    EnrollmentRollNumberService $rollNumbers,
+                    DocumentService $documents,
+                    IdCardService $idCards,
+                ): void {
                     $regenerateIdCard = (bool) ($data['regenerate_id_card'] ?? false);
                     unset($data['regenerate_id_card']);
 
@@ -2030,13 +2042,27 @@ class StudentProfilePage extends Page
                     }
 
                     $rollNumber = $data['enrollment_number'] ?? null;
-                    unset($data['enrollment_number']);
+                    $courseId = isset($data['course_id']) ? (int) $data['course_id'] : null;
+                    $batchId = filled($data['batch_id'] ?? null) ? (int) $data['batch_id'] : null;
+                    unset($data['enrollment_number'], $data['course_id'], $data['batch_id']);
 
                     $this->record = $studentUpdates->update($this->record, $data, Auth::user());
 
                     $enrollment = $this->record->activeEnrollment;
                     $rollNumberChanged = false;
                     $idCardRegenerated = false;
+                    $placementChanged = false;
+
+                    if ($enrollment && $courseId && $courseId !== (int) $enrollment->course_id) {
+                        $placement->updateCourse($enrollment, $courseId, Auth::user());
+                        $placementChanged = true;
+                        $enrollment = $this->record->fresh()->activeEnrollment;
+                    }
+
+                    if ($enrollment && $batchId) {
+                        $placement->updateBatch($this->record->fresh(), $batchId, Auth::user());
+                        $placementChanged = true;
+                    }
 
                     if ($enrollment && filled($rollNumber)) {
                         $normalized = strtoupper(trim($rollNumber));
@@ -2052,8 +2078,13 @@ class StudentProfilePage extends Page
                         $idCardRegenerated = true;
                     }
 
-                    if ($photoUpdated || $documentsUpdated || $rollNumberChanged) {
+                    if ($photoUpdated || $documentsUpdated || $rollNumberChanged || $placementChanged) {
                         $this->refreshRecord();
+                    }
+
+                    if ($placementChanged) {
+                        $this->feesTabLoaded = false;
+                        $this->attendanceTabLoaded = false;
                     }
 
                     $body = match (true) {
@@ -2061,6 +2092,8 @@ class StudentProfilePage extends Page
                         $idCardRegenerated => 'Profile and documents saved. ID card regenerated with the new photo.',
                         $rollNumberChanged && $photoUpdated => 'Profile, photo, and roll number saved successfully.',
                         $rollNumberChanged => 'Profile and roll number saved successfully.',
+                        $placementChanged && $photoUpdated => 'Profile, class/batch, and photo saved successfully.',
+                        $placementChanged => 'Profile and class/batch saved successfully.',
                         $photoUpdated => 'Photo updated. Turn on “Regenerate ID card” to refresh the PDF, or use Regenerate on the profile.',
                         $documentsUpdated => 'Documents updated successfully.',
                         default => 'Profile details saved successfully.',
