@@ -29,6 +29,45 @@ class FeeMiscChargeAndGstTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_staff_can_partially_pay_separate_misc_charge(): void
+    {
+        $staff = $this->createStaff();
+        $student = $this->createEnrolledStudent($staff);
+        $feeStructure = $student->activeEnrollment->feeStructure;
+
+        $charge = app(FeeMiscChargeService::class)->addSeparateCharge(
+            $feeStructure,
+            'Materials fee',
+            5000,
+            null,
+            $staff,
+        );
+
+        $this->actingAs($staff);
+
+        $payment = app(PaymentService::class)->addMisc(
+            $feeStructure->fresh(),
+            $student,
+            $charge->fresh(),
+            [
+                'payment_date' => now()->toDateString(),
+                'amount' => 2000,
+                'payment_mode' => PaymentMode::Cash->value,
+                'voucher_number' => 'VCH-200',
+            ],
+            UploadedFile::fake()->image('proof.jpg'),
+            $staff,
+        );
+
+        $charge = $charge->fresh();
+
+        $this->assertSame(2000.0, (float) $payment->amount);
+        $this->assertSame(FeeMiscChargeStatus::Partial, $charge->status);
+        $this->assertSame(2000.0, (float) $charge->paid_amount);
+        $this->assertSame(3000.0, $charge->pendingAmount());
+        $this->assertSame(3000.0, $feeStructure->fresh()->separateMiscChargesPendingTotal());
+    }
+
     public function test_staff_can_add_and_pay_separate_misc_charge(): void
     {
         $staff = $this->createStaff();

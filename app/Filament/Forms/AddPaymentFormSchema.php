@@ -2,9 +2,11 @@
 
 namespace App\Filament\Forms;
 
+use App\Enums\FeeMiscChargeStatus;
 use App\Enums\PaymentMode;
 use App\Enums\PaymentShortfallAction;
 use App\Models\FeeInstallment;
+use App\Models\FeeMiscCharge;
 use App\Models\FeeStructure;
 use App\Support\FeePaymentPolicy;
 use App\Support\FeePlanCalculator;
@@ -25,49 +27,147 @@ class AddPaymentFormSchema
     /**
      * @return array<int, \Filament\Forms\Components\Component|\Filament\Schemas\Components\Component>
      */
-    public static function fields(FeeStructure $feeStructure): array
+    public static function fields(FeeStructure $feeStructure, ?int $prefillMiscChargeId = null): array
     {
-        $feeStructure->loadMissing('installments');
-        $pending = round((float) $feeStructure->pending_amount, 2);
+        $feeStructure->loadMissing(['installments', 'miscCharges']);
+        $tuitionPending = round((float) $feeStructure->pending_amount, 2);
+        $miscPending = round((float) $feeStructure->separateMiscChargesPendingTotal(), 2);
+        $collectible = round((float) $feeStructure->totalCollectiblePending(), 2);
+        $payableMisc = $feeStructure->separateMiscCharges()
+            ->filter(fn (FeeMiscCharge $charge): bool => $charge->isPayableSeparately())
+            ->values();
         $payableInstallments = $feeStructure->installments
             ->filter(fn (FeeInstallment $row): bool => (float) $row->pending_amount > 0)
             ->values();
-
         $defaultInstallment = $payableInstallments->first();
+        $defaultMisc = $prefillMiscChargeId
+            ? $payableMisc->firstWhere('id', $prefillMiscChargeId)
+            : $payableMisc->first();
         $flexible = FeePaymentPolicy::usesFlexibleAllocation();
         $collector = Auth::user()?->loadMissing('staffProfile');
         $format = fn (float $amount): string => FeePlanCalculator::formatRupeeAmount($amount);
 
-        $installmentLine = $defaultInstallment
-            ? $defaultInstallment->label.' · ₹'.$format((float) $defaultInstallment->pending_amount).' due'
-            .($defaultInstallment->due_date ? ' · '.$defaultInstallment->due_date->format('d M Y') : '')
-            : 'No installment schedule';
+        $defaultTarget = match (true) {
+            $prefillMiscChargeId && $defaultMisc => 'misc',
+            $tuitionPending > 0 => 'tuition',
+            $miscPending > 0 => 'misc',
+            default => 'tuition',
+        };
 
         return [
             Placeholder::make('payment_snapshot')
                 ->label('')
                 ->content(new HtmlString(
-                    '<div class="grid gap-2 text-sm sm:grid-cols-3">'
+                    '<div class="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">'
+                    .'<div class="rounded-lg bg-primary-50 px-3 py-2 dark:bg-primary-500/10">'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-primary-800 dark:text-primary-300">Net tuition fee</p>'
+                    .'<p class="mt-0.5 text-base font-bold text-primary-950 dark:text-primary-100">₹'.$format((float) $feeStructure->net_fee).'</p>'
+                    .'<p class="mt-0.5 text-xs text-primary-800/80 dark:text-primary-200">Paid ₹'.$format((float) $feeStructure->paid_amount).' · Pending ₹'.$format($tuitionPending).'</p></div>'
+                    .'<div class="rounded-lg bg-violet-50 px-3 py-2 dark:bg-violet-500/10">'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-300">Misc charges</p>'
+                    .'<p class="mt-0.5 text-base font-bold text-violet-950 dark:text-violet-100">₹'.$format($feeStructure->separateMiscChargesTotal()).'</p>'
+                    .'<p class="mt-0.5 text-xs text-violet-800/80 dark:text-violet-200">Paid ₹'.$format($feeStructure->separateMiscChargesPaidTotal()).' · Pending ₹'.$format($miscPending).'</p></div>'
                     .'<div class="rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-500/10">'
-                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Balance due</p>'
-                    .'<p class="mt-0.5 text-base font-bold text-amber-900 dark:text-amber-100">₹'.$format($pending).'</p></div>'
-                    .'<div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5 sm:col-span-2">'
-                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Against</p>'
-                    .'<p class="mt-0.5 font-semibold text-gray-950 dark:text-white">'.e($installmentLine).'</p>'
-                    .'<p class="mt-0.5 text-xs text-gray-500">Collected by '.e($collector?->staffCollectorLabel() ?? 'logged-in staff').'</p>'
-                    .'</div></div>'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Total due now</p>'
+                    .'<p class="mt-0.5 text-base font-bold text-amber-950 dark:text-amber-100">₹'.$format($collectible).'</p></div>'
+                    .'<div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5">'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Collector</p>'
+                    .'<p class="mt-0.5 font-semibold text-gray-950 dark:text-white">'.e($collector?->staffCollectorLabel() ?? 'Staff').'</p></div>'
+                    .'</div>'
                 ))
                 ->columnSpanFull(),
             Section::make('Payment details')
                 ->compact()
                 ->columns(2)
-                ->schema(self::paymentDetailFields(
-                    $feeStructure,
-                    $payableInstallments,
-                    $defaultInstallment,
-                    $pending,
-                    $flexible,
-                )),
+                ->schema([
+                    Select::make('payment_target')
+                        ->label('Pay against')
+                        ->options(array_filter([
+                            'tuition' => $tuitionPending > 0 ? 'Tuition / installments' : null,
+                            'misc' => $payableMisc->isNotEmpty() ? 'Miscellaneous charge' : null,
+                        ]))
+                        ->default($defaultTarget)
+                        ->required()
+                        ->native(false)
+                        ->live()
+                        ->columnSpanFull(),
+                    ...self::tuitionFields(
+                        $feeStructure,
+                        $payableInstallments,
+                        $defaultInstallment,
+                        $tuitionPending,
+                        $flexible,
+                    ),
+                    ...self::miscFields($payableMisc, $defaultMisc),
+                    DatePicker::make('payment_date')
+                        ->label('Payment date')
+                        ->default(now())
+                        ->required()
+                        ->native(false)
+                        ->maxDate(now()),
+                    TextInput::make('amount')
+                        ->label('Amount (₹)')
+                        ->numeric()
+                        ->required()
+                        ->minValue(1)
+                        ->live(debounce: 300)
+                        ->default(function (Get $get) use ($defaultInstallment, $defaultMisc, $tuitionPending, $defaultTarget): ?string {
+                            if ($get('payment_target') === 'misc') {
+                                $charge = self::selectedMiscCharge($get, $defaultMisc);
+
+                                return $charge
+                                    ? (string) FeePlanCalculator::toWholeRupeeAmount($charge->pendingAmount())
+                                    : null;
+                            }
+
+                            if ($defaultInstallment) {
+                                return (string) FeePlanCalculator::toWholeRupeeAmount((float) $defaultInstallment->pending_amount);
+                            }
+
+                            return $tuitionPending > 0
+                                ? (string) FeePlanCalculator::toWholeRupeeAmount($tuitionPending)
+                                : null;
+                        })
+                        ->maxValue(function (Get $get) use ($payableInstallments, $defaultInstallment, $defaultMisc, $tuitionPending): int {
+                            if ($get('payment_target') === 'misc') {
+                                $charge = self::selectedMiscCharge($get, $defaultMisc);
+
+                                return $charge
+                                    ? FeePlanCalculator::toWholeRupeeAmount($charge->pendingAmount())
+                                    : 1;
+                            }
+
+                            return FeePlanCalculator::toWholeRupeeAmount($tuitionPending);
+                        })
+                        ->step(1)
+                        ->helperText(fn (Get $get): string => $get('payment_target') === 'misc'
+                            ? 'Partial payments are allowed on misc charges.'
+                            : 'You may pay more than one installment; extra reduces future dues automatically.'),
+                    ...self::tuitionShortfallFields($feeStructure, $payableInstallments, $defaultInstallment, $flexible),
+                    Select::make('payment_mode')
+                        ->label('Payment mode')
+                        ->options(collect(PaymentMode::cases())->mapWithKeys(
+                            fn (PaymentMode $mode) => [$mode->value => $mode->label()],
+                        ))
+                        ->required()
+                        ->native(false)
+                        ->live(),
+                    TextInput::make('voucher_number')
+                        ->label('Voucher number')
+                        ->maxLength(100)
+                        ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Cash->value)
+                        ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Cash->value),
+                    TextInput::make('transaction_id')
+                        ->label('Transaction ID')
+                        ->maxLength(100)
+                        ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Online->value)
+                        ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Online->value),
+                    TextInput::make('utr_number')
+                        ->label('UTR number')
+                        ->maxLength(100)
+                        ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Upi->value)
+                        ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Upi->value),
+                ]),
             Section::make('Proof')
                 ->compact()
                 ->schema([
@@ -89,17 +189,15 @@ class AddPaymentFormSchema
      * @param  \Illuminate\Support\Collection<int, FeeInstallment>  $payableInstallments
      * @return array<int, \Filament\Forms\Components\Component>
      */
-    protected static function paymentDetailFields(
+    protected static function tuitionFields(
         FeeStructure $feeStructure,
         $payableInstallments,
         ?FeeInstallment $defaultInstallment,
-        float $pending,
+        float $tuitionPending,
         bool $flexible,
     ): array {
-        $fields = [];
-
-        if ($payableInstallments->count() > 1) {
-            $fields[] = Select::make('fee_installment_id')
+        return [
+            Select::make('fee_installment_id')
                 ->label('Installment')
                 ->options($payableInstallments->mapWithKeys(function (FeeInstallment $row): array {
                     $due = $row->due_date?->format('d M Y') ?? 'No due date';
@@ -107,9 +205,10 @@ class AddPaymentFormSchema
                     return [$row->id => "{$row->label} · ₹".FeePlanCalculator::formatRupeeAmount((float) $row->pending_amount)." · {$due}"];
                 }))
                 ->default($defaultInstallment?->id)
-                ->required()
+                ->required(fn (Get $get): bool => $get('payment_target') === 'tuition' && $payableInstallments->count() > 1)
                 ->native(false)
                 ->live()
+                ->visible(fn (Get $get): bool => $get('payment_target') === 'tuition' && $payableInstallments->count() > 1)
                 ->columnSpanFull()
                 ->afterStateUpdated(function (mixed $state, callable $set) use ($payableInstallments): void {
                     $installment = $payableInstallments->firstWhere('id', (int) $state);
@@ -120,55 +219,92 @@ class AddPaymentFormSchema
 
                     $set('shortfall_action', null);
                     $set('shortfall_due_date', null);
-                });
-        } elseif ($defaultInstallment) {
-            $fields[] = Hidden::make('fee_installment_id')
-                ->default($defaultInstallment->id);
+                }),
+            Hidden::make('fee_installment_id')
+                ->default($defaultInstallment?->id)
+                ->visible(fn (Get $get): bool => $get('payment_target') === 'tuition' && $payableInstallments->count() === 1),
+        ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, FeeMiscCharge>  $payableMisc
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    protected static function miscFields($payableMisc, ?FeeMiscCharge $defaultMisc): array
+    {
+        return [
+            Select::make('fee_misc_charge_id')
+                ->label('Misc charge')
+                ->options($payableMisc->mapWithKeys(function (FeeMiscCharge $charge): array {
+                    $pending = FeePlanCalculator::formatRupeeAmount($charge->pendingAmount());
+                    $total = FeePlanCalculator::formatRupeeAmount((float) $charge->amount);
+
+                    return [$charge->id => "{$charge->label} · ₹{$pending} pending of ₹{$total}"];
+                }))
+                ->default($defaultMisc?->id)
+                ->required(fn (Get $get): bool => $get('payment_target') === 'misc')
+                ->native(false)
+                ->live()
+                ->visible(fn (Get $get): bool => $get('payment_target') === 'misc')
+                ->columnSpanFull()
+                ->afterStateUpdated(function (mixed $state, callable $set) use ($payableMisc): void {
+                    $charge = $payableMisc->firstWhere('id', (int) $state);
+
+                    if ($charge) {
+                        $set('amount', (string) FeePlanCalculator::toWholeRupeeAmount($charge->pendingAmount()));
+                    }
+                }),
+        ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, FeeInstallment>  $payableInstallments
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    protected static function tuitionShortfallFields(
+        FeeStructure $feeStructure,
+        $payableInstallments,
+        ?FeeInstallment $defaultInstallment,
+        bool $flexible,
+    ): array {
+        if (! $flexible || ! $defaultInstallment) {
+            return [];
         }
 
-        $fields[] = DatePicker::make('payment_date')
-            ->label('Payment date')
-            ->default(now())
-            ->required()
-            ->native(false)
-            ->maxDate(now());
+        return [
+            Placeholder::make('surplus_notice')
+                ->label('Extra amount')
+                ->content(function (Get $get) use ($payableInstallments, $defaultInstallment): string {
+                    if ($get('payment_target') !== 'tuition') {
+                        return '';
+                    }
 
-        $fields[] = TextInput::make('amount')
-            ->label('Amount (₹)')
-            ->numeric()
-            ->required()
-            ->minValue(1)
-            ->live(debounce: 300)
-            ->default(fn (): ?string => $defaultInstallment
-                ? (string) FeePlanCalculator::toWholeRupeeAmount((float) $defaultInstallment->pending_amount)
-                : ($pending > 0 ? (string) FeePlanCalculator::toWholeRupeeAmount($pending) : null))
-            ->maxValue(FeePlanCalculator::toWholeRupeeAmount($pending))
-            ->step(1)
-            ->helperText('You may pay more than one installment; extra reduces future dues automatically.');
+                    $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
 
-        $fields[] = Placeholder::make('surplus_notice')
-            ->label('Extra amount')
-            ->content(function (Get $get) use ($payableInstallments, $defaultInstallment): string {
-                $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
+                    return PaymentShortfallHelper::surplusForwardPreview(
+                        (float) ($get('amount') ?? 0),
+                        $installment,
+                        $payableInstallments,
+                    ) ?? '';
+                })
+                ->visible(function (Get $get) use ($payableInstallments, $defaultInstallment): bool {
+                    if ($get('payment_target') !== 'tuition') {
+                        return false;
+                    }
 
-                return PaymentShortfallHelper::surplusForwardPreview(
-                    (float) ($get('amount') ?? 0),
-                    $installment,
-                    $payableInstallments,
-                ) ?? '';
-            })
-            ->visible(function (Get $get) use ($payableInstallments, $defaultInstallment): bool {
-                $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
+                    $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
 
-                return PaymentShortfallHelper::surplusAmount((float) ($get('amount') ?? 0), $installment) > 0;
-            })
-            ->extraAttributes(['class' => 'text-sm font-medium text-primary-600 dark:text-primary-400'])
-            ->columnSpanFull();
-
-        if ($flexible && $defaultInstallment) {
-            $fields[] = Placeholder::make('shortfall_notice')
+                    return PaymentShortfallHelper::surplusAmount((float) ($get('amount') ?? 0), $installment) > 0;
+                })
+                ->extraAttributes(['class' => 'text-sm font-medium text-primary-600 dark:text-primary-400'])
+                ->columnSpanFull(),
+            Placeholder::make('shortfall_notice')
                 ->label('Remaining on this installment')
                 ->content(function (Get $get) use ($payableInstallments, $defaultInstallment): string {
+                    if ($get('payment_target') !== 'tuition') {
+                        return '';
+                    }
+
                     $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
                     $shortfall = PaymentShortfallHelper::shortfallAmount((float) ($get('amount') ?? 0), $installment);
 
@@ -179,15 +315,18 @@ class AddPaymentFormSchema
                     return '₹'.FeePlanCalculator::formatRupeeAmount($shortfall).' from '.$installment->label.' stays unpaid. Choose how to schedule it below.';
                 })
                 ->visible(function (Get $get) use ($payableInstallments, $defaultInstallment): bool {
+                    if ($get('payment_target') !== 'tuition') {
+                        return false;
+                    }
+
                     $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
 
                     return PaymentShortfallHelper::shortfallAmount((float) ($get('amount') ?? 0), $installment) > 0;
                 })
-                ->columnSpanFull();
-
-            $fields[] = Select::make('shortfall_action')
+                ->columnSpanFull(),
+            Select::make('shortfall_action')
                 ->label('Handle remaining balance')
-                ->options(function (Get $get) use ($payableInstallments, $defaultInstallment, $feeStructure): array {
+                ->options(function (Get $get) use ($payableInstallments, $defaultInstallment): array {
                     $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
                     $options = [];
 
@@ -209,6 +348,10 @@ class AddPaymentFormSchema
                     return PaymentShortfallAction::NewInstallment->value;
                 })
                 ->required(function (Get $get) use ($payableInstallments, $defaultInstallment): bool {
+                    if ($get('payment_target') !== 'tuition') {
+                        return false;
+                    }
+
                     $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
 
                     return PaymentShortfallHelper::shortfallAmount((float) ($get('amount') ?? 0), $installment) > 0;
@@ -216,20 +359,22 @@ class AddPaymentFormSchema
                 ->native(false)
                 ->live()
                 ->visible(function (Get $get) use ($payableInstallments, $defaultInstallment): bool {
+                    if ($get('payment_target') !== 'tuition') {
+                        return false;
+                    }
+
                     $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
 
                     return PaymentShortfallHelper::shortfallAmount((float) ($get('amount') ?? 0), $installment) > 0;
                 })
-                ->columnSpanFull();
-
-            $fields[] = TextInput::make('shortfall_label')
+                ->columnSpanFull(),
+            TextInput::make('shortfall_label')
                 ->label('New installment label')
                 ->default(fn (): string => PaymentShortfallHelper::suggestNewInstallmentLabel($feeStructure->id))
                 ->maxLength(100)
-                ->visible(fn (Get $get): bool => $get('shortfall_action') === PaymentShortfallAction::NewInstallment->value)
-                ->required(fn (Get $get): bool => $get('shortfall_action') === PaymentShortfallAction::NewInstallment->value);
-
-            $fields[] = DatePicker::make('shortfall_due_date')
+                ->visible(fn (Get $get): bool => $get('payment_target') === 'tuition' && $get('shortfall_action') === PaymentShortfallAction::NewInstallment->value)
+                ->required(fn (Get $get): bool => $get('payment_target') === 'tuition' && $get('shortfall_action') === PaymentShortfallAction::NewInstallment->value),
+            DatePicker::make('shortfall_due_date')
                 ->label('New installment due date')
                 ->native(false)
                 ->default(now()->addMonth())
@@ -238,38 +383,9 @@ class AddPaymentFormSchema
 
                     return $installment?->due_date;
                 })
-                ->visible(fn (Get $get): bool => $get('shortfall_action') === PaymentShortfallAction::NewInstallment->value)
-                ->required(fn (Get $get): bool => $get('shortfall_action') === PaymentShortfallAction::NewInstallment->value);
-        }
-
-        $fields[] = Select::make('payment_mode')
-            ->label('Payment mode')
-            ->options(collect(PaymentMode::cases())->mapWithKeys(
-                fn (PaymentMode $mode) => [$mode->value => $mode->label()],
-            ))
-            ->required()
-            ->native(false)
-            ->live();
-
-        $fields[] = TextInput::make('voucher_number')
-            ->label('Voucher number')
-            ->maxLength(100)
-            ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Cash->value)
-            ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Cash->value);
-
-        $fields[] = TextInput::make('transaction_id')
-            ->label('Transaction ID')
-            ->maxLength(100)
-            ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Online->value)
-            ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Online->value);
-
-        $fields[] = TextInput::make('utr_number')
-            ->label('UTR number')
-            ->maxLength(100)
-            ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Upi->value)
-            ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Upi->value);
-
-        return $fields;
+                ->visible(fn (Get $get): bool => $get('payment_target') === 'tuition' && $get('shortfall_action') === PaymentShortfallAction::NewInstallment->value)
+                ->required(fn (Get $get): bool => $get('payment_target') === 'tuition' && $get('shortfall_action') === PaymentShortfallAction::NewInstallment->value),
+        ];
     }
 
     /**
@@ -285,5 +401,14 @@ class AddPaymentFormSchema
             $payableInstallments,
             $defaultInstallment,
         );
+    }
+
+    protected static function selectedMiscCharge(Get $get, ?FeeMiscCharge $defaultMisc): ?FeeMiscCharge
+    {
+        if (! filled($get('fee_misc_charge_id'))) {
+            return $defaultMisc;
+        }
+
+        return FeeMiscCharge::query()->find((int) $get('fee_misc_charge_id')) ?? $defaultMisc;
     }
 }

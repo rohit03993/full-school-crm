@@ -265,11 +265,17 @@ class PaymentService
         }
 
         $amount = round((float) $data['amount'], 2);
-        $expected = round((float) $charge->amount, 2);
+        $pending = round($charge->pendingAmount(), 2);
 
-        if (abs($amount - $expected) > 0.01) {
+        if ($amount <= 0) {
             throw ValidationException::withMessages([
-                'amount' => 'Miscellaneous charges must be paid in full (₹'.number_format($expected, 2).').',
+                'amount' => 'Payment amount must be greater than zero.',
+            ]);
+        }
+
+        if ($amount > $pending + 0.01) {
+            throw ValidationException::withMessages([
+                'amount' => 'Amount cannot exceed the pending balance of ₹'.number_format($pending, 2).'.',
             ]);
         }
 
@@ -295,7 +301,7 @@ class PaymentService
                 'added_by_user_id' => $staff->id,
             ]);
 
-            $this->miscCharges->markPaid($charge->fresh());
+            $this->miscCharges->applyPayment($charge->fresh(), $amount);
 
             $staff->loadMissing('staffProfile');
 

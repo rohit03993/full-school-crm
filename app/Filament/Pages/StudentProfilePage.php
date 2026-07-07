@@ -1158,7 +1158,7 @@ class StudentProfilePage extends Page
 
     public function openPayMiscCharge(int $chargeId): void
     {
-        $this->mountAction('payMiscCharge', ['chargeId' => $chargeId]);
+        $this->mountAction('addPayment', ['miscChargeId' => $chargeId]);
     }
 
     public function cancelMiscCharge(int $chargeId, FeeMiscChargeService $miscCharges): void
@@ -1210,7 +1210,7 @@ class StudentProfilePage extends Page
     {
         $this->payments = Payment::query()
             ->where('student_id', $this->record->id)
-            ->with(['addedBy.staffProfile', 'feeStructure.enrollment.course', 'feeInstallment'])
+            ->with(['addedBy.staffProfile', 'feeStructure.enrollment.course', 'feeInstallment', 'feeMiscCharge'])
             ->orderByDesc('payment_date')
             ->orderByDesc('id')
             ->limit(CrmPagination::PER_PAGE)
@@ -2029,16 +2029,21 @@ class StudentProfilePage extends Page
                 ->button()
                 ->modalHeading('Add payment')
                 ->modalWidth('lg')
-                ->form(function (): array {
+                ->arguments(['miscChargeId' => null])
+                ->form(function (array $arguments): array {
                     $feeStructure = $this->record->activeEnrollment?->feeStructure;
 
                     if (! $feeStructure) {
                         return [];
                     }
 
-                    return AddPaymentFormSchema::fields($feeStructure);
+                    $miscChargeId = filled($arguments['miscChargeId'] ?? null)
+                        ? (int) $arguments['miscChargeId']
+                        : null;
+
+                    return AddPaymentFormSchema::fields($feeStructure, $miscChargeId);
                 })
-                ->action(function (array $data, PaymentService $payments): void {
+                ->action(function (array $data, array $arguments, PaymentService $payments): void {
                     abort_unless($this->userCan(CrmPermission::FeesCollect), 403);
 
                     $feeStructure = $this->record->activeEnrollment?->feeStructure;
@@ -2053,13 +2058,25 @@ class StudentProfilePage extends Page
                         $proof = $proof[0] ?? null;
                     }
 
-                    $payment = $payments->add(
-                        $feeStructure,
-                        $this->record,
-                        $data,
-                        (string) $proof,
-                        Auth::user(),
-                    );
+                    $payment = ($data['payment_target'] ?? 'tuition') === 'misc'
+                        ? $payments->addMisc(
+                            $feeStructure,
+                            $this->record,
+                            app(FeeMiscChargeService::class)->resolveForStudent(
+                                $this->record,
+                                (int) ($data['fee_misc_charge_id'] ?? $arguments['miscChargeId'] ?? 0),
+                            ),
+                            $data,
+                            (string) $proof,
+                            Auth::user(),
+                        )
+                        : $payments->add(
+                            $feeStructure,
+                            $this->record,
+                            $data,
+                            (string) $proof,
+                            Auth::user(),
+                        );
 
                     app(StorageCleanupService::class)->pruneLivewireTempFiles(0);
 
@@ -2071,17 +2088,18 @@ class StudentProfilePage extends Page
                     $this->refreshRecord();
 
                     $body = "Receipt {$payment->receipt_number} · ₹".number_format((float) $payment->amount, 0).' · PDF generated';
+                    $isMiscPayment = ($data['payment_target'] ?? 'tuition') === 'misc';
 
                     if ($payment->shortfallSummary()) {
                         $body .= ' · '.$payment->shortfallSummary();
                     }
 
-                    if (Payment::query()->where('fee_structure_id', $feeStructure->id)->count() === 1) {
+                    if (! $isMiscPayment && Payment::query()->where('fee_structure_id', $feeStructure->id)->whereNull('fee_misc_charge_id')->count() === 1) {
                         $body .= ' · ID card generated';
                     }
 
                     Notification::make()
-                        ->title('Payment recorded')
+                        ->title($isMiscPayment ? 'Misc payment recorded' : 'Payment recorded')
                         ->body($body)
                         ->success()
                         ->send();

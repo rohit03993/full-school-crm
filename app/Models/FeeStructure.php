@@ -97,15 +97,33 @@ class FeeStructure extends Model
             ->sum('amount'), 2);
     }
 
+    public function separateMiscCharges()
+    {
+        $charges = $this->relationLoaded('miscCharges')
+            ? $this->miscCharges
+            : $this->miscCharges()->get();
+
+        return $charges->filter(fn (FeeMiscCharge $charge): bool => $charge->isSeparateCharge());
+    }
+
+    public function separateMiscChargesTotal(): float
+    {
+        return round((float) $this->separateMiscCharges()
+            ->reject(fn (FeeMiscCharge $charge): bool => $charge->status === FeeMiscChargeStatus::Cancelled)
+            ->sum('amount'), 2);
+    }
+
+    public function separateMiscChargesPaidTotal(): float
+    {
+        return round((float) $this->separateMiscCharges()
+            ->reject(fn (FeeMiscCharge $charge): bool => $charge->status === FeeMiscChargeStatus::Cancelled)
+            ->sum('paid_amount'), 2);
+    }
+
     public function separateMiscChargesPendingTotal(): float
     {
-        return round((float) $this->miscCharges()
-            ->whereIn('kind', [
-                FeeMiscChargeKind::Separate->value,
-                FeeMiscChargeKind::GstPenalty->value,
-            ])
-            ->where('status', FeeMiscChargeStatus::Pending->value)
-            ->sum('amount'), 2);
+        return round((float) $this->separateMiscCharges()
+            ->sum(fn (FeeMiscCharge $charge): float => $charge->pendingAmount()), 2);
     }
 
     public function hasOnlineAllowancePlan(): bool

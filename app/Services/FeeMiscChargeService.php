@@ -49,6 +49,7 @@ class FeeMiscChargeService
             'fee_structure_id' => $feeStructure->id,
             'label' => $label,
             'amount' => $amount,
+            'paid_amount' => 0,
             'kind' => FeeMiscChargeKind::Separate,
             'status' => FeeMiscChargeStatus::Pending,
             'due_date' => $dueDate,
@@ -212,9 +213,15 @@ class FeeMiscChargeService
             ]);
         }
 
-        if ($charge->status !== FeeMiscChargeStatus::Pending) {
+        if (! in_array($charge->status, [FeeMiscChargeStatus::Pending, FeeMiscChargeStatus::Partial], true)) {
             throw ValidationException::withMessages([
-                'charge' => 'Only pending charges can be cancelled.',
+                'charge' => 'Only unpaid or partially paid charges can be cancelled.',
+            ]);
+        }
+
+        if ((float) $charge->paid_amount > 0) {
+            throw ValidationException::withMessages([
+                'charge' => 'Cannot cancel a charge that already has payments recorded.',
             ]);
         }
 
@@ -233,14 +240,40 @@ class FeeMiscChargeService
         return $charge->fresh();
     }
 
-    public function markPaid(FeeMiscCharge $charge): FeeMiscCharge
+    public function applyPayment(FeeMiscCharge $charge, float $amount): FeeMiscCharge
     {
+        $amount = round($amount, 2);
+        $total = round((float) $charge->amount, 2);
+        $newPaid = round((float) $charge->paid_amount + $amount, 2);
+
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => 'Payment amount must be greater than zero.',
+            ]);
+        }
+
+        if ($newPaid > $total + 0.01) {
+            throw ValidationException::withMessages([
+                'amount' => 'Payment exceeds the remaining balance of ₹'.number_format($charge->pendingAmount(), 2).'.',
+            ]);
+        }
+
+        $status = $newPaid >= $total - 0.01
+            ? FeeMiscChargeStatus::Paid
+            : FeeMiscChargeStatus::Partial;
+
         $charge->update([
-            'status' => FeeMiscChargeStatus::Paid,
-            'paid_at' => now(),
+            'paid_amount' => $newPaid,
+            'status' => $status,
+            'paid_at' => $status === FeeMiscChargeStatus::Paid ? now() : null,
         ]);
 
         return $charge->fresh();
+    }
+
+    public function markPaid(FeeMiscCharge $charge): FeeMiscCharge
+    {
+        return $this->applyPayment($charge, $charge->pendingAmount());
     }
 
     public function resolveForStudent(Student $student, int $chargeId): FeeMiscCharge

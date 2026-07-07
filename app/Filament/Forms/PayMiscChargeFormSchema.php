@@ -4,6 +4,7 @@ namespace App\Filament\Forms;
 
 use App\Enums\PaymentMode;
 use App\Models\FeeMiscCharge;
+use App\Support\FeePlanCalculator;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -21,8 +22,11 @@ class PayMiscChargeFormSchema
      */
     public static function fields(FeeMiscCharge $charge): array
     {
-        $amount = round((float) $charge->amount, 2);
+        $total = round((float) $charge->amount, 2);
+        $paid = round((float) $charge->paid_amount, 2);
+        $pending = $charge->pendingAmount();
         $collector = Auth::user()?->loadMissing('staffProfile');
+        $format = fn (float $amount): string => FeePlanCalculator::formatRupeeAmount($amount);
 
         return [
             Hidden::make('fee_misc_charge_id')
@@ -32,9 +36,10 @@ class PayMiscChargeFormSchema
                 ->content(new HtmlString(
                     '<div class="rounded-lg bg-amber-50 px-3 py-2 text-sm dark:bg-amber-500/10">'
                     .'<p class="font-semibold text-amber-900 dark:text-amber-100">'.e($charge->label).'</p>'
-                    .'<p class="mt-1 text-lg font-bold text-amber-950 dark:text-amber-50">₹'.number_format($amount, 2).'</p>'
-                    .'<p class="mt-1 text-xs text-amber-800 dark:text-amber-200">Full payment required · collected by '
-                    .e($collector?->staffCollectorLabel() ?? 'staff').'</p></div>'
+                    .'<p class="mt-1 text-lg font-bold text-amber-950 dark:text-amber-50">₹'.$format($pending).' pending</p>'
+                    .'<p class="mt-1 text-xs text-amber-800 dark:text-amber-200">Total ₹'.$format($total)
+                    .' · Paid ₹'.$format($paid)
+                    .' · collected by '.e($collector?->staffCollectorLabel() ?? 'staff').'</p></div>'
                 ))
                 ->columnSpanFull(),
             Section::make('Payment details')
@@ -46,11 +51,14 @@ class PayMiscChargeFormSchema
                         ->required()
                         ->native(false),
                     TextInput::make('amount')
+                        ->label('Amount (₹)')
                         ->numeric()
                         ->required()
-                        ->default($amount)
-                        ->readOnly()
-                        ->dehydrated(),
+                        ->default((string) FeePlanCalculator::toWholeRupeeAmount($pending))
+                        ->minValue(1)
+                        ->maxValue(FeePlanCalculator::toWholeRupeeAmount($pending))
+                        ->step(1)
+                        ->helperText('Partial payments are allowed.'),
                     Select::make('payment_mode')
                         ->options(collect(PaymentMode::cases())->mapWithKeys(
                             fn (PaymentMode $mode): array => [$mode->value => $mode->label()],

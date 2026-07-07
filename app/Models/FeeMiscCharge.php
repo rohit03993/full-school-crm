@@ -14,6 +14,7 @@ class FeeMiscCharge extends Model
         'fee_structure_id',
         'label',
         'amount',
+        'paid_amount',
         'kind',
         'status',
         'due_date',
@@ -26,6 +27,7 @@ class FeeMiscCharge extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'paid_amount' => 'decimal:2',
             'kind' => FeeMiscChargeKind::class,
             'status' => FeeMiscChargeStatus::class,
             'due_date' => 'date',
@@ -49,14 +51,33 @@ class FeeMiscCharge extends Model
         return $this->hasMany(Payment::class);
     }
 
-    public function isPayableSeparately(): bool
-    {
-        return in_array($this->kind, [FeeMiscChargeKind::Separate, FeeMiscChargeKind::GstPenalty], true)
-            && $this->status === FeeMiscChargeStatus::Pending;
-    }
-
     public function isBundledInNetFee(): bool
     {
         return $this->kind === FeeMiscChargeKind::Bundled;
+    }
+
+    public function isSeparateCharge(): bool
+    {
+        return in_array($this->kind, [FeeMiscChargeKind::Separate, FeeMiscChargeKind::GstPenalty], true);
+    }
+
+    public function pendingAmount(): float
+    {
+        if (! $this->isSeparateCharge() || $this->status === FeeMiscChargeStatus::Cancelled) {
+            return 0.0;
+        }
+
+        if ($this->status === FeeMiscChargeStatus::Paid) {
+            return 0.0;
+        }
+
+        return round(max(0, (float) $this->amount - (float) $this->paid_amount), 2);
+    }
+
+    public function isPayableSeparately(): bool
+    {
+        return $this->isSeparateCharge()
+            && in_array($this->status, [FeeMiscChargeStatus::Pending, FeeMiscChargeStatus::Partial], true)
+            && $this->pendingAmount() > 0;
     }
 }

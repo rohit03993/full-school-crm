@@ -24,11 +24,60 @@
         <p class="mt-1">Approve the admission to create the fee record.</p>
     </div>
 @else
+    @php
+        $tuitionPending = (float) $fees->pending_amount;
+        $miscTotal = $fees->separateMiscChargesTotal();
+        $miscPaid = $fees->separateMiscChargesPaidTotal();
+        $miscPending = $fees->separateMiscChargesPendingTotal();
+        $penaltyPending = $pendingPenalties->sum(fn ($p) => (float) $p->penalty_amount);
+        $collectible = (float) $fees->totalCollectiblePending();
+    @endphp
     <div class="space-y-4">
-        <div class="rounded-xl border-2 border-primary-500/40 bg-gradient-to-r from-primary-500/10 to-amber-500/5 px-4 py-5 sm:px-6">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-primary-700 dark:text-primary-400">{{ \App\Support\StudentLabels::rollNumberLabel() }}</p>
-            <h3 class="mt-1 text-lg font-bold text-gray-950 dark:text-white">{{ $enrollment->enrollment_number }}</h3>
-            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ $course?->name ?? 'Course' }} · {{ $course?->duration_label }}</p>
+        <div class="rounded-xl border-2 border-primary-500/40 bg-gradient-to-r from-primary-500/10 to-amber-500/5 px-4 py-4 sm:px-6">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-primary-700 dark:text-primary-400">{{ \App\Support\StudentLabels::rollNumberLabel() }}</p>
+                    <h3 class="mt-1 text-lg font-bold text-gray-950 dark:text-white">{{ $enrollment->enrollment_number }}</h3>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ $course?->name ?? 'Course' }} · {{ $course?->duration_label }}</p>
+                </div>
+            </div>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="rounded-lg bg-amber-50 px-3 py-3 dark:bg-amber-500/10">
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Net tuition fee</p>
+                    <p class="mt-1 text-xl font-bold text-amber-950 dark:text-amber-50">₹{{ number_format((float) $fees->net_fee, 2) }}</p>
+                    <p class="mt-1 text-xs text-amber-800/80 dark:text-amber-200">
+                        Course ₹{{ number_format((float) $fees->course_fee, 2) }}
+                        @if ((float) $fees->discount_amount > 0)
+                            − Discount ₹{{ number_format((float) $fees->discount_amount, 2) }}
+                        @endif
+                    </p>
+                </div>
+                <div class="rounded-lg bg-violet-50 px-3 py-3 dark:bg-violet-500/10">
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-300">Misc charges</p>
+                    <p class="mt-1 text-xl font-bold text-violet-950 dark:text-violet-50">₹{{ number_format($miscTotal, 2) }}</p>
+                    <p class="mt-1 text-xs text-violet-800/80 dark:text-violet-200">
+                        Paid ₹{{ number_format($miscPaid, 2) }} · Pending ₹{{ number_format($miscPending, 2) }}
+                    </p>
+                </div>
+                <div class="rounded-lg bg-emerald-50 px-3 py-3 dark:bg-emerald-500/10">
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Tuition paid</p>
+                    <p class="mt-1 text-xl font-bold text-emerald-950 dark:text-emerald-50">₹{{ number_format((float) $fees->paid_amount, 2) }}</p>
+                    <p class="mt-1 text-xs text-emerald-800/80 dark:text-emerald-200">Installments collected</p>
+                </div>
+                <div class="rounded-lg bg-orange-50 px-3 py-3 dark:bg-orange-500/10">
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-orange-800 dark:text-orange-300">Balance due</p>
+                    <p class="mt-1 text-xl font-bold text-orange-950 dark:text-orange-50">₹{{ number_format($collectible, 2) }}</p>
+                    <p class="mt-1 text-xs text-orange-800/80 dark:text-orange-200">
+                        Tuition ₹{{ number_format($tuitionPending, 2) }}
+                        @if ($miscPending > 0)
+                            · Misc ₹{{ number_format($miscPending, 2) }}
+                        @endif
+                        @if ($penaltyPending > 0)
+                            · Late fees ₹{{ number_format($penaltyPending, 2) }}
+                        @endif
+                    </p>
+                </div>
+            </div>
         </div>
 
         <div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
@@ -173,8 +222,11 @@
                     @foreach ($separateMisc as $charge)
                         @php
                             $statusLabel = $charge->status->label();
+                            $chargePaid = (float) $charge->paid_amount;
+                            $chargePending = $charge->pendingAmount();
                             $statusClass = match ($charge->status) {
                                 FeeMiscChargeStatus::Paid => 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
+                                FeeMiscChargeStatus::Partial => 'bg-sky-500/15 text-sky-800 dark:text-sky-300',
                                 FeeMiscChargeStatus::Cancelled => 'bg-gray-500/10 text-gray-600 dark:text-gray-400',
                                 default => 'bg-amber-500/15 text-amber-900 dark:text-amber-200',
                             };
@@ -183,7 +235,13 @@
                             <div>
                                 <p class="font-semibold text-gray-950 dark:text-white">{{ $charge->label }}</p>
                                 <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
-                                    ₹{{ number_format((float) $charge->amount, 2) }}
+                                    Total ₹{{ number_format((float) $charge->amount, 2) }}
+                                    @if ($chargePaid > 0)
+                                        · Paid ₹{{ number_format($chargePaid, 2) }}
+                                    @endif
+                                    @if ($chargePending > 0)
+                                        · <span class="font-semibold text-amber-700 dark:text-amber-300">Pending ₹{{ number_format($chargePending, 2) }}</span>
+                                    @endif
                                     @if ($charge->due_date)
                                         · Due {{ $charge->due_date->format('d M Y') }}
                                     @endif
@@ -291,10 +349,15 @@
                 <p class="font-semibold">Collect payment</p>
                 <p class="mt-1">
                     Outstanding total <strong>₹{{ number_format($collectible, 2) }}</strong>
-                    @if ((float) $fees->pending_amount <= 0 && $pendingPenalties->isNotEmpty())
-                        (late fees only — fee balance is cleared)
+                    (tuition ₹{{ number_format($tuitionPending, 2) }}
+                    @if ($miscPending > 0)
+                        · misc ₹{{ number_format($miscPending, 2) }}
                     @endif
-                    · Use <strong>Add Payment</strong> at the top of this page.
+                    @if ($penaltyPending > 0)
+                        · late fees ₹{{ number_format($penaltyPending, 2) }}
+                    @endif
+                    )
+                    · Use <strong>Add Payment</strong> for tuition or misc charges.
                 </p>
             </div>
         @elseif ($collectible > 0)
@@ -318,6 +381,7 @@
                                 <p class="font-mono text-sm font-bold text-primary-600 dark:text-primary-400">{{ $payment->receipt_number }}</p>
                                 <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
                                     {{ $payment->payment_date->format('d M Y') }} · {{ $payment->payment_mode->label() }}
+                                    @if ($payment->feeMiscCharge) · Misc: {{ $payment->feeMiscCharge->label }} @endif
                                     @if ($payment->feeInstallment) · {{ $payment->feeInstallment->label }} @endif
                                     @if ($payment->voucher_number) · Voucher {{ $payment->voucher_number }} @endif
                                     @if ($payment->transaction_id) · Txn {{ $payment->transaction_id }} @endif
