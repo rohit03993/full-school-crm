@@ -157,6 +157,8 @@ class StudentProfilePage extends Page
 
     public ?TemporaryUploadedFile $metaReplyAttachment = null;
 
+    public bool $showMetaReplyAttachment = false;
+
     public bool $metaSessionOpen = false;
 
     public bool $metaRoutingActive = false;
@@ -324,6 +326,11 @@ class StudentProfilePage extends Page
 
     public function updatedProfileTab(): void
     {
+        if ($this->profileTab !== 'messages') {
+            $this->showMetaReplyAttachment = false;
+            $this->metaReplyAttachment = null;
+        }
+
         if (str_starts_with($this->profileTab, 'activity_')) {
             $this->activitySubTab = substr($this->profileTab, strlen('activity_'));
             $this->profileTab = 'activities';
@@ -565,6 +572,8 @@ class StudentProfilePage extends Page
                 'metaRoutingActive' => $this->metaRoutingActive,
                 'whatsappProviderLabel' => $this->whatsappProviderLabel,
                 'metaReplyText' => $this->metaReplyText,
+                'showMetaReplyAttachment' => $this->showMetaReplyAttachment,
+                'metaReplyAttachment' => $this->metaReplyAttachment,
                 'waTemplates' => $catalog->selectableTemplates(),
                 'waTemplateSyncHint' => $this->whatsAppTemplateSyncHint($catalog),
                 'sendWhatsAppTemplateId' => $this->sendWhatsAppTemplateId,
@@ -584,6 +593,8 @@ class StudentProfilePage extends Page
                 'metaRoutingActive' => false,
                 'whatsappProviderLabel' => 'Unavailable',
                 'metaReplyText' => $this->metaReplyText,
+                'showMetaReplyAttachment' => false,
+                'metaReplyAttachment' => null,
                 'waTemplates' => collect(),
                 'waTemplateSyncHint' => null,
                 'sendWhatsAppTemplateId' => null,
@@ -593,6 +604,11 @@ class StudentProfilePage extends Page
                 'sendWhatsAppSelectedTemplateName' => null,
             ];
         }
+    }
+
+    public function enableMetaReplyAttachment(): void
+    {
+        $this->showMetaReplyAttachment = true;
     }
 
     protected function whatsAppTemplateSyncHint(WhatsAppTemplateCatalog $catalog): ?string
@@ -614,7 +630,7 @@ class StudentProfilePage extends Page
 
     public function loadMessagesTab(): void
     {
-        if ($this->messagesTabLoaded) {
+        if ($this->profileTab !== 'messages' || $this->messagesTabLoaded) {
             return;
         }
 
@@ -709,6 +725,7 @@ class StudentProfilePage extends Page
 
         $this->metaReplyText = '';
         $this->metaReplyAttachment = null;
+        $this->showMetaReplyAttachment = false;
         $this->messagesTabLoaded = false;
         $this->loadMessagesTab();
 

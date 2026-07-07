@@ -1,9 +1,4 @@
-<div
-    @unless ($compactInbox ?? false)
-        wire:init="loadMessagesTab"
-    @endunless
-    @class(['crm-wa-inbox', 'crm-wa-inbox--compact' => $compactInbox ?? false])
->
+<div @class(['crm-wa-inbox', 'crm-wa-inbox--compact' => $compactInbox ?? false])>
     @php
         $lastThreadKey = $messageThread === []
             ? 'empty'
@@ -150,20 +145,30 @@
                         ></textarea>
                     </div>
                     @unless ($compactInbox ?? false)
-                    <div class="crm-wa-inbox__field">
-                        <label class="crm-wa-inbox__label" for="wa-quick-attachment">Photo, video, or file</label>
-                        <input
-                            id="wa-quick-attachment"
-                            type="file"
-                            wire:model="metaReplyAttachment"
-                            accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
-                            class="crm-wa-inbox__file"
-                        />
-                        <p class="crm-wa-inbox__field-hint">Images, videos, voice notes, and PDFs — like WhatsApp. Max 16 MB for video, 5 MB for images.</p>
-                        <div wire:loading wire:target="metaReplyAttachment,sendMetaMedia" class="crm-wa-inbox__hint">Uploading…</div>
-                    </div>
+                    @if ($showMetaReplyAttachment ?? false)
+                        <div class="crm-wa-inbox__field">
+                            <label class="crm-wa-inbox__label" for="wa-quick-attachment">Photo, video, or file</label>
+                            <input
+                                id="wa-quick-attachment"
+                                type="file"
+                                wire:model="metaReplyAttachment"
+                                accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                                class="crm-wa-inbox__file"
+                            />
+                            <p class="crm-wa-inbox__field-hint">Images, videos, voice notes, and PDFs — like WhatsApp. Max 16 MB for video, 5 MB for images.</p>
+                            <div wire:loading wire:target="metaReplyAttachment,sendMetaMedia" class="crm-wa-inbox__hint">Uploading…</div>
+                        </div>
+                    @else
+                        <button
+                            type="button"
+                            wire:click="enableMetaReplyAttachment"
+                            class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--full"
+                        >
+                            Attach photo or file
+                        </button>
+                    @endif
                     <div class="crm-wa-inbox__composer-actions">
-                        @if ($metaReplyAttachment)
+                        @if (filled($metaReplyAttachment ?? null))
                             <button
                                 type="button"
                                 wire:click="sendMetaMedia"

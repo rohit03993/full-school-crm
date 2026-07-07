@@ -28,6 +28,8 @@ trait InteractsWithStudentWhatsAppInbox
 
     public ?TemporaryUploadedFile $metaReplyAttachment = null;
 
+    public bool $showMetaReplyAttachment = false;
+
     public bool $metaSessionOpen = false;
 
     public bool $metaRoutingActive = false;
@@ -136,6 +138,8 @@ trait InteractsWithStudentWhatsAppInbox
                 'metaRoutingActive' => $this->metaRoutingActive,
                 'whatsappProviderLabel' => $this->whatsappProviderLabel,
                 'metaReplyText' => $this->metaReplyText,
+                'showMetaReplyAttachment' => $this->showMetaReplyAttachment,
+                'metaReplyAttachment' => $this->metaReplyAttachment,
                 'waTemplates' => $catalog->selectableTemplates(),
                 'waTemplateSyncHint' => $this->whatsAppTemplateSyncHint($catalog),
                 'sendWhatsAppTemplateId' => $this->sendWhatsAppTemplateId,
@@ -156,6 +160,8 @@ trait InteractsWithStudentWhatsAppInbox
                 'metaRoutingActive' => false,
                 'whatsappProviderLabel' => 'Unavailable',
                 'metaReplyText' => $this->metaReplyText,
+                'showMetaReplyAttachment' => false,
+                'metaReplyAttachment' => null,
                 'waTemplates' => collect(),
                 'waTemplateSyncHint' => null,
                 'sendWhatsAppTemplateId' => null,
@@ -182,6 +188,11 @@ trait InteractsWithStudentWhatsAppInbox
         return 'Only Meta-synced templates can be sent. Templates like «'
             .implode('», «', array_slice($orphaned, 0, 3))
             .'» are from an old import — open Connection & Setup and click Sync templates.';
+    }
+
+    public function enableMetaReplyAttachment(): void
+    {
+        $this->showMetaReplyAttachment = true;
     }
 
     public function loadMessagesTab(): void
@@ -221,6 +232,7 @@ trait InteractsWithStudentWhatsAppInbox
         $this->messageThread = [];
         $this->metaReplyText = '';
         $this->metaReplyAttachment = null;
+        $this->showMetaReplyAttachment = false;
         $this->sendWhatsAppTemplateId = null;
         $this->refreshWhatsAppTemplateComposer();
     }
