@@ -2133,6 +2133,14 @@ class StudentProfilePage extends Page
                             ->body(collect($exception->errors())->flatten()->first() ?? 'Please check the form.')
                             ->danger()
                             ->send();
+                    } catch (\Throwable $exception) {
+                        report($exception);
+
+                        Notification::make()
+                            ->title('Could not save profile')
+                            ->body('Something went wrong while saving. Please try again.')
+                            ->danger()
+                            ->send();
                     }
                 })
                 ->visible(fn (): bool => $this->userCan(CrmPermission::StudentsEdit)),

@@ -150,7 +150,7 @@ class StudentProfileFormSchema
                         ->label('Alternate mobile')
                         ->tel()
                         ->maxLength(10)
-                        ->rule('nullable|regex:/^[6-9]\d{9}$/'),
+                        ->rules(['nullable', 'regex:/^[6-9]\d{9}$/']),
                     Select::make('category')
                         ->options(self::categoryOptions())
                         ->native(false),
@@ -168,7 +168,7 @@ class StudentProfileFormSchema
                         ->maxLength(100),
                     TextInput::make('pincode')
                         ->maxLength(6)
-                        ->rule('nullable|digits:6'),
+                        ->rules(['nullable', 'digits:6']),
                 ]),
             ...CustomFieldFormBuilder::sections(CustomFieldService::ENTITY_STUDENT),
         ]);

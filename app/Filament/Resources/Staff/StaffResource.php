@@ -125,7 +125,7 @@ class StaffResource extends Resource
                         ->label('Work Mobile')
                         ->tel()
                         ->maxLength(10)
-                        ->rule('nullable|regex:/^[6-9]\d{9}$/'),
+                        ->rules(['nullable', 'regex:/^[6-9]\d{9}$/']),
                 ]),
         ]);
     }

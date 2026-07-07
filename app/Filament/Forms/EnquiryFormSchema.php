@@ -431,7 +431,7 @@ class EnquiryFormSchema
             TextInput::make('alternate_mobile')
                 ->tel()
                 ->maxLength(10)
-                ->rule('nullable|regex:/^[6-9]\d{9}$/'),
+                ->rules(['nullable', 'regex:/^[6-9]\d{9}$/']),
         ];
     }
 
@@ -450,7 +450,7 @@ class EnquiryFormSchema
                 ->maxLength(100),
             TextInput::make('pincode')
                 ->maxLength(6)
-                ->rule('nullable|digits:6'),
+                ->rules(['nullable', 'digits:6']),
         ];
     }
 
