@@ -77,6 +77,13 @@ class CampusVisitsPage extends Page
         $this->resetPage();
     }
 
+    public function setPeriodThisWeek(): void
+    {
+        $this->dateFrom = now()->startOfWeek()->toDateString();
+        $this->dateTo = now()->toDateString();
+        $this->resetPage();
+    }
+
     public function updatedDateFrom(): void
     {
         $this->resetPage();

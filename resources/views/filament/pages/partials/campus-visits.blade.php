@@ -14,6 +14,13 @@
       </button>
       <button
         type="button"
+        wire:click="setPeriodThisWeek"
+        class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300"
+      >
+        This week
+      </button>
+      <button
+        type="button"
         wire:click="setPeriodThisMonth"
         class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300"
       >
@@ -42,7 +49,7 @@
     </div>
 
     <div class="mt-3 flex flex-wrap gap-2">
-      @foreach (['all' => 'All visits', 'prospect' => 'New / prospect', 'enrolled' => 'Enrolled students'] as $value => $label)
+      @foreach (['all' => 'All visits', 'prospect' => 'Lead visits', 'enrolled' => 'Student visits'] as $value => $label)
         <button
           type="button"
           wire:click="$set('enrollmentFilter', '{{ $value }}')"
@@ -66,8 +73,8 @@
     @foreach ([
       ['label' => 'Total visits', 'value' => $stats['total_visits'] ?? 0],
       ['label' => 'Unique students', 'value' => $stats['unique_students'] ?? 0],
-      ['label' => 'New / prospect', 'value' => $stats['prospect_visits'] ?? 0],
-      ['label' => 'Enrolled', 'value' => $stats['enrolled_visits'] ?? 0],
+      ['label' => 'Lead visits', 'value' => $stats['prospect_visits'] ?? 0],
+      ['label' => 'Student visits', 'value' => $stats['enrolled_visits'] ?? 0],
       ['label' => 'First-time visitors', 'value' => $stats['first_time_visitors'] ?? 0],
       ['label' => 'Visited 2+ times', 'value' => $stats['repeat_visit_students'] ?? 0],
     ] as $stat)

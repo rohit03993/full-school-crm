@@ -36,7 +36,6 @@ class AllStudentsResourceTest extends TestCase
         $student = $this->createEnrolledStudent('Listed Student', '9876500999', '501');
 
         $listed = StudentResource::getEloquentQuery()
-            ->where('status', StudentStatus::Enrolled)
             ->where('mobile', '9876500999')
             ->first();
 

@@ -8,6 +8,7 @@ use App\Enums\DocumentType;
 use App\Enums\Gender;
 use App\Enums\StudentCategory;
 use App\Enums\StudentStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -197,5 +198,20 @@ class Student extends Model
             ->take(2)
             ->map(fn (string $part): string => mb_strtoupper(mb_substr($part, 0, 1)))
             ->implode('');
+    }
+
+    /**
+     * Students directory — enrolled alumni and exits; not enquiry or admission pipeline.
+     *
+     * @param  Builder<Student>  $query
+     * @return Builder<Student>
+     */
+    public function scopeInStudentsDirectory(Builder $query): Builder
+    {
+        return $query->whereIn('status', [
+            StudentStatus::Enrolled,
+            StudentStatus::Completed,
+            StudentStatus::Dropped,
+        ]);
     }
 }

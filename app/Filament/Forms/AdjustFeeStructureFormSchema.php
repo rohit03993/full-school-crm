@@ -114,7 +114,7 @@ class AdjustFeeStructureFormSchema
                                 ->dehydrated(false),
                             Placeholder::make('new_net_fee_preview')
                                 ->label('After change')
-                                ->content(function (Get $get) use ($feeStructure, $miscTotal, $currentNet, $paid): string {
+                                ->content(function (Get $get) use ($feeStructure, $miscTotal, $currentNet, $paid, $format): string {
                                     $mounted = self::mountedSliceFromGet($get);
                                     $newNet = self::previewNetFromMounted($feeStructure, $mounted, $miscTotal);
                                     $newPending = round(max(0, $newNet - $paid), 2);

@@ -75,6 +75,7 @@ class EnquiryResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
+            ->activeLeads()
             ->with(['student', 'course', 'meetingWith']);
     }
 
@@ -152,16 +153,6 @@ class EnquiryResource extends Resource
                     ->queries(
                         true: fn (Builder $query): Builder => $query->whereNotNull('calling_assigned_at'),
                         false: fn (Builder $query): Builder => $query->whereNull('calling_assigned_at'),
-                        blank: fn (Builder $query): Builder => $query,
-                    ),
-                TernaryFilter::make('student_enrolled')
-                    ->label('Student type')
-                    ->placeholder('All students')
-                    ->trueLabel('Enrolled')
-                    ->falseLabel('Prospect')
-                    ->queries(
-                        true: fn (Builder $query): Builder => $query->whereHas('student.activeEnrollment'),
-                        false: fn (Builder $query): Builder => $query->whereDoesntHave('student.activeEnrollment'),
                         blank: fn (Builder $query): Builder => $query,
                     ),
                 SelectFilter::make('latest_visit_status')
@@ -302,7 +293,7 @@ class EnquiryResource extends Resource
                 fn (Enquiry $record): string => StudentProfilePage::getUrl(['record' => $record->student_id]),
             )
             ->emptyStateHeading('No leads yet')
-            ->emptyStateDescription('Website and walk-in enquiries will appear here.')
+            ->emptyStateDescription('Active prospects appear here. Once enrolled, they move to All Students; visit history stays in Visit Log.')
             ->emptyStateIcon(Heroicon::OutlinedInbox);
     }
 

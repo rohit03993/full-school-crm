@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\LeadSource;
 use App\Enums\VisitStatus;
 use App\Enums\VisitType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -69,5 +70,21 @@ class Enquiry extends Model
     public function admission(): HasOne
     {
         return $this->hasOne(Admission::class);
+    }
+
+    /**
+     * Open leads only — excludes enrolled students and converted (Joined) enquiries.
+     *
+     * @param  Builder<Enquiry>  $query
+     * @return Builder<Enquiry>
+     */
+    public function scopeActiveLeads(Builder $query): Builder
+    {
+        return $query
+            ->whereDoesntHave('student.activeEnrollment')
+            ->where(function (Builder $inner): void {
+                $inner->whereNull('latest_visit_status')
+                    ->orWhere('latest_visit_status', '!=', VisitStatus::Joined);
+            });
     }
 }

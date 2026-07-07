@@ -56,6 +56,7 @@ class StudentResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
+            ->inStudentsDirectory()
             ->with([
                 'activeEnrollment.course',
                 'activeEnrollment.academicSession',
@@ -163,7 +164,11 @@ class StudentResource extends Resource
                         blank: fn (Builder $query): Builder => $query,
                     ),
                 SelectFilter::make('status')
-                    ->options(collect(StudentStatus::cases())->mapWithKeys(
+                    ->options(collect([
+                        StudentStatus::Enrolled,
+                        StudentStatus::Completed,
+                        StudentStatus::Dropped,
+                    ])->mapWithKeys(
                         fn (StudentStatus $status) => [$status->value => $status->label()],
                     )),
                 SelectFilter::make('course')
