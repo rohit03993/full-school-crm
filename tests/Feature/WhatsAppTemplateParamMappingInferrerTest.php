@@ -70,11 +70,55 @@ class WhatsAppTemplateParamMappingInferrerTest extends TestCase
         ], $sources);
     }
 
-    public function test_numeric_variable_labels_stay_manual(): void
+    public function test_numeric_variable_labels_use_attendance_defaults(): void
     {
         $sources = WhatsAppTemplateParamMappingInferrer::infer(['1', '2', '3'], 3);
 
-        $this->assertSame([null, null, null], $sources);
+        $this->assertSame([
+            'student.name',
+            'student.enrollment_number',
+            'campaign.time',
+        ], $sources);
+    }
+
+    public function test_positional_manual_in_template_maps_student_time_and_date(): void
+    {
+        $sources = WhatsAppTemplateParamMappingInferrer::infer(['1', '2', '3', '4'], 4, 'manual_in');
+
+        $this->assertSame([
+            'student.name',
+            'student.enrollment_number',
+            'campaign.time',
+            'campaign.date',
+        ], $sources);
+    }
+
+    public function test_template_with_positional_meta_variables_uses_attendance_defaults(): void
+    {
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'manual_in',
+            'param_count' => 4,
+            'param_mappings' => [null, null, null, null],
+            'provider_meta' => [
+                'body_variables' => ['1', '2', '3', '4'],
+            ],
+        ]);
+
+        $this->assertSame([
+            'student.name',
+            'student.enrollment_number',
+            'campaign.time',
+            'campaign.date',
+        ], $template->paramSources());
+
+        $template->ensureParamMappings();
+
+        $this->assertSame([
+            'student.name',
+            'student.enrollment_number',
+            'campaign.time',
+            'campaign.date',
+        ], $template->fresh()->param_mappings);
     }
 
     public function test_template_uses_inferred_mappings_when_param_mappings_empty(): void

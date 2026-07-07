@@ -87,14 +87,120 @@ class WhatsAppTemplateParamMappingInferrer
      * @param  list<mixed>  $bodyVariables
      * @return list<string|null>
      */
-    public static function infer(array $bodyVariables, int $paramCount): array
+    public static function infer(array $bodyVariables, int $paramCount, ?string $templateName = null): array
     {
         $bodyVariables = array_values($bodyVariables);
+
+        if ($paramCount < 1) {
+            return [];
+        }
+
+        if (self::looksPositionalOnly($bodyVariables)) {
+            if ($templateName && self::looksLikeMarksTemplateName($templateName)) {
+                return self::marksDefaults($paramCount);
+            }
+
+            return self::attendancePunchDefaults($paramCount);
+        }
+
         $sources = [];
 
         for ($i = 0; $i < $paramCount; $i++) {
             $label = isset($bodyVariables[$i]) ? (string) $bodyVariables[$i] : '';
             $sources[] = self::inferSource($label);
+        }
+
+        return $sources;
+    }
+
+    /**
+     * @return list<string|null>
+     */
+    public static function marksDefaults(int $paramCount): array
+    {
+        $defaults = [
+            0 => 'student.name',
+            1 => 'student.enrollment_number',
+            2 => 'activity.test_name',
+            3 => 'activity.marks_summary',
+        ];
+
+        $sources = [];
+
+        for ($i = 0; $i < $paramCount; $i++) {
+            $sources[] = $defaults[$i] ?? null;
+        }
+
+        return $sources;
+    }
+
+    public static function looksLikeMarksTemplateName(string $name): bool
+    {
+        $normalized = strtolower(trim($name));
+
+        foreach (['marks', 'test_marks', 'activity_marks', 'exam_marks'] as $needle) {
+            if (str_contains($normalized, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  list<string|null>  $sources
+     * @return list<string|null>
+     */
+    public static function fillAttendancePunchDefaults(array $sources, int $paramCount): array
+    {
+        $defaults = self::attendancePunchDefaults($paramCount);
+
+        for ($i = 0; $i < $paramCount; $i++) {
+            if (! filled($sources[$i] ?? null) && filled($defaults[$i] ?? null)) {
+                $sources[$i] = $defaults[$i];
+            }
+        }
+
+        return $sources;
+    }
+
+    /**
+     * @param  list<mixed>  $bodyVariables
+     */
+    public static function looksPositionalOnly(array $bodyVariables): bool
+    {
+        if ($bodyVariables === []) {
+            return false;
+        }
+
+        foreach ($bodyVariables as $variable) {
+            if (preg_match('/^\d+$/', trim((string) $variable)) !== 1) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Standard punch / attendance template slots used across Folks and Meta templates.
+     *
+     * @return list<string|null>
+     */
+    public static function attendancePunchDefaults(int $paramCount): array
+    {
+        $defaults = [
+            0 => 'student.name',
+            1 => 'student.enrollment_number',
+            2 => 'campaign.time',
+            3 => 'campaign.date',
+            4 => 'attendance.status',
+        ];
+
+        $sources = [];
+
+        for ($i = 0; $i < $paramCount; $i++) {
+            $sources[] = $defaults[$i] ?? null;
         }
 
         return $sources;

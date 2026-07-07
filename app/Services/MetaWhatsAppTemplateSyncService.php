@@ -60,7 +60,7 @@ class MetaWhatsAppTemplateSyncService
                 ->where('language', $language)
                 ->first();
 
-            $inferredMappings = WhatsAppTemplateParamMappingInferrer::infer($bodyVariables, $paramCount);
+            $inferredMappings = WhatsAppTemplateParamMappingInferrer::infer($bodyVariables, $paramCount, $name);
             $paramMappings = $this->resolveParamMappings($existing, $inferredMappings, $paramCount);
 
             MetaWhatsAppTemplate::query()->updateOrCreate(

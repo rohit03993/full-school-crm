@@ -42,9 +42,9 @@ class MetaWhatsAppTemplateSubmitService
         $parsed = MetaWhatsAppTemplateParser::parse($components);
         $paramCount = (int) $parsed['param_count'];
         $bodyVariables = $parsed['body_variables'];
-        $inferredMappings = WhatsAppTemplateParamMappingInferrer::infer($bodyVariables, $paramCount);
-
         $name = (string) $payload['name'];
+        $inferredMappings = WhatsAppTemplateParamMappingInferrer::infer($bodyVariables, $paramCount, $name);
+
         $language = (string) $payload['language'];
         $status = strtoupper((string) ($metaResponse['status'] ?? 'PENDING'));
 

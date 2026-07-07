@@ -92,6 +92,9 @@ class PunchWhatsAppService
                     'date' => $date,
                     'time' => $punchAt->format('H:i:s'),
                     '_student_ids' => [$student->id],
+                    '_student_rolls' => [
+                        $student->id => $enrollmentNumber,
+                    ],
                     '_student_attendance_status' => [
                         $student->id => $state === 'IN' ? 'Present' : 'Checked out',
                     ],

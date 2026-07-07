@@ -58,7 +58,7 @@ class WhatsAppTemplate extends Model
 
         $bodyVariables = data_get($this->provider_meta, 'body_variables', []);
         $bodyVariables = is_array($bodyVariables) ? array_values($bodyVariables) : [];
-        $inferred = WhatsAppTemplateParamMappingInferrer::infer($bodyVariables, $paramCount);
+        $inferred = WhatsAppTemplateParamMappingInferrer::infer($bodyVariables, $paramCount, (string) $this->name);
         $mappings = $this->param_mappings ?? [];
         $sources = [];
 
@@ -82,6 +82,16 @@ class WhatsAppTemplate extends Model
             }
         }
 
+        if ($this->looksLikeAttendancePunchTemplate($bodyVariables)) {
+            $defaults = WhatsAppTemplateParamMappingInferrer::attendancePunchDefaults($paramCount);
+
+            foreach ($defaults as $index => $default) {
+                if (! filled($sources[$index] ?? null) && filled($default)) {
+                    $sources[$index] = $default;
+                }
+            }
+        }
+
         return $sources;
     }
 
@@ -99,6 +109,46 @@ class WhatsAppTemplate extends Model
         }
 
         return $this;
+    }
+
+    /**
+     * @param  list<mixed>  $bodyVariables
+     */
+    protected function looksLikeAttendancePunchTemplate(array $bodyVariables): bool
+    {
+        if ($this->looksLikeAttendancePunchName((string) $this->name)) {
+            return true;
+        }
+
+        return WhatsAppTemplateParamMappingInferrer::looksPositionalOnly($bodyVariables);
+    }
+
+    protected function looksLikeAttendancePunchName(string $name): bool
+    {
+        $normalized = strtolower(trim($name));
+
+        if ($normalized === '') {
+            return false;
+        }
+
+        foreach ([
+            'manual_in',
+            'manual_out',
+            'punch_in',
+            'punch_out',
+            'check_in',
+            'check_out',
+            'checkin',
+            'checkout',
+            'attendance',
+            'parent_attendance',
+        ] as $needle) {
+            if (str_contains($normalized, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
