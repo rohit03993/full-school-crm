@@ -89,8 +89,7 @@ class MetaWhatsAppMessageLogger
         ?string $mediaFilename = null,
         ?string $caption = null,
     ): MetaWhatsAppMessage {
-        return MetaWhatsAppMessage::query()->create([
-            'wamid' => $wamid,
+        $attributes = [
             'direction' => MetaWhatsAppMessageDirection::Inbound->value,
             'phone' => $this->normalizePhone($phone),
             'student_id' => $this->guessStudentId($phone),
@@ -103,6 +102,18 @@ class MetaWhatsAppMessageLogger
             'status' => MetaWhatsAppMessageStatus::Received->value,
             'payload' => $payload,
             'status_at' => now(),
+        ];
+
+        if (filled($wamid)) {
+            return MetaWhatsAppMessage::query()->updateOrCreate(
+                ['wamid' => $wamid],
+                $attributes,
+            );
+        }
+
+        return MetaWhatsAppMessage::query()->create([
+            'wamid' => $wamid,
+            ...$attributes,
         ]);
     }
 

@@ -7,6 +7,7 @@ use App\Enums\StudentStatus;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Jobs\DownloadMetaWhatsAppMediaJob;
 use App\Services\MetaWhatsAppMediaService;
 use App\Services\MetaWhatsAppWebhookService;
 use App\Services\StudentWhatsAppThreadService;
@@ -36,6 +37,21 @@ class MetaWhatsAppMediaTest extends TestCase
         $this->assertSame('media-123', $parsed['media_id']);
         $this->assertSame('Homework photo', $parsed['body_preview']);
         $this->assertSame('Homework photo', $parsed['caption']);
+    }
+
+    public function test_inbound_parser_uses_photo_label_when_image_has_no_caption(): void
+    {
+        $parsed = MetaWhatsAppInboundMessageParser::parse([
+            'type' => 'image',
+            'image' => [
+                'id' => 'media-123',
+                'mime_type' => 'image/jpeg',
+            ],
+        ]);
+
+        $this->assertSame('image', $parsed['message_type']);
+        $this->assertSame('📷 Photo', $parsed['body_preview']);
+        $this->assertNull($parsed['caption']);
     }
 
     public function test_webhook_stores_inbound_image_and_downloads_media(): void
@@ -101,6 +117,13 @@ class MetaWhatsAppMediaTest extends TestCase
         $this->assertNotNull($message);
         $this->assertSame('image', $message->message_type);
         $this->assertSame('Homework photo', $message->caption);
+        $this->assertSame('media-123', $message->media_id);
+
+        $job = new DownloadMetaWhatsAppMediaJob((int) $message->id);
+        $job->handle(app(MetaWhatsAppMediaService::class));
+
+        $message->refresh();
+
         $this->assertNotNull($message->media_path);
         $this->assertTrue(Storage::disk(MetaWhatsAppMediaService::DISK)->exists((string) $message->media_path));
 
@@ -250,6 +273,64 @@ class MetaWhatsAppMediaTest extends TestCase
         $this->assertNull($item->mediaUrl);
         $this->assertTrue($item->mediaPending);
         Http::assertNothingSent();
+    }
+
+    public function test_webhook_stores_production_style_image_and_handles_meta_retries(): void
+    {
+        Storage::fake(MetaWhatsAppMediaService::DISK);
+
+        Setting::setValue('meta_whatsapp.app_secret', Crypt::encryptString('meta-app-secret'), 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '123456789', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-token'), 'meta_whatsapp');
+
+        Student::query()->create([
+            'name' => 'Amit Verma',
+            'mobile' => '8109462946',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $payload = [
+            'object' => 'whatsapp_business_account',
+            'entry' => [[
+                'changes' => [[
+                    'field' => 'messages',
+                    'value' => [
+                        'messages' => [[
+                            'from' => '918109462946',
+                            'id' => 'wamid.HBgMOTE4MTA5NDYyOTQ2FQIAEhggQUNERjFENEQ5QzVBRjA4NzVBMzc4NzcxNjNEODNCMjIA',
+                            'timestamp' => '1783405543',
+                            'type' => 'image',
+                            'from_user_id' => 'IN.1490097205801892',
+                            'image' => [
+                                'id' => '1011017401826893',
+                                'mime_type' => 'image/jpeg',
+                                'sha256' => 'abc123',
+                            ],
+                        ]],
+                    ],
+                ]],
+            ]],
+        ];
+
+        $body = json_encode($payload, JSON_THROW_ON_ERROR);
+        $signature = 'sha256='.hash_hmac('sha256', $body, 'meta-app-secret');
+        $headers = [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_HUB_SIGNATURE_256' => $signature,
+        ];
+
+        foreach (range(1, 4) as $attempt) {
+            $this->call('POST', '/webhooks/meta/whatsapp', [], [], [], $headers, $body)->assertOk();
+        }
+
+        $this->assertSame(1, MetaWhatsAppMessage::query()->where('message_type', 'image')->count());
+
+        $message = MetaWhatsAppMessage::query()
+            ->where('wamid', 'wamid.HBgMOTE4MTA5NDYyOTQ2FQIAEhggQUNERjFENEQ5QzVBRjA4NzVBMzc4NzcxNjNEODNCMjIA')
+            ->first();
+
+        $this->assertNotNull($message);
+        $this->assertSame('1011017401826893', $message->media_id);
     }
 
     public function test_text_message_with_emoji_keeps_body(): void

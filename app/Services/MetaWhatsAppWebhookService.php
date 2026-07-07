@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\MetaWhatsAppMessageStatus;
 use App\Jobs\DownloadMetaWhatsAppMediaJob;
 use App\Support\MetaWhatsAppInboundMessageParser;
+use App\Support\MetaWhatsAppWebhookTrace;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -13,7 +14,6 @@ class MetaWhatsAppWebhookService
     public function __construct(
         protected MetaWhatsAppService $meta,
         protected MetaWhatsAppMessageLogger $logger,
-        protected MetaWhatsAppMediaService $media,
     ) {}
 
     public function verifySubscription(Request $request): ?string
@@ -129,38 +129,58 @@ class MetaWhatsAppWebhookService
 
             $from = (string) ($message['from'] ?? '');
             $wamid = (string) ($message['id'] ?? '');
-            $parsed = MetaWhatsAppInboundMessageParser::parse($message);
 
             if ($from === '') {
                 continue;
             }
 
-            Log::info('Meta WhatsApp inbound message received', [
-                'wamid' => $wamid,
-                'from' => $from,
-                'type' => $parsed['message_type'],
-                'media_id' => $parsed['media_id'],
-                'preview' => mb_substr($parsed['body_preview'], 0, 80),
-            ]);
+            try {
+                $parsed = MetaWhatsAppInboundMessageParser::parse($message);
 
-            $record = $this->logger->recordInbound(
-                $from,
-                $wamid !== '' ? $wamid : null,
-                $parsed['body_preview'],
-                $message,
-                $parsed['message_type'],
-                $parsed['media_id'],
-                $parsed['media_mime_type'],
-                $parsed['media_filename'],
-                $parsed['caption'],
-            );
+                Log::info('Meta WhatsApp inbound message received', [
+                    'wamid' => $wamid,
+                    'from' => $from,
+                    'type' => $parsed['message_type'],
+                    'media_id' => $parsed['media_id'],
+                    'preview' => mb_substr($parsed['body_preview'], 0, 80),
+                ]);
 
-            if (MetaWhatsAppInboundMessageParser::isMediaType($parsed['message_type'])) {
-                $stored = $this->media->downloadInboundMedia($record);
+                $record = $this->logger->recordInbound(
+                    $from,
+                    $wamid !== '' ? $wamid : null,
+                    $parsed['body_preview'],
+                    $message,
+                    $parsed['message_type'],
+                    $parsed['media_id'],
+                    $parsed['media_mime_type'],
+                    $parsed['media_filename'],
+                    $parsed['caption'],
+                );
 
-                if ($stored === null || blank($stored->media_path)) {
-                    DownloadMetaWhatsAppMediaJob::dispatch($record->id)->delay(now()->addSeconds(30));
+                MetaWhatsAppWebhookTrace::write('inbound_saved', [
+                    'message_id' => $record->id,
+                    'wamid' => $wamid,
+                    'type' => $parsed['message_type'],
+                    'media_id' => $parsed['media_id'],
+                ]);
+
+                if (MetaWhatsAppInboundMessageParser::isMediaType($parsed['message_type'])) {
+                    DownloadMetaWhatsAppMediaJob::dispatch($record->id)->afterResponse();
                 }
+            } catch (\Throwable $exception) {
+                Log::error('Meta WhatsApp inbound message failed', [
+                    'wamid' => $wamid,
+                    'from' => $from,
+                    'type' => (string) ($message['type'] ?? ''),
+                    'error' => $exception->getMessage(),
+                ]);
+
+                MetaWhatsAppWebhookTrace::write('inbound_failed', [
+                    'wamid' => $wamid,
+                    'from' => $from,
+                    'type' => (string) ($message['type'] ?? ''),
+                    'error' => $exception->getMessage(),
+                ]);
             }
         }
     }

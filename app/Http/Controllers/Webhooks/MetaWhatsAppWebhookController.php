@@ -6,6 +6,7 @@ use App\Services\MetaWhatsAppWebhookService;
 use App\Support\MetaWhatsAppWebhookTrace;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class MetaWhatsAppWebhookController
@@ -35,7 +36,17 @@ class MetaWhatsAppWebhookController
             'messages' => MetaWhatsAppWebhookTrace::summarizeInboundTypes($payload),
         ]);
 
-        $webhook->process($payload);
+        try {
+            $webhook->process($payload);
+        } catch (\Throwable $exception) {
+            Log::error('Meta WhatsApp webhook processing failed', [
+                'error' => $exception->getMessage(),
+            ]);
+
+            MetaWhatsAppWebhookTrace::write('process_failed', [
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         return response()->json(['success' => true]);
     }

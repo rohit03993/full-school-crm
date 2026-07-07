@@ -105,11 +105,11 @@ class MetaWhatsAppInboundMessageParser
 
         return [
             'message_type' => $type,
-            'body_preview' => $caption !== '' ? $caption : $fallbackLabel,
+            'body_preview' => filled($caption) ? $caption : $fallbackLabel,
             'media_id' => self::mediaIdFromPayload($message, $type),
             'media_mime_type' => (string) data_get($message, "{$type}.mime_type", '') ?: null,
             'media_filename' => (string) data_get($message, "{$type}.filename", '') ?: null,
-            'caption' => $caption !== '' ? $caption : null,
+            'caption' => filled($caption) ? $caption : null,
         ];
     }
 
@@ -131,11 +131,11 @@ class MetaWhatsAppInboundMessageParser
 
         return [
             'message_type' => 'document',
-            'body_preview' => $caption !== '' ? $caption : ($filename !== '' ? '📄 '.$filename : '📄 Document'),
+            'body_preview' => filled($caption) ? $caption : ($filename !== '' ? '📄 '.$filename : '📄 Document'),
             'media_id' => self::mediaIdFromPayload($message, 'document'),
             'media_mime_type' => (string) data_get($message, 'document.mime_type', '') ?: null,
             'media_filename' => $filename !== '' ? $filename : null,
-            'caption' => $caption !== '' ? $caption : null,
+            'caption' => filled($caption) ? $caption : null,
         ];
     }
 
