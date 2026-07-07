@@ -135,7 +135,7 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertSet('selectedStudentId', $student->id)
             ->assertSet('metaSessionOpen', true)
             ->assertSee('Amit Verma')
-            ->assertSee('Quick reply')
+            ->assertSee('Type a message')
             ->assertSee('Open student profile')
             ->assertDontSee('wire:model="metaReplyAttachment"', false)
             ->assertStatus(200);

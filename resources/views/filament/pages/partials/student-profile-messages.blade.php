@@ -6,6 +6,9 @@
         $hasPendingMedia = collect($messageThread)->contains(
             fn (array $message): bool => (bool) ($message['mediaPending'] ?? false),
         );
+        $replyFieldId = ($compactInbox ?? false) ? 'wa-quick-reply-inbox' : 'wa-quick-reply-profile';
+        $templateFieldId = ($compactInbox ?? false) ? 'wa-template-select-inbox' : 'wa-template-select-profile';
+        $attachmentFieldId = ($compactInbox ?? false) ? 'wa-quick-attachment-inbox' : 'wa-quick-attachment-profile';
     @endphp
 
     @unless ($compactInbox ?? false)
@@ -29,7 +32,7 @@
         </div>
         @if ($metaRoutingActive && $metaSessionOpen)
             <p class="crm-wa-inbox__hint crm-wa-inbox__hint--success">
-                Parent messaged recently — you can send a <strong>free-text reply</strong> below, or a template anytime.
+                Parent messaged recently — type a reply below or send a template.
             </p>
         @elseif ($metaRoutingActive && ! $metaSessionOpen)
             <p class="crm-wa-inbox__hint crm-wa-inbox__hint--banner">
@@ -43,176 +46,6 @@
     @endunless
 
     <div @class(['crm-wa-inbox__layout', 'crm-wa-inbox__layout--compact' => $compactInbox ?? false])>
-        <aside class="crm-wa-inbox__compose">
-            <section class="crm-wa-inbox__composer">
-                <div class="crm-wa-inbox__composer-head">
-                    <h3 class="crm-wa-inbox__composer-title">Send template</h3>
-                    <p class="crm-wa-inbox__composer-lead">Pick a template. If it has variables, fill every field marked required.</p>
-                </div>
-
-                @if (blank($record?->mobile))
-                    <p class="crm-wa-inbox__hint crm-wa-inbox__hint--danger">Add a mobile number on the student profile first.</p>
-                @elseif ($waTemplates->isEmpty())
-                    <p class="crm-wa-inbox__hint">
-                        No templates synced.
-                        Open <strong>{{ \App\Support\CrmNavigation::whatsAppMenu('Connection & Setup') }}</strong> → <strong>Sync templates</strong>.
-                    </p>
-                @else
-                    <div class="crm-wa-inbox__field">
-                        <label class="crm-wa-inbox__label" for="wa-template-select">Template</label>
-                        <x-crm.select
-                            id="wa-template-select"
-                            wire:model.live="sendWhatsAppTemplateId"
-                            class="mt-1"
-                        >
-                            <option value="">Choose template…</option>
-                            @foreach ($waTemplates as $template)
-                                <option value="{{ $template->id }}">
-                                    {{ $template->name }}
-                                    @if ((int) $template->param_count > 0)
-                                        — {{ (int) $template->param_count }} {{ (int) $template->param_count === 1 ? 'variable' : 'variables' }}
-                                    @else
-                                        — no variables
-                                    @endif
-                                </option>
-                            @endforeach
-                        </x-crm.select>
-                    </div>
-
-                    @if ($sendWhatsAppTemplateId)
-                        @if ($sendWhatsAppTemplateParamCount === 0)
-                            <p class="crm-wa-inbox__hint crm-wa-inbox__hint--info">
-                                No variables needed — click send when ready.
-                            </p>
-                        @else
-                            <p class="crm-wa-inbox__param-intro">
-                                This template needs <strong>{{ $sendWhatsAppTemplateParamCount }}</strong>
-                                {{ $sendWhatsAppTemplateParamCount === 1 ? 'value' : 'values' }}:
-                            </p>
-                            <div class="crm-wa-inbox__param-grid">
-                                @foreach ($sendWhatsAppTemplateFields as $field)
-                                    <div class="crm-wa-inbox__field crm-wa-inbox__field--param" wire:key="wa-param-{{ $field['index'] }}">
-                                        <label class="crm-wa-inbox__label" for="wa-param-{{ $field['index'] }}">
-                                            {{ $field['label'] }}
-                                            <span class="crm-wa-inbox__required" aria-hidden="true">*</span>
-                                        </label>
-                                        <input
-                                            id="wa-param-{{ $field['index'] }}"
-                                            type="text"
-                                            wire:model.live="sendWhatsAppTemplateParams.{{ $field['index'] }}"
-                                            placeholder="{{ $field['placeholder'] }}"
-                                            class="crm-wa-inbox__input"
-                                            required
-                                        />
-                                        <p class="crm-wa-inbox__field-hint">{{ $field['hint'] }}</p>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-
-                        @if (filled($sendWhatsAppTemplatePreview))
-                            <div class="crm-wa-inbox__preview">
-                                <p class="crm-wa-inbox__preview-label">What parent will see</p>
-                                <p class="crm-wa-inbox__preview-body">{{ $sendWhatsAppTemplatePreview }}</p>
-                            </div>
-                        @endif
-
-                        <button
-                            type="button"
-                            wire:click="sendWhatsAppMessage"
-                            wire:loading.attr="disabled"
-                            wire:target="sendWhatsAppMessage"
-                            class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--full"
-                        >
-                            <span wire:loading.remove wire:target="sendWhatsAppMessage">Send template</span>
-                            <span wire:loading wire:target="sendWhatsAppMessage">Sending…</span>
-                        </button>
-                    @endif
-                @endif
-            </section>
-
-            @if ($metaRoutingActive && $metaSessionOpen)
-                <section class="crm-wa-inbox__composer crm-wa-inbox__composer--reply">
-                    <div class="crm-wa-inbox__composer-head">
-                        <h3 class="crm-wa-inbox__composer-title">Quick reply</h3>
-                        <p class="crm-wa-inbox__composer-lead">Plain text — only while the 24h window is open.</p>
-                    </div>
-                    <div class="crm-wa-inbox__field">
-                        <label class="crm-wa-inbox__label" for="wa-quick-reply">Message</label>
-                        <textarea
-                            id="wa-quick-reply"
-                            wire:model.live="metaReplyText"
-                            rows="3"
-                            class="crm-wa-inbox__textarea"
-                            placeholder="Type your reply… emojis work too 🙂"
-                        ></textarea>
-                    </div>
-                    @unless ($compactInbox ?? false)
-                    @if ($showMetaReplyAttachment ?? false)
-                        <div class="crm-wa-inbox__field">
-                            <label class="crm-wa-inbox__label" for="wa-quick-attachment">Photo, video, or file</label>
-                            <input
-                                id="wa-quick-attachment"
-                                type="file"
-                                wire:model="metaReplyAttachment"
-                                accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
-                                class="crm-wa-inbox__file"
-                            />
-                            <p class="crm-wa-inbox__field-hint">Images, videos, voice notes, and PDFs — like WhatsApp. Max 16 MB for video, 5 MB for images.</p>
-                            <div wire:loading wire:target="metaReplyAttachment,sendMetaMedia" class="crm-wa-inbox__hint">Uploading…</div>
-                        </div>
-                    @else
-                        <button
-                            type="button"
-                            wire:click="enableMetaReplyAttachment"
-                            class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--full"
-                        >
-                            Attach photo or file
-                        </button>
-                    @endif
-                    <div class="crm-wa-inbox__composer-actions">
-                        @if (filled($metaReplyAttachment ?? null))
-                            <button
-                                type="button"
-                                wire:click="sendMetaMedia"
-                                wire:loading.attr="disabled"
-                                wire:target="sendMetaMedia,metaReplyAttachment"
-                                class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--full"
-                            >
-                                <span wire:loading.remove wire:target="sendMetaMedia,metaReplyAttachment">Send attachment</span>
-                                <span wire:loading wire:target="sendMetaMedia,metaReplyAttachment">Sending…</span>
-                            </button>
-                        @endif
-                        <button
-                            type="button"
-                            wire:click="sendMetaReply"
-                            wire:loading.attr="disabled"
-                            wire:target="sendMetaReply"
-                            class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--full"
-                        >
-                            <span wire:loading.remove wire:target="sendMetaReply">Send reply</span>
-                            <span wire:loading wire:target="sendMetaReply">Sending…</span>
-                        </button>
-                    </div>
-                    @else
-                    <p class="crm-wa-inbox__hint crm-wa-inbox__hint--info">
-                        To send a photo or file, use <strong>Open student profile</strong> above → Messages tab.
-                    </p>
-                    <button
-                        type="button"
-                        wire:click="sendMetaReply"
-                        wire:loading.attr="disabled"
-                        wire:target="sendMetaReply"
-                        class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--full"
-                    >
-                        <span wire:loading.remove wire:target="sendMetaReply">Send reply</span>
-                        <span wire:loading wire:target="sendMetaReply">Sending…</span>
-                    </button>
-                    @endunless
-                </section>
-            @endif
-        </aside>
-
         <section
             class="crm-wa-inbox__thread"
             wire:key="wa-thread-{{ count($messageThread) }}-{{ $lastThreadKey }}"
@@ -221,10 +54,12 @@
             @endif
             aria-label="WhatsApp conversation"
         >
+            @unless ($compactInbox ?? false)
             <div class="crm-wa-inbox__thread-head">
                 <h3 class="crm-wa-inbox__thread-title">Conversation</h3>
                 <p class="crm-wa-inbox__thread-meta">{{ count($messageThread) }} messages</p>
             </div>
+            @endunless
 
             @if (! $messagesTabLoaded)
                 <p class="crm-wa-inbox__hint crm-wa-inbox__hint--center">Loading…</p>
@@ -269,5 +104,161 @@
                 </div>
             @endif
         </section>
+
+        <footer class="crm-wa-inbox__compose" aria-label="Send messages">
+            <section class="crm-wa-inbox__composer crm-wa-inbox__composer--template">
+                <div class="crm-wa-inbox__composer-head crm-wa-inbox__composer-head--compact">
+                    <h3 class="crm-wa-inbox__composer-title">Template</h3>
+                </div>
+
+                @if (blank($record?->mobile))
+                    <p class="crm-wa-inbox__hint crm-wa-inbox__hint--danger">Add a mobile number on the student profile first.</p>
+                @elseif ($waTemplates->isEmpty())
+                    <p class="crm-wa-inbox__hint">
+                        No templates synced.
+                        Open <strong>{{ \App\Support\CrmNavigation::whatsAppMenu('Connection & Setup') }}</strong> → <strong>Sync templates</strong>.
+                    </p>
+                @else
+                    <div class="crm-wa-inbox__template-row">
+                        <div class="crm-wa-inbox__field crm-wa-inbox__field--template">
+                            <label class="crm-wa-inbox__label sr-only" for="{{ $templateFieldId }}">Template</label>
+                            <x-crm.select
+                                id="{{ $templateFieldId }}"
+                                wire:model.live="sendWhatsAppTemplateId"
+                            >
+                                <option value="">Choose template…</option>
+                                @foreach ($waTemplates as $template)
+                                    <option value="{{ $template->id }}">
+                                        {{ $template->name }}
+                                        @if ((int) $template->param_count > 0)
+                                            — {{ (int) $template->param_count }} {{ (int) $template->param_count === 1 ? 'variable' : 'variables' }}
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </x-crm.select>
+                        </div>
+
+                        @if ($sendWhatsAppTemplateId)
+                            <button
+                                type="button"
+                                wire:click="sendWhatsAppMessage"
+                                wire:loading.attr="disabled"
+                                wire:target="sendWhatsAppMessage"
+                                class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--template"
+                            >
+                                <span wire:loading.remove wire:target="sendWhatsAppMessage">Send template</span>
+                                <span wire:loading wire:target="sendWhatsAppMessage">Sending…</span>
+                            </button>
+                        @endif
+                    </div>
+
+                    @if ($sendWhatsAppTemplateId)
+                        @if ($sendWhatsAppTemplateParamCount > 0)
+                            <div class="crm-wa-inbox__param-grid">
+                                @foreach ($sendWhatsAppTemplateFields as $field)
+                                    <div class="crm-wa-inbox__field crm-wa-inbox__field--param" wire:key="wa-param-{{ $field['index'] }}">
+                                        <label class="crm-wa-inbox__label" for="wa-param-{{ ($compactInbox ?? false) ? 'inbox' : 'profile' }}-{{ $field['index'] }}">
+                                            {{ $field['label'] }}
+                                            <span class="crm-wa-inbox__required" aria-hidden="true">*</span>
+                                        </label>
+                                        <input
+                                            id="wa-param-{{ ($compactInbox ?? false) ? 'inbox' : 'profile' }}-{{ $field['index'] }}"
+                                            type="text"
+                                            wire:model.live="sendWhatsAppTemplateParams.{{ $field['index'] }}"
+                                            placeholder="{{ $field['placeholder'] }}"
+                                            class="crm-wa-inbox__input"
+                                            required
+                                        />
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        @if (filled($sendWhatsAppTemplatePreview))
+                            <div class="crm-wa-inbox__preview crm-wa-inbox__preview--muted">
+                                <p class="crm-wa-inbox__preview-body">{{ $sendWhatsAppTemplatePreview }}</p>
+                            </div>
+                        @endif
+                    @endif
+                @endif
+            </section>
+
+            @if ($metaRoutingActive && $metaSessionOpen)
+                <section class="crm-wa-inbox__composer crm-wa-inbox__composer--reply">
+                    @unless ($compactInbox ?? false)
+                    @if ($showMetaReplyAttachment ?? false)
+                        <div class="crm-wa-inbox__field">
+                            <label class="crm-wa-inbox__label" for="{{ $attachmentFieldId }}">Photo, video, or file</label>
+                            <input
+                                id="{{ $attachmentFieldId }}"
+                                type="file"
+                                wire:model="metaReplyAttachment"
+                                accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                                class="crm-wa-inbox__file"
+                            />
+                            <div wire:loading wire:target="metaReplyAttachment,sendMetaMedia" class="crm-wa-inbox__hint">Uploading…</div>
+                        </div>
+                    @endif
+                    @endunless
+
+                    <div class="crm-wa-inbox__reply-bar">
+                        @unless ($compactInbox ?? false)
+                        @if (! ($showMetaReplyAttachment ?? false))
+                            <button
+                                type="button"
+                                wire:click="enableMetaReplyAttachment"
+                                class="crm-wa-inbox__icon-btn"
+                                title="Attach photo or file"
+                            >
+                                <x-filament::icon icon="heroicon-o-paper-clip" class="h-5 w-5" />
+                            </button>
+                        @endif
+                        @else
+                        <p class="crm-wa-inbox__hint crm-wa-inbox__hint--inline">
+                            Files: use <strong>Open student profile</strong> → Messages.
+                        </p>
+                        @endunless
+
+                        <div class="crm-wa-inbox__field crm-wa-inbox__field--reply">
+                            <label class="crm-wa-inbox__label sr-only" for="{{ $replyFieldId }}">Message</label>
+                            <textarea
+                                id="{{ $replyFieldId }}"
+                                wire:model.live="metaReplyText"
+                                rows="1"
+                                class="crm-wa-inbox__textarea crm-wa-inbox__textarea--reply"
+                                placeholder="Type a message…"
+                            ></textarea>
+                        </div>
+
+                        @if (filled($metaReplyAttachment ?? null))
+                            <button
+                                type="button"
+                                wire:click="sendMetaMedia"
+                                wire:loading.attr="disabled"
+                                wire:target="sendMetaMedia,metaReplyAttachment"
+                                class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--icon"
+                                title="Send attachment"
+                            >
+                                <x-filament::icon icon="heroicon-o-paper-airplane" class="h-5 w-5" />
+                            </button>
+                        @else
+                            <button
+                                type="button"
+                                wire:click="sendMetaReply"
+                                wire:loading.attr="disabled"
+                                wire:target="sendMetaReply"
+                                class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--reply crm-wa-inbox__send-btn--icon"
+                                title="Send reply"
+                            >
+                                <span wire:loading.remove wire:target="sendMetaReply">
+                                    <x-filament::icon icon="heroicon-o-paper-airplane" class="h-5 w-5" />
+                                </span>
+                                <span wire:loading wire:target="sendMetaReply">…</span>
+                            </button>
+                        @endif
+                    </div>
+                </section>
+            @endif
+        </footer>
     </div>
 </div>

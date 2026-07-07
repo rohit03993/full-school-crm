@@ -153,7 +153,7 @@ class StudentProfileMessagesTabTest extends TestCase
         Livewire::test(StudentProfilePage::class, ['record' => $student])
             ->set('profileTab', 'messages')
             ->assertSet('metaSessionOpen', true)
-            ->assertSee('Quick reply')
+            ->assertSee('Type a message')
             ->assertSee('Attach photo or file')
             ->assertSee('crm-wa-bubble__media-pending', false)
             ->assertDontSee('wire:model="metaReplyAttachment"', false)
@@ -224,7 +224,7 @@ class StudentProfileMessagesTabTest extends TestCase
             'sendWhatsAppSelectedTemplateName' => null,
         ])->render();
 
-        $this->assertStringContainsString('Pick a template', $html);
+        $this->assertStringContainsString('Choose template', $html);
     }
 
     protected function createSuperAdmin(): User

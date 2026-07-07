@@ -689,15 +689,19 @@
     }
 
     .crm-wa-inbox__layout {
-        @apply grid max-h-[calc(100vh-12rem)] gap-4 lg:grid-cols-[minmax(17rem,20rem)_minmax(0,1fr)] lg:items-stretch;
+        @apply flex min-h-[28rem] max-h-[calc(100vh-14rem)] flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900/40;
     }
 
     .crm-wa-inbox__compose {
-        @apply flex max-h-[calc(100vh-12rem)] flex-col gap-3 overflow-y-auto pr-1;
+        @apply max-h-[min(45vh,22rem)] shrink-0 space-y-2 overflow-y-auto overscroll-contain border-t border-gray-200/70 bg-gray-50/90 p-3 dark:border-white/10 dark:bg-gray-900/60;
+    }
+
+    .crm-wa-inbox__compose .crm-wa-inbox__composer {
+        @apply rounded-xl border border-gray-200/70 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-gray-950/80;
     }
 
     .crm-wa-inbox__thread {
-        @apply flex max-h-[calc(100vh-12rem)] min-h-[20rem] flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-[#e5ddd5]/40 p-3 dark:border-white/10 dark:bg-gray-950/50;
+        @apply flex min-h-0 flex-1 flex-col overflow-hidden bg-[#e5ddd5]/40 p-3 dark:bg-gray-950/50;
     }
 
     .crm-wa-inbox__thread-head {
@@ -713,7 +717,47 @@
     }
 
     .crm-wa-inbox__composer-head {
-        @apply mb-4 space-y-1;
+        @apply mb-3 space-y-1;
+    }
+
+    .crm-wa-inbox__composer-head--compact {
+        @apply mb-2 space-y-0;
+    }
+
+    .crm-wa-inbox__template-row {
+        @apply flex flex-col gap-2 sm:flex-row sm:items-end;
+    }
+
+    .crm-wa-inbox__field--template {
+        @apply min-w-0 flex-1;
+    }
+
+    .crm-wa-inbox__field--reply {
+        @apply min-w-0 flex-1;
+    }
+
+    .crm-wa-inbox__reply-bar {
+        @apply flex items-end gap-2;
+    }
+
+    .crm-wa-inbox__icon-btn {
+        @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/10;
+    }
+
+    .crm-wa-inbox__textarea--reply {
+        @apply mt-0 max-h-32 min-h-[2.75rem] resize-y rounded-3xl py-2.5;
+    }
+
+    .crm-wa-inbox__send-btn--icon {
+        @apply h-11 w-11 shrink-0 rounded-full p-0;
+    }
+
+    .crm-wa-inbox__send-btn--template {
+        @apply w-full shrink-0 sm:w-auto sm:min-w-[9.5rem];
+    }
+
+    .crm-wa-inbox__hint--inline {
+        @apply mt-0 shrink-0 text-[11px] leading-snug;
     }
 
     .crm-wa-inbox__composer-lead {
@@ -721,7 +765,7 @@
     }
 
     .crm-wa-inbox__param-grid {
-        @apply mt-2 space-y-2.5;
+        @apply mt-2 grid gap-2 sm:grid-cols-2;
     }
 
     .crm-wa-inbox__param-intro {
@@ -1062,7 +1106,7 @@
     }
 
     .crm-wa-inbox__layout--compact {
-        @apply min-h-0 max-h-none flex-1;
+        @apply min-h-0 max-h-none flex-1 rounded-none border-0 shadow-none;
     }
 
     .crm-wa-inbox--compact {
@@ -1070,11 +1114,11 @@
     }
 
     .crm-wa-inbox--compact .crm-wa-inbox__layout--compact {
-        @apply flex flex-col gap-0 overflow-hidden;
+        @apply flex min-h-0 flex-1 flex-col overflow-hidden;
     }
 
     .crm-wa-inbox--compact .crm-wa-inbox__thread {
-        @apply order-1 min-h-0 max-h-none flex-1 rounded-none border-0 border-b border-gray-200/70 bg-[#e5ddd5]/40 p-3 dark:border-white/10 dark:bg-gray-950/50;
+        @apply min-h-0 flex-1 rounded-none border-0 bg-[#e5ddd5]/40 p-3 dark:bg-gray-950/50;
     }
 
     .crm-wa-inbox--compact .crm-wa-inbox__thread-head {
@@ -1082,25 +1126,11 @@
     }
 
     .crm-wa-inbox--compact .crm-wa-inbox__compose {
-        @apply order-2 max-h-[min(42%,22rem)] shrink-0 gap-2 overflow-y-auto overscroll-contain border-t border-gray-200/70 bg-gray-50/80 p-3 pr-1 dark:border-white/10 dark:bg-gray-900/50;
+        @apply max-h-[min(42%,20rem)] shrink-0 gap-2 border-t border-gray-200/70 p-3 dark:border-white/10;
     }
 
     .crm-wa-inbox--compact .crm-wa-inbox__composer {
-        @apply rounded-xl p-3 shadow-none;
-    }
-
-    @media (min-width: 1280px) {
-        .crm-wa-inbox--compact .crm-wa-inbox__layout--compact {
-            @apply grid grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)] grid-rows-1;
-        }
-
-        .crm-wa-inbox--compact .crm-wa-inbox__compose {
-            @apply order-1 max-h-none border-b-0 border-r border-t-0 border-gray-200/70;
-        }
-
-        .crm-wa-inbox--compact .crm-wa-inbox__thread {
-            @apply order-2 border-b-0;
-        }
+        @apply p-3 shadow-none;
     }
 
     .crm-wa-global-inbox {
@@ -1211,6 +1241,10 @@
 
     .crm-wa-global-inbox__chat {
         @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white dark:bg-gray-950;
+    }
+
+    .crm-wa-global-inbox__chat > .crm-wa-inbox--compact {
+        @apply min-h-0 flex-1 overflow-hidden;
     }
 
     .crm-wa-global-inbox__chat-head {
