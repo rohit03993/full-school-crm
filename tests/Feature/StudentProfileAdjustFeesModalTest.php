@@ -11,10 +11,12 @@ use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Filament\Pages\StudentProfilePage;
 use App\Models\Course;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\AdmissionService;
 use App\Services\EnquiryService;
+use App\Support\FeeSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
@@ -35,6 +37,39 @@ class StudentProfileAdjustFeesModalTest extends TestCase
         Livewire::test(StudentProfilePage::class, ['record' => $student])
             ->callAction('adjustFees')
             ->assertStatus(200);
+    }
+
+    public function test_adjust_fees_modal_can_save_cash_online_split_when_enabled(): void
+    {
+        Setting::setValue(FeeSettings::KEY_ONLINE_ALLOWANCE_GST_ENABLED, '1', 'fees');
+        Setting::setValue(FeeSettings::KEY_GST_PENALTY_PERCENTAGE, '18', 'fees');
+        Setting::flushValueCache();
+
+        $admin = $this->createSuperAdmin();
+        $student = $this->createEnrolledStudentWithFees($admin);
+        $feeStructure = $student->activeEnrollment->feeStructure;
+
+        $this->actingAs($admin);
+
+        Livewire::test(StudentProfilePage::class, ['record' => $student])
+            ->callAction('adjustFees', data: [
+                'course_fee' => (float) $feeStructure->course_fee,
+                'discount_mode' => 'amount',
+                'discount_adjustment' => 0,
+                'reschedule_installments' => false,
+                'installment_plan' => [],
+                'new_misc_charges' => [],
+                'planned_cash_amount' => 35000,
+                'planned_online_amount' => 25000,
+                'reason' => '',
+            ])
+            ->assertNotified();
+
+        $feeStructure = $feeStructure->fresh();
+
+        $this->assertSame(35000.0, (float) $feeStructure->planned_cash_amount);
+        $this->assertSame(25000.0, (float) $feeStructure->planned_online_amount);
+        $this->assertTrue($feeStructure->hasOnlineAllowancePlan());
     }
 
     public function test_adjust_fees_modal_can_add_misc_charge(): void

@@ -1057,8 +1057,7 @@ class StudentProfilePage extends Page
 
     public function getCanManageAdmissionFeePlanProperty(): bool
     {
-        return $this->activeAdmission?->canAdjustFees()
-            && $this->userCan(CrmPermission::AdmissionsApprove);
+        return false;
     }
 
     public function saveAdmissionFeePlan(AdmissionService $admissions): void
@@ -1768,80 +1767,19 @@ class StudentProfilePage extends Page
 
                     return ConvertToAdmissionFormSchema::fields($convertible, $presenter);
                 })
-                ->extraModalFooterActions([
-                    Action::make('suggestInstallmentPlan')
-                        ->label('Suggest 50/50 plan')
-                        ->color('gray')
-                        ->action(function (Action $action): void {
-                            $livewire = $action->getLivewire();
-                            $mounted = $livewire->mountedActionsData[0] ?? [];
-
-                            if (! is_array($mounted)) {
-                                return;
-                            }
-
-                            $courseId = $mounted['course_id'] ?? null;
-                            $discount = max(0, (float) ($mounted['discount_amount'] ?? 0));
-                            $miscTotal = FeePlanCalculator::sumAmounts($mounted['misc_fees'] ?? []);
-
-                            if (! $courseId) {
-                                return;
-                            }
-
-                            $course = \App\Models\Course::query()->find($courseId);
-
-                            if (! $course) {
-                                return;
-                            }
-
-                            $net = round(max(0, (float) $course->fee - $discount + $miscTotal), 2);
-                            $livewire->mountedActionsData[0]['use_installment_plan'] = true;
-                            $livewire->mountedActionsData[0]['installment_plan'] = FeePlanCalculator::defaultTwoPartPlan($net);
-                        }),
-                    Action::make('fillInstallmentBalance')
-                        ->label('Fill balance on last row')
-                        ->color('gray')
-                        ->action(function (Action $action): void {
-                            $livewire = $action->getLivewire();
-                            $mounted = $livewire->mountedActionsData[0] ?? [];
-
-                            if (! is_array($mounted)) {
-                                return;
-                            }
-
-                            $courseId = $mounted['course_id'] ?? null;
-                            $discount = max(0, (float) ($mounted['discount_amount'] ?? 0));
-                            $miscTotal = FeePlanCalculator::sumAmounts($mounted['misc_fees'] ?? []);
-                            $plan = $mounted['installment_plan'] ?? [];
-
-                            if (! $courseId || $plan === []) {
-                                return;
-                            }
-
-                            $course = \App\Models\Course::query()->find($courseId);
-
-                            if (! $course) {
-                                return;
-                            }
-
-                            $net = round(max(0, (float) $course->fee - $discount + $miscTotal), 2);
-                            $livewire->mountedActionsData[0]['installment_plan'] = FeePlanCalculator::fillBalanceOnLastRow($plan, $net);
-                            $livewire->mountedActionsData[0]['use_installment_plan'] = true;
-                        }),
-                ])
-                ->modalSubmitAction(function (Action $action): Action {
-                    return $action->disabled(function (): bool {
-                        $mounted = $this->mountedActionsData[0] ?? [];
-
-                        if (! is_array($mounted)) {
-                            return true;
-                        }
-
-                        return ! FeePlanSubmissionGuard::canSubmitConvert($mounted);
-                    });
-                })
                 ->before(function (array $data, Action $action): void {
-                    FeePlanSubmissionGuard::assertConvertable($data, $action);
+                    $courseId = (int) ($data['course_id'] ?? 0);
+                    $course = \App\Models\Course::query()->find($courseId);
+
+                    if (! $course || (float) $course->fee <= 0) {
+                        Notification::make()
+                            ->title('Course fee not set')
+                            ->body('Update the fee for this course in Courses admin before converting.')
+                            ->danger()
+                            ->send();
+
+                        $action->halt();
+                    }
                 })
                 ->action(function (array $data, ConvertToAdmissionPresenter $presenter, AdmissionService $admissions): void {
                     $convertible = $presenter->convertibleEnquiries($this->record);
@@ -1859,10 +1797,6 @@ class StudentProfilePage extends Page
                         Auth::user(),
                         [
                             'course_id' => (int) $data['course_id'],
-                            'discount_amount' => $data['discount_amount'] ?? 0,
-                            'use_installment_plan' => $data['use_installment_plan'] ?? false,
-                            'misc_fees' => $data['misc_fees'] ?? [],
-                            'installment_plan' => $data['installment_plan'] ?? [],
                         ],
                     );
 
@@ -1874,7 +1808,7 @@ class StudentProfilePage extends Page
 
                     Notification::make()
                         ->title('Converted to admission')
-                        ->body("Admission {$admission->admission_number} for {$admission->enquiry?->course?->name} · Net fee ₹".number_format((float) $admission->net_fee, 2))
+                        ->body("Admission {$admission->admission_number} for {$admission->enquiry?->course?->name}. Set fees via Adjust Fees after approval.")
                         ->success()
                         ->send();
                 })

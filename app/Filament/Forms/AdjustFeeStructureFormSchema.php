@@ -6,6 +6,7 @@ use App\Enums\FeeMiscChargeStatus;
 use App\Models\FeeMiscCharge;
 use App\Models\FeeStructure;
 use App\Support\FeePlanCalculator;
+use App\Support\FeeSettings;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -61,39 +62,11 @@ class AdjustFeeStructureFormSchema
             $set('installment_plan', self::pendingInstallmentPlan($feeStructure, $target));
         };
 
-        return [
-            Placeholder::make('fee_snapshot')
-                ->label('')
-                ->content(new HtmlString(
-                    '<div class="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">'
-                    .'<div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5">'
-                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Net tuition fee</p>'
-                    .'<p class="mt-0.5 text-base font-bold text-gray-950 dark:text-white">₹'.$format($currentNet).'</p>'
-                    .'<p class="mt-0.5 text-xs text-gray-500">Course ₹'.$format($studentCourseFee)
-                    .' · Discount ₹'.$format($currentDiscount)
-                    .($miscTotal > 0 ? ' · In plan misc ₹'.$format($miscTotal) : '')
-                    .'</p></div>'
-                    .'<div class="rounded-lg bg-violet-50 px-3 py-2 dark:bg-violet-500/10">'
-                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-300">Misc charges</p>'
-                    .'<p class="mt-0.5 text-base font-bold text-violet-950 dark:text-violet-50">₹'.$format($separateMiscTotal).'</p>'
-                    .'<p class="mt-0.5 text-xs text-violet-800/80 dark:text-violet-200">Pending ₹'.$format($separateMiscPending).' · paid separately</p></div>'
-                    .'<div class="rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">'
-                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Tuition paid</p>'
-                    .'<p class="mt-0.5 text-base font-bold text-emerald-800 dark:text-emerald-200">₹'.$format($paid).'</p>'
-                    .'<p class="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-300/80">Already collected — fixed</p></div>'
-                    .'<div class="rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-500/10">'
-                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Tuition balance</p>'
-                    .'<p class="mt-0.5 text-base font-bold text-amber-900 dark:text-amber-100">₹'.$format($pending).'</p>'
-                    .'<p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/80">Pending installments</p></div>'
-                    .'</div>'
-                ))
-                ->columnSpanFull(),
-            Tabs::make('adjustFeeTabs')
-                ->tabs([
-                    Tab::make('discount')
-                        ->label('Give discount')
-                        ->icon(Heroicon::OutlinedTag)
-                        ->schema([
+        $tabs = [
+            Tab::make('discount')
+                ->label('Give discount')
+                ->icon(Heroicon::OutlinedTag)
+                ->schema([
                             Hidden::make('course_fee')
                                 ->default($feeStructure->course_fee),
                             Select::make('discount_mode')
@@ -251,24 +224,104 @@ class AdjustFeeStructureFormSchema
                                 },
                             ),
                         ]),
-                    Tab::make('misc')
-                        ->label('Misc charges')
-                        ->icon(Heroicon::OutlinedPlusCircle)
-                        ->schema([
-                            Placeholder::make('existing_misc_charges')
-                                ->label('Current charges')
-                                ->content(fn (): HtmlString => new HtmlString(self::separateMiscChargesHtml($feeStructure)))
-                                ->columnSpanFull(),
-                            Repeater::make('new_misc_charges')
-                                ->label('Add new charges')
-                                ->helperText('Exam fees, materials, etc. — collected separately from tuition installments.')
-                                ->schema(AddMiscChargeFormSchema::fields())
-                                ->addActionLabel('Add charge')
-                                ->defaultItems(0)
-                                ->reorderable(false)
-                                ->columnSpanFull(),
-                        ]),
+        ];
+
+        if (FeeSettings::onlineAllowanceGstEnabled()) {
+            $tabs[] = Tab::make('cash_online')
+                ->label('Cash / online')
+                ->icon(Heroicon::OutlinedBanknotes)
+                ->schema([
+                    Placeholder::make('online_allowance_help')
+                        ->label('Cash vs online agreement')
+                        ->content('Split the net tuition fee. If the student pays more tuition via UPI/online than agreed, GST is charged on the excess only.')
+                        ->columnSpanFull(),
+                    TextInput::make('planned_cash_amount')
+                        ->label('Agreed cash (₹)')
+                        ->numeric()
+                        ->minValue(0)
+                        ->step(1)
+                        ->default($feeStructure->planned_cash_amount)
+                        ->live(debounce: 300),
+                    TextInput::make('planned_online_amount')
+                        ->label('Agreed online (₹)')
+                        ->numeric()
+                        ->minValue(0)
+                        ->step(1)
+                        ->default($feeStructure->planned_online_amount)
+                        ->live(debounce: 300)
+                        ->helperText(fn (Get $get): string => 'Cash plus online must equal net tuition (₹'
+                            .$format(self::previewNet($feeStructure, $get, $miscTotal)).').'),
+                    Placeholder::make('online_allowance_preview')
+                        ->label('Split check')
+                        ->content(function (Get $get) use ($feeStructure, $miscTotal, $format): string {
+                            $net = self::previewNet($feeStructure, $get, $miscTotal);
+                            $cash = round((float) ($get('planned_cash_amount') ?? 0), 2);
+                            $online = round((float) ($get('planned_online_amount') ?? 0), 2);
+                            $total = round($cash + $online, 2);
+
+                            if ($cash <= 0 && $online <= 0) {
+                                return 'Enter cash and online amounts that add up to net tuition.';
+                            }
+
+                            if (abs($total - $net) <= 0.01) {
+                                return 'Cash ₹'.$format($cash).' + Online ₹'.$format($online).' = Net ₹'.$format($net);
+                            }
+
+                            return 'Cash ₹'.$format($cash).' + Online ₹'.$format($online).' = ₹'.$format($total)
+                                .' · Net tuition is ₹'.$format($net).' — adjust the split.';
+                        })
+                        ->columnSpanFull(),
                 ])
+                ->columns(2);
+        }
+
+        $tabs[] = Tab::make('misc')
+            ->label('Misc charges')
+            ->icon(Heroicon::OutlinedPlusCircle)
+            ->schema([
+                Placeholder::make('existing_misc_charges')
+                    ->label('Current charges')
+                    ->content(fn (): HtmlString => new HtmlString(self::separateMiscChargesHtml($feeStructure)))
+                    ->columnSpanFull(),
+                Repeater::make('new_misc_charges')
+                    ->label('Add new charges')
+                    ->helperText('Exam fees, materials, etc. — collected separately from tuition installments.')
+                    ->schema(AddMiscChargeFormSchema::fields())
+                    ->addActionLabel('Add charge')
+                    ->defaultItems(0)
+                    ->reorderable(false)
+                    ->columnSpanFull(),
+            ]);
+
+        return [
+            Placeholder::make('fee_snapshot')
+                ->label('')
+                ->content(new HtmlString(
+                    '<div class="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">'
+                    .'<div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5">'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Net tuition fee</p>'
+                    .'<p class="mt-0.5 text-base font-bold text-gray-950 dark:text-white">₹'.$format($currentNet).'</p>'
+                    .'<p class="mt-0.5 text-xs text-gray-500">Course ₹'.$format($studentCourseFee)
+                    .' · Discount ₹'.$format($currentDiscount)
+                    .($miscTotal > 0 ? ' · In plan misc ₹'.$format($miscTotal) : '')
+                    .'</p></div>'
+                    .'<div class="rounded-lg bg-violet-50 px-3 py-2 dark:bg-violet-500/10">'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-300">Misc charges</p>'
+                    .'<p class="mt-0.5 text-base font-bold text-violet-950 dark:text-violet-50">₹'.$format($separateMiscTotal).'</p>'
+                    .'<p class="mt-0.5 text-xs text-violet-800/80 dark:text-violet-200">Pending ₹'.$format($separateMiscPending).' · paid separately</p></div>'
+                    .'<div class="rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10">'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Tuition paid</p>'
+                    .'<p class="mt-0.5 text-base font-bold text-emerald-800 dark:text-emerald-200">₹'.$format($paid).'</p>'
+                    .'<p class="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-300/80">Already collected — fixed</p></div>'
+                    .'<div class="rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-500/10">'
+                    .'<p class="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Tuition balance</p>'
+                    .'<p class="mt-0.5 text-base font-bold text-amber-900 dark:text-amber-100">₹'.$format($pending).'</p>'
+                    .'<p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-200/80">Pending installments</p></div>'
+                    .'</div>'
+                ))
+                ->columnSpanFull(),
+            Tabs::make('adjustFeeTabs')
+                ->tabs($tabs)
                 ->columnSpanFull(),
         ];
     }
@@ -291,6 +344,8 @@ class AdjustFeeStructureFormSchema
             'reschedule_installments' => $currentPending > 0,
             'installment_plan' => self::pendingInstallmentPlan($feeStructure),
             'new_misc_charges' => [],
+            'planned_cash_amount' => $feeStructure->planned_cash_amount,
+            'planned_online_amount' => $feeStructure->planned_online_amount,
             'reason' => '',
         ];
     }

@@ -11,6 +11,7 @@ use App\Models\FeeMiscCharge;
 use App\Models\FeeStructure;
 use App\Models\FeeStructureHistory;
 use App\Models\User;
+use App\Support\FeeSettings;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -162,6 +163,24 @@ class FeeStructureService
             app(AdmissionFeePlanService::class)->assertInstallmentPlanValid($installmentPlan, $newPending);
         }
 
+        $plannedCash = $feeStructure->planned_cash_amount;
+        $plannedOnline = $feeStructure->planned_online_amount;
+
+        if (FeeSettings::onlineAllowanceGstEnabled()) {
+            if (isset($data['planned_cash_amount'], $data['planned_online_amount'])
+                && $data['planned_cash_amount'] !== null
+                && $data['planned_cash_amount'] !== ''
+                && $data['planned_online_amount'] !== null
+                && $data['planned_online_amount'] !== '') {
+                $plannedCash = round((float) $data['planned_cash_amount'], 2);
+                $plannedOnline = round((float) $data['planned_online_amount'], 2);
+                app(OnlineAllowanceGstService::class)->assertAllowanceSplitValid($newNet, $plannedCash, $plannedOnline);
+            }
+        } else {
+            $plannedCash = null;
+            $plannedOnline = null;
+        }
+
         return DB::transaction(function () use (
             $feeStructure,
             $courseFee,
@@ -173,6 +192,8 @@ class FeeStructureService
             $admin,
             $reschedule,
             $installmentPlan,
+            $plannedCash,
+            $plannedOnline,
         ): FeeStructure {
             $oldInstallmentSnapshot = $feeStructure->installments()
                 ->orderBy('sort_order')
@@ -213,6 +234,8 @@ class FeeStructureService
                 'discount_set_by_user_id' => $discount > 0 ? $admin->id : null,
                 'net_fee' => $newNet,
                 'pending_amount' => $newPending,
+                'planned_cash_amount' => $plannedCash,
+                'planned_online_amount' => $plannedOnline,
             ]);
 
             $this->discountLedger->recordFeeStructureChange(
