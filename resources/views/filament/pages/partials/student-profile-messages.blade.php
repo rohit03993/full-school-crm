@@ -5,6 +5,7 @@
             : ($messageThread[array_key_last($messageThread)]['key'] ?? 'empty');
     @endphp
 
+    @unless ($compactInbox ?? false)
     <header class="crm-wa-inbox__toolbar">
         <div class="crm-wa-inbox__toolbar-main">
             <div class="crm-wa-inbox__toolbar-copy">
@@ -36,8 +37,9 @@
             <p class="crm-wa-inbox__hint crm-wa-inbox__hint--banner">{{ $waTemplateSyncHint }}</p>
         @endif
     </header>
+    @endunless
 
-    <div class="crm-wa-inbox__layout">
+    <div @class(['crm-wa-inbox__layout', 'crm-wa-inbox__layout--compact' => $compactInbox ?? false])>
         <aside class="crm-wa-inbox__compose">
             <section class="crm-wa-inbox__composer">
                 <div class="crm-wa-inbox__composer-head">

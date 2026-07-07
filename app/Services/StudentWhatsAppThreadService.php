@@ -220,6 +220,35 @@ class StudentWhatsAppThreadService
         return strcasecmp(trim($text), trim($templateName)) === 0;
     }
 
+    public function findStudentByPhone(string $phone): ?Student
+    {
+        $normalized = $this->normalizePhone($phone);
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        $candidates = [$normalized];
+
+        if (strlen($normalized) === 12 && str_starts_with($normalized, '91')) {
+            $candidates[] = substr($normalized, 2);
+        }
+
+        return Student::query()
+            ->where(function ($query) use ($candidates): void {
+                foreach ($candidates as $candidate) {
+                    $query->orWhere('mobile', 'like', '%'.$candidate);
+                }
+            })
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    public function normalizePhoneForStorage(string $phone): string
+    {
+        return $this->normalizePhone($phone);
+    }
+
     protected function normalizePhone(string $phone): string
     {
         $digits = preg_replace('/\D+/', '', $phone) ?? '';
