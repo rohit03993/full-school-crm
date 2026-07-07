@@ -534,35 +534,63 @@
 
     /* Student profile — header actions & tab bar */
     .fi-page:has(.fi-student-profile-shell) .fi-page-header {
-        @apply mb-3 gap-1;
+        @apply mb-2 gap-2;
+    }
+
+    .fi-page:has(.fi-student-profile-shell) .fi-header {
+        @apply flex-col gap-3 lg:flex-row lg:items-center lg:justify-between;
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-heading {
-        @apply text-xl font-bold sm:text-2xl;
+        @apply sr-only;
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-subheading {
-        @apply text-xs text-gray-500 dark:text-gray-400;
+        @apply hidden;
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions {
-        @apply w-full justify-end;
+        @apply w-full lg:w-auto lg:shrink-0;
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
-        @apply flex-wrap justify-end gap-2;
+        @apply flex w-full flex-wrap justify-start gap-1.5 rounded-2xl border border-gray-200/80 bg-white p-2 shadow-sm dark:border-white/10 dark:bg-gray-900 lg:justify-end;
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn {
-        @apply min-h-10 shrink-0 text-sm;
+        @apply min-h-9 shrink-0 rounded-xl text-xs font-semibold shadow-none sm:text-sm;
+    }
+
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-gray.fi-btn-outlined {
+        @apply border-gray-200/80 bg-gray-50/80 text-gray-700 hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10;
+    }
+
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-primary:not(.fi-btn-outlined) {
+        @apply shadow-sm shadow-primary-500/20;
+    }
+
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-success {
+        @apply shadow-sm shadow-success-500/25;
+    }
+
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-warning {
+        @apply shadow-sm shadow-warning-500/20;
     }
 
     .fi-student-profile-shell {
-        @apply mb-4;
+        @apply mb-3;
+    }
+
+    .fi-student-profile-dossier {
+        @apply shadow-md;
+    }
+
+    .fi-student-profile-dossier-stats {
+        grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
     }
 
     .fi-student-profile-tabs {
-        @apply mt-2;
+        @apply mt-1;
     }
 
     .fi-student-profile-tabs .fi-tabs {

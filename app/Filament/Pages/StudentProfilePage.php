@@ -328,6 +328,10 @@ class StudentProfilePage extends Page
 
     public function getSubheading(): ?string
     {
+        if ($this->record->activeEnrollment !== null) {
+            return null;
+        }
+
         return CrmHint::text('students.profile');
     }
 
