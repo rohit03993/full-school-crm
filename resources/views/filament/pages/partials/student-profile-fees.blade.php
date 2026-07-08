@@ -18,6 +18,9 @@
         ->values();
     $archivedMisc = $separateMisc->filter(fn ($c) => $c->status === FeeMiscChargeStatus::Cancelled);
     $lateFeePending = (float) $fees?->pendingPenaltiesTotal();
+    $needsCashOnlineSplit = $fees
+        && \App\Support\FeeSettings::onlineAllowanceGstEnabled()
+        && ! $fees->hasOnlineAllowancePlan();
 @endphp
 
 <div wire:init="loadFeesTab">
@@ -57,6 +60,15 @@
     @endphp
 
     <div class="space-y-4">
+        @if ($needsCashOnlineSplit)
+            <div class="rounded-2xl border border-amber-200/80 bg-amber-50 px-4 py-3 dark:border-amber-500/20 dark:bg-amber-950/30">
+                <p class="text-sm font-semibold text-amber-900 dark:text-amber-100">Cash / online split missing</p>
+                <p class="mt-1 text-xs leading-relaxed text-amber-800/90 dark:text-amber-200/90">
+                    GST on online overage is enabled institute-wide, but this student has no agreed split yet.
+                    Use <span class="font-semibold">Adjust Fees → Cash / online</span> before collecting online or UPI tuition.
+                </p>
+            </div>
+        @endif
         {{-- Financial overview --}}
         <div class="overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg ring-1 ring-white/10">
             <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
@@ -334,6 +346,16 @@
                                                     <div x-show="open" x-cloak class="absolute right-0 z-10 mt-1 w-56 rounded-xl border bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900">
                                                         <textarea x-model="reason" rows="2" class="w-full rounded-lg border-gray-200 text-xs dark:border-white/10 dark:bg-white/5" placeholder="Reason for waiver"></textarea>
                                                         <button type="button" class="mt-2 w-full rounded-lg bg-red-600 py-1.5 text-xs font-semibold text-white hover:bg-red-500" @click="$wire.waiveLateFeeMiscCharge({{ $charge->id }}, reason); open = false; reason = ''">Confirm waiver</button>
+                                                    </div>
+                                                </div>
+                                            @endif
+                                            @if ($charge->canBeWaivedBySuperAdmin() && ($canWaiveMiscCharge ?? false))
+                                                <div class="relative" x-data="{ open: false, reason: '' }">
+                                                    <button type="button" @click="open = !open" class="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10">Remove</button>
+                                                    <div x-show="open" x-cloak class="absolute right-0 z-10 mt-1 w-60 rounded-xl border bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900">
+                                                        <p class="mb-2 text-[11px] leading-relaxed text-gray-500">Super Admin only. Use when a charge was added by mistake. Requires a reason.</p>
+                                                        <textarea x-model="reason" rows="2" class="w-full rounded-lg border-gray-200 text-xs dark:border-white/10 dark:bg-white/5" placeholder="Why is this charge being removed?"></textarea>
+                                                        <button type="button" class="mt-2 w-full rounded-lg bg-red-600 py-1.5 text-xs font-semibold text-white hover:bg-red-500" @click="$wire.waiveMiscCharge({{ $charge->id }}, reason); open = false; reason = ''">Confirm removal</button>
                                                     </div>
                                                 </div>
                                             @endif

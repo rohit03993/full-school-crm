@@ -106,6 +106,7 @@ class PaymentService
 
         $mode = PaymentMode::from($data['payment_mode']);
         $this->validateModeFields($mode, $data);
+        $this->onlineAllowanceGst->assertOnlineTuitionAllowed($feeStructure, $mode);
 
         return DB::transaction(function () use ($feeStructure, $student, $data, $proof, $staff, $amount, $mode, $flexible): Payment {
             $locked = FeeStructure::query()

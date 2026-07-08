@@ -40,7 +40,7 @@ class DashboardController extends Controller
             ? Payment::query()
                 ->where('student_id', $student->id)
                 ->where('fee_structure_id', $fees->id)
-                ->with('feeInstallment')
+                ->with(['feeInstallment', 'feeMiscCharge'])
                 ->orderByDesc('payment_date')
                 ->orderByDesc('id')
                 ->get()

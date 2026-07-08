@@ -7,6 +7,7 @@ use App\Enums\RoleName;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Support\CrmNavigation;
 use App\Support\FeeSettings;
+use App\Services\OnlineAllowanceGstService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -69,6 +70,7 @@ class ManageFeeSettings extends Page
                 ->schema([
                     Toggle::make('online_allowance_gst_enabled')
                         ->label('Enable cash / online split and GST on online overage')
+                        ->helperText('Turning this off clears all cash/online splits and removes unpaid GST penalty charges.')
                         ->live(),
                     TextInput::make('gst_penalty_percentage')
                         ->label('GST % on online excess')
@@ -79,27 +81,46 @@ class ManageFeeSettings extends Page
                         ->suffix('%')
                         ->visible(fn (callable $get): bool => (bool) $get('online_allowance_gst_enabled')),
                 ]),
-            Section::make('Late fees (read-only)')
-                ->description('Configured in config/fees.php. Applied by crm:process-late-fees daily.')
+            Section::make('Late fees on overdue installments')
+                ->description('When enabled, the daily job creates late fee misc charges on the student Fees tab after the grace period. Grace days and daily rate are set in config/fees.php or .env.')
                 ->schema([
-                    Toggle::make('late_fee_enabled')->label('Late fees enabled')->disabled(),
-                    TextInput::make('late_fee_grace_days')->label('Grace days')->disabled(),
-                    TextInput::make('late_fee_daily_rate')
-                        ->label('Daily rate')
+                    Toggle::make('late_fee_enabled')
+                        ->label('Enable late fees')
+                        ->helperText('Turn off to stop new late fee penalties. Existing unpaid late fees remain until paid or waived.'),
+                    TextInput::make('late_fee_grace_days')
+                        ->label('Grace days (read-only)')
                         ->disabled()
-                        ->helperText('0.0015 = 0.15% of pending installment per day after grace.'),
+                        ->helperText('Days after due date before penalties start. Set FEE_LATE_FEE_GRACE_DAYS in .env.'),
+                    TextInput::make('late_fee_daily_rate')
+                        ->label('Daily rate (read-only)')
+                        ->disabled()
+                        ->helperText('0.0015 = 0.15% of pending installment per day after grace. Set FEE_LATE_FEE_DAILY_RATE in .env.'),
                 ]),
         ]);
     }
 
     public function save(): void
     {
-        FeeSettings::saveFormData($this->form->getState());
+        $state = $this->form->getState();
+        $wasGstEnabled = FeeSettings::onlineAllowanceGstEnabled();
+        $willGstEnable = (bool) ($state['online_allowance_gst_enabled'] ?? false);
 
-        Notification::make()
+        FeeSettings::saveFormData($state);
+
+        $notification = Notification::make()
             ->title('Fee settings saved')
-            ->success()
-            ->send();
+            ->success();
+
+        if ($wasGstEnabled && ! $willGstEnable) {
+            $cleanup = app(OnlineAllowanceGstService::class)->cleanupWhenDisabled(Auth::user());
+
+            $notification->body(
+                'Cleared cash/online split on '.$cleanup['splits_cleared'].' fee record(s)'
+                .' and removed '.$cleanup['gst_charges_removed'].' unpaid GST charge(s).',
+            );
+        }
+
+        $notification->send();
     }
 
     public function content(Schema $schema): Schema

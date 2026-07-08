@@ -1187,6 +1187,28 @@ class StudentProfilePage extends Page
             ->send();
     }
 
+    public function waiveMiscCharge(int $chargeId, string $reason, FeeMiscChargeService $miscCharges): void
+    {
+        abort_unless($this->userIsSuperAdmin(), 403);
+
+        $charge = $miscCharges->resolveForStudent($this->record, $chargeId);
+        $miscCharges->waiveSeparateCharge($charge, Auth::user(), $reason);
+
+        $this->feesTabLoaded = false;
+        $this->loadFeesTab();
+
+        Notification::make()
+            ->title('Misc charge removed')
+            ->body('The charge was archived and no longer counts toward balance due.')
+            ->success()
+            ->send();
+    }
+
+    protected function userIsSuperAdmin(): bool
+    {
+        return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
+    }
+
     public function loadReceiptsTab(): void
     {
         if ($this->receiptsTabLoaded) {
@@ -2315,6 +2337,7 @@ class StudentProfilePage extends Page
                                     'feeStructureHistory' => $this->feeStructureHistory,
                                     'canCollectFees' => $this->userCan(CrmPermission::FeesCollect),
                                     'canWaivePenalty' => $this->userCan(CrmPermission::FeesWaivePenalty),
+                                    'canWaiveMiscCharge' => $this->userIsSuperAdmin(),
                                 ]),
                         ]),
                     'receipts' => Tab::make('Receipts')

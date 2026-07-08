@@ -14,8 +14,10 @@ use App\Enums\FeeMiscChargeKind;
 use App\Enums\FeeMiscChargeStatus;
 use App\Models\FeeMiscCharge;
 use App\Models\FeePenalty;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\FeeSettings;
 use App\Services\AdmissionService;
 use App\Services\EnquiryService;
 use App\Services\PaymentService;
@@ -150,6 +152,36 @@ class FeeInstallmentTest extends TestCase
         $this->assertSame(FeeMiscChargeKind::LateFeePenalty, $charge->kind);
         $this->assertGreaterThan(0, (float) $charge->amount);
         $this->assertSame(0, FeePenalty::query()->where('status', 'pending')->count());
+    }
+
+    public function test_late_fees_are_skipped_when_disabled_in_fee_settings(): void
+    {
+        Setting::setValue(FeeSettings::KEY_LATE_FEE_ENABLED, '0', 'fees');
+        Setting::flushValueCache();
+
+        $staff = $this->createStaffUser();
+        $student = $this->createStudent();
+        $course = $this->createCourse();
+        $enquiry = $this->createEnquiry($student, $course, $staff);
+
+        $admissionService = app(AdmissionService::class);
+        $admission = $admissionService->convert($student, $enquiry, $staff, [
+            'course_id' => $course->id,
+            'use_installment_plan' => true,
+            'installment_plan' => [
+                ['label' => 'Term 1', 'amount' => 60000, 'due_date' => now()->subDays(20)->toDateString()],
+            ],
+        ]);
+
+        $enrollment = $admissionService->approve($this->submitAdmissionForm($admission, $staff), $staff);
+        $installment = $enrollment->feeStructure->installments()->first();
+
+        config(['fees.late_fee.grace_days' => 7, 'fees.late_fee.daily_rate' => 0.0015]);
+
+        $charge = app(PenaltyCalculationService::class)->processInstallmentPenalty($installment, now());
+
+        $this->assertNull($charge);
+        $this->assertSame(0, FeeMiscCharge::query()->where('kind', FeeMiscChargeKind::LateFeePenalty)->count());
     }
 
     public function test_late_fee_misc_charge_can_be_paid_via_add_payment(): void

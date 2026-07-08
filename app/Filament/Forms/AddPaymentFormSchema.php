@@ -10,6 +10,7 @@ use App\Models\FeeMiscCharge;
 use App\Models\FeeStructure;
 use App\Support\FeePaymentPolicy;
 use App\Support\FeePlanCalculator;
+use App\Support\FeeSettings;
 use App\Support\PaymentShortfallHelper;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
@@ -53,8 +54,21 @@ class AddPaymentFormSchema
             $miscPending > 0 => 'misc',
             default => 'tuition',
         };
+        $needsCashOnlineSplit = FeeSettings::onlineAllowanceGstEnabled() && ! $feeStructure->hasOnlineAllowancePlan();
 
         return [
+            Placeholder::make('gst_split_warning')
+                ->label('')
+                ->content(new HtmlString(
+                    '<div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">'
+                    .'<p class="font-semibold">Cash / online split not set</p>'
+                    .'<p class="mt-1 text-xs leading-relaxed text-amber-800 dark:text-amber-200">'
+                    .'GST tracking is enabled but this student has no agreed cash vs online split. '
+                    .'Open <strong>Adjust Fees → Cash / online</strong> to set it before recording online or UPI tuition payments.'
+                    .'</p></div>'
+                ))
+                ->visible($needsCashOnlineSplit)
+                ->columnSpanFull(),
             Placeholder::make('payment_snapshot')
                 ->label('')
                 ->content(new HtmlString(

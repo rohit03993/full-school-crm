@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\BatchStatus;
 use App\Enums\FeeMiscChargeKind;
 use App\Enums\FeeMiscChargeStatus;
+use App\Enums\RoleName;
 use App\Models\Batch;
 use App\Models\Course;
 use App\Models\Enrollment;
@@ -241,12 +242,52 @@ class FeeMiscChargeService
             ]);
         }
 
+        return $this->markChargeWaived($charge, $staff, $reason, 'Late Fee Penalty Waived');
+    }
+
+    public function waiveSeparateCharge(FeeMiscCharge $charge, User $staff, string $reason): FeeMiscCharge
+    {
+        if (! $staff->hasRole(RoleName::SuperAdmin->value)) {
+            throw ValidationException::withMessages([
+                'charge' => 'Only Super Admin can remove mistaken misc charges.',
+            ]);
+        }
+
+        $reason = trim($reason);
+
+        if ($reason === '') {
+            throw ValidationException::withMessages([
+                'reason' => 'A reason is required to remove this charge.',
+            ]);
+        }
+
+        if ($charge->kind !== FeeMiscChargeKind::Separate) {
+            throw ValidationException::withMessages([
+                'charge' => 'Only staff-added misc charges can be removed. GST and late fee penalties use their own rules.',
+            ]);
+        }
+
+        if (! $charge->canBeWaivedBySuperAdmin()) {
+            throw ValidationException::withMessages([
+                'charge' => 'Only unpaid misc charges with no payments recorded can be removed.',
+            ]);
+        }
+
+        return $this->markChargeWaived($charge, $staff, $reason, 'Misc Charge Removed');
+    }
+
+    protected function markChargeWaived(
+        FeeMiscCharge $charge,
+        User $staff,
+        string $reason,
+        string $auditAction,
+    ): FeeMiscCharge {
         $charge->update([
             'status' => FeeMiscChargeStatus::Cancelled,
         ]);
 
         $this->audit->log(
-            action: 'Late Fee Penalty Waived',
+            action: $auditAction,
             auditable: $charge,
             newValues: ['status' => FeeMiscChargeStatus::Cancelled->value, 'reason' => $reason],
             user: $staff,

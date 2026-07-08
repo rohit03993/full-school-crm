@@ -2,9 +2,19 @@
     @php
         $netFee = (float) $fees->net_fee;
         $paidAmount = (float) $fees->paid_amount;
-        $pendingAmount = (float) $fees->pending_amount;
+        $tuitionPending = (float) $fees->pending_amount;
+        $miscPending = (float) $fees->separateMiscChargesPendingTotal();
+        $collectiblePending = (float) $fees->totalCollectiblePending();
         $installments = $installments ?? collect();
-        $miscCharges = $miscCharges ?? collect();
+        $miscCharges = ($miscCharges ?? collect())
+            ->filter(fn ($charge) => $charge->isSeparateCharge() && $charge->status !== \App\Enums\FeeMiscChargeStatus::Cancelled)
+            ->sortBy(fn ($charge) => [
+                $charge->kind === \App\Enums\FeeMiscChargeKind::LateFeePenalty ? 0 : 1,
+                $charge->due_date?->timestamp ?? PHP_INT_MAX,
+                $charge->id,
+            ])
+            ->values();
+        $payableMisc = $miscCharges->filter(fn ($charge) => $charge->pendingAmount() > 0);
     @endphp
 
     <div class="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
@@ -35,30 +45,55 @@
             </div>
             <div @class([
                 'col-span-2 rounded-xl p-3 sm:col-span-1',
-                'bg-amber-50 ring-1 ring-amber-200' => $pendingAmount > 0,
-                'bg-emerald-50 ring-1 ring-emerald-100' => $pendingAmount <= 0,
+                'bg-amber-50 ring-1 ring-amber-200' => $collectiblePending > 0,
+                'bg-emerald-50 ring-1 ring-emerald-100' => $collectiblePending <= 0,
             ])>
                 <p @class([
                     'text-[10px] font-bold uppercase tracking-wide',
-                    'text-amber-800' => $pendingAmount > 0,
-                    'text-emerald-700' => $pendingAmount <= 0,
-                ])>Pending</p>
+                    'text-amber-800' => $collectiblePending > 0,
+                    'text-emerald-700' => $collectiblePending <= 0,
+                ])>Total due</p>
                 <p @class([
                     'mt-1 text-lg font-bold',
-                    'text-amber-900' => $pendingAmount > 0,
-                    'text-emerald-800' => $pendingAmount <= 0,
-                ])>₹{{ number_format($pendingAmount, 0) }}</p>
+                    'text-amber-900' => $collectiblePending > 0,
+                    'text-emerald-800' => $collectiblePending <= 0,
+                ])>₹{{ number_format($collectiblePending, 0) }}</p>
+                @if ($collectiblePending > 0 && $miscPending > 0)
+                    <p class="mt-1 text-[10px] leading-snug text-amber-800/80">
+                        Tuition ₹{{ number_format($tuitionPending, 0) }}
+                        @if ($miscPending > 0)
+                            · Other ₹{{ number_format($miscPending, 0) }}
+                        @endif
+                    </p>
+                @endif
             </div>
         </div>
 
-        @if ($miscCharges->isNotEmpty())
+        @if ($payableMisc->isNotEmpty())
             <div class="mt-4 rounded-xl border border-navy-100 p-3">
-                <p class="text-[10px] font-bold uppercase tracking-wide text-navy-500">Miscellaneous</p>
-                <ul class="mt-2 space-y-1 text-sm text-navy-700">
-                    @foreach ($miscCharges as $charge)
-                        <li class="flex justify-between gap-3">
-                            <span>{{ $charge->label }}</span>
-                            <span class="font-semibold">₹{{ number_format((float) $charge->amount, 2) }}</span>
+                <p class="text-[10px] font-bold uppercase tracking-wide text-navy-500">Additional charges due</p>
+                <ul class="mt-2 space-y-2 text-sm text-navy-700">
+                    @foreach ($payableMisc as $charge)
+                        @php
+                            $chargePending = $charge->pendingAmount();
+                            $chargePaid = (float) $charge->paid_amount;
+                            $typeBadge = match ($charge->kind) {
+                                \App\Enums\FeeMiscChargeKind::LateFeePenalty => 'Late fee',
+                                \App\Enums\FeeMiscChargeKind::GstPenalty => 'GST',
+                                default => null,
+                            };
+                        @endphp
+                        <li class="flex items-start justify-between gap-3 rounded-lg bg-navy-50/70 px-2.5 py-2">
+                            <div class="min-w-0">
+                                <p class="font-medium text-navy-900">{{ $charge->label }}</p>
+                                @if ($typeBadge)
+                                    <p class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">{{ $typeBadge }}</p>
+                                @endif
+                                @if ($chargePaid > 0)
+                                    <p class="mt-0.5 text-xs text-navy-500">Paid ₹{{ number_format($chargePaid, 2) }} of ₹{{ number_format((float) $charge->amount, 2) }}</p>
+                                @endif
+                            </div>
+                            <span class="shrink-0 font-semibold text-amber-900">₹{{ number_format($chargePending, 2) }}</span>
                         </li>
                     @endforeach
                 </ul>
@@ -129,7 +164,9 @@
                                 <p class="font-mono text-sm font-bold text-brand-700">{{ $payment->receipt_number }}</p>
                                 <p class="mt-1 text-sm text-navy-600">
                                     {{ $payment->payment_date->format('d M Y') }} · {{ $payment->payment_mode->label() }}
-                                    @if ($payment->feeInstallment)
+                                    @if ($payment->feeMiscCharge)
+                                        · {{ $payment->feeMiscCharge->label }}
+                                    @elseif ($payment->feeInstallment)
                                         · {{ $payment->feeInstallment->label }}
                                     @endif
                                 </p>

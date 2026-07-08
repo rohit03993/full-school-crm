@@ -14,7 +14,7 @@ class ProcessLateFees extends Command
     public function handle(PenaltyCalculationService $penalties): int
     {
         if (! $penalties->isEnabled()) {
-            $this->warn('Late fees are disabled in config/fees.php.');
+            $this->warn('Late fees are disabled in Fee Settings (or config/fees.php).');
 
             return self::SUCCESS;
         }

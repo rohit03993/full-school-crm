@@ -7,7 +7,8 @@ return [
   | Late fee on overdue installments
   |--------------------------------------------------------------------------
   |
-  | Applied by `php artisan crm:process-late-fees` (scheduled daily).
+    | When enabled in Settings → Fee Settings, applied by `php artisan crm:process-late-fees` (scheduled daily).
+    | Grace days and daily rate default from .env; the on/off toggle is stored in the database.
   | Formula: pending_installment_amount × daily_rate × days_after_grace
   |
   */

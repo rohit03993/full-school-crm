@@ -82,6 +82,14 @@ class FeeMiscCharge extends Model
         return $this->kind === FeeMiscChargeKind::GstPenalty;
     }
 
+    public function canBeWaivedBySuperAdmin(): bool
+    {
+        return $this->kind === FeeMiscChargeKind::Separate
+            && $this->status === FeeMiscChargeStatus::Pending
+            && (float) $this->paid_amount <= 0
+            && $this->pendingAmount() > 0;
+    }
+
     public function pendingAmount(): float
     {
         if (! $this->isSeparateCharge() || $this->status === FeeMiscChargeStatus::Cancelled) {

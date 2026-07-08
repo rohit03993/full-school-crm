@@ -10,6 +10,7 @@ use App\Models\FeeInstallment;
 use App\Models\FeeMiscCharge;
 use App\Models\FeePenalty;
 use App\Models\User;
+use App\Support\FeeSettings;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -17,17 +18,17 @@ class PenaltyCalculationService
 {
     public function graceDays(): int
     {
-        return max(0, (int) config('fees.late_fee.grace_days', 7));
+        return FeeSettings::lateFeeGraceDays();
     }
 
     public function dailyRate(): float
     {
-        return max(0, (float) config('fees.late_fee.daily_rate', 0.0015));
+        return FeeSettings::lateFeeDailyRate();
     }
 
     public function isEnabled(): bool
     {
-        return (bool) config('fees.late_fee.enabled', true);
+        return FeeSettings::lateFeeEnabled();
     }
 
     public function calculateLateFee(float $baseAmount, int $daysLate): float
@@ -84,6 +85,10 @@ class PenaltyCalculationService
 
     public function processInstallmentPenalty(FeeInstallment $installment, Carbon $today): ?FeeMiscCharge
     {
+        if (! $this->isEnabled()) {
+            return null;
+        }
+
         if (! $installment->due_date) {
             return null;
         }

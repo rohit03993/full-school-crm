@@ -5,16 +5,96 @@ namespace App\Services;
 use App\Enums\FeeMiscChargeKind;
 use App\Enums\FeeMiscChargeStatus;
 use App\Enums\PaymentMode;
+use App\Models\Admission;
 use App\Models\FeeMiscCharge;
 use App\Models\FeeStructure;
 use App\Models\Payment;
+use App\Models\User;
 use App\Support\FeeSettings;
+use Illuminate\Support\Facades\DB;
 
 class OnlineAllowanceGstService
 {
+    public function __construct(
+        protected AuditService $audit,
+    ) {}
+
     public function isEnabled(): bool
     {
         return FeeSettings::onlineAllowanceGstEnabled();
+    }
+
+    public function requiresAllowanceSplit(FeeStructure $feeStructure): bool
+    {
+        return $this->isEnabled() && ! $feeStructure->hasOnlineAllowancePlan();
+    }
+
+    public function assertOnlineTuitionAllowed(FeeStructure $feeStructure, PaymentMode $mode): void
+    {
+        if (! $this->requiresAllowanceSplit($feeStructure)) {
+            return;
+        }
+
+        if (! in_array($mode, [PaymentMode::Online, PaymentMode::Upi], true)) {
+            return;
+        }
+
+        throw \Illuminate\Validation\ValidationException::withMessages([
+            'payment_mode' => 'Set the cash vs online split in Adjust Fees before recording online or UPI tuition payments.',
+        ]);
+    }
+
+    /**
+     * @return array{splits_cleared: int, gst_charges_removed: int}
+     */
+    public function cleanupWhenDisabled(User $staff): array
+    {
+        return DB::transaction(function () use ($staff): array {
+            $splitsCleared = FeeStructure::query()
+                ->where(function ($query): void {
+                    $query->whereNotNull('planned_cash_amount')
+                        ->orWhereNotNull('planned_online_amount');
+                })
+                ->update([
+                    'planned_cash_amount' => null,
+                    'planned_online_amount' => null,
+                ]);
+
+            Admission::query()
+                ->where(function ($query): void {
+                    $query->whereNotNull('planned_cash_amount')
+                        ->orWhereNotNull('planned_online_amount');
+                })
+                ->update([
+                    'planned_cash_amount' => null,
+                    'planned_online_amount' => null,
+                ]);
+
+            $gstCharges = FeeMiscCharge::query()
+                ->where('kind', FeeMiscChargeKind::GstPenalty)
+                ->where('status', FeeMiscChargeStatus::Pending)
+                ->where('paid_amount', '<=', 0)
+                ->get();
+
+            foreach ($gstCharges as $charge) {
+                $charge->update(['status' => FeeMiscChargeStatus::Cancelled]);
+            }
+
+            $this->audit->log(
+                action: 'GST Feature Disabled Cleanup',
+                auditable: null,
+                newValues: [
+                    'splits_cleared' => $splitsCleared,
+                    'gst_charges_removed' => $gstCharges->count(),
+                ],
+                user: $staff,
+            );
+
+            return [
+                'splits_cleared' => $splitsCleared,
+                'gst_charges_removed' => $gstCharges->count(),
+            ];
+        });
     }
 
     public function applyAfterTuitionPayment(

@@ -1,7 +1,7 @@
 @php
     $netFee = $enrollment && $fees ? (float) $fees->net_fee : 0;
     $paidAmount = $enrollment && $fees ? (float) $fees->paid_amount : 0;
-    $pendingAmount = $enrollment && $fees ? (float) $fees->pending_amount : 0;
+    $collectiblePending = $enrollment && $fees ? (float) $fees->totalCollectiblePending() : 0;
     $paidPercent = $netFee > 0 ? min(100, (int) round(($paidAmount / $netFee) * 100)) : 0;
     $hasMarks = ! empty($examMarksSections);
     $hasAttendance = $enrollment && ($classAttendancePercentage !== null || $sessionAttendanceRecords->isNotEmpty());
@@ -78,8 +78,8 @@
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                 </span>
                 <span class="text-xs font-bold text-navy-900 sm:text-sm">Fees</span>
-                @if ($pendingAmount > 0)
-                    <span class="text-[10px] font-semibold text-amber-700">₹{{ number_format($pendingAmount, 0) }} due</span>
+                @if ($collectiblePending > 0)
+                    <span class="text-[10px] font-semibold text-amber-700">₹{{ number_format($collectiblePending, 0) }} due</span>
                 @else
                     <span class="text-[10px] font-semibold text-emerald-700">All paid</span>
                 @endif
