@@ -8,6 +8,7 @@ use App\Enums\CourseStatus;
 use App\Enums\Gender;
 use App\Enums\InstituteType;
 use App\Enums\LeadSource;
+use App\Enums\PaymentMode;
 use App\Enums\PaymentShortfallAction;
 use App\Enums\RoleName;
 use App\Enums\StudentCategory;
@@ -18,6 +19,7 @@ use App\Models\ActivityType;
 use App\Models\Batch;
 use App\Models\Course;
 use App\Models\FeeStructure;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\ActivityAttendanceService;
@@ -25,12 +27,14 @@ use App\Services\AdmissionService;
 use App\Services\BatchService;
 use App\Services\EnquiryService;
 use App\Services\EnrollmentRollNumberService;
+use App\Services\FeeMiscChargeService;
 use App\Services\PaymentService;
+use App\Services\PenaltyCalculationService;
 use App\Services\StudentAuthService;
-use App\Support\DefaultCourse;
 use App\Support\DefaultProgrammes;
 use App\Support\FeePaymentPolicy;
 use App\Support\FeePlanCalculator;
+use App\Support\FeeSettings;
 use App\Support\InstituteProfile;
 use App\Support\PaymentShortfallHelper;
 use Illuminate\Database\Seeder;
@@ -63,9 +67,11 @@ class DemoDataSeeder extends Seeder
             return;
         }
 
+        $this->enableDemoFeeSettings();
+
         $enquiries = app(EnquiryService::class);
 
-        // --- Leads only (no student record yet) ---
+        // --- Leads only (pipeline) ---
         $enquiries->create([
             'name' => 'Aarav Sharma',
             'father_name' => 'Mr Sharma',
@@ -86,52 +92,6 @@ class DemoDataSeeder extends Seeder
             'visit_status' => 'follow_up_required',
         ], $staff, LeadSource::Website);
 
-        $enquiries->create([
-            'name' => 'Karan Mehta',
-            'mobile' => '9811000003',
-            'gender' => Gender::Male->value,
-            'course_id' => DefaultCourse::undecided()->id,
-            'discussion_summary' => 'Walk-in — course not decided yet.',
-            'visit_status' => 'interested',
-        ], $staff, LeadSource::WalkIn);
-
-        // --- Admission in progress (fee plan with installments, not yet enrolled) ---
-        $neha = Student::query()->create([
-            'name' => 'Neha Singh',
-            'father_name' => 'Mr Singh',
-            'date_of_birth' => '2002-04-18',
-            'gender' => Gender::Female,
-            'mobile' => '9811000004',
-            'email' => 'neha.demo@example.com',
-            'category' => StudentCategory::General,
-            'status' => StudentStatus::Enquiry,
-            'portal_password' => app(StudentAuthService::class)->hashPortalPassword('18042002'),
-        ]);
-
-        $nehaEnquiry = $enquiries->createForExistingStudent($neha, [
-            'course_id' => $primaryCourse->id,
-            'discussion_summary' => 'Ready for admission — fee plan agreed.',
-            'visit_status' => 'interested',
-        ], $staff, LeadSource::WalkIn);
-
-        $nehaNet = round((float) $primaryCourse->fee - 10000 + 5000, 2);
-        $nehaHalf = round($nehaNet / 2, 2);
-        $nehaBalance = round($nehaNet - $nehaHalf, 2);
-
-        app(AdmissionService::class)->convert($neha, $nehaEnquiry, $staff, [
-            'course_id' => $primaryCourse->id,
-            'discount_amount' => 10000,
-            'use_installment_plan' => true,
-            'misc_fees' => [
-                ['label' => 'Transport', 'amount' => 5000],
-            ],
-            'installment_plan' => [
-                ['label' => 'Installment 1', 'amount' => $nehaHalf, 'due_date' => now()->toDateString()],
-                ['label' => 'Installment 2', 'amount' => $nehaBalance, 'due_date' => now()->addMonth()->toDateString()],
-            ],
-        ]);
-
-        // --- Fully enrolled student with installments + partial payment ---
         $demo = $this->demoProfileForType($instituteType);
 
         $batch = $this->createBatch(
@@ -143,7 +103,8 @@ class DemoDataSeeder extends Seeder
             shift: $demo['shift'],
         );
 
-        $enrolledStudent = $this->seedEnrolledStudent(
+        // 1 — Normal partial tuition
+        $studentOne = $this->seedEnrolledStudent(
             staff: $staff,
             approver: $superAdmin,
             name: $demo['name'],
@@ -156,6 +117,7 @@ class DemoDataSeeder extends Seeder
             gender: $demo['gender'],
         );
 
+        // 2 — Separate misc charge with partial payment
         $studentTwo = $this->seedEnrolledStudent(
             staff: $staff,
             approver: $superAdmin,
@@ -168,7 +130,12 @@ class DemoDataSeeder extends Seeder
             payment: 12000,
             gender: Gender::Female,
         );
+        $this->seedPartialMiscCharge($studentTwo, $staff, 'Hostel fee', 5000, 2000);
 
+        // 3 — Overdue installment → pending late fee penalty (open Fees tab to see Late fees > 0)
+        $lateFeeNet = round((float) $primaryCourse->fee - 5000, 2);
+        $lateFirst = round($lateFeeNet * 0.4, 2);
+        $lateSecond = round($lateFeeNet - $lateFirst, 2);
         $studentThree = $this->seedEnrolledStudent(
             staff: $staff,
             approver: $superAdmin,
@@ -178,36 +145,149 @@ class DemoDataSeeder extends Seeder
             course: $primaryCourse,
             batch: $batch,
             discount: 5000,
-            payment: 10000,
+            payment: 0,
+            gender: Gender::Male,
+            installmentPlan: [
+                ['label' => 'Term 1', 'amount' => $lateFirst, 'due_date' => now()->subDays(20)->toDateString()],
+                ['label' => 'Term 2', 'amount' => $lateSecond, 'due_date' => now()->addMonths(2)->toDateString()],
+            ],
+        );
+        $this->seedLateFeePenalty($studentThree);
+
+        // 4 — Cash/online split + GST on online overage
+        $gstNet = round((float) $primaryCourse->fee - 10000, 2);
+        $gstCash = round($gstNet * 0.6, 2);
+        $gstOnline = round($gstNet - $gstCash, 2);
+        $onlineOveragePay = round($gstOnline + 5000, 2);
+        $studentFour = $this->seedEnrolledStudent(
+            staff: $staff,
+            approver: $superAdmin,
+            name: 'Kavya Nair',
+            mobile: '9811000010',
+            dob: '2002-06-20',
+            course: $primaryCourse,
+            batch: $batch,
+            discount: 10000,
+            payment: 0,
+            gender: Gender::Female,
+            installmentPlan: FeePlanCalculator::defaultTwoPartPlan($gstNet),
+            plannedCash: $gstCash,
+            plannedOnline: $gstOnline,
+        );
+        $this->seedOnlineOveragePayment($studentFour, $staff, $onlineOveragePay);
+
+        // 5 — Almost cleared (small tuition balance)
+        $studentFive = $this->seedEnrolledStudent(
+            staff: $staff,
+            approver: $superAdmin,
+            name: 'Vikram Joshi',
+            mobile: '9811000011',
+            dob: '2001-09-14',
+            course: $primaryCourse,
+            batch: $batch,
+            discount: 15000,
+            payment: max(0, (int) round((float) $primaryCourse->fee - 15000 - 5000)),
             gender: Gender::Male,
         );
 
         $rolls = app(EnrollmentRollNumberService::class);
-        $enrollmentOne = $enrolledStudent->activeEnrollment;
-        $enrollmentTwo = $studentTwo->activeEnrollment;
-        $enrollmentThree = $studentThree->activeEnrollment;
-
-        if ($enrollmentOne) {
-            $rolls->update($enrollmentOne, '101', $staff);
-        }
-
-        if ($enrollmentTwo) {
-            $rolls->update($enrollmentTwo, '102', $staff);
-        }
-
-        if ($enrollmentThree) {
-            $rolls->update($enrollmentThree, '103', $staff);
-        }
-
         $classStudents = [
-            $enrolledStudent->fresh(),
+            $studentOne->fresh(),
             $studentTwo->fresh(),
             $studentThree->fresh(),
+            $studentFour->fresh(),
+            $studentFive->fresh(),
         ];
 
-        $this->seedDemoActivities($staff, $batch, $classStudents, $instituteType);
+        foreach ($classStudents as $index => $student) {
+            if ($student->activeEnrollment) {
+                $rolls->update($student->activeEnrollment, (string) (101 + $index), $staff);
+            }
+        }
 
-        $this->printSummary($instituteType, $primaryCourse, $demo, $nehaNet);
+        $this->seedDemoActivities($staff, $batch, array_slice($classStudents, 0, 3), $instituteType);
+
+        $this->printSummary($instituteType, $primaryCourse, $demo, $studentThree->fresh());
+    }
+
+    protected function enableDemoFeeSettings(): void
+    {
+        Setting::setValue(FeeSettings::KEY_LATE_FEE_ENABLED, '1', 'fees');
+        Setting::setValue(FeeSettings::KEY_ONLINE_ALLOWANCE_GST_ENABLED, '1', 'fees');
+        Setting::setValue(FeeSettings::KEY_GST_PENALTY_PERCENTAGE, '18', 'fees');
+        Setting::flushValueCache();
+    }
+
+    protected function seedPartialMiscCharge(Student $student, User $staff, string $label, float $amount, float $paid): void
+    {
+        $feeStructure = $student->activeEnrollment?->feeStructure;
+
+        if (! $feeStructure) {
+            return;
+        }
+
+        $charge = app(FeeMiscChargeService::class)->addSeparateCharge(
+            $feeStructure,
+            $label,
+            $amount,
+            now()->addDays(15)->toDateString(),
+            $staff,
+        );
+
+        if ($paid <= 0) {
+            return;
+        }
+
+        app(PaymentService::class)->addMisc(
+            $feeStructure->fresh(),
+            $student,
+            $charge->fresh(),
+            [
+                'payment_date' => now()->toDateString(),
+                'amount' => $paid,
+                'payment_mode' => PaymentMode::Cash->value,
+                'voucher_number' => 'DEMO-MISC-'.strtoupper(substr($label, 0, 3)),
+            ],
+            UploadedFile::fake()->image('proof.jpg'),
+            $staff,
+        );
+    }
+
+    protected function seedLateFeePenalty(Student $student): void
+    {
+        $installment = $student->activeEnrollment?->feeStructure?->installments()
+            ->orderBy('sort_order')
+            ->first();
+
+        if (! $installment) {
+            return;
+        }
+
+        config(['fees.late_fee.grace_days' => 7, 'fees.late_fee.daily_rate' => 0.0015]);
+
+        app(PenaltyCalculationService::class)->processInstallmentPenalty($installment, now());
+    }
+
+    protected function seedOnlineOveragePayment(Student $student, User $staff, float $amount): void
+    {
+        $feeStructure = $student->activeEnrollment?->feeStructure;
+
+        if (! $feeStructure || $amount <= 0) {
+            return;
+        }
+
+        $payload = $this->demoPaymentPayload($feeStructure->fresh(), $amount, 'DEMO-GST');
+        unset($payload['voucher_number'], $payload['payment_mode']);
+        $payload['payment_mode'] = PaymentMode::Upi->value;
+        $payload['utr_number'] = 'UTR-DEMO-GST-001';
+
+        app(PaymentService::class)->add(
+            $feeStructure->fresh(),
+            $student,
+            $payload,
+            UploadedFile::fake()->image('proof.jpg'),
+            $staff,
+        );
     }
 
     protected function seedDemoCourses(InstituteType $type): void
@@ -312,6 +392,9 @@ class DemoDataSeeder extends Seeder
         int $discount,
         int $payment,
         Gender $gender = Gender::Male,
+        ?array $installmentPlan = null,
+        ?float $plannedCash = null,
+        ?float $plannedOnline = null,
     ): Student {
         $dobPassword = app(StudentAuthService::class)->hashPortalPassword(
             str_replace('-', '', date('dmY', strtotime($dob))),
@@ -330,7 +413,7 @@ class DemoDataSeeder extends Seeder
         ]);
 
         $netFee = round((float) $course->fee - $discount, 2);
-        $installmentPlan = FeePlanCalculator::defaultTwoPartPlan($netFee);
+        $installmentPlan ??= FeePlanCalculator::defaultTwoPartPlan($netFee);
 
         $enquiries = app(EnquiryService::class);
         $admissions = app(AdmissionService::class);
@@ -341,12 +424,19 @@ class DemoDataSeeder extends Seeder
             'visit_status' => 'interested',
         ], $staff, LeadSource::WalkIn);
 
-        $admission = $admissions->convert($student, $enquiry, $staff, [
+        $convertData = [
             'course_id' => $course->id,
             'discount_amount' => $discount,
             'use_installment_plan' => true,
             'installment_plan' => $installmentPlan,
-        ]);
+        ];
+
+        if ($plannedCash !== null && $plannedOnline !== null) {
+            $convertData['planned_cash_amount'] = $plannedCash;
+            $convertData['planned_online_amount'] = $plannedOnline;
+        }
+
+        $admission = $admissions->convert($student, $enquiry, $staff, $convertData);
 
         $admission = $admissions->submitForm(
             $admission,
@@ -370,12 +460,19 @@ class DemoDataSeeder extends Seeder
 
         $feeStructure = $enrollment->feeStructure;
 
+        if ($feeStructure && $plannedCash !== null && $plannedOnline !== null) {
+            $feeStructure->update([
+                'planned_cash_amount' => $plannedCash,
+                'planned_online_amount' => $plannedOnline,
+            ]);
+        }
+
         if ($feeStructure && $payment > 0) {
             app(PaymentService::class)->add(
-                $feeStructure,
+                $feeStructure->fresh(),
                 $student,
                 $this->demoPaymentPayload(
-                    $feeStructure,
+                    $feeStructure->fresh(),
                     $payment,
                     'DEMO-'.strtoupper(substr($name, 0, 3)),
                 ),
@@ -614,8 +711,10 @@ class DemoDataSeeder extends Seeder
             ->firstOrFail();
     }
 
-    protected function printSummary(InstituteType $instituteType, Course $course, array $demo, float $nehaNet): void
+    protected function printSummary(InstituteType $instituteType, Course $course, array $demo, Student $lateFeeStudent): void
     {
+        $latePending = (float) ($lateFeeStudent->activeEnrollment?->feeStructure?->pendingPenaltiesTotal() ?? 0);
+
         $this->command?->newLine();
         $this->command?->info('=== Fresh demo data ('.$instituteType->label().') ===');
         $this->command?->line('Primary course: '.$course->name.' · Fee ₹'.number_format((float) $course->fee, 2));
@@ -623,10 +722,14 @@ class DemoDataSeeder extends Seeder
         $this->command?->line('Super Admin mobile: '.env('ADMIN_MOBILE', '9876543210').' / '.env('ADMIN_PASSWORD', 'Admin@2026'));
         $this->command?->line('Staff: demo@example.com / password');
         $this->command?->newLine();
-        $this->command?->line('Leads: Aarav 9811000001 · Priya 9811000002 · Karan 9811000003 (undecided course)');
-        $this->command?->line("Admission pending: Neha Singh 9811000004 · net ₹".number_format($nehaNet, 2).' · 2 installments + transport');
-        $this->command?->line("Enrolled: {$demo['name']} roll 101 · Sneha Gupta roll 102 · Amit Verma roll 103 · partial fees paid");
-        $this->command?->line('Marks: Student profile → Exam tab — Unit Test June & July (subjects as columns)');
-        $this->command?->line('Import Marks: use rolls 101–103 · template under Academics → Import Marks');
+        $this->command?->line('Leads: Aarav 9811000001 · Priya 9811000002');
+        $this->command?->line('5 enrolled students (rolls 101–105):');
+        $this->command?->line("  101 {$demo['name']} — partial tuition");
+        $this->command?->line('  102 Sneha Gupta — Hostel misc ₹5,000 (₹2,000 paid / ₹3,000 due)');
+        $this->command?->line('  103 Amit Verma — overdue Term 1 → Late fees ₹'.number_format($latePending, 2).' (open Fees tab)');
+        $this->command?->line('  104 Kavya Nair — cash/online split + GST on UPI overage');
+        $this->command?->line('  105 Vikram Joshi — almost cleared (₹5,000 tuition left)');
+        $this->command?->line('Fee Settings: late fees ON · GST/cash-online ON (18%)');
+        $this->command?->line('Marks: rolls 101–103 on Exam tab · Import Marks uses 101–103');
     }
 }
