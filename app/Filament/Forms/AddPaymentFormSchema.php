@@ -66,7 +66,7 @@ class AddPaymentFormSchema
                     .'<div class="rounded-lg bg-violet-50 px-3 py-2 dark:bg-violet-500/10">'
                     .'<p class="text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-300">Misc charges</p>'
                     .'<p class="mt-0.5 text-base font-bold text-violet-950 dark:text-violet-100">₹'.$format($feeStructure->separateMiscChargesTotal()).'</p>'
-                    .'<p class="mt-0.5 text-xs text-violet-800/80 dark:text-violet-200">Paid ₹'.$format($feeStructure->separateMiscChargesPaidTotal()).' · Pending ₹'.$format($miscPending).'</p></div>'
+                    .'<p class="mt-0.5 text-xs text-violet-800/80 dark:text-violet-200">Paid ₹'.$format($feeStructure->separateMiscChargesPaidTotal()).' · Pending ₹'.$format($miscPending).' · includes late fees & GST</p></div>'
                     .'<div class="rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-500/10">'
                     .'<p class="text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Total due now</p>'
                     .'<p class="mt-0.5 text-base font-bold text-amber-950 dark:text-amber-100">₹'.$format($collectible).'</p></div>'

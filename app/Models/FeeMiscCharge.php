@@ -13,6 +13,7 @@ class FeeMiscCharge extends Model
 {
     protected $fillable = [
         'fee_structure_id',
+        'fee_installment_id',
         'label',
         'amount',
         'paid_amount',
@@ -42,6 +43,11 @@ class FeeMiscCharge extends Model
         return $this->belongsTo(FeeStructure::class);
     }
 
+    public function feeInstallment(): BelongsTo
+    {
+        return $this->belongsTo(FeeInstallment::class);
+    }
+
     public function addedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'added_by_user_id');
@@ -59,7 +65,21 @@ class FeeMiscCharge extends Model
 
     public function isSeparateCharge(): bool
     {
-        return in_array($this->kind, [FeeMiscChargeKind::Separate, FeeMiscChargeKind::GstPenalty], true);
+        return in_array($this->kind, [
+            FeeMiscChargeKind::Separate,
+            FeeMiscChargeKind::GstPenalty,
+            FeeMiscChargeKind::LateFeePenalty,
+        ], true);
+    }
+
+    public function isLateFeePenalty(): bool
+    {
+        return $this->kind === FeeMiscChargeKind::LateFeePenalty;
+    }
+
+    public function isGstPenalty(): bool
+    {
+        return $this->kind === FeeMiscChargeKind::GstPenalty;
     }
 
     public function pendingAmount(): float
@@ -89,7 +109,11 @@ class FeeMiscCharge extends Model
     public function scopeSeparatePayable(Builder $query): Builder
     {
         return $query
-            ->whereIn('kind', [FeeMiscChargeKind::Separate, FeeMiscChargeKind::GstPenalty])
+            ->whereIn('kind', [
+                FeeMiscChargeKind::Separate,
+                FeeMiscChargeKind::GstPenalty,
+                FeeMiscChargeKind::LateFeePenalty,
+            ])
             ->where('status', '!=', FeeMiscChargeStatus::Cancelled);
     }
 }

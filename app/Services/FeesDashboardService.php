@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Enums\EnrollmentStatus;
-use App\Enums\FeePenaltyStatus;
+use App\Enums\FeeMiscChargeKind;
+use App\Enums\FeeMiscChargeStatus;
 use App\Models\FeeInstallment;
+use App\Models\FeeMiscCharge;
 use App\Models\FeeStructure;
 use App\Models\Payment;
 use App\Models\Student;
@@ -43,12 +45,14 @@ class FeesDashboardService
                 ->whereDate('payment_date', '<=', $today)
                 ->sum('amount'), 2),
             'pending_fees_total' => round((float) FeeStructure::query()->forActiveEnrollments()->sum('pending_amount'), 2),
-            'pending_penalties_total' => round((float) \App\Models\FeePenalty::query()
-                ->where('status', FeePenaltyStatus::Pending)
+            'pending_penalties_total' => round((float) FeeMiscCharge::query()
+                ->where('kind', FeeMiscChargeKind::LateFeePenalty)
+                ->whereIn('status', [FeeMiscChargeStatus::Pending, FeeMiscChargeStatus::Partial])
                 ->whereHas('feeStructure.enrollment', fn ($query) => $query
                     ->where('is_active', true)
                     ->where('status', EnrollmentStatus::Enrolled))
-                ->sum('penalty_amount'), 2),
+                ->get()
+                ->sum(fn (FeeMiscCharge $charge): float => $charge->pendingAmount()), 2),
             'overdue_installment_count' => $overdueInstallments->count(),
             'overdue_students_count' => $overdueStudents,
             'overdue_amount' => round((float) $overdueInstallments->sum('pending_amount'), 2),

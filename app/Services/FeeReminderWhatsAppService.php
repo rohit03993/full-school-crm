@@ -3,7 +3,8 @@
 namespace App\Services;
 
 use App\Enums\EnrollmentStatus;
-use App\Enums\FeePenaltyStatus;
+use App\Enums\FeeMiscChargeKind;
+use App\Enums\FeeMiscChargeStatus;
 use App\Models\FeeInstallment;
 use App\Models\FeeReminderLog;
 use App\Models\Setting;
@@ -114,7 +115,7 @@ class FeeReminderWhatsAppService
             ->flip();
 
         $installmentsByStudent = FeeInstallment::query()
-            ->with(['feeStructure.penalties'])
+            ->with(['feeStructure.miscCharges'])
             ->where('pending_amount', '>', 0)
             ->whereNotNull('due_date')
             ->whereDate('due_date', '<', $today->toDateString())
@@ -145,9 +146,9 @@ class FeeReminderWhatsAppService
                 $penaltyPending = 0.0;
 
                 if ($first?->feeStructure) {
-                    $penaltyPending = round((float) $first->feeStructure->penalties
-                        ->where('status', FeePenaltyStatus::Pending)
-                        ->sum('penalty_amount'), 2);
+                    $penaltyPending = round((float) $first->feeStructure->miscCharges
+                        ->filter(fn ($charge) => $charge->kind === FeeMiscChargeKind::LateFeePenalty)
+                        ->sum(fn ($charge) => $charge->pendingAmount()), 2);
                 }
 
                 return [

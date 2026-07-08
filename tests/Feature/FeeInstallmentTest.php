@@ -10,6 +10,9 @@ use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Models\Course;
 use App\Models\FeeInstallment;
+use App\Enums\FeeMiscChargeKind;
+use App\Enums\FeeMiscChargeStatus;
+use App\Models\FeeMiscCharge;
 use App\Models\FeePenalty;
 use App\Models\Student;
 use App\Models\User;
@@ -141,11 +144,57 @@ class FeeInstallmentTest extends TestCase
 
         config(['fees.late_fee.grace_days' => 7, 'fees.late_fee.daily_rate' => 0.0015]);
 
-        $penalty = app(PenaltyCalculationService::class)->processInstallmentPenalty($installment, now());
+        $charge = app(PenaltyCalculationService::class)->processInstallmentPenalty($installment, now());
 
-        $this->assertNotNull($penalty);
-        $this->assertSame(1, FeePenalty::query()->count());
-        $this->assertGreaterThan(0, (float) $penalty->penalty_amount);
+        $this->assertNotNull($charge);
+        $this->assertSame(FeeMiscChargeKind::LateFeePenalty, $charge->kind);
+        $this->assertGreaterThan(0, (float) $charge->amount);
+        $this->assertSame(0, FeePenalty::query()->where('status', 'pending')->count());
+    }
+
+    public function test_late_fee_misc_charge_can_be_paid_via_add_payment(): void
+    {
+        $staff = $this->createStaffUser();
+        $student = $this->createStudent();
+        $course = $this->createCourse();
+        $enquiry = $this->createEnquiry($student, $course, $staff);
+
+        $admissionService = app(AdmissionService::class);
+        $admission = $admissionService->convert($student, $enquiry, $staff, [
+            'course_id' => $course->id,
+            'use_installment_plan' => true,
+            'installment_plan' => [
+                ['label' => 'Term 1', 'amount' => 60000, 'due_date' => now()->subDays(20)->toDateString()],
+            ],
+        ]);
+
+        $enrollment = $admissionService->approve($this->submitAdmissionForm($admission, $staff), $staff);
+        $installment = $enrollment->feeStructure->installments()->first();
+        $feeStructure = $enrollment->feeStructure;
+
+        config(['fees.late_fee.grace_days' => 7, 'fees.late_fee.daily_rate' => 0.0015]);
+
+        $charge = app(PenaltyCalculationService::class)->processInstallmentPenalty($installment, now());
+        $this->assertNotNull($charge);
+
+        $this->actingAs($staff);
+
+        $payment = app(PaymentService::class)->addMisc(
+            $feeStructure->fresh(),
+            $student,
+            $charge->fresh(),
+            [
+                'payment_date' => now()->toDateString(),
+                'amount' => (float) $charge->amount,
+                'payment_mode' => \App\Enums\PaymentMode::Cash->value,
+                'voucher_number' => 'LATE-001',
+            ],
+            \Illuminate\Http\UploadedFile::fake()->image('proof.jpg'),
+            $staff,
+        );
+
+        $this->assertGreaterThan(0, (float) $payment->amount);
+        $this->assertSame(\App\Enums\FeeMiscChargeStatus::Paid, $charge->fresh()->status);
     }
 
     protected function createCourse(): Course

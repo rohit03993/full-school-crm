@@ -5,11 +5,13 @@ namespace App\Services;
 use App\Enums\AccountingAccountType;
 use App\Enums\AccountingReferenceType;
 use App\Enums\EnrollmentStatus;
+use App\Enums\FeeMiscChargeKind;
 use App\Enums\PaymentMode;
 use App\Models\AccountingAccount;
 use App\Models\AccountingJournalEntry;
 use App\Models\AccountingJournalLine;
 use App\Models\FeeInstallment;
+use App\Models\FeeMiscCharge;
 use App\Models\FeePenalty;
 use App\Models\Payment;
 use App\Models\User;
@@ -128,6 +130,50 @@ class AccountingLedgerService
             description: 'Late fee accrued — '.$penalty->description,
             referenceType: AccountingReferenceType::FeePenalty,
             referenceId: $penalty->id,
+            lines: [
+                [
+                    'account' => $this->account(self::CODE_FEES_RECEIVABLE),
+                    'debit' => $amount,
+                    'credit' => 0.0,
+                    'memo' => 'Accrued late fee',
+                ],
+                [
+                    'account' => $this->account(self::CODE_LATE_FEE_INCOME),
+                    'debit' => 0.0,
+                    'credit' => $amount,
+                    'memo' => 'Late fee income',
+                ],
+            ],
+            postedBy: $postedBy,
+        );
+    }
+
+    public function postLateFeeMiscAccrual(FeeMiscCharge $charge, ?User $postedBy = null): ?AccountingJournalEntry
+    {
+        $this->ensureDefaultAccounts();
+
+        if ($charge->kind !== FeeMiscChargeKind::LateFeePenalty) {
+            return null;
+        }
+
+        if (AccountingJournalEntry::query()
+            ->where('reference_type', AccountingReferenceType::FeeMiscCharge)
+            ->where('reference_id', $charge->id)
+            ->exists()) {
+            return null;
+        }
+
+        $amount = round((float) $charge->amount, 2);
+
+        if ($amount <= 0) {
+            return null;
+        }
+
+        return $this->createEntry(
+            entryDate: Carbon::parse($charge->due_date ?? now()),
+            description: 'Late fee accrued — '.$charge->label,
+            referenceType: AccountingReferenceType::FeeMiscCharge,
+            referenceId: $charge->id,
             lines: [
                 [
                     'account' => $this->account(self::CODE_FEES_RECEIVABLE),

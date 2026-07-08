@@ -1171,15 +1171,12 @@ class StudentProfilePage extends Page
         $this->mountAction('addPayment', ['miscChargeId' => $chargeId]);
     }
 
-    public function waivePenalty(int $penaltyId, string $reason, PenaltyCalculationService $penalties): void
+    public function waiveLateFeeMiscCharge(int $chargeId, string $reason, FeeMiscChargeService $miscCharges): void
     {
         abort_unless($this->userCan(CrmPermission::FeesWaivePenalty), 403);
 
-        $penalty = FeePenalty::query()
-            ->where('student_id', $this->record->id)
-            ->findOrFail($penaltyId);
-
-        $penalties->waive($penalty, Auth::user(), $reason);
+        $charge = $miscCharges->resolveForStudent($this->record, $chargeId);
+        $miscCharges->waiveLateFeePenalty($charge, Auth::user(), $reason);
 
         $this->feesTabLoaded = false;
         $this->loadFeesTab();

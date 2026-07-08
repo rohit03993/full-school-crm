@@ -84,6 +84,12 @@ class PaymentService
         $pending = round((float) $feeStructure->pending_amount, 2);
         $feePaymentAmount = min($amount, $pending);
 
+        if ($amount > $pending + 0.01) {
+            throw ValidationException::withMessages([
+                'amount' => 'Tuition payments cannot include late fees or misc charges. Pay those separately under Miscellaneous charge.',
+            ]);
+        }
+
         $installment = $this->resolveInstallment($feeStructure, $data['fee_installment_id'] ?? null);
         $flexible = FeePaymentPolicy::usesFlexibleAllocation();
         $installmentPending = $installment ? round((float) $installment->pending_amount, 2) : 0.0;
@@ -119,7 +125,12 @@ class PaymentService
             }
 
             $feePaymentAmount = min($amount, $pending);
-            $penaltyPaymentAmount = round($amount - $feePaymentAmount, 2);
+
+            if ($amount > $pending + 0.01) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Tuition payments cannot include late fees or misc charges. Pay those separately under Miscellaneous charge.',
+                ]);
+            }
 
             $installment = $this->resolveInstallment($locked, $data['fee_installment_id'] ?? null);
             $installmentPending = $installment ? round((float) $installment->pending_amount, 2) : 0.0;
@@ -194,10 +205,6 @@ class PaymentService
                 }
             }
 
-            if ($penaltyPaymentAmount > 0) {
-                $this->penalties->applyPendingPayments($locked, $penaltyPaymentAmount);
-            }
-
             $this->onlineAllowanceGst->applyAfterTuitionPayment($payment, $locked->fresh(), $feePaymentAmount);
 
             $staff->loadMissing('staffProfile');
@@ -220,7 +227,7 @@ class PaymentService
 
             $payment = $this->receipts->generateForPayment($payment, $staff);
 
-            $this->ledger->postPayment($payment, $feePaymentAmount, $penaltyPaymentAmount, $staff);
+            $this->ledger->postPayment($payment, $feePaymentAmount, 0, $staff);
 
             if ($this->idCards->shouldGenerateForFirstPayment($payment)) {
                 $this->idCards->generateForEnrollment($locked->enrollment, $staff);

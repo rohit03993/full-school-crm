@@ -139,16 +139,19 @@ class FeeStructure extends Model
 
     public function pendingPenaltiesTotal(): float
     {
-        return round((float) $this->penalties()
-            ->where('status', \App\Enums\FeePenaltyStatus::Pending)
-            ->sum('penalty_amount'), 2);
+        $charges = $this->relationLoaded('miscCharges')
+            ? $this->miscCharges
+            : $this->miscCharges()->get();
+
+        return round((float) $charges
+            ->filter(fn (FeeMiscCharge $charge): bool => $charge->kind === FeeMiscChargeKind::LateFeePenalty)
+            ->sum(fn (FeeMiscCharge $charge): float => $charge->pendingAmount()), 2);
     }
 
     public function totalCollectiblePending(): float
     {
         return round(
             (float) $this->pending_amount
-            + $this->pendingPenaltiesTotal()
             + $this->separateMiscChargesPendingTotal(),
             2,
         );

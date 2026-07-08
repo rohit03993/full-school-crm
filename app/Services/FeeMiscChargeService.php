@@ -213,6 +213,48 @@ class FeeMiscChargeService
         ]);
     }
 
+    public function waiveLateFeePenalty(FeeMiscCharge $charge, User $staff, string $reason): FeeMiscCharge
+    {
+        $reason = trim($reason);
+
+        if ($reason === '') {
+            throw ValidationException::withMessages([
+                'reason' => 'A reason is required to waive a late fee penalty.',
+            ]);
+        }
+
+        if (! $charge->isLateFeePenalty()) {
+            throw ValidationException::withMessages([
+                'charge' => 'Only late fee penalty charges can be waived here.',
+            ]);
+        }
+
+        if ((float) $charge->paid_amount > 0) {
+            throw ValidationException::withMessages([
+                'charge' => 'Cannot waive a late fee that already has payments recorded.',
+            ]);
+        }
+
+        if (! in_array($charge->status, [FeeMiscChargeStatus::Pending, FeeMiscChargeStatus::Partial], true)) {
+            throw ValidationException::withMessages([
+                'charge' => 'Only unpaid late fee penalties can be waived.',
+            ]);
+        }
+
+        $charge->update([
+            'status' => FeeMiscChargeStatus::Cancelled,
+        ]);
+
+        $this->audit->log(
+            action: 'Late Fee Penalty Waived',
+            auditable: $charge,
+            newValues: ['status' => FeeMiscChargeStatus::Cancelled->value, 'reason' => $reason],
+            user: $staff,
+        );
+
+        return $charge->fresh();
+    }
+
     public function applyPayment(FeeMiscCharge $charge, float $amount): FeeMiscCharge
     {
         $amount = round($amount, 2);

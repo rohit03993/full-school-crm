@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Enums\FeeMiscChargeKind;
+use App\Enums\FeeMiscChargeStatus;
 use App\Enums\FeePenaltyStatus;
 use App\Enums\FeePenaltyType;
 use App\Models\FeeInstallment;
+use App\Models\FeeMiscCharge;
 use App\Models\FeePenalty;
 use App\Models\User;
 use Carbon\Carbon;
@@ -45,6 +48,8 @@ class PenaltyCalculationService
             return ['processed' => 0, 'total_penalty' => 0.0];
         }
 
+        $this->migrateLegacyPenaltiesToMiscCharges();
+
         $today = ($asOf ?? now())->copy()->startOfDay();
         $graceCutoff = $today->copy()->subDays($this->graceDays())->toDateString();
         $processed = 0;
@@ -58,11 +63,11 @@ class PenaltyCalculationService
             ->get();
 
         foreach ($installments as $installment) {
-            $penalty = $this->processInstallmentPenalty($installment, $today);
+            $charge = $this->processInstallmentPenalty($installment, $today);
 
-            if ($penalty) {
+            if ($charge) {
                 $processed++;
-                $totalPenalty += (float) $penalty->penalty_amount;
+                $totalPenalty += (float) $charge->pendingAmount();
             }
         }
 
@@ -77,7 +82,7 @@ class PenaltyCalculationService
         ];
     }
 
-    public function processInstallmentPenalty(FeeInstallment $installment, Carbon $today): ?FeePenalty
+    public function processInstallmentPenalty(FeeInstallment $installment, Carbon $today): ?FeeMiscCharge
     {
         if (! $installment->due_date) {
             return null;
@@ -104,28 +109,51 @@ class PenaltyCalculationService
             return null;
         }
 
-        $penalty = FeePenalty::query()->updateOrCreate(
+        $existing = FeeMiscCharge::query()
+            ->where('fee_installment_id', $installment->id)
+            ->where('kind', FeeMiscChargeKind::LateFeePenalty)
+            ->where('status', '!=', FeeMiscChargeStatus::Cancelled)
+            ->first();
+
+        $paidAmount = round((float) ($existing?->paid_amount ?? 0), 2);
+        $status = match (true) {
+            $paidAmount <= 0 => FeeMiscChargeStatus::Pending,
+            $paidAmount + 0.01 >= $penaltyAmount => FeeMiscChargeStatus::Paid,
+            default => FeeMiscChargeStatus::Partial,
+        };
+
+        $label = sprintf(
+            'Late fee penalty — %s (%d day(s) after grace · installment due %s · ₹%s pending × %s%%/day)',
+            $installment->label,
+            $daysLate,
+            $installment->due_date->format('d M Y'),
+            number_format($baseAmount, 2),
+            number_format($this->dailyRate() * 100, 2),
+        );
+
+        $charge = FeeMiscCharge::query()->updateOrCreate(
             [
                 'fee_installment_id' => $installment->id,
-                'penalty_type' => FeePenaltyType::LateFee,
-                'status' => FeePenaltyStatus::Pending,
+                'kind' => FeeMiscChargeKind::LateFeePenalty,
             ],
             [
-                'student_id' => $student->id,
                 'fee_structure_id' => $feeStructure->id,
-                'penalty_date' => $today->toDateString(),
-                'base_amount' => $baseAmount,
-                'penalty_amount' => $penaltyAmount,
-                'days_late' => $daysLate,
-                'description' => "Late fee for {$daysLate} day(s) after grace (due {$installment->due_date->format('d M Y')})",
+                'label' => $label,
+                'amount' => $penaltyAmount,
+                'paid_amount' => $paidAmount,
+                'status' => $status,
+                'due_date' => $today->toDateString(),
+                'sort_order' => (int) ($existing?->sort_order ?? ((int) $feeStructure->miscCharges()->max('sort_order') + 1)),
             ],
         );
 
-        if ($penalty->wasRecentlyCreated) {
-            app(AccountingLedgerService::class)->postPenaltyAccrual($penalty);
+        if ($charge->wasRecentlyCreated) {
+            app(AccountingLedgerService::class)->postLateFeeMiscAccrual($charge);
         }
 
-        return $penalty;
+        $this->retireLegacyPenaltyRecord($installment);
+
+        return $charge->fresh();
     }
 
     public function waive(FeePenalty $penalty, User $admin, string $reason): FeePenalty
@@ -150,38 +178,72 @@ class PenaltyCalculationService
             'waived_reason' => $reason,
         ]);
 
+        if ($penalty->fee_installment_id) {
+            FeeMiscCharge::query()
+                ->where('fee_installment_id', $penalty->fee_installment_id)
+                ->where('kind', FeeMiscChargeKind::LateFeePenalty)
+                ->whereIn('status', [FeeMiscChargeStatus::Pending, FeeMiscChargeStatus::Partial])
+                ->update([
+                    'status' => FeeMiscChargeStatus::Cancelled,
+                ]);
+        }
+
         return $penalty->fresh(['feeInstallment', 'waivedBy']);
     }
 
-    public function applyPendingPayments(FeeStructure $feeStructure, float $amount): void
+    protected function migrateLegacyPenaltiesToMiscCharges(): void
     {
-        $remaining = round($amount, 2);
-
-        if ($remaining <= 0) {
-            return;
-        }
-
-        $penalties = $feeStructure->penalties()
+        FeePenalty::query()
+            ->where('penalty_type', FeePenaltyType::LateFee)
             ->where('status', FeePenaltyStatus::Pending)
-            ->orderBy('penalty_date')
+            ->with(['feeInstallment', 'feeStructure'])
             ->orderBy('id')
-            ->get();
+            ->each(function (FeePenalty $penalty): void {
+                $installment = $penalty->feeInstallment;
 
-        foreach ($penalties as $penalty) {
-            if ($remaining <= 0.01) {
-                break;
-            }
+                if (! $installment || ! $penalty->feeStructure) {
+                    return;
+                }
 
-            $due = round((float) $penalty->penalty_amount, 2);
+                $exists = FeeMiscCharge::query()
+                    ->where('fee_installment_id', $installment->id)
+                    ->where('kind', FeeMiscChargeKind::LateFeePenalty)
+                    ->where('status', '!=', FeeMiscChargeStatus::Cancelled)
+                    ->exists();
 
-            if ($remaining + 0.01 < $due) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'amount' => 'Late fee payments must cover each penalty in full.',
+                if (! $exists) {
+                    $amount = round((float) $penalty->penalty_amount, 2);
+
+                    FeeMiscCharge::query()->create([
+                        'fee_structure_id' => $penalty->fee_structure_id,
+                        'fee_installment_id' => $installment->id,
+                        'label' => $penalty->description
+                            ?? sprintf('Late fee penalty — %s', $installment->label),
+                        'amount' => $amount,
+                        'paid_amount' => 0,
+                        'kind' => FeeMiscChargeKind::LateFeePenalty,
+                        'status' => FeeMiscChargeStatus::Pending,
+                        'due_date' => $penalty->penalty_date,
+                        'sort_order' => (int) $penalty->feeStructure->miscCharges()->max('sort_order') + 1,
+                    ]);
+                }
+
+                $penalty->update([
+                    'status' => FeePenaltyStatus::Waived,
+                    'waived_reason' => 'Moved to misc charge for collection',
                 ]);
-            }
+            });
+    }
 
-            $penalty->update(['status' => FeePenaltyStatus::Paid]);
-            $remaining = round($remaining - $due, 2);
-        }
+    protected function retireLegacyPenaltyRecord(FeeInstallment $installment): void
+    {
+        FeePenalty::query()
+            ->where('fee_installment_id', $installment->id)
+            ->where('penalty_type', FeePenaltyType::LateFee)
+            ->where('status', FeePenaltyStatus::Pending)
+            ->update([
+                'status' => FeePenaltyStatus::Waived,
+                'waived_reason' => 'Moved to misc charge for collection',
+            ]);
     }
 }

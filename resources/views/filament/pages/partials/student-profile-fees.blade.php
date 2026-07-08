@@ -8,9 +8,16 @@
     $miscCharges = $fees?->miscCharges ?? collect();
     $bundledMisc = $miscCharges->filter(fn ($c) => $c->kind === FeeMiscChargeKind::Bundled);
     $separateMisc = $miscCharges->filter(fn ($c) => $c->kind !== FeeMiscChargeKind::Bundled);
-    $activeMisc = $separateMisc->reject(fn ($c) => $c->status === FeeMiscChargeStatus::Cancelled);
+    $activeMisc = $separateMisc
+        ->reject(fn ($c) => $c->status === FeeMiscChargeStatus::Cancelled)
+        ->sortBy(fn ($c) => [
+            $c->kind === FeeMiscChargeKind::LateFeePenalty ? 0 : 1,
+            $c->due_date?->timestamp ?? PHP_INT_MAX,
+            $c->id,
+        ])
+        ->values();
     $archivedMisc = $separateMisc->filter(fn ($c) => $c->status === FeeMiscChargeStatus::Cancelled);
-    $pendingPenalties = $penalties->filter(fn ($p) => $p->status === \App\Enums\FeePenaltyStatus::Pending);
+    $lateFeePending = (float) $fees?->pendingPenaltiesTotal();
 @endphp
 
 <div wire:init="loadFeesTab">
@@ -40,7 +47,7 @@
         $miscTotal = $fees->separateMiscChargesTotal();
         $miscPaid = $fees->separateMiscChargesPaidTotal();
         $miscPending = $fees->separateMiscChargesPendingTotal();
-        $penaltyPending = $pendingPenalties->sum(fn ($p) => (float) $p->penalty_amount);
+        $penaltyPending = $lateFeePending;
         $collectible = (float) $fees->totalCollectiblePending();
         $tuitionPaid = (float) $fees->paid_amount;
         $netTuition = (float) $fees->net_fee;
@@ -251,7 +258,7 @@
                     </span>
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Additional charges</h3>
-                        <p class="text-xs text-gray-500">Hostel, materials, and other fees — paid separately from tuition</p>
+                        <p class="text-xs text-gray-500">Hostel, materials, late fees, GST — paid separately via Add Payment</p>
                     </div>
                 </div>
                 <div class="overflow-x-auto">
@@ -272,15 +279,34 @@
                                     $statusLabel = $charge->status->label();
                                     $chargePaid = (float) $charge->paid_amount;
                                     $chargePending = $charge->pendingAmount();
-                                    $statusClass = match ($charge->status) {
-                                        FeeMiscChargeStatus::Paid => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
-                                        FeeMiscChargeStatus::Partial => 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300',
+                                    $statusClass = match (true) {
+                                        $charge->kind === FeeMiscChargeKind::LateFeePenalty => 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300',
+                                        $charge->kind === FeeMiscChargeKind::GstPenalty => 'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300',
+                                        $charge->status === FeeMiscChargeStatus::Paid => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
+                                        $charge->status === FeeMiscChargeStatus::Partial => 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300',
                                         default => 'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200',
                                     };
+                                    $typeBadge = match ($charge->kind) {
+                                        FeeMiscChargeKind::LateFeePenalty => 'Late fee',
+                                        FeeMiscChargeKind::GstPenalty => 'GST',
+                                        default => null,
+                                    };
                                 @endphp
-                                <tr class="transition-colors hover:bg-gray-50/80 dark:hover:bg-white/[0.02]" wire:key="misc-{{ $charge->id }}">
+                                <tr @class([
+                                    'transition-colors hover:bg-gray-50/80 dark:hover:bg-white/[0.02]',
+                                    'bg-red-50/40 dark:bg-red-500/5' => $charge->kind === FeeMiscChargeKind::LateFeePenalty,
+                                ]) wire:key="misc-{{ $charge->id }}">
                                     <td class="px-5 py-3">
-                                        <p class="font-medium text-gray-900 dark:text-white">{{ $charge->label }}</p>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            @if ($typeBadge)
+                                                <span @class([
+                                                    'inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                                                    'bg-red-200/80 text-red-900 dark:bg-red-500/20 dark:text-red-300' => $charge->kind === FeeMiscChargeKind::LateFeePenalty,
+                                                    'bg-orange-200/80 text-orange-900 dark:bg-orange-500/20 dark:text-orange-300' => $charge->kind === FeeMiscChargeKind::GstPenalty,
+                                                ])>{{ $typeBadge }}</span>
+                                            @endif
+                                            <p class="font-medium text-gray-900 dark:text-white">{{ $charge->label }}</p>
+                                        </div>
                                         @if ($charge->due_date)
                                             <p class="mt-0.5 text-[11px] text-gray-500">Due {{ $charge->due_date->format('d M Y') }}</p>
                                         @endif
@@ -292,15 +318,26 @@
                                         <span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $statusClass }}">{{ $statusLabel }}</span>
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        @if ($charge->isPayableSeparately() && ($canCollectFees ?? false))
-                                            <button
-                                                type="button"
-                                                wire:click="openPayMiscCharge({{ $charge->id }})"
-                                                class="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-500"
-                                            >
-                                                Pay
-                                            </button>
-                                        @endif
+                                        <div class="flex flex-wrap items-center justify-end gap-2">
+                                            @if ($charge->isPayableSeparately() && ($canCollectFees ?? false))
+                                                <button
+                                                    type="button"
+                                                    wire:click="openPayMiscCharge({{ $charge->id }})"
+                                                    class="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-500"
+                                                >
+                                                    Pay
+                                                </button>
+                                            @endif
+                                            @if ($charge->isLateFeePenalty() && ($canWaivePenalty ?? false) && $charge->isPayableSeparately())
+                                                <div class="relative" x-data="{ open: false, reason: '' }">
+                                                    <button type="button" @click="open = !open" class="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5">Waive</button>
+                                                    <div x-show="open" x-cloak class="absolute right-0 z-10 mt-1 w-56 rounded-xl border bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900">
+                                                        <textarea x-model="reason" rows="2" class="w-full rounded-lg border-gray-200 text-xs dark:border-white/10 dark:bg-white/5" placeholder="Reason for waiver"></textarea>
+                                                        <button type="button" class="mt-2 w-full rounded-lg bg-red-600 py-1.5 text-xs font-semibold text-white hover:bg-red-500" @click="$wire.waiveLateFeeMiscCharge({{ $charge->id }}, reason); open = false; reason = ''">Confirm waiver</button>
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach
@@ -324,44 +361,6 @@
                     @endforeach
                 </div>
             </details>
-        @endif
-
-        @if ($pendingPenalties->isNotEmpty())
-            <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-red-200/60 dark:bg-gray-900 dark:ring-red-500/20">
-                <div class="flex items-center gap-3 border-b border-red-100 px-5 py-3.5 dark:border-red-500/20">
-                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:text-red-400">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                    </span>
-                    <div>
-                        <h3 class="text-sm font-semibold text-red-800 dark:text-red-300">Late fees</h3>
-                        <p class="text-xs text-red-600/70 dark:text-red-400/70">Outstanding penalty charges</p>
-                    </div>
-                </div>
-                <div class="divide-y divide-gray-100 dark:divide-white/5">
-                    @foreach ($pendingPenalties as $penalty)
-                        <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3" wire:key="penalty-{{ $penalty->id }}">
-                            <div class="min-w-0">
-                                <p class="text-sm font-semibold text-red-800 dark:text-red-300">{{ $penalty->penalty_type->label() }}</p>
-                                <p class="text-xs text-gray-500">
-                                    {{ $penalty->feeInstallment?->label ?? 'Installment' }} · {{ $penalty->days_late }} days late
-                                </p>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <span class="text-lg font-bold text-red-700 dark:text-red-300">₹{{ number_format((float) $penalty->penalty_amount, 0) }}</span>
-                                @if ($canWaivePenalty ?? false)
-                                    <div class="relative" x-data="{ open: false, reason: '' }">
-                                        <button type="button" @click="open = !open" class="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5">Waive</button>
-                                        <div x-show="open" x-cloak class="absolute right-0 z-10 mt-1 w-56 rounded-xl border bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900">
-                                            <textarea x-model="reason" rows="2" class="w-full rounded-lg border-gray-200 text-xs dark:border-white/10 dark:bg-white/5" placeholder="Reason for waiver"></textarea>
-                                            <button type="button" class="mt-2 w-full rounded-lg bg-red-600 py-1.5 text-xs font-semibold text-white hover:bg-red-500" @click="$wire.waivePenalty({{ $penalty->id }}, reason); open = false; reason = ''">Confirm waiver</button>
-                                        </div>
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
         @endif
 
         <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
