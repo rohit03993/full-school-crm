@@ -6,12 +6,7 @@
     $fees = $dossier['fees'];
     $photo = $dossier['photo'];
     $items = $profile['items'];
-    $netFee = $fees ? (float) $fees->net_fee : null;
-    $tuitionPending = $fees ? (float) $fees->pending_amount : null;
-    $miscPending = $fees ? (float) $fees->separateMiscChargesPendingTotal() : 0;
-    $totalDue = $fees ? (float) $fees->totalCollectiblePending() : null;
     $tuitionPaid = $fees ? (float) $fees->paid_amount : 0;
-    $tuitionPct = $netFee > 0 ? min(100, round($tuitionPaid / $netFee * 100)) : 0;
 
     $statIcons = [
         'Batch' => 'M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z',
@@ -82,23 +77,8 @@
                         ])
                     </div>
 
-                    {{-- Balance + ID card --}}
+                    {{-- ID card actions (fee details live on the Fees tab) --}}
                     <div class="flex flex-col items-center gap-2 lg:items-end">
-                        @if ($fees)
-                            <div @class([
-                                'rounded-xl px-4 py-2 text-center ring-1 lg:text-right',
-                                'bg-orange-50 ring-orange-200/80 dark:bg-orange-500/10 dark:ring-orange-500/25' => $totalDue > 0,
-                                'bg-emerald-50 ring-emerald-200/80 dark:bg-emerald-500/10 dark:ring-emerald-500/25' => $totalDue <= 0,
-                            ])>
-                                <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Balance due</p>
-                                <p @class([
-                                    'text-2xl font-bold tracking-tight',
-                                    'text-orange-700 dark:text-orange-300' => $totalDue > 0,
-                                    'text-emerald-700 dark:text-emerald-300' => $totalDue <= 0,
-                                ])>₹{{ number_format($totalDue, 0) }}</p>
-                            </div>
-                        @endif
-
                         @if ($enrollment->hasIdCard())
                             <div class="flex flex-wrap items-center justify-center gap-1 lg:justify-end">
                                 <button type="button" wire:click="openIdCardPreview" class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-500">
@@ -122,31 +102,8 @@
                     </div>
                 </div>
 
-                {{-- Quick metrics --}}
-                <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    @if ($fees)
-                        <div class="rounded-xl border border-gray-100 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Net tuition</p>
-                            <p class="mt-0.5 text-lg font-bold text-gray-950 dark:text-white">₹{{ number_format($netFee, 0) }}</p>
-                            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
-                                <div class="h-full rounded-full bg-emerald-500 transition-all" style="width: {{ $tuitionPct }}%"></div>
-                            </div>
-                            <p class="mt-1 text-[10px] text-gray-500">{{ $tuitionPct }}% collected</p>
-                        </div>
-                        <div class="rounded-xl border border-gray-100 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Tuition pending</p>
-                            <p class="mt-0.5 text-lg font-bold text-amber-700 dark:text-amber-400">₹{{ number_format($tuitionPending, 0) }}</p>
-                            @if ($miscPending > 0)
-                                <p class="mt-1 text-[10px] text-violet-600 dark:text-violet-400">+ ₹{{ number_format($miscPending, 0) }} misc</p>
-                            @endif
-                        </div>
-                    @else
-                        <div class="rounded-xl border border-gray-100 bg-white/80 p-3 sm:col-span-2 dark:border-white/10 dark:bg-white/[0.03]">
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Course fee</p>
-                            <p class="mt-0.5 text-lg font-bold text-gray-950 dark:text-white">{{ $course?->formatted_fee ?? '—' }}</p>
-                        </div>
-                    @endif
-
+                {{-- Quick metrics (no fee amounts — see Fees tab) --}}
+                <div class="mt-4 grid gap-2 sm:grid-cols-2">
                     <div class="rounded-xl border border-gray-100 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
                         <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Batch</p>
                         <p class="mt-0.5 truncate text-lg font-bold text-gray-950 dark:text-white">{{ $batch?->name ?? 'Not assigned' }}</p>

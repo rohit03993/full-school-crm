@@ -2,7 +2,6 @@
     $dossier = $profile['dossier'];
     $enrollment = $dossier['enrollment'];
     $admission = $dossier['admission'];
-    $fees = $dossier['fees'];
     $leadSources = $profile['lead_sources'];
     $batchName = $record->activeBatchStudent?->batch?->name;
 @endphp
@@ -32,7 +31,7 @@
         </div>
     @endif
 
-    <div class="grid gap-4 lg:grid-cols-2 lg:gap-5">
+    <div class="grid gap-4 lg:gap-5">
         <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
             <div class="border-b border-gray-100 px-4 py-3.5 sm:px-6 dark:border-white/10">
                 <h3 class="text-sm font-bold text-gray-950 dark:text-white">Enrollment</h3>
@@ -61,34 +60,6 @@
                     </div>
                 @endif
             </dl>
-        </div>
-
-        <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <div class="border-b border-gray-100 px-4 py-3.5 sm:px-6 dark:border-white/10">
-                <h3 class="text-sm font-bold text-gray-950 dark:text-white">Fee summary</h3>
-            </div>
-            @if ($fees)
-                <div class="grid grid-cols-2 gap-3 p-4 sm:p-6">
-                    <div class="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-white/5">
-                        <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500">Net fee</p>
-                        <p class="mt-0.5 text-base font-bold text-gray-950 dark:text-white">₹{{ number_format((float) $fees->net_fee, 2) }}</p>
-                    </div>
-                    <div class="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-white/5">
-                        <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500">Discount</p>
-                        <p class="mt-0.5 text-base font-bold text-gray-950 dark:text-white">₹{{ number_format((float) $fees->discount_amount, 2) }}</p>
-                    </div>
-                    <div class="rounded-xl bg-emerald-500/10 px-3 py-2.5 ring-1 ring-emerald-500/15">
-                        <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Paid</p>
-                        <p class="mt-0.5 text-base font-bold text-emerald-700 dark:text-emerald-400">₹{{ number_format((float) $fees->paid_amount, 2) }}</p>
-                    </div>
-                    <div class="rounded-xl bg-amber-500/10 px-3 py-2.5 ring-1 ring-amber-500/15">
-                        <p class="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">Pending</p>
-                        <p class="mt-0.5 text-base font-bold text-amber-800 dark:text-amber-400">₹{{ number_format((float) $fees->pending_amount, 2) }}</p>
-                    </div>
-                </div>
-            @else
-                <p class="px-4 py-8 text-center text-sm text-gray-500 sm:px-6 dark:text-gray-400">Fee structure not set.</p>
-            @endif
         </div>
     </div>
 
