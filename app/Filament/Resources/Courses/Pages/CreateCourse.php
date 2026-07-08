@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Courses\Pages;
 
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Courses\Concerns\SyncsCourseInstallmentTemplates;
+use App\Filament\Resources\Courses\Concerns\SyncsCourseSubjects;
 use App\Filament\Resources\Courses\CourseResource;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -11,6 +12,7 @@ class CreateCourse extends CreateRecord
 {
     use ShowsCrmPageHint;
     use SyncsCourseInstallmentTemplates;
+    use SyncsCourseSubjects;
 
     protected static function crmHintKey(): ?string
     {
@@ -26,6 +28,9 @@ class CreateCourse extends CreateRecord
 
     protected function afterCreate(): void
     {
-        $this->syncCourseInstallmentTemplates($this->record, $this->form->getState());
+        $state = $this->form->getState();
+
+        $this->syncCourseInstallmentTemplates($this->record, $state);
+        $this->syncCourseSubjects($this->record, $state);
     }
 }

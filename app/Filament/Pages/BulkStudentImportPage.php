@@ -12,6 +12,7 @@ use App\Models\StudentImportBatch;
 use App\Services\StudentBulkImportService;
 use App\Services\StudentImportColumnMapper;
 use App\Services\StudentImportFileReader;
+use App\Support\BatchSelectOptions;
 use App\Support\StudentImportFields;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
@@ -703,18 +704,7 @@ class BulkStudentImportPage extends Page
      */
     public function batchOptions(): array
     {
-        return Batch::query()
-            ->with('course')
-            ->when(
-                filled($this->academicSessionId),
-                fn ($query) => $query->where('academic_session_id', $this->academicSessionId),
-            )
-            ->orderBy('name')
-            ->get()
-            ->mapWithKeys(fn (Batch $batch): array => [
-                $batch->id => trim($batch->name.' — '.($batch->course?->name ?? 'Course')),
-            ])
-            ->all();
+        return BatchSelectOptions::forSession($this->academicSessionId, activeOnly: false);
     }
 
     public function content(Schema $schema): Schema

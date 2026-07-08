@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\BatchShift;
 use App\Enums\BatchStatus;
+use App\Support\ClassSectionLabel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -62,6 +63,11 @@ class Batch extends Model
         return $this->hasMany(Attendance::class);
     }
 
+    public function staffAssignments(): HasMany
+    {
+        return $this->hasMany(BatchStaffAssignment::class);
+    }
+
     public function isActive(): bool
     {
         return $this->status === BatchStatus::Active;
@@ -69,20 +75,11 @@ class Batch extends Model
 
     public function selectLabel(): string
     {
-        $course = $this->course;
+        return ClassSectionLabel::forBatch($this);
+    }
 
-        if (! $course) {
-            return $this->name;
-        }
-
-        $parts = array_filter([
-            $this->name,
-            $this->section,
-            $this->shift?->label(),
-            $course->name,
-            $this->academicSession?->name,
-        ]);
-
-        return implode(' · ', $parts);
+    public function displayLabel(): string
+    {
+        return ClassSectionLabel::forBatch($this, includeSession: false, includeShift: false);
     }
 }

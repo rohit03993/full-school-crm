@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Batches;
 
+use App\Enums\BatchStaffRole;
 use App\Enums\BatchShift;
 use App\Enums\BatchStatus;
 use App\Enums\CrmPermission;
@@ -12,15 +13,22 @@ use App\Filament\Resources\Batches\Pages\ListBatches;
 use App\Filament\Support\CrmTable;
 use App\Models\AcademicSession;
 use App\Models\Batch;
+use App\Models\CourseSubject;
+use App\Support\ClassSectionLabel;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
 use App\Support\InstituteProfile;
+use App\Support\InstituteTerminology;
 use App\Support\StaffOptions;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -94,6 +102,25 @@ class BatchResource extends Resource
                             ->searchable()
                             ->required()
                             ->native(false)
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, ?int $state): void {
+                                $rows = $state
+                                    ? CourseSubject::query()
+                                        ->where('course_id', $state)
+                                        ->active()
+                                        ->ordered()
+                                        ->get()
+                                        ->map(fn (CourseSubject $subject): array => [
+                                            'course_subject_id' => $subject->id,
+                                            'subject_name' => $subject->displayLabel(),
+                                            'user_id' => null,
+                                        ])
+                                        ->values()
+                                        ->all()
+                                    : [];
+
+                                $set('subject_teacher_assignments', $rows);
+                            })
                             ->columnSpanFull(),
                         Select::make('trainer_user_id')
                             ->label('Faculty / Teacher')
@@ -117,6 +144,46 @@ class BatchResource extends Resource
                             ->native(false),
                     ])
                     ->columns(2),
+                Section::make('Staff assignments')
+                    ->description('Optional. Assign a class/batch lead and subject teachers when you use structured academics and mark entry.')
+                    ->schema([
+                        Select::make('lead_teacher_user_id')
+                            ->label('Class / batch lead teacher')
+                            ->options(fn (): array => StaffOptions::facultyOptions())
+                            ->searchable()
+                            ->native(false)
+                            ->placeholder('Not assigned'),
+                        Repeater::make('subject_teacher_assignments')
+                            ->label('Subject teachers')
+                            ->schema([
+                                Hidden::make('course_subject_id'),
+                                TextInput::make('subject_name')
+                                    ->label('Subject')
+                                    ->disabled()
+                                    ->dehydrated(false),
+                                Select::make('user_id')
+                                    ->label('Teacher')
+                                    ->options(fn (): array => StaffOptions::facultyOptions())
+                                    ->searchable()
+                                    ->native(false)
+                                    ->placeholder('Not assigned'),
+                            ])
+                            ->columns(2)
+                            ->columnSpanFull()
+                            ->defaultItems(0)
+                            ->addable(false)
+                            ->deletable(false)
+                            ->reorderable(false)
+                            ->visible(fn (Get $get): bool => filled($get('course_id')))
+                            ->helperText(fn (Get $get): string => CourseSubject::query()
+                                ->where('course_id', $get('course_id'))
+                                ->active()
+                                ->exists()
+                                ? 'Assign a teacher per subject for this section. Leave blank to assign later.'
+                                : 'Add subjects on the parent '.strtolower(InstituteTerminology::label('course')).' first — they appear here automatically.'),
+                    ])
+                    ->collapsed()
+                    ->columns(2),
             ]);
     }
 
@@ -125,8 +192,20 @@ class BatchResource extends Resource
         return CrmTable::configure($table)
             ->columns([
                 TextColumn::make('name')
-                    ->searchable()
+                    ->label('Display')
+                    ->state(fn (Batch $record): string => ClassSectionLabel::forBatch($record, includeSession: false))
+                    ->searchable(query: function ($query, string $search): void {
+                        $query->where(function ($inner) use ($search): void {
+                            $inner->where('name', 'like', "%{$search}%")
+                                ->orWhere('section', 'like', "%{$search}%")
+                                ->orWhereHas('course', fn ($course) => $course->where('name', 'like', "%{$search}%"));
+                        });
+                    })
                     ->sortable(),
+                TextColumn::make('internal_name')
+                    ->label('Batch name')
+                    ->state(fn (Batch $record): string => $record->name)
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('section')
                     ->label('Section')
                     ->placeholder('—')
@@ -146,6 +225,18 @@ class BatchResource extends Resource
                 TextColumn::make('trainer.name')
                     ->label('Faculty')
                     ->searchable(),
+                TextColumn::make('lead_teacher_name')
+                    ->label('Lead teacher')
+                    ->state(function (Batch $record): string {
+                        $record->loadMissing('staffAssignments.user');
+
+                        $lead = $record->staffAssignments
+                            ->first(fn ($row) => $row->role === BatchStaffRole::LeadTeacher);
+
+                        return $lead?->user?->name ?? '—';
+                    })
+                    ->placeholder('—')
+                    ->toggleable(),
                 TextColumn::make('start_date')
                     ->label('Start')
                     ->date('d M Y')

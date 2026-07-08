@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Batches\Pages;
 
+use App\Filament\Pages\AddClassSectionPage;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Pages\AttendancePage;
 use App\Filament\Resources\Batches\BatchResource;
@@ -24,13 +25,18 @@ class ListBatches extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('addClassSection')
+                ->label('Add class & section')
+                ->icon(Heroicon::OutlinedPlusCircle)
+                ->url(AddClassSectionPage::getUrl())
+                ->color('primary'),
             Action::make('markAttendance')
                 ->label('Mark Attendance')
                 ->icon(Heroicon::OutlinedCalendarDays)
                 ->url(AttendancePage::getUrl(['mode' => 'manual']))
                 ->color('gray'),
             CreateAction::make()
-                ->label('Add Batch'),
+                ->label('Add section only'),
         ];
     }
 }

@@ -8,8 +8,8 @@ use App\Enums\Gender;
 use App\Enums\RoleName;
 use App\Enums\StudentCategory;
 use App\Models\Admission;
-use App\Models\Batch;
 use App\Models\Enrollment;
+use App\Support\BatchSelectOptions;
 use App\Services\CustomFieldService;
 use App\Support\CrmHint;
 use App\Support\CustomFieldFormBuilder;
@@ -181,22 +181,7 @@ class StudentProfileFormSchema
      */
     protected static function batchOptions(int $courseId, ?int $sessionId): array
     {
-        if ($courseId <= 0) {
-            return [];
-        }
-
-        $query = Batch::query()
-            ->where('status', BatchStatus::Active)
-            ->where('course_id', $courseId)
-            ->orderBy('name');
-
-        if ($sessionId) {
-            $query->where('academic_session_id', $sessionId);
-        }
-
-        return $query
-            ->pluck('name', 'id')
-            ->all();
+        return BatchSelectOptions::forCourse($courseId, $sessionId);
     }
 
     protected static function documentUpload(string $name, string $label, bool $imageOnly = false): FileUpload

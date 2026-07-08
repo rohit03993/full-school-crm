@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Batches\Pages;
 
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Batches\BatchResource;
+use App\Filament\Resources\Batches\Concerns\SyncsBatchStaffAssignments;
 use App\Models\Student;
 use App\Services\BatchService;
 use Filament\Actions\Action;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Auth;
 class EditBatch extends EditRecord
 {
     use ShowsCrmPageHint;
+    use SyncsBatchStaffAssignments;
 
     protected static string $resource = BatchResource::class;
 
@@ -71,5 +73,19 @@ class EditBatch extends EditRecord
     protected function getRedirectUrl(): string
     {
         return $this->getResource()::getUrl('index');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        return $this->mutateFormDataBeforeFillForStaffAssignments($data, $this->record);
+    }
+
+    protected function afterSave(): void
+    {
+        $this->syncBatchStaffAssignments($this->record, $this->form->getState());
     }
 }

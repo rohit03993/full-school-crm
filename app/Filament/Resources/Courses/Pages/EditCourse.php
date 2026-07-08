@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Courses\Pages;
 use App\Enums\CourseStatus;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Courses\Concerns\SyncsCourseInstallmentTemplates;
+use App\Filament\Resources\Courses\Concerns\SyncsCourseSubjects;
 use App\Filament\Resources\Courses\CourseResource;
 use App\Models\Course;
 use Filament\Actions\Action;
@@ -16,6 +17,7 @@ class EditCourse extends EditRecord
 {
     use ShowsCrmPageHint;
     use SyncsCourseInstallmentTemplates;
+    use SyncsCourseSubjects;
 
     protected static string $resource = CourseResource::class;
 
@@ -74,11 +76,16 @@ class EditCourse extends EditRecord
      */
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        return $this->mutateFormDataBeforeFillForInstallmentTemplates($data, $this->record);
+        $data = $this->mutateFormDataBeforeFillForInstallmentTemplates($data, $this->record);
+
+        return $this->mutateFormDataBeforeFillForCourseSubjects($data, $this->record);
     }
 
     protected function afterSave(): void
     {
-        $this->syncCourseInstallmentTemplates($this->record, $this->form->getState());
+        $state = $this->form->getState();
+
+        $this->syncCourseInstallmentTemplates($this->record, $state);
+        $this->syncCourseSubjects($this->record, $state);
     }
 }

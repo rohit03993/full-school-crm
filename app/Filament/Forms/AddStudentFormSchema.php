@@ -2,10 +2,11 @@
 
 namespace App\Filament\Forms;
 
-use App\Enums\BatchStatus;
 use App\Enums\Gender;
 use App\Models\AcademicSession;
 use App\Models\Batch;
+use App\Support\BatchSelectOptions;
+use App\Support\BatchSelectOptions;
 use App\Support\StudentLabels;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
@@ -67,8 +68,8 @@ class AddStudentFormSchema
                         ->live()
                         ->afterStateUpdated(fn (Set $set): mixed => $set('batch_id', null)),
                     Select::make('batch_id')
-                        ->label('Batch')
-                        ->options(fn (Get $get): array => self::batchOptions((int) ($get('academic_session_id') ?? 0)))
+                        ->label('Class & section')
+                        ->options(fn (Get $get): array => BatchSelectOptions::forSession((int) ($get('academic_session_id') ?? 0)))
                         ->searchable()
                         ->required()
                         ->native(false)
@@ -132,27 +133,5 @@ class AddStudentFormSchema
                         ->native(false),
                 ]),
         ];
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    protected static function batchOptions(int $sessionId): array
-    {
-        if ($sessionId <= 0) {
-            return [];
-        }
-
-        return Batch::query()
-            ->where('status', BatchStatus::Active)
-            ->where('academic_session_id', $sessionId)
-            ->orderBy('name')
-            ->get()
-            ->mapWithKeys(fn (Batch $batch): array => [
-                $batch->id => filled($batch->section)
-                    ? "{$batch->name} ({$batch->section})"
-                    : $batch->name,
-            ])
-            ->all();
     }
 }

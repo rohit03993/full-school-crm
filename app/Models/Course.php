@@ -111,6 +111,19 @@ class Course extends Model
         return $this->hasMany(CourseInstallmentTemplate::class)->orderBy('sort_order');
     }
 
+    public function subjects(): HasMany
+    {
+        return $this->hasMany(CourseSubject::class)->orderBy('sort_order')->orderBy('name');
+    }
+
+    public function activeSubjects(): HasMany
+    {
+        return $this->hasMany(CourseSubject::class)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name');
+    }
+
     /**
      * @return array{can_delete: bool, reason: ?string}
      */

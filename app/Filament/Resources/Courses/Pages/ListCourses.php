@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources\Courses\Pages;
 
+use App\Filament\Pages\AddClassSectionPage;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Courses\CourseResource;
+use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
@@ -21,8 +23,13 @@ class ListCourses extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('addClassSection')
+                ->label('Add class & section')
+                ->url(AddClassSectionPage::getUrl())
+                ->color('primary')
+                ->icon('heroicon-o-plus-circle'),
             CreateAction::make()
-                ->label('Add Course'),
+                ->label('Add programme only'),
         ];
     }
 }
