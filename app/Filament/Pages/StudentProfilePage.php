@@ -17,6 +17,7 @@ use App\Support\FeatureGate;
 use App\Support\CrmPagination;
 use App\Models\Attendance;
 use App\Models\Batch;
+use App\Filament\Concerns\HandlesCloseMeetingModal;
 use App\Filament\Concerns\HandlesLogCallModal;
 use App\Filament\Forms\AdjustFeeStructureFormSchema;
 use App\Filament\Forms\AddPaymentFormSchema;
@@ -86,6 +87,7 @@ use Livewire\WithFileUploads;
 
 class StudentProfilePage extends Page
 {
+    use HandlesCloseMeetingModal;
     use HandlesLogCallModal;
     use WithFileUploads;
 
@@ -454,6 +456,8 @@ class StudentProfilePage extends Page
             $this->cachedProfileSummary = app(StudentCounterService::class)->profile($this->record);
             $this->cachedProfileSummary['calling_assignment'] = app(LeadAssignmentService::class)
                 ->profileCallingAssignment($this->record, Auth::user());
+            $this->cachedProfileSummary['meeting_assignment'] = app(VisitMeetingAssignmentService::class)
+                ->profileMeetingAssignment($this->record, Auth::user());
         }
 
         return $this->cachedProfileSummary;
@@ -2236,6 +2240,18 @@ class StudentProfilePage extends Page
         return (int) $this->record->id === $studentId;
     }
 
+    protected function studentForCloseMeeting(): Student
+    {
+        return $this->record;
+    }
+
+    protected function afterMeetingClosed(): void
+    {
+        $this->refreshRecord();
+        $this->visitsTabLoaded = false;
+        $this->loadVisitsTab();
+    }
+
     public function submitLogCall(CallLogService $callLog): void
     {
         if (! $this->persistLogCall($this->record, $callLog)) {
@@ -2261,6 +2277,13 @@ class StudentProfilePage extends Page
     public function content(Schema $schema): Schema
     {
         return $schema->components([
+            View::make('filament.pages.partials.close-meeting-modal')
+                ->viewData(fn (): array => [
+                    'showCloseMeetingModal' => $this->showCloseMeetingModal,
+                    'isEnrolledStudent' => $this->record->activeEnrollment !== null,
+                    'campusOutcomeOptions' => $this->closeMeetingCampusOutcomeOptions(),
+                    'visitStatusOptions' => $this->closeMeetingVisitStatusOptions(),
+                ]),
             View::make('filament.pages.partials.log-call-modal')
                 ->viewData(fn (): array => [
                     'showLogCallModal' => $this->showLogCallModal,
