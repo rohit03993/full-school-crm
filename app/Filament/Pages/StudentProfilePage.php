@@ -1175,14 +1175,29 @@ class StudentProfilePage extends Page
     {
         abort_unless($this->userCan(CrmPermission::FeesWaivePenalty), 403);
 
+        $reason = trim($reason);
+
+        if ($reason === '') {
+            Notification::make()
+                ->title('Reason required')
+                ->body('Enter why this late fee is being waived.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $charge = $miscCharges->resolveForStudent($this->record, $chargeId);
+        $amount = $charge->pendingAmount();
         $miscCharges->waiveLateFeePenalty($charge, Auth::user(), $reason);
 
         $this->feesTabLoaded = false;
         $this->loadFeesTab();
+        $this->refreshRecord();
 
         Notification::make()
             ->title('Late fee waived')
+            ->body('₹'.number_format($amount, 2).' removed from balance due.')
             ->success()
             ->send();
     }

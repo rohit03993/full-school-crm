@@ -55,6 +55,12 @@ class AddPaymentFormSchema
             default => 'tuition',
         };
         $needsCashOnlineSplit = FeeSettings::onlineAllowanceGstEnabled() && ! $feeStructure->hasOnlineAllowancePlan();
+        $initialAmount = self::suggestedAmount(
+            $defaultTarget,
+            $defaultInstallment,
+            $defaultMisc,
+            $tuitionPending,
+        );
 
         return [
             Placeholder::make('gst_split_warning')
@@ -104,6 +110,29 @@ class AddPaymentFormSchema
                         ->required()
                         ->native(false)
                         ->live()
+                        ->afterStateUpdated(function (mixed $state, callable $set, Get $get) use (
+                            $payableInstallments,
+                            $defaultInstallment,
+                            $payableMisc,
+                            $defaultMisc,
+                            $tuitionPending,
+                        ): void {
+                            if ($state === 'misc') {
+                                if (! filled($get('fee_misc_charge_id')) && $defaultMisc) {
+                                    $set('fee_misc_charge_id', $defaultMisc->id);
+                                }
+
+                                $charge = self::selectedMiscCharge($get, $defaultMisc, $payableMisc);
+                                $set('amount', (string) self::suggestedAmount('misc', null, $charge, 0));
+
+                                return;
+                            }
+
+                            $installment = self::selectedInstallment($get, $payableInstallments, $defaultInstallment);
+                            $set('amount', (string) self::suggestedAmount('tuition', $installment, null, $tuitionPending));
+                            $set('shortfall_action', null);
+                            $set('shortfall_due_date', null);
+                        })
                         ->columnSpanFull(),
                     ...self::tuitionFields(
                         $feeStructure,
@@ -125,26 +154,10 @@ class AddPaymentFormSchema
                         ->required()
                         ->minValue(1)
                         ->live(debounce: 300)
-                        ->default(function (Get $get) use ($defaultInstallment, $defaultMisc, $tuitionPending, $defaultTarget): ?string {
+                        ->default((string) $initialAmount)
+                        ->maxValue(function (Get $get) use ($payableInstallments, $defaultInstallment, $defaultMisc, $payableMisc, $tuitionPending): int {
                             if ($get('payment_target') === 'misc') {
-                                $charge = self::selectedMiscCharge($get, $defaultMisc);
-
-                                return $charge
-                                    ? (string) FeePlanCalculator::toWholeRupeeAmount($charge->pendingAmount())
-                                    : null;
-                            }
-
-                            if ($defaultInstallment) {
-                                return (string) FeePlanCalculator::toWholeRupeeAmount((float) $defaultInstallment->pending_amount);
-                            }
-
-                            return $tuitionPending > 0
-                                ? (string) FeePlanCalculator::toWholeRupeeAmount($tuitionPending)
-                                : null;
-                        })
-                        ->maxValue(function (Get $get) use ($payableInstallments, $defaultInstallment, $defaultMisc, $tuitionPending): int {
-                            if ($get('payment_target') === 'misc') {
-                                $charge = self::selectedMiscCharge($get, $defaultMisc);
+                                $charge = self::selectedMiscCharge($get, $defaultMisc, $payableMisc);
 
                                 return $charge
                                     ? FeePlanCalculator::toWholeRupeeAmount($charge->pendingAmount())
@@ -265,7 +278,7 @@ class AddPaymentFormSchema
                     $charge = $payableMisc->firstWhere('id', (int) $state);
 
                     if ($charge) {
-                        $set('amount', (string) FeePlanCalculator::toWholeRupeeAmount($charge->pendingAmount()));
+                        $set('amount', (string) self::suggestedAmount('misc', null, $charge, 0));
                     }
                 }),
         ];
@@ -417,12 +430,42 @@ class AddPaymentFormSchema
         );
     }
 
-    protected static function selectedMiscCharge(Get $get, ?FeeMiscCharge $defaultMisc): ?FeeMiscCharge
-    {
-        if (! filled($get('fee_misc_charge_id'))) {
-            return $defaultMisc;
+    protected static function selectedMiscCharge(
+        Get $get,
+        ?FeeMiscCharge $defaultMisc,
+        $payableMisc = null,
+    ): ?FeeMiscCharge {
+        if (filled($get('fee_misc_charge_id'))) {
+            $chargeId = (int) $get('fee_misc_charge_id');
+
+            if ($payableMisc) {
+                return $payableMisc->firstWhere('id', $chargeId)
+                    ?? FeeMiscCharge::query()->find($chargeId)
+                    ?? $defaultMisc;
+            }
+
+            return FeeMiscCharge::query()->find($chargeId) ?? $defaultMisc;
         }
 
-        return FeeMiscCharge::query()->find((int) $get('fee_misc_charge_id')) ?? $defaultMisc;
+        return $defaultMisc;
+    }
+
+    protected static function suggestedAmount(
+        string $target,
+        ?FeeInstallment $installment,
+        ?FeeMiscCharge $miscCharge,
+        float $tuitionPending,
+    ): int {
+        if ($target === 'misc' && $miscCharge) {
+            return FeePlanCalculator::toWholeRupeeAmount($miscCharge->pendingAmount());
+        }
+
+        if ($installment) {
+            return FeePlanCalculator::toWholeRupeeAmount((float) $installment->pending_amount);
+        }
+
+        return $tuitionPending > 0
+            ? FeePlanCalculator::toWholeRupeeAmount($tuitionPending)
+            : 1;
     }
 }
