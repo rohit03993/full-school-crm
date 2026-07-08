@@ -3,9 +3,9 @@
 namespace App\Filament\Pages;
 
 use App\Enums\RoleName;
+use App\Filament\Pages\ClassSectionsPage;
 use App\Filament\Resources\AcademicSessions\AcademicSessionResource;
 use App\Filament\Resources\ActivityTypes\ActivityTypeResource;
-use App\Filament\Resources\Courses\CourseResource;
 use App\Models\AcademicSession;
 use App\Support\CrmNavigation;
 use App\Support\InstituteOnboarding;
@@ -90,9 +90,9 @@ class InstituteSetup extends Page
                 'icon' => 'heroicon-o-adjustments-horizontal',
             ],
             [
-                'label' => 'Courses / Programmes',
-                'description' => "Manage {$courseLabel} listings, fees, and website visibility.",
-                'url' => CourseResource::getUrl(),
+                'label' => 'Classes & sections',
+                'description' => "Manage {$courseLabel}s, sections, fees, subjects, and teachers.",
+                'url' => ClassSectionsPage::getUrl(),
                 'icon' => 'heroicon-o-academic-cap',
             ],
             [

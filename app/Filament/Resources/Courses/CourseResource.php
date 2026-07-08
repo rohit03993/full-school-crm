@@ -65,6 +65,11 @@ class CourseResource extends Resource
 
     protected static string | UnitEnum | null $navigationGroup = CrmNavigation::GROUP_ACADEMICS;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function getNavigationTooltip(): ?string
     {
         return CrmHint::navigationTooltip('courses.list');

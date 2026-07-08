@@ -17,6 +17,7 @@ use App\Support\CrmNavigation;
 use App\Support\InstituteProfile;
 use App\Support\InstituteTerminology;
 use App\Support\StaffOptions;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
@@ -58,6 +59,11 @@ class AddClassSectionPage extends Page
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_ACADEMICS;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     /**
      * @var array<string, mixed>|null
      */
@@ -92,6 +98,16 @@ class AddClassSectionPage extends Page
         ]);
     }
 
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('back')
+                ->label('All classes & sections')
+                ->url(ClassSectionsPage::getUrl())
+                ->color('gray'),
+        ];
+    }
+
     public function defaultForm(Schema $schema): Schema
     {
         return $schema->statePath('data');
@@ -107,8 +123,7 @@ class AddClassSectionPage extends Page
                 ->label('')
                 ->content(new HtmlString(
                     '<p class="text-sm text-gray-600 dark:text-gray-400">'
-                    ."Create <strong>{$courseLabel}</strong> and <strong>{$batchLabel}</strong> together — e.g. Class 12 + Section A, or IIT JEE Class 12 + Batch A. "
-                    .'Existing programmes and separate course/batch screens still work the same.'
+                    ."Create <strong>{$courseLabel}</strong> and <strong>{$batchLabel}</strong> together — e.g. Class 12 + Section A, or IIT JEE Class 12 + Batch A."
                     .'</p>'
                 ))
                 ->columnSpanFull(),
@@ -346,7 +361,7 @@ class AddClassSectionPage extends Page
             ])
             ->send();
 
-        $this->redirect(BatchResource::getUrl('edit', ['record' => $batch]));
+        $this->redirect(ClassSectionsPage::getUrl());
     }
 
     public function content(Schema $schema): Schema

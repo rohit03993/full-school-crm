@@ -6,6 +6,7 @@ use App\Enums\CourseStatus;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Courses\Concerns\SyncsCourseInstallmentTemplates;
 use App\Filament\Resources\Courses\Concerns\SyncsCourseSubjects;
+use App\Filament\Pages\ClassSectionsPage;
 use App\Filament\Resources\Courses\CourseResource;
 use App\Models\Course;
 use Filament\Actions\Action;
@@ -67,7 +68,7 @@ class EditCourse extends EditRecord
 
     protected function getRedirectUrl(): string
     {
-        return $this->getResource()::getUrl('index');
+        return ClassSectionsPage::getUrl();
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Courses\Pages;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Courses\Concerns\SyncsCourseInstallmentTemplates;
 use App\Filament\Resources\Courses\Concerns\SyncsCourseSubjects;
+use App\Filament\Pages\ClassSectionsPage;
 use App\Filament\Resources\Courses\CourseResource;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -23,7 +24,7 @@ class CreateCourse extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
-        return $this->getResource()::getUrl('index');
+        return ClassSectionsPage::getUrl();
     }
 
     protected function afterCreate(): void
