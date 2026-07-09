@@ -49,7 +49,7 @@
                     <h2 class="text-base font-semibold text-gray-950 dark:text-white">Collections summary</h2>
                     <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Money received during the selected period</p>
                 </div>
-                @if (($summary['collection_rows'] ?? collect())->isEmpty())
+                @if (empty($summary['collection_rows'] ?? []))
                     <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">No fee collections in this period.</p>
                 @else
                     <div class="overflow-x-auto">
@@ -78,7 +78,7 @@
                     <h2 class="text-base font-semibold text-gray-950 dark:text-white">Income breakdown</h2>
                     <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Fee income recognized in this period</p>
                 </div>
-                @if (($summary['income_rows'] ?? collect())->isEmpty() && (float) ($summary['fees_receivable'] ?? 0) <= 0)
+                @if (empty($summary['income_rows'] ?? []) && (float) ($summary['fees_receivable'] ?? 0) <= 0)
                     <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">No fee income activity yet.</p>
                 @else
                     <div class="overflow-x-auto">
