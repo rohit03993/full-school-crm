@@ -6,7 +6,9 @@ use App\Enums\CrmPermission;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\Courses\CourseResource;
 use App\Models\AcademicSession;
+use App\Models\Course;
 use App\Services\ClassSectionListService;
+use App\Services\CourseLifecycleService;
 use App\Support\ClassSectionLabel;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
@@ -15,10 +17,12 @@ use App\Support\CrmNavigation;
 use App\Support\CrmPagination;
 use App\Support\InstituteTerminology;
 use Filament\Pages\Page;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\WithPagination;
 use UnitEnum;
 
@@ -100,6 +104,35 @@ class ClassSectionsPage extends Page
     protected function refreshStats(): void
     {
         $this->stats = app(ClassSectionListService::class)->stats($this->sessionFilter);
+    }
+
+    public function deleteProgramme(int $courseId, CourseLifecycleService $lifecycle): void
+    {
+        abort_unless(static::canAccess(), 403);
+
+        $course = Course::query()->findOrFail($courseId);
+
+        try {
+            $lifecycle->deleteProgrammeWithAllSections($course);
+        } catch (ValidationException $exception) {
+            Notification::make()
+                ->title('Could not delete class')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'This class cannot be deleted.')
+                ->warning()
+                ->persistent()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('Class deleted')
+            ->body('All sections were removed and the class no longer appears on the website.')
+            ->success()
+            ->send();
+
+        $this->resetPage();
+        $this->refreshStats();
     }
 
     public function content(Schema $schema): Schema

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ResultDeclarationStatus;
 use App\Models\Batch;
 use App\Models\BatchStudent;
+use App\Models\Course;
 use App\Models\ResultDeclaration;
 use App\Models\Student;
 use App\Models\User;
@@ -125,6 +126,12 @@ class BatchService
             }
 
             $batch->delete();
+
+            $course = Course::query()->find($batch->course_id);
+
+            if ($course) {
+                app(CourseLifecycleService::class)->syncAfterSectionDeleted($course);
+            }
         });
     }
 

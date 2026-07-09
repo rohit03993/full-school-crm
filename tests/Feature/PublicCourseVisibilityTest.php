@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\DurationType;
 use App\Enums\ProgrammeCategory;
+use App\Models\AcademicSession;
+use App\Models\Batch;
 use App\Models\Course;
 use App\Support\InstituteProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,6 +28,25 @@ class PublicCourseVisibilityTest extends TestCase
             'fee' => 1000,
             'status' => CourseStatus::Active,
             'show_on_website' => true,
+        ]);
+
+        $session = AcademicSession::query()->create([
+            'name' => '2026-27',
+            'code' => '2026-27',
+            'starts_on' => '2026-04-01',
+            'ends_on' => '2027-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
+
+        Batch::query()->create([
+            'course_id' => $visible->id,
+            'academic_session_id' => $session->id,
+            'name' => 'Visible A',
+            'section' => 'A',
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'status' => BatchStatus::Active,
         ]);
 
         Course::query()->create([
@@ -67,7 +89,7 @@ class PublicCourseVisibilityTest extends TestCase
             'show_on_website' => false,
         ]);
 
-        Course::query()->create([
+        $myProgramme = Course::query()->create([
             'name' => 'My Programme',
             'code' => 'MY-001',
             'programme_category' => ProgrammeCategory::Custom,
@@ -78,9 +100,28 @@ class PublicCourseVisibilityTest extends TestCase
             'show_on_website' => true,
         ]);
 
+        $session = AcademicSession::query()->create([
+            'name' => '2026-27',
+            'code' => '2026-27',
+            'starts_on' => '2026-04-01',
+            'ends_on' => '2027-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
+
+        Batch::query()->create([
+            'course_id' => $myProgramme->id,
+            'academic_session_id' => $session->id,
+            'name' => 'My Programme A',
+            'section' => 'A',
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'status' => BatchStatus::Active,
+        ]);
+
         $options = InstituteProfile::activeCourseOptions();
 
-        $this->assertArrayHasKey(Course::query()->where('code', 'MY-001')->value('id'), $options);
+        $this->assertArrayHasKey($myProgramme->id, $options);
         $this->assertArrayNotHasKey(Course::query()->where('code', 'GEN-UNDECIDED')->value('id'), $options);
     }
 }

@@ -107,6 +107,14 @@
                                 >
                                     Fee & details
                                 </a>
+                                <button
+                                    type="button"
+                                    wire:click="deleteProgramme({{ $course->id }})"
+                                    wire:confirm="Delete this class and all its sections? It will be removed from the website and admin lists when possible."
+                                    class="inline-flex items-center rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-xs font-semibold text-danger-700 hover:bg-danger-100 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-300 dark:hover:bg-danger-500/20"
+                                >
+                                    Delete class
+                                </button>
                             </div>
                         </div>
                     @endif

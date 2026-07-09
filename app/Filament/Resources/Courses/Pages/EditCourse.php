@@ -9,10 +9,12 @@ use App\Filament\Resources\Courses\Concerns\SyncsCourseSubjects;
 use App\Filament\Pages\ClassSectionsPage;
 use App\Filament\Resources\Courses\CourseResource;
 use App\Models\Course;
+use App\Services\CourseLifecycleService;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Validation\ValidationException;
 
 class EditCourse extends EditRecord
 {
@@ -65,21 +67,28 @@ class EditCourse extends EditRecord
                         ->send();
                 }),
             DeleteAction::make()
-                ->before(function (DeleteAction $action, Course $record): void {
-                    $check = $record->deletionBlockReason();
+                ->modalHeading('Delete this class?')
+                ->modalDescription('Deletes all sections and removes the class from the website and CRM when safe. Classes linked to past enquiries or students are hidden instead of fully deleted.')
+                ->action(function (CourseLifecycleService $lifecycle): void {
+                    try {
+                        $lifecycle->deleteProgrammeWithAllSections($this->getRecord());
+                    } catch (ValidationException $exception) {
+                        Notification::make()
+                            ->title('Could not delete class')
+                            ->body(collect($exception->errors())->flatten()->first() ?? 'This class cannot be deleted.')
+                            ->warning()
+                            ->persistent()
+                            ->send();
 
-                    if ($check['can_delete']) {
                         return;
                     }
 
                     Notification::make()
-                        ->title('Cannot delete this course')
-                        ->body($check['reason'])
-                        ->warning()
-                        ->persistent()
+                        ->title('Class deleted')
+                        ->success()
                         ->send();
 
-                    $action->halt();
+                    $this->redirect(ClassSectionsPage::getUrl());
                 }),
         ];
     }

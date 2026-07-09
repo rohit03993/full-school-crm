@@ -99,7 +99,8 @@ class InstituteProfile
     {
         return self::adminCoursesQuery($query)
             ->where('status', CourseStatus::Active)
-            ->where('show_on_website', true);
+            ->where('show_on_website', true)
+            ->whereHas('batches');
     }
 
     /**
@@ -109,7 +110,10 @@ class InstituteProfile
      */
     public static function activeCourseOptions(bool $excludeUndecided = true): array
     {
-        $query = Course::query()->active()->orderBy('name');
+        $query = Course::query()
+            ->active()
+            ->whereHas('batches')
+            ->orderBy('name');
 
         if ($excludeUndecided) {
             $query = self::adminCoursesQuery($query);
