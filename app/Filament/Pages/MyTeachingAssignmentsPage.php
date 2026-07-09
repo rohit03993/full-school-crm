@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Services\BatchStaffAssignmentService;
+use App\Services\ExamWindowService;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
 use Filament\Pages\Page;
@@ -39,6 +40,7 @@ class MyTeachingAssignmentsPage extends Page
     public function content(Schema $schema): Schema
     {
         $user = Auth::user();
+        $examService = app(ExamWindowService::class);
 
         return $schema->components([
             View::make('filament.pages.partials.my-teaching-assignments')
@@ -46,6 +48,16 @@ class MyTeachingAssignmentsPage extends Page
                     'assignments' => $user
                         ? app(BatchStaffAssignmentService::class)->assignmentsForUser($user)
                         : [],
+                    'pendingMarkEntries' => $user
+                        ? $examService->pendingEntriesForUser($user)
+                        : [],
+                    'submitCandidates' => $user
+                        ? $examService->submitCandidatesForUser($user)
+                        : [],
+                    'marksEntryUrl' => fn (?int $sessionId): string => $sessionId
+                        ? ActivityAttendancePage::getUrl(['id' => $sessionId])
+                        : '#',
+                    'examWindowUrl' => fn (int $windowId): string => ExamWindowPage::getUrl(['window' => $windowId]),
                 ]),
         ]);
     }

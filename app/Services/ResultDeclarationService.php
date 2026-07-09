@@ -66,6 +66,8 @@ class ResultDeclarationService
             ]);
         }
 
+        app(ExamWindowService::class)->assertApprovedForPublish($groupKey);
+
         $markSheet = ExamTestGroupMatrix::markSheetForGroup($groupKey);
 
         if (! $markSheet || ($markSheet['rows'] ?? []) === []) {

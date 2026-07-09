@@ -127,6 +127,10 @@ class ActivityAttendanceService
             }
         });
 
+        if ($saved > 0) {
+            app(ExamWindowService::class)->recordMarksEntry($attendable, $staff);
+        }
+
         return $saved;
     }
 

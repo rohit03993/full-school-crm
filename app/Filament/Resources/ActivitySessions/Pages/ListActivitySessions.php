@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ActivitySessions\Pages;
 
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Pages\BulkActivityMarksImportPage;
+use App\Filament\Pages\ExamWindowsPage;
 use App\Filament\Pages\SessionAttendancePage;
 use App\Filament\Pages\TestMarksReviewPage;
 use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
@@ -84,6 +85,15 @@ class ListActivitySessions extends ListRecords
                 ->icon(Heroicon::OutlinedArrowUpTray)
                 ->color('primary')
                 ->url(BulkActivityMarksImportPage::getUrl());
+        }
+
+        if (ExamWindowsPage::canAccess()) {
+            $actions[] = Action::make('examWindows')
+                ->label('Exam windows')
+                ->icon(Heroicon::OutlinedClipboardDocumentCheck)
+                ->color('success')
+                ->url(ExamWindowsPage::getUrl())
+                ->tooltip('Create exams from programme subjects — teacher entry, approval, then publish.');
         }
 
         if ($this->activitySchemaReady() && ! ActivityType::query()->enabled()->exists()) {

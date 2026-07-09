@@ -165,10 +165,15 @@ class ActivityAttendancePage extends Page
             return;
         }
 
+        $examWindowId = (int) ($activity->metadataValue('exam_window_id') ?? 0);
+        $redirectTo = $examWindowId > 0
+            ? ExamWindowPage::getUrl(['window' => $examWindowId])
+            : ActivitySessionResource::getUrl('index');
+
         $this->finishAttendanceSave(
             'Saved',
             "{$saved} student record(s) saved.",
-            ActivitySessionResource::getUrl('index'),
+            $redirectTo,
         );
     }
 

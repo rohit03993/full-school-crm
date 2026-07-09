@@ -11,6 +11,7 @@ use App\Support\FeatureGate;
 use App\Models\StudentMarksheet;
 use App\Models\WhatsAppTemplate;
 use App\Services\ActivityMarksWhatsAppService;
+use App\Services\ExamWindowService;
 use App\Services\ResultDeclarationService;
 use App\Support\CrmHint;
 use App\Support\ExamTestGroupMatrix;
@@ -337,11 +338,50 @@ class TestMarksReviewPage extends Page
                         && CrmAccess::can(Auth::user(), CrmPermission::WhatsappCampaigns),
                     'resultStatus' => $this->resultStatus(),
                     'canPublish' => FeatureGate::enabled(LicenseFeature::Results)
-                        && CrmAccess::can(Auth::user(), CrmPermission::MarksImport),
+                        && CrmAccess::can(Auth::user(), CrmPermission::MarksImport)
+                        && $this->examWindowAllowsPublish(),
+                    'examWindowStatus' => $this->examWindowStatus(),
                     'canIssueMarksheet' => FeatureGate::enabled(LicenseFeature::Marksheets)
                         && (Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false),
                     'studentMarksheets' => $this->studentMarksheetsByStudentId(),
                 ]),
         ]);
+    }
+
+    protected function examWindowAllowsPublish(): bool
+    {
+        if (blank($this->groupKey)) {
+            return false;
+        }
+
+        $window = app(ExamWindowService::class)->findForGroupKey((string) $this->groupKey);
+
+        if (! $window) {
+            return true;
+        }
+
+        return $window->status === \App\Enums\ExamWindowStatus::Approved;
+    }
+
+    /**
+     * @return array{exists: bool, label: ?string, url: ?string}
+     */
+    protected function examWindowStatus(): array
+    {
+        if (blank($this->groupKey)) {
+            return ['exists' => false, 'label' => null, 'url' => null];
+        }
+
+        $window = app(ExamWindowService::class)->findForGroupKey((string) $this->groupKey);
+
+        if (! $window) {
+            return ['exists' => false, 'label' => null, 'url' => null];
+        }
+
+        return [
+            'exists' => true,
+            'label' => $window->status->label(),
+            'url' => ExamWindowPage::getUrl(['window' => $window->id]),
+        ];
     }
 }

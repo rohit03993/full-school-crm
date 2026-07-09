@@ -27,6 +27,16 @@ final class BatchSelectOptions
     /**
      * @return array<int, string>
      */
+    public static function activeOptions(): array
+    {
+        return ClassSectionLabel::options(
+            self::baseQuery(true)->orderBy('name')->get(),
+        );
+    }
+
+    /**
+     * @return array<int, string>
+     */
     public static function forCourse(?int $courseId, ?int $sessionId = null, bool $activeOnly = true): array
     {
         if (! $courseId) {
