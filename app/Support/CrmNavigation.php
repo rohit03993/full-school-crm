@@ -8,7 +8,10 @@ use Filament\Support\Icons\Heroicon;
 /**
  * Sidebar group names and order — keep menu paths in hints/docs aligned with {@see CrmMenuLabels}.
  *
- * Leads → Calls → WhatsApp → Students → Academics → Reports → Setup → Admin → Website
+ * Ungrouped top (fixed): Dashboard → My meetings → My classes
+ * Daily use: Leads → Students → Academics
+ * Operations: Calls → Reports
+ * Configuration (bottom): WhatsApp → Setup → Admin → Website
  */
 class CrmNavigation
 {
@@ -39,30 +42,47 @@ class CrmNavigation
     public const GROUP_WEBSITE = CrmMenuLabels::GROUP_WEBSITE;
 
     /**
+     * Sidebar group order — most-used sections first; setup/config at the bottom.
+     *
+     * @return list<string>
+     */
+    public static function groupOrder(): array
+    {
+        return [
+            self::GROUP_LEADS,
+            self::GROUP_STUDENTS,
+            self::GROUP_ACADEMICS,
+            self::GROUP_CALLS,
+            self::GROUP_REPORTS,
+            self::GROUP_META_WHATSAPP,
+            self::GROUP_SETTINGS,
+            self::GROUP_ADMIN,
+            self::GROUP_WEBSITE,
+        ];
+    }
+
+    /**
      * @return array<int, NavigationGroup>
      */
     public static function navigationGroups(): array
     {
-        return [
-            NavigationGroup::make(self::GROUP_LEADS)
-                ->icon(Heroicon::OutlinedChatBubbleLeftRight),
-            NavigationGroup::make(self::GROUP_CALLS)
-                ->icon(Heroicon::OutlinedPhone),
-            NavigationGroup::make(self::GROUP_META_WHATSAPP)
-                ->icon(Heroicon::OutlinedDevicePhoneMobile),
-            NavigationGroup::make(self::GROUP_STUDENTS)
-                ->icon(Heroicon::OutlinedAcademicCap),
-            NavigationGroup::make(self::GROUP_ACADEMICS)
-                ->icon(Heroicon::OutlinedBookOpen),
-            NavigationGroup::make(self::GROUP_REPORTS)
-                ->icon(Heroicon::OutlinedChartBar),
-            NavigationGroup::make(self::GROUP_SETTINGS)
-                ->icon(Heroicon::OutlinedCog6Tooth),
-            NavigationGroup::make(self::GROUP_ADMIN)
-                ->icon(Heroicon::OutlinedShieldCheck),
-            NavigationGroup::make(self::GROUP_WEBSITE)
-                ->icon(Heroicon::OutlinedGlobeAlt),
+        $icons = [
+            self::GROUP_LEADS => Heroicon::OutlinedChatBubbleLeftRight,
+            self::GROUP_STUDENTS => Heroicon::OutlinedAcademicCap,
+            self::GROUP_ACADEMICS => Heroicon::OutlinedBookOpen,
+            self::GROUP_CALLS => Heroicon::OutlinedPhone,
+            self::GROUP_REPORTS => Heroicon::OutlinedChartBar,
+            self::GROUP_META_WHATSAPP => Heroicon::OutlinedDevicePhoneMobile,
+            self::GROUP_SETTINGS => Heroicon::OutlinedCog6Tooth,
+            self::GROUP_ADMIN => Heroicon::OutlinedShieldCheck,
+            self::GROUP_WEBSITE => Heroicon::OutlinedGlobeAlt,
         ];
+
+        return array_map(
+            fn (string $group): NavigationGroup => NavigationGroup::make($group)
+                ->icon($icons[$group]),
+            self::groupOrder(),
+        );
     }
 
     /**
