@@ -35,5 +35,25 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('whatsapp:process-pending')->everyMinute()->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (\Throwable $exception, \Illuminate\Http\Request $request) {
+            if (! $request->header('X-Livewire') && ! $request->header('X-Livewire-Navigate')) {
+                return null;
+            }
+
+            if ($exception instanceof \Illuminate\Auth\AuthenticationException) {
+                return null;
+            }
+
+            if ($exception instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                return null;
+            }
+
+            $message = \App\Support\CrmLivewireErrors::messageFor($exception);
+
+            if ($request->header('X-Livewire-Navigate')) {
+                return response($message, 500);
+            }
+
+            return null;
+        });
     })->create();

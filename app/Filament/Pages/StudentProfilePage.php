@@ -1153,33 +1153,46 @@ class StudentProfilePage extends Page
             return;
         }
 
-        $this->syncCatalogCourseFeeIfNeeded();
-        $this->feesTabLoaded = true;
-        $this->record->loadMissing(array_merge([
-            'activeEnrollment.course',
-            'activeEnrollment.feeStructure.installments',
-            'activeEnrollment.feeStructure.penalties.feeInstallment',
-            'activeEnrollment.feeStructure.discountSetBy',
-            'activeEnrollment.feeStructure.discountEntries.grantedBy',
-            'activeEnrollment.feeStructure.setBy',
-            'activeEnrollment.feeStructure.history.changedBy',
-        ], $this->miscChargesEagerLoadPaths()));
-        $feeStructure = $this->record->activeEnrollment?->feeStructure;
+        try {
+            $this->syncCatalogCourseFeeIfNeeded();
+            $this->record->loadMissing(array_merge([
+                'activeEnrollment.course',
+                'activeEnrollment.feeStructure.installments',
+                'activeEnrollment.feeStructure.penalties.feeInstallment',
+                'activeEnrollment.feeStructure.discountSetBy',
+                'activeEnrollment.feeStructure.discountEntries.grantedBy',
+                'activeEnrollment.feeStructure.setBy',
+                'activeEnrollment.feeStructure.history.changedBy',
+            ], $this->miscChargesEagerLoadPaths()));
+            $feeStructure = $this->record->activeEnrollment?->feeStructure;
 
-        $this->installments = $feeStructure
-            ? $feeStructure->installments
-                ->sortBy(fn (\App\Models\FeeInstallment $row): array => [
-                    $row->due_date?->timestamp ?? PHP_INT_MAX,
-                    $row->sort_order,
-                    $row->id,
-                ])
-                ->values()
-            : new Collection;
-        $this->penalties = $feeStructure?->penalties ?? new Collection;
-        $this->feeStructureHistory = $feeStructure
-            ? $feeStructure->history()->with('changedBy')->orderByDesc('changed_at')->limit(20)->get()
-            : new Collection;
-        $this->loadPayments();
+            $this->installments = $feeStructure
+                ? $feeStructure->installments
+                    ->sortBy(fn (\App\Models\FeeInstallment $row): array => [
+                        $row->due_date?->timestamp ?? PHP_INT_MAX,
+                        $row->sort_order,
+                        $row->id,
+                    ])
+                    ->values()
+                : new Collection;
+            $this->penalties = $feeStructure?->penalties ?? new Collection;
+            $this->feeStructureHistory = $feeStructure
+                ? $feeStructure->history()->with('changedBy')->orderByDesc('changed_at')->limit(20)->get()
+                : new Collection;
+            $this->loadPayments();
+            $this->feesTabLoaded = true;
+        } catch (\Throwable $exception) {
+            $this->feesTabLoaded = false;
+
+            Notification::make()
+                ->title('Could not load fees tab')
+                ->body(\App\Support\CrmLivewireErrors::messageFor($exception))
+                ->danger()
+                ->persistent()
+                ->send();
+
+            report($exception);
+        }
     }
 
     public function openPayMiscCharge(int $chargeId): void

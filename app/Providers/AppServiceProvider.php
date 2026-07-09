@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Http\Responses\LogoutResponse;
 use App\Models\Student;
 use App\Services\HomeworkAssignmentService;
+use App\Support\CrmLivewireErrors;
 use App\Support\CrmPagination;
 use App\Support\SiteContent;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
@@ -21,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        CrmLivewireErrors::register();
+
         Table::configureUsing(function (Table $table): void {
             $table
                 ->paginationPageOptions(CrmPagination::perPageOptions())

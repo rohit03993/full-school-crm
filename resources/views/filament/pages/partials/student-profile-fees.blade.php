@@ -340,7 +340,9 @@
                                                     Pay
                                                 </button>
                                             @endif
-                                            @php($pendingRequest = $charge->pendingAdjustmentRequest())
+                                            @php
+                                                $pendingRequest = $charge->pendingAdjustmentRequest();
+                                            @endphp
                                             @if ($pendingRequest)
                                                 <span class="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-900 dark:bg-amber-500/15 dark:text-amber-200">
                                                     {{ $pendingRequest->type->label() }} pending
@@ -349,7 +351,7 @@
                                                 <div x-data="{ open: false, type: 'waive_off', discount: '', reason: '' }">
                                                     <button
                                                         type="button"
-                                                        @click="open = true; type = 'waive_off'; discount = ''; reason = ''"
+                                                        @@click="open = true; type = 'waive_off'; discount = ''; reason = ''"
                                                         class="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20"
                                                     >
                                                         Discount / Waive
@@ -359,11 +361,11 @@
                                                             x-show="open"
                                                             x-cloak
                                                             class="fixed inset-0 z-[200] flex items-center justify-center bg-gray-950/50 p-4 backdrop-blur-[1px]"
-                                                            @keydown.escape.window="open = false"
+                                                            @@keydown.escape.window="open = false"
                                                         >
                                                             <div
                                                                 class="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10"
-                                                                @click.outside="open = false"
+                                                                @@click.outside="open = false"
                                                             >
                                                                 <div class="border-b border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50 px-5 py-4 dark:border-amber-500/20 dark:from-amber-950/40 dark:to-orange-950/20">
                                                                     <p class="text-[11px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">Request adjustment</p>
@@ -393,12 +395,12 @@
                                                                         <textarea x-model="reason" rows="3" class="w-full rounded-xl border-gray-200 text-sm dark:border-white/10 dark:bg-white/5" placeholder="e.g. Management approved waiver, first-time penalty, financial hardship"></textarea>
                                                                     </div>
                                                                     <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                                                                        <button type="button" class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300" @click="open = false">Cancel</button>
+                                                                        <button type="button" class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300" @@click="open = false">Cancel</button>
                                                                         <button
                                                                             type="button"
                                                                             class="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
                                                                             :disabled="reason.trim().length < 3 || (type === 'discount' && (!discount || Number(discount) <= 0 || Number(discount) > {{ $chargePending }}))"
-                                                                            @click="$wire.submitMiscChargeAdjustmentRequest({{ $charge->id }}, type, type === 'discount' ? Number(discount) : null, reason.trim()); open = false"
+                                                                            @@click="$wire.submitMiscChargeAdjustmentRequest({{ $charge->id }}, type, type === 'discount' ? Number(discount) : null, reason.trim()); open = false"
                                                                         >
                                                                             Send for approval
                                                                         </button>
@@ -449,15 +451,15 @@
                 <p class="px-5 py-8 text-center text-sm text-gray-500">No payments recorded yet.</p>
             @else
                 <div class="divide-y divide-gray-100 dark:divide-white/5">
-                    @foreach ($payments as $payment)
+                    @foreach ($payments as $paymentRow)
                         @php
-                            $modeLabel = $payment->payment_mode->label();
+                            $modeLabel = $paymentRow->payment_mode->label();
                             $modeClass = match (true) {
                                 str_contains(strtolower($modeLabel), 'cash') => 'bg-lime-100 text-lime-800 dark:bg-lime-500/15 dark:text-lime-300',
                                 str_contains(strtolower($modeLabel), 'online') || str_contains(strtolower($modeLabel), 'upi') => 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300',
                                 default => 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300',
                             };
-                            $description = $payment->feeMiscCharge?->label ?? $payment->feeInstallment?->label;
+                            $description = $paymentRow->feeMiscCharge?->label ?? $paymentRow->feeInstallment?->label;
                         @endphp
                         <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-gray-50/80 dark:hover:bg-white/[0.02]">
                             <div class="flex min-w-0 flex-1 items-start gap-3">
@@ -466,11 +468,11 @@
                                 </div>
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <span class="font-mono text-sm font-bold text-primary-600 dark:text-primary-400">{{ $payment->receipt_number }}</span>
+                                        <span class="font-mono text-sm font-bold text-primary-600 dark:text-primary-400">{{ $paymentRow->receipt_number }}</span>
                                         <span class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $modeClass }}">{{ $modeLabel }}</span>
                                     </div>
                                     <p class="mt-0.5 text-xs text-gray-500">
-                                        {{ $payment->payment_date->format('d M Y') }}
+                                        {{ $paymentRow->payment_date->format('d M Y') }}
                                         @if ($description)
                                             · {{ $description }}
                                         @endif
@@ -478,12 +480,12 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-3">
-                                <span class="text-base font-bold text-emerald-600 dark:text-emerald-400">₹{{ number_format((float) $payment->amount, 0) }}</span>
-                                @if ($payment->hasReceiptPdf())
+                                <span class="text-base font-bold text-emerald-600 dark:text-emerald-400">₹{{ number_format((float) $paymentRow->amount, 0) }}</span>
+                                @if ($paymentRow->hasReceiptPdf())
                                     <x-crm.media-preview-button
-                                        :url="$payment->receiptPreviewUrl()"
-                                        :download-url="$payment->receiptDownloadUrl()"
-                                        :title="'Receipt · '.$payment->receipt_number"
+                                        :url="$paymentRow->receiptPreviewUrl()"
+                                        :download-url="$paymentRow->receiptDownloadUrl()"
+                                        :title="'Receipt · '.$paymentRow->receipt_number"
                                         :is-pdf="true"
                                         label="PDF"
                                     />
