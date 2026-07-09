@@ -4,8 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Enums\RoleName;
 use App\Filament\Pages\ClassSectionsPage;
+use App\Filament\Pages\ExamWindowsPage;
 use App\Filament\Resources\AcademicSessions\AcademicSessionResource;
-use App\Filament\Resources\ActivityTypes\ActivityTypeResource;
 use App\Models\AcademicSession;
 use App\Support\CrmNavigation;
 use App\Support\InstituteOnboarding;
@@ -84,10 +84,10 @@ class InstituteSetup extends Page
                 'icon' => 'heroicon-o-calendar-days',
             ],
             [
-                'label' => 'Exam Types',
-                'description' => 'Unit Test, Half Yearly, Mock Test — templates for entering marks.',
-                'url' => ActivityTypeResource::getUrl(),
-                'icon' => 'heroicon-o-adjustments-horizontal',
+                'label' => 'Exam windows',
+                'description' => 'Create unit tests and term exams from programme subjects.',
+                'url' => ExamWindowsPage::getUrl(),
+                'icon' => 'heroicon-o-clipboard-document-check',
             ],
             [
                 'label' => 'Classes & sections',

@@ -3,13 +3,10 @@
 namespace App\Filament\Resources\ActivityTypes\Pages;
 
 use App\Filament\Concerns\ShowsCrmPageHint;
-use App\Filament\Pages\SessionAttendancePage;
 use App\Filament\Resources\ActivityTypes\ActivityTypeResource;
 use App\Models\ActivityType;
 use App\Support\ActivityTypePresets;
-use Filament\Actions\Action;
 use Filament\Resources\Pages\EditRecord;
-use Filament\Support\Icons\Heroicon;
 
 class EditActivityType extends EditRecord
 {
@@ -20,23 +17,6 @@ class EditActivityType extends EditRecord
     protected static function crmHintKey(): ?string
     {
         return 'activity.types.edit';
-    }
-
-    protected function getHeaderActions(): array
-    {
-        $actions = parent::getHeaderActions();
-
-        $record = $this->getRecord();
-
-        if ($record instanceof ActivityType && ! $record->supportsScoring()) {
-            array_unshift($actions, Action::make('markAttendance')
-                ->label('Mark attendance')
-                ->icon(Heroicon::OutlinedUserGroup)
-                ->color('info')
-                ->url(SessionAttendancePage::getUrl().'?activity_type_id='.$record->id));
-        }
-
-        return $actions;
     }
 
     protected function mutateFormDataBeforeFill(array $data): array

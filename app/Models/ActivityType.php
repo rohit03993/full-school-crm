@@ -74,6 +74,41 @@ class ActivityType extends Model
             ->contains(fn (array $field): bool => ($field['key'] ?? null) === 'max_marks');
     }
 
+    /**
+     * Enabled types used for marks and exams (excludes workshops/events).
+     *
+     * @return \Illuminate\Support\Collection<int, ActivityType>
+     */
+    public static function scoringTypes(): \Illuminate\Support\Collection
+    {
+        return static::query()
+            ->enabled()
+            ->ordered()
+            ->get()
+            ->filter(fn (ActivityType $type): bool => $type->supportsScoring())
+            ->values();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function scoringOptions(): array
+    {
+        return static::scoringTypes()
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    /**
+     * @return list<int>
+     */
+    public static function scoringTypeIds(): array
+    {
+        return static::scoringTypes()
+            ->pluck('id')
+            ->all();
+    }
+
     public function scopeAttendanceOnly(Builder $query): Builder
     {
         return $query->enabled()->ordered();

@@ -7,7 +7,7 @@
         @if ($activityType->supportsScoring())
             No {{ strtolower($activityType->plural_name) }} with marks recorded yet.
         @else
-            No {{ strtolower($activityType->plural_name) }} attendance recorded yet. Mark under <strong>Workshops &amp; Events</strong>.
+            No {{ strtolower($activityType->plural_name) }} recorded yet.
         @endif
     </div>
 @elseif ($activityType->supportsScoring())

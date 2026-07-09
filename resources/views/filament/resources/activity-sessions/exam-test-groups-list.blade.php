@@ -6,13 +6,13 @@
                 <li class="rounded-xl bg-white/80 px-3 py-3 ring-1 ring-gray-200 dark:bg-gray-900/80 dark:ring-white/10">
                     <p class="text-[10px] font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400">Step 1 · Setup (once)</p>
                     <p class="mt-1 text-gray-700 dark:text-gray-300">
-                        <strong>Exam Types</strong> — add categories (Unit Test, Practical, Mock). Turn <strong>Marks ✓</strong> on for types you will score.
+                        <strong>Exam windows</strong> — create a test from programme subjects (recommended for schools).
                     </p>
                 </li>
                 <li class="rounded-xl bg-white/80 px-3 py-3 ring-1 ring-gray-200 dark:bg-gray-900/80 dark:ring-white/10">
-                    <p class="text-[10px] font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400">Step 2 · Upload</p>
+                    <p class="text-[10px] font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400">Step 2 · Upload or enter</p>
                     <p class="mt-1 text-gray-700 dark:text-gray-300">
-                        Click <strong>Upload marks (Excel)</strong> above. Enter the <strong>test name</strong> and date, pick exam type, upload the file — all subjects are created together.
+                        <strong>Upload marks (Excel)</strong> or open an <strong>Exam window</strong> and enter marks per subject.
                     </p>
                 </li>
                 <li class="rounded-xl bg-white/80 px-3 py-3 ring-1 ring-gray-200 dark:bg-gray-900/80 dark:ring-white/10">
@@ -29,7 +29,6 @@
                 </li>
             </ol>
             <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                <strong>Workshops &amp; events</strong> — use sidebar <strong>Workshops &amp; Events</strong> (not Excel upload).
                 Daily class roll call stays under <strong>Attendance</strong>.
             </p>
         </div>
@@ -37,9 +36,9 @@
 
     <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
         <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
-            <h2 class="text-lg font-bold text-gray-950 dark:text-white">All tests &amp; activities</h2>
+            <h2 class="text-lg font-bold text-gray-950 dark:text-white">All exams</h2>
             <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Exam rows show mark counts. Workshop and event rows use <strong>Mark attendance</strong> instead of Excel upload.
+                Each row is one exam (all subjects). Use <strong>View sheet</strong> to review and publish.
             </p>
         </div>
 
@@ -153,23 +152,6 @@
                                             class="rounded-lg bg-primary-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-primary-500"
                                         >
                                             Upload marks
-                                        </a>
-                                    @elseif (filled($row['session_id'] ?? null))
-                                        <a
-                                            href="{{ \App\Filament\Pages\SessionAttendancePage::getUrl()
-                                                .'?activity_type_id='.urlencode((string) ($row['activity_type_id'] ?? ''))
-                                                .'&batch_id='.urlencode((string) ($row['batch_id'] ?? ''))
-                                                .'&session_date='.urlencode($row['date']?->format('Y-m-d') ?? '')
-                                                .'&session_title='.urlencode($row['label']) }}"
-                                            class="rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-sky-500"
-                                        >
-                                            Mark attendance
-                                        </a>
-                                        <a
-                                            href="{{ \App\Filament\Resources\ActivitySessions\ActivitySessionResource::getUrl('edit', ['record' => $row['session_id']]) }}"
-                                            class="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
-                                        >
-                                            Edit
                                         </a>
                                     @endif
                                 </div>

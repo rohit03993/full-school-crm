@@ -2,7 +2,7 @@
     <section class="portal-card overflow-hidden">
         <div class="border-b border-navy-100 px-4 py-3.5 sm:px-5">
             <h2 class="font-display text-lg font-bold text-navy-900">Attendance</h2>
-            <p class="mt-0.5 text-sm text-navy-500">Class and workshop / event attendance</p>
+            <p class="mt-0.5 text-sm text-navy-500">Class attendance</p>
         </div>
         <div class="space-y-4 p-4 sm:p-5">
             @if ($classAttendancePercentage !== null)

@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\ActivitySession;
+use App\Models\ActivityType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
@@ -46,6 +47,12 @@ class ExamTestGroupMatrix
 
         if ($activityTypeId) {
             $query->where('activity_type_id', $activityTypeId);
+        }
+
+        $scoringTypeIds = ActivityType::scoringTypeIds();
+
+        if ($scoringTypeIds !== []) {
+            $query->whereIn('activity_type_id', $scoringTypeIds);
         }
 
         /** @var array<string, array<string, mixed>> $grouped */

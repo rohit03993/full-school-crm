@@ -444,7 +444,7 @@ class StudentProfilePage extends Page
      */
     protected function enabledActivityTypes(): Collection
     {
-        return $this->cachedEnabledActivityTypes ??= ActivityType::query()->enabled()->ordered()->get();
+        return $this->cachedEnabledActivityTypes ??= ActivityType::scoringTypes();
     }
 
     /**

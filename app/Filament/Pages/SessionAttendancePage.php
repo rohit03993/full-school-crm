@@ -38,6 +38,11 @@ class SessionAttendancePage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static ?string $navigationLabel = 'Workshops & Events';
 
     protected static ?string $title = 'Workshop & Event Attendance';

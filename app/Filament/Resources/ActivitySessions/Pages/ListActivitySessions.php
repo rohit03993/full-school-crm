@@ -5,7 +5,6 @@ namespace App\Filament\Resources\ActivitySessions\Pages;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Pages\BulkActivityMarksImportPage;
 use App\Filament\Pages\ExamWindowsPage;
-use App\Filament\Pages\SessionAttendancePage;
 use App\Filament\Pages\TestMarksReviewPage;
 use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
 use App\Filament\Resources\ActivityTypes\ActivityTypeResource;
@@ -57,7 +56,7 @@ class ListActivitySessions extends ListRecords
                 ->viewData(fn (): array => [
                     'matrix' => $matrix,
                     'batchOptions' => Batch::query()->orderBy('name')->pluck('name', 'id')->all(),
-                    'activityTypeOptions' => ActivityType::query()->enabled()->ordered()->pluck('name', 'id')->all(),
+                    'activityTypeOptions' => ActivityType::scoringOptions(),
                     'importMarksUrl' => BulkActivityMarksImportPage::getUrl(),
                     'reviewPageBaseUrl' => TestMarksReviewPage::getUrl(),
                     'declarationStatuses' => collect($matrix['rows'] ?? [])
@@ -96,22 +95,14 @@ class ListActivitySessions extends ListRecords
                 ->tooltip('Create exams from programme subjects — teacher entry, approval, then publish.');
         }
 
-        if ($this->activitySchemaReady() && ! ActivityType::query()->enabled()->exists()) {
+        if ($this->activitySchemaReady() && ActivityType::scoringTypes()->isEmpty()) {
             if (ActivityTypeResource::canAccess()) {
                 $actions[] = Action::make('setupActivityTypes')
-                    ->label('Set up exam types first')
+                    ->label('Set up exam type')
                     ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
                     ->color('warning')
                     ->url(ActivityTypeResource::getUrl('index'));
             }
-        }
-
-        if (SessionAttendancePage::canAccess()) {
-            $actions[] = Action::make('sessionAttendance')
-                ->label('Workshop / event attendance')
-                ->icon(Heroicon::OutlinedUserGroup)
-                ->color('info')
-                ->url(SessionAttendancePage::getUrl());
         }
 
         if (ActivitySessionResource::canCreate()) {

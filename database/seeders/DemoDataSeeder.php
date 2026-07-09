@@ -531,19 +531,17 @@ class DemoDataSeeder extends Seeder
         InstituteType $instituteType,
     ): void {
         $examType = ActivityType::query()->where('slug', 'exam')->first();
-        $mockType = ActivityType::query()->where('slug', 'mock_test')->first();
 
-        if (! $examType || ! $mockType) {
-            $this->command?->warn('Exam types missing — run ActivityTypeSeeder first.');
+        if (! $examType) {
+            $this->command?->warn('Exam type missing — run ActivityTypeSeeder first.');
 
             return;
         }
 
-        $type = $instituteType === InstituteType::Coaching ? $mockType : $examType;
         $tests = $this->demoExamTestsForType($instituteType);
 
         foreach ($tests as $test) {
-            $this->seedTestMarks($staff, $batch, $students, $type, $test);
+            $this->seedTestMarks($staff, $batch, $students, $examType, $test);
         }
 
         $this->command?->line('Demo marks: '.count($tests).' test(s) · rolls 101–103 · student profile shows subject columns');

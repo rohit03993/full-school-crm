@@ -4,7 +4,6 @@ namespace App\Filament\Resources\ActivityTypes;
 
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
-use App\Enums\RoleName;
 use App\Filament\Concerns\RequiresAnyCrmPermission;
 use App\Filament\Resources\ActivityTypes\Pages\CreateActivityType;
 use App\Support\CrmAccess;
@@ -79,19 +78,36 @@ class ActivityTypeResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_ACADEMICS;
 
-    public static function canCreate(): bool
+    public static function shouldRegisterNavigation(): bool
     {
-        return CrmAccess::can(Auth::user(), CrmPermission::AcademicsManage);
+        return false;
     }
 
-    public static function canEdit($record): bool
+    public static function canCreate(): bool
     {
-        return static::canCreate();
+        return false;
     }
 
     public static function canDelete($record): bool
     {
-        return static::canCreate();
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return CrmAccess::can(Auth::user(), CrmPermission::AcademicsManage);
+    }
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = parent::getEloquentQuery()->where('is_enabled', true);
+        $ids = ActivityType::scoringTypeIds();
+
+        if ($ids !== []) {
+            $query->whereIn('id', $ids);
+        }
+
+        return $query;
     }
 
     public static function form(Schema $schema): Schema
@@ -99,7 +115,7 @@ class ActivityTypeResource extends Resource
         return $schema
             ->components([
                 Section::make(EduExamLabels::examType())
-                    ->description('Workshop & Event: leave Marks ✗ — staff mark attendance under Academics → Workshops & Events.')
+                    ->description('Exam categories for marks entry (e.g. Unit Test, Half Yearly).')
                     ->schema([
                         TextInput::make('name')
                             ->required()
