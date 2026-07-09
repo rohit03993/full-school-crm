@@ -117,12 +117,13 @@ class CourseFeeSyncServiceTest extends TestCase
 
     private function createEnquiry(Student $student, Course $course, User $staff)
     {
-        return app(EnquiryService::class)->create($student, [
+        return app(EnquiryService::class)->create([
+            'name' => $student->name,
+            'father_name' => $student->father_name,
+            'date_of_birth' => $student->date_of_birth->toDateString(),
+            'gender' => $student->gender->value,
+            'mobile' => $student->mobile,
             'course_id' => $course->id,
-            'lead_source' => LeadSource::WalkIn,
-            'meeting_for' => 'school',
-            'visit_type' => 'first_visit',
-            'latest_visit_status' => 'interested',
-        ], $staff);
+        ], $staff, LeadSource::WalkIn);
     }
 }

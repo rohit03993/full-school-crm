@@ -17,6 +17,7 @@ use App\Services\Punch\ManualBatchAttendanceService;
 use App\Services\Punch\PunchAttendanceProcessor;
 use App\Services\Punch\PunchBatchRosterService;
 use App\Support\CrmAccess;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
 use Filament\Forms\Components\DatePicker;
@@ -44,9 +45,19 @@ class AttendancePage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
-    protected static ?string $navigationLabel = 'Attendance';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Attendance';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::attendance();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::attendance();
+    }
 
     protected static ?int $navigationSort = 39;
 

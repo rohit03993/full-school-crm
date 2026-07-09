@@ -67,9 +67,9 @@ class FeeInstallmentTest extends TestCase
             ->get();
 
         $this->assertCount(2, $installments);
-        $this->assertSame('Installment 1', $installments[0]->label);
+        $this->assertSame('Admission fee', $installments[0]->label);
         $this->assertSame(31000.0, (float) $installments[0]->amount);
-        $this->assertSame('Installment 2', $installments[1]->label);
+        $this->assertSame('Balance', $installments[1]->label);
         $this->assertSame(31000.0, (float) $installments[1]->amount);
         $this->assertSame(2000.0, $feeStructure->miscChargesTotal());
     }

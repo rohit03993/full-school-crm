@@ -10,6 +10,7 @@ use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Services\CallReportService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\CrmPagination;
 use Filament\Pages\Page;
@@ -26,11 +27,21 @@ class CallReportPage extends Page
     use WithPagination;
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedChartBar;
 
-    protected static ?string $navigationLabel = 'Call Report';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Call Report';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 20;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::callReport();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::callReport();
+    }
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_CALLS;
 

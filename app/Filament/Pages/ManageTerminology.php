@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\RoleName;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\InstituteTerminology;
 use App\Support\CrmNavigation;
 use Filament\Actions\Action;
@@ -27,9 +28,19 @@ class ManageTerminology extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedLanguage;
 
-    protected static ?string $navigationLabel = 'Terminology';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Terminology & labels';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::terminology();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::terminology();
+    }
 
     protected static ?int $navigationSort = 30;
 

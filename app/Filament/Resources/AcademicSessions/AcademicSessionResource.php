@@ -9,6 +9,7 @@ use App\Filament\Resources\AcademicSessions\Pages\ListAcademicSessions;
 use App\Filament\Support\CrmTable;
 use App\Models\AcademicSession;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
@@ -29,11 +30,26 @@ class AcademicSessionResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
-    protected static ?string $navigationLabel = 'Academic Sessions';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $modelLabel = 'Academic Session';
+    protected static ?string $modelLabel = null;
 
-    protected static ?string $pluralModelLabel = 'Academic Sessions';
+    protected static ?string $pluralModelLabel = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::schoolYears();
+    }
+
+    public static function getModelLabel(): string
+    {
+        return 'School year';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'School years';
+    }
 
     protected static ?int $navigationSort = 10;
 

@@ -15,6 +15,7 @@ use App\Filament\Widgets\MonthlyFeeCollectionChartWidget;
 use App\Filament\Widgets\PendingAdmissionsWidget;
 use App\Filament\Widgets\RecentEnquiriesWidget;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use Filament\Actions\Action;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Support\Icons\Heroicon;
@@ -22,9 +23,14 @@ use Illuminate\Contracts\Support\Htmlable;
 
 class Dashboard extends BaseDashboard
 {
-    protected static ?string $navigationLabel = 'Dashboard';
+    protected static ?string $navigationLabel = null;
 
     protected static ?int $navigationSort = -200;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::dashboard();
+    }
 
     public function getTitle(): string | Htmlable
     {

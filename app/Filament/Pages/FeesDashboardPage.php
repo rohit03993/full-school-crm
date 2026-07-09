@@ -7,6 +7,7 @@ use App\Enums\LicenseFeature;
 use App\Services\FeesDashboardService;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
 use Filament\Pages\Page;
@@ -19,9 +20,14 @@ class FeesDashboardPage extends Page
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 
-    protected static ?string $navigationLabel = 'Fees';
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $title = 'Fees dashboard';
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::fees();
+    }
 
     protected static ?int $navigationSort = 25;
 

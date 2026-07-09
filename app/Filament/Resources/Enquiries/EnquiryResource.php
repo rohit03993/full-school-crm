@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\LeadAssignmentService;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\MeetingForOptions;
 use Carbon\Carbon;
@@ -55,11 +56,16 @@ class EnquiryResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedInboxStack;
 
-    protected static ?string $navigationLabel = 'All Leads';
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $modelLabel = 'Lead';
 
     protected static ?string $pluralModelLabel = 'Leads';
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::leads();
+    }
 
     protected static ?string $recordTitleAttribute = 'enquiry_number';
 

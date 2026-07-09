@@ -53,11 +53,7 @@ class ActivityTypeResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedAdjustmentsHorizontal;
 
-    protected static ?string $navigationLabel = 'Exam Types';
-
-    protected static ?string $modelLabel = 'Exam Type';
-
-    protected static ?string $pluralModelLabel = 'Exam Types';
+    protected static ?string $navigationLabel = null;
 
     public static function getNavigationLabel(): string
     {

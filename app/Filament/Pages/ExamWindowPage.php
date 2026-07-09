@@ -11,6 +11,7 @@ use App\Services\ExamWindowService;
 use App\Support\ClassSectionLabel;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\FeatureGate;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -25,7 +26,7 @@ class ExamWindowPage extends Page
 {
     protected static bool $shouldRegisterNavigation = false;
 
-    protected static ?string $title = 'Exam window';
+    protected static ?string $title = null;
 
     protected static ?string $slug = 'exam-window';
 
@@ -69,7 +70,7 @@ class ExamWindowPage extends Page
 
     public function getTitle(): string
     {
-        return $this->window?->test_name ?? static::$title;
+        return $this->window?->test_name ?? 'Exam progress';
     }
 
     public function getSubheading(): ?string
@@ -81,7 +82,7 @@ class ExamWindowPage extends Page
     {
         return [
             Action::make('back')
-                ->label('All exam windows')
+                ->label('Back to '.CrmMenuLabels::createExam())
                 ->url(ExamWindowsPage::getUrl())
                 ->color('gray'),
         ];

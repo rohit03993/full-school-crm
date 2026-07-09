@@ -9,6 +9,7 @@ use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Services\MyLeadsService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavBadges;
 use App\Support\CrmNavigation;
 use App\Support\CrmPagination;
@@ -26,11 +27,21 @@ class MyLeadsPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
 
-    protected static ?string $navigationLabel = 'Assigned to Call';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Assigned to Call';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 30;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::myCallList();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::myCallList();
+    }
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_LEADS;
 

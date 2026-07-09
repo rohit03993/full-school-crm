@@ -4,7 +4,7 @@
 
 @if (! $rosterLoaded)
     <div class="mx-auto max-w-4xl rounded-xl bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10">
-        Open this page from <span class="font-semibold">Tests &amp; Exams</span> or an exam window.
+        Open this page from <span class="font-semibold">{{ \App\Support\CrmMenuLabels::examResults() }}</span> or {{ strtolower(\App\Support\CrmMenuLabels::createExam()) }}.
     </div>
 @elseif ($roster->isEmpty())
     <div class="mx-auto max-w-4xl rounded-xl bg-amber-50 px-4 py-8 text-center text-sm text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30">

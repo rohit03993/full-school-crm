@@ -14,6 +14,7 @@ use App\Models\HomeworkAssignment;
 use App\Models\WhatsAppTemplate;
 use App\Services\HomeworkAssignmentService;
 use App\Support\CrmAccess;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -53,11 +54,16 @@ class HomeworkAssignmentResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;
 
-    protected static ?string $navigationLabel = 'Homework';
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $modelLabel = 'Homework';
 
     protected static ?string $pluralModelLabel = 'Homework';
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::homework();
+    }
 
     protected static ?int $navigationSort = 45;
 

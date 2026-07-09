@@ -12,6 +12,7 @@ use App\Filament\Resources\ActivitySessions\Pages\EditActivitySession;
 use App\Filament\Resources\ActivitySessions\Pages\ListActivitySessions;
 use App\Filament\Support\CrmTable;
 use App\Models\ActivitySession;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\CrmAccess;
 use App\Support\EduExamLabels;
@@ -49,11 +50,7 @@ class ActivitySessionResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
-    protected static ?string $navigationLabel = 'Tests & Exams';
-
-    protected static ?string $modelLabel = 'Test / Exam';
-
-    protected static ?string $pluralModelLabel = 'Tests & Exams';
+    protected static ?string $navigationLabel = null;
 
     public static function getNavigationLabel(): string
     {
@@ -83,8 +80,8 @@ class ActivitySessionResource extends Resource
     {
         return $schema
             ->components([
-                Section::make('Test / Exam')
-                    ->description('For most tests, use Tests & Exams → Upload marks (Excel). Use this form only when entering one subject manually.')
+                Section::make('Exam')
+                    ->description('For most exams, use '.CrmMenuLabels::examResults().' → '.CrmMenuLabels::uploadMarksExcel().'. Use this form only to add one subject manually.')
                     ->schema(ActivitySessionFormSchema::fields())
                     ->columns(1),
             ]);

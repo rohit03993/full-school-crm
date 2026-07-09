@@ -10,6 +10,7 @@ use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Services\WhatsAppAnalyticsService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -32,11 +33,21 @@ class WhatsAppAnalyticsPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedChartBar;
 
-    protected static ?string $navigationLabel = 'Analytics & cost';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'WhatsApp analytics & cost';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 15;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::whatsAppUsage();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::whatsAppUsage();
+    }
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_META_WHATSAPP;
 

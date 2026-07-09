@@ -12,6 +12,7 @@ use App\Filament\Resources\Admissions\Pages\ListAdmissions;
 use App\Filament\Support\CrmTable;
 use App\Filament\Resources\Admissions\Pages\ViewAdmission;
 use App\Models\Admission;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Actions\Action;
 use Filament\Resources\Resource;
@@ -40,11 +41,16 @@ class AdmissionResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
 
-    protected static ?string $navigationLabel = 'Admissions';
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $modelLabel = 'Admission';
 
     protected static ?string $pluralModelLabel = 'Admissions';
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::admissions();
+    }
 
     protected static ?string $recordTitleAttribute = 'admission_number';
 

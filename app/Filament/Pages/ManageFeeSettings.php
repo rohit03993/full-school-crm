@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Enums\CrmPermission;
 use App\Enums\RoleName;
 use App\Filament\Concerns\RequiresCrmPermission;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeeSettings;
 use App\Services\OnlineAllowanceGstService;
@@ -34,9 +35,19 @@ class ManageFeeSettings extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedAdjustmentsHorizontal;
 
-    protected static ?string $navigationLabel = 'Fee Settings';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Fee settings';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::feeSettings();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::feeSettings();
+    }
 
     protected static ?int $navigationSort = 55;
 

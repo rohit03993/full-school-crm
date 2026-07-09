@@ -7,6 +7,8 @@ use App\Filament\Pages\ClassSectionsPage;
 use App\Filament\Pages\ExamWindowsPage;
 use App\Filament\Resources\AcademicSessions\AcademicSessionResource;
 use App\Models\AcademicSession;
+use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\InstituteOnboarding;
 use App\Support\InstituteSettings;
@@ -22,9 +24,19 @@ class InstituteSetup extends Page
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
-    protected static ?string $navigationLabel = 'Institute Setup';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Institute Setup';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::instituteSetup();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::instituteSetup();
+    }
 
     protected static ?int $navigationSort = 10;
 
@@ -84,7 +96,7 @@ class InstituteSetup extends Page
                 'icon' => 'heroicon-o-calendar-days',
             ],
             [
-                'label' => 'Exam windows',
+                'label' => CrmMenuLabels::createExam(),
                 'description' => 'Create unit tests and term exams from programme subjects.',
                 'url' => ExamWindowsPage::getUrl(),
                 'icon' => 'heroicon-o-clipboard-document-check',

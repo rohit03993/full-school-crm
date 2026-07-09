@@ -3,42 +3,47 @@
 namespace App\Support;
 
 /**
- * Education-friendly labels for exams, tests, and marks (replaces generic "Activity" wording).
+ * Education-friendly labels for exams, tests, and marks.
  */
 class EduExamLabels
 {
     public static function examType(): string
     {
-        return 'Exam Type';
+        return 'Exam type';
     }
 
     public static function examTypes(): string
     {
-        return 'Exam Types';
+        return CrmMenuLabels::examTypes();
     }
 
     public static function test(): string
     {
-        return 'Test / Exam';
+        return 'Exam';
     }
 
     public static function tests(): string
     {
-        return 'Tests & Exams';
+        return CrmMenuLabels::examResults();
+    }
+
+    public static function createExam(): string
+    {
+        return CrmMenuLabels::createExam();
     }
 
     public static function enterMarks(): string
     {
-        return 'Enter Marks';
+        return 'Enter marks';
     }
 
     public static function scheduleTest(): string
     {
-        return 'Schedule Test';
+        return 'Add one subject';
     }
 
     public static function markAttendancePageTitle(): string
     {
-        return 'Enter Test Marks';
+        return 'Enter marks';
     }
 }

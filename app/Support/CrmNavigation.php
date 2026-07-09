@@ -6,37 +6,37 @@ use Filament\Navigation\NavigationGroup;
 use Filament\Support\Icons\Heroicon;
 
 /**
- * Sidebar group names and order — keep menu paths in hints/docs aligned with these labels.
+ * Sidebar group names and order — keep menu paths in hints/docs aligned with {@see CrmMenuLabels}.
  *
- * Leads → Calls → WhatsApp → Students → Academics → Reports → Settings → Admin → Website
+ * Leads → Calls → WhatsApp → Students → Academics → Reports → Setup → Admin → Website
  */
 class CrmNavigation
 {
-    public const GROUP_LEADS = 'Leads & Enquiries';
+    public const GROUP_LEADS = CrmMenuLabels::GROUP_LEADS;
 
-    public const GROUP_CALLS = 'Calls';
+    public const GROUP_CALLS = CrmMenuLabels::GROUP_CALLS;
 
     public const GROUP_MESSAGING = 'Messaging';
 
     /** WhatsApp via Meta Cloud API — per-school credentials in this CRM's database. */
-    public const GROUP_META_WHATSAPP = 'WhatsApp';
+    public const GROUP_META_WHATSAPP = CrmMenuLabels::GROUP_WHATSAPP;
 
     public static function whatsAppMenu(string $item): string
     {
-        return self::GROUP_META_WHATSAPP.' → '.$item;
+        return CrmMenuLabels::whatsAppPath($item);
     }
 
-    public const GROUP_STUDENTS = 'Students & Admissions';
+    public const GROUP_STUDENTS = CrmMenuLabels::GROUP_STUDENTS;
 
-    public const GROUP_ACADEMICS = 'Academics';
+    public const GROUP_ACADEMICS = CrmMenuLabels::GROUP_ACADEMICS;
 
-    public const GROUP_REPORTS = 'Reports';
+    public const GROUP_REPORTS = CrmMenuLabels::GROUP_REPORTS;
 
-    public const GROUP_SETTINGS = 'Settings';
+    public const GROUP_SETTINGS = CrmMenuLabels::GROUP_SETTINGS;
 
-    public const GROUP_ADMIN = 'Administration';
+    public const GROUP_ADMIN = CrmMenuLabels::GROUP_ADMIN;
 
-    public const GROUP_WEBSITE = 'Website';
+    public const GROUP_WEBSITE = CrmMenuLabels::GROUP_WEBSITE;
 
     /**
      * @return array<int, NavigationGroup>

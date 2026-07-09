@@ -7,6 +7,7 @@ use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavBadges;
 use App\Support\CrmPagination;
 use App\Services\MyLeadsService;
@@ -26,11 +27,21 @@ class MyMeetingsPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentList;
 
-    protected static ?string $navigationLabel = 'Assigned To Me';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Assigned To Me';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = -199;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::myMeetings();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::myMeetings();
+    }
 
     protected static string|UnitEnum|null $navigationGroup = null;
 

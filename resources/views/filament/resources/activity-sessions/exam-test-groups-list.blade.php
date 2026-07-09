@@ -1,18 +1,21 @@
+@php
+    use App\Support\CrmMenuLabels;
+@endphp
 <div class="space-y-5">
     <div class="overflow-hidden rounded-2xl border border-primary-500/20 bg-gradient-to-r from-primary-500/5 to-white shadow-sm ring-1 ring-gray-950/5 dark:from-primary-500/10 dark:to-gray-900 dark:ring-white/10">
         <div class="px-4 py-5 sm:px-6">
-            <h2 class="text-base font-bold text-gray-950 dark:text-white">How test marks work</h2>
+            <h2 class="text-base font-bold text-gray-950 dark:text-white">How exams work</h2>
             <ol class="mt-3 grid gap-3 text-sm sm:grid-cols-4">
                 <li class="rounded-xl bg-white/80 px-3 py-3 ring-1 ring-gray-200 dark:bg-gray-900/80 dark:ring-white/10">
-                    <p class="text-[10px] font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400">Step 1 · Setup (once)</p>
+                    <p class="text-[10px] font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400">Step 1 · Create</p>
                     <p class="mt-1 text-gray-700 dark:text-gray-300">
-                        <strong>Exam windows</strong> — create a test from programme subjects (recommended for schools).
+                        <strong>{{ CrmMenuLabels::createExam() }}</strong> — pick section and exam name; mark sheets are created for every subject.
                     </p>
                 </li>
                 <li class="rounded-xl bg-white/80 px-3 py-3 ring-1 ring-gray-200 dark:bg-gray-900/80 dark:ring-white/10">
-                    <p class="text-[10px] font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400">Step 2 · Upload or enter</p>
+                    <p class="text-[10px] font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400">Step 2 · Enter marks</p>
                     <p class="mt-1 text-gray-700 dark:text-gray-300">
-                        <strong>Upload marks (Excel)</strong> or open an <strong>Exam window</strong> and enter marks per subject.
+                        Teachers enter marks per subject, or use <strong>{{ CrmMenuLabels::uploadMarksExcel() }}</strong> for a spreadsheet.
                     </p>
                 </li>
                 <li class="rounded-xl bg-white/80 px-3 py-3 ring-1 ring-gray-200 dark:bg-gray-900/80 dark:ring-white/10">

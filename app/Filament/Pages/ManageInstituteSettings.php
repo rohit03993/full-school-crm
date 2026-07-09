@@ -8,6 +8,7 @@ use App\Filament\Pages\ManageSiteContent as ManageSiteContentPage;
 use App\Services\InstituteSettingsService;
 use App\Services\SiteImageService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
@@ -40,9 +41,19 @@ class ManageInstituteSettings extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
 
-    protected static ?string $navigationLabel = 'Institute Settings';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Institute Settings';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::instituteSettings();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::instituteSettings();
+    }
 
     protected static ?int $navigationSort = 50;
 

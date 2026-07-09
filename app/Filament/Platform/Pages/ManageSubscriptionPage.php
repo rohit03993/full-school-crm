@@ -5,6 +5,7 @@ namespace App\Filament\Platform\Pages;
 use App\Enums\LicenseFeature;
 use App\Enums\LicensePlan;
 use App\Services\LicenseService;
+use App\Support\CrmMenuLabels;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
@@ -28,9 +29,19 @@ class ManageSubscriptionPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 
-    protected static ?string $navigationLabel = 'License & features';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Client license';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::license();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::license();
+    }
 
     protected static ?int $navigationSort = 1;
 

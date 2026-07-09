@@ -9,6 +9,7 @@ use App\Filament\Concerns\RequiresCrmPermission;
 use App\Models\Student;
 use App\Services\MetaWhatsAppConversationService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\MetaWhatsAppConversation;
 use Filament\Notifications\Notification;
@@ -35,11 +36,21 @@ class WhatsAppInboxPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedInbox;
 
-    protected static ?string $navigationLabel = 'Inbox';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'WhatsApp Inbox';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 12;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::whatsAppInbox();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::whatsAppInbox();
+    }
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_META_WHATSAPP;
 

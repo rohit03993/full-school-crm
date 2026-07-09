@@ -42,6 +42,7 @@ class StudentProfileAttendanceTabTest extends TestCase
             'attendance_date' => '2026-06-18',
             'status' => AttendanceStatus::Present,
             'punch_source' => 'biometric',
+            'marked_by_user_id' => $admin->id,
             'checked_in_at' => '2026-06-18 09:00:00',
             'checked_out_at' => '2026-06-18 17:00:00',
         ]);

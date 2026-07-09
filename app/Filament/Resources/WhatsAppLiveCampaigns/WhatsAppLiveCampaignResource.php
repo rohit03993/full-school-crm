@@ -13,6 +13,7 @@ use App\Filament\Support\CrmTable;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\WhatsAppLiveCampaign;
 use App\Services\WhatsAppIntegrationApiService;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -46,11 +47,16 @@ class WhatsAppLiveCampaignResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBolt;
 
-    protected static ?string $navigationLabel = 'Live campaigns';
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $modelLabel = 'Live API campaign';
 
     protected static ?string $pluralModelLabel = 'Live API campaigns';
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::whatsAppQuickCampaigns();
+    }
 
     protected static ?int $navigationSort = 18;
 

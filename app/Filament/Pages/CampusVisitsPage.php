@@ -8,6 +8,7 @@ use App\Services\InstituteVisitsService;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\CrmPagination;
 use Carbon\Carbon;
@@ -25,11 +26,21 @@ class CampusVisitsPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingStorefront;
 
-    protected static ?string $navigationLabel = 'Visit Log';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Visit Log';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 22;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::campusVisits();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::campusVisits();
+    }
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_LEADS;
 

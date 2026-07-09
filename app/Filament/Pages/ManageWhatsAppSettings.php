@@ -10,6 +10,7 @@ use App\Services\PalDigitalWhatsAppService;
 use App\Services\WhatsAppProviderResolver;
 use App\Services\WhatsAppSettingsService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\CrmNotification;
 use Filament\Actions\Action;
@@ -48,11 +49,21 @@ class ManageWhatsAppSettings extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCog8Tooth;
 
-    protected static ?string $navigationLabel = 'Automations';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'WhatsApp Automations';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 30;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::whatsAppAutomations();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::whatsAppAutomations();
+    }
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_META_WHATSAPP;
 

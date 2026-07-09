@@ -6,6 +6,7 @@ use App\Enums\RoleName;
 use App\Models\CustomFieldDefinition;
 use App\Services\CustomFieldService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Repeater;
@@ -31,9 +32,19 @@ class ManageCustomFields extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedAdjustmentsHorizontal;
 
-    protected static ?string $navigationLabel = 'Extra Student Fields';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Extra Student Fields';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::customFields();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::customFields();
+    }
 
     protected static ?int $navigationSort = 40;
 

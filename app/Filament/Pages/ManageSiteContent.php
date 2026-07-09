@@ -8,6 +8,7 @@ use App\Support\FeatureGate;
 use App\Services\SiteContentService;
 use App\Services\SiteImageService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\SiteLogo;
 use Filament\Actions\Action;
@@ -40,9 +41,19 @@ class ManageSiteContent extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedGlobeAlt;
 
-    protected static ?string $navigationLabel = 'Site Content';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Website Content';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::websiteContent();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::websiteContent();
+    }
 
     protected static ?int $navigationSort = 10;
 

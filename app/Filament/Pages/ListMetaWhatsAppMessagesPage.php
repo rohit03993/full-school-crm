@@ -7,6 +7,7 @@ use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Models\MetaWhatsAppMessage;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\CrmPagination;
 use Filament\Pages\Page;
@@ -33,11 +34,21 @@ class ListMetaWhatsAppMessagesPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedChatBubbleLeftRight;
 
-    protected static ?string $navigationLabel = 'Message log';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Meta message log';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 20;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::whatsAppMessageLog();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::whatsAppMessageLog();
+    }
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_META_WHATSAPP;
 

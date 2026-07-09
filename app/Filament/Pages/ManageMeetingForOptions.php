@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\RoleName;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\MeetingForOptions;
 use Filament\Actions\Action;
@@ -29,9 +30,19 @@ class ManageMeetingForOptions extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedListBullet;
 
-    protected static ?string $navigationLabel = 'Meeting for';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Meeting for options';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::meetingTypes();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::meetingTypes();
+    }
 
     protected static ?int $navigationSort = 35;
 

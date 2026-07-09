@@ -11,6 +11,7 @@ use App\Filament\Forms\EnquiryFormSchema;
 use App\Services\EnquiryService;
 use App\Services\StudentSearchService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\MeetingForOptions;
 use Filament\Actions\Action;
@@ -36,11 +37,21 @@ class StudentSearchPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedMagnifyingGlass;
 
-    protected static ?string $navigationLabel = 'Search Student';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Search Student';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 10;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::findStudent();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::findStudent();
+    }
 
     protected static string | UnitEnum | null $navigationGroup = CrmNavigation::GROUP_LEADS;
 

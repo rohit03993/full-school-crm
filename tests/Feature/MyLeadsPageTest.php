@@ -27,7 +27,7 @@ class MyLeadsPageTest extends TestCase
 
         Livewire::test(MyLeadsPage::class)
             ->assertOk()
-            ->assertSee('Assigned')
+            ->assertSee('My call list')
             ->assertSee('Uncalled')
             ->set('calledFilter', 'uncalled')
             ->assertOk();

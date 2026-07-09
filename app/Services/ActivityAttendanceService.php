@@ -8,6 +8,7 @@ use App\Models\ActivityType;
 use App\Models\BatchStudent;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\CrmMenuLabels;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -179,7 +180,7 @@ class ActivityAttendanceService
 
         if ($activityType->supportsScoring()) {
             throw ValidationException::withMessages([
-                'activity_type_id' => 'This type uses marks upload. Use Tests & Exams instead.',
+                'activity_type_id' => 'This type uses marks upload. Use '.CrmMenuLabels::examResults().' instead.',
             ]);
         }
 

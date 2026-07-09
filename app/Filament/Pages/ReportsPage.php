@@ -19,6 +19,7 @@ use App\Services\ReportService;
 use App\Exports\ReportExport;
 use App\Support\ReportCsvExporter;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\InstituteProfile;
 use Maatwebsite\Excel\Facades\Excel;
@@ -45,9 +46,19 @@ class ReportsPage extends Page
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentChartBar;
 
-    protected static ?string $navigationLabel = 'Reports';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Reports';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::reports();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::reports();
+    }
 
     protected static ?int $navigationSort = 10;
 

@@ -1,6 +1,6 @@
 @if (! is_array($markSheet))
     <div class="rounded-xl bg-gray-50 px-4 py-10 text-center text-sm text-gray-600 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10">
-        Test not found. Go back to Tests &amp; Exams and choose <strong>View sheet</strong>.
+        Test not found. Go back to {{ \App\Support\CrmMenuLabels::examResults() }} and choose <strong>View sheet</strong>.
     </div>
 @else
     @php

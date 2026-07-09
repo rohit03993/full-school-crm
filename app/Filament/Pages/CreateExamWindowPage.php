@@ -11,6 +11,7 @@ use App\Services\ExamWindowService;
 use App\Support\BatchSelectOptions;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\FeatureGate;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -40,9 +41,14 @@ class CreateExamWindowPage extends Page
 
     protected static bool $shouldRegisterNavigation = false;
 
-    protected static ?string $title = 'Create exam window';
+    protected static ?string $title = null;
 
     protected static ?string $slug = 'create-exam-window';
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::createExam();
+    }
 
     /**
      * @var array<string, mixed>|null

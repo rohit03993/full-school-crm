@@ -8,6 +8,7 @@ use App\Services\FollowUpWorklistService;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
@@ -21,11 +22,21 @@ class FollowUpsPage extends Page
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBellAlert;
 
-    protected static ?string $navigationLabel = 'Follow-ups';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Follow-ups';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 40;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::followUps();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::followUps();
+    }
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_LEADS;
 

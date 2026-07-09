@@ -11,6 +11,7 @@ use App\Models\Batch;
 use App\Models\Course;
 use App\Services\FeeMiscChargeService;
 use App\Support\CrmAccess;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
 use App\Support\InstituteProfile;
@@ -32,9 +33,14 @@ class BulkMiscChargePage extends Page
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $navigationLabel = 'Bulk misc charges';
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $title = 'Add misc charge in bulk';
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::bulkMiscCharges();
+    }
 
     protected static ?int $navigationSort = 26;
 

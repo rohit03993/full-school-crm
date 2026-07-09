@@ -14,6 +14,7 @@ use App\Models\ExamWindow;
 use App\Models\ExamWindowSubject;
 use App\Models\User;
 use App\Support\CrmAccess;
+use App\Support\CrmMenuLabels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -186,7 +187,7 @@ class ExamWindowService
 
         if ($window->status !== ExamWindowStatus::Approved) {
             throw ValidationException::withMessages([
-                'status' => 'Approve the exam window before publishing results. Open Exam windows from Academics.',
+                'status' => 'Approve the exam before publishing results. Open '.CrmMenuLabels::createExam().' from Academics.',
             ]);
         }
     }

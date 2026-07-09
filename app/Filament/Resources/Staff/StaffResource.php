@@ -11,6 +11,7 @@ use App\Filament\Resources\Staff\Pages\EditStaff;
 use App\Filament\Resources\Staff\Pages\ListStaff;
 use App\Filament\Support\CrmTable;
 use App\Models\User;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
@@ -43,11 +44,16 @@ class StaffResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
 
-    protected static ?string $navigationLabel = 'Staff';
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $modelLabel = 'Staff Member';
 
     protected static ?string $pluralModelLabel = 'Staff';
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::staff();
+    }
 
     protected static ?string $recordTitleAttribute = 'name';
 

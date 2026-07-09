@@ -11,6 +11,7 @@ use App\Support\FeatureGate;
 use App\Services\CallLogService;
 use App\Services\CallQueueService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -26,11 +27,21 @@ class CallQueuePage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedPhone;
 
-    protected static ?string $navigationLabel = 'Call Queue';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Call Queue';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 10;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::callQueue();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::callQueue();
+    }
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_CALLS;
 

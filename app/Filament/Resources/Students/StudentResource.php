@@ -14,6 +14,7 @@ use App\Models\AcademicSession;
 use App\Models\Course;
 use App\Models\Student;
 use App\Services\FeesDashboardService;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
 use App\Support\InstituteProfile;
@@ -41,11 +42,16 @@ class StudentResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
-    protected static ?string $navigationLabel = 'All Students';
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $modelLabel = 'Student';
 
     protected static ?string $pluralModelLabel = 'Students';
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::students();
+    }
 
     protected static ?string $recordTitleAttribute = 'name';
 

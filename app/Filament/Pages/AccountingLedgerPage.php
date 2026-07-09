@@ -6,6 +6,7 @@ use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Services\AccountingLedgerService;
 use App\Support\CrmAccess;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
 use Filament\Pages\Page;
@@ -19,9 +20,19 @@ class AccountingLedgerPage extends Page
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCalculator;
 
-    protected static ?string $navigationLabel = 'Accounting ledger';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Accounting ledger';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::feeLedger();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::feeLedger();
+    }
 
     protected static ?int $navigationSort = 26;
 

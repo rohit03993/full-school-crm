@@ -18,6 +18,7 @@ use App\Services\ActivityMarksBulkImportService;
 use App\Services\ActivityMarksImportColumnMapper;
 use App\Services\ActivityMarksWhatsAppService;
 use App\Services\StudentImportFileReader;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\EduExamLabels;
 use App\Support\ExamSubjectCatalog;
@@ -43,9 +44,19 @@ class BulkActivityMarksImportPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedTableCells;
 
-    protected static ?string $navigationLabel = 'Import Marks';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Upload marks';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::uploadMarksExcel();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::uploadMarksExcel();
+    }
 
     protected static ?int $navigationSort = 55;
 

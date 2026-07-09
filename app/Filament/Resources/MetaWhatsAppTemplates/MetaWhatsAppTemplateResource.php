@@ -12,6 +12,7 @@ use App\Filament\Support\CrmTable;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\WhatsAppTemplate;
 use App\Services\WhatsAppTemplateParamResolver;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\MetaWhatsAppTemplateBuilder;
 use App\Support\MetaWhatsAppTemplateVariableHelper;
@@ -52,11 +53,16 @@ class MetaWhatsAppTemplateResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
-    protected static ?string $navigationLabel = 'Templates';
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $modelLabel = 'WhatsApp Template';
 
     protected static ?string $pluralModelLabel = 'WhatsApp Templates';
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::whatsAppTemplates();
+    }
 
     protected static ?int $navigationSort = 15;
 

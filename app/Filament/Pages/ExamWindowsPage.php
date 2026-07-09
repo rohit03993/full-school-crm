@@ -9,6 +9,7 @@ use App\Models\ExamWindow;
 use App\Support\ClassSectionLabel;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\CrmPagination;
 use App\Support\FeatureGate;
@@ -27,15 +28,25 @@ class ExamWindowsPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
 
-    protected static ?string $navigationLabel = 'Exam windows';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Exam windows';
+    protected static ?string $title = null;
 
     protected static ?string $slug = 'exam-windows';
 
     protected static ?int $navigationSort = 25;
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_ACADEMICS;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::createExam();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::createExam();
+    }
 
     public string $search = '';
 

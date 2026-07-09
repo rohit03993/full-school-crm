@@ -6,6 +6,7 @@ use App\Services\BatchStaffAssignmentService;
 use App\Services\ExamWindowService;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -16,9 +17,19 @@ class MyTeachingAssignmentsPage extends Page
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedAcademicCap;
 
-    protected static ?string $navigationLabel = 'My classes';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'My classes';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::myClasses();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::myClasses();
+    }
 
     protected static ?int $navigationSort = -198;
 

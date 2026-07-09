@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Enums\RoleName;
 use App\Services\Punch\AttendanceBiometricStatusService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
@@ -17,9 +18,19 @@ class ManageAttendanceBiometricPage extends Page
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedFingerPrint;
 
-    protected static ?string $navigationLabel = 'Biometric Attendance';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Biometric Attendance Setup';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::biometricSetup();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::biometricSetup();
+    }
 
     protected static ?int $navigationSort = 58;
 

@@ -20,6 +20,7 @@ use App\Services\WhatsAppCampaignService;
 use App\Services\WhatsAppTemplateCatalog;
 use App\Support\WhatsAppCampaignFormHelper;
 use App\Support\WhatsAppCampaignViewHelper;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\InstituteProfile;
 use Filament\Forms\Components\Placeholder;
@@ -56,11 +57,16 @@ class WhatsAppCampaignResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedMegaphone;
 
-    protected static ?string $navigationLabel = 'WhatsApp Campaigns';
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $modelLabel = 'WhatsApp Campaign';
 
     protected static ?string $pluralModelLabel = 'WhatsApp Campaigns';
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::whatsAppBulkCampaigns();
+    }
 
     protected static ?int $navigationSort = 25;
 

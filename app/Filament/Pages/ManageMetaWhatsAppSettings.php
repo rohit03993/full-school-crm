@@ -10,6 +10,7 @@ use App\Services\MetaWhatsAppService;
 use App\Services\MetaWhatsAppSettingsService;
 use App\Services\MetaWhatsAppTemplateSyncService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\CrmNotification;
 use Filament\Actions\Action;
@@ -47,11 +48,21 @@ class ManageMetaWhatsAppSettings extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedDevicePhoneMobile;
 
-    protected static ?string $navigationLabel = 'Connection & Setup';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Connection & Setup';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 10;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::whatsAppSetup();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::whatsAppSetup();
+    }
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_META_WHATSAPP;
 

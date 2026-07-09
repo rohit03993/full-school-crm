@@ -11,6 +11,7 @@ use App\Filament\Resources\ActivityTypes\ActivityTypeResource;
 use App\Models\ActivityType;
 use App\Models\Batch;
 use App\Services\ResultDeclarationService;
+use App\Support\CrmMenuLabels;
 use App\Support\ExamTestGroupMatrix;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
@@ -25,11 +26,16 @@ class ListActivitySessions extends ListRecords
 
     protected static string $resource = ActivitySessionResource::class;
 
-    protected static ?string $title = 'Tests & Exams';
+    protected static ?string $title = null;
 
     protected static function crmHintKey(): ?string
     {
         return 'activity.sessions.list';
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::examResults();
     }
 
     public ?int $batchFilter = null;
@@ -80,7 +86,7 @@ class ListActivitySessions extends ListRecords
 
         if (BulkActivityMarksImportPage::canAccess()) {
             $actions[] = Action::make('uploadMarks')
-                ->label('Upload marks (Excel)')
+                ->label(CrmMenuLabels::uploadMarksExcel())
                 ->icon(Heroicon::OutlinedArrowUpTray)
                 ->color('primary')
                 ->url(BulkActivityMarksImportPage::getUrl());
@@ -88,7 +94,7 @@ class ListActivitySessions extends ListRecords
 
         if (ExamWindowsPage::canAccess()) {
             $actions[] = Action::make('examWindows')
-                ->label('Exam windows')
+                ->label(CrmMenuLabels::createExam())
                 ->icon(Heroicon::OutlinedClipboardDocumentCheck)
                 ->color('success')
                 ->url(ExamWindowsPage::getUrl())

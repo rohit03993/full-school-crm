@@ -15,6 +15,7 @@ use App\Services\StudentImportFileReader;
 use App\Support\BatchSelectOptions;
 use App\Support\StudentImportFields;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -38,9 +39,19 @@ class BulkStudentImportPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowUpTray;
 
-    protected static ?string $navigationLabel = 'Import Students';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Import Enrolled Students';
+    protected static ?string $title = null;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::importStudents();
+    }
+
+    public function getTitle(): string
+    {
+        return CrmMenuLabels::importStudents();
+    }
 
     protected static ?int $navigationSort = 30;
 

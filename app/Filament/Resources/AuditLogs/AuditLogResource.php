@@ -6,6 +6,7 @@ use App\Enums\RoleName;
 use App\Filament\Resources\AuditLogs\Pages\ListAuditLogs;
 use App\Filament\Support\CrmTable;
 use App\Models\AuditLog;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
@@ -26,11 +27,16 @@ class AuditLogResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentList;
 
-    protected static ?string $navigationLabel = 'Audit Log';
+    protected static ?string $navigationLabel = null;
 
     protected static ?string $modelLabel = 'Audit entry';
 
     protected static ?string $pluralModelLabel = 'Audit log';
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::auditLog();
+    }
 
     protected static ?int $navigationSort = 20;
 
