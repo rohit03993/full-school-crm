@@ -167,4 +167,37 @@ class AdjustFeeStructureFormSchemaTest extends TestCase
         $this->assertSame(2000.0, $rows[0]['amount']);
         $this->assertSame('2026-08-01', $rows[0]['due_date']);
     }
+
+    public function test_locked_installments_summary_includes_partially_paid_rows(): void
+    {
+        $feeStructure = new FeeStructure([
+            'course_fee' => 100000,
+            'discount_amount' => 0,
+            'net_fee' => 100000,
+            'paid_amount' => 15000,
+            'pending_amount' => 85000,
+        ]);
+
+        $feeStructure->setRelation('installments', new Collection([
+            new FeeInstallment([
+                'label' => 'Installment 1',
+                'amount' => 50000,
+                'paid_amount' => 15000,
+                'pending_amount' => 35000,
+                'sort_order' => 1,
+            ]),
+            new FeeInstallment([
+                'label' => 'Installment 2',
+                'amount' => 50000,
+                'paid_amount' => 50000,
+                'pending_amount' => 0,
+                'sort_order' => 2,
+            ]),
+        ]));
+
+        $summary = AdjustFeeStructureFormSchema::lockedInstallmentsSummary($feeStructure);
+
+        $this->assertStringContainsString('still due', $summary);
+        $this->assertStringContainsString('paid ₹50,000', $summary);
+    }
 }

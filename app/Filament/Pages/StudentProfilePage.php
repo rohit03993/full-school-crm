@@ -20,6 +20,7 @@ use App\Models\Batch;
 use App\Filament\Concerns\HandlesCloseMeetingModal;
 use App\Filament\Concerns\HandlesLogCallModal;
 use App\Filament\Forms\AdjustFeeStructureFormSchema;
+use App\Filament\Forms\AdmissionFeePlanFormSchema;
 use App\Filament\Forms\AddPaymentFormSchema;
 use App\Filament\Forms\ConvertToAdmissionFormSchema;
 use App\Filament\Forms\EnquiryFormSchema;
@@ -1065,7 +1066,16 @@ class StudentProfilePage extends Page
 
     public function getCanManageAdmissionFeePlanProperty(): bool
     {
-        return false;
+        if (! $this->licensed(LicenseFeature::Fees) || ! $this->userCan(CrmPermission::FeesAdjustStructure)) {
+            return false;
+        }
+
+        $admission = $this->activeAdmission ?? $this->record->admissions()
+            ->whereDoesntHave('enrollment')
+            ->latest()
+            ->first();
+
+        return (bool) $admission?->canAdjustFees();
     }
 
     public function saveAdmissionFeePlan(AdmissionService $admissions): void
@@ -1808,12 +1818,26 @@ class StudentProfilePage extends Page
                     if (! $course || (float) $course->fee <= 0) {
                         Notification::make()
                             ->title('Course fee not set')
-                            ->body('Update the fee for this course in Courses admin before converting.')
+                            ->body('Update the fee for this course in Classes admin before converting.')
                             ->danger()
                             ->send();
 
                         $action->halt();
                     }
+                })
+                ->modalSubmitAction(function (Action $action): Action {
+                    return $action->disabled(function (): bool {
+                        $mounted = $this->mountedActionsData[0] ?? [];
+
+                        if (! is_array($mounted)) {
+                            return true;
+                        }
+
+                        $courseId = (int) ($mounted['course_id'] ?? 0);
+                        $course = \App\Models\Course::query()->find($courseId);
+
+                        return ! $course || (float) $course->fee <= 0;
+                    });
                 })
                 ->action(function (array $data, ConvertToAdmissionPresenter $presenter, AdmissionService $admissions): void {
                     $convertible = $presenter->convertibleEnquiries($this->record);
@@ -1849,6 +1873,105 @@ class StudentProfilePage extends Page
                 ->visible(fn (ConvertToAdmissionPresenter $presenter): bool => $this->licensed(LicenseFeature::Admissions)
                     && $this->userCan(CrmPermission::AdmissionsView)
                     && $presenter->convertibleEnquiries($this->record)->isNotEmpty()),
+            Action::make('setAdmissionFeePlan')
+                ->label('Set fee plan')
+                ->icon('heroicon-o-banknotes')
+                ->button()
+                ->color('warning')
+                ->outlined()
+                ->modalHeading('Admission fee plan')
+                ->modalDescription('Set discount, misc charges, and installments before approval. Amounts must total the net fee.')
+                ->modalWidth('2xl')
+                ->fillForm(function (): array {
+                    $this->loadAdmissionTab();
+                    $admission = $this->activeAdmission ?? $this->record->admissions()
+                        ->whereDoesntHave('enrollment')
+                        ->with(['enquiry.course', 'miscFees', 'installmentPlans'])
+                        ->latest()
+                        ->first();
+
+                    if (! $admission) {
+                        return [];
+                    }
+
+                    return AdmissionFeePlanFormSchema::initialStateForAdmission($admission);
+                })
+                ->form(function (): array {
+                    $this->loadAdmissionTab();
+                    $admission = $this->activeAdmission ?? $this->record->admissions()
+                        ->whereDoesntHave('enrollment')
+                        ->with(['enquiry.course', 'miscFees', 'installmentPlans'])
+                        ->latest()
+                        ->first();
+
+                    if (! $admission) {
+                        return [];
+                    }
+
+                    return AdmissionFeePlanFormSchema::fieldsForAdmission($admission);
+                })
+                ->extraModalFooterActions([
+                    Action::make('fillAdmissionInstallmentBalance')
+                        ->label('Fill balance on last row')
+                        ->color('gray')
+                        ->action(function (Action $action): void {
+                            $livewire = $action->getLivewire();
+                            $mounted = $livewire->mountedActionsData[0] ?? [];
+
+                            if (! is_array($mounted)) {
+                                return;
+                            }
+
+                            $net = AdmissionFeePlanFormSchema::resolveNetFeeFromArray($mounted);
+                            $plan = $mounted['installment_plan'] ?? [];
+
+                            if ($plan === [] || $net <= 0) {
+                                return;
+                            }
+
+                            $livewire->mountedActionsData[0]['installment_plan'] = FeePlanCalculator::fillBalanceOnLastRow($plan, $net);
+                            $livewire->mountedActionsData[0]['use_installment_plan'] = true;
+                        }),
+                ])
+                ->modalSubmitAction(function (Action $action): Action {
+                    return $action
+                        ->label('Save fee plan')
+                        ->disabled(function (): bool {
+                            $mounted = $this->mountedActionsData[0] ?? [];
+
+                            if (! is_array($mounted)) {
+                                return true;
+                            }
+
+                            if ((float) ($this->activeAdmission?->course_fee ?? $this->record->admissions()->latest()->value('course_fee') ?? 0) <= 0) {
+                                return true;
+                            }
+
+                            return ! FeePlanSubmissionGuard::canSubmitConvert($mounted);
+                        });
+                })
+                ->before(function (array $data, Action $action): void {
+                    FeePlanSubmissionGuard::assertConvertable($data, $action);
+                })
+                ->action(function (array $data, AdmissionService $admissions): void {
+                    abort_unless($this->canManageAdmissionFeePlan, 403);
+                    $this->loadAdmissionTab();
+
+                    if (! $this->activeAdmission) {
+                        return;
+                    }
+
+                    $this->activeAdmission = $admissions->updateFeePlan($this->activeAdmission, $data, Auth::user());
+                    $this->admissionTabLoaded = false;
+                    $this->loadAdmissionTab();
+
+                    Notification::make()
+                        ->title('Fee plan saved')
+                        ->body('Net fee is now ₹'.$this->admissionNetFee.'.')
+                        ->success()
+                        ->send();
+                })
+                ->visible(fn (): bool => $this->canManageAdmissionFeePlan),
             Action::make('assignBatch')
                 ->label('Assign Batch')
                 ->icon('heroicon-o-user-group')

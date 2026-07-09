@@ -13,11 +13,19 @@
     </dl>
 
     <div class="mt-4 rounded-xl border border-primary-500/20 bg-primary-500/5 px-4 py-3 text-sm text-primary-950 dark:text-primary-100">
-        <p class="font-semibold">Fees are managed after enrollment</p>
-        <p class="mt-1 text-primary-900/80 dark:text-primary-100/80">
-            Discount, installments, misc charges, and cash/online split are set from
-            <strong>Adjust Fees</strong> on the student profile once admission is approved.
-        </p>
+        @if ($activeAdmission->canAdjustFees())
+            <p class="font-semibold">Set the fee plan before approval</p>
+            <p class="mt-1 text-primary-900/80 dark:text-primary-100/80">
+                Use <strong>Set fee plan</strong> on the profile header to add discount, installments, and misc charges.
+                After approval, use <strong>Adjust Fees</strong> on the Fees tab.
+            </p>
+        @else
+            <p class="font-semibold">Fees are managed after enrollment</p>
+            <p class="mt-1 text-primary-900/80 dark:text-primary-100/80">
+                Discount, installments, misc charges, and cash/online split are set from
+                <strong>Adjust Fees</strong> on the student profile once admission is approved.
+            </p>
+        @endif
     </div>
 
     @if ($activeAdmission->miscFees->isNotEmpty() || ($activeAdmission->use_installment_plan && $activeAdmission->installmentPlans->isNotEmpty()))

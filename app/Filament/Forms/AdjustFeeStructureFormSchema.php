@@ -174,9 +174,9 @@ class AdjustFeeStructureFormSchema
                                 ->extraAttributes(['class' => 'text-sm font-medium text-amber-700 dark:text-amber-300'])
                                 ->columnSpanFull(),
                             Placeholder::make('paid_installments_snapshot')
-                                ->label('Settled installments')
-                                ->content(fn (): HtmlString => new HtmlString(self::paidInstallmentsHtml($feeStructure)))
-                                ->visible(fn (): bool => self::paidInstallmentsSummary($feeStructure) !== '')
+                                ->label('Settled installments (read-only)')
+                                ->content(fn (): HtmlString => new HtmlString(self::lockedInstallmentsHtml($feeStructure)))
+                                ->visible(fn (): bool => self::lockedInstallmentsSummary($feeStructure) !== '')
                                 ->columnSpanFull(),
                             Placeholder::make('installment_allocation_summary')
                                 ->label('Allocation')
@@ -504,25 +504,47 @@ class AdjustFeeStructureFormSchema
 
     public static function paidInstallmentsSummary(FeeStructure $feeStructure): string
     {
+        return self::lockedInstallmentsSummary($feeStructure, settledOnly: true);
+    }
+
+    public static function lockedInstallmentsSummary(FeeStructure $feeStructure, bool $settledOnly = false): string
+    {
         $feeStructure->loadMissing('installments');
 
         $lines = $feeStructure->installments
-            ->filter(fn ($row): bool => (float) $row->paid_amount > 0 && (float) $row->pending_amount <= 0.01)
+            ->filter(function ($row) use ($settledOnly): bool {
+                $paid = (float) $row->paid_amount;
+                $pending = (float) $row->pending_amount;
+
+                if ($settledOnly) {
+                    return $paid > 0 && $pending <= 0.01;
+                }
+
+                return $paid > 0;
+            })
             ->sortBy(fn ($row): array => [
                 $row->due_date?->toDateString() ?? '0000-01-01',
                 $row->sort_order,
                 $row->id,
             ])
-            ->map(function ($row): string {
+            ->map(function ($row) use ($settledOnly): string {
                 $due = $row->due_date?->format('d M Y') ?? 'TBD';
                 $label = FeePlanCalculator::displayInstallmentLabel((string) $row->label, (int) $row->sort_order);
+                $paid = FeePlanCalculator::formatRupeeAmount((float) $row->paid_amount);
+                $total = FeePlanCalculator::formatRupeeAmount((float) $row->amount);
+                $pending = round((float) $row->pending_amount, 2);
+
+                if ($settledOnly || $pending <= 0.01) {
+                    return sprintf('%s — due %s — paid ₹%s of ₹%s', $label, $due, $paid, $total);
+                }
 
                 return sprintf(
-                    '%s — due %s — paid ₹%s of ₹%s',
+                    '%s — due %s — paid ₹%s of ₹%s · ₹%s still due (edit pending rows below)',
                     $label,
                     $due,
-                    FeePlanCalculator::formatRupeeAmount((float) $row->paid_amount),
-                    FeePlanCalculator::formatRupeeAmount((float) $row->amount),
+                    $paid,
+                    $total,
+                    FeePlanCalculator::formatRupeeAmount($pending),
                 );
             })
             ->values()
@@ -533,7 +555,12 @@ class AdjustFeeStructureFormSchema
 
     public static function paidInstallmentsHtml(FeeStructure $feeStructure): string
     {
-        $summary = self::paidInstallmentsSummary($feeStructure);
+        return self::lockedInstallmentsHtml($feeStructure, settledOnly: true);
+    }
+
+    public static function lockedInstallmentsHtml(FeeStructure $feeStructure, bool $settledOnly = false): string
+    {
+        $summary = self::lockedInstallmentsSummary($feeStructure, $settledOnly);
 
         if ($summary === '') {
             return '';

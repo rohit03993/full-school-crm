@@ -69,6 +69,11 @@ class FeePlanSubmissionGuard
      */
     public static function canSubmitAdjustFees(array $data, FeeStructure $feeStructure): bool
     {
+        if (AdjustFeeStructureFormSchema::requiresReasonFromMounted($feeStructure, $data)
+            && trim((string) ($data['reason'] ?? '')) === '') {
+            return false;
+        }
+
         $feeStructure->loadMissing('miscCharges');
         $miscTotal = $feeStructure->miscChargesTotal();
         $previousNet = round((float) ($feeStructure->net_fee ?? max(

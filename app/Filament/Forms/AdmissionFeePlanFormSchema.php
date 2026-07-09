@@ -2,6 +2,7 @@
 
 namespace App\Filament\Forms;
 
+use App\Models\Admission;
 use App\Models\Course;
 use App\Support\FeePlanCalculator;
 use App\Support\FeeSettings;
@@ -9,6 +10,7 @@ use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Field;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\TextInput;
@@ -17,6 +19,67 @@ use Filament\Schemas\Components\Utilities\Get;
 
 class AdmissionFeePlanFormSchema
 {
+    /**
+     * Fee plan fields for pre-enrollment admission (student profile modal).
+     *
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    public static function fieldsForAdmission(Admission $admission): array
+    {
+        $admission->loadMissing(['enquiry.course', 'miscFees', 'installmentPlans']);
+        $courseFee = round((float) $admission->course_fee, 2);
+
+        return [
+            Hidden::make('course_id')
+                ->default($admission->enquiry?->course_id),
+            Placeholder::make('admission_course_fee_display')
+                ->label('Course fee')
+                ->content('₹'.number_format($courseFee, 2))
+                ->columnSpanFull(),
+            Placeholder::make('course_fee_zero_warning')
+                ->label('')
+                ->content('This course has ₹0 fee. Set the fee in Classes admin before saving a fee plan.')
+                ->visible($courseFee <= 0)
+                ->extraAttributes(['class' => 'text-sm font-medium text-danger-600 dark:text-danger-400'])
+                ->columnSpanFull(),
+            TextInput::make('discount_amount')
+                ->label('Discount (₹)')
+                ->numeric()
+                ->minValue(0)
+                ->maxValue($courseFee > 0 ? $courseFee : null)
+                ->step(0.01)
+                ->default((float) $admission->discount_amount)
+                ->live(debounce: 300)
+                ->columnSpanFull(),
+            ...self::fields(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function initialStateForAdmission(Admission $admission): array
+    {
+        $admission->loadMissing(['enquiry.course', 'miscFees', 'installmentPlans']);
+
+        return [
+            'course_id' => $admission->enquiry?->course_id,
+            'discount_amount' => (float) $admission->discount_amount,
+            'misc_fees' => $admission->miscFees->map(fn ($row): array => [
+                'label' => $row->label,
+                'amount' => (string) $row->amount,
+            ])->values()->all(),
+            'use_installment_plan' => (bool) $admission->use_installment_plan,
+            'installment_plan' => $admission->installmentPlans->map(fn ($row): array => [
+                'label' => $row->label,
+                'amount' => (string) $row->amount,
+                'due_date' => $row->due_date?->toDateString(),
+            ])->values()->all(),
+            'planned_cash_amount' => $admission->planned_cash_amount,
+            'planned_online_amount' => $admission->planned_online_amount,
+        ];
+    }
+
     /**
      * @return array<int, \Filament\Forms\Components\Component>
      */
@@ -41,10 +104,7 @@ class AdmissionFeePlanFormSchema
                 ->columns(2)
                 ->columnSpanFull()
                 ->defaultItems(0)
-                ->live()
-                ->afterStateUpdated(function (mixed $state, callable $set, Get $get): void {
-                    ConvertToAdmissionFormSchema::syncFeeDisplays($set, $get('course_id'), $get('discount_amount'), $state);
-                }),
+                ->live(),
             ...self::onlineAllowanceFields(),
             Toggle::make('use_installment_plan')
                 ->label('Split into installments')
@@ -231,23 +291,44 @@ class AdmissionFeePlanFormSchema
     }
 
     /**
-     * @return array<int, \Filament\Forms\Components\Field>
+     * @return array<int, Field>
      */
-    public static function installmentRowSchemaForRepeater(Closure $resolveTarget): array
+    public static function installmentRowSchemaForRepeater(Closure $resolveTarget, bool $wholeRupeesOnly = false): array
     {
         $schema = self::installmentRowSchema();
 
         foreach ($schema as $field) {
-            if ($field->getName() !== 'amount') {
+            if ($field->getName() === 'amount') {
+                if ($wholeRupeesOnly) {
+                    $field
+                        ->minValue(1)
+                        ->step(1)
+                        ->placeholder('Whole rupees');
+                }
+
+                $field->afterStateUpdated(function (mixed $state, Field $component) use ($resolveTarget): void {
+                    self::autoFillEmptyRowInRepeater($component, $resolveTarget);
+                });
+
                 continue;
             }
 
-            $field->afterStateUpdated(function (mixed $state, Field $component) use ($resolveTarget): void {
-                self::autoFillEmptyRowInRepeater($component, $resolveTarget);
-            });
+            if ($field->getName() === 'due_date') {
+                $field->helperText('First row defaults to today; each new row is +1 month from the previous due date.');
+            }
         }
 
         return $schema;
+    }
+
+    /**
+     * Adjust-fees modal: whole rupee amounts with allocation helpers.
+     */
+    public static function configureAdjustFeeInstallmentRepeater(Repeater $repeater, Closure $resolveTarget): Repeater
+    {
+        return self::configureInstallmentRepeater($repeater, $resolveTarget)
+            ->schema(self::installmentRowSchemaForRepeater($resolveTarget, wholeRupeesOnly: true))
+            ->helperText('New rows default to the remaining balance and the next due date (+1 month). One empty row auto-fills the remaining balance.');
     }
 
     public static function configureInstallmentRepeater(Repeater $repeater, Closure $resolveTarget): Repeater
@@ -263,55 +344,6 @@ class AdmissionFeePlanFormSchema
                     $existing = array_values($component->getState() ?? []);
                     $target = $resolveTarget($component);
                     $newRow = FeePlanCalculator::newInstallmentRow($existing, $target, count($existing));
-
-                    if ($newUuid) {
-                        $items[$newUuid] = $newRow;
-                    } else {
-                        $items[] = $newRow;
-                    }
-
-                    $component->rawState($items);
-                    $component->collapsed(false, shouldMakeComponentCollapsible: false);
-                    $component->callAfterStateUpdated();
-                    $component->shouldPartiallyRenderAfterActionsCalled() ? $component->partiallyRender() : null;
-                });
-            });
-    }
-
-    /**
-     * Adjust-fees modal: whole rupee amounts, manual entry, allocation shown separately.
-     */
-    public static function configureAdjustFeeInstallmentRepeater(Repeater $repeater, Closure $resolveTarget): Repeater
-    {
-        return $repeater
-            ->schema([
-                TextInput::make('label')
-                    ->required()
-                    ->maxLength(100)
-                    ->placeholder('Installment 1'),
-                TextInput::make('amount')
-                    ->label('Amount (₹)')
-                    ->numeric()
-                    ->minValue(1)
-                    ->step(1)
-                    ->placeholder('Whole rupees'),
-                DatePicker::make('due_date')
-                    ->label('Due date')
-                    ->native(false)
-                    ->live()
-                    ->afterStateUpdated(function (DatePicker $component): void {
-                        self::resortInstallmentRepeater($component);
-                    }),
-            ])
-            ->helperText('Enter whole rupee amounts yourself. The allocation line above shows what is left or if you entered too much.')
-            ->addActionLabel('Add row')
-            ->addAction(function (Action $action) use ($resolveTarget): Action {
-                return $action->action(function (Repeater $component) use ($resolveTarget): void {
-                    $newUuid = $component->generateUuid();
-                    $items = $component->getRawState();
-                    $existing = array_values($component->getState() ?? []);
-                    $target = $resolveTarget($component);
-                    $newRow = FeePlanCalculator::newInstallmentRow($existing, $target, count($existing), false);
 
                     if ($newUuid) {
                         $items[$newUuid] = $newRow;
