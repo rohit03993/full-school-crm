@@ -114,13 +114,10 @@
                 <h2 class="text-base font-semibold text-gray-950 dark:text-white">Recent journal entries</h2>
                 <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Fee receipts show as credit (money received). Late-fee accruals show debit and credit.</p>
             </div>
-            @if ($presentedEntries->isEmpty())
-                <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">No entries in this period.</p>
-            @else
-                <div class="divide-y divide-gray-100 dark:divide-white/10">
-                    @foreach ($presentedEntries as $presented)
-                        @php($entry = $presented['entry'])
-                        <div class="px-4 py-4 sm:px-6">
+            <div class="divide-y divide-gray-100 dark:divide-white/10">
+                @forelse ($this->getPresentedEntries() as $presented)
+                    @php($entry = $presented['entry'])
+                    <div class="px-4 py-4 sm:px-6">
                             <div class="flex flex-wrap items-start justify-between gap-2">
                                 <div>
                                     <p class="font-semibold text-gray-950 dark:text-white">{{ $entry->description }}</p>
@@ -171,10 +168,11 @@
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
+                    </div>
+                @empty
+                    <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">No entries in this period.</p>
+                @endforelse
+            </div>
         </div>
     </div>
 </x-filament-panels::page>

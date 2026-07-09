@@ -49,16 +49,6 @@ class AccountingLedgerPage extends Page
      */
     public array $summary = [];
 
-    /**
-     * @var Collection<int, array{entry: \App\Models\AccountingJournalEntry, lines: Collection<int, \App\Support\FeeLedgerPresentation>}>
-     */
-    public Collection $presentedEntries;
-
-    public function boot(): void
-    {
-        $this->presentedEntries = collect();
-    }
-
     public static function canAccess(): bool
     {
         if (! FeatureGate::enabled(LicenseFeature::Fees)) {
@@ -85,10 +75,23 @@ class AccountingLedgerPage extends Page
         $from = filled($this->fromDate) ? Carbon::parse($this->fromDate)->startOfDay() : null;
         $to = filled($this->toDate) ? Carbon::parse($this->toDate)->endOfDay() : null;
 
-        $entries = $ledger->recentEntries(50, $from, $to);
+        $summary = $ledger->feeLedgerSummary($from, $to);
+        $summary['collection_rows'] = collect($summary['collection_rows'])->values()->all();
+        $summary['income_rows'] = collect($summary['income_rows'])->values()->all();
 
-        $this->summary = $ledger->feeLedgerSummary($from, $to);
-        $this->presentedEntries = $ledger->presentEntries($entries);
+        $this->summary = $summary;
+    }
+
+    /**
+     * @return Collection<int, array{entry: \App\Models\AccountingJournalEntry, lines: Collection<int, \App\Support\FeeLedgerPresentation>}>
+     */
+    public function getPresentedEntries(): Collection
+    {
+        $ledger = app(AccountingLedgerService::class);
+        $from = filled($this->fromDate) ? Carbon::parse($this->fromDate)->startOfDay() : null;
+        $to = filled($this->toDate) ? Carbon::parse($this->toDate)->endOfDay() : null;
+
+        return $ledger->presentEntries($ledger->recentEntries(50, $from, $to));
     }
 
     public function applyFilters(AccountingLedgerService $ledger): void
