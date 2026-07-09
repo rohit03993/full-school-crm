@@ -2417,7 +2417,7 @@ class StudentProfilePage extends Page
                                     'portalUrl' => route('portal.homework.index'),
                                 ]),
                         ]),
-                    'activities' => Tab::make('Activities')
+                    'activities' => Tab::make('Exams')
                         ->icon('heroicon-o-academic-cap')
                         ->visible(fn (): bool => $this->licensed(LicenseFeature::Marks)
                             && $this->record->activeEnrollment !== null

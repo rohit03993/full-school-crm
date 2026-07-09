@@ -27,6 +27,8 @@ class ClassSectionListService
                 'staffAssignments.courseSubject',
             ])
             ->withCount('activeStudents')
+            ->orderBy('course_id')
+            ->orderBy('section')
             ->orderByDesc('id');
 
         if ($sessionId) {

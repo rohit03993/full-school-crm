@@ -162,7 +162,7 @@ class BatchResource extends Resource
                                 ->active()
                                 ->exists()
                                 ? 'Assign a teacher per subject for this section. Leave blank to assign later.'
-                                : 'Add subjects on the parent '.strtolower(InstituteTerminology::label('course')).' first — they appear here automatically.'),
+                                : 'No subjects on this class yet — open Manage subjects in the page header (or Classes & sections → Subjects).'),
                     ])
                     ->collapsed()
                     ->columns(2),

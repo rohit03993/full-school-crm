@@ -116,6 +116,7 @@ class ClassSectionsPage extends Page
                     'addUrl' => AddClassSectionPage::getUrl(),
                     'batchEditUrl' => fn (int $id): string => BatchResource::getUrl('edit', ['record' => $id]),
                     'courseEditUrl' => fn (int $id): string => CourseResource::getUrl('edit', ['record' => $id]),
+                    'courseSubjectsUrl' => fn (int $id): string => CourseResource::getUrl('edit', ['record' => $id]).'?panel=subjects',
                     'displayLabel' => fn ($batch): string => ClassSectionLabel::forBatch($batch, includeSession: false),
                 ]),
         ]);

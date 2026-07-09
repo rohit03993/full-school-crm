@@ -86,6 +86,7 @@ class CourseResource extends Resource
             ->components([
                 Section::make('Programme Details')
                     ->description(fn (): string => 'Create and manage '.strtolower(InstituteTerminology::label('course')).' entries for your institute.')
+                    ->collapsed(fn (): bool => request()->query('panel') === 'subjects')
                     ->schema([
                         TextInput::make('name')
                             ->label('Programme Name')
@@ -139,6 +140,39 @@ class CourseResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
+                Section::make('Subjects')
+                    ->id('subjects')
+                    ->description('Add every subject for this class here (e.g. English, Mathematics, Science). All sections share this list — required before exam windows and subject teachers.')
+                    ->schema([
+                        Repeater::make('course_subjects')
+                            ->label('Subject list')
+                            ->schema([
+                                TextInput::make('name')
+                                    ->label('Subject name')
+                                    ->placeholder('e.g. English, Physics, Accountancy')
+                                    ->required()
+                                    ->maxLength(100),
+                                TextInput::make('code')
+                                    ->label('Short code')
+                                    ->placeholder('e.g. ENG')
+                                    ->maxLength(30),
+                                TextInput::make('default_max_marks')
+                                    ->label('Default max marks')
+                                    ->numeric()
+                                    ->minValue(1)
+                                    ->maxValue(1000)
+                                    ->placeholder('e.g. 100'),
+                                Toggle::make('is_active')
+                                    ->label('Active')
+                                    ->default(true),
+                            ])
+                            ->columns(2)
+                            ->columnSpanFull()
+                            ->defaultItems(0)
+                            ->addActionLabel('Add subject')
+                            ->reorderable(),
+                    ])
+                    ->columnSpanFull(),
                 Section::make('Default installment plan')
                     ->description('Optional. When staff convert a student to this course, these rows auto-fill the admission installment schedule (percentages should total 100%).')
                     ->schema([
@@ -168,39 +202,6 @@ class CourseResource extends Resource
                             ->columnSpanFull()
                             ->defaultItems(0)
                             ->addActionLabel('Add installment'),
-                    ])
-                    ->collapsed()
-                    ->columnSpanFull(),
-                Section::make('Subjects')
-                    ->description('Optional. Shared by every section/batch under this '.strtolower(InstituteTerminology::label('course')).' — e.g. English, Mathematics, Science.')
-                    ->schema([
-                        Repeater::make('course_subjects')
-                            ->label('Subjects')
-                            ->schema([
-                                TextInput::make('name')
-                                    ->label('Subject name')
-                                    ->placeholder('e.g. English, Physics, Accountancy')
-                                    ->required()
-                                    ->maxLength(100),
-                                TextInput::make('code')
-                                    ->label('Short code')
-                                    ->placeholder('e.g. ENG')
-                                    ->maxLength(30),
-                                TextInput::make('default_max_marks')
-                                    ->label('Default max marks')
-                                    ->numeric()
-                                    ->minValue(1)
-                                    ->maxValue(1000)
-                                    ->placeholder('e.g. 100'),
-                                Toggle::make('is_active')
-                                    ->label('Active')
-                                    ->default(true),
-                            ])
-                            ->columns(2)
-                            ->columnSpanFull()
-                            ->defaultItems(0)
-                            ->addActionLabel('Add subject')
-                            ->reorderable(),
                     ])
                     ->collapsed()
                     ->columnSpanFull(),

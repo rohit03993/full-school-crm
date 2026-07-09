@@ -9,9 +9,6 @@
 
 <div class="space-y-4">
     <div class="rounded-2xl bg-gray-50/80 p-2 ring-1 ring-gray-200/80 dark:bg-white/5 dark:ring-white/10">
-        <p class="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            Exams
-        </p>
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             @foreach ($activityTypes as $type)
                 <button

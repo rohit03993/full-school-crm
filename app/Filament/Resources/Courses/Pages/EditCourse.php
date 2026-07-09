@@ -24,7 +24,25 @@ class EditCourse extends EditRecord
 
     protected static function crmHintKey(): ?string
     {
-        return 'courses.edit';
+        return request()->query('panel') === 'subjects' ? 'courses.subjects' : 'courses.edit';
+    }
+
+    public function getTitle(): string
+    {
+        if (request()->query('panel') === 'subjects' && $this->record instanceof Course) {
+            return 'Subjects — '.$this->record->name;
+        }
+
+        return parent::getTitle();
+    }
+
+    public function getSubheading(): ?string
+    {
+        if (request()->query('panel') === 'subjects') {
+            return 'Shared by every section under this class. Add subjects before creating exam windows.';
+        }
+
+        return parent::getSubheading();
     }
 
     protected function getHeaderActions(): array
