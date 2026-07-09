@@ -16,6 +16,7 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Concerns\CanUseDatabaseTransactions;
 use Filament\Pages\Page;
@@ -128,6 +129,57 @@ class ManageInstituteSettings extends Page
                         ->rows(4)
                         ->columnSpanFull()
                         ->helperText('Legal note printed at the bottom of every fee receipt.'),
+                ])
+                ->columns(2),
+            Section::make('Marksheet & report card PDF')
+                ->description('Controls fields shown on exam marksheets and consolidated report cards.')
+                ->schema([
+                    TextInput::make('marksheet_title')
+                        ->label('Document title')
+                        ->maxLength(120)
+                        ->default('Statement of Marks'),
+                    TextInput::make('marksheet_signature_title')
+                        ->label('Signature line title')
+                        ->maxLength(120)
+                        ->placeholder('e.g. Principal / Controller of Examination'),
+                    TextInput::make('marksheet_signature_name')
+                        ->label('Signatory name (optional)')
+                        ->maxLength(120)
+                        ->placeholder('Printed below signature line'),
+                    Textarea::make('marksheet_footer_note')
+                        ->label('Footer note')
+                        ->rows(3)
+                        ->columnSpanFull(),
+                    Toggle::make('marksheet_show_rank')
+                        ->label('Show class rank')
+                        ->default(true),
+                    Toggle::make('marksheet_show_attendance')
+                        ->label('Show attendance %')
+                        ->default(true),
+                    Toggle::make('marksheet_show_subject_remarks')
+                        ->label('Show subject remarks column')
+                        ->default(false),
+                    Toggle::make('marksheet_show_principal_remarks')
+                        ->label('Show principal remarks block')
+                        ->default(true),
+                    TextInput::make('marksheet_division_first')
+                        ->label('First division from %')
+                        ->numeric()
+                        ->minValue(0)
+                        ->maxValue(100)
+                        ->default(55),
+                    TextInput::make('marksheet_division_second')
+                        ->label('Second division from %')
+                        ->numeric()
+                        ->minValue(0)
+                        ->maxValue(100)
+                        ->default(48),
+                    TextInput::make('marksheet_division_pass')
+                        ->label('Pass from %')
+                        ->numeric()
+                        ->minValue(0)
+                        ->maxValue(100)
+                        ->default(40),
                 ])
                 ->columns(2),
             Section::make('Student portal login')

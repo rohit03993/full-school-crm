@@ -15,6 +15,8 @@ use App\Services\ExamWindowService;
 use App\Services\ResultDeclarationService;
 use App\Support\CrmHint;
 use App\Support\ExamTestGroupMatrix;
+use App\Support\PublishedResultsGate;
+use App\Support\ResultAuditTrail;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -51,6 +53,8 @@ class TestMarksReviewPage extends Page
 
     public ?string $marksheetIssueDate = null;
 
+    public ?string $principalRemarks = null;
+
     public function mount(): void
     {
         $this->declarationDate = now()->toDateString();
@@ -60,6 +64,8 @@ class TestMarksReviewPage extends Page
 
         if (filled($this->groupKey)) {
             $this->markSheet = ExamTestGroupMatrix::markSheetForGroup($this->groupKey);
+            $declaration = app(ResultDeclarationService::class)->findForGroupKey((string) $this->groupKey);
+            $this->principalRemarks = $declaration?->remarks;
         }
     }
 
@@ -75,8 +81,10 @@ class TestMarksReviewPage extends Page
 
     protected function getHeaderActions(): array
     {
-        return [
-            Action::make('uploadMarks')
+        $actions = [];
+
+        if (is_array($this->markSheet) && ! $this->marksAreLocked()) {
+            $actions[] = Action::make('uploadMarks')
                 ->label('Upload marks')
                 ->icon(Heroicon::OutlinedArrowUpTray)
                 ->url(fn (): string => BulkActivityMarksImportPage::urlForTest(
@@ -84,11 +92,14 @@ class TestMarksReviewPage extends Page
                     isset($this->markSheet['activity_type_id']) ? (int) $this->markSheet['activity_type_id'] : null,
                     isset($this->markSheet['batch_id']) ? (int) $this->markSheet['batch_id'] : null,
                     $this->markSheet['date']?->format('Y-m-d') ?? null,
-                )),
-            Action::make('back')
-                ->label('Back to tests')
-                ->url(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::getUrl('index')),
-        ];
+                ));
+        }
+
+        $actions[] = Action::make('back')
+            ->label('Back to tests')
+            ->url(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::getUrl('index'));
+
+        return $actions;
     }
 
     public function publishResults(ResultDeclarationService $declarations): void
@@ -219,6 +230,114 @@ class TestMarksReviewPage extends Page
         }
     }
 
+    public function savePrincipalRemarks(ResultDeclarationService $declarations): void
+    {
+        if (blank($this->groupKey)) {
+            return;
+        }
+
+        $declarations->savePrincipalRemarks((string) $this->groupKey, $this->principalRemarks);
+
+        Notification::make()
+            ->title('Principal remarks saved')
+            ->success()
+            ->send();
+    }
+
+    public function unpublishResults(ResultDeclarationService $declarations): void
+    {
+        abort_unless(Auth::user()?->hasRole(RoleName::SuperAdmin->value), 403);
+
+        if (blank($this->groupKey)) {
+            Notification::make()->title('Test not found')->warning()->send();
+
+            return;
+        }
+
+        try {
+            $declarations->unpublish((string) $this->groupKey, Auth::user());
+
+            Notification::make()
+                ->title('Results unpublished')
+                ->body('Marks are hidden from the student portal. You can edit marks and publish again.')
+                ->success()
+                ->send();
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not unpublish')
+                ->body(collect($exception->errors())->flatten()->first())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function lockMarks(ResultDeclarationService $declarations): void
+    {
+        abort_unless(Auth::user()?->hasRole(RoleName::SuperAdmin->value), 403);
+
+        if (blank($this->groupKey)) {
+            return;
+        }
+
+        try {
+            $declarations->lockMarks((string) $this->groupKey, Auth::user());
+
+            Notification::make()->title('Marks locked')->success()->send();
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not lock marks')
+                ->body(collect($exception->errors())->flatten()->first())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function unlockMarks(ResultDeclarationService $declarations): void
+    {
+        abort_unless(Auth::user()?->hasRole(RoleName::SuperAdmin->value), 403);
+
+        if (blank($this->groupKey)) {
+            return;
+        }
+
+        try {
+            $declarations->unlockMarks((string) $this->groupKey, Auth::user());
+
+            Notification::make()
+                ->title('Marks unlocked')
+                ->body('Marks can be edited. Re-publish after corrections to refresh student portal snapshots.')
+                ->warning()
+                ->send();
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not unlock marks')
+                ->body(collect($exception->errors())->flatten()->first())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function marksAreLocked(): bool
+    {
+        if (blank($this->groupKey)) {
+            return false;
+        }
+
+        return PublishedResultsGate::marksAreLocked((string) $this->groupKey);
+    }
+
+    /**
+     * @return array<int, \App\Models\AuditLog>
+     */
+    public function auditTrailEntries(): array
+    {
+        if (blank($this->groupKey)) {
+            return [];
+        }
+
+        return ResultAuditTrail::entriesForGroupKey((string) $this->groupKey)->all();
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -343,6 +462,9 @@ class TestMarksReviewPage extends Page
                     'examWindowStatus' => $this->examWindowStatus(),
                     'canIssueMarksheet' => FeatureGate::enabled(LicenseFeature::Marksheets)
                         && (Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false),
+                    'canManagePublish' => Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false,
+                    'marksAreLocked' => $this->marksAreLocked(),
+                    'auditTrailEntries' => $this->auditTrailEntries(),
                     'studentMarksheets' => $this->studentMarksheetsByStudentId(),
                 ]),
         ]);

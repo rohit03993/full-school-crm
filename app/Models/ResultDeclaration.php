@@ -19,6 +19,10 @@ class ResultDeclaration extends Model
         'declaration_date',
         'declared_by_user_id',
         'declared_at',
+        'marks_locked_at',
+        'marks_locked_by_user_id',
+        'unpublished_at',
+        'unpublished_by_user_id',
         'marksheet_issue_date',
         'marksheet_issued_by_user_id',
         'marksheet_issued_at',
@@ -32,6 +36,8 @@ class ResultDeclaration extends Model
             'declaration_date' => 'date',
             'marksheet_issue_date' => 'date',
             'declared_at' => 'datetime',
+            'marks_locked_at' => 'datetime',
+            'unpublished_at' => 'datetime',
             'marksheet_issued_at' => 'datetime',
             'status' => ResultDeclarationStatus::class,
         ];
@@ -57,6 +63,16 @@ class ResultDeclaration extends Model
         return $this->belongsTo(User::class, 'marksheet_issued_by_user_id');
     }
 
+    public function marksLockedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'marks_locked_by_user_id');
+    }
+
+    public function unpublishedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'unpublished_by_user_id');
+    }
+
     public function studentMarksheets(): HasMany
     {
         return $this->hasMany(StudentMarksheet::class);
@@ -71,5 +87,10 @@ class ResultDeclaration extends Model
     public function marksheetsIssued(): bool
     {
         return $this->marksheet_issued_at !== null;
+    }
+
+    public function marksAreLocked(): bool
+    {
+        return $this->marks_locked_at !== null;
     }
 }

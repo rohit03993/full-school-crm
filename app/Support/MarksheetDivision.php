@@ -10,10 +10,12 @@ class MarksheetDivision
             return null;
         }
 
+        $thresholds = InstituteSettings::marksheetDivisionThresholds();
+
         return match (true) {
-            $percentage >= 55 => 'First Division',
-            $percentage >= 48 => 'Second Division',
-            $percentage >= 40 => 'Pass',
+            $percentage >= $thresholds['first'] => 'First Division',
+            $percentage >= $thresholds['second'] => 'Second Division',
+            $percentage >= $thresholds['pass'] => 'Pass',
             default => 'Fail',
         };
     }

@@ -31,14 +31,14 @@ class MarksheetPdfService
 
         $this->storage->replaceStoredFile($marksheet->pdf_path, $relativePath);
 
-        $institute = InstituteSettings::forDocuments();
+        $template = InstituteSettings::forMarksheets();
         $snapshot = $marksheet->snapshot ?? [];
         $row = $snapshot['row'] ?? [];
         $subjects = $snapshot['subjects'] ?? [];
         $scores = $row['scores'] ?? [];
 
         $pdf = Pdf::loadView('pdf.exam-marksheet', [
-            'institute' => $institute,
+            'template' => $template,
             'marksheet' => $marksheet,
             'declaration' => $declaration,
             'student' => $student,
@@ -49,6 +49,10 @@ class MarksheetPdfService
             'subjects' => $subjects,
             'scores' => $scores,
             'total' => $row['total'] ?? [],
+            'rank' => $marksheet->rank ?? ($snapshot['rank'] ?? null),
+            'attendancePercentage' => $snapshot['attendance_percentage'] ?? null,
+            'subjectRemarks' => $snapshot['subject_remarks'] ?? [],
+            'principalRemarks' => $declaration->remarks,
             'declarationDate' => $declaration->declaration_date,
             'issueDate' => $declaration->marksheet_issue_date ?? now()->toDateString(),
         ])->setPaper('a4', 'portrait');

@@ -9,6 +9,7 @@ use App\Models\BatchStudent;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\CrmMenuLabels;
+use App\Support\PublishedResultsGate;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -68,6 +69,12 @@ class ActivityAttendanceService
             throw new \InvalidArgumentException('Unsupported activity model.');
         }
 
+        PublishedResultsGate::assertMarksEditableForSession($attendable);
+
+        $groupKey = PublishedResultsGate::groupKeyForSession($attendable);
+        $wasPublished = $groupKey !== null && PublishedResultsGate::isPublishedGroupKey($groupKey);
+        $oldScores = $wasPublished ? $this->scoresFor($attendable) : [];
+
         $batchId = $attendable->batch_id;
         $maxMarks = $this->maxMarksForSession($attendable);
 
@@ -85,7 +92,7 @@ class ActivityAttendanceService
 
         $saved = 0;
 
-        DB::transaction(function () use ($attendable, $marks, $scores, $staff, $activeStudentIds, $maxMarks, &$saved): void {
+        DB::transaction(function () use ($attendable, $marks, $scores, $staff, $activeStudentIds, $maxMarks, $wasPublished, $groupKey, $oldScores, &$saved): void {
             foreach ($marks as $studentId => $isPresent) {
                 $studentId = (int) $studentId;
 
@@ -125,6 +132,19 @@ class ActivityAttendanceService
                     ],
                     user: $staff,
                 );
+
+                if ($wasPublished && $groupKey !== null) {
+                    $this->audit->log(
+                        'marks_changed_after_publish',
+                        null,
+                        ['scores' => $oldScores],
+                        [
+                            'group_key' => $groupKey,
+                            'scores' => $this->scoresFor($attendable),
+                        ],
+                        user: $staff,
+                    );
+                }
             }
         });
 
@@ -199,10 +219,16 @@ class ActivityAttendanceService
      */
     public function importStudentScores(ActivitySession $session, array $studentScores, User $staff): int
     {
+        PublishedResultsGate::assertMarksEditableForSession($session);
+
+        $groupKey = PublishedResultsGate::groupKeyForSession($session);
+        $wasPublished = $groupKey !== null && PublishedResultsGate::isPublishedGroupKey($groupKey);
+        $oldScores = $wasPublished ? $this->scoresFor($session) : [];
+
         $maxMarks = $this->maxMarksForSession($session);
         $saved = 0;
 
-        DB::transaction(function () use ($session, $studentScores, $staff, $maxMarks, &$saved): void {
+        DB::transaction(function () use ($session, $studentScores, $staff, $maxMarks, $wasPublished, $groupKey, $oldScores, &$saved): void {
             foreach ($studentScores as $studentId => $rawMark) {
                 if (! filled($rawMark) && $rawMark !== 0 && $rawMark !== '0') {
                     continue;
@@ -240,8 +266,25 @@ class ActivityAttendanceService
                     ],
                     user: $staff,
                 );
+
+                if ($wasPublished && $groupKey !== null) {
+                    $this->audit->log(
+                        'marks_changed_after_publish',
+                        null,
+                        ['scores' => $oldScores],
+                        [
+                            'group_key' => $groupKey,
+                            'scores' => $this->scoresFor($session),
+                        ],
+                        user: $staff,
+                    );
+                }
             }
         });
+
+        if ($saved > 0) {
+            app(ExamWindowService::class)->recordMarksEntry($session, $staff);
+        }
 
         return $saved;
     }

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ActivitySessions\Pages;
 
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Pages\BulkActivityMarksImportPage;
+use App\Filament\Pages\ConsolidatedReportCardsPage;
 use App\Filament\Pages\ExamWindowsPage;
 use App\Filament\Pages\TestMarksReviewPage;
 use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
@@ -99,6 +100,15 @@ class ListActivitySessions extends ListRecords
                 ->color('success')
                 ->url(ExamWindowsPage::getUrl())
                 ->tooltip('Create exams from programme subjects — teacher entry, approval, then publish.');
+        }
+
+        if (ConsolidatedReportCardsPage::canAccess()) {
+            $actions[] = Action::make('consolidatedReportCards')
+                ->label('Consolidated report cards')
+                ->icon(Heroicon::OutlinedDocumentDuplicate)
+                ->color('gray')
+                ->url(ConsolidatedReportCardsPage::getUrl())
+                ->tooltip('Combine Term 1 + Term 2 (or more) into one PDF per student.');
         }
 
         if ($this->activitySchemaReady() && ActivityType::scoringTypes()->isEmpty()) {

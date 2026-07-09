@@ -5,9 +5,11 @@ namespace App\Support;
 use App\Enums\ResultDeclarationStatus;
 use App\Models\ActivityAttendance;
 use App\Models\ActivitySession;
+use App\Models\AuditLog;
 use App\Models\ResultDeclaration;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class PublishedResultsGate
 {
@@ -40,6 +42,55 @@ class PublishedResultsGate
             ->where('status', ResultDeclarationStatus::Published)
             ->whereNotNull('declared_at')
             ->exists();
+    }
+
+    public static function declarationForGroupKey(string $groupKey): ?ResultDeclaration
+    {
+        if (! Schema::hasTable('result_declarations')) {
+            return null;
+        }
+
+        return ResultDeclaration::query()->where('group_key', $groupKey)->first();
+    }
+
+    public static function marksAreLocked(string $groupKey): bool
+    {
+        $declaration = self::declarationForGroupKey($groupKey);
+
+        return $declaration?->marksAreLocked() ?? false;
+    }
+
+    public static function groupKeyForSession(ActivitySession $session): ?string
+    {
+        $groupKey = StudentExamMarksMatrix::groupKeyForSession($session);
+
+        return filled($groupKey) ? (string) $groupKey : null;
+    }
+
+    public static function assertMarksEditableForGroupKey(string $groupKey): void
+    {
+        if (! self::isPublishedGroupKey($groupKey)) {
+            return;
+        }
+
+        if (! self::marksAreLocked($groupKey)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'marks' => 'Marks are locked after results were published. Super Admin can unlock from the exam review page.',
+        ]);
+    }
+
+    public static function assertMarksEditableForSession(ActivitySession $session): void
+    {
+        $groupKey = self::groupKeyForSession($session);
+
+        if ($groupKey === null) {
+            return;
+        }
+
+        self::assertMarksEditableForGroupKey($groupKey);
     }
 
     /**

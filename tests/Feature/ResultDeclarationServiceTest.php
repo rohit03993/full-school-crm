@@ -26,6 +26,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -72,8 +73,14 @@ class ResultDeclarationServiceTest extends TestCase
 
         $declaration = app(ResultDeclarationService::class)->publish($groupKey, $staff, '2026-06-15');
         $this->assertSame(ResultDeclarationStatus::Published, $declaration->status);
+        $this->assertTrue($declaration->marksAreLocked());
         $this->assertTrue(PublishedResultsGate::isPublishedGroupKey($groupKey));
+        $this->assertTrue(PublishedResultsGate::marksAreLocked($groupKey));
         $this->assertFalse(PublishedResultsGate::filterRecordsForPortal($records)->isEmpty());
+
+        $sheet = $declaration->studentMarksheets()->where('student_id', $student->id)->first();
+        $this->assertNotNull($sheet?->rank);
+        $this->assertArrayHasKey('attendance_percentage', $sheet->snapshot ?? []);
 
         $issued = app(ResultDeclarationService::class)->issueMarksheets($groupKey, $staff, '2026-06-16');
         $sheet = $issued->studentMarksheets()->where('student_id', $student->id)->first();
@@ -83,6 +90,85 @@ class ResultDeclarationServiceTest extends TestCase
         $this->assertSame($groupKey, StudentExamMarksMatrix::groupKeyForSession(
             ActivitySession::query()->where('batch_id', $batch->id)->first(),
         ));
+    }
+
+    public function test_locked_marks_block_import_after_publish(): void
+    {
+        $this->seed(\Database\Seeders\ActivityTypeSeeder::class);
+
+        $staff = $this->createSuperAdmin();
+        $student = $this->createEnrolledStudent($staff);
+        $batch = Batch::query()->where('name', 'Result Batch')->firstOrFail();
+        $examType = ActivityType::query()->where('slug', 'exam')->firstOrFail();
+        $attendance = app(ActivityAttendanceService::class);
+        $service = app(ResultDeclarationService::class);
+
+        $testName = 'Unit Test — June 2026';
+        $testDate = '2026-06-10';
+        $groupKey = Str::slug($testName).'-'.$testDate;
+
+        $session = ActivitySession::query()->create([
+            'activity_type_id' => $examType->id,
+            'title' => "{$testName} — Mathematics",
+            'batch_id' => $batch->id,
+            'session_date' => $testDate,
+            'metadata' => [
+                'test_key' => $groupKey,
+                'test_name' => $testName,
+                'subject' => 'Mathematics',
+                'max_marks' => 50,
+            ],
+            'created_by_user_id' => $staff->id,
+        ]);
+
+        $attendance->importStudentScores($session, [$student->id => 40], $staff);
+        $service->publish($groupKey, $staff, '2026-06-15');
+
+        $this->expectException(ValidationException::class);
+        $attendance->importStudentScores($session, [$student->id => 45], $staff);
+    }
+
+    public function test_unlock_allows_mark_edits_and_unpublish_hides_portal(): void
+    {
+        $this->seed(\Database\Seeders\ActivityTypeSeeder::class);
+
+        $staff = $this->createSuperAdmin();
+        $student = $this->createEnrolledStudent($staff);
+        $batch = Batch::query()->where('name', 'Result Batch')->firstOrFail();
+        $examType = ActivityType::query()->where('slug', 'exam')->firstOrFail();
+        $attendance = app(ActivityAttendanceService::class);
+        $service = app(ResultDeclarationService::class);
+
+        $testName = 'Unit Test — June 2026';
+        $testDate = '2026-06-10';
+        $groupKey = Str::slug($testName).'-'.$testDate;
+
+        $session = ActivitySession::query()->create([
+            'activity_type_id' => $examType->id,
+            'title' => "{$testName} — Mathematics",
+            'batch_id' => $batch->id,
+            'session_date' => $testDate,
+            'metadata' => [
+                'test_key' => $groupKey,
+                'test_name' => $testName,
+                'subject' => 'Mathematics',
+                'max_marks' => 50,
+            ],
+            'created_by_user_id' => $staff->id,
+        ]);
+
+        $attendance->importStudentScores($session, [$student->id => 40], $staff);
+        $service->publish($groupKey, $staff, '2026-06-15');
+
+        $service->unlockMarks($groupKey, $staff);
+        $this->assertFalse(PublishedResultsGate::marksAreLocked($groupKey));
+
+        $attendance->importStudentScores($session, [$student->id => 44], $staff);
+        $this->assertSame(44.0, (float) $attendance->scoresFor($session)[$student->id]['marks_obtained']);
+
+        $service->unpublish($groupKey, $staff);
+        $this->assertFalse(PublishedResultsGate::isPublishedGroupKey($groupKey));
+        $this->assertFalse(PublishedResultsGate::marksAreLocked($groupKey));
     }
 
     public function test_regenerate_marksheets_refreshes_pdf_paths(): void
@@ -172,7 +258,7 @@ class ResultDeclarationServiceTest extends TestCase
         $service->publish($groupKey, $staff, '2026-06-15');
         $service->issueMarksheets($groupKey, $staff, '2026-06-16');
 
-        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->expectException(ValidationException::class);
         $service->issueMarksheets($groupKey, $staff, '2026-06-18');
     }
 

@@ -15,6 +15,7 @@ class StudentMarksheet extends Model
         'total_max',
         'percentage',
         'division',
+        'rank',
         'pdf_path',
         'snapshot',
     ];
@@ -27,6 +28,7 @@ class StudentMarksheet extends Model
             'percentage' => 'decimal:2',
             'snapshot' => 'array',
             'marksheet_serial' => 'integer',
+            'rank' => 'integer',
         ];
     }
 

@@ -77,6 +77,8 @@ Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
             ->name('admin.marksheets.preview');
         Route::get('marksheets/{marksheet}/download', [MarksheetDownloadController::class, 'download'])
             ->name('admin.marksheets.download');
+        Route::get('marksheets/consolidated/download', [\App\Http\Controllers\Admin\ConsolidatedMarksheetDownloadController::class, 'download'])
+            ->name('admin.marksheets.consolidated.download');
     });
 });
 

@@ -8,6 +8,7 @@ use App\Models\BatchStudent;
 use App\Models\Enrollment;
 use App\Models\User;
 use App\Support\ExamSubjectCatalog;
+use App\Support\PublishedResultsGate;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -210,6 +211,8 @@ class ActivityMarksBulkImportService
         }
 
         $testKey = $this->buildTestKey($testName, $sessionDate);
+        PublishedResultsGate::assertMarksEditableForGroupKey($testKey);
+
         $readyRows = collect($previewRows)->where('status', 'ready')->values();
 
         /** @var array<int, array<string, array<int, float>>> $batchSubjectScores batch => subject => student => mark */
