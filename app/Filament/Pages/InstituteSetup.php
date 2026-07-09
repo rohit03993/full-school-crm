@@ -126,16 +126,10 @@ class InstituteSetup extends Page
                 'icon' => 'heroicon-o-finger-print',
             ],
             [
-                'label' => 'Fees dashboard',
-                'description' => 'Collections, defaulters, and overdue installments.',
+                'label' => 'Fees',
+                'description' => 'Collections, defaulters, overdue installments, and fee ledger.',
                 'url' => FeesDashboardPage::getUrl(),
                 'icon' => 'heroicon-o-banknotes',
-            ],
-            [
-                'label' => 'Accounting ledger',
-                'description' => 'Double-entry journal from fee receipts and late-fee accruals.',
-                'url' => AccountingLedgerPage::getUrl(),
-                'icon' => 'heroicon-o-calculator',
             ],
             [
                 'label' => 'WhatsApp — Connection & Setup',

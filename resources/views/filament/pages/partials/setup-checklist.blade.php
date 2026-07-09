@@ -65,10 +65,10 @@
             'done' => null,
         ],
         [
-            'title' => '10. Accounting ledger',
-            'body' => 'Fee receipts and late-fee accruals post automatically. Review balances under Students → Accounting ledger.',
-            'menu' => 'Students → Accounting ledger',
-            'url' => \App\Filament\Pages\AccountingLedgerPage::getUrl(),
+            'title' => '10. Fee ledger',
+            'body' => 'Fee receipts and late-fee accruals post automatically. Review collections under Students → Fees → Fee ledger.',
+            'menu' => 'Students → Fees → Fee ledger',
+            'url' => \App\Filament\Pages\FeesDashboardPage::getUrl(['tab' => 'ledger']),
             'done' => null,
         ],
     ];
