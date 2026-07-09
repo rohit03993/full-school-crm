@@ -20,6 +20,7 @@ class FeeMiscChargeAdjustmentRequest extends Model
         'reviewed_by_user_id',
         'type',
         'discount_amount',
+        'applied_amount',
         'reason',
         'status',
         'review_notes',
@@ -32,6 +33,7 @@ class FeeMiscChargeAdjustmentRequest extends Model
             'type' => FeeMiscChargeAdjustmentType::class,
             'status' => FeeMiscChargeAdjustmentRequestStatus::class,
             'discount_amount' => 'decimal:2',
+            'applied_amount' => 'decimal:2',
             'reviewed_at' => 'datetime',
         ];
     }
@@ -58,6 +60,10 @@ class FeeMiscChargeAdjustmentRequest extends Model
 
     public function resolvedDiscountAmount(): float
     {
+        if ($this->applied_amount !== null) {
+            return round((float) $this->applied_amount, 2);
+        }
+
         if ($this->type === FeeMiscChargeAdjustmentType::WaiveOff) {
             return round((float) ($this->charge?->pendingAmount() ?? 0), 2);
         }

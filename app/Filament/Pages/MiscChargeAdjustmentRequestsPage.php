@@ -7,6 +7,7 @@ use App\Enums\FeeMiscChargeAdjustmentType;
 use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Models\FeeMiscChargeAdjustmentRequest;
+use App\Services\FeeDiscountHistoryService;
 use App\Services\FeeMiscChargeAdjustmentService;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavBadges;
@@ -92,6 +93,8 @@ class MiscChargeAdjustmentRequestsPage extends Page
             View::make('filament.pages.partials.misc-charge-adjustment-requests')
                 ->viewData(fn (): array => [
                     'requests' => $this->pendingRequests(app(FeeMiscChargeAdjustmentService::class)),
+                    'summary' => $this->discountSummary(app(FeeDiscountHistoryService::class)),
+                    'history' => $this->discountHistory(app(FeeDiscountHistoryService::class)),
                     'feesLabel' => CrmMenuLabels::fees(),
                 ]),
         ]);
@@ -99,6 +102,22 @@ class MiscChargeAdjustmentRequestsPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Staff requests to discount or waive additional charges (hostel, penalties, GST, etc.). Approve or reject with a note.';
+        return 'Approve staff requests on additional charges and review the full record of tuition discounts and waive-offs.';
+    }
+
+    /**
+     * @return array<string, int|float>
+     */
+    public function discountSummary(FeeDiscountHistoryService $history): array
+    {
+        return $history->summary();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, \App\Support\FeeDiscountHistoryItem>
+     */
+    public function discountHistory(FeeDiscountHistoryService $history): \Illuminate\Support\Collection
+    {
+        return $history->recent();
     }
 }

@@ -128,6 +128,7 @@ class FeeMiscChargeAdjustmentService
 
             $request->update([
                 'status' => FeeMiscChargeAdjustmentRequestStatus::Approved,
+                'applied_amount' => $discountAmount,
                 'reviewed_by_user_id' => $admin->id,
                 'reviewed_at' => now(),
                 'review_notes' => filled($reviewNotes) ? trim($reviewNotes) : null,
