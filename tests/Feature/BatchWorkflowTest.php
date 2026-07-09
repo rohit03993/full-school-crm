@@ -84,6 +84,57 @@ class BatchWorkflowTest extends TestCase
         $this->assertSame(50.0, $percentage);
     }
 
+    public function test_section_can_be_deleted_when_no_published_results(): void
+    {
+        $staff = $this->createStaffUser();
+        $course = Course::query()->create([
+            'name' => 'Delete Test Programme',
+            'code' => 'DEL-SEC',
+            'programme_category' => 'coaching',
+            'duration' => 1,
+            'duration_type' => 'years',
+            'fee' => 10000,
+            'status' => CourseStatus::Active,
+        ]);
+        $batch = $this->createBatch($course, $staff, 'Delete Me Batch');
+
+        app(BatchService::class)->deleteSection($batch);
+
+        $this->assertDatabaseMissing('batches', ['id' => $batch->id]);
+    }
+
+    public function test_section_delete_is_blocked_when_published_results_exist(): void
+    {
+        $staff = $this->createStaffUser();
+        $course = Course::query()->create([
+            'name' => 'Locked Programme',
+            'code' => 'LOCK-SEC',
+            'programme_category' => 'coaching',
+            'duration' => 1,
+            'duration_type' => 'years',
+            'fee' => 10000,
+            'status' => CourseStatus::Active,
+        ]);
+        $batch = $this->createBatch($course, $staff, 'Locked Batch');
+
+        $this->seed(\Database\Seeders\ActivityTypeSeeder::class);
+
+        \App\Models\ResultDeclaration::query()->create([
+            'group_key' => 'locked-test-'.$batch->id,
+            'test_name' => 'Unit Test 1',
+            'session_date' => '2026-07-09',
+            'batch_id' => $batch->id,
+            'activity_type_id' => \App\Models\ActivityType::query()->firstOrFail()->id,
+            'status' => \App\Enums\ResultDeclarationStatus::Published,
+            'declared_at' => now(),
+        ]);
+
+        $check = $batch->fresh()->deletionBlockReason();
+
+        $this->assertFalse($check['can_delete']);
+        $this->assertStringContainsString('Published exam results', (string) $check['reason']);
+    }
+
     protected function createStaffUser(): User
     {
         Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);

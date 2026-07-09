@@ -13,16 +13,23 @@ class CrmResetStudentsCommand extends Command
     protected $signature = 'crm:reset-students
                             {--force : Skip confirmation prompt}';
 
-    protected $description = 'Delete all student records (leads, admissions, fees, attendance, marks) and keep courses, staff, and settings';
+    protected $description = 'Delete all student-related data and keep academics structure, staff, and WhatsApp connection';
 
     public function handle(StudentDataResetService $resetService): int
     {
         $studentCount = Student::withTrashed()->count();
 
         $this->warn('This permanently deletes ALL student-related data.');
-        $this->line('Removed: students, enquiries, visits, admissions, enrollments, fees, payments, receipts, attendance, test marks, calls, WhatsApp campaigns, inbox messages, fee reminder logs, accounting journal entries, and import history.');
         $this->newLine();
-        $this->line('Kept: courses, batches, academic sessions, staff accounts, institute settings, Meta/WhatsApp connection settings, synced templates, and live campaigns.');
+        $this->line('<fg=red>Removed:</>');
+        foreach (StudentDataResetService::clearedSummary() as $line) {
+            $this->line('  • '.$line);
+        }
+        $this->newLine();
+        $this->line('<fg=green>Kept:</>');
+        foreach (StudentDataResetService::preservedSummary() as $line) {
+            $this->line('  • '.$line);
+        }
         $this->newLine();
         $this->line("Students to remove: {$studentCount}");
 

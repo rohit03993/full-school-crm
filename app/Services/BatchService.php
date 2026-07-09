@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Enums\ResultDeclarationStatus;
 use App\Models\Batch;
 use App\Models\BatchStudent;
+use App\Models\ResultDeclaration;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class BatchService
@@ -101,6 +104,28 @@ class BatchService
         }
 
         return $assigned;
+    }
+
+    public function deleteSection(Batch $batch): void
+    {
+        $check = $batch->deletionBlockReason();
+
+        if (! $check['can_delete']) {
+            throw ValidationException::withMessages([
+                'batch' => $check['reason'] ?? 'This section cannot be deleted.',
+            ]);
+        }
+
+        DB::transaction(function () use ($batch): void {
+            if (Schema::hasTable('result_declarations')) {
+                ResultDeclaration::query()
+                    ->where('batch_id', $batch->id)
+                    ->where('status', ResultDeclarationStatus::Draft)
+                    ->delete();
+            }
+
+            $batch->delete();
+        });
     }
 
     protected function assertBatchMatchesEnrollment(Student $student, Batch $batch): void

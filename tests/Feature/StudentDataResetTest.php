@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\EnquiryService;
 use App\Services\StudentDataResetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class StudentDataResetTest extends TestCase
@@ -100,5 +101,62 @@ class StudentDataResetTest extends TestCase
             ->assertSuccessful();
 
         $this->assertSame(0, Student::query()->count());
+    }
+
+    public function test_reset_students_clears_exam_and_result_tables_when_present(): void
+    {
+        if (! Schema::hasTable('exam_windows') || ! Schema::hasTable('result_declarations')) {
+            $this->markTestSkipped('Exam/result tables not migrated.');
+        }
+
+        $staff = User::factory()->create(['is_active' => true]);
+        $staff->assignRole(RoleName::SuperAdmin->value);
+
+        $course = Course::query()->create([
+            'name' => 'Reset Exam Programme',
+            'code' => 'RESET-EX',
+            'programme_category' => 'school',
+            'duration' => 12,
+            'duration_type' => 'months',
+            'fee' => 50000,
+            'status' => CourseStatus::Active,
+        ]);
+
+        $batch = \App\Models\Batch::query()->create([
+            'name' => 'Section A',
+            'section' => 'A',
+            'course_id' => $course->id,
+            'trainer_user_id' => $staff->id,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-12-31',
+            'status' => \App\Enums\BatchStatus::Active,
+        ]);
+
+        $this->seed(\Database\Seeders\ActivityTypeSeeder::class);
+        $activityTypeId = \App\Models\ActivityType::query()->firstOrFail()->id;
+
+        \App\Models\ExamWindow::query()->create([
+            'batch_id' => $batch->id,
+            'activity_type_id' => $activityTypeId,
+            'test_name' => 'Unit Test 1',
+            'session_date' => '2026-07-09',
+            'test_key' => 'unit-test-1',
+            'status' => 'draft',
+        ]);
+
+        \App\Models\ResultDeclaration::query()->create([
+            'group_key' => 'unit-test-1',
+            'test_name' => 'Unit Test 1',
+            'session_date' => '2026-07-09',
+            'batch_id' => $batch->id,
+            'activity_type_id' => $activityTypeId,
+            'status' => \App\Enums\ResultDeclarationStatus::Draft,
+        ]);
+
+        app(StudentDataResetService::class)->reset();
+
+        $this->assertSame(0, \App\Models\ExamWindow::query()->count());
+        $this->assertSame(0, \App\Models\ResultDeclaration::query()->count());
+        $this->assertSame(1, \App\Models\Batch::query()->count());
     }
 }

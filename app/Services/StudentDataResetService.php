@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Enums\NumberSequenceType;
 use App\Models\Document;
 use App\Models\Enrollment;
+use App\Models\HomeworkAssignment;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Payment;
+use App\Models\StudentMarksheet;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -80,6 +82,26 @@ class StudentDataResetService
                     $this->storage->deleteStoredFile($message->media_path);
                 });
         }
+
+        if (Schema::hasTable('student_marksheets')) {
+            StudentMarksheet::query()
+                ->whereNotNull('pdf_path')
+                ->select(['pdf_path'])
+                ->cursor()
+                ->each(function (StudentMarksheet $marksheet): void {
+                    $this->storage->deleteStoredFile($marksheet->pdf_path);
+                });
+        }
+
+        if (Schema::hasTable('homework_assignments')) {
+            HomeworkAssignment::query()
+                ->whereNotNull('file_path')
+                ->select(['file_path'])
+                ->cursor()
+                ->each(function (HomeworkAssignment $homework): void {
+                    $this->storage->deleteStoredFile($homework->file_path);
+                });
+        }
     }
 
     /**
@@ -93,9 +115,23 @@ class StudentDataResetService
             'fee_reminder_logs',
             'meta_whatsapp_messages',
             'attendance_punch_whatsapp_logs',
-            'homework_views',
             'whatsapp_campaign_recipients',
             'whatsapp_campaigns',
+            'whatsapp_live_campaigns',
+            'student_marksheets',
+            'result_declarations',
+            'exam_window_subjects',
+            'exam_windows',
+            'homework_views',
+            'homework_assignments',
+            'activity_attendances',
+            'activity_sessions',
+            'attendance_manual_punches',
+            'attendances',
+            'batch_students',
+            'student_calls',
+            'visit_meeting_assignments',
+            'documents',
             'payments',
             'fee_penalties',
             'fee_discount_entries',
@@ -105,17 +141,13 @@ class StudentDataResetService
             'fee_structures',
             'admission_misc_fees',
             'admission_installment_plans',
-            'activity_attendances',
-            'activity_sessions',
-            'attendances',
-            'batch_students',
-            'student_calls',
-            'documents',
             'enrollments',
             'admissions',
             'visits',
             'enquiries',
             'student_import_batches',
+            'audit_logs',
+            'notifications',
             'students',
         ];
     }
@@ -127,8 +159,59 @@ class StudentDataResetService
             NumberSequenceType::cases(),
         );
 
-        return DB::table('number_sequences')
+        $deleted = DB::table('number_sequences')
             ->whereIn('type', $types)
             ->delete();
+
+        if (Schema::hasTable('marksheet_serial_sequences')) {
+            DB::table('marksheet_serial_sequences')->update(['last_value' => 0]);
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * Tables and settings left intact by {@see reset()}.
+     *
+     * @return list<string>
+     */
+    public static function preservedSummary(): array
+    {
+        return [
+            'Staff logins (users, roles, staff profiles)',
+            'Institute settings (name, logo, WhatsApp/Meta connection tokens)',
+            'Meta WhatsApp templates (synced from Meta)',
+            'Academic structure (sessions, programmes/courses, subjects, sections/batches)',
+            'Subject teachers & batch staff assignments',
+            'Activity types (Exam, etc.)',
+            'Accounting chart of accounts (ledger account list)',
+            'Course fee templates & installment templates',
+            'Website gallery & custom field definitions',
+            'License / feature settings',
+        ];
+    }
+
+    /**
+     * Data categories removed by {@see reset()}.
+     *
+     * @return list<string>
+     */
+    public static function clearedSummary(): array
+    {
+        return [
+            'All students and import history',
+            'Leads, enquiries, campus visits, assigned meetings',
+            'Admissions, enrollments, documents, ID cards',
+            'Fees, installments, discounts, penalties, payments, receipts',
+            'Fee reminder logs & accounting journal entries',
+            'Batch attendance & biometric/manual punch logs',
+            'Exam windows, test sessions, marks, result declarations, marksheets',
+            'Homework assignments & view history',
+            'Call queue / call logs tied to students',
+            'WhatsApp inbox messages, bulk campaigns, and live campaigns',
+            'WhatsApp punch notification logs',
+            'Audit log history & in-app notifications',
+            'Student roll/receipt number sequences (reset to start)',
+        ];
     }
 }

@@ -7,6 +7,7 @@ use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\Batches\Concerns\SyncsBatchStaffAssignments;
 use App\Filament\Resources\Courses\CourseResource;
+use App\Models\Batch;
 use App\Models\CourseSubject;
 use App\Models\Student;
 use App\Services\BatchService;
@@ -84,7 +85,47 @@ class EditBatch extends EditRecord
                         ->send();
                 })
                 ->visible(fn (): bool => $this->record->isActive()),
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->modalDescription(fn (Batch $record): string => $record->deletionBlockReason()['can_delete']
+                    ? 'This removes the section, student assignments, exam windows, and draft results linked to it. Published results block deletion.'
+                    : ($record->deletionBlockReason()['reason'] ?? 'This section cannot be deleted.'))
+                ->before(function (DeleteAction $action, Batch $record): void {
+                    $check = $record->deletionBlockReason();
+
+                    if ($check['can_delete']) {
+                        return;
+                    }
+
+                    Notification::make()
+                        ->title('Cannot delete this section')
+                        ->body($check['reason'])
+                        ->warning()
+                        ->persistent()
+                        ->send();
+
+                    $action->halt();
+                })
+                ->action(function (BatchService $batches): void {
+                    try {
+                        $batches->deleteSection($this->getRecord());
+                    } catch (\Illuminate\Validation\ValidationException $exception) {
+                        Notification::make()
+                            ->title('Cannot delete this section')
+                            ->body(collect($exception->errors())->flatten()->first() ?? 'This section cannot be deleted.')
+                            ->warning()
+                            ->persistent()
+                            ->send();
+
+                        return;
+                    }
+
+                    Notification::make()
+                        ->title('Section deleted')
+                        ->success()
+                        ->send();
+
+                    $this->redirect(ClassSectionsPage::getUrl());
+                }),
         ];
     }
 

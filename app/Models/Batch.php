@@ -4,10 +4,12 @@ namespace App\Models;
 
 use App\Enums\BatchShift;
 use App\Enums\BatchStatus;
+use App\Enums\ResultDeclarationStatus;
 use App\Support\ClassSectionLabel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 
 class Batch extends Model
 {
@@ -81,6 +83,28 @@ class Batch extends Model
     public function displayLabel(): string
     {
         return ClassSectionLabel::forBatch($this, includeSession: false, includeShift: false);
+    }
+
+    /**
+     * @return array{can_delete: bool, reason: ?string}
+     */
+    public function deletionBlockReason(): array
+    {
+        if (Schema::hasTable('result_declarations')) {
+            $publishedResults = ResultDeclaration::query()
+                ->where('batch_id', $this->id)
+                ->where('status', ResultDeclarationStatus::Published)
+                ->count();
+
+            if ($publishedResults > 0) {
+                return [
+                    'can_delete' => false,
+                    'reason' => 'Published exam results exist for this section ('.$publishedResults.' test'.($publishedResults === 1 ? '' : 's').'). Mark the section Completed instead of deleting.',
+                ];
+            }
+        }
+
+        return ['can_delete' => true, 'reason' => null];
     }
 
     protected static function booted(): void
