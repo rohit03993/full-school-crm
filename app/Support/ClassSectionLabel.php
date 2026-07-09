@@ -66,6 +66,20 @@ final class ClassSectionLabel
         return mb_strlen($slug) > 24 ? mb_substr($slug, 0, 24) : $slug;
     }
 
+    public static function uniqueCourseCode(string $programmeName): string
+    {
+        $base = self::suggestCourseCode($programmeName);
+        $code = $base;
+        $suffix = 2;
+
+        while (\App\Models\Course::query()->where('code', $code)->exists()) {
+            $code = $base.'-'.$suffix;
+            $suffix++;
+        }
+
+        return $code;
+    }
+
     /**
      * @param  iterable<int, Batch>  $batches
      * @return array<int, string>

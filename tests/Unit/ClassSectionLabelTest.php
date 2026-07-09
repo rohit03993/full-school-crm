@@ -67,6 +67,53 @@ class ClassSectionLabelTest extends TestCase
         $this->assertSame('IIT JEE Class 12-A', ClassSectionLabel::suggestBatchName('IIT JEE Class 12', 'A'));
     }
 
+    public function test_unique_course_code_avoids_collisions(): void
+    {
+        Course::query()->create([
+            'name' => 'Class 12 Science',
+            'code' => 'CLASS-12-SCIENCE',
+            'programme_category' => ProgrammeCategory::School,
+            'duration' => 1,
+            'duration_type' => DurationType::Years,
+            'fee' => 100000,
+            'status' => CourseStatus::Active,
+        ]);
+
+        $this->assertSame('CLASS-12-SCIENCE-2', ClassSectionLabel::uniqueCourseCode('Class 12 Science'));
+    }
+
+    public function test_service_create_without_trainer(): void
+    {
+        $course = Course::query()->create([
+            'name' => 'Class 10',
+            'code' => 'SCH-10',
+            'programme_category' => ProgrammeCategory::School,
+            'duration' => 1,
+            'duration_type' => DurationType::Years,
+            'fee' => 80000,
+            'status' => CourseStatus::Active,
+        ]);
+
+        $session = AcademicSession::query()->create([
+            'name' => '2025–26',
+            'code' => '2025-26',
+            'starts_on' => '2025-04-01',
+            'ends_on' => '2026-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
+
+        $result = app(ClassSectionService::class)->create([
+            'programme_mode' => 'existing',
+            'course_id' => $course->id,
+            'academic_session_id' => $session->id,
+            'section' => 'B',
+        ]);
+
+        $this->assertNull($result['batch']->trainer_user_id);
+        $this->assertSame('Class 10-B', $result['batch']->name);
+    }
+
     public function test_service_create_with_existing_course_and_new_section(): void
     {
         Role::findOrCreate(RoleName::Staff->value);
@@ -119,13 +166,9 @@ class ClassSectionLabelTest extends TestCase
             'is_active' => true,
         ]);
 
-        $trainer = User::factory()->create(['is_active' => true]);
-        $trainer->assignRole(RoleName::Staff->value);
-
         $result = app(ClassSectionService::class)->create([
             'programme_mode' => 'new',
             'programme_name' => 'IIT JEE Class 12',
-            'programme_code' => 'JEE-12',
             'duration' => 1,
             'duration_type' => DurationType::Years->value,
             'fee' => 120000,
@@ -135,10 +178,9 @@ class ClassSectionLabelTest extends TestCase
             ],
             'academic_session_id' => $session->id,
             'section' => 'A',
-            'trainer_user_id' => $trainer->id,
         ]);
 
-        $this->assertDatabaseHas('courses', ['name' => 'IIT JEE Class 12', 'code' => 'JEE-12']);
+        $this->assertDatabaseHas('courses', ['name' => 'IIT JEE Class 12', 'code' => 'IIT-JEE-CLASS-12']);
         $this->assertDatabaseCount('course_subjects', 2);
         $this->assertSame('IIT JEE Class 12', $result['batch']->course->name);
         $this->assertSame('A', $result['batch']->section);

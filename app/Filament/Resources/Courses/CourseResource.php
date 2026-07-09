@@ -94,12 +94,11 @@ class CourseResource extends Resource
                             ->maxLength(255)
                             ->columnSpanFull(),
                         TextInput::make('code')
-                            ->label('Course Code')
-                            ->placeholder('e.g. SCH-12-SCI, COACH-JEE-1Y, COL-BCOM-2Y')
-                            ->required()
-                            ->unique(ignoreRecord: true)
-                            ->maxLength(50)
-                            ->helperText(CrmHint::field('course_code')),
+                            ->label('Internal reference')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->visible(fn (?Course $record): bool => $record !== null)
+                            ->helperText('Auto-generated when the programme is created. Used internally for reports and imports.'),
                         TextInput::make('duration')
                             ->label('Duration')
                             ->numeric()

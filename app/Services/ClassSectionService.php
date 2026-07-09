@@ -81,17 +81,9 @@ class ClassSectionService
             ]);
         }
 
-        $code = strtoupper(trim((string) ($data['programme_code'] ?? ClassSectionLabel::suggestCourseCode($name))));
-
-        if (Course::query()->where('code', $code)->exists()) {
-            throw ValidationException::withMessages([
-                'programme_code' => 'This programme code is already in use.',
-            ]);
-        }
-
         return Course::query()->create([
             'name' => $name,
-            'code' => $code,
+            'code' => ClassSectionLabel::uniqueCourseCode($name),
             'programme_category' => ProgrammeCategory::Custom,
             'duration' => max(1, (int) ($data['duration'] ?? 1)),
             'duration_type' => DurationType::tryFrom((string) ($data['duration_type'] ?? '')) ?? DurationType::Years,
@@ -108,18 +100,12 @@ class ClassSectionService
     protected function createBatch(Course $course, array $data): Batch
     {
         $sessionId = (int) ($data['academic_session_id'] ?? 0);
-        $trainerId = (int) ($data['trainer_user_id'] ?? 0);
+        $trainerId = filled($data['trainer_user_id'] ?? null) ? (int) $data['trainer_user_id'] : null;
         $section = trim((string) ($data['section'] ?? ''));
 
         if ($sessionId <= 0) {
             throw ValidationException::withMessages([
                 'academic_session_id' => 'Academic session is required.',
-            ]);
-        }
-
-        if ($trainerId <= 0) {
-            throw ValidationException::withMessages([
-                'trainer_user_id' => 'Select faculty / trainer for attendance and batch ownership.',
             ]);
         }
 
@@ -141,14 +127,8 @@ class ClassSectionService
             ]);
         }
 
-        $batchName = trim((string) ($data['batch_name'] ?? ''));
-
-        if ($batchName === '') {
-            $batchName = ClassSectionLabel::suggestBatchName($course->name, $section);
-        }
-
         return Batch::query()->create([
-            'name' => $batchName,
+            'name' => ClassSectionLabel::suggestBatchName($course->name, $section),
             'section' => $section,
             'shift' => filled($data['shift'] ?? null) ? BatchShift::tryFrom((string) $data['shift']) : null,
             'course_id' => $course->id,

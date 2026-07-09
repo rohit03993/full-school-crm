@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\CourseStatus;
 use App\Enums\ProgrammeCategory;
 use App\Enums\DurationType;
+use App\Support\ClassSectionLabel;
 use App\Support\DefaultCourse;
 use App\Services\CourseFeeSyncService;
 use Illuminate\Database\Eloquent\Builder;
@@ -43,6 +44,10 @@ class Course extends Model
         static::creating(function (Course $course): void {
             if ($course->programme_category === null) {
                 $course->programme_category = ProgrammeCategory::Custom;
+            }
+
+            if (blank($course->code) && filled($course->name)) {
+                $course->code = ClassSectionLabel::uniqueCourseCode($course->name);
             }
         });
 

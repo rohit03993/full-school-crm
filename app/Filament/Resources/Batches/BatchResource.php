@@ -20,7 +20,6 @@ use App\Support\CrmNavigation;
 use App\Support\InstituteProfile;
 use App\Support\InstituteTerminology;
 use App\Support\StaffOptions;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -85,22 +84,13 @@ class BatchResource extends Resource
                             ->default(fn (): ?int => AcademicSession::current()?->id)
                             ->searchable()
                             ->preload()
-                            ->native(false),
-                        TextInput::make('name')
-                            ->label('Batch Name')
-                            ->placeholder('e.g. Class 12-A, JEE Batch 2026, B.Com Sem 2-B')
                             ->required()
-                            ->maxLength(255),
+                            ->native(false),
                         TextInput::make('section')
                             ->label('Section')
                             ->placeholder('e.g. A, B, Morning')
+                            ->required()
                             ->maxLength(50),
-                        Select::make('shift')
-                            ->label('Shift')
-                            ->options(collect(BatchShift::cases())->mapWithKeys(
-                                fn (BatchShift $shift) => [$shift->value => $shift->label()],
-                            ))
-                            ->native(false),
                         Select::make('course_id')
                             ->label('Programme')
                             ->options(fn (): array => InstituteProfile::activeCourseAdmissionOptions())
@@ -127,19 +117,6 @@ class BatchResource extends Resource
                                 $set('subject_teacher_assignments', $rows);
                             })
                             ->columnSpanFull(),
-                        Select::make('trainer_user_id')
-                            ->label('Faculty / Teacher')
-                            ->options(fn (): array => StaffOptions::facultyOptions())
-                            ->searchable()
-                            ->required()
-                            ->native(false),
-                        DatePicker::make('start_date')
-                            ->label('Start Date')
-                            ->native(false),
-                        DatePicker::make('end_date')
-                            ->label('End Date')
-                            ->afterOrEqual('start_date')
-                            ->native(false),
                         Select::make('status')
                             ->options(collect(BatchStatus::cases())->mapWithKeys(
                                 fn (BatchStatus $status) => [$status->value => $status->label()],
@@ -229,6 +206,7 @@ class BatchResource extends Resource
                     ->sortable(),
                 TextColumn::make('trainer.name')
                     ->label('Faculty')
+                    ->placeholder('—')
                     ->searchable(),
                 TextColumn::make('lead_teacher_name')
                     ->label('Lead teacher')

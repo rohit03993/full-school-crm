@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Enums\BatchShift;
 use App\Enums\CrmPermission;
 use App\Enums\DurationType;
 use App\Filament\Resources\Batches\BatchResource;
@@ -18,7 +17,6 @@ use App\Support\InstituteProfile;
 use App\Support\InstituteTerminology;
 use App\Support\StaffOptions;
 use Filament\Actions\Action;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -154,19 +152,6 @@ class AddClassSectionPage extends Page
                         ->placeholder('e.g. Class 12 Science, IIT JEE Class 12')
                         ->maxLength(255)
                         ->visible(fn (Get $get): bool => $get('programme_mode') === 'new')
-                        ->required(fn (Get $get): bool => $get('programme_mode') === 'new')
-                        ->live(onBlur: true)
-                        ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
-                            if (blank($get('programme_code'))) {
-                                $set('programme_code', ClassSectionLabel::suggestCourseCode((string) $state));
-                            }
-
-                            $this->applySuggestedBatchName($set, $get);
-                        }),
-                    TextInput::make('programme_code')
-                        ->label('Programme code')
-                        ->maxLength(50)
-                        ->visible(fn (Get $get): bool => $get('programme_mode') === 'new')
                         ->required(fn (Get $get): bool => $get('programme_mode') === 'new'),
                     TextInput::make('duration')
                         ->label('Duration')
@@ -249,32 +234,7 @@ class AddClassSectionPage extends Page
                         ->placeholder('e.g. A, B, Morning, Batch A')
                         ->required()
                         ->maxLength(50)
-                        ->live(onBlur: true)
-                        ->afterStateUpdated(fn (Set $set, Get $get) => $this->applySuggestedBatchName($set, $get)),
-                    TextInput::make('batch_name')
-                        ->label('Internal batch name')
-                        ->helperText('Used in reports. Auto-filled from programme + section; you can edit.')
-                        ->maxLength(255),
-                    Select::make('shift')
-                        ->label('Shift')
-                        ->options(collect(BatchShift::cases())->mapWithKeys(
-                            fn (BatchShift $shift): array => [$shift->value => $shift->label()],
-                        ))
-                        ->native(false),
-                    Select::make('trainer_user_id')
-                        ->label('Faculty / trainer')
-                        ->options(fn (): array => StaffOptions::facultyOptions())
-                        ->searchable()
-                        ->required()
-                        ->native(false)
-                        ->helperText('Used for attendance and batch ownership (existing behaviour).'),
-                    DatePicker::make('start_date')
-                        ->label('Start date')
-                        ->native(false),
-                    DatePicker::make('end_date')
-                        ->label('End date')
-                        ->afterOrEqual('start_date')
-                        ->native(false),
+                        ->live(onBlur: true),
                     Placeholder::make('preview_label')
                         ->label('Will appear as')
                         ->content(function (Get $get): string {
@@ -407,18 +367,6 @@ class AddClassSectionPage extends Page
             ->all();
 
         $set('subject_teacher_assignments', $rows);
-    }
-
-    protected function applySuggestedBatchName(Set $set, Get $get): void
-    {
-        $programme = $this->previewProgrammeName($get);
-        $section = trim((string) $get('section'));
-
-        if (blank($programme) || $section === '') {
-            return;
-        }
-
-        $set('batch_name', ClassSectionLabel::suggestBatchName($programme, $section));
     }
 
     protected function previewProgrammeName(Get $get): string

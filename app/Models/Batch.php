@@ -82,4 +82,19 @@ class Batch extends Model
     {
         return ClassSectionLabel::forBatch($this, includeSession: false, includeShift: false);
     }
+
+    protected static function booted(): void
+    {
+        static::saving(function (Batch $batch): void {
+            if (blank($batch->section) || ! $batch->course_id) {
+                return;
+            }
+
+            $course = $batch->course ?? Course::query()->find($batch->course_id);
+
+            if ($course) {
+                $batch->name = ClassSectionLabel::suggestBatchName($course->name, $batch->section);
+            }
+        });
+    }
 }
