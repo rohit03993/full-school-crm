@@ -122,7 +122,7 @@ class ActivityAttendancePage extends Page
             ? (string) $activity->metadataValue('test_name')
             : $activity->title;
         $this->batchLabel = $activity->batch
-            ? ClassSectionLabel::forBatch($activity->batch)
+            ? ClassSectionLabel::forBatch($activity->batch, includeSession: false)
             : null;
         $this->sessionDateLabel = $activity->session_date?->format('d M Y');
         $this->examWindowId = (int) ($activity->metadataValue('exam_window_id') ?? 0) ?: null;

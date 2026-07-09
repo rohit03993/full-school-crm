@@ -187,6 +187,26 @@ class StudentExamMarksMatrix
         return filled($grade) ? $grade : '—';
     }
 
+    public static function percentage(?float $marks, ?float $maxMarks): ?float
+    {
+        if ($marks === null || $maxMarks === null || $maxMarks <= 0) {
+            return null;
+        }
+
+        return round(($marks / $maxMarks) * 100, 2);
+    }
+
+    public static function formatPercentage(?float $marks, ?float $maxMarks): string
+    {
+        $percentage = self::percentage($marks, $maxMarks);
+
+        if ($percentage === null) {
+            return '—';
+        }
+
+        return rtrim(rtrim(number_format($percentage, 2), '0'), '.').'%';
+    }
+
     public static function formatTotal(float $totalMarks, float $totalMax, ?float $percentage, bool $hasMarks): string
     {
         if (! $hasMarks) {

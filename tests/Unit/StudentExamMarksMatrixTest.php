@@ -14,4 +14,11 @@ class StudentExamMarksMatrixTest extends TestCase
         $this->assertStringContainsString('181 / 300', $display);
         $this->assertStringContainsString('60.33%', $display);
     }
+
+    public function test_format_percentage_from_marks_and_max(): void
+    {
+        $this->assertSame(50.0, StudentExamMarksMatrix::percentage(50, 100));
+        $this->assertSame('50%', StudentExamMarksMatrix::formatPercentage(50, 100));
+        $this->assertSame('—', StudentExamMarksMatrix::formatPercentage(null, 100));
+    }
 }
