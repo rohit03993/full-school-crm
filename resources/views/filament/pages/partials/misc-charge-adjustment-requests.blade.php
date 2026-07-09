@@ -122,6 +122,7 @@
                             <th class="px-4 py-3 font-semibold">Type</th>
                             <th class="px-4 py-3 font-semibold">Item</th>
                             <th class="px-4 py-3 font-semibold text-right">Amount</th>
+                            <th class="px-4 py-3 font-semibold">Status</th>
                             <th class="px-4 py-3 font-semibold">By</th>
                             <th class="px-4 py-3 font-semibold">Reason</th>
                         </tr>
@@ -147,6 +148,13 @@
                                 </td>
                                 <td class="px-4 py-3 text-gray-800 dark:text-gray-200">{{ $entry->label }}</td>
                                 <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300">− ₹{{ number_format($entry->amount, 2) }}</td>
+                                <td class="px-4 py-3">
+                                    <span @class([
+                                        'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                        'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' => $entry->status === 'approved',
+                                        'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200' => $entry->status === 'pending',
+                                    ])>{{ $entry->statusLabel }}</span>
+                                </td>
                                 <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ $entry->actorName }}</td>
                                 <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ $entry->reason ?: '—' }}</td>
                             </tr>

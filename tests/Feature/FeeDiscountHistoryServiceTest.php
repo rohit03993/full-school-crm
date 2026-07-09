@@ -96,6 +96,37 @@ class FeeDiscountHistoryServiceTest extends TestCase
         $this->assertSame($student->name, $history->first()->studentName);
     }
 
+    public function test_student_timeline_includes_pending_misc_adjustment(): void
+    {
+        $staff = $this->createStaff();
+        $admin = $this->createSuperAdmin();
+        $student = $this->createEnrolledStudent($staff);
+        $feeStructure = $student->activeEnrollment->feeStructure;
+
+        $charge = app(FeeMiscChargeService::class)->addSeparateCharge(
+            $feeStructure,
+            'Glass Broke',
+            2000,
+            null,
+            $staff,
+        );
+
+        app(FeeMiscChargeAdjustmentService::class)->submitRequest(
+            $charge,
+            $staff,
+            FeeMiscChargeAdjustmentType::Discount,
+            500,
+            'Accidental damage waiver request',
+        );
+
+        $summary = app(FeeDiscountHistoryService::class)->studentSummary($student);
+        $timeline = app(FeeDiscountHistoryService::class)->studentTimeline($student);
+
+        $this->assertSame(500.0, $summary['pending_total']);
+        $this->assertSame(1, $summary['pending_count']);
+        $this->assertTrue($timeline->contains(fn ($item) => $item->status === 'pending' && $item->amount === 500.0));
+    }
+
     protected function createSuperAdmin(): User
     {
         Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);

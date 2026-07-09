@@ -21,6 +21,16 @@
     $needsCashOnlineSplit = $fees
         && \App\Support\FeeSettings::onlineAllowanceGstEnabled()
         && ! $fees->hasOnlineAllowancePlan();
+    $discountSummary = $discountSummary ?? [
+        'approved_total' => 0.0,
+        'pending_total' => 0.0,
+        'approved_count' => 0,
+        'pending_count' => 0,
+    ];
+    $discountTimeline = $discountTimeline ?? collect();
+    $hasDiscountRecord = ($discountSummary['approved_total'] ?? 0) > 0
+        || ($discountSummary['pending_total'] ?? 0) > 0
+        || $discountTimeline->isNotEmpty();
 @endphp
 
 <div wire:init="loadFeesTab">
@@ -70,7 +80,7 @@
             </div>
         @endif
         {{-- Financial overview --}}
-        <div class="overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg ring-1 ring-white/10">
+        <div x-data="{ discountOpen: false }" class="overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg ring-1 ring-white/10">
             <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-medium uppercase tracking-wider text-slate-400">
@@ -82,7 +92,7 @@
                         ₹{{ number_format($netTuition, 0) }}
                         <span class="text-base font-medium text-slate-400">net tuition</span>
                     </p>
-                    @if ($discount > 0 || $fees->hasOnlineAllowancePlan())
+                    @if ($discount > 0 || $fees->hasOnlineAllowancePlan() || $hasDiscountRecord)
                         <p class="mt-1 text-xs text-slate-400">
                             Course ₹{{ number_format($courseFee, 0) }}
                             @if ($discount > 0)
@@ -92,6 +102,22 @@
                                 · Cash ₹{{ number_format((float) $fees->planned_cash_amount, 0) }} / Online ₹{{ number_format((float) $fees->planned_online_amount, 0) }}
                             @endif
                         </p>
+                    @endif
+
+                    @if ($hasDiscountRecord)
+                        <button
+                            type="button"
+                            @@click="discountOpen = true"
+                            class="mt-3 inline-flex flex-wrap items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-left text-xs ring-1 ring-white/15 transition hover:bg-white/15"
+                        >
+                            <span class="font-semibold text-emerald-300">Total discounts received: ₹{{ number_format((float) $discountSummary['approved_total'], 0) }}</span>
+                            @if (($discountSummary['pending_total'] ?? 0) > 0)
+                                <span class="rounded-full bg-amber-500/20 px-2 py-0.5 font-semibold text-amber-200">
+                                    ₹{{ number_format((float) $discountSummary['pending_total'], 0) }} pending
+                                </span>
+                            @endif
+                            <span class="text-slate-400">· Click for history</span>
+                        </button>
                     @endif
 
                     <div class="mt-4">
@@ -152,6 +178,78 @@
                     ])>₹{{ number_format($penaltyPending, 0) }}</p>
                 </div>
             </div>
+
+            @if ($hasDiscountRecord)
+                <template x-teleport="body">
+                    <div
+                        x-show="discountOpen"
+                        x-cloak
+                        class="fixed inset-0 z-[200] flex items-center justify-center bg-gray-950/50 p-4 backdrop-blur-[1px]"
+                        @@keydown.escape.window="discountOpen = false"
+                    >
+                        <div
+                            class="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10"
+                            @@click.outside="discountOpen = false"
+                        >
+                            <div class="border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-teal-50 px-5 py-4 dark:border-white/10 dark:from-emerald-950/40 dark:to-teal-950/30">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-[11px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Discount & waive-off history</p>
+                                        <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                                            Approved: <span class="font-bold text-emerald-700 dark:text-emerald-300">₹{{ number_format((float) $discountSummary['approved_total'], 2) }}</span>
+                                            @if (($discountSummary['pending_total'] ?? 0) > 0)
+                                                · Pending: <span class="font-bold text-amber-700 dark:text-amber-300">₹{{ number_format((float) $discountSummary['pending_total'], 2) }}</span>
+                                            @endif
+                                        </p>
+                                    </div>
+                                    <button type="button" class="rounded-lg px-2 py-1 text-sm text-gray-500 hover:bg-white/60 dark:hover:bg-white/10" @@click="discountOpen = false">Close</button>
+                                </div>
+                            </div>
+                            <div class="overflow-y-auto">
+                                @if ($discountTimeline->isEmpty())
+                                    <p class="px-5 py-8 text-center text-sm text-gray-500">No discount or waive-off entries yet.</p>
+                                @else
+                                    <table class="w-full min-w-[640px] text-left text-sm">
+                                        <thead class="sticky top-0 bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 dark:bg-gray-900">
+                                            <tr>
+                                                <th class="px-5 py-3 font-semibold">Date</th>
+                                                <th class="px-4 py-3 font-semibold">Type</th>
+                                                <th class="px-4 py-3 font-semibold">Item</th>
+                                                <th class="px-4 py-3 font-semibold text-right">Amount</th>
+                                                <th class="px-4 py-3 font-semibold">Status</th>
+                                                <th class="px-4 py-3 font-semibold">By</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100 dark:divide-white/5">
+                                            @foreach ($discountTimeline as $entry)
+                                                <tr>
+                                                    <td class="px-5 py-3 text-gray-600 dark:text-gray-400">{{ $entry->occurredAt->format('d M Y H:i') }}</td>
+                                                    <td class="px-4 py-3 text-gray-800 dark:text-gray-200">{{ $entry->kindLabel }}</td>
+                                                    <td class="px-4 py-3 text-gray-800 dark:text-gray-200">
+                                                        <p>{{ $entry->label }}</p>
+                                                        @if ($entry->reason)
+                                                            <p class="mt-0.5 text-xs text-gray-500">{{ $entry->reason }}</p>
+                                                        @endif
+                                                    </td>
+                                                    <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300">− ₹{{ number_format($entry->amount, 2) }}</td>
+                                                    <td class="px-4 py-3">
+                                                        <span @class([
+                                                            'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                                            'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' => $entry->status === 'approved',
+                                                            'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200' => $entry->status === 'pending',
+                                                        ])>{{ $entry->statusLabel }}</span>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ $entry->actorName }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            @endif
         </div>
 
         @if ($fees->discountEntries->isNotEmpty() || $bundledMisc->isNotEmpty() || ($discount > 0 && $fees->discountSetBy))

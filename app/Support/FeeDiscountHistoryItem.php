@@ -17,5 +17,7 @@ readonly class FeeDiscountHistoryItem
         public ?string $reason,
         public CarbonInterface $occurredAt,
         public string $source,
+        public string $status = 'approved',
+        public string $statusLabel = 'Approved',
     ) {}
 }

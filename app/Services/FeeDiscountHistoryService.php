@@ -6,6 +6,7 @@ use App\Enums\FeeMiscChargeAdjustmentRequestStatus;
 use App\Enums\FeeMiscChargeAdjustmentType;
 use App\Models\FeeDiscountEntry;
 use App\Models\FeeMiscChargeAdjustmentRequest;
+use App\Models\Student;
 use App\Support\CrmPagination;
 use App\Support\FeeDiscountHistoryItem;
 use Illuminate\Support\Collection;
@@ -159,5 +160,174 @@ class FeeDiscountHistoryService
         }
 
         return 0.0;
+    }
+
+    /**
+     * @return array{
+     *     approved_total: float,
+     *     pending_total: float,
+     *     approved_count: int,
+     *     pending_count: int,
+     * }
+     */
+    public function studentSummary(Student $student): array
+    {
+        $feeStructureId = $student->activeEnrollment?->feeStructure?->id;
+        $admissionId = $student->activeEnrollment?->admission_id;
+
+        if (! $feeStructureId && ! $admissionId) {
+            return [
+                'approved_total' => 0.0,
+                'pending_total' => 0.0,
+                'approved_count' => 0,
+                'pending_count' => 0,
+            ];
+        }
+
+        $tuitionQuery = FeeDiscountEntry::query()->where('amount', '<', 0);
+
+        if ($feeStructureId) {
+            $tuitionQuery->where('fee_structure_id', $feeStructureId);
+        } else {
+            $tuitionQuery->where('admission_id', $admissionId);
+        }
+
+        $tuition = $tuitionQuery
+            ->selectRaw('COUNT(*) as entry_count, COALESCE(SUM(ABS(amount)), 0) as entry_total')
+            ->first();
+
+        $approvedTotal = round((float) ($tuition->entry_total ?? 0), 2);
+        $approvedCount = (int) ($tuition->entry_count ?? 0);
+        $pendingTotal = 0.0;
+        $pendingCount = 0;
+
+        if (FeeMiscChargeAdjustmentRequest::schemaReady() && $feeStructureId) {
+            $miscApproved = FeeMiscChargeAdjustmentRequest::query()
+                ->where('status', FeeMiscChargeAdjustmentRequestStatus::Approved)
+                ->whereHas('charge', fn ($query) => $query->where('fee_structure_id', $feeStructureId))
+                ->get();
+
+            foreach ($miscApproved as $request) {
+                $approvedTotal = round($approvedTotal + $this->resolvedAppliedAmount($request), 2);
+                $approvedCount++;
+            }
+
+            $miscPending = FeeMiscChargeAdjustmentRequest::query()
+                ->where('status', FeeMiscChargeAdjustmentRequestStatus::Pending)
+                ->whereHas('charge', fn ($query) => $query->where('fee_structure_id', $feeStructureId))
+                ->with('charge')
+                ->get();
+
+            foreach ($miscPending as $request) {
+                $pendingTotal = round($pendingTotal + $this->pendingRequestAmount($request), 2);
+                $pendingCount++;
+            }
+        }
+
+        return [
+            'approved_total' => $approvedTotal,
+            'pending_total' => $pendingTotal,
+            'approved_count' => $approvedCount,
+            'pending_count' => $pendingCount,
+        ];
+    }
+
+    /**
+     * @return Collection<int, FeeDiscountHistoryItem>
+     */
+    public function studentTimeline(Student $student, int $limit = 50): Collection
+    {
+        $feeStructureId = $student->activeEnrollment?->feeStructure?->id;
+        $admissionId = $student->activeEnrollment?->admission_id;
+
+        if (! $feeStructureId && ! $admissionId) {
+            return collect();
+        }
+
+        $items = collect();
+
+        $tuitionQuery = FeeDiscountEntry::query()
+            ->where('amount', '<', 0)
+            ->with(['grantedBy']);
+
+        if ($feeStructureId) {
+            $tuitionQuery->where('fee_structure_id', $feeStructureId);
+        } else {
+            $tuitionQuery->where('admission_id', $admissionId);
+        }
+
+        $tuitionQuery
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get()
+            ->each(function (FeeDiscountEntry $entry) use ($items, $student): void {
+                $items->push(new FeeDiscountHistoryItem(
+                    kind: 'tuition_discount',
+                    kindLabel: 'Main fee discount',
+                    label: 'Tuition fee plan',
+                    amount: round(abs((float) $entry->amount), 2),
+                    studentName: $student->name,
+                    studentId: $student->id,
+                    actorName: $entry->grantedBy?->name ?? '—',
+                    reason: $entry->reason,
+                    occurredAt: $entry->created_at,
+                    source: 'fee_discount_entry',
+                    status: 'approved',
+                    statusLabel: 'Approved',
+                ));
+            });
+
+        if (FeeMiscChargeAdjustmentRequest::schemaReady() && $feeStructureId) {
+            FeeMiscChargeAdjustmentRequest::query()
+                ->whereHas('charge', fn ($query) => $query->where('fee_structure_id', $feeStructureId))
+                ->whereIn('status', [
+                    FeeMiscChargeAdjustmentRequestStatus::Approved,
+                    FeeMiscChargeAdjustmentRequestStatus::Pending,
+                ])
+                ->with(['charge', 'requestedBy', 'reviewedBy'])
+                ->orderByDesc('created_at')
+                ->limit($limit)
+                ->get()
+                ->each(function (FeeMiscChargeAdjustmentRequest $request) use ($items, $student): void {
+                    $charge = $request->charge;
+                    $isWaive = $request->type === FeeMiscChargeAdjustmentType::WaiveOff;
+                    $isPending = $request->status === FeeMiscChargeAdjustmentRequestStatus::Pending;
+
+                    $items->push(new FeeDiscountHistoryItem(
+                        kind: $isWaive ? 'misc_waive_off' : 'misc_discount',
+                        kindLabel: $isWaive ? 'Additional charge waive-off' : 'Additional charge discount',
+                        label: $charge?->label ?? 'Additional charge',
+                        amount: $isPending
+                            ? $this->pendingRequestAmount($request)
+                            : $this->resolvedAppliedAmount($request),
+                        studentName: $student->name,
+                        studentId: $student->id,
+                        actorName: $isPending
+                            ? ($request->requestedBy?->name ?? '—')
+                            : ($request->reviewedBy?->name ?? $request->requestedBy?->name ?? '—'),
+                        reason: $request->reason,
+                        occurredAt: $isPending
+                            ? $request->created_at
+                            : ($request->reviewed_at ?? $request->created_at),
+                        source: 'misc_charge_adjustment',
+                        status: $isPending ? 'pending' : 'approved',
+                        statusLabel: $isPending ? 'Pending' : 'Approved',
+                    ));
+                });
+        }
+
+        return $items
+            ->sortByDesc(fn (FeeDiscountHistoryItem $item): int => $item->occurredAt->timestamp)
+            ->take($limit)
+            ->values();
+    }
+
+    public function pendingRequestAmount(FeeMiscChargeAdjustmentRequest $request): float
+    {
+        if ($request->type === FeeMiscChargeAdjustmentType::Discount) {
+            return round((float) ($request->discount_amount ?? 0), 2);
+        }
+
+        return round((float) ($request->charge?->pendingAmount() ?? 0), 2);
     }
 }

@@ -49,6 +49,7 @@ use App\Services\DocumentService;
 use App\Services\EnquiryService;
 use App\Services\EnrollmentPlacementService;
 use App\Services\EnrollmentRollNumberService;
+use App\Services\FeeDiscountHistoryService;
 use App\Services\FeeInstallmentService;
 use App\Services\FeeMiscChargeAdjustmentService;
 use App\Services\FeeMiscChargeService;
@@ -2536,6 +2537,8 @@ class StudentProfilePage extends Page
                                     'canRequestMiscAdjustment' => $this->userCanRequestMiscAdjustment(),
                                     'adjustmentsUrl' => MiscChargeAdjustmentRequestsPage::getUrl(),
                                     'canReviewMiscAdjustments' => $this->userIsSuperAdmin(),
+                                    'discountSummary' => app(FeeDiscountHistoryService::class)->studentSummary($this->record),
+                                    'discountTimeline' => app(FeeDiscountHistoryService::class)->studentTimeline($this->record),
                                 ]),
                         ]),
                     'receipts' => Tab::make('Receipts')
