@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\FeeMiscChargeKind;
 use App\Enums\FeeMiscChargeStatus;
+use App\Enums\FeeMiscChargeAdjustmentRequestStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -65,14 +66,27 @@ class FeeMiscCharge extends Model
 
     public function pendingAdjustmentRequest(): ?FeeMiscChargeAdjustmentRequest
     {
+        if (! FeeMiscChargeAdjustmentRequest::schemaReady()) {
+            return null;
+        }
+
+        if ($this->relationLoaded('adjustmentRequests')) {
+            return $this->adjustmentRequests
+                ->first(fn (FeeMiscChargeAdjustmentRequest $request): bool => $request->status === FeeMiscChargeAdjustmentRequestStatus::Pending);
+        }
+
         return $this->adjustmentRequests()
-            ->where('status', \App\Enums\FeeMiscChargeAdjustmentRequestStatus::Pending)
+            ->where('status', FeeMiscChargeAdjustmentRequestStatus::Pending)
             ->latest('id')
             ->first();
     }
 
     public function canRequestAdjustment(): bool
     {
+        if (! FeeMiscChargeAdjustmentRequest::schemaReady()) {
+            return false;
+        }
+
         return $this->isSeparateCharge()
             && $this->status !== FeeMiscChargeStatus::Cancelled
             && $this->pendingAmount() > 0

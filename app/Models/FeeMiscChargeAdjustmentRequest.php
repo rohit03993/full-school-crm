@@ -6,9 +6,14 @@ use App\Enums\FeeMiscChargeAdjustmentRequestStatus;
 use App\Enums\FeeMiscChargeAdjustmentType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Schema;
 
 class FeeMiscChargeAdjustmentRequest extends Model
 {
+    public static function schemaReady(): bool
+    {
+        return Schema::hasTable('fee_misc_charge_adjustment_requests');
+    }
     protected $fillable = [
         'fee_misc_charge_id',
         'requested_by_user_id',

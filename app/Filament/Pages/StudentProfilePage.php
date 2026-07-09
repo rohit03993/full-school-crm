@@ -31,6 +31,7 @@ use App\Models\Admission;
 use App\Models\Document;
 use App\Models\Enquiry;
 use App\Models\FeeMiscCharge;
+use App\Models\FeeMiscChargeAdjustmentRequest;
 use App\Models\FeePenalty;
 use App\Models\Payment;
 use App\Models\Student;
@@ -1154,16 +1155,15 @@ class StudentProfilePage extends Page
 
         $this->syncCatalogCourseFeeIfNeeded();
         $this->feesTabLoaded = true;
-        $this->record->loadMissing([
+        $this->record->loadMissing(array_merge([
             'activeEnrollment.course',
             'activeEnrollment.feeStructure.installments',
-            'activeEnrollment.feeStructure.miscCharges.adjustmentRequests.requestedBy',
             'activeEnrollment.feeStructure.penalties.feeInstallment',
             'activeEnrollment.feeStructure.discountSetBy',
             'activeEnrollment.feeStructure.discountEntries.grantedBy',
             'activeEnrollment.feeStructure.setBy',
             'activeEnrollment.feeStructure.history.changedBy',
-        ]);
+        ], $this->miscChargesEagerLoadPaths()));
         $feeStructure = $this->record->activeEnrollment?->feeStructure;
 
         $this->installments = $feeStructure
@@ -1234,12 +1234,28 @@ class StudentProfilePage extends Page
 
     protected function userCanRequestMiscAdjustment(): bool
     {
+        if (! FeeMiscChargeAdjustmentRequest::schemaReady()) {
+            return false;
+        }
+
         if ($this->userIsSuperAdmin()) {
             return true;
         }
 
         return $this->userCan(CrmPermission::FeesWaivePenalty)
             || $this->userCan(CrmPermission::FeesAdjustStructure);
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function miscChargesEagerLoadPaths(): array
+    {
+        if (FeeMiscChargeAdjustmentRequest::schemaReady()) {
+            return ['activeEnrollment.feeStructure.miscCharges.adjustmentRequests.requestedBy'];
+        }
+
+        return ['activeEnrollment.feeStructure.miscCharges'];
     }
 
     protected function userIsSuperAdmin(): bool
@@ -1690,11 +1706,10 @@ class StudentProfilePage extends Page
             return false;
         }
 
-        $this->record->load([
+        $this->record->load(array_merge([
             'activeEnrollment.course',
             'activeEnrollment.feeStructure.installments',
-            'activeEnrollment.feeStructure.miscCharges.adjustmentRequests.requestedBy',
-        ]);
+        ], $this->miscChargesEagerLoadPaths()));
         $this->cachedProfileSummary = null;
 
         return true;
@@ -2495,11 +2510,10 @@ class StudentProfilePage extends Page
                         ->schema([
                             View::make('filament.pages.partials.student-profile-fees')
                                 ->viewData(fn (): array => [
-                                    'record' => $this->record->loadMissing([
+                                    'record' => $this->record->loadMissing(array_merge([
                                         'activeEnrollment.course',
                                         'activeEnrollment.feeStructure.installments',
-                                        'activeEnrollment.feeStructure.miscCharges.adjustmentRequests.requestedBy',
-                                    ]),
+                                    ], $this->miscChargesEagerLoadPaths())),
                                     'feesTabLoaded' => $this->feesTabLoaded,
                                     'payments' => $this->payments,
                                     'installments' => $this->installments,

@@ -29,6 +29,12 @@ class FeeMiscChargeAdjustmentService
         ?float $discountAmount,
         string $reason,
     ): FeeMiscChargeAdjustmentRequest {
+        if (! FeeMiscChargeAdjustmentRequest::schemaReady()) {
+            throw ValidationException::withMessages([
+                'charge' => 'Charge adjustment requests are not available yet. Run database migrations on the server (php artisan migrate).',
+            ]);
+        }
+
         $this->assertCanRequest($staff);
         $this->assertChargeAdjustable($charge);
 
@@ -236,6 +242,10 @@ class FeeMiscChargeAdjustmentService
      */
     public function pendingRequests(): Collection
     {
+        if (! FeeMiscChargeAdjustmentRequest::schemaReady()) {
+            return collect();
+        }
+
         return FeeMiscChargeAdjustmentRequest::query()
             ->where('status', FeeMiscChargeAdjustmentRequestStatus::Pending)
             ->with([
@@ -249,6 +259,10 @@ class FeeMiscChargeAdjustmentService
 
     public function pendingCount(): int
     {
+        if (! FeeMiscChargeAdjustmentRequest::schemaReady()) {
+            return 0;
+        }
+
         return FeeMiscChargeAdjustmentRequest::query()
             ->where('status', FeeMiscChargeAdjustmentRequestStatus::Pending)
             ->count();
