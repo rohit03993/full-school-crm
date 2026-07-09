@@ -58,6 +58,27 @@ class FeeMiscCharge extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function adjustmentRequests(): HasMany
+    {
+        return $this->hasMany(FeeMiscChargeAdjustmentRequest::class);
+    }
+
+    public function pendingAdjustmentRequest(): ?FeeMiscChargeAdjustmentRequest
+    {
+        return $this->adjustmentRequests()
+            ->where('status', \App\Enums\FeeMiscChargeAdjustmentRequestStatus::Pending)
+            ->latest('id')
+            ->first();
+    }
+
+    public function canRequestAdjustment(): bool
+    {
+        return $this->isSeparateCharge()
+            && $this->status !== FeeMiscChargeStatus::Cancelled
+            && $this->pendingAmount() > 0
+            && $this->pendingAdjustmentRequest() === null;
+    }
+
     public function isBundledInNetFee(): bool
     {
         return $this->kind === FeeMiscChargeKind::Bundled;

@@ -98,4 +98,18 @@ class CrmNavBadges
             Cache::forget('crm.nav.my_meetings_open.'.$userId);
         }
     }
+
+    public static function miscChargeAdjustmentsPending(): int
+    {
+        return (int) Cache::remember(
+            'crm.nav.misc_charge_adjustments_pending',
+            self::CACHE_SECONDS,
+            fn (): int => app(\App\Services\FeeMiscChargeAdjustmentService::class)->pendingCount(),
+        );
+    }
+
+    public static function flushMiscChargeAdjustmentBadgeCache(): void
+    {
+        Cache::forget('crm.nav.misc_charge_adjustments_pending');
+    }
 }

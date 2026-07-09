@@ -9,6 +9,7 @@ use App\Models\ActivityAttendance;
 use App\Models\ActivityType;
 use App\Enums\CrmPermission;
 use App\Enums\DocumentType;
+use App\Enums\FeeMiscChargeAdjustmentType;
 use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Enums\WhatsAppRecipientStatus;
@@ -48,6 +49,7 @@ use App\Services\EnquiryService;
 use App\Services\EnrollmentPlacementService;
 use App\Services\EnrollmentRollNumberService;
 use App\Services\FeeInstallmentService;
+use App\Services\FeeMiscChargeAdjustmentService;
 use App\Services\FeeMiscChargeService;
 use App\Services\FeeStructureService;
 use App\Services\HomeworkAssignmentService;
@@ -1155,7 +1157,7 @@ class StudentProfilePage extends Page
         $this->record->loadMissing([
             'activeEnrollment.course',
             'activeEnrollment.feeStructure.installments',
-            'activeEnrollment.feeStructure.miscCharges',
+            'activeEnrollment.feeStructure.miscCharges.adjustmentRequests.requestedBy',
             'activeEnrollment.feeStructure.penalties.feeInstallment',
             'activeEnrollment.feeStructure.discountSetBy',
             'activeEnrollment.feeStructure.discountEntries.grantedBy',
@@ -1185,16 +1187,22 @@ class StudentProfilePage extends Page
         $this->mountAction('addPayment', ['miscChargeId' => $chargeId]);
     }
 
-    public function waiveLateFeeMiscCharge(int $chargeId, string $reason, FeeMiscChargeService $miscCharges): void
-    {
-        abort_unless($this->userCan(CrmPermission::FeesWaivePenalty), 403);
+    public function submitMiscChargeAdjustmentRequest(
+        int $chargeId,
+        string $type,
+        ?float $discountAmount,
+        string $reason,
+        FeeMiscChargeService $miscCharges,
+        FeeMiscChargeAdjustmentService $adjustments,
+    ): void {
+        abort_unless($this->userCanRequestMiscAdjustment(), 403);
 
         $reason = trim($reason);
 
         if ($reason === '') {
             Notification::make()
                 ->title('Reason required')
-                ->body('Enter why this late fee is being waived.')
+                ->body('Enter why this discount or waive-off is needed.')
                 ->warning()
                 ->send();
 
@@ -1202,35 +1210,36 @@ class StudentProfilePage extends Page
         }
 
         $charge = $miscCharges->resolveForStudent($this->record, $chargeId);
-        $amount = $charge->pendingAmount();
-        $miscCharges->waiveLateFeePenalty($charge, Auth::user(), $reason);
 
-        $this->feesTabLoaded = false;
-        $this->loadFeesTab();
-        $this->refreshRecord();
+        try {
+            $adjustmentType = FeeMiscChargeAdjustmentType::from($type);
+            $adjustments->submitRequest($charge, Auth::user(), $adjustmentType, $discountAmount, $reason);
 
-        Notification::make()
-            ->title('Late fee waived')
-            ->body('₹'.number_format($amount, 2).' removed from balance due.')
-            ->success()
-            ->send();
+            $this->feesTabLoaded = false;
+            $this->loadFeesTab();
+
+            Notification::make()
+                ->title('Request sent to admin')
+                ->body('Super Admin will review your '.$adjustmentType->label().' request.')
+                ->success()
+                ->send();
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not submit request')
+                ->body(collect($exception->errors())->flatten()->first())
+                ->danger()
+                ->send();
+        }
     }
 
-    public function waiveMiscCharge(int $chargeId, string $reason, FeeMiscChargeService $miscCharges): void
+    protected function userCanRequestMiscAdjustment(): bool
     {
-        abort_unless($this->userIsSuperAdmin(), 403);
+        if ($this->userIsSuperAdmin()) {
+            return true;
+        }
 
-        $charge = $miscCharges->resolveForStudent($this->record, $chargeId);
-        $miscCharges->waiveSeparateCharge($charge, Auth::user(), $reason);
-
-        $this->feesTabLoaded = false;
-        $this->loadFeesTab();
-
-        Notification::make()
-            ->title('Misc charge removed')
-            ->body('The charge was archived and no longer counts toward balance due.')
-            ->success()
-            ->send();
+        return $this->userCan(CrmPermission::FeesWaivePenalty)
+            || $this->userCan(CrmPermission::FeesAdjustStructure);
     }
 
     protected function userIsSuperAdmin(): bool
@@ -1684,7 +1693,7 @@ class StudentProfilePage extends Page
         $this->record->load([
             'activeEnrollment.course',
             'activeEnrollment.feeStructure.installments',
-            'activeEnrollment.feeStructure.miscCharges',
+            'activeEnrollment.feeStructure.miscCharges.adjustmentRequests.requestedBy',
         ]);
         $this->cachedProfileSummary = null;
 
@@ -2489,7 +2498,7 @@ class StudentProfilePage extends Page
                                     'record' => $this->record->loadMissing([
                                         'activeEnrollment.course',
                                         'activeEnrollment.feeStructure.installments',
-                                        'activeEnrollment.feeStructure.miscCharges',
+                                        'activeEnrollment.feeStructure.miscCharges.adjustmentRequests.requestedBy',
                                     ]),
                                     'feesTabLoaded' => $this->feesTabLoaded,
                                     'payments' => $this->payments,
@@ -2497,8 +2506,9 @@ class StudentProfilePage extends Page
                                     'penalties' => $this->penalties,
                                     'feeStructureHistory' => $this->feeStructureHistory,
                                     'canCollectFees' => $this->userCan(CrmPermission::FeesCollect),
-                                    'canWaivePenalty' => $this->userCan(CrmPermission::FeesWaivePenalty),
-                                    'canWaiveMiscCharge' => $this->userIsSuperAdmin(),
+                                    'canRequestMiscAdjustment' => $this->userCanRequestMiscAdjustment(),
+                                    'adjustmentsUrl' => MiscChargeAdjustmentRequestsPage::getUrl(),
+                                    'canReviewMiscAdjustments' => $this->userIsSuperAdmin(),
                                 ]),
                         ]),
                     'receipts' => Tab::make('Receipts')

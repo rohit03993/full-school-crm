@@ -270,7 +270,7 @@
                     </span>
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Additional charges</h3>
-                        <p class="text-xs text-gray-500">Hostel, materials, late fees, GST — paid separately via Add Payment</p>
+                        <p class="text-xs text-gray-500">Hostel, materials, late fees, GST — paid separately via Add Payment. Discount / waive-off needs admin approval.</p>
                     </div>
                 </div>
                 <div class="overflow-x-auto">
@@ -340,15 +340,19 @@
                                                     Pay
                                                 </button>
                                             @endif
-                                            @if ($charge->isLateFeePenalty() && ($canWaivePenalty ?? false) && $charge->isPayableSeparately())
-                                                <div x-data="{ open: false, reason: '' }">
+                                            @php($pendingRequest = $charge->pendingAdjustmentRequest())
+                                            @if ($pendingRequest)
+                                                <span class="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-900 dark:bg-amber-500/15 dark:text-amber-200">
+                                                    {{ $pendingRequest->type->label() }} pending
+                                                </span>
+                                            @elseif ($charge->canRequestAdjustment() && ($canRequestMiscAdjustment ?? false))
+                                                <div x-data="{ open: false, type: 'waive_off', discount: '', reason: '' }">
                                                     <button
                                                         type="button"
-                                                        @click="open = true; reason = ''"
+                                                        @click="open = true; type = 'waive_off'; discount = ''; reason = ''"
                                                         class="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20"
                                                     >
-                                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                                                        Waive
+                                                        Discount / Waive
                                                     </button>
                                                     <template x-teleport="body">
                                                         <div
@@ -362,55 +366,47 @@
                                                                 @click.outside="open = false"
                                                             >
                                                                 <div class="border-b border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50 px-5 py-4 dark:border-amber-500/20 dark:from-amber-950/40 dark:to-orange-950/20">
-                                                                    <p class="text-[11px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">Waive late fee</p>
+                                                                    <p class="text-[11px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">Request adjustment</p>
                                                                     <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ $charge->label }}</p>
-                                                                    <p class="mt-1 text-xs text-amber-900/80 dark:text-amber-200/80">Pending amount: <span class="font-bold">₹{{ number_format($chargePending, 2) }}</span></p>
+                                                                    <p class="mt-1 text-xs text-amber-900/80 dark:text-amber-200/80">Pending balance: <span class="font-bold">₹{{ number_format($chargePending, 2) }}</span></p>
                                                                 </div>
                                                                 <div class="space-y-3 px-5 py-4">
                                                                     <p class="text-xs leading-relaxed text-gray-600 dark:text-gray-400">
-                                                                        Use when the institute agrees not to collect this penalty. The charge is removed from balance due and logged in the audit trail.
+                                                                        Super Admin must approve before the balance changes. Use waive-off to forgive the full pending amount, or discount for a partial reduction.
                                                                     </p>
+                                                                    <div class="grid grid-cols-2 gap-2">
+                                                                        <label class="cursor-pointer rounded-xl border px-3 py-2 text-center text-xs font-semibold" :class="type === 'waive_off' ? 'border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200' : 'border-gray-200 text-gray-600 dark:border-white/10 dark:text-gray-400'">
+                                                                            <input type="radio" class="sr-only" value="waive_off" x-model="type" />
+                                                                            Waive off
+                                                                        </label>
+                                                                        <label class="cursor-pointer rounded-xl border px-3 py-2 text-center text-xs font-semibold" :class="type === 'discount' ? 'border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200' : 'border-gray-200 text-gray-600 dark:border-white/10 dark:text-gray-400'">
+                                                                            <input type="radio" class="sr-only" value="discount" x-model="type" />
+                                                                            Discount
+                                                                        </label>
+                                                                    </div>
+                                                                    <div x-show="type === 'discount'">
+                                                                        <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Discount amount (₹)</label>
+                                                                        <input type="number" min="1" :max="{{ $chargePending }}" step="0.01" x-model="discount" class="w-full rounded-xl border-gray-200 text-sm dark:border-white/10 dark:bg-white/5" placeholder="e.g. 500" />
+                                                                    </div>
                                                                     <div>
-                                                                        <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Reason for waiver <span class="text-red-500">*</span></label>
-                                                                        <textarea
-                                                                            x-model="reason"
-                                                                            rows="3"
-                                                                            class="w-full rounded-xl border-gray-200 text-sm shadow-sm focus:border-amber-400 focus:ring-amber-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
-                                                                            placeholder="e.g. First-time delay, medical emergency, management approval"
-                                                                        ></textarea>
-                                                                        <p class="mt-1 text-[11px] text-gray-500" x-show="reason.trim().length > 0 && reason.trim().length < 3">Please enter at least 3 characters.</p>
+                                                                        <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Reason <span class="text-red-500">*</span></label>
+                                                                        <textarea x-model="reason" rows="3" class="w-full rounded-xl border-gray-200 text-sm dark:border-white/10 dark:bg-white/5" placeholder="e.g. Management approved waiver, first-time penalty, financial hardship"></textarea>
                                                                     </div>
                                                                     <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                                                        <button type="button" class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300" @click="open = false">Cancel</button>
                                                                         <button
                                                                             type="button"
-                                                                            class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5"
-                                                                            @click="open = false"
+                                                                            class="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
+                                                                            :disabled="reason.trim().length < 3 || (type === 'discount' && (!discount || Number(discount) <= 0 || Number(discount) > {{ $chargePending }}))"
+                                                                            @click="$wire.submitMiscChargeAdjustmentRequest({{ $charge->id }}, type, type === 'discount' ? Number(discount) : null, reason.trim()); open = false"
                                                                         >
-                                                                            Cancel
-                                                                        </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            class="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                                                            :disabled="reason.trim().length < 3"
-                                                                            @click="$wire.waiveLateFeeMiscCharge({{ $charge->id }}, reason.trim()); open = false; reason = ''"
-                                                                        >
-                                                                            Waive ₹{{ number_format($chargePending, 0) }}
+                                                                            Send for approval
                                                                         </button>
                                                                     </div>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </template>
-                                                </div>
-                                            @endif
-                                            @if ($charge->canBeWaivedBySuperAdmin() && ($canWaiveMiscCharge ?? false))
-                                                <div class="relative" x-data="{ open: false, reason: '' }">
-                                                    <button type="button" @click="open = !open" class="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10">Remove</button>
-                                                    <div x-show="open" x-cloak class="absolute right-0 z-10 mt-1 w-60 rounded-xl border bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900">
-                                                        <p class="mb-2 text-[11px] leading-relaxed text-gray-500">Super Admin only. Use when a charge was added by mistake. Requires a reason.</p>
-                                                        <textarea x-model="reason" rows="2" class="w-full rounded-lg border-gray-200 text-xs dark:border-white/10 dark:bg-white/5" placeholder="Why is this charge being removed?"></textarea>
-                                                        <button type="button" class="mt-2 w-full rounded-lg bg-red-600 py-1.5 text-xs font-semibold text-white hover:bg-red-500" @click="$wire.waiveMiscCharge({{ $charge->id }}, reason); open = false; reason = ''">Confirm removal</button>
-                                                    </div>
                                                 </div>
                                             @endif
                                         </div>
