@@ -4,17 +4,16 @@ namespace App\Services;
 
 use App\Enums\AccountingAccountType;
 use App\Enums\AccountingReferenceType;
-use App\Enums\EnrollmentStatus;
 use App\Enums\FeeMiscChargeKind;
 use App\Enums\PaymentMode;
 use App\Models\AccountingAccount;
 use App\Models\AccountingJournalEntry;
 use App\Models\AccountingJournalLine;
-use App\Models\FeeInstallment;
 use App\Models\FeeMiscCharge;
 use App\Models\FeePenalty;
 use App\Models\Payment;
 use App\Models\User;
+use App\Support\FeeLedgerPresentation;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -287,8 +286,127 @@ class AccountingLedgerService
     }
 
     /**
-     * @param  list<array{account: AccountingAccount, debit: float, credit: float, memo?: string|null}>  $lines
+     * School CRM fee ledger summary — collections as credits (money received), not accounting debits on cash.
+     *
+     * @return array{
+     *     entry_count: int,
+     *     total_collected: float,
+     *     cash_collected: float,
+     *     bank_collected: float,
+     *     tuition_income: float,
+     *     late_fee_income: float,
+     *     fees_receivable: float,
+     *     collection_rows: Collection<int, array{label: string, amount: float}>,
+     *     income_rows: Collection<int, array{label: string, amount: float}>,
+     * }
      */
+    public function feeLedgerSummary(?Carbon $from = null, ?Carbon $to = null): array
+    {
+        $raw = $this->summary($from, $to);
+        $accounts = $raw['accounts']->keyBy('code');
+
+        $cashCollected = round((float) ($accounts->get(self::CODE_CASH)['debit'] ?? 0), 2);
+        $bankCollected = round((float) ($accounts->get(self::CODE_BANK)['debit'] ?? 0), 2);
+        $tuitionIncome = round((float) ($accounts->get(self::CODE_TUITION_INCOME)['credit'] ?? 0), 2);
+        $lateFeeIncome = round((float) ($accounts->get(self::CODE_LATE_FEE_INCOME)['credit'] ?? 0), 2);
+
+        $receivableRow = $accounts->get(self::CODE_FEES_RECEIVABLE);
+        $feesReceivable = round(
+            (float) ($receivableRow['debit'] ?? 0) - (float) ($receivableRow['credit'] ?? 0),
+            2,
+        );
+
+        $totalCollected = round($cashCollected + $bankCollected, 2);
+
+        return [
+            'entry_count' => $raw['entry_count'],
+            'total_collected' => $totalCollected,
+            'cash_collected' => $cashCollected,
+            'bank_collected' => $bankCollected,
+            'tuition_income' => $tuitionIncome,
+            'late_fee_income' => $lateFeeIncome,
+            'fees_receivable' => max(0, $feesReceivable),
+            'collection_rows' => collect([
+                ['label' => 'Cash', 'amount' => $cashCollected],
+                ['label' => 'Bank / UPI', 'amount' => $bankCollected],
+            ])->filter(fn (array $row): bool => $row['amount'] > 0)->values(),
+            'income_rows' => collect([
+                ['label' => 'Tuition fees', 'amount' => $tuitionIncome],
+                ['label' => 'Late fees', 'amount' => $lateFeeIncome],
+            ])->filter(fn (array $row): bool => $row['amount'] > 0)->values(),
+        ];
+    }
+
+    /**
+     * @return Collection<int, FeeLedgerPresentation>
+     */
+    public function presentEntryLines(AccountingJournalEntry $entry): Collection
+    {
+        $entry->loadMissing(['lines.account']);
+
+        if ($entry->reference_type === AccountingReferenceType::Payment) {
+            $payment = Payment::query()
+                ->with('student')
+                ->find($entry->reference_id);
+
+            $collectionLine = $entry->lines->first(
+                fn (AccountingJournalLine $line): bool => in_array($line->account?->code, [self::CODE_CASH, self::CODE_BANK], true),
+            );
+
+            $presented = collect();
+
+            if ($collectionLine && (float) $collectionLine->debit > 0) {
+                $presented->push(new FeeLedgerPresentation(
+                    side: 'credit',
+                    sideLabel: 'Credit',
+                    label: 'Fee collected via '.($collectionLine->account?->name ?? 'Cash / Bank'),
+                    amount: round((float) $collectionLine->debit, 2),
+                    detail: $payment?->student?->name,
+                ));
+            }
+
+            return $presented->values();
+        }
+
+        $presented = collect();
+
+        foreach ($entry->lines as $line) {
+            if ((float) $line->debit > 0) {
+                $presented->push(new FeeLedgerPresentation(
+                    side: 'debit',
+                    sideLabel: 'Debit',
+                    label: $line->account?->name ?? 'Account',
+                    amount: round((float) $line->debit, 2),
+                    detail: $line->memo,
+                ));
+            }
+
+            if ((float) $line->credit > 0) {
+                $presented->push(new FeeLedgerPresentation(
+                    side: 'credit',
+                    sideLabel: 'Credit',
+                    label: $line->account?->name ?? 'Account',
+                    amount: round((float) $line->credit, 2),
+                    detail: $line->memo,
+                ));
+            }
+        }
+
+        return $presented->values();
+    }
+
+    /**
+     * @param  Collection<int, AccountingJournalEntry>  $entries
+     * @return Collection<int, array{entry: AccountingJournalEntry, lines: Collection<int, FeeLedgerPresentation>}>
+     */
+    public function presentEntries(Collection $entries): Collection
+    {
+        return $entries->map(fn (AccountingJournalEntry $entry): array => [
+            'entry' => $entry,
+            'lines' => $this->presentEntryLines($entry),
+        ]);
+    }
+
     protected function createEntry(
         Carbon $entryDate,
         string $description,

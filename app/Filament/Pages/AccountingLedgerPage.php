@@ -45,18 +45,18 @@ class AccountingLedgerPage extends Page
     public ?string $toDate = null;
 
     /**
-     * @var array<string, float|int>
+     * @var array<string, mixed>
      */
     public array $summary = [];
 
     /**
-     * @var Collection<int, \App\Models\AccountingJournalEntry>
+     * @var Collection<int, array{entry: \App\Models\AccountingJournalEntry, lines: Collection<int, \App\Support\FeeLedgerPresentation>}>
      */
-    public Collection $entries;
+    public Collection $presentedEntries;
 
     public function boot(): void
     {
-        $this->entries = collect();
+        $this->presentedEntries = collect();
     }
 
     public static function canAccess(): bool
@@ -70,7 +70,7 @@ class AccountingLedgerPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Double-entry journal from fee receipts and late-fee accruals.';
+        return 'Fee collections and late-fee accruals for the selected period. Receipts are shown as credits (money received).';
     }
 
     public function mount(AccountingLedgerService $ledger): void
@@ -85,8 +85,10 @@ class AccountingLedgerPage extends Page
         $from = filled($this->fromDate) ? Carbon::parse($this->fromDate)->startOfDay() : null;
         $to = filled($this->toDate) ? Carbon::parse($this->toDate)->endOfDay() : null;
 
-        $this->summary = $ledger->summary($from, $to);
-        $this->entries = $ledger->recentEntries(50, $from, $to);
+        $entries = $ledger->recentEntries(50, $from, $to);
+
+        $this->summary = $ledger->feeLedgerSummary($from, $to);
+        $this->presentedEntries = $ledger->presentEntries($entries);
     }
 
     public function applyFilters(AccountingLedgerService $ledger): void

@@ -111,6 +111,77 @@ class AccountingLedgerServiceTest extends TestCase
         $this->assertSame(250.0, round((float) $lines->sum('credit'), 2));
     }
 
+    public function test_fee_ledger_summary_shows_collections_as_credits(): void
+    {
+        $staff = User::factory()->create();
+        $student = $this->createStudent();
+        $feeStructure = $this->createFeeStructure($student);
+        $ledger = app(AccountingLedgerService::class);
+
+        $cashPayment = Payment::query()->create([
+            'fee_structure_id' => $feeStructure->id,
+            'student_id' => $student->id,
+            'payment_date' => now()->toDateString(),
+            'amount' => 60000,
+            'payment_mode' => PaymentMode::Cash,
+            'receipt_number' => 'RCP-CASH-001',
+            'proof_image_path' => 'proofs/test.jpg',
+            'added_by_user_id' => $staff->id,
+        ]);
+
+        $bankPayment = Payment::query()->create([
+            'fee_structure_id' => $feeStructure->id,
+            'student_id' => $student->id,
+            'payment_date' => now()->toDateString(),
+            'amount' => 110000,
+            'payment_mode' => PaymentMode::Upi,
+            'receipt_number' => 'RCP-BANK-001',
+            'proof_image_path' => 'proofs/test.jpg',
+            'added_by_user_id' => $staff->id,
+        ]);
+
+        $ledger->postPayment($cashPayment, 60000, 0, $staff);
+        $ledger->postPayment($bankPayment, 110000, 0, $staff);
+
+        $summary = $ledger->feeLedgerSummary();
+
+        $this->assertSame(2, $summary['entry_count']);
+        $this->assertSame(170000.0, $summary['total_collected']);
+        $this->assertSame(60000.0, $summary['cash_collected']);
+        $this->assertSame(110000.0, $summary['bank_collected']);
+        $this->assertSame(170000.0, $summary['tuition_income']);
+        $this->assertCount(2, $summary['collection_rows']);
+    }
+
+    public function test_payment_entry_is_presented_as_credit_collection(): void
+    {
+        $staff = User::factory()->create();
+        $student = $this->createStudent();
+        $feeStructure = $this->createFeeStructure($student);
+        $ledger = app(AccountingLedgerService::class);
+
+        $payment = Payment::query()->create([
+            'fee_structure_id' => $feeStructure->id,
+            'student_id' => $student->id,
+            'payment_date' => now()->toDateString(),
+            'amount' => 10000,
+            'payment_mode' => PaymentMode::Upi,
+            'receipt_number' => 'RCP-PRESENT-001',
+            'proof_image_path' => 'proofs/test.jpg',
+            'added_by_user_id' => $staff->id,
+        ]);
+
+        $entry = $ledger->postPayment($payment, 10000, 0, $staff);
+        $presented = $ledger->presentEntryLines($entry);
+
+        $this->assertCount(1, $presented);
+        $this->assertSame('credit', $presented->first()->side);
+        $this->assertSame('Credit', $presented->first()->sideLabel);
+        $this->assertStringContainsString('Bank / UPI', $presented->first()->label);
+        $this->assertSame(10000.0, $presented->first()->amount);
+        $this->assertSame('Ledger Student', $presented->first()->detail);
+    }
+
     protected function createStudent(): Student
     {
         return Student::query()->create([
