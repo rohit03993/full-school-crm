@@ -8,10 +8,10 @@ use App\Enums\LicenseFeature;
 use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
 use App\Models\BatchStudent;
 use App\Services\ActivityAttendanceService;
+use App\Support\ClassSectionLabel;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Support\CrmHint;
-use App\Support\EduExamLabels;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
@@ -40,11 +40,6 @@ class ActivityAttendancePage extends Page
         );
     }
 
-    public function getSubheading(): ?string
-    {
-        return CrmHint::text('activity.attendance');
-    }
-
     public ?int $activityId = null;
 
     /**
@@ -64,6 +59,18 @@ class ActivityAttendancePage extends Page
     public ?float $maxMarks = null;
 
     public ?string $activityTitle = null;
+
+    public ?string $examName = null;
+
+    public ?string $subjectName = null;
+
+    public ?string $batchLabel = null;
+
+    public ?string $sessionDateLabel = null;
+
+    public ?int $examWindowId = null;
+
+    public int $enteredMarksCount = 0;
 
     /**
      * @var Collection<int, BatchStudent>
@@ -92,6 +99,12 @@ class ActivityAttendancePage extends Page
             $this->scoreMarks = [];
             $this->rosterLoaded = false;
             $this->activityTitle = null;
+            $this->examName = null;
+            $this->subjectName = null;
+            $this->batchLabel = null;
+            $this->sessionDateLabel = null;
+            $this->examWindowId = null;
+            $this->enteredMarksCount = 0;
             $this->supportsScoring = false;
             $this->maxMarks = null;
 
@@ -99,7 +112,20 @@ class ActivityAttendancePage extends Page
         }
 
         $activity = app(ActivityAttendanceService::class)->resolve($id);
+        $activity->loadMissing(['batch.academicSession', 'batch.course']);
+
         $this->activityTitle = $activity->displayTitle();
+        $this->subjectName = filled($activity->metadataValue('subject'))
+            ? (string) $activity->metadataValue('subject')
+            : null;
+        $this->examName = filled($activity->metadataValue('test_name'))
+            ? (string) $activity->metadataValue('test_name')
+            : $activity->title;
+        $this->batchLabel = $activity->batch
+            ? ClassSectionLabel::forBatch($activity->batch)
+            : null;
+        $this->sessionDateLabel = $activity->session_date?->format('d M Y');
+        $this->examWindowId = (int) ($activity->metadataValue('exam_window_id') ?? 0) ?: null;
         $this->rosterLoaded = true;
         $this->supportsScoring = (bool) $activity->activityType?->supportsScoring();
         $maxMarks = $activity->metadataValue('max_marks');
@@ -129,6 +155,10 @@ class ActivityAttendancePage extends Page
                 'remarks' => $scores[$studentId]['remarks'] ?? null,
             ];
         }
+
+        $this->enteredMarksCount = collect($this->scoreMarks)
+            ->filter(fn (array $row): bool => filled($row['marks_obtained'] ?? null))
+            ->count();
     }
 
     public function markAllPresent(): void
@@ -179,13 +209,36 @@ class ActivityAttendancePage extends Page
 
     public function getHeading(): string
     {
-        if ($this->activityTitle) {
-            return $this->supportsScoring
-                ? $this->activityTitle
-                : 'Mark attendance · '.$this->activityTitle;
+        if ($this->supportsScoring) {
+            if (filled($this->subjectName)) {
+                return $this->subjectName;
+            }
+
+            return $this->examName ?? 'Enter marks';
         }
 
-        return $this->supportsScoring ? 'Enter Test Marks' : 'Mark Activity Attendance';
+        if ($this->activityTitle) {
+            return 'Mark attendance · '.$this->activityTitle;
+        }
+
+        return 'Mark Activity Attendance';
+    }
+
+    public function getSubheading(): ?string
+    {
+        if ($this->supportsScoring) {
+            $parts = array_filter([
+                $this->examName,
+                $this->batchLabel,
+                $this->sessionDateLabel,
+            ]);
+
+            if ($parts !== []) {
+                return implode(' · ', $parts);
+            }
+        }
+
+        return CrmHint::text('activity.attendance');
     }
 
     public function content(Schema $schema): Schema
@@ -197,9 +250,16 @@ class ActivityAttendancePage extends Page
                     'roster' => $this->roster,
                     'marks' => $this->marks,
                     'scoreMarks' => $this->scoreMarks,
-                    'activityTitle' => $this->activityTitle,
                     'supportsScoring' => $this->supportsScoring,
                     'maxMarks' => $this->maxMarks,
+                    'examName' => $this->examName,
+                    'subjectName' => $this->subjectName,
+                    'batchLabel' => $this->batchLabel,
+                    'sessionDateLabel' => $this->sessionDateLabel,
+                    'enteredMarksCount' => $this->enteredMarksCount,
+                    'examWindowBackUrl' => $this->examWindowId
+                        ? ExamWindowPage::getUrl(['window' => $this->examWindowId])
+                        : null,
                 ]),
         ]);
     }

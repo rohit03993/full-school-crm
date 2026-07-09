@@ -75,7 +75,7 @@ class CrmHint
         'activity.sessions.list' => 'Upload exam marks via Excel, create exam windows from programme subjects, or enter marks per subject.',
         'activity.marks.review' => 'Read-only mark sheet for this exam. Publish after the exam window is approved.',
         'activity.sessions.create' => 'Schedule one exam subject manually — prefer Exam windows for full tests.',
-        'activity.attendance' => 'Enter marks for each student in this exam subject.',
+        'activity.attendance' => 'Mark Present or Absent, then enter marks for each student who appeared.',
         'activity.marks.import' => 'Enter test name and date, pick exam type, upload Excel. Roll numbers match students automatically.',
         'whatsapp.templates' => 'Create templates here and submit to Meta for approval. Sync refreshes APPROVED / PENDING / REJECTED status. Map {{1}} to student name before bulk campaigns.',
         'whatsapp.templates.create' => 'Type {{1}}, {{2}}, … in the message body — sample fields for each variable appear automatically (like AiSensy). {{1}} is usually student name.',
