@@ -57,13 +57,21 @@ class InstituteSettings
      *     address: string,
      *     receipt_header: string,
      *     footer: string,
-     *     logo_data_uri: ?string
+     *     logo_data_uri: ?string,
+     *     id_card_primary: string,
+     *     id_card_primary_dark: string,
+     *     id_card_accent: string,
+     *     id_card_badge: string,
+     *     id_card_header_text: string
      * }
      */
     public static function forDocuments(): array
     {
         return Cache::rememberForever(self::CACHE_KEY, function (): array {
             $g = fn (string $key, mixed $default = null) => Setting::getValue($key, $default);
+            $primary = self::normalizeHexColor($g('crm.id_card_primary_color'), '#1e40af');
+            $accent = self::normalizeHexColor($g('crm.id_card_accent_color'), '#dc2626');
+            $badge = self::normalizeHexColor($g('crm.id_card_badge_color'), '#fbbf24');
 
             return [
                 'name' => (string) $g('site.name', config('institute.name')),
@@ -76,6 +84,11 @@ class InstituteSettings
                 'logo_data_uri' => self::logoDataUri(
                     $g('crm.receipt_logo') ?: $g('site.logo'),
                 ),
+                'id_card_primary' => $primary,
+                'id_card_primary_dark' => self::darkenHex($primary, 0.18),
+                'id_card_accent' => $accent,
+                'id_card_badge' => $badge,
+                'id_card_header_text' => self::darkenHex($primary, 0.35),
             ];
         });
     }
@@ -149,5 +162,31 @@ class InstituteSettings
         $mime = $disk->mimeType($path) ?: 'image/png';
 
         return 'data:'.$mime.';base64,'.base64_encode($contents);
+    }
+
+    public static function normalizeHexColor(mixed $value, string $fallback): string
+    {
+        $raw = strtoupper(trim((string) $value));
+
+        if (preg_match('/^#?[0-9A-F]{6}$/', $raw) !== 1) {
+            return strtoupper($fallback);
+        }
+
+        return str_starts_with($raw, '#') ? $raw : '#'.$raw;
+    }
+
+    /**
+     * Darken a #RRGGBB color by a 0–1 factor (DomPDF-safe solid colors).
+     */
+    public static function darkenHex(string $hex, float $factor): string
+    {
+        $hex = ltrim(self::normalizeHexColor($hex, '#1e40af'), '#');
+        $factor = max(0, min(1, $factor));
+
+        $r = max(0, (int) round(hexdec(substr($hex, 0, 2)) * (1 - $factor)));
+        $g = max(0, (int) round(hexdec(substr($hex, 2, 2)) * (1 - $factor)));
+        $b = max(0, (int) round(hexdec(substr($hex, 4, 2)) * (1 - $factor)));
+
+        return sprintf('#%02X%02X%02X', $r, $g, $b);
     }
 }

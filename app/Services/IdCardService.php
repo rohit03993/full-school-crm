@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Enums\DocumentType;
+use App\Support\ClassSectionLabel;
 use App\Support\InstituteSettings;
+use App\Support\StudentLabels;
 use App\Models\Document;
 use App\Models\Enrollment;
 use App\Models\Payment;
@@ -40,7 +42,7 @@ class IdCardService
         }
 
         $enrollment->loadMissing([
-            'student',
+            'student.activeBatchStudent.batch.academicSession',
             'course',
             'admission.documents',
         ]);
@@ -50,7 +52,17 @@ class IdCardService
         $this->storage->replaceStoredFile($enrollment->id_card_path, $relativePath);
 
         $verificationUrl = route('id-card.verify', ['enrollment' => $enrollment->enrollment_number]);
-        $photo = $enrollment->admission?->documentForType(DocumentType::Photo);
+        $photo = $enrollment->admission?->documentForType(DocumentType::Photo)
+            ?? $enrollment->student?->profilePhoto();
+
+        $batch = $enrollment->student?->activeBatchStudent?->batch;
+        $sessionName = $batch?->academicSession?->name;
+        $batchLabel = $batch
+            ? (filled($batch->section) ? 'Section '.$batch->section : $batch->name)
+            : null;
+
+        $validTill = $batch?->end_date?->format('Y')
+            ?? $enrollment->enrolled_at?->copy()->addYears(2)->format('Y');
 
         $pdf = Pdf::loadView('pdf.student-id-card', [
             'student' => $enrollment->student,
@@ -59,6 +71,11 @@ class IdCardService
             'photoDataUri' => $this->photoDataUri($photo),
             'qrDataUri' => $this->qrDataUri($enrollment->enrollment_number, $verificationUrl),
             'institute' => InstituteSettings::forDocuments(),
+            'rollLabel' => StudentLabels::rollNumberLabel(),
+            'batchLabel' => $batchLabel,
+            'sessionName' => $sessionName,
+            'validTill' => $validTill,
+            'batchFullLabel' => $batch ? ClassSectionLabel::forBatch($batch, includeSession: false) : null,
         ])->setPaper([0, 0, self::CARD_WIDTH_PT, self::CARD_HEIGHT_PT]);
 
         Storage::disk(self::DISK)->put($relativePath, $pdf->output());
@@ -78,7 +95,11 @@ class IdCardService
             user: $staff,
         );
 
-        return $enrollment->fresh(['student', 'course', 'admission.documents']);
+        return $enrollment->fresh([
+            'student.activeBatchStudent.batch.academicSession',
+            'course',
+            'admission.documents',
+        ]);
     }
 
     protected function photoDataUri(?Document $photo): ?string

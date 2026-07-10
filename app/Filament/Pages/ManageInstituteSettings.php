@@ -129,6 +129,21 @@ class ManageInstituteSettings extends Page
                         ->rows(4)
                         ->columnSpanFull()
                         ->helperText('Legal note printed at the bottom of every fee receipt.'),
+                    TextInput::make('id_card_primary_color')
+                        ->label('ID card primary colour')
+                        ->placeholder('#1e40af')
+                        ->maxLength(7)
+                        ->helperText('Main card background (hex). Default blue matches a classic institute card.'),
+                    TextInput::make('id_card_accent_color')
+                        ->label('ID card title colour')
+                        ->placeholder('#dc2626')
+                        ->maxLength(7)
+                        ->helperText('Colour for “STUDENT IDENTITY CARD” text.'),
+                    TextInput::make('id_card_badge_color')
+                        ->label('ID card roll badge colour')
+                        ->placeholder('#fbbf24')
+                        ->maxLength(7)
+                        ->helperText('Highlight behind roll / enrollment number.'),
                 ])
                 ->columns(2),
             Section::make('Marksheet & report card PDF')

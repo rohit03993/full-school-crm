@@ -25,6 +25,9 @@ class InstituteSettingsService
             'receipt_logo' => $g('crm.receipt_logo') ?: $g('site.logo'),
             'receipt_header' => $g('crm.receipt_header', ''),
             'receipt_footer' => $g('crm.receipt_footer', config('institute.receipt_footer')),
+            'id_card_primary_color' => InstituteSettings::normalizeHexColor($g('crm.id_card_primary_color'), '#1e40af'),
+            'id_card_accent_color' => InstituteSettings::normalizeHexColor($g('crm.id_card_accent_color'), '#dc2626'),
+            'id_card_badge_color' => InstituteSettings::normalizeHexColor($g('crm.id_card_badge_color'), '#fbbf24'),
             'portal_shared_password' => '',
             'marksheet_title' => $g('marksheet.title', 'Statement of Marks'),
             'marksheet_footer_note' => $g('marksheet.footer_note', 'This is a computer-generated marksheet. Collect the official signed copy from the institute office if required.'),
@@ -46,6 +49,21 @@ class InstituteSettingsService
 
         Setting::setValue('crm.receipt_header', $data['receipt_header'] ?? '', 'crm');
         Setting::setValue('crm.receipt_footer', $data['receipt_footer'] ?? '', 'crm');
+        Setting::setValue(
+            'crm.id_card_primary_color',
+            InstituteSettings::normalizeHexColor($data['id_card_primary_color'] ?? null, '#1e40af'),
+            'crm',
+        );
+        Setting::setValue(
+            'crm.id_card_accent_color',
+            InstituteSettings::normalizeHexColor($data['id_card_accent_color'] ?? null, '#dc2626'),
+            'crm',
+        );
+        Setting::setValue(
+            'crm.id_card_badge_color',
+            InstituteSettings::normalizeHexColor($data['id_card_badge_color'] ?? null, '#fbbf24'),
+            'crm',
+        );
 
         Setting::setValue('marksheet.title', $data['marksheet_title'] ?? 'Statement of Marks', 'marksheet');
         Setting::setValue('marksheet.footer_note', $data['marksheet_footer_note'] ?? '', 'marksheet');

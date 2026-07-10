@@ -100,12 +100,13 @@
                 <button type="button" wire:click="saveGoogleDriveSettings" class="inline-flex rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-500">
                     Save Drive settings
                 </button>
-                <a
-                    href="{{ route('admin.backups.google.redirect') }}"
+                <button
+                    type="button"
+                    wire:click="connectGoogleDrive"
                     class="inline-flex rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-800 ring-1 ring-gray-300 hover:bg-gray-50 dark:bg-white/10 dark:text-white dark:ring-white/20 dark:hover:bg-white/15"
                 >
                     Sign in with Google
-                </a>
+                </button>
                 <button type="button" wire:click="testGoogleDrive" class="inline-flex rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-500">
                     Test connection
                 </button>

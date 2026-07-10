@@ -251,6 +251,34 @@ class BackupsPage extends Page
             ->send();
     }
 
+    /**
+     * Persist Client ID/Secret from the form, then send the browser to Google OAuth.
+     * (A plain link would skip unsaved form fields and fail.)
+     */
+    public function connectGoogleDrive(GoogleDriveBackupService $drive)
+    {
+        try {
+            $drive->saveSettings([
+                'enabled' => true,
+                'folder_id' => $this->gdriveFolderId,
+                'oauth_client_id' => $this->gdriveClientId !== '' ? $this->gdriveClientId : null,
+                'oauth_client_secret' => $this->gdriveClientSecret !== '' ? $this->gdriveClientSecret : null,
+            ]);
+            $this->gdriveEnabled = true;
+            $this->gdriveClientSecret = '';
+
+            return redirect()->away($drive->authorizationUrl());
+        } catch (Throwable $exception) {
+            Notification::make()
+                ->title('Google sign-in failed')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            return null;
+        }
+    }
+
     public function testGoogleDrive(GoogleDriveBackupService $drive): void
     {
         try {

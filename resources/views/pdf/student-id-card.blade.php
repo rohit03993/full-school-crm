@@ -9,88 +9,120 @@
     </style>
 </head>
 <body>
-    <table width="100%" cellpadding="0" cellspacing="0" border="2" bordercolor="#b45309" style="border-collapse: collapse;">
-        {{-- Header (one nested table only — DomPDF safe) --}}
-        <tr>
-            <td colspan="2" bgcolor="#92400e" style="padding: 5px 8px;">
-                <table width="100%" cellpadding="0" cellspacing="0">
+@php
+    $primary = $institute['id_card_primary'] ?? '#1e40af';
+    $primaryDark = $institute['id_card_primary_dark'] ?? '#1e3a8a';
+    $accent = $institute['id_card_accent'] ?? '#dc2626';
+    $badge = $institute['id_card_badge'] ?? '#fbbf24';
+    $headerText = $institute['id_card_header_text'] ?? '#1e3a8a';
+@endphp
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; background-color: {{ $primary }};">
+    {{-- White institute header (MJPITM-style) --}}
+    <tr>
+        <td colspan="2" bgcolor="#ffffff" style="padding: 5px 8px; border-bottom: 2px solid {{ $primaryDark }};">
+            <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                    <td width="34" valign="middle" align="center">
+                        @if (! empty($institute['logo_data_uri']))
+                            <img src="{{ $institute['logo_data_uri'] }}" alt="Logo" width="28" height="28" style="object-fit: contain;">
+                        @else
+                            <table width="28" height="28" cellpadding="0" cellspacing="0" bgcolor="{{ $primary }}">
+                                <tr>
+                                    <td align="center" valign="middle" style="color: #ffffff; font-size: 11px; font-weight: bold;">
+                                        {{ mb_strtoupper(mb_substr($institute['name'], 0, 1)) }}
+                                    </td>
+                                </tr>
+                            </table>
+                        @endif
+                    </td>
+                    <td valign="middle" style="padding-left: 6px;">
+                        <div style="font-size: 8px; font-weight: bold; color: {{ $headerText }}; line-height: 1.2; text-transform: uppercase;">
+                            {{ $institute['name'] }}
+                        </div>
+                        <div style="font-size: 7px; font-weight: bold; color: {{ $accent }}; letter-spacing: 0.4px; margin-top: 2px;">
+                            STUDENT IDENTITY CARD
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    {{-- Body: photo + details on brand colour --}}
+    <tr>
+        <td width="28%" valign="middle" align="center" bgcolor="{{ $primary }}" style="padding: 8px 6px;">
+            @if ($photoDataUri)
+                <img src="{{ $photoDataUri }}" width="68" height="78" style="border: 2px solid #ffffff; background-color: #ffffff;">
+            @else
+                <table width="68" height="78" cellpadding="0" cellspacing="0" border="1" bordercolor="#ffffff" bgcolor="#ffffff">
                     <tr>
-                        <td width="28" valign="middle" align="center">
-                            @if (! empty($institute['logo_data_uri']))
-                                <img src="{{ $institute['logo_data_uri'] }}" alt="Logo" width="24" height="24" style="object-fit: contain;">
-                            @else
-                                <table width="24" height="24" cellpadding="0" cellspacing="0" border="1" bordercolor="#fcd34d">
-                                    <tr>
-                                        <td align="center" valign="middle" bgcolor="#f59e0b" style="color: #ffffff; font-size: 12px; font-weight: bold;">F</td>
-                                    </tr>
-                                </table>
-                            @endif
-                        </td>
-                        <td valign="middle" style="padding-left: 5px; color: #ffffff;">
-                            <span style="font-size: 11px; font-weight: bold; letter-spacing: 0.3px;">{{ strtoupper($institute['name']) }}</span><br>
-                            <span style="font-size: 6px; color: #fde68a;">{{ $institute['tagline'] }}</span>
-                        </td>
-                        <td align="right" valign="middle" style="color: #ffffff; font-size: 8px; font-weight: bold; letter-spacing: 0.7px;">
-                            IDENTITY CARD
-                        </td>
+                        <td align="center" valign="middle" style="font-size: 7px; color: #9ca3af;">Photo</td>
                     </tr>
                 </table>
-            </td>
-        </tr>
+            @endif
+        </td>
+        <td width="72%" valign="top" bgcolor="{{ $primary }}" style="padding: 7px 8px 6px 4px; color: #ffffff;">
+            <div style="font-size: 12px; font-weight: bold; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.2px;">
+                {{ $student->name }}
+            </div>
 
-        {{-- Body (no nested tables — keeps DomPDF rendering reliable) --}}
-        <tr>
-            <td width="64%" valign="top" bgcolor="#fffdf7" style="padding: 8px 10px; font-size: 7px; line-height: 1.55; border-right: 2px solid #fde68a;">
-                <span style="font-size: 6px; font-weight: bold; color: #92400e;">NAME</span>
-                <span style="font-size: 9px; font-weight: bold; color: #111827;"> : {{ $student->name }}</span><br>
-
-                <span style="font-size: 6px; font-weight: bold; color: #92400e;">COURSE</span>
-                <span style="color: #1f2937;"> : {{ $course?->name ?? '—' }}</span><br>
-
-                <span style="font-size: 6px; font-weight: bold; color: #92400e;">DURATION</span>
-                <span style="color: #1f2937;"> : {{ $course?->duration_label ?? '—' }}</span><br>
-
-                <span style="font-size: 6px; font-weight: bold; color: #92400e;">FATHER</span>
-                <span style="color: #1f2937;"> : {{ $student->father_name ?? '—' }}</span><br>
-
-                <span style="font-size: 6px; font-weight: bold; color: #92400e;">D.O.B.</span>
-                <span style="color: #1f2937;"> : {{ $student->date_of_birth?->format('d-m-Y') ?? '—' }}</span><br>
-
-                <span style="font-size: 6px; font-weight: bold; color: #92400e;">PHONE</span>
-                <span style="color: #1f2937;"> : {{ $student->mobile }}</span><br><br>
-
-                <span style="font-size: 6px; font-weight: bold; color: #92400e; background-color: #fef3c7; padding: 2px 5px; border: 1px solid #fde68a;">
-                    Valid from : {{ $enrollment->enrolled_at?->format('M Y') ?? '—' }}
+            <div style="margin-top: 4px; margin-bottom: 5px;">
+                <span style="display: inline-block; background-color: {{ $badge }}; color: #111827; font-size: 7px; font-weight: bold; padding: 2px 6px;">
+                    {{ strtoupper($rollLabel) }}: {{ $enrollment->enrollment_number }}
                 </span>
-            </td>
+            </div>
 
-            <td width="36%" valign="top" align="center" bgcolor="#ffffff" style="padding: 6px 5px;">
-                <span style="font-size: 6px; font-weight: bold; color: #92400e; background-color: #fffbeb; padding: 1px 4px; border: 1px solid #fde68a;">
-                    ID : {{ $enrollment->enrollment_number }}
-                </span><br><br>
-
-                @if ($photoDataUri)
-                    <img src="{{ $photoDataUri }}" width="62" height="76" style="border: 2px solid #d97706; background-color: #fffbeb;"><br>
-                @else
-                    <span style="display: inline-block; width: 62px; height: 76px; line-height: 76px; text-align: center; border: 2px solid #d97706; background-color: #fffbeb; font-size: 6px; color: #9ca3af;">Photo</span><br>
+            <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 6.5px; line-height: 1.55; color: #ffffff;">
+                <tr>
+                    <td width="34%" style="font-weight: bold; opacity: 0.9;">DURATION</td>
+                    <td>: {{ $course?->duration_label ?? '—' }}</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold; opacity: 0.9;">SESSION</td>
+                    <td>: {{ $sessionName ?: '—' }}</td>
+                </tr>
+                @if (filled($batchLabel))
+                    <tr>
+                        <td style="font-weight: bold; opacity: 0.9;">BATCH</td>
+                        <td>: {{ $batchLabel }}</td>
+                    </tr>
                 @endif
+                <tr>
+                    <td style="font-weight: bold; opacity: 0.9;">FATHER'S NAME</td>
+                    <td>: {{ $student->father_name ?: '—' }}</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold; opacity: 0.9;">COURSE</td>
+                    <td>: {{ $course?->name ?? '—' }}</td>
+                </tr>
+                @if (filled($validTill))
+                    <tr>
+                        <td style="font-weight: bold; opacity: 0.9;">VALID TILL</td>
+                        <td>: {{ $validTill }}</td>
+                    </tr>
+                @endif
+            </table>
+        </td>
+    </tr>
 
-                <img src="{{ $qrDataUri }}" width="36" height="36" style="margin-top: 5px; border: 1px solid #e5e7eb; background-color: #ffffff; padding: 2px;"><br>
-                <span style="font-size: 5px; font-weight: bold; color: #6b7280; letter-spacing: 0.3px;">SCAN TO VERIFY</span>
-            </td>
-        </tr>
-
-        {{-- Footer --}}
-        <tr>
-            <td bgcolor="#92400e" style="padding: 4px 8px; font-size: 5.5px; line-height: 1.35; color: #fde68a;">
-                {{ $institute['address'] }}<br>
-                <span style="color: #ffffff;">{{ $institute['phone'] }} · {{ $institute['email'] }}</span>
-            </td>
-            <td bgcolor="#92400e" align="right" valign="middle" style="padding: 4px 8px; color: #ffffff; font-size: 6px; font-weight: bold;">
-                ________________<br>
-                Authorised Signatory
-            </td>
-        </tr>
-    </table>
+    {{-- Footer strip --}}
+    <tr>
+        <td colspan="2" bgcolor="{{ $primaryDark }}" style="padding: 3px 8px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                    <td valign="middle" style="font-size: 5px; color: #e5e7eb; line-height: 1.3;">
+                        {{ $institute['phone'] }}
+                        @if (filled($institute['email']))
+                            · {{ $institute['email'] }}
+                        @endif
+                    </td>
+                    <td width="42" align="right" valign="middle">
+                        <img src="{{ $qrDataUri }}" width="28" height="28" style="background-color: #ffffff; padding: 1px;">
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
 </body>
 </html>
