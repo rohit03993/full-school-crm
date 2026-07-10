@@ -118,6 +118,41 @@ class StudentCaseServiceTest extends TestCase
         $this->assertSame(2, $updated->assignments()->count());
     }
 
+    public function test_previous_assignee_cannot_transfer_or_close_after_handoff(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
+        $director = $this->createStaffUser('Director');
+        $service = app(StudentCaseService::class);
+
+        $case = $service->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::Academic,
+            'Chemistry teacher issue',
+            'Parent complaint.',
+            $accountant,
+            $counsellor,
+            'Please review with parent.',
+        );
+
+        $case = $service->transfer(
+            $case,
+            $director,
+            $accountant,
+            'Needs academic coordinator review.',
+        );
+
+        $this->assertFalse($service->canTransfer($case, $counsellor));
+        $this->assertFalse($service->canClose($case, $counsellor));
+        $this->assertFalse($service->canLogCall($case, $counsellor));
+        $this->assertTrue($service->canTransfer($case, $director));
+        $this->assertTrue($service->canClose($case, $director));
+        $this->assertTrue($service->canLogCall($case, $director));
+
+        $this->expectException(ValidationException::class);
+
+        $service->transfer($case, $accountant, $counsellor, 'Trying to pull case back.');
+    }
+
     public function test_close_case_records_closing_note(): void
     {
         [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();

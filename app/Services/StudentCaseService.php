@@ -18,6 +18,8 @@ use App\Support\CrmNavBadges;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -433,30 +435,86 @@ class StudentCaseService
 
     public function canTransfer(StudentCase $case, ?User $viewer): bool
     {
-        if (! $viewer || ! $case->isOpen()) {
-            return false;
-        }
-
-        if (CrmAccess::can($viewer, CrmPermission::CasesViewAll)) {
-            return CrmAccess::can($viewer, CrmPermission::CasesAssign);
-        }
-
-        return CrmAccess::can($viewer, CrmPermission::CasesAssign)
-            && $case->current_assignee_user_id === $viewer->id;
+        return $this->isCurrentAssignee($case, $viewer)
+            && CrmAccess::can($viewer, CrmPermission::CasesAssign);
     }
 
     public function canClose(StudentCase $case, ?User $viewer): bool
     {
-        if (! $viewer || ! $case->isOpen()) {
-            return false;
-        }
+        return $this->isCurrentAssignee($case, $viewer)
+            && CrmAccess::can($viewer, CrmPermission::CasesClose);
+    }
 
-        if (CrmAccess::can($viewer, CrmPermission::CasesViewAll)) {
-            return CrmAccess::can($viewer, CrmPermission::CasesClose);
-        }
+    public function canLogCall(StudentCase $case, ?User $viewer): bool
+    {
+        return $this->isCurrentAssignee($case, $viewer);
+    }
 
-        return CrmAccess::can($viewer, CrmPermission::CasesClose)
+    public function isCurrentAssignee(StudentCase $case, ?User $viewer): bool
+    {
+        return $viewer
+            && $case->isOpen()
             && $case->current_assignee_user_id === $viewer->id;
+    }
+
+    /**
+     * @return SupportCollection<int, array{
+     *     type: string,
+     *     label: string,
+     *     occurred_at: Carbon,
+     *     summary: ?string,
+     *     detail: ?string,
+     *     actor_name: ?string,
+     *     status_label: ?string,
+     * }>
+     */
+    public function activityTrail(StudentCase $case): SupportCollection
+    {
+        $items = collect();
+
+        foreach ($case->assignments as $assignment) {
+            $items->push([
+                'type' => 'assignment',
+                'label' => $assignment->fromUser
+                    ? 'Transferred'
+                    : 'Case opened',
+                'occurred_at' => $assignment->created_at ?? now(),
+                'summary' => $assignment->note,
+                'detail' => $assignment->fromUser
+                    ? $assignment->fromUser->name.' → '.$assignment->toUser->name
+                    : 'Assigned to '.$assignment->toUser->name,
+                'actor_name' => $assignment->assignedBy?->name,
+                'status_label' => null,
+            ]);
+        }
+
+        foreach ($case->calls as $call) {
+            $items->push([
+                'type' => 'call',
+                'label' => $call->call_direction->label().' call',
+                'occurred_at' => $call->called_at ?? now(),
+                'summary' => filled($call->call_notes) ? $call->call_notes : $call->call_status->label(),
+                'detail' => $call->who_answered?->label(),
+                'actor_name' => $call->staff?->name,
+                'status_label' => $call->call_status->label(),
+            ]);
+        }
+
+        if ($case->closed_at) {
+            $items->push([
+                'type' => 'closed',
+                'label' => 'Case closed',
+                'occurred_at' => $case->closed_at,
+                'summary' => $case->closing_note,
+                'detail' => null,
+                'actor_name' => $case->closedBy?->name,
+                'status_label' => $case->status->label(),
+            ]);
+        }
+
+        return $items
+            ->sortBy(fn (array $item): int => $item['occurred_at']->timestamp)
+            ->values();
     }
 
     /**

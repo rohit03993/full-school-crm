@@ -159,6 +159,12 @@ class CallLogService
             ]);
         }
 
+        if (! app(StudentCaseService::class)->canLogCall($case, $staff)) {
+            throw ValidationException::withMessages([
+                'case' => 'Only the assigned staff member can log calls on this case.',
+            ]);
+        }
+
         $connected = (bool) ($data['call_connected'] ?? false);
         $direction = CallDirection::tryFrom((string) ($data['call_direction'] ?? 'outgoing'))
             ?? CallDirection::Outgoing;

@@ -638,6 +638,16 @@ class StudentProfilePage extends Page
             return;
         }
 
+        if (! app(StudentCaseService::class)->canLogCall($case, Auth::user())) {
+            Notification::make()
+                ->title('Not assigned to this case')
+                ->body('Only '.$case->currentAssignee?->name.' can log calls, transfer, or close this case.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->logCallStudentCaseId = $case->id;
         $this->openLogCallModal();
     }
