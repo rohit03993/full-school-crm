@@ -10,6 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Visit extends Model
 {
+    /**
+     * @var list<string>
+     */
+    public const PHONE_CALL_REMARKS = [
+        'Outgoing call',
+        'Incoming call',
+    ];
+
     protected $fillable = [
         'student_id',
         'enquiry_id',
@@ -38,6 +46,24 @@ class Visit extends Model
     public function isCampusVisit(): bool
     {
         return $this->campus_purpose !== null || $this->campus_outcome !== null;
+    }
+
+    public function isPhoneCallLog(): bool
+    {
+        return $this->remarks !== null
+            && in_array($this->remarks, self::PHONE_CALL_REMARKS, true);
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<static>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<static>
+     */
+    public function scopeInPerson($query)
+    {
+        return $query->where(function ($query): void {
+            $query->whereNull('remarks')
+                ->orWhereNotIn('remarks', self::PHONE_CALL_REMARKS);
+        });
     }
 
     public function displayStatusLabel(): string

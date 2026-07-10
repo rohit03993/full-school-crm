@@ -126,7 +126,9 @@ class FollowUpWorklistService
      */
     protected function visitCountQuery()
     {
-        return Visit::query()->whereNotNull('next_follow_up_date');
+        return Visit::query()
+            ->inPerson()
+            ->whereNotNull('next_follow_up_date');
     }
 
     /**

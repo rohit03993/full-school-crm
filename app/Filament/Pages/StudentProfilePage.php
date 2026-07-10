@@ -551,12 +551,6 @@ class StudentProfilePage extends Page
 
         $this->visitSequenceById = $timelineService->visitSequenceMap($this->record);
         $this->leadTimeline = $timelineService->forStudent($this->record);
-        $this->visits = $this->record->visits()
-            ->with(['staff', 'enquiry.course'])
-            ->orderByDesc('visit_date')
-            ->orderByDesc('id')
-            ->limit(CrmPagination::PER_PAGE)
-            ->get();
     }
 
     public function loadCasesTab(): void
@@ -663,7 +657,7 @@ class StudentProfilePage extends Page
 
         $this->callsTabLoaded = true;
         $this->calls = $this->record->calls()
-            ->with(['staff', 'enquiry.course'])
+            ->with(['staff', 'enquiry.course', 'studentCase'])
             ->orderByDesc('called_at')
             ->orderByDesc('id')
             ->limit(CrmPagination::PER_PAGE)
@@ -2653,8 +2647,6 @@ class StudentProfilePage extends Page
                             View::make('filament.pages.partials.student-profile-visits')
                                 ->viewData(fn (): array => [
                                     'visitsTabLoaded' => $this->visitsTabLoaded,
-                                    'visits' => $this->visits,
-                                    'visitSequenceById' => $this->visitSequenceById,
                                     'leadTimeline' => $this->leadTimeline,
                                     'record' => $this->record,
                                 ]),

@@ -73,10 +73,14 @@
                         @foreach ($case->calls as $call)
                             <div class="rounded-lg bg-sky-50 px-3 py-2 text-sm dark:bg-sky-500/10">
                                 <p class="font-medium text-sky-900 dark:text-sky-200">
-                                    {{ $call->called_at?->format('d M Y, h:i A') }}
+                                    {{ $call->call_direction->label() }} call
+                                    · {{ $call->called_at?->format('d M Y, h:i A') }}
                                     · {{ $call->call_status->label() }}
                                     · {{ $call->staff?->name }}
                                 </p>
+                                @if ($call->who_answered)
+                                    <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Answered by: {{ $call->who_answered->label() }}</p>
+                                @endif
                                 @if ($call->call_notes)
                                     <p class="mt-1 text-xs leading-relaxed text-gray-700 dark:text-gray-300">{{ $call->call_notes }}</p>
                                 @endif

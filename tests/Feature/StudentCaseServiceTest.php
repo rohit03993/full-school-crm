@@ -169,6 +169,36 @@ class StudentCaseServiceTest extends TestCase
         $this->assertSame($case->id, $call->student_case_id);
         $this->assertSame($callsBefore + 1, $student->fresh()->calls()->count());
         $this->assertSame(1, $case->fresh()->calls()->count());
+        $this->assertDatabaseMissing('visits', [
+            'student_id' => $student->id,
+            'remarks' => 'Outgoing call',
+        ]);
+    }
+
+    public function test_case_calls_are_excluded_from_general_activity_timeline(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
+
+        $case = app(StudentCaseService::class)->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::Fees,
+            'Fee discount request',
+            null,
+            $accountant,
+            $counsellor,
+            'Accounts to review.',
+        );
+
+        app(CallLogService::class)->logForCase($case, $accountant, [
+            'call_connected' => true,
+            'who_answered' => 'father',
+            'call_notes' => 'Explained approved discount to parent on phone.',
+        ]);
+
+        $timeline = app(\App\Services\LeadTimelineService::class)->forStudent($student->fresh());
+
+        $this->assertFalse($timeline->contains(fn (array $item): bool => $item['type'] === 'call'));
+        $this->assertSame(1, $case->fresh()->calls()->count());
     }
 
     public function test_meeting_close_can_open_case_from_assignment_visit(): void

@@ -102,6 +102,37 @@ class FollowUpWorklistTest extends TestCase
         $this->assertSame(0, $worklist->dueCount());
     }
 
+    public function test_phone_call_mirror_visits_are_excluded_from_visit_follow_ups(): void
+    {
+        $staff = $this->createStaffUser();
+
+        $enquiry = app(EnquiryService::class)->create([
+            'name' => 'Phone Mirror Student',
+            'mobile' => '9000000004',
+            'discussion_summary' => 'Initial walk-in.',
+            'visit_status' => VisitStatus::FollowUpRequired->value,
+        ], $staff, LeadSource::WalkIn);
+
+        Visit::query()->create([
+            'student_id' => $enquiry->student_id,
+            'enquiry_id' => $enquiry->id,
+            'visit_date' => today(),
+            'discussion_summary' => 'Callback notes from telecaller.',
+            'remarks' => 'Outgoing call',
+            'next_follow_up_date' => today()->addDay(),
+            'status' => VisitStatus::FollowUpRequired,
+        ]);
+
+        Student::query()->whereKey($enquiry->student_id)->update([
+            'next_call_followup_at' => today()->addDay(),
+        ]);
+
+        $worklist = app(FollowUpWorklistService::class);
+
+        $this->assertCount(0, $worklist->upcoming());
+        $this->assertCount(1, $worklist->upcomingCallFollowUps());
+    }
+
     protected function createStaffUser(): User
     {
         Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);

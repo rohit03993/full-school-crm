@@ -20,12 +20,22 @@ class StudentCounterService
     public function __construct(
         protected AttendanceService $attendance,
         protected ActivityAttendanceService $activityAttendance,
+        protected LeadTimelineService $leadTimeline,
     ) {}
     /**
      * @return array{
      *     phase: ProfilePhase,
      *     items: array<int, array{label: string, value: int|float|string|null}>,
-     *     recent_visits: Collection<int, \App\Models\Visit>,
+     *     recent_activity: Collection<int, array{
+     *         type: string,
+     *         label: string,
+     *         occurred_at: \Illuminate\Support\Carbon,
+     *         summary: string,
+     *         detail: ?string,
+     *         staff_name: ?string,
+     *         follow_up_at: ?\Illuminate\Support\Carbon,
+     *         status_label: ?string,
+     *     }>,
      *     lead_sources: array{
      *         website_count: int,
      *         walk_in_count: int,
@@ -67,13 +77,8 @@ class StudentCounterService
             'phase' => $phase,
             'items' => $this->countersForPhase($student, $phase, $leadSources),
             'dossier' => $dossier,
-            'recent_visits' => $phase->isLeadStage()
-                ? $student->visits()
-                    ->with(['enquiry.course', 'staff'])
-                    ->orderByDesc('visit_date')
-                    ->orderByDesc('id')
-                    ->limit(5)
-                    ->get()
+            'recent_activity' => $phase->isLeadStage()
+                ? $this->leadTimeline->forStudent($student, 5)
                 : new Collection,
             'lead_sources' => $leadSources,
         ];

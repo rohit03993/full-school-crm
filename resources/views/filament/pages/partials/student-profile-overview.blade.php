@@ -2,7 +2,7 @@
     use App\Enums\ProfilePhase;
 
     $phase = $profile['phase'];
-    $recentVisits = $profile['recent_visits'];
+    $recentActivity = $profile['recent_activity'];
 @endphp
 
 @if (($phase === ProfilePhase::Enrolled || $phase === ProfilePhase::ActiveStudent) && ($profile['dossier'] ?? null))
@@ -73,33 +73,44 @@
 
         <div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 lg:col-span-2 dark:ring-white/10">
             <div class="border-b border-gray-100 px-4 py-3 dark:border-white/10 sm:px-6 sm:py-4">
-                <h3 class="text-base font-semibold text-gray-950 dark:text-white">Recent Visits</h3>
+                <h3 class="text-base font-semibold text-gray-950 dark:text-white">Recent activity</h3>
             </div>
 
-            @if ($recentVisits->isEmpty())
-                <p class="px-4 py-6 text-sm text-gray-500 sm:px-6 dark:text-gray-400">No visits recorded yet.</p>
+            @if ($recentActivity->isEmpty())
+                <p class="px-4 py-6 text-sm text-gray-500 sm:px-6 dark:text-gray-400">No visits or calls recorded yet.</p>
             @else
                 <div class="divide-y divide-gray-100 dark:divide-white/10">
-                    @foreach ($recentVisits as $visit)
+                    @foreach ($recentActivity as $item)
                         <div class="px-4 py-4 sm:px-6">
                             <div class="flex flex-wrap items-start justify-between gap-2">
                                 <div>
-                                    <p class="font-semibold text-gray-950 dark:text-white">{{ $visit->visit_date?->format('d M Y') }}</p>
+                                    <p class="font-semibold text-gray-950 dark:text-white">{{ $item['label'] }}</p>
                                     <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                                        {{ $visit->enquiry?->course?->name ?? '—' }}
-                                        · {{ $visit->staff?->name ?? 'Staff' }}
+                                        {{ $item['occurred_at']->format('d M Y, h:i A') }}
+                                        @if ($item['staff_name'])
+                                            · {{ $item['staff_name'] }}
+                                        @endif
                                     </p>
                                 </div>
-                                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-white/10 dark:text-gray-300">
-                                    {{ $visit->status?->label() ?? '—' }}
-                                </span>
+                                @if ($item['status_label'])
+                                    <span @class([
+                                        'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                                        'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300' => $item['type'] === 'call',
+                                        'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300' => $item['type'] !== 'call',
+                                    ])>
+                                        {{ $item['status_label'] }}
+                                    </span>
+                                @endif
                             </div>
-                            @if ($visit->discussion_summary)
-                                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ $visit->discussion_summary }}</p>
+                            @if ($item['summary'])
+                                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ $item['summary'] }}</p>
                             @endif
-                            @if ($visit->next_follow_up_date)
+                            @if ($item['detail'])
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $item['detail'] }}</p>
+                            @endif
+                            @if ($item['follow_up_at'])
                                 <p class="mt-1 text-xs text-primary-600 dark:text-primary-400">
-                                    Follow-up: {{ $visit->next_follow_up_date->format('d M Y') }}
+                                    Follow-up: {{ $item['follow_up_at']->format('d M Y, h:i A') }}
                                 </p>
                             @endif
                         </div>

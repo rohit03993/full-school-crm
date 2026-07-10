@@ -10,7 +10,6 @@ use App\Models\Enquiry;
 use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\User;
-use App\Models\Visit;
 use App\Support\CrmCacheInvalidator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -365,21 +364,6 @@ class CallLogService
         if ($visitStatus) {
             $enquiry->update(['latest_visit_status' => $visitStatus]);
         }
-
-        $summary = filled($call->call_notes)
-            ? $call->call_notes
-            : 'Phone call — '.$call->call_status->label();
-
-        Visit::query()->create([
-            'student_id' => $call->student_id,
-            'enquiry_id' => $enquiry->id,
-            'visit_date' => $call->called_at->toDateString(),
-            'staff_user_id' => $staff->id,
-            'discussion_summary' => $summary,
-            'remarks' => $call->call_direction === CallDirection::Incoming ? 'Incoming call' : 'Outgoing call',
-            'next_follow_up_date' => $nextFollowup?->toDateString(),
-            'status' => $visitStatus ?? VisitStatus::FollowUpRequired,
-        ]);
     }
 
     protected function applyPermanentBlock(Student $student, string $reason): void

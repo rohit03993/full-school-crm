@@ -21,6 +21,11 @@
                             </p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
+                        @if ($call->student_case_id && $call->studentCase)
+                            <span class="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-semibold text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
+                                {{ $call->studentCase->case_number }}
+                            </span>
+                        @endif
                         @if ($call->visit_status_changed_to)
                             <span class="inline-flex rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
                                 {{ $call->visit_status_changed_to->label() }}

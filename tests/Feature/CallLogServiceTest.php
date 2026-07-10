@@ -22,7 +22,7 @@ class CallLogServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_connected_call_is_logged_with_staff_name_and_visit(): void
+    public function test_connected_call_is_logged_with_staff_name(): void
     {
         $staff = $this->createStaffUser();
         $student = $this->createLeadStudent($staff);
@@ -42,9 +42,9 @@ class CallLogServiceTest extends TestCase
         $this->assertSame(CallStatus::Connected, $call->call_status);
         $this->assertSame(1, $student->total_calls);
         $this->assertNotNull($student->last_call_at);
-        $this->assertDatabaseHas('visits', [
+        $this->assertDatabaseMissing('visits', [
             'student_id' => $student->id,
-            'staff_user_id' => $staff->id,
+            'remarks' => 'Outgoing call',
         ]);
     }
 

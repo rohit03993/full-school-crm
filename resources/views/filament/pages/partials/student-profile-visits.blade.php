@@ -24,13 +24,19 @@
             </div>
         @endif
 
-        @if ($leadTimeline->isNotEmpty())
-            <div class="mb-6">
-                <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Lead timeline</h3>
-                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Visits and calls in one place, newest first.</p>
+        @if ($leadTimeline->isEmpty())
+            <p class="px-1 text-sm text-gray-500 dark:text-gray-400">No visits or calls recorded yet.</p>
+        @else
+            <div>
+                <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Activity timeline</h3>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Campus visits and phone calls in one place, newest first.</p>
                 <div class="mt-3 space-y-2">
                     @foreach ($leadTimeline as $item)
-                        <div class="rounded-xl bg-white px-4 py-3 ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                        <div @class([
+                            'rounded-xl px-4 py-3 ring-1',
+                            'bg-white ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10' => $item['type'] !== 'call',
+                            'bg-sky-50/80 ring-sky-200/80 dark:bg-sky-500/5 dark:ring-sky-500/20' => $item['type'] === 'call',
+                        ])>
                             <div class="flex items-start justify-between gap-2">
                                 <div>
                                     <p class="text-sm font-bold text-gray-950 dark:text-white">{{ $item['label'] }}</p>
@@ -42,12 +48,19 @@
                                     </p>
                                 </div>
                                 @if ($item['status_label'])
-                                    <span class="shrink-0 rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-semibold text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
+                                    <span @class([
+                                        'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                                        'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300' => $item['type'] === 'call',
+                                        'bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300' => $item['type'] !== 'call',
+                                    ])>
                                         {{ $item['status_label'] }}
                                     </span>
                                 @endif
                             </div>
                             <p class="mt-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $item['summary'] }}</p>
+                            @if ($item['detail'])
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $item['detail'] }}</p>
+                            @endif
                             @if ($item['follow_up_at'])
                                 <p class="mt-1 text-xs font-medium text-amber-700 dark:text-amber-300">
                                     Follow-up: {{ $item['follow_up_at']->format('d M Y, h:i A') }}
@@ -56,51 +69,6 @@
                         </div>
                     @endforeach
                 </div>
-            </div>
-        @endif
-
-        <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Visit log</h3>
-
-        @if ($visits->isEmpty())
-            <p class="mt-2 px-1 text-sm text-gray-500 dark:text-gray-400">No visits recorded yet.</p>
-        @else
-            <div class="mt-3 space-y-3">
-                @foreach ($visits as $visit)
-                    <div class="rounded-xl bg-gray-50 px-4 py-3.5 ring-1 ring-gray-950/5 dark:bg-white/5 dark:ring-white/10">
-                        <div class="flex items-start justify-between gap-2">
-                            <p class="text-sm font-bold text-gray-950 dark:text-white">
-                                @if ($visit->isCampusVisit())
-                                    Campus visit
-                                @else
-                                    Visit #{{ $visitSequenceById[$visit->id] ?? '—' }}
-                                @endif
-                                <span class="font-normal text-gray-500 dark:text-gray-400">· {{ $visit->visit_date?->format('d M Y') }}</span>
-                            </p>
-                            <span class="shrink-0 rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-semibold text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
-                                {{ $visit->displayStatusLabel() }}
-                            </span>
-                        </div>
-                        <p class="mt-1 truncate text-xs font-medium text-gray-600 dark:text-gray-400">
-                            @if ($visit->isCampusVisit())
-                                @if ($visit->campus_purpose)
-                                    {{ $visit->campus_purpose->label() }}
-                                @endif
-                            @else
-                                {{ $visit->enquiry?->course?->name ?? 'General visit' }}
-                            @endif
-                        </p>
-                        <p class="mt-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $visit->discussion_summary }}</p>
-                        @if ($visit->remarks)
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $visit->remarks }}</p>
-                        @endif
-                        <p class="mt-2 text-xs text-gray-400">
-                            {{ $visit->staff?->name ?? '—' }}
-                            @if ($visit->next_follow_up_date)
-                                · Follow-up {{ $visit->next_follow_up_date->format('d M Y') }}
-                            @endif
-                        </p>
-                    </div>
-                @endforeach
             </div>
         @endif
     @endif

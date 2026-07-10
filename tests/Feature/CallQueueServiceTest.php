@@ -93,7 +93,7 @@ class CallQueueServiceTest extends TestCase
         $this->assertSame(1, $queue->dueQueueCount($staff));
     }
 
-    public function test_lead_timeline_merges_visits_and_calls(): void
+    public function test_lead_timeline_merges_visits_and_calls_without_duplicates(): void
     {
         [$staff, $student] = $this->createAssignedLead();
 
@@ -107,9 +107,9 @@ class CallQueueServiceTest extends TestCase
 
         $timeline = app(LeadTimelineService::class)->forStudent($student->fresh());
 
-        $this->assertGreaterThanOrEqual(2, $timeline->count());
-        $this->assertTrue($timeline->contains(fn (array $item): bool => $item['type'] === 'call'));
-        $this->assertTrue($timeline->contains(fn (array $item): bool => in_array($item['type'], ['visit', 'call_visit'], true)));
+        $this->assertCount(1, $timeline);
+        $this->assertSame('call', $timeline->first()['type']);
+        $this->assertSame('Outgoing call', $timeline->first()['label']);
     }
 
     /**

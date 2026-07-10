@@ -24,16 +24,17 @@ class LeadTimelineService
      */
     public function forStudent(Student $student, int $limit = 50): Collection
     {
-        $visits = $student->visits()
+        $sequenceMap = $this->visitSequenceMap($student);
+
+        $visits = collect($student->visits()
+            ->inPerson()
             ->with(['staff', 'enquiry.course'])
-            ->get()
-            ->map(function (Visit $visit) use ($student): array {
-                $sequence = $this->visitSequenceNumber($student, $visit);
+            ->get())
+            ->map(function (Visit $visit) use ($sequenceMap): array {
+                $sequence = $sequenceMap[$visit->id] ?? 1;
 
                 return [
-                    'type' => $visit->remarks && str_contains(strtolower($visit->remarks), 'call')
-                        ? 'call_visit'
-                        : ($visit->isCampusVisit() ? 'campus_visit' : 'visit'),
+                    'type' => $visit->isCampusVisit() ? 'campus_visit' : 'visit',
                     'label' => $visit->isCampusVisit()
                         ? 'Campus visit'
                         : 'Visit #'.$sequence,
@@ -48,9 +49,10 @@ class LeadTimelineService
                 ];
             });
 
-        $calls = $student->calls()
-            ->with(['staff', 'enquiry.course'])
-            ->get()
+        $calls = collect($student->calls()
+            ->whereNull('student_case_id')
+            ->with(['staff', 'enquiry.course', 'studentCase'])
+            ->get())
             ->map(fn (StudentCall $call): array => [
                 'type' => 'call',
                 'label' => $call->call_direction->label().' call',
@@ -58,7 +60,7 @@ class LeadTimelineService
                 'summary' => filled($call->call_notes)
                     ? $call->call_notes
                     : $call->call_status->label(),
-                'detail' => $call->who_answered?->label(),
+                'detail' => $this->callDetailLabel($call),
                 'staff_name' => $call->staff?->name,
                 'follow_up_at' => $call->next_followup_at,
                 'status_label' => $call->call_status->label(),
@@ -77,6 +79,7 @@ class LeadTimelineService
     public function visitSequenceMap(Student $student): array
     {
         $orderedIds = $student->visits()
+            ->inPerson()
             ->orderBy('visit_date')
             ->orderBy('id')
             ->pluck('id');
@@ -93,5 +96,15 @@ class LeadTimelineService
     public function visitSequenceNumber(Student $student, Visit $visit): int
     {
         return $this->visitSequenceMap($student)[$visit->id] ?? 1;
+    }
+
+    protected function callDetailLabel(StudentCall $call): ?string
+    {
+        $parts = array_filter([
+            $call->who_answered?->label(),
+            $call->enquiry?->course?->name,
+        ]);
+
+        return $parts === [] ? null : implode(' · ', $parts);
     }
 }
