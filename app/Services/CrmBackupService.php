@@ -55,19 +55,29 @@ class CrmBackupService
 
             $this->progress($onProgress, 'Collecting private files (documents, photos, receipts)…');
             $privateDir = $workDir.DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'private';
-            $privateFiles = $this->copyStorageTree(
+            $privateCopy = $this->copyStorageTree(
                 storage_path('app/private'),
                 $privateDir,
                 config('crm-backup.exclude_private_prefixes', []),
             );
+            $privateFiles = $privateCopy['files'];
 
             $this->progress($onProgress, 'Collecting public files (homework, logos, gallery)…');
             $publicDir = $workDir.DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'public';
-            $publicFiles = $this->copyStorageTree(
+            $publicCopy = $this->copyStorageTree(
                 storage_path('app/public'),
                 $publicDir,
                 config('crm-backup.exclude_public_prefixes', []),
             );
+            $publicFiles = $publicCopy['files'];
+            $skippedPaths = array_values(array_unique(array_merge($privateCopy['skipped'], $publicCopy['skipped'])));
+
+            if ($skippedPaths !== []) {
+                $this->progress(
+                    $onProgress,
+                    'Skipped '.count($skippedPaths).' unreadable path(s) (fix server permissions on storage/).',
+                );
+            }
 
             $this->progress($onProgress, 'Writing restore metadata…');
             $manifest = [
@@ -88,6 +98,7 @@ class CrmBackupService
                     'database' => self::DATABASE_NAME,
                     'private_files' => $privateFiles,
                     'public_files' => $publicFiles,
+                    'skipped_unreadable_paths' => $skippedPaths,
                     'app_key' => self::APP_KEY_NAME,
                     'env_snapshot' => self::ENV_SNAPSHOT_NAME,
                 ],
@@ -139,6 +150,7 @@ class CrmBackupService
                 'private_files' => $privateFiles,
                 'public_files' => $publicFiles,
                 'tables' => $tableCount,
+                'skipped_paths' => $skippedPaths,
             ];
         } catch (Throwable $exception) {
             if (is_file($zipPath)) {
@@ -733,60 +745,117 @@ class CrmBackupService
 
     /**
      * @param  list<string>  $excludePrefixes
+     * @return array{files: int, skipped: list<string>}
      */
-    protected function copyStorageTree(string $sourceRoot, string $targetRoot, array $excludePrefixes): int
+    protected function copyStorageTree(string $sourceRoot, string $targetRoot, array $excludePrefixes): array
     {
         File::ensureDirectoryExists($targetRoot);
 
         if (! is_dir($sourceRoot)) {
+            return ['files' => 0, 'skipped' => []];
+        }
+
+        $sourceRootReal = realpath($sourceRoot) ?: $sourceRoot;
+        $skipped = [];
+        $files = $this->copyStorageTreeRecursive(
+            $sourceRootReal,
+            $sourceRootReal,
+            $targetRoot,
+            $excludePrefixes,
+            $skipped,
+        );
+
+        return [
+            'files' => $files,
+            'skipped' => array_values(array_unique($skipped)),
+        ];
+    }
+
+    /**
+     * @param  list<string>  $excludePrefixes
+     * @param  list<string>  $skipped
+     */
+    protected function copyStorageTreeRecursive(
+        string $sourceRoot,
+        string $currentDir,
+        string $targetRoot,
+        array $excludePrefixes,
+        array &$skipped,
+    ): int {
+        if (! is_readable($currentDir)) {
+            $relative = ltrim(str_replace('\\', '/', Str::after($currentDir, $sourceRoot)), '/');
+            $skipped[] = $relative !== '' ? $relative : basename($currentDir);
+
+            return 0;
+        }
+
+        $entries = @scandir($currentDir);
+
+        if ($entries === false) {
+            $relative = ltrim(str_replace('\\', '/', Str::after($currentDir, $sourceRoot)), '/');
+            $skipped[] = $relative !== '' ? $relative : basename($currentDir);
+
             return 0;
         }
 
         $count = 0;
-        $sourceRootReal = realpath($sourceRoot) ?: $sourceRoot;
 
-        $directory = new \RecursiveDirectoryIterator($sourceRootReal, \FilesystemIterator::SKIP_DOTS);
-        $filter = new \RecursiveCallbackFilterIterator(
-            $directory,
-            function (\SplFileInfo $current) use ($sourceRootReal, $excludePrefixes): bool {
-                $absolute = $current->getPathname();
-                $relative = ltrim(str_replace('\\', '/', Str::after($absolute, $sourceRootReal)), '/');
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
 
-                if ($relative === '') {
-                    return true;
-                }
-
-                if (str_contains($relative, '/.work-') || str_starts_with($relative, '.work-')
-                    || str_contains($relative, '/.restore-') || str_starts_with($relative, '.restore-')) {
-                    return false;
-                }
-
-                return ! $this->shouldExcludePath($relative, $excludePrefixes);
-            },
-        );
-
-        $iterator = new \RecursiveIteratorIterator($filter, \RecursiveIteratorIterator::SELF_FIRST);
-
-        /** @var \SplFileInfo $item */
-        foreach ($iterator as $item) {
-            $absolute = $item->getPathname();
-            $relative = ltrim(str_replace('\\', '/', Str::after($absolute, $sourceRootReal)), '/');
+            $absolute = $currentDir.DIRECTORY_SEPARATOR.$entry;
+            $relative = ltrim(str_replace('\\', '/', Str::after($absolute, $sourceRoot)), '/');
 
             if ($relative === '') {
                 continue;
             }
 
-            $destination = $targetRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relative);
+            if (str_contains($relative, '/.work-') || str_starts_with($relative, '.work-')
+                || str_contains($relative, '/.restore-') || str_starts_with($relative, '.restore-')) {
+                continue;
+            }
 
-            if ($item->isDir()) {
-                File::ensureDirectoryExists($destination);
+            if ($this->shouldExcludePath($relative, $excludePrefixes)) {
+                continue;
+            }
+
+            if (is_dir($absolute)) {
+                if (! is_readable($absolute)) {
+                    $skipped[] = $relative;
+
+                    continue;
+                }
+
+                $destinationDir = $targetRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relative);
+                File::ensureDirectoryExists($destinationDir);
+                $count += $this->copyStorageTreeRecursive(
+                    $sourceRoot,
+                    $absolute,
+                    $targetRoot,
+                    $excludePrefixes,
+                    $skipped,
+                );
 
                 continue;
             }
 
-            File::ensureDirectoryExists(dirname($destination));
-            File::copy($absolute, $destination);
-            $count++;
+            if (! is_file($absolute) || ! is_readable($absolute)) {
+                $skipped[] = $relative;
+
+                continue;
+            }
+
+            $destination = $targetRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relative);
+
+            try {
+                File::ensureDirectoryExists(dirname($destination));
+                File::copy($absolute, $destination);
+                $count++;
+            } catch (Throwable) {
+                $skipped[] = $relative;
+            }
         }
 
         return $count;
@@ -822,7 +891,7 @@ class CrmBackupService
             }
         }
 
-        return $this->copyStorageTree($sourceRoot, $destinationRoot, []);
+        return $this->copyStorageTree($sourceRoot, $destinationRoot, [])['files'];
     }
 
     /**

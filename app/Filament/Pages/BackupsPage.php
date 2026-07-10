@@ -118,7 +118,14 @@ class BackupsPage extends Page
 
         Notification::make()
             ->title('Full backup ready')
-            ->body($result['filename'].' ('.$backups->formatBytes($result['size_bytes']).').'.$driveNote)
+            ->body(
+                $result['filename'].' ('.$backups->formatBytes($result['size_bytes']).').'.$driveNote
+                .(
+                    ! empty($result['skipped_paths'])
+                        ? ' Warning: '.count($result['skipped_paths']).' path(s) skipped due to server permissions — run: chmod -R ug+rwX storage'
+                        : ''
+                )
+            )
             ->success()
             ->send();
     }
