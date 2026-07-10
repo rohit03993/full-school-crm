@@ -4,8 +4,25 @@
     <meta charset="utf-8">
     <title>{{ $enrollment->enrollment_number }} — ID Card</title>
     <style>
-        @page { margin: 0; size: 86mm 54mm; }
-        body { margin: 0; padding: 0; font-family: DejaVu Sans, sans-serif; }
+        /* Exact CR80 size — must stay on ONE page */
+        @page { margin: 0; size: 85.6mm 54mm; }
+        * { margin: 0; padding: 0; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 85.6mm;
+            height: 54mm;
+            overflow: hidden;
+            font-family: DejaVu Sans, sans-serif;
+        }
+        .card {
+            width: 85.6mm;
+            height: 54mm;
+            overflow: hidden;
+            border-collapse: collapse;
+        }
+        .label { font-size: 6px; font-weight: bold; color: #ffffff; }
+        .value { font-size: 6.5px; color: #ffffff; }
     </style>
 </head>
 <body>
@@ -15,31 +32,37 @@
     $accent = $institute['id_card_accent'] ?? '#dc2626';
     $badge = $institute['id_card_badge'] ?? '#fbbf24';
     $headerText = $institute['id_card_header_text'] ?? '#1e3a8a';
+
+    $instituteName = \Illuminate\Support\Str::upper(\Illuminate\Support\Str::limit($institute['name'] ?? '', 58, '…'));
+    $studentName = \Illuminate\Support\Str::upper(\Illuminate\Support\Str::limit($student->name ?? '', 28, '…'));
+    $courseName = \Illuminate\Support\Str::limit($course?->name ?? '—', 32, '…');
+    $fatherName = \Illuminate\Support\Str::limit($student->father_name ?: '—', 28, '…');
+    $duration = \Illuminate\Support\Str::limit($course?->duration_label ?? '—', 16, '…');
+    $session = \Illuminate\Support\Str::limit($sessionName ?: '—', 16, '…');
+    $batch = filled($batchLabel) ? \Illuminate\Support\Str::limit($batchLabel, 22, '…') : null;
+    $roll = $enrollment->enrollment_number;
 @endphp
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; background-color: {{ $primary }};">
-    {{-- White institute header (MJPITM-style) --}}
+
+<table class="card" width="243" height="153" cellpadding="0" cellspacing="0" border="0" bgcolor="{{ $primary }}">
+    {{-- Header: white bar like MJPITM --}}
     <tr>
-        <td colspan="2" bgcolor="#ffffff" style="padding: 5px 8px; border-bottom: 2px solid {{ $primaryDark }};">
+        <td colspan="2" height="34" bgcolor="#ffffff" style="padding: 3px 6px;">
             <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                    <td width="34" valign="middle" align="center">
+                    <td width="30" valign="middle" align="center">
                         @if (! empty($institute['logo_data_uri']))
-                            <img src="{{ $institute['logo_data_uri'] }}" alt="Logo" width="28" height="28" style="object-fit: contain;">
+                            <img src="{{ $institute['logo_data_uri'] }}" width="24" height="24" alt="">
                         @else
-                            <table width="28" height="28" cellpadding="0" cellspacing="0" bgcolor="{{ $primary }}">
-                                <tr>
-                                    <td align="center" valign="middle" style="color: #ffffff; font-size: 11px; font-weight: bold;">
-                                        {{ mb_strtoupper(mb_substr($institute['name'], 0, 1)) }}
-                                    </td>
-                                </tr>
-                            </table>
+                            <span style="display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;background:{{ $primary }};color:#fff;font-size:10px;font-weight:bold;">
+                                {{ mb_strtoupper(mb_substr($institute['name'], 0, 1)) }}
+                            </span>
                         @endif
                     </td>
-                    <td valign="middle" style="padding-left: 6px;">
-                        <div style="font-size: 8px; font-weight: bold; color: {{ $headerText }}; line-height: 1.2; text-transform: uppercase;">
-                            {{ $institute['name'] }}
+                    <td valign="middle" style="padding-left: 5px;">
+                        <div style="font-size: 7px; font-weight: bold; color: {{ $headerText }}; line-height: 1.15; text-transform: uppercase;">
+                            {{ $instituteName }}
                         </div>
-                        <div style="font-size: 7px; font-weight: bold; color: {{ $accent }}; letter-spacing: 0.4px; margin-top: 2px;">
+                        <div style="font-size: 6.5px; font-weight: bold; color: {{ $accent }}; margin-top: 1px; letter-spacing: 0.3px;">
                             STUDENT IDENTITY CARD
                         </div>
                     </td>
@@ -48,76 +71,58 @@
         </td>
     </tr>
 
-    {{-- Body: photo + details on brand colour --}}
+    {{-- Body: photo + details (fixed height so footer never spills) --}}
     <tr>
-        <td width="28%" valign="middle" align="center" bgcolor="{{ $primary }}" style="padding: 8px 6px;">
+        <td width="78" height="100" valign="middle" align="center" bgcolor="{{ $primary }}" style="padding: 4px 3px;">
             @if ($photoDataUri)
-                <img src="{{ $photoDataUri }}" width="68" height="78" style="border: 2px solid #ffffff; background-color: #ffffff;">
+                <img src="{{ $photoDataUri }}" width="58" height="70" alt="" style="border: 1.5px solid #ffffff;">
             @else
-                <table width="68" height="78" cellpadding="0" cellspacing="0" border="1" bordercolor="#ffffff" bgcolor="#ffffff">
-                    <tr>
-                        <td align="center" valign="middle" style="font-size: 7px; color: #9ca3af;">Photo</td>
-                    </tr>
-                </table>
+                <div style="width:58px;height:70px;border:1.5px solid #ffffff;background:#ffffff;line-height:70px;text-align:center;font-size:7px;color:#9ca3af;">
+                    Photo
+                </div>
             @endif
         </td>
-        <td width="72%" valign="top" bgcolor="{{ $primary }}" style="padding: 7px 8px 6px 4px; color: #ffffff;">
-            <div style="font-size: 12px; font-weight: bold; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.2px;">
-                {{ $student->name }}
+        <td height="100" valign="top" bgcolor="{{ $primary }}" style="padding: 4px 6px 2px 2px;">
+            <div style="font-size: 11px; font-weight: bold; color: #ffffff; line-height: 1.1; text-transform: uppercase;">
+                {{ $studentName }}
             </div>
 
-            <div style="margin-top: 4px; margin-bottom: 5px;">
-                <span style="display: inline-block; background-color: {{ $badge }}; color: #111827; font-size: 7px; font-weight: bold; padding: 2px 6px;">
-                    {{ strtoupper($rollLabel) }}: {{ $enrollment->enrollment_number }}
+            <div style="margin-top: 3px; margin-bottom: 4px;">
+                <span style="background-color: {{ $badge }}; color: #111827; font-size: 6.5px; font-weight: bold; padding: 1px 5px;">
+                    {{ strtoupper($rollLabel) }}: {{ $roll }}
                 </span>
             </div>
 
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 6.5px; line-height: 1.55; color: #ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                    <td width="34%" style="font-weight: bold; opacity: 0.9;">DURATION</td>
-                    <td>: {{ $course?->duration_label ?? '—' }}</td>
+                    <td class="label" width="48%">DURATION: <span class="value">{{ $duration }}</span></td>
+                    <td class="label">SESSION: <span class="value">{{ $session }}</span></td>
                 </tr>
-                <tr>
-                    <td style="font-weight: bold; opacity: 0.9;">SESSION</td>
-                    <td>: {{ $sessionName ?: '—' }}</td>
-                </tr>
-                @if (filled($batchLabel))
+                @if ($batch)
                     <tr>
-                        <td style="font-weight: bold; opacity: 0.9;">BATCH</td>
-                        <td>: {{ $batchLabel }}</td>
+                        <td colspan="2" style="padding-top: 2px;" class="label">BATCH: <span class="value">{{ $batch }}</span></td>
                     </tr>
                 @endif
                 <tr>
-                    <td style="font-weight: bold; opacity: 0.9;">FATHER'S NAME</td>
-                    <td>: {{ $student->father_name ?: '—' }}</td>
+                    <td colspan="2" style="padding-top: 2px;" class="label">FATHER'S NAME: <span class="value">{{ $fatherName }}</span></td>
                 </tr>
                 <tr>
-                    <td style="font-weight: bold; opacity: 0.9;">COURSE</td>
-                    <td>: {{ $course?->name ?? '—' }}</td>
+                    <td colspan="2" style="padding-top: 2px;" class="label">COURSE: <span class="value">{{ $courseName }}</span></td>
                 </tr>
-                @if (filled($validTill))
-                    <tr>
-                        <td style="font-weight: bold; opacity: 0.9;">VALID TILL</td>
-                        <td>: {{ $validTill }}</td>
-                    </tr>
-                @endif
             </table>
         </td>
     </tr>
 
-    {{-- Footer strip --}}
+    {{-- Thin footer — phone + tiny QR (kept short to avoid page 2) --}}
     <tr>
-        <td colspan="2" bgcolor="{{ $primaryDark }}" style="padding: 3px 8px;">
+        <td colspan="2" height="19" bgcolor="{{ $primaryDark }}" style="padding: 1px 5px;">
             <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                    <td valign="middle" style="font-size: 5px; color: #e5e7eb; line-height: 1.3;">
-                        {{ $institute['phone'] }}
-                        @if (filled($institute['email']))
-                            · {{ $institute['email'] }}
-                        @endif
+                    <td valign="middle" style="font-size: 5px; color: #e5e7eb;">
+                        {{ \Illuminate\Support\Str::limit(trim(($institute['phone'] ?? '').'  '.($institute['email'] ?? '')), 55, '…') }}
                     </td>
-                    <td width="42" align="right" valign="middle">
-                        <img src="{{ $qrDataUri }}" width="28" height="28" style="background-color: #ffffff; padding: 1px;">
+                    <td width="22" align="right" valign="middle">
+                        <img src="{{ $qrDataUri }}" width="16" height="16" alt="" style="background:#ffffff;">
                     </td>
                 </tr>
             </table>

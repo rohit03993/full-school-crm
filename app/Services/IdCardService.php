@@ -76,7 +76,11 @@ class IdCardService
             'sessionName' => $sessionName,
             'validTill' => $validTill,
             'batchFullLabel' => $batch ? ClassSectionLabel::forBatch($batch, includeSession: false) : null,
-        ])->setPaper([0, 0, self::CARD_WIDTH_PT, self::CARD_HEIGHT_PT]);
+        ])
+            ->setPaper([0, 0, self::CARD_WIDTH_PT, self::CARD_HEIGHT_PT])
+            ->setOption('dpi', 96)
+            ->setOption('defaultFont', 'DejaVu Sans')
+            ->setOption('isRemoteEnabled', true);
 
         Storage::disk(self::DISK)->put($relativePath, $pdf->output());
 
