@@ -78,9 +78,10 @@ class IdCardService
             'batchFullLabel' => $batch ? ClassSectionLabel::forBatch($batch, includeSession: false) : null,
         ])
             ->setPaper([0, 0, self::CARD_WIDTH_PT, self::CARD_HEIGHT_PT])
-            ->setOption('dpi', 96)
+            ->setOption('dpi', 72)
             ->setOption('defaultFont', 'DejaVu Sans')
-            ->setOption('isRemoteEnabled', true);
+            ->setOption('isRemoteEnabled', true)
+            ->setOption('isHtml5ParserEnabled', true);
 
         Storage::disk(self::DISK)->put($relativePath, $pdf->output());
 
@@ -127,9 +128,9 @@ class IdCardService
         $payload = $enrollmentNumber.'|'.$verificationUrl;
 
         $svg = QrCode::format('svg')
-            ->size(120)
-            ->margin(1)
-            ->errorCorrection('M')
+            ->size(48)
+            ->margin(0)
+            ->errorCorrection('L')
             ->generate($payload);
 
         return 'data:image/svg+xml;base64,'.base64_encode($svg);
