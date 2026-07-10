@@ -4,6 +4,23 @@
 
 <div class="mx-auto max-w-lg space-y-4 pb-24 lg:max-w-4xl lg:pb-6">
   <div class="flex flex-wrap gap-2">
+    @if ($canAllCasesTab)
+      <button
+        type="button"
+        wire:click="switchWorkTab('all_cases')"
+        @class([
+          'rounded-full px-3 py-1.5 text-xs font-semibold transition touch-manipulation',
+          'bg-primary-600 text-white shadow-sm' => $workTab === 'all_cases',
+          'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300 dark:hover:bg-white/15' => $workTab !== 'all_cases',
+        ])
+      >
+        All cases
+        @if (($allCaseStats['open'] ?? 0) > 0)
+          <span class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">{{ $allCaseStats['open'] }}</span>
+        @endif
+      </button>
+    @endif
+
     <button
       type="button"
       wire:click="switchWorkTab('meetings')"
@@ -13,7 +30,7 @@
         'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300 dark:hover:bg-white/15' => $workTab !== 'meetings',
       ])
     >
-      Meetings
+      {{ $canAllCasesTab ? 'My meetings' : 'Meetings' }}
       @if (($stats['open'] ?? 0) > 0)
         <span class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">{{ $stats['open'] }}</span>
       @endif
@@ -37,7 +54,15 @@
     @endif
   </div>
 
-  @if ($workTab === 'meetings')
+  @if ($workTab === 'all_cases')
+    @include('filament.pages.partials.all-cases', [
+      'cases' => $allCases,
+      'caseTypeOptions' => $caseTypeOptions,
+      'staffOptions' => $staffOptions,
+      'stats' => $allCaseStats,
+      'embedded' => true,
+    ])
+  @elseif ($workTab === 'meetings')
     @if (($callStats['uncalled'] ?? 0) > 0 || ($callStats['due_call_followups'] ?? 0) > 0)
       <a
         href="{{ MyLeadsPage::getUrl() }}"

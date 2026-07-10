@@ -72,6 +72,16 @@ class DashboardHeroWidget extends Widget
             ],
         ];
 
+        if ($user && CrmAccess::can($user, CrmPermission::CasesViewAll)) {
+            $ownerActions[] = [
+                'label' => 'All cases',
+                'description' => 'Institute-wide support cases',
+                'icon' => 'heroicon-o-rectangle-stack',
+                'url' => MyMeetingsPage::getUrl(['tab' => 'all_cases']),
+                'feature' => null,
+            ];
+        }
+
         $staffActions = [
             [
                 'label' => 'Assigned to Call',

@@ -57,6 +57,7 @@ class CrmHint
         'call.report' => 'Daily and weekly call stats for your team. Filter by staff and date range before exporting.',
         'assigned.to.call' => 'Leads the admin assigned to you for calling. Open a profile to log the call.',
         'assigned.to.me' => 'Work assigned to you — campus meetings and support cases currently on your name.',
+        'work.supervisor.meetings' => 'Campus meetings assigned to you personally. Use the All cases tab for institute-wide case oversight.',
         'cases.my' => 'Support cases assigned to you for enrolled students — fees, academic issues, complaints. Open the student profile to transfer, call, or close.',
         'cases.all' => 'All enrolled-student support cases across the institute. Filter by status, type, or assignee.',
         'teaching.assignments' => 'Your class assignments and open exams — enter subject marks or submit to admin as class lead.',

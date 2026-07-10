@@ -79,7 +79,7 @@ class MyCasesPageTest extends TestCase
             ->assertRedirect(MyMeetingsPage::getUrl(['tab' => 'my_cases']));
     }
 
-    public function test_all_cases_tab_requires_view_all_permission(): void
+    public function test_counsellor_does_not_see_all_cases_tab_on_my_work(): void
     {
         $counsellor = User::factory()->create(['is_active' => true]);
         $counsellor->assignRole(StaffJobRole::Counsellor->value);
@@ -91,6 +91,36 @@ class MyCasesPageTest extends TestCase
 
         Livewire::test(MyMeetingsPage::class)
             ->assertDontSee('All cases');
+    }
+
+    public function test_super_admin_lands_on_all_cases_tab_with_institute_view(): void
+    {
+        Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);
+
+        [$student, $counsellor, $accountant] = $this->createEnrolledScenario();
+
+        app(StudentCaseService::class)->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::Academic,
+            'Chemistry teacher',
+            null,
+            $accountant,
+            $counsellor,
+            'Please review with parent.',
+        );
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(MyMeetingsPage::class)
+            ->assertOk()
+            ->assertSee('All cases')
+            ->assertSee('Open institute-wide')
+            ->assertSee('Chemistry teacher')
+            ->assertSee($student->name);
     }
 
     public function test_transferred_case_is_hidden_from_opener_on_student_profile(): void
