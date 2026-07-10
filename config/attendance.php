@@ -17,6 +17,12 @@ return [
     /** Daily auto check-out time (server timezone), e.g. 20:00 = 8 PM. */
     'auto_out_time' => env('ATTENDANCE_AUTO_OUT_TIME', '20:00'),
 
+    /**
+     * If a student checks in AFTER auto_out_time (evening class), wait this many
+     * minutes from check-in before auto check-out.
+     */
+    'auto_out_late_grace_minutes' => (int) env('ATTENDANCE_AUTO_OUT_LATE_GRACE_MINUTES', 60),
+
     'process_batch_size' => (int) env('ATTENDANCE_PUNCH_PROCESS_BATCH', 100),
 
 ];

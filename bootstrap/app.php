@@ -32,7 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('crm:process-late-fees')->dailyAt('00:30');
         $schedule->command('crm:send-fee-reminders')->dailyAt('09:00');
         $schedule->command('attendance:process-punches')->everyMinute();
-        $schedule->command('attendance:auto-out')->everyFiveMinutes();
+        $schedule->command('attendance:auto-out')->everyMinute();
         $schedule->command('crm:process-queue')->everyMinute()->withoutOverlapping();
         $schedule->command('whatsapp:process-pending')->everyMinute()->withoutOverlapping();
     })

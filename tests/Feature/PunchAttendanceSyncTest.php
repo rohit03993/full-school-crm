@@ -158,6 +158,36 @@ class PunchAttendanceSyncTest extends TestCase
         );
     }
 
+    public function test_late_evening_check_in_auto_outs_after_grace(): void
+    {
+        config([
+            'attendance.auto_out_enabled' => true,
+            'attendance.auto_out_time' => '20:00',
+            'attendance.auto_out_late_grace_minutes' => 60,
+        ]);
+
+        [$student] = $this->createEnrolledStudent('ROLL-LATE');
+
+        $this->travelTo('2026-07-10 21:01:00');
+        app(PunchAttendanceSyncService::class)->syncFromPunch(
+            $student,
+            '2026-07-10',
+            'IN',
+            '21:01:00',
+            'manual',
+        );
+
+        $this->travelTo('2026-07-10 21:30:00');
+        $this->assertSame(0, app(\App\Services\Punch\AttendanceAutoOutService::class)->applyDue());
+        $this->assertNull(Attendance::query()->first()?->checked_out_at);
+
+        $this->travelTo('2026-07-10 22:05:00');
+        $this->assertSame(1, app(\App\Services\Punch\AttendanceAutoOutService::class)->applyDue());
+
+        $attendance = Attendance::query()->first();
+        $this->assertSame('22:01:00', $attendance?->checked_out_at?->format('H:i:s'));
+    }
+
     public function test_auto_out_source_label_does_not_duplicate_out_word(): void
     {
         if (! Schema::hasTable('punch_logs')) {

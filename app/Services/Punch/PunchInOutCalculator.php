@@ -169,10 +169,16 @@ class PunchInOutCalculator
             || (now()->hour === $autoOutHour && now()->minute >= $autoOutMinute);
 
         foreach ($entries as &$entry) {
-            if ($entry['in'] && ! $entry['out'] && ($isPastDate || ($isToday && $isPastAutoOutTime))) {
-                $entry['out'] = $normalized;
-                $entry['is_auto_out'] = true;
+            if (! ($entry['in'] && ! $entry['out'] && ($isPastDate || ($isToday && $isPastAutoOutTime)))) {
+                continue;
             }
+
+            $inNormalized = $this->normalizeTime((string) $entry['in']);
+            // Never invent an OUT earlier than IN (evening check-ins after cutoff).
+            $entry['out'] = strcmp($inNormalized, $normalized) >= 0
+                ? Carbon::parse($date.' '.$inNormalized)->addMinute()->format('H:i:s')
+                : $normalized;
+            $entry['is_auto_out'] = true;
         }
 
         return $entries;
