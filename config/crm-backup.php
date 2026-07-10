@@ -42,4 +42,15 @@ return [
     'exclude_public_prefixes' => [
         'livewire-tmp',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Google Drive OAuth (optional — can also be saved in Setup → Backups)
+    |--------------------------------------------------------------------------
+    */
+    'google_client_id' => env('GOOGLE_DRIVE_CLIENT_ID', ''),
+    'google_client_secret' => env('GOOGLE_DRIVE_CLIENT_SECRET', ''),
+
+    /** Tests only — skip real token exchange. */
+    'gdrive_test_access_token' => env('CRM_BACKUP_GDRIVE_TEST_TOKEN'),
 ];

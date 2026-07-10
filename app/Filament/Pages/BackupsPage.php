@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Enums\RoleName;
+use App\Models\Setting;
 use App\Services\AuditService;
 use App\Services\CrmBackupService;
 use App\Services\GoogleDriveBackupService;
@@ -40,7 +41,9 @@ class BackupsPage extends Page
 
     public string $gdriveFolderId = '';
 
-    public string $gdriveServiceAccountJson = '';
+    public string $gdriveClientId = '';
+
+    public string $gdriveClientSecret = '';
 
     public bool $restoreConfirmed = false;
 
@@ -71,6 +74,18 @@ class BackupsPage extends Page
         $status = $drive->status();
         $this->gdriveEnabled = $status['enabled'];
         $this->gdriveFolderId = $status['folder_id'];
+        $this->gdriveClientId = (string) (Setting::getValue('backup.gdrive.oauth_client_id', '')
+            ?: config('crm-backup.google_client_id', ''));
+
+        if ($success = session('gdrive_oauth_success')) {
+            Notification::make()->title('Google Drive connected')->body((string) $success)->success()->send();
+            session()->forget('gdrive_oauth_success');
+        }
+
+        if ($error = session('gdrive_oauth_error')) {
+            Notification::make()->title('Google sign-in failed')->body((string) $error)->danger()->send();
+            session()->forget('gdrive_oauth_error');
+        }
     }
 
     public function createBackup(CrmBackupService $backups, GoogleDriveBackupService $drive, AuditService $audit): void
@@ -197,15 +212,14 @@ class BackupsPage extends Page
 
     public function saveGoogleDriveSettings(GoogleDriveBackupService $drive, AuditService $audit): void
     {
-        $credentialsUpdated = $this->gdriveServiceAccountJson !== '';
+        $secretUpdated = $this->gdriveClientSecret !== '';
 
         try {
             $drive->saveSettings([
                 'enabled' => $this->gdriveEnabled,
                 'folder_id' => $this->gdriveFolderId,
-                'service_account_json' => $credentialsUpdated
-                    ? $this->gdriveServiceAccountJson
-                    : null,
+                'oauth_client_id' => $this->gdriveClientId !== '' ? $this->gdriveClientId : null,
+                'oauth_client_secret' => $secretUpdated ? $this->gdriveClientSecret : null,
             ]);
         } catch (Throwable $exception) {
             Notification::make()
@@ -217,20 +231,22 @@ class BackupsPage extends Page
             return;
         }
 
-        $this->gdriveServiceAccountJson = '';
+        $this->gdriveClientSecret = '';
 
         $audit->log(
             action: 'Google Drive Backup Settings Updated',
             newValues: [
                 'enabled' => $this->gdriveEnabled,
                 'folder_id' => $this->gdriveFolderId,
-                'credentials_updated' => $credentialsUpdated,
+                'client_id_saved' => $this->gdriveClientId !== '',
+                'client_secret_updated' => $secretUpdated,
             ],
             user: Auth::user(),
         );
 
         Notification::make()
             ->title('Google Drive settings saved')
+            ->body('Next: Sign in with Google, then Test connection.')
             ->success()
             ->send();
     }
@@ -238,16 +254,14 @@ class BackupsPage extends Page
     public function testGoogleDrive(GoogleDriveBackupService $drive): void
     {
         try {
-            // Persist current form values first if folder/json provided
-            if ($this->gdriveFolderId !== '' || $this->gdriveServiceAccountJson !== '') {
+            if ($this->gdriveFolderId !== '' || $this->gdriveClientId !== '' || $this->gdriveClientSecret !== '') {
                 $drive->saveSettings([
                     'enabled' => $this->gdriveEnabled,
                     'folder_id' => $this->gdriveFolderId,
-                    'service_account_json' => $this->gdriveServiceAccountJson !== ''
-                        ? $this->gdriveServiceAccountJson
-                        : null,
+                    'oauth_client_id' => $this->gdriveClientId !== '' ? $this->gdriveClientId : null,
+                    'oauth_client_secret' => $this->gdriveClientSecret !== '' ? $this->gdriveClientSecret : null,
                 ]);
-                $this->gdriveServiceAccountJson = '';
+                $this->gdriveClientSecret = '';
             }
 
             $message = $drive->testConnection();
@@ -273,7 +287,7 @@ class BackupsPage extends Page
         $drive->clearCredentials();
         $this->gdriveEnabled = false;
         $this->gdriveFolderId = '';
-        $this->gdriveServiceAccountJson = '';
+        $this->gdriveClientSecret = '';
 
         $audit->log(
             action: 'Google Drive Backup Disconnected',

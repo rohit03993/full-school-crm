@@ -20,7 +20,7 @@
         <div class="border-b border-gray-100 px-4 py-3 dark:border-white/10 sm:px-6">
             <h2 class="text-sm font-bold text-gray-950 dark:text-white">Google Drive (automatic off-site copy)</h2>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                After each nightly backup, the zip is uploaded here so you can recover even if the server is wiped.
+                Sign in with your Google account so backups use your Drive storage (not a service account).
             </p>
         </div>
 
@@ -30,34 +30,44 @@
                     ? 'bg-emerald-50 text-emerald-900 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20'
                     : 'bg-amber-50 text-amber-950 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20' }}">
                 @if ($drive['last_test_ok'] ?? false)
-                    Verified · folder “{{ $drive['last_test_folder_name'] ?? 'Drive' }}”
-                    @if ($drive['client_email'])
+                    Verified
+                    @if ($drive['oauth_email'])
+                        · {{ $drive['oauth_email'] }}
+                    @elseif ($drive['client_email'])
                         · {{ $drive['client_email'] }}
                     @endif
+                    · folder “{{ $drive['last_test_folder_name'] ?? 'Drive' }}”
                     @if ($drive['last_upload_at'])
                         · Last upload: {{ \Illuminate\Support\Carbon::parse($drive['last_upload_at'])->timezone(config('app.timezone'))->format('d M Y, h:i A') }}
                         ({{ $drive['last_upload_filename'] }})
                     @endif
-                @elseif ($drive['enabled'] && $drive['has_credentials'] && filled($drive['folder_id']))
-                    Settings saved
-                    @if ($drive['client_email'])
-                        · {{ $drive['client_email'] }}
+                @elseif ($drive['oauth_connected'])
+                    Signed in
+                    @if ($drive['oauth_email'])
+                        as {{ $drive['oauth_email'] }}
                     @endif
-                    — click <strong>Test connection</strong> to verify the folder (green “Connected” only after a successful test).
+                    — save folder ID and click <strong>Test connection</strong>.
+                @elseif ($drive['enabled'] && $drive['has_credentials'] && filled($drive['folder_id']))
+                    Settings saved — click <strong>Test connection</strong> to verify.
                 @else
-                    Not connected yet — paste service account JSON, folder ID, enable, then Test connection.
+                    Not connected — create an OAuth client, save Client ID/Secret, then Sign in with Google.
                 @endif
                 @if (filled($drive['last_upload_error']))
                     <p class="mt-1 font-medium text-rose-700 dark:text-rose-300">Last error: {{ $drive['last_upload_error'] }}</p>
                 @endif
             </div>
 
-            <ol class="list-decimal space-y-1 pl-4 text-xs text-gray-600 dark:text-gray-400">
-                <li>Google Cloud Console → create project → enable <strong>Google Drive API</strong>.</li>
-                <li>Create a <strong>Service account</strong> → Keys → Add key → JSON → download.</li>
-                <li>In Google Drive, create folder <strong>School CRM Backups</strong>.</li>
-                <li>Share that folder with the service account email (Editor).</li>
-                <li>Open the folder → copy the <strong>folder ID</strong> from the URL (<code>…/folders/FOLDER_ID</code>).</li>
+            <ol class="list-decimal space-y-1.5 pl-4 text-xs text-gray-600 dark:text-gray-400">
+                <li>Google Cloud Console → create/select project → enable <strong>Google Drive API</strong>.</li>
+                <li>APIs &amp; Services → <strong>OAuth consent screen</strong> (External / Testing) → add your Gmail as a test user.</li>
+                <li>Credentials → <strong>Create credentials → OAuth client ID → Web application</strong>.</li>
+                <li>
+                    Add authorized redirect URI:
+                    <code class="break-all rounded bg-gray-100 px-1 dark:bg-white/10">{{ $drive['redirect_uri'] }}</code>
+                </li>
+                <li>Copy Client ID and Client Secret into the fields below → Save.</li>
+                <li>Create a Drive folder (e.g. <strong>School CRM Backups</strong>) → copy the <strong>folder ID</strong> from the URL (<code>…/folders/FOLDER_ID</code>).</li>
+                <li>Click <strong>Sign in with Google</strong>, then <strong>Test connection</strong>.</li>
             </ol>
 
             <label class="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
@@ -65,37 +75,44 @@
                 Enable automatic upload to Google Drive
             </label>
 
-            <div>
-                <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Drive folder ID</label>
-                <input type="text" wire:model="gdriveFolderId" class="fi-crm-input mt-1 block w-full font-mono text-xs" placeholder="1AbCDefGhi…" />
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="text-xs font-medium text-gray-600 dark:text-gray-300">OAuth Client ID</label>
+                    <input type="text" wire:model="gdriveClientId" class="fi-crm-input mt-1 block w-full font-mono text-xs" placeholder="….apps.googleusercontent.com" autocomplete="off" />
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-600 dark:text-gray-300">
+                        OAuth Client Secret
+                        @if ($drive['has_oauth_client'])
+                            <span class="font-normal text-gray-400">(saved — leave blank to keep)</span>
+                        @endif
+                    </label>
+                    <input type="password" wire:model="gdriveClientSecret" class="fi-crm-input mt-1 block w-full font-mono text-xs" placeholder="GOCSPX-…" autocomplete="new-password" />
+                </div>
             </div>
 
             <div>
-                <label class="text-xs font-medium text-gray-600 dark:text-gray-300">
-                    Service account JSON
-                    @if ($drive['has_credentials'])
-                        <span class="font-normal text-gray-400">(already saved — paste again only to replace)</span>
-                    @endif
-                </label>
-                <textarea
-                    wire:model="gdriveServiceAccountJson"
-                    rows="5"
-                    class="fi-crm-input mt-1 block w-full font-mono text-[11px]"
-                    placeholder='{ "type": "service_account", "project_id": "…", … }'
-                ></textarea>
+                <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Drive folder ID</label>
+                <input type="text" wire:model="gdriveFolderId" class="fi-crm-input mt-1 block w-full font-mono text-xs" placeholder="1AbCDefGhi…" />
             </div>
 
             <div class="flex flex-wrap gap-2">
                 <button type="button" wire:click="saveGoogleDriveSettings" class="inline-flex rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-500">
                     Save Drive settings
                 </button>
+                <a
+                    href="{{ route('admin.backups.google.redirect') }}"
+                    class="inline-flex rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-800 ring-1 ring-gray-300 hover:bg-gray-50 dark:bg-white/10 dark:text-white dark:ring-white/20 dark:hover:bg-white/15"
+                >
+                    Sign in with Google
+                </a>
                 <button type="button" wire:click="testGoogleDrive" class="inline-flex rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-500">
                     Test connection
                 </button>
                 <button type="button" wire:click="uploadLatestToDrive" class="inline-flex rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500">
                     Upload latest backup now
                 </button>
-                @if ($drive['has_credentials'])
+                @if ($drive['has_credentials'] || $drive['oauth_connected'])
                     <button
                         type="button"
                         wire:click="disconnectGoogleDrive"

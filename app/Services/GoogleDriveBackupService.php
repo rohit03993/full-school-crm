@@ -6,21 +6,25 @@ use App\Models\Setting;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
 class GoogleDriveBackupService
 {
     /**
-     * Full Drive scope is required so the service account can see a folder
-     * that was shared with it (drive.file only sees files the app created).
+     * User OAuth scope — uploads use the signed-in Google account's storage quota.
      */
-    public const SCOPE = 'https://www.googleapis.com/auth/drive';
+    public const OAUTH_SCOPE = 'https://www.googleapis.com/auth/drive';
 
     /**
      * @return array{
      *     enabled: bool,
      *     folder_id: string,
+     *     auth_mode: string,
+     *     oauth_connected: bool,
+     *     oauth_email: ?string,
+     *     has_oauth_client: bool,
      *     client_email: ?string,
      *     has_credentials: bool,
      *     last_upload_at: ?string,
@@ -30,17 +34,23 @@ class GoogleDriveBackupService
      *     last_test_ok: bool,
      *     last_test_at: ?string,
      *     last_test_folder_name: ?string,
+     *     redirect_uri: string,
      * }
      */
     public function status(): array
     {
         $json = $this->serviceAccountPayload();
+        $hasOauth = filled($this->decryptSetting('backup.gdrive.oauth_refresh_token'));
 
         return [
             'enabled' => (bool) Setting::getValue('backup.gdrive.enabled', false),
             'folder_id' => (string) Setting::getValue('backup.gdrive.folder_id', ''),
+            'auth_mode' => $hasOauth ? 'oauth' : (is_array($json) ? 'service_account' : 'none'),
+            'oauth_connected' => $hasOauth,
+            'oauth_email' => Setting::getValue('backup.gdrive.oauth_email'),
+            'has_oauth_client' => filled($this->oauthClientId()) && filled($this->oauthClientSecret()),
             'client_email' => is_array($json) ? ($json['client_email'] ?? null) : null,
-            'has_credentials' => is_array($json) && filled($json['private_key'] ?? null) && filled($json['client_email'] ?? null),
+            'has_credentials' => $hasOauth || (is_array($json) && filled($json['private_key'] ?? null) && filled($json['client_email'] ?? null)),
             'last_upload_at' => Setting::getValue('backup.gdrive.last_upload_at'),
             'last_upload_filename' => Setting::getValue('backup.gdrive.last_upload_filename'),
             'last_upload_error' => Setting::getValue('backup.gdrive.last_upload_error'),
@@ -48,6 +58,7 @@ class GoogleDriveBackupService
             'last_test_ok' => (bool) Setting::getValue('backup.gdrive.last_test_ok', false),
             'last_test_at' => Setting::getValue('backup.gdrive.last_test_at'),
             'last_test_folder_name' => Setting::getValue('backup.gdrive.last_test_folder_name'),
+            'redirect_uri' => $this->redirectUri(),
         ];
     }
 
@@ -60,21 +71,41 @@ class GoogleDriveBackupService
             && filled($status['folder_id']);
     }
 
+    public function redirectUri(): string
+    {
+        return url('/admin/backups/google/callback');
+    }
+
     /**
-     * @param  array{enabled?: bool, folder_id?: string, service_account_json?: ?string}  $data
+     * @param  array{
+     *     enabled?: bool,
+     *     folder_id?: string,
+     *     oauth_client_id?: ?string,
+     *     oauth_client_secret?: ?string,
+     *     service_account_json?: ?string
+     * }  $data
      */
     public function saveSettings(array $data): void
     {
         Setting::setValue('backup.gdrive.enabled', ! empty($data['enabled']) ? '1' : '0', 'backup');
         Setting::setValue('backup.gdrive.folder_id', trim((string) ($data['folder_id'] ?? '')), 'backup');
 
-        $rawJson = trim((string) ($data['service_account_json'] ?? ''));
+        $clientId = trim((string) ($data['oauth_client_id'] ?? ''));
+        if ($clientId !== '') {
+            Setting::setValue('backup.gdrive.oauth_client_id', $clientId, 'backup');
+        }
 
+        $clientSecret = trim((string) ($data['oauth_client_secret'] ?? ''));
+        if ($clientSecret !== '') {
+            Setting::setValue('backup.gdrive.oauth_client_secret', Crypt::encryptString($clientSecret), 'backup');
+        }
+
+        $rawJson = trim((string) ($data['service_account_json'] ?? ''));
         if ($rawJson !== '') {
             $decoded = json_decode($rawJson, true);
 
             if (! is_array($decoded) || blank($decoded['client_email'] ?? null) || blank($decoded['private_key'] ?? null)) {
-                throw new RuntimeException('Invalid service account JSON. It must include client_email and private_key.');
+                throw new RuntimeException('Invalid service account JSON. Prefer Sign in with Google for personal Drive.');
             }
 
             Setting::setValue(
@@ -87,16 +118,89 @@ class GoogleDriveBackupService
         Setting::flushValueCache();
     }
 
+    public function authorizationUrl(): string
+    {
+        $clientId = $this->oauthClientId();
+        $clientSecret = $this->oauthClientSecret();
+
+        if ($clientId === '' || $clientSecret === '') {
+            throw new RuntimeException('Save Google OAuth Client ID and Client Secret first.');
+        }
+
+        $state = Str::random(40);
+        session(['gdrive_oauth_state' => $state]);
+
+        return 'https://accounts.google.com/o/oauth2/v2/auth?'.http_build_query([
+            'client_id' => $clientId,
+            'redirect_uri' => $this->redirectUri(),
+            'response_type' => 'code',
+            'scope' => self::OAUTH_SCOPE,
+            'access_type' => 'offline',
+            'prompt' => 'consent',
+            'include_granted_scopes' => 'true',
+            'state' => $state,
+        ]);
+    }
+
+    public function handleOAuthCallback(string $code, ?string $state): string
+    {
+        $expected = session('gdrive_oauth_state');
+        session()->forget('gdrive_oauth_state');
+
+        if (! is_string($expected) || $expected === '' || $state !== $expected) {
+            throw new RuntimeException('Invalid OAuth state. Try Connect Google Drive again.');
+        }
+
+        $response = Http::asForm()
+            ->timeout(30)
+            ->post('https://oauth2.googleapis.com/token', [
+                'code' => $code,
+                'client_id' => $this->oauthClientId(),
+                'client_secret' => $this->oauthClientSecret(),
+                'redirect_uri' => $this->redirectUri(),
+                'grant_type' => 'authorization_code',
+            ]);
+
+        if (! $response->successful() || (blank($response->json('refresh_token')) && blank($response->json('access_token')))) {
+            $message = $response->json('error_description') ?? $response->json('error') ?? $response->body();
+
+            throw new RuntimeException('Google sign-in failed: '.$message);
+        }
+
+        $refresh = $response->json('refresh_token');
+        if (is_string($refresh) && $refresh !== '') {
+            Setting::setValue('backup.gdrive.oauth_refresh_token', Crypt::encryptString($refresh), 'backup');
+        } elseif (! filled($this->decryptSetting('backup.gdrive.oauth_refresh_token'))) {
+            throw new RuntimeException(
+                'Google did not return a refresh token. Revoke app access at https://myaccount.google.com/permissions then Connect again.'
+            );
+        }
+
+        $accessToken = (string) $response->json('access_token');
+        $email = $this->fetchUserEmail($accessToken);
+        if ($email !== null) {
+            Setting::setValue('backup.gdrive.oauth_email', $email, 'backup');
+        }
+
+        Setting::setValue('backup.gdrive.enabled', '1', 'backup');
+        Setting::setValue('backup.gdrive.last_test_ok', '0', 'backup');
+        Setting::setValue('backup.gdrive.last_upload_error', '', 'backup');
+        Setting::flushValueCache();
+
+        return $email ?? 'Google account';
+    }
+
     public function clearCredentials(): void
     {
         Setting::setValue('backup.gdrive.service_account_json', '', 'backup');
+        Setting::setValue('backup.gdrive.oauth_refresh_token', '', 'backup');
+        Setting::setValue('backup.gdrive.oauth_email', '', 'backup');
         Setting::setValue('backup.gdrive.enabled', '0', 'backup');
+        Setting::setValue('backup.gdrive.last_test_ok', '0', 'backup');
         Setting::flushValueCache();
     }
 
     /**
-     * Upload a local backup zip to the configured Drive folder.
-     *
      * @return array{file_id: string, filename: string, web_view_link: ?string}
      */
     public function uploadBackup(string $localPath, ?string $filename = null): array
@@ -106,7 +210,7 @@ class GoogleDriveBackupService
         }
 
         if (! $this->isReady()) {
-            throw new RuntimeException('Google Drive backup is not connected. Enable it and save folder ID + service account JSON.');
+            throw new RuntimeException('Google Drive is not connected. Use Sign in with Google and set the folder ID.');
         }
 
         $filename ??= basename($localPath);
@@ -163,13 +267,10 @@ class GoogleDriveBackupService
         ];
     }
 
-    /**
-     * Verify credentials can list the target folder.
-     */
     public function testConnection(): string
     {
         if (! $this->status()['has_credentials']) {
-            throw new RuntimeException('Paste the Google service account JSON first.');
+            throw new RuntimeException('Connect Google Drive with Sign in with Google first.');
         }
 
         $folderId = trim((string) Setting::getValue('backup.gdrive.folder_id', ''));
@@ -193,7 +294,7 @@ class GoogleDriveBackupService
             Setting::flushValueCache();
 
             throw new RuntimeException(
-                'Cannot access that folder. Share the Drive folder with the service account email as Editor. Details: '.$message
+                'Cannot access that folder. Use a folder in the same Google account you signed in with. Details: '.$message
             );
         }
 
@@ -205,7 +306,9 @@ class GoogleDriveBackupService
         Setting::setValue('backup.gdrive.last_upload_error', '', 'backup');
         Setting::flushValueCache();
 
-        return 'Connected to Drive folder: '.$name;
+        $who = Setting::getValue('backup.gdrive.oauth_email') ?: 'Google account';
+
+        return 'Connected as '.$who.' → folder: '.$name;
     }
 
     protected function accessToken(): string
@@ -216,17 +319,48 @@ class GoogleDriveBackupService
             return $testToken;
         }
 
+        $refresh = $this->decryptSetting('backup.gdrive.oauth_refresh_token');
+
+        if (is_string($refresh) && $refresh !== '') {
+            return $this->accessTokenFromRefresh($refresh);
+        }
+
+        return $this->accessTokenFromServiceAccount();
+    }
+
+    protected function accessTokenFromRefresh(string $refreshToken): string
+    {
+        $response = Http::asForm()
+            ->timeout(30)
+            ->post('https://oauth2.googleapis.com/token', [
+                'client_id' => $this->oauthClientId(),
+                'client_secret' => $this->oauthClientSecret(),
+                'refresh_token' => $refreshToken,
+                'grant_type' => 'refresh_token',
+            ]);
+
+        if (! $response->successful() || blank($response->json('access_token'))) {
+            $message = $response->json('error_description') ?? $response->json('error') ?? $response->body();
+
+            throw new RuntimeException('Google token refresh failed. Disconnect and Sign in with Google again. '.$message);
+        }
+
+        return (string) $response->json('access_token');
+    }
+
+    protected function accessTokenFromServiceAccount(): string
+    {
         $payload = $this->serviceAccountPayload();
 
         if (! is_array($payload)) {
-            throw new RuntimeException('Google Drive service account is not configured.');
+            throw new RuntimeException('Google Drive is not connected.');
         }
 
         $now = time();
         $header = $this->base64UrlEncode(json_encode(['alg' => 'RS256', 'typ' => 'JWT'], JSON_THROW_ON_ERROR));
         $claims = $this->base64UrlEncode(json_encode([
             'iss' => $payload['client_email'],
-            'scope' => self::SCOPE,
+            'scope' => self::OAUTH_SCOPE,
             'aud' => 'https://oauth2.googleapis.com/token',
             'iat' => $now,
             'exp' => $now + 3600,
@@ -261,6 +395,59 @@ class GoogleDriveBackupService
         }
 
         return (string) $response->json('access_token');
+    }
+
+    protected function fetchUserEmail(string $accessToken): ?string
+    {
+        $response = $this->driveHttp($accessToken)
+            ->get('https://www.googleapis.com/drive/v3/about', [
+                'fields' => 'user(emailAddress,displayName)',
+            ]);
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $email = $response->json('user.emailAddress');
+
+        return is_string($email) && $email !== '' ? $email : null;
+    }
+
+    protected function oauthClientId(): string
+    {
+        $fromSettings = trim((string) Setting::getValue('backup.gdrive.oauth_client_id', ''));
+
+        if ($fromSettings !== '') {
+            return $fromSettings;
+        }
+
+        return trim((string) config('crm-backup.google_client_id', env('GOOGLE_DRIVE_CLIENT_ID', '')));
+    }
+
+    protected function oauthClientSecret(): string
+    {
+        $fromSettings = $this->decryptSetting('backup.gdrive.oauth_client_secret');
+
+        if (is_string($fromSettings) && $fromSettings !== '') {
+            return $fromSettings;
+        }
+
+        return trim((string) config('crm-backup.google_client_secret', env('GOOGLE_DRIVE_CLIENT_SECRET', '')));
+    }
+
+    protected function decryptSetting(string $key): ?string
+    {
+        $stored = Setting::getValue($key);
+
+        if (! is_string($stored) || trim($stored) === '') {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($stored);
+        } catch (Throwable) {
+            return $stored;
+        }
     }
 
     protected function pruneOldDriveBackups(string $accessToken, string $folderId): void
@@ -323,7 +510,6 @@ class GoogleDriveBackupService
         try {
             $json = Crypt::decryptString($stored);
         } catch (Throwable) {
-            // Allow plain JSON during migration/tests
             $json = $stored;
         }
 

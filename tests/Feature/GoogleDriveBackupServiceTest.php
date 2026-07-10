@@ -65,19 +65,10 @@ class GoogleDriveBackupServiceTest extends TestCase
     {
         config(['crm-backup.gdrive_test_access_token' => 'ya29.test-token']);
 
-        $serviceJson = json_encode([
-            'type' => 'service_account',
-            'project_id' => 'test-project',
-            'private_key_id' => 'abc',
-            'private_key' => "-----BEGIN PRIVATE KEY-----\nTEST\n-----END PRIVATE KEY-----\n",
-            'client_email' => 'backup@test-project.iam.gserviceaccount.com',
-            'client_id' => '123',
-            'token_uri' => 'https://oauth2.googleapis.com/token',
-        ], JSON_THROW_ON_ERROR);
-
         Setting::setValue('backup.gdrive.enabled', '1', 'backup');
         Setting::setValue('backup.gdrive.folder_id', 'folder-123', 'backup');
-        Setting::setValue('backup.gdrive.service_account_json', Crypt::encryptString($serviceJson), 'backup');
+        Setting::setValue('backup.gdrive.oauth_refresh_token', Crypt::encryptString('refresh-token-test'), 'backup');
+        Setting::setValue('backup.gdrive.oauth_email', 'owner@gmail.com', 'backup');
         Setting::flushValueCache();
 
         Http::fake([
@@ -96,8 +87,36 @@ class GoogleDriveBackupServiceTest extends TestCase
 
         $this->assertSame('drive-file-1', $upload['file_id']);
         $this->assertSame($backup['filename'], Setting::getValue('backup.gdrive.last_upload_filename'));
+        $this->assertSame('oauth', app(GoogleDriveBackupService::class)->status()['auth_mode']);
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'upload/drive/v3/files'));
+    }
+
+    public function test_oauth_callback_stores_refresh_token(): void
+    {
+        Setting::setValue('backup.gdrive.oauth_client_id', 'client-123.apps.googleusercontent.com', 'backup');
+        Setting::setValue('backup.gdrive.oauth_client_secret', Crypt::encryptString('secret-xyz'), 'backup');
+        Setting::flushValueCache();
+
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response([
+                'access_token' => 'ya29.access',
+                'refresh_token' => '1//refresh-abc',
+                'expires_in' => 3600,
+                'token_type' => 'Bearer',
+            ], 200),
+            'https://www.googleapis.com/drive/v3/about*' => Http::response([
+                'user' => ['emailAddress' => 'owner@gmail.com'],
+            ], 200),
+        ]);
+
+        session(['gdrive_oauth_state' => 'state-token']);
+
+        $email = app(GoogleDriveBackupService::class)->handleOAuthCallback('auth-code', 'state-token');
+
+        $this->assertSame('owner@gmail.com', $email);
+        $this->assertTrue(app(GoogleDriveBackupService::class)->status()['oauth_connected']);
+        $this->assertSame('owner@gmail.com', Setting::getValue('backup.gdrive.oauth_email'));
     }
 
     public function test_drive_not_ready_without_credentials(): void
@@ -114,5 +133,21 @@ class GoogleDriveBackupServiceTest extends TestCase
         $this->actingAs($staff);
 
         $this->assertFalse(\App\Filament\Pages\BackupsPage::canAccess());
+    }
+
+    public function test_super_admin_can_start_google_oauth_redirect(): void
+    {
+        Role::findOrCreate(RoleName::SuperAdmin->value);
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+
+        Setting::setValue('backup.gdrive.oauth_client_id', 'client-123.apps.googleusercontent.com', 'backup');
+        Setting::setValue('backup.gdrive.oauth_client_secret', Crypt::encryptString('secret-xyz'), 'backup');
+        Setting::flushValueCache();
+
+        $response = $this->actingAs($admin)->get(route('admin.backups.google.redirect'));
+
+        $response->assertRedirect();
+        $this->assertStringContainsString('accounts.google.com/o/oauth2/v2/auth', $response->headers->get('Location'));
     }
 }

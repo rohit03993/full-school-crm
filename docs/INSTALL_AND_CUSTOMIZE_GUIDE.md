@@ -367,10 +367,15 @@ Nightly at **02:15** (server time) the scheduler runs `php artisan crm:backup`. 
 
 **Google Drive (recommended):**
 
-1. Enable Google Drive API + create a service account (JSON key).
-2. Create a Drive folder and share it with the service account email (Editor).
-3. In Setup → Backups, paste folder ID + JSON, enable, Test connection.
-4. Nightly `crm:backup` then uploads the zip to Drive automatically.
+1. Google Cloud Console → enable **Google Drive API**.
+2. Configure **OAuth consent screen** (add your Gmail as a test user if the app is in Testing).
+3. Create **OAuth client ID** (Web application). Authorized redirect URI:
+   `https://YOUR-DOMAIN/admin/backups/google/callback`
+4. In Setup → **Backups**, paste Client ID + Client Secret, folder ID (from Drive URL `…/folders/FOLDER_ID`), enable upload.
+5. Click **Sign in with Google**, then **Test connection**.
+6. Nightly `crm:backup` uploads the zip to that folder using your Google account storage.
+
+(Service accounts cannot upload into personal My Drive — use Sign in with Google.)
 
 **Manual:**
 

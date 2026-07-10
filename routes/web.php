@@ -3,6 +3,7 @@
 use App\Http\Controllers\Webhooks\MetaWhatsAppWebhookController;
 use App\Http\Controllers\Api\AisensyCampaignTriggerController;
 use App\Http\Controllers\Admin\BackupDownloadController;
+use App\Http\Controllers\Admin\GoogleDriveOAuthController;
 use App\Http\Controllers\Admin\DocumentDownloadController;
 use App\Http\Controllers\Admin\MetaWhatsAppMediaController;
 use App\Http\Controllers\Admin\IdCardDownloadController;
@@ -45,6 +46,11 @@ Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
     Route::get('backups/{filename}/download', BackupDownloadController::class)
         ->where('filename', 'school-crm-full-backup-[\w\-]+\.zip')
         ->name('admin.backups.download');
+
+    Route::get('backups/google/redirect', [GoogleDriveOAuthController::class, 'redirect'])
+        ->name('admin.backups.google.redirect');
+    Route::get('backups/google/callback', [GoogleDriveOAuthController::class, 'callback'])
+        ->name('admin.backups.google.callback');
 
     Route::get('documents/{document}/download', [DocumentDownloadController::class, 'download'])
         ->name('admin.documents.download');
