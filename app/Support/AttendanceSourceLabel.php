@@ -43,21 +43,24 @@ class AttendanceSourceLabel
         $inLabel = ($pair['is_manual_in'] ?? false)
             ? 'Manual'
             : (filled($pair['device_in'] ?? null) ? (string) $pair['device_in'] : 'Biometric');
-        $outLabel = filled($pair['out'] ?? null)
-            ? (($pair['is_manual_out'] ?? false)
-                ? 'Manual'
-                : (filled($pair['device_out'] ?? null) ? (string) $pair['device_out'] : 'Biometric'))
-            : null;
 
-        if ($outLabel !== null && $inLabel !== $outLabel) {
+        if (! filled($pair['out'] ?? null)) {
+            return "{$inLabel} IN";
+        }
+
+        if ($pair['is_auto_out'] ?? false) {
+            return "{$inLabel} IN · Auto OUT";
+        }
+
+        $outLabel = ($pair['is_manual_out'] ?? false)
+            ? 'Manual'
+            : (filled($pair['device_out'] ?? null) ? (string) $pair['device_out'] : 'Biometric');
+
+        if ($inLabel !== $outLabel) {
             return "{$inLabel} IN · {$outLabel} OUT";
         }
 
-        if ($outLabel !== null) {
-            return "{$outLabel} IN/OUT";
-        }
-
-        return "{$inLabel} IN";
+        return "{$outLabel} IN/OUT";
     }
 
     public static function visitState(?\Illuminate\Support\Carbon $checkedIn, ?\Illuminate\Support\Carbon $checkedOut): ?string

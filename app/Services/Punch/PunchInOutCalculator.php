@@ -157,19 +157,20 @@ class PunchInOutCalculator
             return $entries;
         }
 
-        $autoOutTime = (string) config('attendance.auto_out_time', '19:00');
+        $autoOutTime = (string) config('attendance.auto_out_time', '20:00');
         $today = Carbon::today()->toDateString();
         $currentDate = Carbon::parse($date);
         $isPastDate = $currentDate->toDateString() < $today;
         $isToday = $currentDate->toDateString() === $today;
-        $autoOutHour = (int) substr($autoOutTime, 0, 2);
-        $autoOutMinute = (int) substr($autoOutTime, 3, 2);
+        $normalized = strlen($autoOutTime) === 5 ? $autoOutTime.':00' : $autoOutTime;
+        $autoOutHour = (int) substr($normalized, 0, 2);
+        $autoOutMinute = (int) substr($normalized, 3, 2);
         $isPastAutoOutTime = now()->hour > $autoOutHour
             || (now()->hour === $autoOutHour && now()->minute >= $autoOutMinute);
 
         foreach ($entries as &$entry) {
             if ($entry['in'] && ! $entry['out'] && ($isPastDate || ($isToday && $isPastAutoOutTime))) {
-                $entry['out'] = $autoOutTime.':00';
+                $entry['out'] = $normalized;
                 $entry['is_auto_out'] = true;
             }
         }

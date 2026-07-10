@@ -15,14 +15,15 @@ class PunchAttendanceProcessor
         protected PunchInOutCalculator $calculator,
         protected PunchAttendanceSyncService $sync,
         protected PunchWhatsAppService $whatsapp,
+        protected AttendanceAutoOutService $autoOut,
     ) {}
 
     /**
-     * @return array{processed: int, synced: int, notified: int}
+     * @return array{processed: int, synced: int, notified: int, auto_out: int}
      */
     public function processPending(): array
     {
-        $stats = ['processed' => 0, 'synced' => 0, 'notified' => 0];
+        $stats = ['processed' => 0, 'synced' => 0, 'notified' => 0, 'auto_out' => 0];
 
         if ($this->logs->notificationQueueExists()) {
             foreach ($this->logs->unprocessedNotificationQueue() as $item) {
@@ -46,6 +47,8 @@ class PunchAttendanceProcessor
                 Setting::setValue('attendance.last_processed_punch_log_id', (string) $punch->id, 'attendance');
             }
         }
+
+        $stats['auto_out'] = $this->autoOut->applyDue();
 
         return $stats;
     }

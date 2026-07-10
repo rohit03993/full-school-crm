@@ -14,7 +14,8 @@ return [
 
     'auto_out_enabled' => env('ATTENDANCE_AUTO_OUT_ENABLED', true),
 
-    'auto_out_time' => env('ATTENDANCE_AUTO_OUT_TIME', '19:00'),
+    /** Daily auto check-out time (server timezone), e.g. 20:00 = 8 PM. */
+    'auto_out_time' => env('ATTENDANCE_AUTO_OUT_TIME', '20:00'),
 
     'process_batch_size' => (int) env('ATTENDANCE_PUNCH_PROCESS_BATCH', 100),
 

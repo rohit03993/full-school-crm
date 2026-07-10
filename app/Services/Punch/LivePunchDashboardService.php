@@ -168,7 +168,7 @@ class LivePunchDashboardService
                 ?? (($pair['is_manual_in'] ?? false) ? 'Manual' : null);
             $pair['device_out'] = filled($pair['out'] ?? null)
                 ? ($this->deviceForTime($deviceByTime, (string) $pair['out'])
-                    ?? (($pair['is_manual_out'] ?? false) ? 'Manual' : (($pair['is_auto_out'] ?? false) ? 'Auto OUT' : null)))
+                    ?? (($pair['is_manual_out'] ?? false) ? 'Manual' : (($pair['is_auto_out'] ?? false) ? 'Auto' : null)))
                 : null;
         }
 

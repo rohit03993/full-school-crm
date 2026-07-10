@@ -125,6 +125,62 @@ class PunchAttendanceSyncTest extends TestCase
         $this->assertStringContainsString('Gate-1 OUT', $label);
     }
 
+    public function test_auto_out_persists_checkout_for_past_open_attendance(): void
+    {
+        config(['attendance.auto_out_enabled' => true, 'attendance.auto_out_time' => '20:00']);
+
+        [$student, $batch] = $this->createEnrolledStudent('ROLL-AUTO');
+
+        $this->travelTo('2026-07-09 14:51:00');
+
+        app(PunchAttendanceSyncService::class)->syncFromPunch(
+            $student,
+            '2026-07-09',
+            'IN',
+            '14:51:00',
+            'manual',
+        );
+
+        $this->assertNull(Attendance::query()->first()?->checked_out_at);
+
+        $this->travelTo('2026-07-10 21:00:00');
+
+        $closed = app(\App\Services\Punch\AttendanceAutoOutService::class)->applyDue();
+
+        $this->assertSame(1, $closed);
+
+        $attendance = Attendance::query()->first();
+        $this->assertNotNull($attendance?->checked_out_at);
+        $this->assertSame('20:00:00', $attendance->checked_out_at->format('H:i:s'));
+        $this->assertSame(
+            'Checked out',
+            \App\Support\AttendanceSourceLabel::visitState($attendance->checked_in_at, $attendance->checked_out_at),
+        );
+    }
+
+    public function test_auto_out_source_label_does_not_duplicate_out_word(): void
+    {
+        if (! Schema::hasTable('punch_logs')) {
+            $this->createPunchLogsTable();
+        }
+
+        $this->travelTo('2026-07-09 14:51:00');
+        [$student] = $this->createEnrolledStudent('ROLL-LABEL');
+        $staff = User::factory()->create(['is_active' => true]);
+
+        app(\App\Services\Punch\ManualBatchAttendanceService::class)->manualIn($student, '2026-07-09', $staff);
+
+        $this->travelTo('2026-07-09 21:00:00');
+
+        $attendance = Attendance::query()->first();
+        $this->assertNotNull($attendance);
+
+        $label = \App\Support\AttendanceSourceLabel::forRecord($attendance->fresh(), $student->fresh(['activeEnrollment']));
+
+        $this->assertSame('Manual IN · Auto OUT', $label);
+        $this->assertStringNotContainsString('OUT OUT', $label);
+    }
+
     /**
      * @return array{0: Student, 1: Batch}
      */
