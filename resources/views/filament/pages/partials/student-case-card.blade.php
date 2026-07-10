@@ -3,6 +3,8 @@
     $canClose = $caseService->canClose($case, $viewer);
     $canLogCall = $caseService->canLogCall($case, $viewer);
     $isAssignee = $caseService->isCurrentAssignee($case, $viewer);
+    $canReassignAsAdmin = $caseService->canReassignAsAdmin($case, $viewer);
+    $isAdminReassign = $canReassignAsAdmin && ! $isAssignee;
     $trail = $caseService->activityTrail($case);
 @endphp
 
@@ -49,7 +51,11 @@
 
             @if ($case->isOpen() && ! $isAssignee && $case->currentAssignee)
                 <div class="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20">
-                    This case is assigned to <strong>{{ $case->currentAssignee->name }}</strong>. Only they can log calls, transfer, or close it.
+                    @if ($isAdminReassign)
+                        This case is with <strong>{{ $case->currentAssignee->name }}</strong>. As Super Admin you can reassign it below; only the current assignee can log calls or close it.
+                    @else
+                        This case is assigned to <strong>{{ $case->currentAssignee->name }}</strong>. Only they can log calls, transfer, or close it.
+                    @endif
                 </div>
             @endif
 
@@ -121,7 +127,9 @@
 
             @if ($case->isOpen() && $canTransfer)
                 <form wire:submit="submitCaseTransfer({{ $case->id }})" class="mt-4 space-y-3 rounded-xl border border-gray-200 p-4 dark:border-white/10">
-                    <p class="text-sm font-semibold text-gray-950 dark:text-white">Transfer case</p>
+                    <p class="text-sm font-semibold text-gray-950 dark:text-white">
+                        {{ $isAdminReassign ? 'Reassign case (admin)' : 'Transfer case' }}
+                    </p>
                     <div>
                         <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Assign to</label>
                         <x-crm.select wire:model="caseTransferAssigneeId" class="mt-1" required>
@@ -134,11 +142,11 @@
                         </x-crm.select>
                     </div>
                     <div>
-                        <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Transfer note</label>
-                        <textarea wire:model="caseTransferNote" rows="2" required class="fi-crm-input mt-1 block w-full" placeholder="Why is this being reassigned?"></textarea>
+                        <label class="text-xs font-medium text-gray-600 dark:text-gray-300">{{ $isAdminReassign ? 'Reassignment note' : 'Transfer note' }}</label>
+                        <textarea wire:model="caseTransferNote" rows="2" required class="fi-crm-input mt-1 block w-full" placeholder="{{ $isAdminReassign ? 'Why is admin reassigning this case?' : 'Why is this being reassigned?' }}"></textarea>
                     </div>
                     <button type="submit" class="inline-flex rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500">
-                        Transfer
+                        {{ $isAdminReassign ? 'Reassign' : 'Transfer' }}
                     </button>
                 </form>
             @endif

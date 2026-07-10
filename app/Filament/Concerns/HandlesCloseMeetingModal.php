@@ -142,7 +142,7 @@ trait HandlesCloseMeetingModal
             } catch (ValidationException $exception) {
                 Notification::make()
                     ->title('Meeting closed — case could not be opened')
-                    ->body(collect($exception->errors())->flatten()->first() ?? 'Please open a case from the student profile.')
+                    ->body(collect($exception->errors())->flatten()->first() ?? 'Please try again from the Cases tab (Super Admin) or close the meeting again.')
                     ->warning()
                     ->send();
             }

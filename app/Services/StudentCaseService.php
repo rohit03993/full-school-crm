@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\CampusVisitPurpose;
 use App\Enums\CrmPermission;
 use App\Enums\NumberSequenceType;
+use App\Enums\RoleName;
 use App\Enums\StudentCaseStatus;
 use App\Filament\Pages\MyMeetingsPage;
 use App\Filament\Pages\StudentProfilePage;
@@ -455,8 +456,32 @@ class StudentCaseService
 
     public function canTransfer(StudentCase $case, ?User $viewer): bool
     {
+        if (! $case->isOpen() || ! $viewer) {
+            return false;
+        }
+
+        if ($this->canReassignAsAdmin($case, $viewer)) {
+            return true;
+        }
+
         return $this->isCurrentAssignee($case, $viewer)
             && CrmAccess::can($viewer, CrmPermission::CasesAssign);
+    }
+
+    public function canReassignAsAdmin(StudentCase $case, ?User $viewer): bool
+    {
+        return $case->isOpen() && $this->isSuperAdmin($viewer);
+    }
+
+    public function canOpenAsAdmin(?User $viewer, Student $student): bool
+    {
+        return $this->isSuperAdmin($viewer)
+            && $student->activeEnrollment()->exists();
+    }
+
+    public function isSuperAdmin(?User $viewer): bool
+    {
+        return $viewer?->hasRole(RoleName::SuperAdmin->value) ?? false;
     }
 
     public function canClose(StudentCase $case, ?User $viewer): bool

@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\CallStatus;
 use App\Enums\BatchStatus;
+use App\Enums\CampusVisitPurpose;
 use App\Enums\LeadSource;
 use App\Models\ActivityAttendance;
 use App\Models\ActivityType;
@@ -187,6 +188,18 @@ class StudentProfilePage extends Page
     public ?int $caseTransferAssigneeId = null;
 
     public string $caseClosingNote = '';
+
+    public bool $showOpenCaseForm = false;
+
+    public ?string $openCaseType = null;
+
+    public string $openCaseTitle = '';
+
+    public string $openCaseSummary = '';
+
+    public ?int $openCaseAssigneeId = null;
+
+    public string $openCaseHandoffNote = '';
 
     /**
      * @var array<int, array<string, mixed>>
@@ -573,6 +586,89 @@ class StudentProfilePage extends Page
         $this->caseClosingNote = '';
     }
 
+    public function openOpenCaseForm(): void
+    {
+        $cases = app(StudentCaseService::class);
+
+        if (! $cases->canOpenAsAdmin(Auth::user(), $this->record)) {
+            Notification::make()
+                ->title('Not allowed')
+                ->body('Only Super Admin can open a case from the student profile.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->openCaseType = CampusVisitPurpose::General->value;
+        $this->openCaseTitle = '';
+        $this->openCaseSummary = '';
+        $this->openCaseAssigneeId = null;
+        $this->openCaseHandoffNote = '';
+        $this->showOpenCaseForm = true;
+    }
+
+    public function cancelOpenCaseForm(): void
+    {
+        $this->showOpenCaseForm = false;
+    }
+
+    public function submitOpenCase(StudentCaseService $cases): void
+    {
+        if (! $cases->canOpenAsAdmin(Auth::user(), $this->record)) {
+            Notification::make()
+                ->title('Not allowed')
+                ->body('Only Super Admin can open a case from the student profile.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $caseType = CampusVisitPurpose::tryFrom((string) $this->openCaseType);
+        $assignee = User::query()->find((int) $this->openCaseAssigneeId);
+
+        if (! $caseType || ! $assignee) {
+            Notification::make()
+                ->title('Missing details')
+                ->body('Select a case type and staff assignee.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $case = $cases->open(
+                $this->record->fresh(['activeEnrollment']),
+                $caseType,
+                $this->openCaseTitle,
+                filled($this->openCaseSummary) ? $this->openCaseSummary : null,
+                $assignee,
+                Auth::user(),
+                filled($this->openCaseHandoffNote) ? $this->openCaseHandoffNote : null,
+            );
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not open case')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Please check the form.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->showOpenCaseForm = false;
+        $this->invalidateCasesTab();
+        $this->expandedCaseId = $case->id;
+
+        Notification::make()
+            ->title('Case opened')
+            ->body("{$case->case_number} assigned to {$assignee->name}.")
+            ->success()
+            ->send();
+    }
+
     public function submitCaseTransfer(int $caseId, StudentCaseService $cases): void
     {
         $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
@@ -594,7 +690,9 @@ class StudentProfilePage extends Page
         $this->expandedCaseId = $caseId;
 
         Notification::make()
-            ->title('Case transferred')
+            ->title($cases->canReassignAsAdmin($case, Auth::user()) && ! $cases->isCurrentAssignee($case, Auth::user())
+                ? 'Case reassigned'
+                : 'Case transferred')
             ->body("Assigned to {$assignee->name}.")
             ->success()
             ->send();
@@ -2690,6 +2788,14 @@ class StudentProfilePage extends Page
                                     'staffOptions' => StudentCaseService::activeStaffOptions(),
                                     'caseService' => app(StudentCaseService::class),
                                     'viewer' => Auth::user(),
+                                    'canOpenCaseAsAdmin' => app(StudentCaseService::class)->canOpenAsAdmin(Auth::user(), $this->record),
+                                    'showOpenCaseForm' => $this->showOpenCaseForm,
+                                    'openCaseType' => $this->openCaseType,
+                                    'openCaseTitle' => $this->openCaseTitle,
+                                    'openCaseSummary' => $this->openCaseSummary,
+                                    'openCaseAssigneeId' => $this->openCaseAssigneeId,
+                                    'openCaseHandoffNote' => $this->openCaseHandoffNote,
+                                    'caseTypeOptions' => CampusVisitPurpose::options(),
                                 ]),
                         ]),
                     'messages' => Tab::make('Messages')

@@ -154,6 +154,62 @@ class StudentCaseServiceTest extends TestCase
         $service->transfer($case, $accountant, $counsellor, 'Trying to pull case back.');
     }
 
+    public function test_super_admin_can_reassign_without_being_current_assignee(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
+        $director = $this->createStaffUser('Director');
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $service = app(StudentCaseService::class);
+
+        $case = $service->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::Academic,
+            'Chemistry teacher issue',
+            null,
+            $accountant,
+            $counsellor,
+            'Please review with parent.',
+        );
+
+        $this->assertFalse($service->isCurrentAssignee($case, $admin));
+        $this->assertTrue($service->canReassignAsAdmin($case, $admin));
+        $this->assertTrue($service->canTransfer($case, $admin));
+
+        $updated = $service->transfer(
+            $case,
+            $director,
+            $admin,
+            'Admin reassigned to academic coordinator.',
+        );
+
+        $this->assertSame($director->id, $updated->current_assignee_user_id);
+    }
+
+    public function test_super_admin_can_open_case_from_profile_rules(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $service = app(StudentCaseService::class);
+
+        $this->assertTrue($service->canOpenAsAdmin($admin, $student));
+        $this->assertFalse($service->canOpenAsAdmin($counsellor, $student));
+
+        $case = $service->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::Fees,
+            'Fee waiver request',
+            'Parent asked for discount.',
+            $accountant,
+            $admin,
+            'Please review fee structure with parent.',
+        );
+
+        $this->assertSame($accountant->id, $case->current_assignee_user_id);
+        $this->assertSame($admin->id, $case->opened_by_user_id);
+    }
+
     public function test_close_case_records_closing_note(): void
     {
         [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
