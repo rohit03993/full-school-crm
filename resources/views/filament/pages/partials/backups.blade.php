@@ -26,11 +26,11 @@
 
         <div class="space-y-4 px-4 py-4 sm:px-6">
             <div class="rounded-xl px-3 py-2 text-xs ring-1
-                {{ $drive['enabled'] && $drive['has_credentials'] && filled($drive['folder_id'])
+                {{ $drive['last_test_ok'] ?? false
                     ? 'bg-emerald-50 text-emerald-900 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-500/20'
                     : 'bg-amber-50 text-amber-950 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20' }}">
-                @if ($drive['enabled'] && $drive['has_credentials'] && filled($drive['folder_id']))
-                    Connected
+                @if ($drive['last_test_ok'] ?? false)
+                    Verified · folder “{{ $drive['last_test_folder_name'] ?? 'Drive' }}”
                     @if ($drive['client_email'])
                         · {{ $drive['client_email'] }}
                     @endif
@@ -38,6 +38,12 @@
                         · Last upload: {{ \Illuminate\Support\Carbon::parse($drive['last_upload_at'])->timezone(config('app.timezone'))->format('d M Y, h:i A') }}
                         ({{ $drive['last_upload_filename'] }})
                     @endif
+                @elseif ($drive['enabled'] && $drive['has_credentials'] && filled($drive['folder_id']))
+                    Settings saved
+                    @if ($drive['client_email'])
+                        · {{ $drive['client_email'] }}
+                    @endif
+                    — click <strong>Test connection</strong> to verify the folder (green “Connected” only after a successful test).
                 @else
                     Not connected yet — paste service account JSON, folder ID, enable, then Test connection.
                 @endif

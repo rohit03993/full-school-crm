@@ -11,7 +11,11 @@ use Throwable;
 
 class GoogleDriveBackupService
 {
-    public const SCOPE = 'https://www.googleapis.com/auth/drive.file';
+    /**
+     * Full Drive scope is required so the service account can see a folder
+     * that was shared with it (drive.file only sees files the app created).
+     */
+    public const SCOPE = 'https://www.googleapis.com/auth/drive';
 
     /**
      * @return array{
@@ -23,6 +27,9 @@ class GoogleDriveBackupService
      *     last_upload_filename: ?string,
      *     last_upload_error: ?string,
      *     last_upload_file_id: ?string,
+     *     last_test_ok: bool,
+     *     last_test_at: ?string,
+     *     last_test_folder_name: ?string,
      * }
      */
     public function status(): array
@@ -38,6 +45,9 @@ class GoogleDriveBackupService
             'last_upload_filename' => Setting::getValue('backup.gdrive.last_upload_filename'),
             'last_upload_error' => Setting::getValue('backup.gdrive.last_upload_error'),
             'last_upload_file_id' => Setting::getValue('backup.gdrive.last_upload_file_id'),
+            'last_test_ok' => (bool) Setting::getValue('backup.gdrive.last_test_ok', false),
+            'last_test_at' => Setting::getValue('backup.gdrive.last_test_at'),
+            'last_test_folder_name' => Setting::getValue('backup.gdrive.last_test_folder_name'),
         ];
     }
 
@@ -178,6 +188,9 @@ class GoogleDriveBackupService
 
         if (! $response->successful()) {
             $message = $response->json('error.message') ?? $response->body();
+            Setting::setValue('backup.gdrive.last_test_ok', '0', 'backup');
+            Setting::setValue('backup.gdrive.last_upload_error', mb_substr((string) $message, 0, 500), 'backup');
+            Setting::flushValueCache();
 
             throw new RuntimeException(
                 'Cannot access that folder. Share the Drive folder with the service account email as Editor. Details: '.$message
@@ -185,6 +198,12 @@ class GoogleDriveBackupService
         }
 
         $name = (string) ($response->json('name') ?? 'Folder');
+
+        Setting::setValue('backup.gdrive.last_test_ok', '1', 'backup');
+        Setting::setValue('backup.gdrive.last_test_at', now()->toIso8601String(), 'backup');
+        Setting::setValue('backup.gdrive.last_test_folder_name', $name, 'backup');
+        Setting::setValue('backup.gdrive.last_upload_error', '', 'backup');
+        Setting::flushValueCache();
 
         return 'Connected to Drive folder: '.$name;
     }
