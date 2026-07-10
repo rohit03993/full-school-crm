@@ -70,7 +70,7 @@
 
                     @if ($phase->isLeadStage())
                         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                            Lead profile — track website vs walk-in enquiries below
+                            Lead profile — counts match campus visits, calls, and enquiries in the timeline
                         </p>
                     @elseif ($phase === ProfilePhase::Admission)
                         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">

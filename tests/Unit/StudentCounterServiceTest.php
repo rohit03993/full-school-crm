@@ -11,6 +11,7 @@ use App\Enums\StudentStatus;
 use App\Models\Course;
 use App\Models\Enquiry;
 use App\Models\Student;
+use App\Models\User;
 use App\Services\StudentCounterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -19,7 +20,7 @@ class StudentCounterServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_lead_profile_shows_visit_and_enquiry_counters_only(): void
+    public function test_lead_profile_shows_visit_call_and_enquiry_counters_only(): void
     {
         $student = Student::query()->create([
             'name' => 'Lead Person',
@@ -36,9 +37,85 @@ class StudentCounterServiceTest extends TestCase
 
         $labels = collect($profile['items'])->pluck('label')->all();
 
-        $this->assertSame(['Visits', 'Enquiries', 'Website', 'Walk-in', 'Enquiry', 'Admission', 'Marketing', 'Fees', 'General'], $labels);
+        $this->assertSame(['Visits', 'Calls', 'Enquiries'], $labels);
+        $this->assertNotContains('Website', $labels);
+        $this->assertNotContains('Walk-in', $labels);
         $this->assertNotContains('Attendance', $labels);
         $this->assertNotContains('Paid', $labels);
+    }
+
+    public function test_visit_counter_excludes_phone_call_mirror_rows(): void
+    {
+        $student = Student::query()->create([
+            'name' => 'Mirror Visit Lead',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2000-01-01',
+            'gender' => Gender::Male,
+            'mobile' => '9876543290',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $course = Course::query()->create([
+            'name' => 'Class 6',
+            'code' => 'C6-MIRROR',
+            'programme_category' => 'school',
+            'duration' => 1,
+            'duration_type' => 'years',
+            'fee' => 50000,
+            'status' => CourseStatus::Active,
+        ]);
+
+        $enquiry = Enquiry::query()->create([
+            'student_id' => $student->id,
+            'enquiry_number' => 'CRM-ENQ-2026-000301',
+            'course_id' => $course->id,
+            'lead_source' => LeadSource::WalkIn,
+            'latest_visit_status' => 'interested',
+        ]);
+
+        \App\Models\Visit::query()->create([
+            'student_id' => $student->id,
+            'enquiry_id' => $enquiry->id,
+            'visit_date' => today(),
+            'discussion_summary' => 'First walk-in.',
+            'status' => 'interested',
+        ]);
+
+        \App\Models\Visit::query()->create([
+            'student_id' => $student->id,
+            'enquiry_id' => $enquiry->id,
+            'visit_date' => today(),
+            'discussion_summary' => 'Second walk-in.',
+            'status' => 'interested',
+        ]);
+
+        \App\Models\Visit::query()->create([
+            'student_id' => $student->id,
+            'enquiry_id' => $enquiry->id,
+            'visit_date' => today(),
+            'discussion_summary' => 'Legacy phone mirror.',
+            'remarks' => 'Outgoing call',
+            'status' => 'interested',
+        ]);
+
+        $staff = User::factory()->create(['is_active' => true]);
+
+        \App\Models\StudentCall::query()->create([
+            'student_id' => $student->id,
+            'enquiry_id' => $enquiry->id,
+            'user_id' => $staff->id,
+            'call_status' => 'connected',
+            'call_direction' => 'outgoing',
+            'call_notes' => 'Follow-up call logged.',
+            'called_at' => now(),
+        ]);
+
+        $profile = app(StudentCounterService::class)->profile($student->fresh());
+        $items = collect($profile['items'])->pluck('value', 'label');
+
+        $this->assertSame(2, $items['Visits']);
+        $this->assertSame(1, $items['Calls']);
+        $this->assertSame(1, $items['Enquiries']);
     }
 
     public function test_lead_source_summary_tracks_website_and_walk_in_enquiries(): void

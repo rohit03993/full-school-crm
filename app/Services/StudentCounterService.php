@@ -12,6 +12,7 @@ use App\Models\Admission;
 use App\Models\Batch;
 use App\Models\Enquiry;
 use App\Models\Student;
+use App\Models\Visit;
 use App\Services\AttendanceService;
 use Illuminate\Support\Collection;
 
@@ -282,21 +283,11 @@ class StudentCounterService
      */
     protected function leadCounters(Student $student, array $leadSources): array
     {
-        $counters = [
-            ['label' => 'Visits', 'value' => $student->visits()->count()],
+        return [
+            ['label' => 'Visits', 'value' => $this->inPersonVisitCount($student)],
+            ['label' => 'Calls', 'value' => $this->telecallingCallCount($student)],
             ['label' => 'Enquiries', 'value' => $student->enquiries()->count()],
-            ['label' => 'Website', 'value' => $leadSources['website_count']],
-            ['label' => 'Walk-in', 'value' => $leadSources['walk_in_count']],
         ];
-
-        foreach (MeetingForOptions::active() as $option) {
-            $counters[] = [
-                'label' => $option['label'],
-                'value' => $leadSources['meeting_for_counts'][$option['value']] ?? 0,
-            ];
-        }
-
-        return $counters;
     }
 
     /**
@@ -307,25 +298,11 @@ class StudentCounterService
     {
         $admission = $this->latestAdmission($student);
 
-        $counters = [
-            ['label' => 'Visits', 'value' => $student->visits()->count()],
-            ['label' => 'Walk-in', 'value' => $leadSources['walk_in_count']],
+        return [
+            ['label' => 'Visits', 'value' => $this->inPersonVisitCount($student)],
+            ['label' => 'Calls', 'value' => $this->telecallingCallCount($student)],
+            ['label' => 'Admission', 'value' => $admission?->status?->label() ?? '—'],
         ];
-
-        foreach (MeetingForOptions::active() as $option) {
-            $count = $leadSources['meeting_for_counts'][$option['value']] ?? 0;
-
-            if ($count > 0) {
-                $counters[] = [
-                    'label' => $option['label'],
-                    'value' => $count,
-                ];
-            }
-        }
-
-        $counters[] = ['label' => 'Admission', 'value' => $admission?->status?->label() ?? '—'];
-
-        return $counters;
     }
 
     /**
@@ -342,8 +319,23 @@ class StudentCounterService
             ['label' => 'Batch', 'value' => $batchName ?? 'Not assigned'],
             ['label' => 'Paid', 'value' => $fees ? '₹'.number_format((float) $fees->paid_amount, 2) : '—'],
             ['label' => 'Pending', 'value' => $fees ? '₹'.number_format((float) $fees->pending_amount, 2) : '—'],
-            ['label' => 'Visits', 'value' => $student->visits()->count()],
+            ['label' => 'Visits', 'value' => $this->inPersonVisitCount($student)],
         ];
+    }
+
+    protected function inPersonVisitCount(Student $student): int
+    {
+        return Visit::query()
+            ->where('student_id', $student->id)
+            ->inPerson()
+            ->count();
+    }
+
+    protected function telecallingCallCount(Student $student): int
+    {
+        return $student->calls()
+            ->whereNull('student_case_id')
+            ->count();
     }
 
     /**
