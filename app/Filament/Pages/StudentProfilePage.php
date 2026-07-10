@@ -516,7 +516,7 @@ class StudentProfilePage extends Page
             $this->cachedProfileSummary['meeting_assignment'] = app(VisitMeetingAssignmentService::class)
                 ->profileMeetingAssignment($this->record, Auth::user());
             $this->cachedProfileSummary['open_cases'] = app(StudentCaseService::class)
-                ->overviewBanners($this->record);
+                ->overviewBanners($this->record, Auth::user());
         }
 
         return $this->cachedProfileSummary;
@@ -562,7 +562,7 @@ class StudentProfilePage extends Page
         $this->casesTabLoaded = true;
 
         $this->cases = app(StudentCaseService::class)->forStudent($this->record);
-        $this->openCaseBanners = app(StudentCaseService::class)->overviewBanners($this->record);
+        $this->openCaseBanners = app(StudentCaseService::class)->overviewBanners($this->record, Auth::user());
     }
 
     public function toggleCase(int $caseId): void

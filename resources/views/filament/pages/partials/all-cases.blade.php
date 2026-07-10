@@ -1,7 +1,8 @@
-<div @class([
-    'space-y-4',
-    'mx-auto max-w-lg pb-24 lg:max-w-4xl lg:pb-6' => ! ($embedded ?? false),
-])>
+<div class="mx-auto max-w-lg space-y-4 pb-24 lg:max-w-4xl lg:pb-6">
+    <div class="rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-900 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20">
+        Supervisor overview only. Staff see cases under <strong>My work → My cases</strong> when assigned to them. Only the current assignee can transfer, close, or log calls.
+    </div>
+
     <div class="grid grid-cols-3 gap-3 sm:grid-cols-3">
         @foreach ([
             ['label' => 'Open institute-wide', 'value' => $stats['open'] ?? 0],
@@ -19,25 +20,25 @@
         <div class="fi-crm-form grid gap-3 sm:grid-cols-2">
             <input
                 type="search"
-                wire:model.live.debounce.300ms="allCaseSearch"
+                wire:model.live.debounce.300ms="search"
                 placeholder="Search case no., student, title…"
                 class="fi-crm-input block w-full sm:col-span-2"
             />
 
-            <x-crm.select wire:model.live="allCaseStatusFilter" class="w-full">
+            <x-crm.select wire:model.live="statusFilter" class="w-full">
                 <option value="open">Open cases</option>
                 <option value="closed">Closed cases</option>
                 <option value="all">All statuses</option>
             </x-crm.select>
 
-            <x-crm.select wire:model.live="allCaseAssigneeFilter" class="w-full">
+            <x-crm.select wire:model.live="assigneeFilter" class="w-full">
                 <option value="">All assignees</option>
                 @foreach ($staffOptions as $id => $name)
                     <option value="{{ $id }}">{{ $name }}</option>
                 @endforeach
             </x-crm.select>
 
-            <x-crm.select wire:model.live="allCaseTypeFilter" class="w-full sm:col-span-2">
+            <x-crm.select wire:model.live="caseTypeFilter" class="w-full sm:col-span-2">
                 <option value="">All case types</option>
                 @foreach ($caseTypeOptions as $value => $label)
                     <option value="{{ $value }}">{{ $label }}</option>

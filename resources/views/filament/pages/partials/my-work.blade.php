@@ -35,23 +35,6 @@
         @endif
       </button>
     @endif
-
-    @if ($canAllCasesTab)
-      <button
-        type="button"
-        wire:click="switchWorkTab('all_cases')"
-        @class([
-          'rounded-full px-3 py-1.5 text-xs font-semibold transition touch-manipulation',
-          'bg-primary-600 text-white shadow-sm' => $workTab === 'all_cases',
-          'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300 dark:hover:bg-white/15' => $workTab !== 'all_cases',
-        ])
-      >
-        All cases
-        @if (($allCaseStats['open'] ?? 0) > 0)
-          <span class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">{{ $allCaseStats['open'] }}</span>
-        @endif
-      </button>
-    @endif
   </div>
 
   @if ($workTab === 'meetings')
@@ -79,23 +62,11 @@
       'statusFilter' => $statusFilter,
       'stats' => $stats,
     ])
-  @elseif ($workTab === 'my_cases')
+  @else
     @include('filament.pages.partials.my-cases', [
       'cases' => $myCases,
       'caseTypeOptions' => $caseTypeOptions,
       'stats' => $caseStats,
-      'embedded' => true,
-    ])
-  @elseif ($workTab === 'all_cases')
-    <div class="rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-900 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20">
-      Institute-wide view for supervisors. Only the <strong>current assignee</strong> can transfer, close, or log calls — use <strong>My cases</strong> for work assigned to you.
-    </div>
-
-    @include('filament.pages.partials.all-cases', [
-      'cases' => $allCases,
-      'caseTypeOptions' => $caseTypeOptions,
-      'staffOptions' => $staffOptions,
-      'stats' => $allCaseStats,
       'embedded' => true,
     ])
   @endif

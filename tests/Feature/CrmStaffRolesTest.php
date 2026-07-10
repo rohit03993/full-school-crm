@@ -97,6 +97,7 @@ class CrmStaffRolesTest extends TestCase
 
         $this->assertTrue($user->canCrm(CrmPermission::FeesCollect));
         $this->assertTrue($user->canCrm(CrmPermission::LeadsCall));
+        $this->assertFalse($user->canCrm(CrmPermission::CasesViewAll));
         $this->assertFalse($user->canCrm(CrmPermission::AttendanceMark));
         $this->assertFalse($user->canCrm(CrmPermission::MarksImport));
         $this->assertFalse($user->canCrm(CrmPermission::WhatsappCampaigns));

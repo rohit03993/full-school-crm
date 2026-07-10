@@ -80,6 +80,7 @@ class StaffRolePermissions
             fn (CrmPermission $permission): bool => ! in_array($permission, [
                 CrmPermission::DashboardOwnerStats,
                 CrmPermission::DashboardFinanceStats,
+                CrmPermission::CasesViewAll,
                 CrmPermission::WhatsappSettings,
                 CrmPermission::MetaWhatsappSettings,
                 CrmPermission::WhatsappCampaigns,

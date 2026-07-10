@@ -93,6 +93,36 @@ class MyCasesPageTest extends TestCase
             ->assertDontSee('All cases');
     }
 
+    public function test_transferred_case_is_hidden_from_opener_on_student_profile(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledScenario();
+        $director = $this->createStaffUser('Director');
+        $service = app(StudentCaseService::class);
+
+        $case = $service->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::Academic,
+            'Chemistry teacher issue',
+            null,
+            $accountant,
+            $counsellor,
+            'Please review with parent.',
+        );
+
+        $service->transfer(
+            $case,
+            $director,
+            $accountant,
+            'Needs academic coordinator review.',
+        );
+
+        $counsellor->givePermissionTo(CrmPermission::CasesView->value);
+
+        $visible = $service->forStudent($student->fresh(), $counsellor);
+
+        $this->assertCount(0, $visible);
+    }
+
     public function test_nav_badge_counts_open_cases_for_assignee(): void
     {
         Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);

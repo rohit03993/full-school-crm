@@ -251,9 +251,11 @@ class StudentCaseService
     /**
      * @return Collection<int, StudentCase>
      */
-    public function forStudent(Student $student): Collection
+    public function forStudent(Student $student, ?User $viewer = null): Collection
     {
-        return StudentCase::query()
+        $viewer ??= auth()->user();
+
+        $query = StudentCase::query()
             ->where('student_id', $student->id)
             ->with([
                 'currentAssignee',
@@ -265,8 +267,16 @@ class StudentCaseService
                 'calls.staff',
             ])
             ->orderByRaw("CASE WHEN status = 'open' THEN 0 ELSE 1 END")
-            ->orderByDesc('opened_at')
-            ->get();
+            ->orderByDesc('opened_at');
+
+        if ($viewer && ! CrmAccess::can($viewer, CrmPermission::CasesViewAll)) {
+            $query->where(function ($inner) use ($viewer): void {
+                $inner->where('current_assignee_user_id', $viewer->id)
+                    ->orWhere('closed_by_user_id', $viewer->id);
+            });
+        }
+
+        return $query->get();
     }
 
     public function openCountForStudent(Student $student): int
@@ -289,13 +299,24 @@ class StudentCaseService
      *     is_open: bool,
      * }>
      */
-    public function overviewBanners(Student $student): array
+    public function overviewBanners(Student $student, ?User $viewer = null): array
     {
-        return StudentCase::query()
+        $viewer ??= auth()->user();
+
+        $query = StudentCase::query()
             ->where('student_id', $student->id)
             ->where('status', StudentCaseStatus::Open)
             ->with('currentAssignee')
-            ->orderByDesc('opened_at')
+            ->orderByDesc('opened_at');
+
+        if ($viewer && ! CrmAccess::can($viewer, CrmPermission::CasesViewAll)) {
+            $query->where(function ($inner) use ($viewer): void {
+                $inner->where('current_assignee_user_id', $viewer->id)
+                    ->orWhere('closed_by_user_id', $viewer->id);
+            });
+        }
+
+        return $query
             ->get()
             ->map(fn (StudentCase $case): array => [
                 'id' => $case->id,
@@ -427,10 +448,9 @@ class StudentCaseService
         }
 
         return in_array($viewer->id, array_filter([
-            $case->opened_by_user_id,
             $case->current_assignee_user_id,
             $case->closed_by_user_id,
-        ]), true) || CrmAccess::can($viewer, CrmPermission::StudentsView);
+        ]), true);
     }
 
     public function canTransfer(StudentCase $case, ?User $viewer): bool

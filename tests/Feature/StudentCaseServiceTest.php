@@ -144,6 +144,7 @@ class StudentCaseServiceTest extends TestCase
         $this->assertFalse($service->canTransfer($case, $counsellor));
         $this->assertFalse($service->canClose($case, $counsellor));
         $this->assertFalse($service->canLogCall($case, $counsellor));
+        $this->assertFalse($service->canView($case, $counsellor));
         $this->assertTrue($service->canTransfer($case, $director));
         $this->assertTrue($service->canClose($case, $director));
         $this->assertTrue($service->canLogCall($case, $director));
