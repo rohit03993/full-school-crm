@@ -6,7 +6,7 @@ use App\Enums\CampusVisitPurpose;
 use App\Enums\CrmPermission;
 use App\Enums\NumberSequenceType;
 use App\Enums\StudentCaseStatus;
-use App\Filament\Pages\MyCasesPage;
+use App\Filament\Pages\MyMeetingsPage;
 use App\Filament\Pages\StudentProfilePage;
 use App\Models\Student;
 use App\Models\StudentCase;
@@ -542,10 +542,10 @@ class StudentCaseService
 
         $actions = [];
 
-        if (MyCasesPage::canAccess()) {
+        if (MyMeetingsPage::canAccess()) {
             $actions[] = \Filament\Actions\Action::make('my_cases')
-                ->label('My cases')
-                ->url(MyCasesPage::getUrl());
+                ->label('My work')
+                ->url(MyMeetingsPage::getUrl(['tab' => 'my_cases']));
         }
 
         if ($profileUrl) {

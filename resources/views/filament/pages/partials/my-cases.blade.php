@@ -2,7 +2,10 @@
     use App\Filament\Pages\StudentProfilePage;
 @endphp
 
-<div class="mx-auto max-w-lg space-y-4 pb-24 lg:max-w-3xl lg:pb-6">
+<div @class([
+    'space-y-4',
+    'mx-auto max-w-lg pb-24 lg:max-w-3xl lg:pb-6' => ! ($embedded ?? false),
+])>
     <div class="grid grid-cols-3 gap-3">
         @foreach ([
             ['label' => 'Open', 'value' => $stats['open'] ?? 0],
@@ -20,7 +23,7 @@
         <div class="fi-crm-form space-y-3">
             <input
                 type="search"
-                wire:model.live.debounce.300ms="search"
+                wire:model.live.debounce.300ms="myCaseSearch"
                 placeholder="Search case no., student, title…"
                 class="fi-crm-input block w-full"
             />
@@ -29,11 +32,11 @@
                 @foreach (['open' => 'Open', 'closed' => 'Closed', 'all' => 'All'] as $value => $label)
                     <button
                         type="button"
-                        wire:click="$set('statusFilter', '{{ $value }}')"
+                        wire:click="$set('myCaseStatusFilter', '{{ $value }}')"
                         @class([
                             'rounded-full px-3 py-1.5 text-xs font-semibold transition touch-manipulation',
-                            'bg-primary-600 text-white shadow-sm' => $statusFilter === $value,
-                            'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300 dark:hover:bg-white/15' => $statusFilter !== $value,
+                            'bg-primary-600 text-white shadow-sm' => $myCaseStatusFilter === $value,
+                            'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300 dark:hover:bg-white/15' => $myCaseStatusFilter !== $value,
                         ])
                     >
                         {{ $label }}
@@ -41,7 +44,7 @@
                 @endforeach
             </div>
 
-            <x-crm.select wire:model.live="caseTypeFilter" class="w-full">
+            <x-crm.select wire:model.live="myCaseTypeFilter" class="w-full">
                 <option value="">All case types</option>
                 @foreach ($caseTypeOptions as $value => $label)
                     <option value="{{ $value }}">{{ $label }}</option>
@@ -54,10 +57,10 @@
         <div class="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center dark:border-white/20 dark:bg-gray-900">
             <p class="text-lg font-semibold text-gray-950 dark:text-white">No cases assigned to you</p>
             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                @if (filled($search) || $statusFilter !== 'open' || filled($caseTypeFilter))
+                @if (filled($myCaseSearch) || $myCaseStatusFilter !== 'open' || filled($myCaseTypeFilter))
                     Try clearing filters.
                 @else
-                    When a counselor opens a case and assigns it to you, it appears here.
+                    When a counselor opens a case and assigns it to you, it appears here for leads and enrolled students.
                 @endif
             </p>
         </div>

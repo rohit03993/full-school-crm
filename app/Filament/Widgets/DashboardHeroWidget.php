@@ -5,7 +5,7 @@ namespace App\Filament\Widgets;
 use App\Filament\Pages\AttendancePage;
 use App\Filament\Pages\CallQueuePage;
 use App\Filament\Pages\FollowUpsPage;
-use App\Filament\Pages\MyCasesPage;
+use App\Filament\Pages\MyMeetingsPage;
 use App\Filament\Pages\MyLeadsPage;
 use App\Filament\Pages\ReportsPage;
 use App\Filament\Pages\StudentSearchPage;
@@ -105,10 +105,10 @@ class DashboardHeroWidget extends Widget
 
         if ($user && CrmAccess::can($user, CrmPermission::CasesView)) {
             $staffActions[] = [
-                'label' => 'My cases',
-                'description' => 'Enrolled student support cases',
+                'label' => 'My work',
+                'description' => 'Meetings, cases, and assigned calls',
                 'icon' => 'heroicon-o-briefcase',
-                'url' => MyCasesPage::getUrl(),
+                'url' => MyMeetingsPage::getUrl(),
                 'feature' => null,
             ];
         }

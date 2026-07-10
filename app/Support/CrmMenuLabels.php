@@ -34,7 +34,12 @@ final class CrmMenuLabels
 
     public static function myMeetings(): string
     {
-        return 'My meetings';
+        return 'My work';
+    }
+
+    public static function myWork(): string
+    {
+        return self::myMeetings();
     }
 
     public static function myClasses(): string

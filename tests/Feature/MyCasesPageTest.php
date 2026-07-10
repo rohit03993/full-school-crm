@@ -12,6 +12,7 @@ use App\Enums\StaffJobRole;
 use App\Enums\VisitStatus;
 use App\Filament\Pages\AllCasesPage;
 use App\Filament\Pages\MyCasesPage;
+use App\Filament\Pages\MyMeetingsPage;
 use App\Models\Admission;
 use App\Models\Course;
 use App\Models\Enrollment;
@@ -32,7 +33,7 @@ class MyCasesPageTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_my_cases_page_renders_for_staff_with_open_case(): void
+    public function test_my_work_page_shows_assigned_cases_tab(): void
     {
         Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);
         Permission::findOrCreate(CrmPermission::CasesView->value, 'web');
@@ -54,14 +55,31 @@ class MyCasesPageTest extends TestCase
         $this->actingAs($accountant);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        Livewire::test(MyCasesPage::class)
+        Livewire::test(MyMeetingsPage::class)
+            ->call('switchWorkTab', 'my_cases')
             ->assertOk()
-            ->assertSee('My cases')
+            ->assertSee('My work')
             ->assertSee('Fee discount request')
             ->assertSee($student->name);
     }
 
-    public function test_all_cases_page_requires_view_all_permission(): void
+    public function test_legacy_my_cases_url_redirects_to_my_work_tab(): void
+    {
+        Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);
+        Permission::findOrCreate(CrmPermission::CasesView->value, 'web');
+
+        $accountant = User::factory()->create(['is_active' => true]);
+        $accountant->assignRole(RoleName::Staff->value);
+        $accountant->givePermissionTo(CrmPermission::CasesView->value);
+
+        $this->actingAs($accountant);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(MyCasesPage::class)
+            ->assertRedirect(MyMeetingsPage::getUrl(['tab' => 'my_cases']));
+    }
+
+    public function test_all_cases_tab_requires_view_all_permission(): void
     {
         $counsellor = User::factory()->create(['is_active' => true]);
         $counsellor->assignRole(StaffJobRole::Counsellor->value);
@@ -70,6 +88,9 @@ class MyCasesPageTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
         $this->assertFalse(AllCasesPage::canAccess());
+
+        Livewire::test(MyMeetingsPage::class)
+            ->assertDontSee('All cases');
     }
 
     public function test_nav_badge_counts_open_cases_for_assignee(): void

@@ -1,8 +1,7 @@
-@php
-    use App\Filament\Pages\StudentProfilePage;
-@endphp
-
-<div class="mx-auto max-w-lg space-y-4 pb-24 lg:max-w-4xl lg:pb-6">
+<div @class([
+    'space-y-4',
+    'mx-auto max-w-lg pb-24 lg:max-w-4xl lg:pb-6' => ! ($embedded ?? false),
+])>
     <div class="grid grid-cols-3 gap-3 sm:grid-cols-3">
         @foreach ([
             ['label' => 'Open institute-wide', 'value' => $stats['open'] ?? 0],
@@ -20,25 +19,25 @@
         <div class="fi-crm-form grid gap-3 sm:grid-cols-2">
             <input
                 type="search"
-                wire:model.live.debounce.300ms="search"
+                wire:model.live.debounce.300ms="allCaseSearch"
                 placeholder="Search case no., student, title…"
                 class="fi-crm-input block w-full sm:col-span-2"
             />
 
-            <x-crm.select wire:model.live="statusFilter" class="w-full">
+            <x-crm.select wire:model.live="allCaseStatusFilter" class="w-full">
                 <option value="open">Open cases</option>
                 <option value="closed">Closed cases</option>
                 <option value="all">All statuses</option>
             </x-crm.select>
 
-            <x-crm.select wire:model.live="assigneeFilter" class="w-full">
+            <x-crm.select wire:model.live="allCaseAssigneeFilter" class="w-full">
                 <option value="">All assignees</option>
                 @foreach ($staffOptions as $id => $name)
                     <option value="{{ $id }}">{{ $name }}</option>
                 @endforeach
             </x-crm.select>
 
-            <x-crm.select wire:model.live="caseTypeFilter" class="w-full sm:col-span-2">
+            <x-crm.select wire:model.live="allCaseTypeFilter" class="w-full sm:col-span-2">
                 <option value="">All case types</option>
                 @foreach ($caseTypeOptions as $value => $label)
                     <option value="{{ $value }}">{{ $label }}</option>
@@ -66,7 +65,7 @@
                         $student = $case->student;
                     @endphp
                     <a
-                        href="{{ $student ? StudentProfilePage::getUrl(['record' => $student->id, 'tab' => 'cases', 'case' => $case->id]) : '#' }}"
+                        href="{{ $student ? \App\Filament\Pages\StudentProfilePage::getUrl(['record' => $student->id, 'tab' => 'cases', 'case' => $case->id]) : '#' }}"
                         class="block px-4 py-4 transition hover:bg-primary-500/[0.03] sm:px-6"
                     >
                         <div class="grid gap-2 sm:grid-cols-12 sm:items-center sm:gap-3">
@@ -84,7 +83,7 @@
                                 <p class="text-xs text-gray-500 dark:text-gray-400">{{ $student?->mobile ?? '' }}</p>
                             </div>
                             <div class="text-sm text-gray-700 dark:text-gray-300 sm:col-span-2">{{ $case->case_type->label() }}</div>
-                            <div class="text-sm text-gray-700 dark:text-gray-300 sm:col-span-2">{{ $case->currentAssignee?->name ?? '—' }}</div>
+                            <div class="text-sm font-medium text-violet-700 dark:text-violet-300 sm:col-span-2">{{ $case->currentAssignee?->name ?? '—' }}</div>
                             <div class="text-xs text-gray-500 dark:text-gray-400 sm:col-span-2">{{ $case->opened_at?->format('d M Y') }}</div>
                         </div>
                     </a>
