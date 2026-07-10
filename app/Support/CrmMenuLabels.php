@@ -234,6 +234,11 @@ final class CrmMenuLabels
         return 'Setup guide';
     }
 
+    public static function backups(): string
+    {
+        return 'Backups';
+    }
+
     public static function feeSettings(): string
     {
         return 'Fee rules';

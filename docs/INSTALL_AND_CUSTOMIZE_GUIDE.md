@@ -346,13 +346,35 @@ autorestart=true
 user=www-data
 ```
 
-### Scheduled tasks (optional)
+### Scheduled tasks
 
-If you add Laravel schedulers later, add to server cron:
+Add to server cron (required for daily backups, late fees, cleanup, WhatsApp helpers):
 
 ```cron
 * * * * * cd /path/to/school-crm && php artisan schedule:run >> /dev/null 2>&1
 ```
+
+### Full backups (database + all files / images)
+
+Nightly at **02:15** (server time) the scheduler runs `php artisan crm:backup`. Each zip includes:
+
+- Entire database (students, leads, calls, cases, fees, attendance, homework, WhatsApp, settings, users…)
+- `storage/app/private` — photos, Aadhaar, documents, receipts, ID cards, payment proofs, marksheets, WhatsApp media
+- `storage/app/public` — homework files, website logo/gallery, CRM branding
+- `app-key.txt` — must match `.env` `APP_KEY` on restore
+
+**Super Admin:** Setup → **Backups** — create now, download, delete. Keep a copy off the server (Drive / USB).
+
+**Manual:**
+
+```powershell
+php artisan crm:backup
+php artisan crm:restore path\to\school-crm-full-backup-….zip --force
+```
+
+After restore: `php artisan storage:link`, `php artisan crm:publish-assets`, `php artisan cache:clear`, restart queue worker.
+
+Retention: last **14** archives (`CRM_BACKUP_RETAIN` in `.env`).
 
 ### After deploy — smoke test
 

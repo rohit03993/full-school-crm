@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Webhooks\MetaWhatsAppWebhookController;
 use App\Http\Controllers\Api\AisensyCampaignTriggerController;
+use App\Http\Controllers\Admin\BackupDownloadController;
 use App\Http\Controllers\Admin\DocumentDownloadController;
 use App\Http\Controllers\Admin\MetaWhatsAppMediaController;
 use App\Http\Controllers\Admin\IdCardDownloadController;
@@ -41,6 +42,10 @@ Route::prefix('pwa')->name('pwa.')->group(function (): void {
 });
 
 Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
+    Route::get('backups/{filename}/download', BackupDownloadController::class)
+        ->where('filename', 'school-crm-full-backup-[\w\-]+\.zip')
+        ->name('admin.backups.download');
+
     Route::get('documents/{document}/download', [DocumentDownloadController::class, 'download'])
         ->name('admin.documents.download');
     Route::get('documents/{document}/preview', [DocumentDownloadController::class, 'preview'])

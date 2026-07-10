@@ -14,6 +14,7 @@ class CrmHint
         'setup.wizard' => 'Complete this once when you first log in. Enter your institute name, contact details, and preferred labels — everything saves automatically.',
         'setup.institute' => 'Pick school, coaching, or college. This controls programme types on the website and enquiry forms. Use the checklist below for remaining steps.',
         'setup.guide' => 'Step-by-step reference for Super Admin. Use the table below to find where to change each setting. Every screen also shows hints under the title.',
+        'setup.backups' => 'Full disaster-recovery archives: entire database plus all photos, documents, receipts, homework, logos, and WhatsApp media. Download and store a copy off the server. Restore only with the same APP_KEY.',
         'setup.terminology' => 'Rename labels to match your institute — e.g. Class instead of Course, Section instead of Batch. Empty fields use sensible defaults for your institute type.',
         'setup.custom_fields' => 'Optional extra fields on student or enquiry forms (e.g. blood group, previous school). Not used for exam marks — use Exam results → Upload marks (Excel).',
         'setup.meeting_for' => 'Choose what appears in the Meeting for dropdown on Search Student and enquiry forms — e.g. Enquiry, Admission, Marketing. Reorder, rename, add, or hide options here.',
