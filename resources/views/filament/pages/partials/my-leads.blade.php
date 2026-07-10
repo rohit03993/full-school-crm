@@ -98,6 +98,17 @@
                         </div>
 
                         @if ($student)
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                Assigned by {{ $enquiry->callingAssignedBy?->name ?? 'Staff' }}
+                                @if ($enquiry->calling_assigned_at)
+                                    · {{ $enquiry->calling_assigned_at->format('d M Y, h:i A') }}
+                                @endif
+                            </p>
+                            @if (filled($enquiry->calling_handoff_note))
+                                <p class="mt-1 text-xs leading-relaxed text-gray-600 dark:text-gray-300">
+                                    Handoff: {{ \Illuminate\Support\Str::limit($enquiry->calling_handoff_note, 120) }}
+                                </p>
+                            @endif
                             @include('filament.pages.partials.student-last-call-summary', ['record' => $student, 'compact' => true])
                         @endif
                     </div>

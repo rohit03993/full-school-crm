@@ -37,12 +37,6 @@ class VisitMeetingAssignmentService
             ]);
         }
 
-        if ($this->openForStudent($student)) {
-            throw ValidationException::withMessages([
-                'assign_meeting' => 'This student already has an open meeting assignment. Complete it before assigning again.',
-            ]);
-        }
-
         return DB::transaction(function () use ($student, $enquiry, $assignedTo, $assignedBy, $handoffNotes): VisitMeetingAssignment {
             $assignment = VisitMeetingAssignment::query()->create([
                 'student_id' => $student->id,

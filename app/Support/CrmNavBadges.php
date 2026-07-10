@@ -7,6 +7,7 @@ use App\Models\Admission;
 use App\Models\User;
 use App\Services\FollowUpWorklistService;
 use App\Services\MyLeadsService;
+use App\Services\StudentCaseService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 
@@ -111,5 +112,40 @@ class CrmNavBadges
     public static function flushMiscChargeAdjustmentBadgeCache(): void
     {
         Cache::forget('crm.nav.misc_charge_adjustments_pending');
+    }
+
+    public static function myCasesOpen(?User $staff = null): int
+    {
+        $staff ??= Auth::user();
+
+        if (! $staff) {
+            return 0;
+        }
+
+        return (int) Cache::remember(
+            'crm.nav.my_cases_open.'.$staff->id,
+            self::CACHE_SECONDS,
+            fn (): int => app(StudentCaseService::class)->openCountForAssignee($staff),
+        );
+    }
+
+    public static function allCasesOpen(): int
+    {
+        return (int) Cache::remember(
+            'crm.nav.all_cases_open',
+            self::CACHE_SECONDS,
+            fn (): int => \App\Models\StudentCase::query()
+                ->where('status', \App\Enums\StudentCaseStatus::Open)
+                ->count(),
+        );
+    }
+
+    public static function flushCaseBadgeCache(?int ...$staffUserIds): void
+    {
+        foreach (array_filter($staffUserIds) as $staffUserId) {
+            Cache::forget('crm.nav.my_cases_open.'.$staffUserId);
+        }
+
+        Cache::forget('crm.nav.all_cases_open');
     }
 }

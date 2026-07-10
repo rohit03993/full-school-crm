@@ -102,8 +102,8 @@ class LogCallFormSchema
                 ->required(fn (Get $get): bool => self::requiresFollowUpDate($get))
                 ->visible(fn (Get $get): bool => (bool) $get('call_connected'))
                 ->helperText(fn (Get $get): string => self::requiresFollowUpDate($get)
-                    ? 'Required for this lead status. Suggested time uses 9 AM – 8 PM.'
-                    : 'Optional for this lead status.'),
+                    ? 'Required. The lead appears in the telecaller queue on this date (not before).'
+                    : 'Optional. Pick date and time — the call queue shows this lead on that date.'),
         ];
     }
 

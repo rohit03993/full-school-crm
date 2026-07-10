@@ -36,6 +36,8 @@ use App\Models\FeePenalty;
 use App\Models\Payment;
 use App\Models\Student;
 use App\Models\StudentCall;
+use App\Models\StudentCase;
+use App\Models\User;
 use App\Models\WhatsAppTemplate;
 use App\Services\ActivityAttendanceService;
 use App\Services\AdmissionFeePlanService;
@@ -61,6 +63,7 @@ use App\Services\PaymentService;
 use App\Services\PenaltyCalculationService;
 use App\Services\ReceiptService;
 use App\Services\StorageCleanupService;
+use App\Services\StudentCaseService;
 use App\Services\StudentCounterService;
 use App\Services\StudentUpdateService;
 use App\Services\MetaWhatsAppInboxService;
@@ -115,6 +118,8 @@ class StudentProfilePage extends Page
 
     public bool $callsTabLoaded = false;
 
+    public bool $casesTabLoaded = false;
+
     public bool $messagesTabLoaded = false;
 
     public bool $admissionTabLoaded = false;
@@ -150,15 +155,43 @@ class StudentProfilePage extends Page
      */
     public array $activityRecords = [];
 
-  /**
+    /**
      * @var Collection<int, Visit>
      */
     public Collection $visits;
 
     /**
+     * @var array<int, int>
+     */
+    public array $visitSequenceById = [];
+
+    /**
+     * @var \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    public \Illuminate\Support\Collection $leadTimeline;
+
+    /**
      * @var Collection<int, StudentCall>
      */
     public Collection $calls;
+
+    /**
+     * @var Collection<int, StudentCase>
+     */
+    public Collection $cases;
+
+    public ?int $expandedCaseId = null;
+
+    public string $caseTransferNote = '';
+
+    public ?int $caseTransferAssigneeId = null;
+
+    public string $caseClosingNote = '';
+
+    /**
+     * @var array<int, array<string, mixed>>
+     */
+    public array $openCaseBanners = [];
 
     /**
      * @var array<int, array{key: string, source: string, direction: string, body: string, status: string, statusLabel: string, at: ?string, at_label: ?string, templateName: ?string, provider: ?string}>
@@ -283,7 +316,10 @@ class StudentProfilePage extends Page
         ]);
 
         $this->visits = new Collection;
+        $this->leadTimeline = collect();
         $this->calls = new Collection;
+        $this->cases = new Collection;
+        $this->openCaseBanners = [];
         $this->messageThread = [];
         $this->homeworkAssignments = new Collection;
         $this->documents = new Collection;
@@ -309,6 +345,17 @@ class StudentProfilePage extends Page
             }
 
             $this->updatedProfileTab();
+        }
+
+        $caseId = request()->query('case');
+
+        if (is_numeric($caseId)) {
+            $this->expandedCaseId = (int) $caseId;
+
+            if (in_array('cases', $this->validProfileTabs(), true)) {
+                $this->profileTab = 'cases';
+                $this->loadCasesTab();
+            }
         }
 
         if (! in_array($this->profileTab, $this->validProfileTabs(), true)) {
@@ -363,6 +410,7 @@ class StudentProfilePage extends Page
         match ($this->profileTab) {
             'visits' => $this->loadVisitsTab(),
             'calls' => $this->loadCallsTab(),
+            'cases' => $this->loadCasesTab(),
             'messages' => $this->loadMessagesTab(),
             'documents' => $this->loadDocumentsTab(),
             'fees' => $this->loadFeesTab(),
@@ -386,6 +434,10 @@ class StudentProfilePage extends Page
 
         if ($this->licensed(LicenseFeature::Calls)) {
             $tabs[] = 'calls';
+        }
+
+        if ($this->record->activeEnrollment !== null && $this->userCan(CrmPermission::CasesView)) {
+            $tabs[] = 'cases';
         }
 
         if ($this->licensed(LicenseFeature::WhatsApp)) {
@@ -463,6 +515,8 @@ class StudentProfilePage extends Page
                 ->profileCallingAssignment($this->record, Auth::user());
             $this->cachedProfileSummary['meeting_assignment'] = app(VisitMeetingAssignmentService::class)
                 ->profileMeetingAssignment($this->record, Auth::user());
+            $this->cachedProfileSummary['open_cases'] = app(StudentCaseService::class)
+                ->overviewBanners($this->record);
         }
 
         return $this->cachedProfileSummary;
@@ -492,12 +546,113 @@ class StudentProfilePage extends Page
         }
 
         $this->visitsTabLoaded = true;
+
+        $timelineService = app(\App\Services\LeadTimelineService::class);
+
+        $this->visitSequenceById = $timelineService->visitSequenceMap($this->record);
+        $this->leadTimeline = $timelineService->forStudent($this->record);
         $this->visits = $this->record->visits()
             ->with(['staff', 'enquiry.course'])
             ->orderByDesc('visit_date')
             ->orderByDesc('id')
             ->limit(CrmPagination::PER_PAGE)
             ->get();
+    }
+
+    public function loadCasesTab(): void
+    {
+        if ($this->casesTabLoaded) {
+            return;
+        }
+
+        $this->casesTabLoaded = true;
+
+        $this->cases = app(StudentCaseService::class)->forStudent($this->record);
+        $this->openCaseBanners = app(StudentCaseService::class)->overviewBanners($this->record);
+    }
+
+    public function toggleCase(int $caseId): void
+    {
+        $this->expandedCaseId = $this->expandedCaseId === $caseId ? null : $caseId;
+        $this->caseTransferNote = '';
+        $this->caseTransferAssigneeId = null;
+        $this->caseClosingNote = '';
+    }
+
+    public function submitCaseTransfer(int $caseId, StudentCaseService $cases): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+        $assignee = User::query()->findOrFail((int) $this->caseTransferAssigneeId);
+
+        try {
+            $cases->transfer($case, $assignee, Auth::user(), $this->caseTransferNote);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not transfer case')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Please check the form.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->invalidateCasesTab();
+        $this->expandedCaseId = $caseId;
+
+        Notification::make()
+            ->title('Case transferred')
+            ->body("Assigned to {$assignee->name}.")
+            ->success()
+            ->send();
+    }
+
+    public function submitCaseClose(int $caseId, StudentCaseService $cases): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+
+        try {
+            $cases->close($case, Auth::user(), $this->caseClosingNote);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not close case')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Please check the form.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->invalidateCasesTab();
+        $this->expandedCaseId = null;
+
+        Notification::make()
+            ->title('Case closed')
+            ->success()
+            ->send();
+    }
+
+    public function openLogCallForCase(int $caseId): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+
+        if (! $case->isOpen()) {
+            Notification::make()
+                ->title('Case is closed')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->logCallStudentCaseId = $case->id;
+        $this->openLogCallModal();
+    }
+
+    protected function invalidateCasesTab(): void
+    {
+        $this->casesTabLoaded = false;
+        $this->cachedProfileSummary = null;
+        $this->loadCasesTab();
     }
 
     public function loadCallsTab(): void
@@ -2410,7 +2565,10 @@ class StudentProfilePage extends Page
     {
         $this->refreshRecord();
         $this->visitsTabLoaded = false;
+        $this->casesTabLoaded = false;
+        $this->cachedProfileSummary = null;
         $this->loadVisitsTab();
+        $this->loadCasesTab();
     }
 
     public function submitLogCall(CallLogService $callLog): void
@@ -2424,9 +2582,12 @@ class StudentProfilePage extends Page
         $this->refreshRecord();
         $this->callsTabLoaded = false;
         $this->visitsTabLoaded = false;
+        $this->casesTabLoaded = false;
+        $this->cachedProfileSummary = null;
         $this->loadCallsTab();
         $this->loadVisitsTab();
-        $this->profileTab = 'calls';
+        $this->loadCasesTab();
+        $this->profileTab = $this->logCallStudentCaseId ? 'cases' : 'calls';
 
         Notification::make()
             ->title('Call logged')
@@ -2444,14 +2605,22 @@ class StudentProfilePage extends Page
                     'isEnrolledStudent' => $this->record->activeEnrollment !== null,
                     'campusOutcomeOptions' => $this->closeMeetingCampusOutcomeOptions(),
                     'visitStatusOptions' => $this->closeMeetingVisitStatusOptions(),
+                    'callingStaffOptions' => $this->closeMeetingCallingStaffOptions(),
+                    'closeMeetingStatus' => $this->closeMeetingStatus,
+                    'closeMeetingCallingMode' => $this->closeMeetingCallingMode,
+                    'closeMeetingResolutionMode' => $this->closeMeetingResolutionMode,
+                    'caseTypeOptions' => $this->closeMeetingCaseTypeOptions(),
                 ]),
             View::make('filament.pages.partials.log-call-modal')
                 ->viewData(fn (): array => [
                     'showLogCallModal' => $this->showLogCallModal,
                     'logCallForm' => $this->logCallForm,
-                    'logCallModalMode' => 'profile',
+                    'logCallModalMode' => $this->logCallStudentCaseId ? 'case' : 'profile',
                     'logCallLeadName' => $this->record->name,
                     'logCallLeadPhone' => $this->record->mobile,
+                    'logCallCaseNumber' => $this->logCallStudentCaseId
+                        ? StudentCase::query()->find($this->logCallStudentCaseId)?->case_number
+                        : null,
                 ]),
             View::make('filament.pages.partials.student-id-card-preview-modal')
                 ->viewData(fn (): array => [
@@ -2485,6 +2654,9 @@ class StudentProfilePage extends Page
                                 ->viewData(fn (): array => [
                                     'visitsTabLoaded' => $this->visitsTabLoaded,
                                     'visits' => $this->visits,
+                                    'visitSequenceById' => $this->visitSequenceById,
+                                    'leadTimeline' => $this->leadTimeline,
+                                    'record' => $this->record,
                                 ]),
                         ]),
                     'calls' => Tab::make('Calls')
@@ -2495,6 +2667,27 @@ class StudentProfilePage extends Page
                                 ->viewData(fn (): array => [
                                     'callsTabLoaded' => $this->callsTabLoaded,
                                     'calls' => $this->calls,
+                                ]),
+                        ]),
+                    'cases' => Tab::make('Cases')
+                        ->icon('heroicon-o-briefcase')
+                        ->badge(fn (): ?string => $this->record->activeEnrollment && $this->userCan(CrmPermission::CasesView)
+                            ? (string) app(StudentCaseService::class)->openCountForStudent($this->record) ?: null
+                            : null)
+                        ->visible(fn (): bool => $this->record->activeEnrollment !== null
+                            && $this->userCan(CrmPermission::CasesView))
+                        ->schema([
+                            View::make('filament.pages.partials.student-profile-cases')
+                                ->viewData(fn (): array => [
+                                    'casesTabLoaded' => $this->casesTabLoaded,
+                                    'cases' => $this->cases,
+                                    'expandedCaseId' => $this->expandedCaseId,
+                                    'caseTransferNote' => $this->caseTransferNote,
+                                    'caseTransferAssigneeId' => $this->caseTransferAssigneeId,
+                                    'caseClosingNote' => $this->caseClosingNote,
+                                    'staffOptions' => StudentCaseService::activeStaffOptions(),
+                                    'caseService' => app(StudentCaseService::class),
+                                    'viewer' => Auth::user(),
                                 ]),
                         ]),
                     'messages' => Tab::make('Messages')

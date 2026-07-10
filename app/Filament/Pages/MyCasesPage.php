@@ -3,17 +3,13 @@
 namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
-use App\Enums\LicenseFeature;
-use App\Enums\RoleName;
+use App\Enums\CampusVisitPurpose;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavBadges;
 use App\Support\CrmPagination;
-use App\Services\MyLeadsService;
 use App\Services\StudentCaseService;
-use App\Services\VisitMeetingAssignmentService;
-use App\Support\FeatureGate;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -22,54 +18,51 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\WithPagination;
 use UnitEnum;
 
-class MyMeetingsPage extends Page
+class MyCasesPage extends Page
 {
     use WithPagination;
 
-    protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentList;
+    protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBriefcase;
 
     protected static ?string $navigationLabel = null;
 
     protected static ?string $title = null;
 
-    protected static ?int $navigationSort = -199;
+    protected static ?int $navigationSort = -198;
+
+    protected static string|UnitEnum|null $navigationGroup = null;
 
     public static function getNavigationLabel(): string
     {
-        return CrmMenuLabels::myMeetings();
+        return CrmMenuLabels::myCases();
     }
 
     public function getTitle(): string
     {
-        return CrmMenuLabels::myMeetings();
+        return CrmMenuLabels::myCases();
     }
-
-    protected static string|UnitEnum|null $navigationGroup = null;
 
     public function getSubheading(): ?string
     {
-        return CrmHint::text('assigned.to.me');
+        return CrmHint::text('cases.my');
     }
 
     public static function canAccess(): bool
     {
-        if (! FeatureGate::enabled(LicenseFeature::Enquiries)) {
-            return false;
-        }
-
         $user = Auth::user();
 
         if (! $user || ! $user->is_active) {
             return false;
         }
 
-        return CrmAccess::can($user, CrmPermission::LeadsCall)
-            || $user->hasRole(RoleName::Staff->value);
+        return CrmAccess::can($user, CrmPermission::CasesView);
     }
 
     public string $search = '';
 
     public string $statusFilter = 'open';
+
+    public string $caseTypeFilter = '';
 
     public int $perPage = CrmPagination::PER_PAGE;
 
@@ -78,25 +71,9 @@ class MyMeetingsPage extends Page
      */
     public array $stats = [];
 
-    /**
-     * @var array{total: int, uncalled: int, called: int, due_call_followups: int}
-     */
-    public array $callStats = [];
-
-    /**
-     * @var array{open: int, closed: int, total: int}
-     */
-    public array $caseStats = [];
-
     public function mount(): void
     {
-        $staff = Auth::user();
-
-        if ($staff) {
-            $this->stats = app(VisitMeetingAssignmentService::class)->statsForStaff($staff);
-            $this->callStats = app(MyLeadsService::class)->stats($staff);
-            $this->caseStats = app(StudentCaseService::class)->statsForAssignee($staff);
-        }
+        $this->refreshStats();
     }
 
     public function updatedSearch(): void
@@ -111,14 +88,17 @@ class MyMeetingsPage extends Page
         $this->refreshStats();
     }
 
+    public function updatedCaseTypeFilter(): void
+    {
+        $this->resetPage();
+    }
+
     protected function refreshStats(): void
     {
         $staff = Auth::user();
 
         if ($staff) {
-            $this->stats = app(VisitMeetingAssignmentService::class)->statsForStaff($staff);
-            $this->callStats = app(MyLeadsService::class)->stats($staff);
-            $this->caseStats = app(StudentCaseService::class)->statsForAssignee($staff);
+            $this->stats = app(StudentCaseService::class)->statsForAssignee($staff);
         }
     }
 
@@ -135,11 +115,9 @@ class MyMeetingsPage extends Page
             return null;
         }
 
-        $pending = CrmNavBadges::myMeetingsOpen($staff)
-            + CrmNavBadges::myLeadsUncalled($staff)
-            + CrmNavBadges::myCasesOpen($staff);
+        $open = CrmNavBadges::myCasesOpen($staff);
 
-        return $pending > 0 ? (string) $pending : null;
+        return $open > 0 ? (string) $open : null;
     }
 
     public static function getNavigationBadgeColor(): string|array|null
@@ -152,21 +130,22 @@ class MyMeetingsPage extends Page
         $staff = Auth::user();
 
         return $schema->components([
-            View::make('filament.pages.partials.my-meetings')
+            View::make('filament.pages.partials.my-cases')
                 ->viewData(fn (): array => [
-                    'meetings' => $staff
-                        ? app(VisitMeetingAssignmentService::class)->paginateForStaff(
+                    'cases' => $staff
+                        ? app(StudentCaseService::class)->paginateForAssignee(
                             $staff,
                             $this->statusFilter,
                             $this->search,
+                            $this->caseTypeFilter ?: null,
                             page: $this->getPage(),
                         )
                         : null,
                     'search' => $this->search,
                     'statusFilter' => $this->statusFilter,
+                    'caseTypeFilter' => $this->caseTypeFilter,
+                    'caseTypeOptions' => CampusVisitPurpose::options(),
                     'stats' => $this->stats,
-                    'callStats' => $this->callStats,
-                    'caseStats' => $this->caseStats,
                 ]),
         ]);
     }

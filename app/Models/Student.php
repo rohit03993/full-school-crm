@@ -117,6 +117,11 @@ class Student extends Model
         return $this->hasMany(Visit::class);
     }
 
+    public function studentCases(): HasMany
+    {
+        return $this->hasMany(StudentCase::class);
+    }
+
     public function enquiry(): HasOne
     {
         return $this->hasOne(Enquiry::class);

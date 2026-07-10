@@ -25,22 +25,124 @@
 
                 @if ($isEnrolledStudent ?? false)
                     <div>
-                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Meeting outcome</label>
-                        <x-crm.select wire:model="closeMeetingCampusOutcome" class="mt-2" required>
-                            @foreach ($campusOutcomeOptions as $value => $label)
-                                <option value="{{ $value }}">{{ $label }}</option>
-                            @endforeach
-                        </x-crm.select>
+                        <p class="text-sm font-semibold text-gray-950 dark:text-white">How was this visit resolved?</p>
+                        <div class="mt-3 space-y-2">
+                            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <input type="radio" wire:model.live="closeMeetingResolutionMode" value="resolved" class="border-gray-300">
+                                Resolved on spot (no case)
+                            </label>
+                            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <input type="radio" wire:model.live="closeMeetingResolutionMode" value="open_case" class="border-gray-300">
+                                Open a case &amp; assign for follow-up
+                            </label>
+                        </div>
                     </div>
+
+                    @if (($closeMeetingResolutionMode ?? 'resolved') === 'resolved')
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Meeting outcome</label>
+                            <x-crm.select wire:model="closeMeetingCampusOutcome" class="mt-2" required>
+                                @foreach ($campusOutcomeOptions as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </x-crm.select>
+                        </div>
+                    @else
+                        <div class="rounded-xl border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-500/20 dark:bg-primary-500/5">
+                            <p class="text-sm font-semibold text-gray-950 dark:text-white">Case details</p>
+                            <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">The visit is recorded and a traceable case is opened for the assigned staff member.</p>
+
+                            <div class="mt-3">
+                                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Case type</label>
+                                <x-crm.select wire:model="closeMeetingCaseType" class="mt-2" required>
+                                    @foreach ($caseTypeOptions as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </x-crm.select>
+                            </div>
+                            <div class="mt-3">
+                                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Case title</label>
+                                <input
+                                    type="text"
+                                    wire:model="closeMeetingCaseTitle"
+                                    class="fi-crm-input mt-2 block w-full"
+                                    placeholder="Short summary (optional — defaults from meeting notes)"
+                                >
+                            </div>
+                            <div class="mt-3">
+                                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Assign to <span class="text-danger-600">*</span></label>
+                                <x-crm.select wire:model="closeMeetingCaseAssigneeId" class="mt-2" required>
+                                    <option value="">Select staff…</option>
+                                    @foreach ($callingStaffOptions as $id => $name)
+                                        <option value="{{ $id }}">{{ $name }}</option>
+                                    @endforeach
+                                </x-crm.select>
+                            </div>
+                            <div class="mt-3">
+                                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Handoff note <span class="text-danger-600">*</span></label>
+                                <textarea
+                                    wire:model="closeMeetingCaseHandoffNote"
+                                    rows="2"
+                                    required
+                                    class="fi-crm-input mt-2 block w-full"
+                                    placeholder="What should the assignee do next?"
+                                ></textarea>
+                            </div>
+                        </div>
+                    @endif
                 @else
                     <div>
                         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Lead status</label>
-                        <x-crm.select wire:model="closeMeetingStatus" class="mt-2" required>
+                        <x-crm.select wire:model.live="closeMeetingStatus" class="mt-2" required>
                             @foreach ($visitStatusOptions as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
                         </x-crm.select>
                     </div>
+
+                    @if (! in_array($closeMeetingStatus ?? '', ['not_interested', 'joined'], true))
+                        <div class="rounded-xl border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-500/20 dark:bg-primary-500/5">
+                            <p class="text-sm font-semibold text-gray-950 dark:text-white">Next step — calling</p>
+                            <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">Assign follow-up calls after this meeting. The lead appears in the telecaller queue on the follow-up date.</p>
+
+                            <div class="mt-3 space-y-2">
+                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                    <input type="radio" wire:model.live="closeMeetingCallingMode" value="self" class="border-gray-300">
+                                    I will call this lead
+                                </label>
+                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                    <input type="radio" wire:model.live="closeMeetingCallingMode" value="staff" class="border-gray-300">
+                                    Assign to telecaller / staff
+                                </label>
+                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                    <input type="radio" wire:model.live="closeMeetingCallingMode" value="none" class="border-gray-300">
+                                    Do not assign for calling yet
+                                </label>
+                            </div>
+
+                            @if (($closeMeetingCallingMode ?? 'self') === 'staff')
+                                <div class="mt-3">
+                                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Assign to</label>
+                                    <x-crm.select wire:model="closeMeetingCallingStaffId" class="mt-2" required>
+                                        <option value="">Select staff…</option>
+                                        @foreach ($callingStaffOptions as $id => $name)
+                                            <option value="{{ $id }}">{{ $name }}</option>
+                                        @endforeach
+                                    </x-crm.select>
+                                </div>
+                                <div class="mt-3">
+                                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Handoff note for telecaller <span class="text-danger-600">*</span></label>
+                                    <textarea
+                                        wire:model="closeMeetingCallingHandoffNote"
+                                        rows="2"
+                                        required
+                                        class="fi-crm-input mt-2 block w-full"
+                                        placeholder="What should the telecaller discuss on the call?"
+                                    ></textarea>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
                 @endif
 
                 <div class="flex flex-col-reverse gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end dark:border-white/10">

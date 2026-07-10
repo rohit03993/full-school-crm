@@ -7,6 +7,8 @@
 @endphp
 
 <div class="space-y-4 lg:space-y-5">
+    @include('filament.pages.partials.student-open-cases-banner', ['profile' => $profile])
+
     @if ($admission)
         <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
             <div class="border-b border-gray-100 px-4 py-3.5 sm:px-6 dark:border-white/10">

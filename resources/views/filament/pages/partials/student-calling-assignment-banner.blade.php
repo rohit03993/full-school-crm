@@ -14,8 +14,16 @@
                 {{ $callingAssignment['staff_name'] }}
             @endif
             <span class="font-normal text-gray-500 dark:text-gray-400">
-                · {{ $callingAssignment['assigned_at']?->format('d M Y') }}
+                · {{ $callingAssignment['assigned_at']?->format('d M Y, h:i A') }}
             </span>
         </p>
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">
+            Assigned by {{ $callingAssignment['assigned_by_name'] ?? 'Staff' }}
+        </p>
+        @if (! empty($callingAssignment['handoff_note']))
+            <p class="mt-1 text-xs leading-relaxed text-gray-600 dark:text-gray-300">
+                Handoff: {{ $callingAssignment['handoff_note'] }}
+            </p>
+        @endif
     </div>
 @endif

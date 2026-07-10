@@ -10,6 +10,7 @@ enum NumberSequenceType: string
     case Admission = 'admission';
     case Enrollment = 'enrollment';
     case Receipt = 'receipt';
+    case StudentCase = 'student_case';
 
     public function prefix(): string
     {
@@ -20,6 +21,7 @@ enum NumberSequenceType: string
             self::Admission => "{$base}-ADM",
             self::Enrollment => $base,
             self::Receipt => 'REC',
+            self::StudentCase => "{$base}-CASE",
         };
     }
 }

@@ -71,6 +71,11 @@ class CallQueuePage extends Page
      */
     public ?array $currentLead = null;
 
+    /**
+     * @var array<int, array<string, mixed>>
+     */
+    public array $scheduledLeads = [];
+
     public function mount(CallQueueService $queue): void
     {
         $this->refreshQueue($queue);
@@ -86,7 +91,7 @@ class CallQueuePage extends Page
         $staff = Auth::user();
         $this->stats = $queue->todayStats($staff);
 
-        $students = $queue->todayQueue($staff);
+        $students = $queue->dueQueue($staff);
         $current = $this->currentStudentId
             ? $students->firstWhere('id', $this->currentStudentId)
             : $students->first();
@@ -97,11 +102,15 @@ class CallQueuePage extends Page
 
         $this->currentStudentId = $current?->id;
         $this->currentLead = $current ? $queue->leadPayload($current) : null;
+        $this->scheduledLeads = $queue->scheduledQueue($staff, 15)
+            ->map(fn (Student $student): array => $queue->leadPayload($student))
+            ->values()
+            ->all();
     }
 
     public function skipLead(CallQueueService $queue): void
     {
-        $students = $queue->todayQueue(Auth::user());
+        $students = $queue->dueQueue(Auth::user());
         $foundCurrent = false;
 
         foreach ($students as $student) {
@@ -160,6 +169,7 @@ class CallQueuePage extends Page
                 ->viewData(fn (): array => [
                     'stats' => $this->stats,
                     'currentLead' => $this->currentLead,
+                    'scheduledLeads' => collect($this->scheduledLeads),
                     'showLogCallModal' => $this->showLogCallModal,
                     'logCallForm' => $this->logCallForm,
                     'logCallModalMode' => 'queue',

@@ -27,7 +27,11 @@
             </span>
         @elseif ($record->next_call_followup_at?->isToday())
             <span class="ml-1 inline-flex rounded-md bg-warning-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-warning-700 dark:text-warning-400">
-                Callback today
+                Callback today · {{ $record->next_call_followup_at->format('h:i A') }}
+            </span>
+        @elseif ($record->next_call_followup_at && $record->next_call_followup_at->toDateString() > today()->toDateString())
+            <span class="ml-1 inline-flex rounded-md bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-sky-700 dark:text-sky-300">
+                Scheduled {{ $record->next_call_followup_at->format('d M Y, h:i A') }}
             </span>
         @endif
     </div>

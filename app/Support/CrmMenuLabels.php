@@ -68,6 +68,16 @@ final class CrmMenuLabels
         return 'My call list';
     }
 
+    public static function myCases(): string
+    {
+        return 'My cases';
+    }
+
+    public static function allCases(): string
+    {
+        return 'All cases';
+    }
+
     // —— Calls ——
     public static function callQueue(): string
     {

@@ -10,6 +10,7 @@ use App\Enums\VisitStatus;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\Visit;
+use App\Models\VisitMeetingAssignment;
 use App\Services\EnquiryService;
 use App\Services\VisitMeetingAssignmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -101,25 +102,33 @@ class VisitMeetingAssignmentTest extends TestCase
         );
     }
 
-    public function test_only_one_open_assignment_per_student(): void
+    public function test_repeat_open_assignments_are_allowed_for_follow_up_visits(): void
     {
         $reception = $this->createStaffUser('Reception');
         $counsellor = $this->createStaffUser('Counsellor');
 
         $enquiry = app(EnquiryService::class)->create([
-            'name' => 'Duplicate Test',
+            'name' => 'Repeat Visit Test',
             'mobile' => '9000000303',
             'discussion_summary' => 'Walk-in',
             'visit_status' => VisitStatus::Interested->value,
         ], $reception, LeadSource::WalkIn);
 
         $student = $enquiry->student;
+        $service = app(VisitMeetingAssignmentService::class);
 
-        app(VisitMeetingAssignmentService::class)->assign($student, $enquiry, $counsellor, $reception, 'First');
+        $first = $service->assign($student, $enquiry, $counsellor, $reception, 'First visit');
+        $second = $service->assign($student, $enquiry, $counsellor, $reception, 'Second visit while calling pending');
 
-        $this->expectException(\Illuminate\Validation\ValidationException::class);
-
-        app(VisitMeetingAssignmentService::class)->assign($student, $enquiry, $counsellor, $reception, 'Second');
+        $this->assertNotSame($first->id, $second->id);
+        $this->assertSame(VisitMeetingAssignmentStatus::Open, $second->status);
+        $this->assertSame(
+            2,
+            VisitMeetingAssignment::query()
+                ->where('student_id', $student->id)
+                ->where('status', VisitMeetingAssignmentStatus::Open)
+                ->count()
+        );
     }
 
     public function test_profile_banner_visible_to_assignee_and_assigner(): void

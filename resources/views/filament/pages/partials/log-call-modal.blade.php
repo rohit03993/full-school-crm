@@ -21,6 +21,11 @@
                                 @endif
                             </p>
                         @endif
+                        @if (($logCallModalMode ?? null) === 'case' && filled($logCallCaseNumber ?? null))
+                            <p class="mt-1 text-xs font-semibold text-primary-700 dark:text-primary-300">
+                                Logging call on case {{ $logCallCaseNumber }}
+                            </p>
+                        @endif
                     </div>
                     <button type="button" wire:click="closeLogCallModal" class="shrink-0 text-sm font-semibold text-gray-500">Close</button>
                 </div>
@@ -61,6 +66,7 @@
                             @endforeach
                         </x-crm.select>
                     </div>
+                    @if (($logCallModalMode ?? null) !== 'case')
                     <div>
                         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Lead status after call</label>
                         <x-crm.select wire:model.live="logCallForm.visit_status" class="mt-2" required>
@@ -70,6 +76,7 @@
                             @endforeach
                         </x-crm.select>
                     </div>
+                    @endif
                 @endif
 
                 <div>
@@ -100,18 +107,23 @@
                 @endif
 
                 @php
-                    $requiresFollowUp = ($logCallForm['call_connected'] ?? true)
+                    $requiresFollowUp = ($logCallModalMode ?? null) !== 'case'
+                        && ($logCallForm['call_connected'] ?? true)
                         && in_array($logCallForm['visit_status'] ?? '', ['interested', 'follow_up_required', 'admission_ready'], true);
                 @endphp
+                @if (($logCallModalMode ?? null) !== 'case')
                 <div>
                     <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                         Next follow-up @if ($requiresFollowUp) <span class="text-danger-600">*</span> @endif
                     </label>
                     <input type="datetime-local" wire:model="logCallForm.next_followup_at" class="mt-1 w-full rounded-lg border-gray-300 text-sm dark:border-white/10 dark:bg-gray-800" @if ($requiresFollowUp) required @endif>
                     @if ($requiresFollowUp)
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Required when lead status is Interested, Follow-up Required, or Admission Ready.</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Required. The lead appears in the telecaller queue on this date (not before).</p>
+                    @else
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Optional. Pick date and time — the call queue shows this lead on that date.</p>
                     @endif
                 </div>
+                @endif
 
                 <div class="flex gap-2 pt-2">
                     <button type="button" wire:click="closeLogCallModal" class="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 dark:border-white/10 dark:text-gray-300">

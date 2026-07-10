@@ -15,6 +15,7 @@ class StudentCall extends Model
     protected $fillable = [
         'student_id',
         'enquiry_id',
+        'student_case_id',
         'user_id',
         'call_status',
         'call_direction',
@@ -51,6 +52,11 @@ class StudentCall extends Model
     public function enquiry(): BelongsTo
     {
         return $this->belongsTo(Enquiry::class);
+    }
+
+    public function studentCase(): BelongsTo
+    {
+        return $this->belongsTo(StudentCase::class);
     }
 
     public function staff(): BelongsTo

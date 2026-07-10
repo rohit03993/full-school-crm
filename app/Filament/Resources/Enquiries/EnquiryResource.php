@@ -24,6 +24,7 @@ use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
@@ -236,10 +237,19 @@ class EnquiryResource extends Resource
                                 ->searchable()
                                 ->required()
                                 ->native(false),
+                            Textarea::make('calling_handoff_note')
+                                ->label('Handoff note')
+                                ->rows(3)
+                                ->helperText('Required when reassigning leads that are already assigned for calling.'),
                         ])
                         ->action(function (Collection $records, array $data, LeadAssignmentService $assignments): void {
                             $staff = User::query()->findOrFail($data['staff_user_id']);
-                            $count = $assignments->assignManyForCalling($records, $staff, Auth::user());
+                            $count = $assignments->assignManyForCalling(
+                                $records,
+                                $staff,
+                                Auth::user(),
+                                $data['calling_handoff_note'] ?? null,
+                            );
 
                             Notification::make()
                                 ->title('Leads assigned')
@@ -281,10 +291,19 @@ class EnquiryResource extends Resource
                             ->searchable()
                             ->required()
                             ->native(false),
+                        Textarea::make('calling_handoff_note')
+                            ->label('Handoff note')
+                            ->rows(3)
+                            ->helperText('Required when reassigning to another staff member.'),
                     ])
                     ->action(function (Enquiry $record, array $data, LeadAssignmentService $assignments): void {
                         $staff = User::query()->findOrFail($data['staff_user_id']);
-                        $assignments->assignForCalling($record, $staff, Auth::user());
+                        $assignments->assignForCalling(
+                            $record,
+                            $staff,
+                            Auth::user(),
+                            $data['calling_handoff_note'] ?? null,
+                        );
                     }),
                 Action::make('clearCallingAssignment')
                     ->label('Unassign')

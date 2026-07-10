@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use App\Filament\Pages\AttendancePage;
 use App\Filament\Pages\CallQueuePage;
 use App\Filament\Pages\FollowUpsPage;
+use App\Filament\Pages\MyCasesPage;
 use App\Filament\Pages\MyLeadsPage;
 use App\Filament\Pages\ReportsPage;
 use App\Filament\Pages\StudentSearchPage;
@@ -13,6 +14,8 @@ use App\Filament\Resources\Enquiries\EnquiryResource;
 use App\Enums\RoleName;
 use App\Enums\LicenseFeature;
 use App\Services\CrmDashboardService;
+use App\Enums\CrmPermission;
+use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Support\InstituteSettings;
 use Filament\Widgets\Widget;
@@ -99,6 +102,16 @@ class DashboardHeroWidget extends Widget
                 'feature' => LicenseFeature::Enquiries,
             ],
         ];
+
+        if ($user && CrmAccess::can($user, CrmPermission::CasesView)) {
+            $staffActions[] = [
+                'label' => 'My cases',
+                'description' => 'Enrolled student support cases',
+                'icon' => 'heroicon-o-briefcase',
+                'url' => MyCasesPage::getUrl(),
+                'feature' => null,
+            ];
+        }
 
         $filterActions = fn (array $actions): array => array_values(array_filter(
             $actions,

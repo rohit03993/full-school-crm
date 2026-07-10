@@ -14,6 +14,12 @@ enum CrmPermission: string
     case LeadsReassign = 'crm.leads.reassign';
     case VisitsViewAll = 'crm.visits.view_all';
 
+    case CasesView = 'crm.cases.view';
+    case CasesOpen = 'crm.cases.open';
+    case CasesAssign = 'crm.cases.assign';
+    case CasesClose = 'crm.cases.close';
+    case CasesViewAll = 'crm.cases.view_all';
+
     case StudentsView = 'crm.students.view';
     case StudentsEdit = 'crm.students.edit';
     case StudentsImport = 'crm.students.import';
@@ -52,6 +58,11 @@ enum CrmPermission: string
             self::LeadsCall => 'Call queue & log calls',
             self::LeadsReassign => 'Reassign leads',
             self::VisitsViewAll => 'View all campus visits',
+            self::CasesView => 'View student cases',
+            self::CasesOpen => 'Open student cases',
+            self::CasesAssign => 'Assign or transfer cases',
+            self::CasesClose => 'Close assigned cases',
+            self::CasesViewAll => 'View all student cases',
             self::StudentsView => 'View students',
             self::StudentsEdit => 'Edit student details',
             self::StudentsImport => 'Import students',

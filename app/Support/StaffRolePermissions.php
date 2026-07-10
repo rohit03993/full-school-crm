@@ -20,6 +20,10 @@ class StaffRolePermissions
                 CrmPermission::LeadsViewAssigned,
                 CrmPermission::LeadsCall,
                 CrmPermission::StudentsView,
+                CrmPermission::CasesView,
+                CrmPermission::CasesOpen,
+                CrmPermission::CasesAssign,
+                CrmPermission::CasesClose,
             ],
             StaffJobRole::AdmissionOfficer->value => [
                 CrmPermission::DashboardCallingStats,
@@ -33,6 +37,11 @@ class StaffRolePermissions
                 CrmPermission::StudentsImport,
                 CrmPermission::AdmissionsView,
                 CrmPermission::AdmissionsApprove,
+                CrmPermission::CasesView,
+                CrmPermission::CasesOpen,
+                CrmPermission::CasesAssign,
+                CrmPermission::CasesClose,
+                CrmPermission::CasesViewAll,
             ],
             StaffJobRole::Accountant->value => [
                 CrmPermission::DashboardFinanceStats,
@@ -40,6 +49,9 @@ class StaffRolePermissions
                 CrmPermission::AdmissionsView,
                 CrmPermission::FeesCollect,
                 CrmPermission::ReportsView,
+                CrmPermission::CasesView,
+                CrmPermission::CasesAssign,
+                CrmPermission::CasesClose,
             ],
             StaffJobRole::AcademicCoordinator->value => [
                 CrmPermission::StudentsView,

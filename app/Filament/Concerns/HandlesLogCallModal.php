@@ -16,6 +16,8 @@ trait HandlesLogCallModal
 {
     public bool $showLogCallModal = false;
 
+    public ?int $logCallStudentCaseId = null;
+
     /**
      * @var array<string, mixed>
      */
@@ -87,6 +89,7 @@ trait HandlesLogCallModal
 
     protected function resetLogCallForm(): void
     {
+        $this->logCallStudentCaseId = null;
         $this->logCallForm = [
             'call_direction' => 'outgoing',
             'call_connected' => true,
@@ -112,7 +115,12 @@ trait HandlesLogCallModal
         }
 
         try {
-            $callLog->log($student, Auth::user(), $this->logCallForm);
+            if ($this->logCallStudentCaseId) {
+                $case = \App\Models\StudentCase::query()->findOrFail($this->logCallStudentCaseId);
+                $callLog->logForCase($case, Auth::user(), $this->logCallForm);
+            } else {
+                $callLog->log($student, Auth::user(), $this->logCallForm);
+            }
         } catch (ValidationException $exception) {
             Notification::make()
                 ->title('Could not log call')

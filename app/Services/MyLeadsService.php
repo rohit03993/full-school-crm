@@ -123,9 +123,14 @@ class MyLeadsService
             'uncalled' => (clone $base)->whereHas('student', fn (Builder $q) => $q->where('total_calls', 0))->count(),
             'called' => (clone $base)->whereHas('student', fn (Builder $q) => $q->where('total_calls', '>', 0))->count(),
             'due_call_followups' => (clone $base)->whereHas('student', function (Builder $q): void {
-                $q->whereNotNull('next_call_followup_at')
-                    ->where('next_call_followup_at', '<=', now())
-                    ->where('is_call_blocked', false);
+                $q->where('is_call_blocked', false)
+                    ->where(function (Builder $inner): void {
+                        $inner->whereDate('next_call_followup_at', '<=', today())
+                            ->orWhere(function (Builder $uncalled): void {
+                                $uncalled->whereNull('next_call_followup_at')
+                                    ->where('total_calls', 0);
+                            });
+                    });
             })->count(),
         ];
     }

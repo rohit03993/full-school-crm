@@ -1,4 +1,5 @@
 @php
+    use App\Filament\Pages\MyCasesPage;
     use App\Filament\Pages\MyLeadsPage;
     use App\Filament\Pages\StudentProfilePage;
 @endphp
@@ -19,6 +20,21 @@
                 </p>
             </div>
             <x-filament::icon icon="heroicon-m-chevron-right" class="h-5 w-5 shrink-0 text-primary-600 dark:text-primary-400" />
+        </a>
+    @endif
+
+    @if (($caseStats['open'] ?? 0) > 0)
+        <a
+            href="{{ MyCasesPage::getUrl() }}"
+            class="flex items-center justify-between gap-3 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 shadow-sm transition hover:border-amber-300 hover:bg-amber-50 dark:border-amber-500/25 dark:bg-amber-500/10"
+        >
+            <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">My cases</p>
+                <p class="mt-0.5 text-sm font-semibold text-gray-950 dark:text-white">
+                    {{ $caseStats['open'] }} open case{{ ($caseStats['open'] ?? 0) === 1 ? '' : 's' }} assigned to you
+                </p>
+            </div>
+            <x-filament::icon icon="heroicon-m-chevron-right" class="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
         </a>
     @endif
 

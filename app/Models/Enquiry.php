@@ -24,6 +24,7 @@ class Enquiry extends Model
         'meeting_with_user_id',
         'calling_assigned_at',
         'calling_assigned_by_user_id',
+        'calling_handoff_note',
         'meeting_for',
         'visit_type',
         'follow_up_reason',
