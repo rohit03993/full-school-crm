@@ -28,6 +28,7 @@ return [
     'exclude_private_prefixes' => [
         'backups',
         'livewire-tmp',
+        '.restore-upload',
         'temp-student-documents',
         'temp-payment-proofs',
         'temp-student-imports',

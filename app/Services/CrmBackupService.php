@@ -202,6 +202,87 @@ class CrmBackupService
         return @unlink($path);
     }
 
+    /**
+     * Peek a backup zip and return validation info without restoring.
+     *
+     * @return array{valid: bool, filename: string, created_at: ?string, app_key_matches: bool, message: string}
+     */
+    public function inspectBackupZip(string $zipPath): array
+    {
+        if (! is_file($zipPath)) {
+            return [
+                'valid' => false,
+                'filename' => basename($zipPath),
+                'created_at' => null,
+                'app_key_matches' => false,
+                'message' => 'Backup file not found.',
+            ];
+        }
+
+        $zip = new ZipArchive;
+
+        if ($zip->open($zipPath) !== true) {
+            return [
+                'valid' => false,
+                'filename' => basename($zipPath),
+                'created_at' => null,
+                'app_key_matches' => false,
+                'message' => 'Could not open zip. Use a school-crm-full-backup-*.zip file.',
+            ];
+        }
+
+        try {
+            $manifestRaw = $zip->getFromName(self::MANIFEST_NAME);
+            $appKeyRaw = $zip->getFromName(self::APP_KEY_NAME);
+            $hasDatabase = $zip->locateName(self::DATABASE_NAME) !== false;
+
+            if ($manifestRaw === false || ! $hasDatabase) {
+                return [
+                    'valid' => false,
+                    'filename' => basename($zipPath),
+                    'created_at' => null,
+                    'app_key_matches' => false,
+                    'message' => 'Invalid backup: missing manifest.json or database.sql.',
+                ];
+            }
+
+            $manifest = json_decode($manifestRaw, true);
+            $formatOk = is_array($manifest) && ($manifest['format'] ?? null) === 'school-crm-full-backup-v1';
+            $backupKey = is_string($appKeyRaw) ? trim($appKeyRaw) : '';
+            $keyMatches = $backupKey !== '' && $backupKey === (string) config('app.key');
+
+            if (! $formatOk) {
+                return [
+                    'valid' => false,
+                    'filename' => basename($zipPath),
+                    'created_at' => is_array($manifest) ? ($manifest['created_at'] ?? null) : null,
+                    'app_key_matches' => $keyMatches,
+                    'message' => 'Unsupported backup format.',
+                ];
+            }
+
+            if (! $keyMatches) {
+                return [
+                    'valid' => true,
+                    'filename' => basename($zipPath),
+                    'created_at' => $manifest['created_at'] ?? null,
+                    'app_key_matches' => false,
+                    'message' => 'APP_KEY in this zip does not match the server .env. Put the key from app-key.txt into .env, then try again.',
+                ];
+            }
+
+            return [
+                'valid' => true,
+                'filename' => basename($zipPath),
+                'created_at' => $manifest['created_at'] ?? null,
+                'app_key_matches' => true,
+                'message' => 'Backup looks valid and ready to restore.',
+            ];
+        } finally {
+            $zip->close();
+        }
+    }
+
     public function backupDirectory(): string
     {
         return (string) config('crm-backup.disk_path', storage_path('app/private/backups'));

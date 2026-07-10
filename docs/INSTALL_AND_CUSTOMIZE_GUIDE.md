@@ -363,7 +363,14 @@ Nightly at **02:15** (server time) the scheduler runs `php artisan crm:backup`. 
 - `storage/app/public` — homework files, website logo/gallery, CRM branding
 - `app-key.txt` — must match `.env` `APP_KEY` on restore
 
-**Super Admin:** Setup → **Backups** — create now, download, delete. Keep a copy off the server (Drive / USB).
+**Super Admin:** Setup → **Backups** — create now, download, connect **Google Drive** for automatic off-site upload, or **upload a zip to restore** (no terminal needed after `.env` is set).
+
+**Google Drive (recommended):**
+
+1. Enable Google Drive API + create a service account (JSON key).
+2. Create a Drive folder and share it with the service account email (Editor).
+3. In Setup → Backups, paste folder ID + JSON, enable, Test connection.
+4. Nightly `crm:backup` then uploads the zip to Drive automatically.
 
 **Manual:**
 
@@ -372,9 +379,11 @@ php artisan crm:backup
 php artisan crm:restore path\to\school-crm-full-backup-….zip --force
 ```
 
-After restore: `php artisan storage:link`, `php artisan crm:publish-assets`, `php artisan cache:clear`, restart queue worker.
+Prefer **Setup → Backups → Restore from uploaded backup** for day-to-day recovery after reinstall.
 
-Retention: last **14** archives (`CRM_BACKUP_RETAIN` in `.env`).
+After restore: `php artisan storage:link`, `php artisan crm:publish-assets`, `php artisan cache:clear`, restart queue worker (UI restore runs link/assets/cache for you).
+
+Retention: last **14** archives (`CRM_BACKUP_RETAIN` in `.env`) on server and on Drive.
 
 ### After deploy — smoke test
 
