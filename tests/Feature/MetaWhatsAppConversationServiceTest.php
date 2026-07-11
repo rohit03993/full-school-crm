@@ -63,6 +63,26 @@ class MetaWhatsAppConversationServiceTest extends TestCase
         $this->assertTrue($conversations->last()->needsReply);
     }
 
+    public function test_includes_unknown_numbers_without_student(): void
+    {
+        MetaWhatsAppMessage::query()->create([
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919999888877',
+            'student_id' => null,
+            'body_preview' => 'Hello from unknown contact',
+            'status' => 'received',
+            'status_at' => now(),
+        ]);
+
+        $conversations = app(MetaWhatsAppConversationService::class)->recentConversations();
+
+        $this->assertCount(1, $conversations);
+        $this->assertNull($conversations->first()->studentId);
+        $this->assertSame('Unknown contact', $conversations->first()->studentName);
+        $this->assertFalse($conversations->first()->isLinked);
+        $this->assertSame('Hello from unknown contact', $conversations->first()->preview);
+    }
+
     public function test_search_filters_conversations(): void
     {
         $student = Student::query()->create([

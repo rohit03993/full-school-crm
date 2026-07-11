@@ -70,11 +70,22 @@ class StudentWhatsAppThreadService
 
     public function sessionOpenForStudent(Student $student): bool
     {
+        $phone = $this->normalizePhone((string) $student->mobile);
+
+        if ($phone === '') {
+            return false;
+        }
+
+        return $this->sessionOpenForPhone($phone, $student->id);
+    }
+
+    public function sessionOpenForPhone(string $phone, ?int $studentId = null): bool
+    {
         if (! $this->metaMessagesSupported() || ! $this->meta->isConfigured()) {
             return false;
         }
 
-        $phone = $this->normalizePhone((string) $student->mobile);
+        $phone = $this->normalizePhone($phone);
 
         if ($phone === '') {
             return false;
@@ -82,14 +93,35 @@ class StudentWhatsAppThreadService
 
         $lastInbound = MetaWhatsAppMessage::query()
             ->where('direction', MetaWhatsAppMessageDirection::Inbound->value)
-            ->where(function ($query) use ($student, $phone): void {
-                $query->where('student_id', $student->id)
-                    ->orWhere('phone', $phone);
+            ->where(function ($query) use ($studentId, $phone): void {
+                $query->where('phone', $phone);
+
+                if ($studentId) {
+                    $query->orWhere('student_id', $studentId);
+                }
             })
             ->latest('created_at')
             ->first();
 
         return $lastInbound?->created_at?->gt(now()->subHours(24)) ?? false;
+    }
+
+    /**
+     * @return Collection<int, StudentWhatsAppThreadItem>
+     */
+    public function threadForPhone(string $phone, int $limit = 50): Collection
+    {
+        $phone = $this->normalizePhone($phone);
+
+        if ($phone === '' || ! $this->metaMessagesSupported()) {
+            return collect();
+        }
+
+        return $this->loadMetaMessagesByPhone($phone, $limit)
+            ->filter(fn (StudentWhatsAppThreadItem $item): bool => $item->at !== null)
+            ->sortBy(fn (StudentWhatsAppThreadItem $item) => $item->at?->timestamp ?? 0)
+            ->values()
+            ->take($limit);
     }
 
     protected function metaMessagesSupported(): bool
@@ -115,8 +147,29 @@ class StudentWhatsAppThreadService
             $metaQuery->where('student_id', $student->id);
         }
 
-        $rows = $metaQuery->get();
+        return $this->mapMetaMessageRows($metaQuery->get());
+    }
 
+    /**
+     * @return Collection<int, StudentWhatsAppThreadItem>
+     */
+    protected function loadMetaMessagesByPhone(string $phone, int $limit): Collection
+    {
+        $rows = MetaWhatsAppMessage::query()
+            ->where('phone', $phone)
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+
+        return $this->mapMetaMessageRows($rows);
+    }
+
+    /**
+     * @param  Collection<int, MetaWhatsAppMessage>  $rows
+     * @return Collection<int, StudentWhatsAppThreadItem>
+     */
+    protected function mapMetaMessageRows(Collection $rows): Collection
+    {
         if ($rows->isNotEmpty()) {
             $this->media->syncPendingDownloads($rows);
             $rows = MetaWhatsAppMessage::query()

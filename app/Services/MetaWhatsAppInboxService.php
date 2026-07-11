@@ -28,38 +28,62 @@ class MetaWhatsAppInboxService
         ?User $sender = null,
         WhatsAppMessageSource $source = WhatsAppMessageSource::Profile,
     ): array {
-        if (! $this->resolver->isMetaActive()) {
-            return ['status' => 'failed', 'error' => 'WhatsApp is not enabled. Open Connection & Setup and turn on WhatsApp.'];
-        }
-
         if (blank($student->mobile)) {
             return ['status' => 'failed', 'error' => 'Student has no mobile number.'];
         }
 
+        return $this->sendReplyToPhone(
+            (string) $student->mobile,
+            $text,
+            $sender,
+            $source,
+            $student->id,
+        );
+    }
+
+    /**
+     * @return array{status: string, error?: string, message_id?: string}
+     */
+    public function sendReplyToPhone(
+        string $phone,
+        string $text,
+        ?User $sender = null,
+        WhatsAppMessageSource $source = WhatsAppMessageSource::Inbox,
+        ?int $studentId = null,
+    ): array {
+        if (! $this->resolver->isMetaActive()) {
+            return ['status' => 'failed', 'error' => 'WhatsApp is not enabled. Open Connection & Setup and turn on WhatsApp.'];
+        }
+
+        $phone = $this->thread->normalizePhoneForStorage($phone);
         $text = trim($text);
+
+        if ($phone === '') {
+            return ['status' => 'failed', 'error' => 'No mobile number for this chat.'];
+        }
 
         if ($text === '') {
             return ['status' => 'failed', 'error' => 'Message text is required.'];
         }
 
-        if (! $this->thread->sessionOpenForStudent($student)) {
+        if (! $this->thread->sessionOpenForPhone($phone, $studentId)) {
             return [
                 'status' => 'failed',
-                'error' => 'The 24-hour reply window is closed. Ask the parent to message you first, or send an approved template.',
+                'error' => 'The 24-hour reply window is closed. Ask them to message you first, or send an approved template.',
             ];
         }
 
-        $result = $this->meta->sendText((string) $student->mobile, $text);
+        $result = $this->meta->sendText($phone, $text);
 
         if ($result['status'] === 'success') {
             $this->logger->recordOutboundText(
-                (string) $student->mobile,
+                $phone,
                 $result['message_id'] ?? null,
                 $text,
                 MetaWhatsAppMessageStatus::Sent,
                 $sender?->name ? 'Reply by '.$sender->name : 'Session reply',
                 is_array($result['response'] ?? null) ? $result['response'] : null,
-                $student->id,
+                $studentId,
                 ['message_source' => $source->value],
             );
         }
@@ -77,18 +101,45 @@ class MetaWhatsAppInboxService
         ?User $sender = null,
         WhatsAppMessageSource $source = WhatsAppMessageSource::Profile,
     ): array {
-        if (! $this->resolver->isMetaActive()) {
-            return ['status' => 'failed', 'error' => 'WhatsApp is not enabled. Open Connection & Setup and turn on WhatsApp.'];
-        }
-
         if (blank($student->mobile)) {
             return ['status' => 'failed', 'error' => 'Student has no mobile number.'];
         }
 
-        if (! $this->thread->sessionOpenForStudent($student)) {
+        return $this->sendMediaToPhone(
+            (string) $student->mobile,
+            $file,
+            $caption,
+            $sender,
+            $source,
+            $student->id,
+        );
+    }
+
+    /**
+     * @return array{status: string, error?: string, message_id?: string}
+     */
+    public function sendMediaToPhone(
+        string $phone,
+        UploadedFile $file,
+        ?string $caption = null,
+        ?User $sender = null,
+        WhatsAppMessageSource $source = WhatsAppMessageSource::Inbox,
+        ?int $studentId = null,
+    ): array {
+        if (! $this->resolver->isMetaActive()) {
+            return ['status' => 'failed', 'error' => 'WhatsApp is not enabled. Open Connection & Setup and turn on WhatsApp.'];
+        }
+
+        $phone = $this->thread->normalizePhoneForStorage($phone);
+
+        if ($phone === '') {
+            return ['status' => 'failed', 'error' => 'No mobile number for this chat.'];
+        }
+
+        if (! $this->thread->sessionOpenForPhone($phone, $studentId)) {
             return [
                 'status' => 'failed',
-                'error' => 'The 24-hour reply window is closed. Ask the parent to message you first, or send an approved template.',
+                'error' => 'The 24-hour reply window is closed. Ask them to message you first, or send an approved template.',
             ];
         }
 
@@ -103,7 +154,7 @@ class MetaWhatsAppInboxService
         $filename = $file->getClientOriginalName();
 
         $result = $this->meta->sendMedia(
-            (string) $student->mobile,
+            $phone,
             $messageType,
             (string) $upload['media_id'],
             $caption !== '' ? $caption : null,
@@ -121,7 +172,7 @@ class MetaWhatsAppInboxService
         );
 
         $logged = $this->logger->recordOutboundMedia(
-            (string) $student->mobile,
+            $phone,
             $result['message_id'] ?? null,
             [
                 'body_preview' => $preview,
@@ -134,7 +185,7 @@ class MetaWhatsAppInboxService
             MetaWhatsAppMessageStatus::Sent,
             $sender?->name ? 'Media by '.$sender->name : 'Session media reply',
             is_array($result['response'] ?? null) ? $result['response'] : null,
-            $student->id,
+            $studentId,
             ['message_source' => $source->value],
         );
 

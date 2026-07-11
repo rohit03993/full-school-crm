@@ -8,6 +8,7 @@ use App\Filament\Concerns\InteractsWithStudentWhatsAppInbox;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Models\Student;
 use App\Services\MetaWhatsAppConversationService;
+use App\Services\StudentWhatsAppThreadService;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
@@ -58,6 +59,8 @@ class WhatsAppInboxPage extends Page
 
     public ?int $selectedStudentId = null;
 
+    public ?string $selectedPhone = null;
+
     /** @var list<array<string, mixed>> */
     public array $conversations = [];
 
@@ -70,13 +73,17 @@ class WhatsAppInboxPage extends Page
         $studentId = request()->query('student');
 
         if (is_numeric($studentId)) {
-            $this->selectedStudentId = (int) $studentId;
-        }
+            $student = Student::query()->find((int) $studentId);
 
-        $this->loadInbox();
-
-        if ($this->selectedStudentId) {
-            $this->selectConversation($this->selectedStudentId);
+            if ($student) {
+                $this->selectConversation(
+                    app(StudentWhatsAppThreadService::class)->normalizePhoneForStorage((string) $student->mobile)
+                        ?: (string) $student->id,
+                    $student->id,
+                );
+            }
+        } else {
+            $this->loadInbox();
         }
     }
 
@@ -106,12 +113,28 @@ class WhatsAppInboxPage extends Page
         }
     }
 
-    public function selectConversation(int $studentId): void
+    public function selectConversation(string $phone, ?int $studentId = null): void
     {
         try {
-            $this->selectedStudentId = $studentId;
+            $thread = app(StudentWhatsAppThreadService::class);
+            $normalized = $thread->normalizePhoneForStorage($phone);
+
+            if ($normalized === '' && $studentId) {
+                $student = Student::query()->find($studentId);
+                $normalized = $student
+                    ? $thread->normalizePhoneForStorage((string) $student->mobile)
+                    : '';
+            }
+
+            $this->selectedPhone = $normalized !== '' ? $normalized : null;
+            $student = $studentId
+                ? Student::query()->find($studentId)
+                : ($this->selectedPhone ? $thread->findStudentByPhone($this->selectedPhone) : null);
+            $this->selectedStudentId = $student?->id;
+
             $this->resetMessagesTab();
             $this->loadMessagesTab();
+            $this->loadInbox();
         } catch (\Throwable $exception) {
             report($exception);
 
@@ -125,11 +148,20 @@ class WhatsAppInboxPage extends Page
 
     protected function whatsAppMessageStudent(): ?Student
     {
-        if (! $this->selectedStudentId) {
-            return null;
+        if ($this->selectedStudentId) {
+            return Student::query()->find($this->selectedStudentId);
         }
 
-        return Student::query()->find($this->selectedStudentId);
+        if (filled($this->selectedPhone)) {
+            return app(StudentWhatsAppThreadService::class)->findStudentByPhone($this->selectedPhone);
+        }
+
+        return null;
+    }
+
+    protected function whatsAppInboxPhone(): ?string
+    {
+        return $this->selectedPhone;
     }
 
     protected function afterWhatsAppMessageSent(): void
@@ -151,10 +183,11 @@ class WhatsAppInboxPage extends Page
                     'inboxLoaded' => $this->inboxLoaded,
                     'conversations' => $this->conversations,
                     'selectedStudentId' => $this->selectedStudentId,
+                    'selectedPhone' => $this->selectedPhone,
                     'chatStudent' => $this->whatsAppMessageStudent(),
                     'metaRoutingActive' => $this->metaRoutingActive,
                     'metaSessionOpen' => $this->metaSessionOpen,
-                    'messagesViewData' => ($this->selectedStudentId && $this->messagesTabLoaded)
+                    'messagesViewData' => ((filled($this->selectedPhone) || $this->selectedStudentId) && $this->messagesTabLoaded)
                         ? $this->whatsAppMessagesViewData()
                         : null,
                 ]),

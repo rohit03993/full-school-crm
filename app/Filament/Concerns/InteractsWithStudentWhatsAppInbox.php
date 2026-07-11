@@ -53,6 +53,11 @@ trait InteractsWithStudentWhatsAppInbox
 
     abstract protected function whatsAppMessageStudent(): ?Student;
 
+    protected function whatsAppInboxPhone(): ?string
+    {
+        return null;
+    }
+
     protected function initializeWhatsAppInboxState(): void
     {
         $this->messageThread = [];
@@ -132,6 +137,7 @@ trait InteractsWithStudentWhatsAppInbox
 
             return [
                 'record' => $student,
+                'chatPhone' => $this->whatsAppInboxPhone() ?: $student?->mobile,
                 'compactInbox' => $this->whatsAppInboxCompactLayout(),
                 'messagesTabLoaded' => $this->messagesTabLoaded,
                 'messageThread' => $this->messageThread,
@@ -141,8 +147,8 @@ trait InteractsWithStudentWhatsAppInbox
                 'metaReplyText' => $this->metaReplyText,
                 'showMetaReplyAttachment' => $this->showMetaReplyAttachment,
                 'metaReplyAttachment' => $this->metaReplyAttachment,
-                'waTemplates' => $catalog->selectableTemplates(),
-                'waTemplateSyncHint' => $this->whatsAppTemplateSyncHint($catalog),
+                'waTemplates' => $student ? $catalog->selectableTemplates() : collect(),
+                'waTemplateSyncHint' => $student ? $this->whatsAppTemplateSyncHint($catalog) : null,
                 'sendWhatsAppTemplateId' => $this->sendWhatsAppTemplateId,
                 'sendWhatsAppTemplateFields' => $this->sendWhatsAppTemplateFields,
                 'sendWhatsAppTemplateParamCount' => $this->sendWhatsAppTemplateParamCount,
@@ -154,6 +160,7 @@ trait InteractsWithStudentWhatsAppInbox
 
             return [
                 'record' => $this->whatsAppMessageStudent(),
+                'chatPhone' => $this->whatsAppInboxPhone(),
                 'compactInbox' => $this->whatsAppInboxCompactLayout(),
                 'messagesTabLoaded' => true,
                 'messageThread' => [],
@@ -209,8 +216,9 @@ trait InteractsWithStudentWhatsAppInbox
     public function loadMessagesTab(): void
     {
         $student = $this->whatsAppMessageStudent();
+        $phone = $this->whatsAppInboxPhone();
 
-        if ($this->messagesTabLoaded || ! $student) {
+        if ($this->messagesTabLoaded || (! $student && blank($phone))) {
             return;
         }
 
@@ -220,11 +228,20 @@ trait InteractsWithStudentWhatsAppInbox
             $threadService = app(StudentWhatsAppThreadService::class);
             $resolver = app(WhatsAppProviderResolver::class);
 
-            $this->messageThread = $threadService->threadForStudent($student)
-                ->map(fn (StudentWhatsAppThreadItem $item): array => $item->toArray())
-                ->values()
-                ->all();
-            $this->metaSessionOpen = $threadService->sessionOpenForStudent($student);
+            if ($student) {
+                $this->messageThread = $threadService->threadForStudent($student)
+                    ->map(fn (StudentWhatsAppThreadItem $item): array => $item->toArray())
+                    ->values()
+                    ->all();
+                $this->metaSessionOpen = $threadService->sessionOpenForStudent($student);
+            } else {
+                $this->messageThread = $threadService->threadForPhone((string) $phone)
+                    ->map(fn (StudentWhatsAppThreadItem $item): array => $item->toArray())
+                    ->values()
+                    ->all();
+                $this->metaSessionOpen = $threadService->sessionOpenForPhone((string) $phone);
+            }
+
             $this->metaRoutingActive = $resolver->metaOverridesPalDigital();
             $this->whatsappProviderLabel = $resolver->activeProviderLabel();
         } catch (\Throwable $exception) {
@@ -251,6 +268,7 @@ trait InteractsWithStudentWhatsAppInbox
     public function sendMetaReply(): void
     {
         $student = $this->whatsAppMessageStudent();
+        $phone = $this->whatsAppInboxPhone() ?: $student?->mobile;
 
         if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
             Notification::make()->title('WhatsApp module is not enabled')->warning()->send();
@@ -258,16 +276,14 @@ trait InteractsWithStudentWhatsAppInbox
             return;
         }
 
-        if (! $student) {
+        if (blank($phone)) {
             return;
         }
 
-        $result = app(MetaWhatsAppInboxService::class)->sendReply(
-            $student,
-            $this->metaReplyText,
-            Auth::user(),
-            WhatsAppMessageSource::Inbox,
-        );
+        $inbox = app(MetaWhatsAppInboxService::class);
+        $result = $student
+            ? $inbox->sendReply($student, $this->metaReplyText, Auth::user(), WhatsAppMessageSource::Inbox)
+            : $inbox->sendReplyToPhone((string) $phone, $this->metaReplyText, Auth::user(), WhatsAppMessageSource::Inbox);
 
         if ($result['status'] !== 'success') {
             Notification::make()
@@ -294,6 +310,7 @@ trait InteractsWithStudentWhatsAppInbox
     public function sendMetaMedia(): void
     {
         $student = $this->whatsAppMessageStudent();
+        $phone = $this->whatsAppInboxPhone() ?: $student?->mobile;
 
         if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
             Notification::make()->title('WhatsApp module is not enabled')->warning()->send();
@@ -301,19 +318,16 @@ trait InteractsWithStudentWhatsAppInbox
             return;
         }
 
-        if (! $student || ! $this->metaReplyAttachment) {
+        if (blank($phone) || ! $this->metaReplyAttachment) {
             Notification::make()->title('Choose a file first')->warning()->send();
 
             return;
         }
 
-        $result = app(MetaWhatsAppInboxService::class)->sendMedia(
-            $student,
-            $this->metaReplyAttachment,
-            $this->metaReplyText,
-            Auth::user(),
-            WhatsAppMessageSource::Inbox,
-        );
+        $inbox = app(MetaWhatsAppInboxService::class);
+        $result = $student
+            ? $inbox->sendMedia($student, $this->metaReplyAttachment, $this->metaReplyText, Auth::user(), WhatsAppMessageSource::Inbox)
+            : $inbox->sendMediaToPhone((string) $phone, $this->metaReplyAttachment, $this->metaReplyText, Auth::user(), WhatsAppMessageSource::Inbox);
 
         if ($result['status'] !== 'success') {
             Notification::make()

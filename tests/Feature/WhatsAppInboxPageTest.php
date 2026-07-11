@@ -49,8 +49,9 @@ class WhatsAppInboxPageTest extends TestCase
         $this->actingAs($admin);
 
         Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', $student->id)
+            ->call('selectConversation', '918320936486', $student->id)
             ->assertSet('selectedStudentId', $student->id)
+            ->assertSet('selectedPhone', '918320936486')
             ->assertStatus(200);
 
         Http::assertNothingSent();
@@ -82,12 +83,41 @@ class WhatsAppInboxPageTest extends TestCase
         $this->actingAs($admin);
 
         Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', $student->id)
+            ->call('selectConversation', '918320936486', $student->id)
             ->assertSet('selectedStudentId', $student->id)
             ->assertSee('Dear Parent, attendance update for Kapil.')
             ->assertStatus(200);
 
         Http::assertNothingSent();
+    }
+
+    public function test_unknown_number_conversation_opens_in_inbox(): void
+    {
+        Http::fake();
+
+        $admin = $this->createSuperAdmin();
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.UNKNOWN1',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919111222333',
+            'student_id' => null,
+            'body_preview' => 'Hi school, I need admission info',
+            'message_type' => 'text',
+            'status' => 'received',
+            'status_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(WhatsAppInboxPage::class)
+            ->assertSee('Unknown contact')
+            ->assertSee('Hi school, I need admission info')
+            ->call('selectConversation', '919111222333')
+            ->assertSet('selectedPhone', '919111222333')
+            ->assertSet('selectedStudentId', null)
+            ->assertSee('Hi school, I need admission info')
+            ->assertStatus(200);
     }
 
     public function test_inbound_parent_image_opens_with_reply_composer_in_inbox(): void
@@ -131,7 +161,7 @@ class WhatsAppInboxPageTest extends TestCase
         $this->actingAs($admin);
 
         Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', $student->id)
+            ->call('selectConversation', '919876543210', $student->id)
             ->assertSet('selectedStudentId', $student->id)
             ->assertSet('metaSessionOpen', true)
             ->assertSee('Amit Verma')
@@ -187,7 +217,7 @@ class WhatsAppInboxPageTest extends TestCase
         $this->actingAs($admin);
 
         Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', $student->id)
+            ->call('selectConversation', '919876543210', $student->id)
             ->assertSee('crm-wa-bubble__image', false)
             ->assertStatus(200);
     }
@@ -224,7 +254,7 @@ class WhatsAppInboxPageTest extends TestCase
         $this->actingAs($admin);
 
         Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', $student->id)
+            ->call('selectConversation', '919876543210', $student->id)
             ->assertSee('crm-wa-bubble__image', false)
             ->assertStatus(200);
     }
@@ -292,7 +322,7 @@ class WhatsAppInboxPageTest extends TestCase
         $this->actingAs($admin);
 
         Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', $student->id)
+            ->call('selectConversation', '918109462946', $student->id)
             ->set('sendWhatsAppTemplateId', $template->id)
             ->assertSet('sendWhatsAppTemplateParamCount', 4)
             ->assertSee('Send template')
@@ -356,7 +386,7 @@ class WhatsAppInboxPageTest extends TestCase
         $this->actingAs($admin);
 
         Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', $student->id)
+            ->call('selectConversation', '918109462946', $student->id)
             ->set('sendWhatsAppTemplateId', $template->id)
             ->set('sendWhatsAppTemplateParams', [
                 0 => 'Amit Verma',

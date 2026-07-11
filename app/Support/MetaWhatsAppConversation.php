@@ -7,7 +7,7 @@ use Carbon\Carbon;
 readonly class MetaWhatsAppConversation
 {
     public function __construct(
-        public int $studentId,
+        public ?int $studentId,
         public string $studentName,
         public string $phone,
         public string $phoneDisplay,
@@ -16,6 +16,7 @@ readonly class MetaWhatsAppConversation
         public ?Carbon $lastAt,
         public bool $sessionOpen,
         public bool $needsReply,
+        public bool $isLinked = true,
     ) {}
 
     /**
@@ -34,6 +35,7 @@ readonly class MetaWhatsAppConversation
             'last_at_label' => $this->lastAtLabel(),
             'session_open' => $this->sessionOpen,
             'needs_reply' => $this->needsReply,
+            'is_linked' => $this->isLinked,
         ];
     }
 

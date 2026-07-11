@@ -40,16 +40,23 @@ class MetaWhatsAppConversationService
 
         $conversations = collect();
         $seenStudentIds = [];
+        $seenPhones = [];
 
         foreach ($latestMeta as $message) {
-            $student = $message->student ?? $this->thread->findStudentByPhone((string) $message->phone);
+            $phone = $this->thread->normalizePhoneForStorage((string) $message->phone);
 
-            if (! $student) {
+            if ($phone === '' || isset($seenPhones[$phone])) {
                 continue;
             }
 
-            $seenStudentIds[$student->id] = true;
-            $conversations->push($this->conversationFromMetaMessage($message, $student));
+            $seenPhones[$phone] = true;
+            $student = $message->student ?? $this->thread->findStudentByPhone($phone);
+
+            if ($student) {
+                $seenStudentIds[$student->id] = true;
+            }
+
+            $conversations->push($this->conversationFromMetaMessage($message, $student, $phone));
         }
 
         WhatsAppCampaignRecipient::query()
@@ -60,11 +67,21 @@ class MetaWhatsAppConversationService
             ->limit(200)
             ->get()
             ->unique('student_id')
-            ->each(function (WhatsAppCampaignRecipient $recipient) use ($conversations): void {
+            ->each(function (WhatsAppCampaignRecipient $recipient) use ($conversations, &$seenPhones): void {
                 $student = $recipient->student;
 
                 if (! $student) {
                     return;
+                }
+
+                $phone = $this->thread->normalizePhoneForStorage((string) $student->mobile);
+
+                if ($phone !== '' && isset($seenPhones[$phone])) {
+                    return;
+                }
+
+                if ($phone !== '') {
+                    $seenPhones[$phone] = true;
                 }
 
                 $conversations->push($this->conversationFromCampaignRecipient($recipient, $student));
@@ -96,8 +113,11 @@ class MetaWhatsAppConversationService
         return $this->filterAndSort($conversations, $search, $limit);
     }
 
-    protected function conversationFromMetaMessage(MetaWhatsAppMessage $message, Student $student): MetaWhatsAppConversation
-    {
+    protected function conversationFromMetaMessage(
+        MetaWhatsAppMessage $message,
+        ?Student $student,
+        ?string $normalizedPhone = null,
+    ): MetaWhatsAppConversation {
         $messageType = Schema::hasColumn('meta_whatsapp_messages', 'message_type')
             ? (string) ($message->message_type ?? 'text')
             : 'text';
@@ -123,17 +143,22 @@ class MetaWhatsAppConversationService
             : 'outbound';
 
         $lastAt = $message->status_at ?? $message->created_at;
+        $phone = $normalizedPhone ?: $this->thread->normalizePhoneForStorage((string) $message->phone);
+        $linked = $student !== null;
 
         return new MetaWhatsAppConversation(
-            studentId: $student->id,
-            studentName: (string) $student->name,
-            phone: (string) $message->phone,
-            phoneDisplay: $this->displayPhone((string) ($student->mobile ?: $message->phone)),
+            studentId: $student?->id,
+            studentName: $linked ? (string) $student->name : 'Unknown contact',
+            phone: $phone,
+            phoneDisplay: $this->displayPhone((string) ($student?->mobile ?: $phone)),
             preview: $preview,
             lastDirection: $direction,
             lastAt: $lastAt,
-            sessionOpen: $this->thread->sessionOpenForStudent($student),
+            sessionOpen: $linked
+                ? $this->thread->sessionOpenForStudent($student)
+                : $this->thread->sessionOpenForPhone($phone),
             needsReply: $direction === 'inbound',
+            isLinked: $linked,
         );
     }
 
@@ -157,6 +182,7 @@ class MetaWhatsAppConversationService
             lastAt: $recipient->updated_at ?? $recipient->created_at,
             sessionOpen: $this->thread->sessionOpenForStudent($student),
             needsReply: false,
+            isLinked: true,
         );
     }
 
@@ -173,6 +199,7 @@ class MetaWhatsAppConversationService
                 return $rows->filter(function (MetaWhatsAppConversation $conversation) use ($needle): bool {
                     return str_contains(strtolower($conversation->studentName), $needle)
                         || str_contains(strtolower($conversation->phoneDisplay), $needle)
+                        || str_contains(strtolower($conversation->phone), $needle)
                         || str_contains(strtolower($conversation->preview), $needle);
                 });
             })
