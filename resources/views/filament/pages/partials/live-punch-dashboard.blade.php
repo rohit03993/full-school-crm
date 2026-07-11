@@ -46,7 +46,7 @@
     ];
 @endphp
 
-<div wire:poll.30s="refreshDashboard" class="space-y-5">
+<div class="space-y-5">
     <div class="grid gap-3 sm:grid-cols-3">
         @foreach ($statTiles as $tile)
             @php

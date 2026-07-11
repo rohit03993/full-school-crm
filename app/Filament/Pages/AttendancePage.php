@@ -202,6 +202,16 @@ class AttendancePage extends Page
             ];
     }
 
+    /** Called by wire:poll — keep signature free of DI so Livewire polling is reliable. */
+    public function pollLiveDashboard(): void
+    {
+        if ($this->viewMode !== 'live') {
+            return;
+        }
+
+        $this->refreshDashboard();
+    }
+
     public function searchAndFocus(PunchBatchRosterService $roster): void
     {
         $term = trim($this->quickSearch);
@@ -705,6 +715,17 @@ class AttendancePage extends Page
                     ->alignment(Alignment::Start)
                     ->fullWidth(),
             ]);
+    }
+
+    public function getFooter(): ?\Illuminate\Contracts\View\View
+    {
+        if ($this->viewMode !== 'live') {
+            return null;
+        }
+
+        return view('filament.pages.partials.attendance-live-poll', [
+            'viewMode' => $this->viewMode,
+        ]);
     }
 
     public function content(Schema $schema): Schema

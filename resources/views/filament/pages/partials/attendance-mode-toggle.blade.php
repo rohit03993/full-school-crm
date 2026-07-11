@@ -22,10 +22,13 @@
                                 <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                                 <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
                             </span>
-                            Live · refreshes every 30s
+                            <span wire:loading.remove wire:target="pollLiveDashboard,refreshDashboard">Live · auto every 30s</span>
+                            <span wire:loading wire:target="pollLiveDashboard,refreshDashboard">Refreshing…</span>
                         </span>
                         @if ($lastRefreshedAt)
-                            <span class="text-xs text-gray-500 dark:text-gray-400">Updated {{ $lastRefreshedAt }}</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400" wire:loading.class="opacity-50" wire:target="pollLiveDashboard,refreshDashboard">
+                                Updated {{ $lastRefreshedAt }}
+                            </span>
                         @endif
                     </div>
                 @else
