@@ -4,7 +4,7 @@ namespace App\Support;
 
 final class CrmPagination
 {
-    public const PER_PAGE = 20;
+    public const PER_PAGE = 15;
 
     /**
      * @return list<int>

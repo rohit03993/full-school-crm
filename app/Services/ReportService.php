@@ -28,6 +28,10 @@ class ReportService
 {
     public const MAX_DETAIL_ROWS = 5000;
 
+    public function __construct(
+        protected AttendanceService $attendance,
+    ) {}
+
     /**
      * @param  array{
      *     date_from?: ?string,
@@ -38,6 +42,7 @@ class ReportService
      *     lead_source?: ?string,
      *     user_id?: ?int,
      *     activity_type_id?: ?int,
+     *     max_percentage?: ?float|int|string,
      * }  $filters
      * @return array{
      *     title: string,
@@ -57,6 +62,16 @@ class ReportService
             ReportType::AdmissionsByStaff => $this->admissionsByStaffReport($from, $to, $filters['user_id'] ?? null),
             ReportType::AttendanceByBatch => $this->attendanceByBatchReport($from, $to, $filters['batch_id'] ?? null),
             ReportType::AttendanceByStudent => $this->attendanceByStudentReport($from, $to, $filters['student_id'] ?? null),
+            ReportType::DailyAbsentSheet => $this->dailyAbsentSheetReport($from, $to, $filters['batch_id'] ?? null),
+            ReportType::MonthlyStudentAttendance => $this->monthlyStudentAttendanceReport($from, $to, $filters['batch_id'] ?? null, $filters['student_id'] ?? null),
+            ReportType::LowAttendanceAlert => $this->lowAttendanceAlertReport(
+                $from,
+                $to,
+                $filters['batch_id'] ?? null,
+                isset($filters['max_percentage']) && $filters['max_percentage'] !== '' && $filters['max_percentage'] !== null
+                    ? (float) $filters['max_percentage']
+                    : 75.0,
+            ),
             ReportType::Activities => $this->activitiesReport($from, $to, $filters['activity_type_id'] ?? null),
             ReportType::TestMarks => $this->testMarksReport(
                 $from,
@@ -288,6 +303,176 @@ class ReportService
             'columns' => ['Date', 'Batch', 'Status'],
             'rows' => $rows,
         ]);
+    }
+
+    /**
+     * Students enrolled in batch(es) with no Present/Leave on each day in range.
+     *
+     * @return array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>}
+     */
+    protected function dailyAbsentSheetReport(Carbon $from, Carbon $to, ?int $batchId): array
+    {
+        $days = $this->attendance->workingDatesBetween($from->copy()->startOfDay(), $to->copy()->startOfDay());
+        $rows = [];
+
+        $batches = Batch::query()
+            ->when($batchId, fn ($q) => $q->whereKey($batchId))
+            ->where('status', BatchStatus::Active)
+            ->orderBy('name')
+            ->get();
+
+        foreach ($batches as $batch) {
+            $students = \App\Models\BatchStudent::query()
+                ->where('batch_id', $batch->id)
+                ->where('is_active', true)
+                ->with(['student.activeEnrollment'])
+                ->get()
+                ->pluck('student')
+                ->filter()
+                ->sortBy('name')
+                ->values();
+
+            if ($students->isEmpty()) {
+                continue;
+            }
+
+            foreach ($days as $day) {
+                if (count($rows) >= self::MAX_DETAIL_ROWS) {
+                    break 2;
+                }
+
+                $creditedIds = Attendance::query()
+                    ->where('batch_id', $batch->id)
+                    ->whereDate('attendance_date', $day)
+                    ->whereIn('status', [AttendanceStatus::Present, AttendanceStatus::Leave])
+                    ->pluck('student_id')
+                    ->all();
+
+                $creditedLookup = array_fill_keys($creditedIds, true);
+
+                foreach ($students as $student) {
+                    if (isset($creditedLookup[$student->id])) {
+                        continue;
+                    }
+
+                    $rows[] = [
+                        Carbon::parse($day)->format('d M Y'),
+                        $batch->name,
+                        $student->name,
+                        $student->activeEnrollment?->enrollment_number ?? '—',
+                        $student->mobile ?? '—',
+                        'Absent',
+                    ];
+
+                    if (count($rows) >= self::MAX_DETAIL_ROWS) {
+                        break 3;
+                    }
+                }
+            }
+        }
+
+        $scope = $batchId
+            ? (Batch::query()->find($batchId)?->name ?? 'Batch')
+            : 'All batches';
+
+        return $this->finalizeDetailReport([
+            'title' => 'Daily absent sheet · '.$scope.' · '.$from->format('d M Y').' – '.$to->format('d M Y'),
+            'columns' => ['Date', 'Batch', 'Student', 'Roll', 'Mobile', 'Status'],
+            'rows' => $rows,
+        ]);
+    }
+
+    /**
+     * @return array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>}
+     */
+    protected function monthlyStudentAttendanceReport(Carbon $from, Carbon $to, ?int $batchId, ?int $studentId): array
+    {
+        $rows = $this->buildMonthlyAttendanceRows($from, $to, $batchId, $studentId, null);
+
+        return $this->finalizeDetailReport([
+            'title' => 'Monthly student attendance · '.$from->format('d M Y').' – '.$to->format('d M Y'),
+            'columns' => ['Student', 'Roll', 'Batch', 'Mobile', 'Present', 'Leave', 'Absent', 'Working days', '%'],
+            'rows' => $rows,
+        ]);
+    }
+
+    /**
+     * @return array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>}
+     */
+    protected function lowAttendanceAlertReport(Carbon $from, Carbon $to, ?int $batchId, float $maxPercentage): array
+    {
+        $rows = $this->buildMonthlyAttendanceRows($from, $to, $batchId, null, $maxPercentage);
+
+        return $this->finalizeDetailReport([
+            'title' => 'Low attendance (below '.$maxPercentage.'%) · '.$from->format('d M Y').' – '.$to->format('d M Y'),
+            'columns' => ['Student', 'Roll', 'Batch', 'Mobile', 'Present', 'Leave', 'Absent', 'Working days', '%'],
+            'rows' => $rows,
+        ]);
+    }
+
+    /**
+     * @return array<int, array<int, string|int|float|null>>
+     */
+    protected function buildMonthlyAttendanceRows(
+        Carbon $from,
+        Carbon $to,
+        ?int $batchId,
+        ?int $studentId,
+        ?float $maxPercentage,
+    ): array {
+        $batchStudents = \App\Models\BatchStudent::query()
+            ->where('is_active', true)
+            ->when($batchId, fn ($q) => $q->where('batch_id', $batchId))
+            ->when($studentId, fn ($q) => $q->where('student_id', $studentId))
+            ->with(['student.activeEnrollment', 'batch'])
+            ->get();
+
+        $rows = [];
+
+        foreach ($batchStudents as $batchStudent) {
+            $student = $batchStudent->student;
+
+            if (! $student) {
+                continue;
+            }
+
+            // Temporarily use this batch assignment for summary math.
+            $student->setRelation('activeBatchStudent', $batchStudent);
+
+            $summary = $this->attendance->summaryForStudentInRange(
+                $student,
+                $from->copy()->startOfDay(),
+                $to->copy()->startOfDay(),
+            );
+
+            if ($summary === null) {
+                continue;
+            }
+
+            if ($maxPercentage !== null && $summary['percentage'] >= $maxPercentage) {
+                continue;
+            }
+
+            $rows[] = [
+                $student->name,
+                $student->activeEnrollment?->enrollment_number ?? '—',
+                $batchStudent->batch?->name ?? '—',
+                $student->mobile ?? '—',
+                $summary['present_days'],
+                $summary['leave_days'],
+                $summary['absent_days'],
+                $summary['expected_days'],
+                $summary['percentage'],
+            ];
+
+            if (count($rows) >= self::MAX_DETAIL_ROWS) {
+                break;
+            }
+        }
+
+        usort($rows, fn (array $a, array $b): int => ((float) $a[8]) <=> ((float) $b[8]));
+
+        return $rows;
     }
 
   /**

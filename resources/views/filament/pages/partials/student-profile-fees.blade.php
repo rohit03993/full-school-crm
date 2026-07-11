@@ -536,13 +536,30 @@
         @endif
 
         <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <div class="flex items-center gap-3 border-b border-gray-100 px-5 py-3.5 dark:border-white/10">
-                <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                </span>
-                <div>
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Payment history</h3>
-                    <p class="text-xs text-gray-500">{{ $payments->count() }} receipt{{ $payments->count() === 1 ? '' : 's' }} on record</p>
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-3.5 dark:border-white/10">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </span>
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Payment history</h3>
+                        <p class="text-xs text-gray-500">
+                            {{ $paymentsTotal ?? $payments->count() }} receipt{{ ($paymentsTotal ?? $payments->count()) === 1 ? '' : 's' }}
+                            @if (filled($paymentsMonth ?? null))
+                                · {{ \Illuminate\Support\Carbon::createFromFormat('Y-m', $paymentsMonth)->format('M Y') }}
+                            @endif
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input
+                        type="month"
+                        wire:model.live="paymentsMonth"
+                        class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                    />
+                    @if (filled($paymentsMonth ?? null))
+                        <button type="button" wire:click="$set('paymentsMonth', '')" class="text-xs font-semibold text-primary-700 hover:underline dark:text-primary-300">Clear</button>
+                    @endif
                 </div>
             </div>
             @if ($payments->isEmpty())
@@ -592,6 +609,18 @@
                         </div>
                     @endforeach
                 </div>
+                @if (($paymentsLastPage ?? 1) > 1)
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-5 py-3 text-xs text-gray-500 dark:border-white/10">
+                        <p>
+                            Page {{ $paymentsPage ?? 1 }} / {{ $paymentsLastPage }}
+                            · {{ $paymentsPerPage ?? 15 }} per page
+                        </p>
+                        <div class="flex gap-2">
+                            <button type="button" wire:click="previousPaymentsPage" @disabled(($paymentsPage ?? 1) <= 1) class="rounded-lg px-3 py-1.5 font-semibold ring-1 ring-gray-200 disabled:opacity-40 dark:ring-white/10">Prev</button>
+                            <button type="button" wire:click="nextPaymentsPage" @disabled(($paymentsPage ?? 1) >= ($paymentsLastPage ?? 1)) class="rounded-lg px-3 py-1.5 font-semibold ring-1 ring-gray-200 disabled:opacity-40 dark:ring-white/10">Next</button>
+                        </div>
+                    </div>
+                @endif
             @endif
         </div>
 

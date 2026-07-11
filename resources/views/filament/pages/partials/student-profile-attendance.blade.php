@@ -7,38 +7,66 @@
         No active batch assigned. Use <span class="font-semibold">Assign Batch</span> from the profile actions.
     </div>
 @else
+    @php
+        $attendanceMonth = $attendanceMonth ?: now()->format('Y-m');
+        $attendancePage = $attendancePage ?? 1;
+        $attendanceTotal = $attendanceTotal ?? 0;
+        $attendanceLastPage = $attendanceLastPage ?? 1;
+        $attendancePerPage = $attendancePerPage ?? 15;
+    @endphp
     <div class="space-y-4">
         <div class="rounded-xl bg-primary-500/5 px-4 py-3 ring-1 ring-primary-500/15 dark:bg-primary-500/10">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Active batch</p>
-            <p class="mt-0.5 text-base font-bold text-gray-950 dark:text-white">{{ $activeBatch->name }}</p>
-            @if ($attendancePercentage !== null && $attendanceSummary)
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Attendance: <span class="font-bold text-emerald-700 dark:text-emerald-400">{{ $attendancePercentage }}%</span>
-                    <span class="text-gray-400">·</span>
-                    {{ $attendanceSummary['credited_days'] }}/{{ $attendanceSummary['expected_days'] }} working days
-                    <span class="text-gray-400">({{ $attendanceSummary['period_label'] }})</span>
-                </p>
-            @elseif ($attendancePercentage !== null)
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Attendance: <span class="font-bold text-emerald-700 dark:text-emerald-400">{{ $attendancePercentage }}%</span>
-                </p>
-            @else
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">No working days in range yet for this month’s attendance %.</p>
-            @endif
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Active batch</p>
+                    <p class="mt-0.5 text-base font-bold text-gray-950 dark:text-white">{{ $activeBatch->name }}</p>
+                    @if ($attendancePercentage !== null && $attendanceSummary)
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                            Attendance:
+                            <span class="font-bold text-emerald-700 dark:text-emerald-400">{{ $attendancePercentage }}%</span>
+                            <span class="text-gray-400">·</span>
+                            {{ $attendanceSummary['credited_days'] }}/{{ $attendanceSummary['expected_days'] }} working days
+                            <span class="text-gray-400">({{ $attendanceSummary['period_label'] }})</span>
+                        </p>
+                        <p class="mt-0.5 text-xs text-gray-500">
+                            Present {{ $attendanceSummary['present_days'] }}
+                            · Leave {{ $attendanceSummary['leave_days'] }}
+                            · Absent {{ $attendanceSummary['absent_days'] ?? max(0, $attendanceSummary['expected_days'] - $attendanceSummary['credited_days']) }}
+                        </p>
+                    @else
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">No working days in this month yet.</p>
+                    @endif
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <label class="sr-only" for="attendance-month">Month</label>
+                    <input
+                        id="attendance-month"
+                        type="month"
+                        wire:model.live="attendanceMonth"
+                        class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                    />
+                    <button
+                        type="button"
+                        wire:click="downloadAttendanceMonthPdf"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-800 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-white/10 dark:text-gray-100 dark:ring-white/10"
+                    >
+                        Print / PDF
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div class="rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-600 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10">
-            <p class="font-semibold text-gray-950 dark:text-white">What appears here</p>
+            <p class="font-semibold text-gray-950 dark:text-white">How to read this</p>
             <ul class="mt-2 list-inside list-disc space-y-1">
-                <li><strong>%</strong> — This month: credited days (Present{{ config('attendance.percentage.credit_leave', true) ? ' + Leave' : '' }}) ÷ working days from the 1st (or batch join) to today. Sundays excluded.</li>
-                <li><strong>Status</strong> — Present (from IN), Absent, or Leave</li>
-                <li><strong>Check-in / Check-out</strong> — times from biometric or manual IN/OUT (same on Attendance screen)</li>
-                <li><strong>Source</strong> — Biometric device, Manual IN/OUT, or roll-call only (A/L)</li>
+                <li><strong>%</strong> — Selected month: Present(+Leave) ÷ working days (Sundays excluded)</li>
+                <li><strong>IN / OUT</strong> — Biometric or manual punch times</li>
+                <li>Use month filter + Print/PDF for parent or file copies. Full class reports: Reports menu.</li>
             </ul>
         </div>
 
         @if ($attendanceRecords->isEmpty())
-            <p class="text-sm text-gray-500 dark:text-gray-400">Records appear after a punch IN, manual IN, or absent/leave mark.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">No attendance rows in this month.</p>
         @else
             <div class="overflow-hidden rounded-xl ring-1 ring-gray-200 dark:ring-white/10">
                 <table class="w-full text-left text-sm">
@@ -92,6 +120,30 @@
                         @endforeach
                     </tbody>
                 </table>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                <p>
+                    Showing
+                    {{ min($attendanceTotal, (($attendancePage - 1) * $attendancePerPage) + 1) }}–{{ min($attendanceTotal, $attendancePage * $attendancePerPage) }}
+                    of {{ $attendanceTotal }}
+                    · {{ $attendancePerPage }} per page
+                </p>
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        wire:click="previousAttendancePage"
+                        @disabled($attendancePage <= 1)
+                        class="rounded-lg px-3 py-1.5 font-semibold ring-1 ring-gray-200 disabled:opacity-40 dark:ring-white/10"
+                    >Prev</button>
+                    <span class="tabular-nums">{{ $attendancePage }} / {{ $attendanceLastPage }}</span>
+                    <button
+                        type="button"
+                        wire:click="nextAttendancePage"
+                        @disabled($attendancePage >= $attendanceLastPage)
+                        class="rounded-lg px-3 py-1.5 font-semibold ring-1 ring-gray-200 disabled:opacity-40 dark:ring-white/10"
+                    >Next</button>
+                </div>
             </div>
         @endif
     </div>

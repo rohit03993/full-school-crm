@@ -26,6 +26,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Actions;
@@ -100,6 +101,7 @@ class ReportsPage extends Page
         $this->filters = [
             'date_from' => now()->startOfMonth()->toDateString(),
             'date_to' => now()->toDateString(),
+            'max_percentage' => 75,
         ];
     }
 
@@ -211,6 +213,12 @@ class ReportsPage extends Page
                     ->label('Exam type')
                     ->options(fn (): array => ActivityType::query()->enabled()->ordered()->pluck('name', 'id')->all())
                     ->native(false),
+                TextInput::make('max_percentage')
+                    ->label('Low attendance below %')
+                    ->numeric()
+                    ->minValue(1)
+                    ->maxValue(100)
+                    ->helperText('Used by Low attendance alert (default 75).'),
             ]);
     }
 

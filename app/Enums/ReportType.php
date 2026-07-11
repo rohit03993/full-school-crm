@@ -10,6 +10,9 @@ enum ReportType: string
     case AdmissionsByStaff = 'admissions_by_staff';
     case AttendanceByBatch = 'attendance_by_batch';
     case AttendanceByStudent = 'attendance_by_student';
+    case DailyAbsentSheet = 'daily_absent_sheet';
+    case MonthlyStudentAttendance = 'monthly_student_attendance';
+    case LowAttendanceAlert = 'low_attendance_alert';
     case Activities = 'activities';
     case TestMarks = 'test_marks';
     case FeeCollection = 'fee_collection';
@@ -29,6 +32,9 @@ enum ReportType: string
             self::AdmissionsByStaff => 'Admissions by staff',
             self::AttendanceByBatch => 'Attendance by batch',
             self::AttendanceByStudent => 'Attendance by student',
+            self::DailyAbsentSheet => 'Daily absent sheet',
+            self::MonthlyStudentAttendance => 'Monthly student attendance',
+            self::LowAttendanceAlert => 'Low attendance alert',
             self::Activities => 'Tests & exams (marks)',
             self::TestMarks => 'Test marks (detail export)',
             self::FeeCollection => 'Fee collection',

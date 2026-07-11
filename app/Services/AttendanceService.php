@@ -108,7 +108,7 @@ class AttendanceService
     }
 
     /**
-     * Month-to-date attendance: credited days ÷ working days (1st → today, from batch join if later).
+     * Month-to-date attendance for the current calendar month (through today).
      *
      * @return array{
      *     percentage: float,
@@ -116,10 +116,65 @@ class AttendanceService
      *     leave_days: int,
      *     credited_days: int,
      *     expected_days: int,
+     *     absent_days: int,
      *     period_label: string,
+     *     from: string,
+     *     to: string,
      * }|null
      */
     public function monthToDateSummaryForStudent(Student $student): ?array
+    {
+        $today = now()->startOfDay();
+
+        return $this->summaryForStudentInRange(
+            $student,
+            $today->copy()->startOfMonth(),
+            $today,
+        );
+    }
+
+    /**
+     * Attendance summary for a calendar month (Y-m). Caps at today for the current month.
+     *
+     * @return array{
+     *     percentage: float,
+     *     present_days: int,
+     *     leave_days: int,
+     *     credited_days: int,
+     *     expected_days: int,
+     *     absent_days: int,
+     *     period_label: string,
+     *     from: string,
+     *     to: string,
+     * }|null
+     */
+    public function summaryForStudentInMonth(Student $student, string $yearMonth): ?array
+    {
+        $month = Carbon::createFromFormat('Y-m', $yearMonth)->startOfMonth();
+        $end = $month->copy()->endOfMonth()->startOfDay();
+        $today = now()->startOfDay();
+
+        if ($end->greaterThan($today)) {
+            $end = $today;
+        }
+
+        return $this->summaryForStudentInRange($student, $month, $end);
+    }
+
+    /**
+     * @return array{
+     *     percentage: float,
+     *     present_days: int,
+     *     leave_days: int,
+     *     credited_days: int,
+     *     expected_days: int,
+     *     absent_days: int,
+     *     period_label: string,
+     *     from: string,
+     *     to: string,
+     * }|null
+     */
+    public function summaryForStudentInRange(Student $student, Carbon $rangeStart, Carbon $rangeEnd): ?array
     {
         $student->loadMissing('activeBatchStudent');
 
@@ -130,18 +185,26 @@ class AttendanceService
             return null;
         }
 
-        $today = now()->startOfDay();
-        $monthStart = $today->copy()->startOfMonth();
-        $joined = $batchStudent->assigned_at
-            ? Carbon::parse($batchStudent->assigned_at)->startOfDay()
-            : $monthStart;
-        $from = $joined->greaterThan($monthStart) ? $joined : $monthStart;
+        $from = $rangeStart->copy()->startOfDay();
+        $to = $rangeEnd->copy()->startOfDay();
 
-        if ($from->greaterThan($today)) {
+        if ($from->greaterThan($to)) {
             return null;
         }
 
-        $workingDates = $this->workingDatesBetween($from, $today);
+        $joined = $batchStudent->assigned_at
+            ? Carbon::parse($batchStudent->assigned_at)->startOfDay()
+            : $from;
+
+        if ($joined->greaterThan($from)) {
+            $from = $joined;
+        }
+
+        if ($from->greaterThan($to)) {
+            return null;
+        }
+
+        $workingDates = $this->workingDatesBetween($from, $to);
         $expected = count($workingDates);
 
         if ($expected === 0) {
@@ -151,7 +214,7 @@ class AttendanceService
         $rows = Attendance::query()
             ->where('batch_id', $batchId)
             ->where('student_id', $student->id)
-            ->whereBetween('attendance_date', [$from->toDateString(), $today->toDateString()])
+            ->whereBetween('attendance_date', [$from->toDateString(), $to->toDateString()])
             ->get(['attendance_date', 'status']);
 
         $presentDates = [];
@@ -175,6 +238,7 @@ class AttendanceService
         $leaveDays = count(array_diff_key($leaveDates, $presentDates));
         $creditLeave = (bool) config('attendance.percentage.credit_leave', true);
         $creditedDays = $presentDays + ($creditLeave ? $leaveDays : 0);
+        $absentDays = max(0, $expected - $creditedDays);
         $percentage = round(($creditedDays / $expected) * 100, 1);
 
         return [
@@ -183,7 +247,10 @@ class AttendanceService
             'leave_days' => $leaveDays,
             'credited_days' => $creditedDays,
             'expected_days' => $expected,
-            'period_label' => $from->format('d M').' – '.$today->format('d M Y'),
+            'absent_days' => $absentDays,
+            'period_label' => $from->format('d M').' – '.$to->format('d M Y'),
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
         ];
     }
 

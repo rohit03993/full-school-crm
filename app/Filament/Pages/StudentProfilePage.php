@@ -44,6 +44,9 @@ use App\Services\ActivityAttendanceService;
 use App\Services\AdmissionFeePlanService;
 use App\Services\AdmissionService;
 use App\Services\AttendanceService;
+use App\Services\ReportPdfService;
+use App\Services\ReportService;
+use App\Enums\ReportType;
 use App\Services\BatchService;
 use App\Services\CallLogService;
 use App\Services\ConvertToAdmissionPresenter;
@@ -151,8 +154,24 @@ class StudentProfilePage extends Page
 
     public ?float $attendancePercentage = null;
 
-    /** @var array{percentage: float, present_days: int, leave_days: int, credited_days: int, expected_days: int, period_label: string}|null */
+    /** @var array{percentage: float, present_days: int, leave_days: int, credited_days: int, expected_days: int, absent_days?: int, period_label: string, from?: string, to?: string}|null */
     public ?array $attendanceSummary = null;
+
+    public string $attendanceMonth = '';
+
+    public int $attendancePage = 1;
+
+    public int $attendanceTotal = 0;
+
+    public int $attendanceLastPage = 1;
+
+    public string $paymentsMonth = '';
+
+    public int $paymentsPage = 1;
+
+    public int $paymentsTotal = 0;
+
+    public int $paymentsLastPage = 1;
 
     /**
      * @var array<int, Collection<int, ActivityAttendance>>
@@ -345,6 +364,10 @@ class StudentProfilePage extends Page
         $this->penalties = new Collection;
         $this->attendanceRecords = new Collection;
         $this->activityRecords = [];
+        $this->attendanceMonth = now()->format('Y-m');
+        $this->attendancePage = 1;
+        $this->paymentsMonth = '';
+        $this->paymentsPage = 1;
 
         $tab = request()->query('tab');
 
@@ -1549,44 +1572,152 @@ class StudentProfilePage extends Page
 
     protected function loadPayments(): void
     {
-        $this->payments = Payment::query()
+        $query = Payment::query()
             ->where('student_id', $this->record->id)
-            ->with(['addedBy.staffProfile', 'feeStructure.enrollment.course', 'feeInstallment', 'feeMiscCharge'])
+            ->with(['addedBy.staffProfile', 'feeStructure.enrollment.course', 'feeInstallment', 'feeMiscCharge']);
+
+        if (filled($this->paymentsMonth) && preg_match('/^\d{4}-\d{2}$/', $this->paymentsMonth)) {
+            $start = \Illuminate\Support\Carbon::createFromFormat('Y-m', $this->paymentsMonth)->startOfMonth();
+            $end = $start->copy()->endOfMonth();
+            $query->whereBetween('payment_date', [$start->toDateString(), $end->toDateString()]);
+        }
+
+        $this->paymentsTotal = (clone $query)->count();
+        $perPage = CrmPagination::PER_PAGE;
+        $this->paymentsLastPage = max(1, (int) ceil($this->paymentsTotal / $perPage));
+        $this->paymentsPage = min(max(1, $this->paymentsPage), $this->paymentsLastPage);
+
+        $this->payments = $query
             ->orderByDesc('payment_date')
             ->orderByDesc('id')
-            ->limit(CrmPagination::PER_PAGE)
+            ->forPage($this->paymentsPage, $perPage)
             ->get();
+    }
+
+    public function updatedPaymentsMonth(): void
+    {
+        $this->paymentsPage = 1;
+        if ($this->feesTabLoaded || $this->receiptsTabLoaded) {
+            $this->loadPayments();
+        }
+    }
+
+    public function previousPaymentsPage(): void
+    {
+        $this->paymentsPage = max(1, $this->paymentsPage - 1);
+        $this->loadPayments();
+    }
+
+    public function nextPaymentsPage(): void
+    {
+        $this->paymentsPage = min($this->paymentsLastPage, $this->paymentsPage + 1);
+        $this->loadPayments();
     }
 
     public function loadAttendanceTab(): void
     {
-        if ($this->attendanceTabLoaded) {
-            return;
+        if (! $this->attendanceTabLoaded) {
+            $this->attendanceTabLoaded = true;
+            $this->cachedProfileSummary = null;
         }
 
-        $this->attendanceTabLoaded = true;
-        $this->cachedProfileSummary = null;
-        $this->record->loadMissing(['activeBatchStudent.batch.trainer']);
+        $this->refreshAttendanceTab();
+    }
 
+    public function updatedAttendanceMonth(): void
+    {
+        $this->attendancePage = 1;
+        if ($this->attendanceTabLoaded) {
+            $this->refreshAttendanceTab();
+        }
+    }
+
+    public function previousAttendancePage(): void
+    {
+        $this->attendancePage = max(1, $this->attendancePage - 1);
+        $this->refreshAttendanceTab();
+    }
+
+    public function nextAttendancePage(): void
+    {
+        $this->attendancePage = min($this->attendanceLastPage, $this->attendancePage + 1);
+        $this->refreshAttendanceTab();
+    }
+
+    protected function refreshAttendanceTab(): void
+    {
+        $this->record->loadMissing(['activeBatchStudent.batch.trainer']);
         $this->activeBatch = $this->record->activeBatchStudent?->batch;
 
         if (! $this->activeBatch) {
             $this->attendanceRecords = new Collection;
             $this->attendancePercentage = null;
             $this->attendanceSummary = null;
+            $this->attendanceTotal = 0;
+            $this->attendanceLastPage = 1;
 
             return;
         }
 
-        $this->attendanceRecords = Attendance::query()
+        if (! filled($this->attendanceMonth) || ! preg_match('/^\d{4}-\d{2}$/', $this->attendanceMonth)) {
+            $this->attendanceMonth = now()->format('Y-m');
+        }
+
+        $monthStart = \Illuminate\Support\Carbon::createFromFormat('Y-m', $this->attendanceMonth)->startOfMonth();
+        $monthEnd = $monthStart->copy()->endOfMonth();
+
+        $query = Attendance::query()
             ->where('batch_id', $this->activeBatch->id)
             ->where('student_id', $this->record->id)
+            ->whereBetween('attendance_date', [$monthStart->toDateString(), $monthEnd->toDateString()]);
+
+        $this->attendanceTotal = (clone $query)->count();
+        $perPage = CrmPagination::PER_PAGE;
+        $this->attendanceLastPage = max(1, (int) ceil($this->attendanceTotal / $perPage));
+        $this->attendancePage = min(max(1, $this->attendancePage), $this->attendanceLastPage);
+
+        $this->attendanceRecords = $query
             ->orderByDesc('attendance_date')
-            ->limit(CrmPagination::PER_PAGE)
+            ->forPage($this->attendancePage, $perPage)
             ->get();
 
-        $this->attendanceSummary = app(AttendanceService::class)->monthToDateSummaryForStudent($this->record);
+        $this->attendanceSummary = app(AttendanceService::class)
+            ->summaryForStudentInMonth($this->record, $this->attendanceMonth);
         $this->attendancePercentage = $this->attendanceSummary['percentage'] ?? null;
+    }
+
+    public function downloadAttendanceMonthPdf(ReportService $reports, ReportPdfService $pdf): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        abort_unless($this->userCan(CrmPermission::StudentsView), 403);
+
+        if (! filled($this->attendanceMonth) || ! preg_match('/^\d{4}-\d{2}$/', $this->attendanceMonth)) {
+            $this->attendanceMonth = now()->format('Y-m');
+        }
+
+        $from = \Illuminate\Support\Carbon::createFromFormat('Y-m', $this->attendanceMonth)->startOfMonth();
+        $to = $from->copy()->endOfMonth();
+        if ($to->isFuture()) {
+            $to = now();
+        }
+
+        $data = $reports->generate(ReportType::AttendanceByStudent, [
+            'date_from' => $from->toDateString(),
+            'date_to' => $to->toDateString(),
+            'student_id' => $this->record->id,
+        ]);
+
+        $summary = app(AttendanceService::class)->summaryForStudentInMonth($this->record, $this->attendanceMonth);
+        if ($summary) {
+            $data['title'] .= ' · '.$summary['percentage'].'% ('.$summary['credited_days'].'/'.$summary['expected_days'].' working days)';
+        }
+
+        $filename = 'attendance-'.$this->record->id.'-'.$this->attendanceMonth.'.pdf';
+
+        return response()->streamDownload(
+            fn () => print $pdf->generate($data),
+            $filename,
+            ['Content-Type' => 'application/pdf'],
+        );
     }
 
     public function loadHomeworkTab(): void
@@ -2836,6 +2967,11 @@ class StudentProfilePage extends Page
                                     ], $this->miscChargesEagerLoadPaths())),
                                     'feesTabLoaded' => $this->feesTabLoaded,
                                     'payments' => $this->payments,
+                                    'paymentsMonth' => $this->paymentsMonth,
+                                    'paymentsPage' => $this->paymentsPage,
+                                    'paymentsTotal' => $this->paymentsTotal,
+                                    'paymentsLastPage' => $this->paymentsLastPage,
+                                    'paymentsPerPage' => CrmPagination::PER_PAGE,
                                     'installments' => $this->installments,
                                     'penalties' => $this->penalties,
                                     'feeStructureHistory' => $this->feeStructureHistory,
@@ -2872,6 +3008,11 @@ class StudentProfilePage extends Page
                                     'attendanceRecords' => $this->attendanceRecords,
                                     'attendancePercentage' => $this->attendancePercentage,
                                     'attendanceSummary' => $this->attendanceSummary,
+                                    'attendanceMonth' => $this->attendanceMonth,
+                                    'attendancePage' => $this->attendancePage,
+                                    'attendanceTotal' => $this->attendanceTotal,
+                                    'attendanceLastPage' => $this->attendanceLastPage,
+                                    'attendancePerPage' => CrmPagination::PER_PAGE,
                                     'student' => $this->record,
                                 ]),
                         ]),
