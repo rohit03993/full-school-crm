@@ -47,7 +47,10 @@ class BiometricAdmsIngestService
         $sn = $device->serial_number;
         $attStamp = $device->attlog_stamp ?: 'None';
         $operStamp = $device->operlog_stamp ?: '9999';
-        $tz = config('biometric.timezone', config('app.timezone', 'Asia/Kolkata'));
+        // K40 / ADMS expect UTC offset in minutes (IST = 330), not "Asia/Kolkata".
+        $tzMinutes = $this->deviceTimezoneOffsetMinutes();
+        $serverTime = Carbon::now(config('biometric.timezone', config('app.timezone', 'Asia/Kolkata')))
+            ->format('Y-m-d H:i:s');
 
         $device->touchSeen();
 
@@ -61,10 +64,31 @@ class BiometricAdmsIngestService
             'TransTimes=00:00;14:05',
             'TransInterval=1',
             'TransFlag=TransData AttLog OpLog',
-            "TimeZone={$tz}",
+            "TimeZone={$tzMinutes}",
+            "DateTime={$serverTime}",
             'Realtime=1',
             'Encrypt=None',
         ])."\n";
+    }
+
+    /**
+     * ZKTeco ADMS TimeZone option: minutes east of UTC (e.g. 330 for India).
+     */
+    public function deviceTimezoneOffsetMinutes(): int
+    {
+        $configured = config('biometric.timezone_offset_minutes');
+
+        if ($configured !== null && $configured !== '') {
+            return (int) $configured;
+        }
+
+        $tz = config('biometric.timezone', config('app.timezone', 'Asia/Kolkata'));
+
+        try {
+            return (int) round(Carbon::now($tz)->getOffset() / 60);
+        } catch (Throwable) {
+            return 330;
+        }
     }
 
     /**

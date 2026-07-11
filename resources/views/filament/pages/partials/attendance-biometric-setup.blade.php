@@ -23,6 +23,10 @@
             · Active devices: <strong>{{ $status['active_device_count'] ?? 0 }}</strong>
             · Raw punches: <strong>{{ number_format($status['raw_punch_count'] ?? 0) }}</strong>
         </p>
+        <p class="mt-2 text-xs text-amber-800 dark:text-amber-200">
+            Machine clock: CRM handshake sends <code>TimeZone=330</code> (IST minutes) and server
+            <code>DateTime</code>. If the display was wrong after connecting to ADMS, pull this fix and wait for the next poll — do not keep resetting the clock manually.
+        </p>
         <div class="mt-4">
             <a
                 href="{{ \App\Filament\Resources\BiometricDevices\BiometricDeviceResource::getUrl() }}"

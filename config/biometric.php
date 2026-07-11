@@ -23,6 +23,17 @@ return [
     /** After saving raw + punch_logs, run processPending immediately. */
     'process_inline' => env('BIOMETRIC_ADMS_PROCESS_INLINE', true),
 
+    /**
+     * IANA zone used when parsing punch timestamps from the device
+     * (device sends local wall-clock times, not UTC).
+     */
     'timezone' => env('BIOMETRIC_ADMS_TIMEZONE', env('APP_TIMEZONE', 'Asia/Kolkata')),
+
+    /**
+     * ADMS handshake TimeZone value: minutes east of UTC.
+     * K40 Pro ignores names like Asia/Kolkata — use 330 for India.
+     * Leave null to compute from biometric.timezone.
+     */
+    'timezone_offset_minutes' => env('BIOMETRIC_ADMS_TZ_OFFSET_MINUTES'),
 
 ];

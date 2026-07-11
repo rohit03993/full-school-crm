@@ -44,6 +44,9 @@ class BiometricAdmsIngestTest extends TestCase
         $response->assertOk();
         $response->assertSee('GET OPTION FROM: K40TEST001', false);
         $response->assertSee('Realtime=1', false);
+        // K40 expects minutes east of UTC (IST = 330), not Asia/Kolkata.
+        $response->assertSee('TimeZone=330', false);
+        $response->assertSee('DateTime=', false);
     }
 
     public function test_attlog_is_stored_and_mirrored_to_punch_logs(): void
