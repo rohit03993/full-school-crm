@@ -112,7 +112,7 @@ class AttendancePage extends Page
     public array $marks = [];
 
     /**
-     * @var array<int, array{status: string, checked_in_at: ?string, checked_out_at: ?string, is_inside: bool}>
+     * @var array<int, array{status: string, checked_in_at: ?string, checked_out_at: ?string, is_inside: bool, punch_source?: ?string}>
      */
     public array $attendanceSnapshot = [];
 
@@ -290,7 +290,7 @@ class AttendancePage extends Page
             ->join('students', 'students.id', '=', 'batch_students.student_id')
             ->orderBy('students.name')
             ->select('batch_students.*')
-            ->with('student')
+            ->with(['student.activeEnrollment'])
             ->get();
 
         $attendance = app(AttendanceService::class);

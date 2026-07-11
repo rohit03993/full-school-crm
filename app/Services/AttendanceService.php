@@ -226,7 +226,8 @@ class AttendanceService
      *     status: string,
      *     checked_in_at: ?string,
      *     checked_out_at: ?string,
-     *     is_inside: bool
+     *     is_inside: bool,
+     *     punch_source: ?string
      * }>
      */
     public function punchSnapshotForBatchDate(Batch $batch, string $date): array
@@ -245,6 +246,7 @@ class AttendanceService
                         'checked_in_at' => $checkedIn,
                         'checked_out_at' => $checkedOut,
                         'is_inside' => $checkedIn !== null && $checkedOut === null,
+                        'punch_source' => $row->punch_source,
                     ],
                 ];
             })
