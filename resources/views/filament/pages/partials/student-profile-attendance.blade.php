@@ -60,7 +60,7 @@
             <p class="font-semibold text-gray-950 dark:text-white">How to read this</p>
             <ul class="mt-2 list-inside list-disc space-y-1">
                 <li><strong>%</strong> — Selected month: Present(+Leave) ÷ working days (Sundays excluded)</li>
-                <li><strong>IN / OUT</strong> — Biometric or manual punch times</li>
+                <li><strong>Visits</strong> — Each biometric/manual IN→OUT pair for that day (same as Live attendance)</li>
                 <li>Use month filter + Print/PDF for parent or file copies. Full class reports: Reports menu.</li>
             </ul>
         </div>
@@ -74,21 +74,37 @@
                         <tr>
                             <th class="px-4 py-2.5">Date</th>
                             <th class="px-4 py-2.5">Status</th>
-                            <th class="px-4 py-2.5">Check-in</th>
-                            <th class="px-4 py-2.5">Check-out</th>
+                            <th class="px-4 py-2.5" colspan="2">Visits (IN / OUT)</th>
                             <th class="px-4 py-2.5">Source</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-white/10">
                         @foreach ($attendanceRecords as $record)
                             @php
-                                $visit = \App\Support\AttendanceSourceLabel::visitState($record->checked_in_at, $record->checked_out_at);
+                                $roll = $student?->activeEnrollment?->enrollment_number;
+                                $dayRow = filled($roll)
+                                    ? app(\App\Services\Punch\LivePunchDashboardService::class)->studentDayRow(
+                                        (string) $roll,
+                                        $record->attendance_date->toDateString(),
+                                        $student,
+                                    )
+                                    : null;
+                                $pairs = $dayRow['pairs'] ?? [];
+                                $lastPair = $pairs !== [] ? $pairs[array_key_last($pairs)] : null;
+                                $visit = $lastPair
+                                    ? (filled($lastPair['out'] ?? null) ? 'Checked out' : 'Inside')
+                                    : \App\Support\AttendanceSourceLabel::visitState($record->checked_in_at, $record->checked_out_at);
                             @endphp
                             <tr class="bg-white dark:bg-gray-900">
-                                <td class="px-4 py-2.5 font-medium text-gray-950 dark:text-white">
+                                <td class="px-4 py-2.5 font-medium text-gray-950 dark:text-white align-top">
                                     {{ $record->attendance_date->format('d M Y') }}
+                                    @if (count($pairs) > 1)
+                                        <p class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                                            {{ count($pairs) }} visits
+                                        </p>
+                                    @endif
                                 </td>
-                                <td class="px-4 py-2.5">
+                                <td class="px-4 py-2.5 align-top">
                                     <div class="flex flex-wrap items-center gap-1.5">
                                         <span @class([
                                             'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold',
@@ -107,13 +123,38 @@
                                         @endif
                                     </div>
                                 </td>
-                                <td class="px-4 py-2.5 font-mono text-xs text-emerald-700 dark:text-emerald-300">
-                                    {{ $record->checked_in_at?->format('H:i') ?? '—' }}
+                                <td class="px-4 py-2.5 align-top" colspan="2">
+                                    @if ($pairs !== [])
+                                        <div class="space-y-2">
+                                            @foreach ($pairs as $index => $pair)
+                                                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono text-xs">
+                                                    <span class="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                                                        Visit {{ $index + 1 }}
+                                                    </span>
+                                                    <span class="text-emerald-700 dark:text-emerald-300">
+                                                        IN {{ $pair['in'] ?? '—' }}
+                                                    </span>
+                                                    <span class="text-rose-700 dark:text-rose-300">
+                                                        OUT {{ filled($pair['out'] ?? null) ? $pair['out'] : '—' }}
+                                                    </span>
+                                                    @if (filled($pair['duration_label'] ?? null))
+                                                        <span class="text-gray-400">{{ $pair['duration_label'] }}</span>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <div class="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs">
+                                            <span class="text-emerald-700 dark:text-emerald-300">
+                                                IN {{ $record->checked_in_at?->format('H:i') ?? '—' }}
+                                            </span>
+                                            <span class="text-rose-700 dark:text-rose-300">
+                                                OUT {{ $record->checked_out_at?->format('H:i') ?? '—' }}
+                                            </span>
+                                        </div>
+                                    @endif
                                 </td>
-                                <td class="px-4 py-2.5 font-mono text-xs text-rose-700 dark:text-rose-300">
-                                    {{ $record->checked_out_at?->format('H:i') ?? '—' }}
-                                </td>
-                                <td class="px-4 py-2.5 text-xs text-gray-600 dark:text-gray-300">
+                                <td class="px-4 py-2.5 text-xs text-gray-600 dark:text-gray-300 align-top">
                                     {{ \App\Support\AttendanceSourceLabel::forRecord($record, $student) }}
                                 </td>
                             </tr>

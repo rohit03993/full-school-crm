@@ -21,12 +21,14 @@ class AddStudentFormSchema
     /**
      * @return array<string, mixed>
      */
-    public static function initialState(): array
+    public static function initialState(?string $rollNumber = null): array
     {
+        $roll = strtoupper(trim((string) $rollNumber));
+
         return [
             'academic_session_id' => AcademicSession::current()?->id,
             'batch_id' => null,
-            'roll_number' => '',
+            'roll_number' => $roll,
             'name' => '',
             'father_name' => null,
             'mobile' => null,

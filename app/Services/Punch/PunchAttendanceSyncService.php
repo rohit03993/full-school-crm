@@ -38,12 +38,23 @@ class PunchAttendanceSyncService
 
         if ($state === 'IN') {
             if ($existing) {
-                $existing->update([
+                $payload = [
                     'status' => AttendanceStatus::Present,
-                    'checked_in_at' => $checkedInAt,
                     'punch_source' => $existing->punch_source ?? $source,
                     'marked_by_user_id' => $markedByUserId ?? $existing->marked_by_user_id ?? $staffId,
-                ]);
+                ];
+
+                // Keep first IN of the day — do not overwrite with a later visit.
+                if ($existing->checked_in_at === null || $checkedInAt->lt($existing->checked_in_at)) {
+                    $payload['checked_in_at'] = $checkedInAt;
+                }
+
+                // New visit after checkout → clear OUT so status is Inside again.
+                if ($existing->checked_out_at !== null && $checkedInAt->gte($existing->checked_out_at)) {
+                    $payload['checked_out_at'] = null;
+                }
+
+                $existing->update($payload);
             } else {
                 Attendance::query()->create([
                     'batch_id' => $batchId,
@@ -60,10 +71,13 @@ class PunchAttendanceSyncService
         }
 
         if ($existing) {
-            $existing->update([
-                'checked_out_at' => $checkedInAt,
-                'punch_source' => $existing->punch_source ?? $source,
-            ]);
+            // Keep last OUT of the day when multiple visits exist.
+            if ($existing->checked_out_at === null || $checkedInAt->gt($existing->checked_out_at)) {
+                $existing->update([
+                    'checked_out_at' => $checkedInAt,
+                    'punch_source' => $existing->punch_source ?? $source,
+                ]);
+            }
         }
     }
 

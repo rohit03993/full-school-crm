@@ -7,7 +7,7 @@ use App\Models\AttendancePunchWhatsappLog;
 use App\Models\Batch;
 use App\Models\Enrollment;
 use App\Filament\Pages\StudentProfilePage;
-use App\Filament\Pages\StudentSearchPage;
+use App\Filament\Resources\Students\StudentResource;
 use App\Models\Student;
 use App\Support\PunchDuration;
 use App\Support\PunchWhatsappStatus;
@@ -137,7 +137,7 @@ class LivePunchDashboardService
             'profile_url' => $student
                 ? StudentProfilePage::getUrl(['record' => $student->id])
                 : null,
-            'find_student_url' => StudentSearchPage::getUrl().'?roll='.urlencode($roll),
+            'find_student_url' => StudentResource::getUrl('index').'?action=addStudent&roll='.urlencode($roll),
         ];
     }
 

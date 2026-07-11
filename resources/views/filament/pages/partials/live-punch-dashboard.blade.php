@@ -201,7 +201,7 @@
                             @if ($row['is_mapped'] && filled($row['profile_url'] ?? null))
                                 <a href="{{ $row['profile_url'] }}" class="rounded-xl bg-primary-500/10 px-3 py-2 text-xs font-bold text-primary-700 ring-1 ring-primary-500/20 hover:bg-primary-500/15 dark:text-primary-300">Profile</a>
                             @else
-                                <a href="{{ $row['find_student_url'] }}" class="rounded-xl bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-900 ring-1 ring-amber-500/20 dark:text-amber-200">Link student</a>
+                                <a href="{{ $row['find_student_url'] }}" class="rounded-xl bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-900 ring-1 ring-amber-500/20 dark:text-amber-200">Add student</a>
                             @endif
                             <button type="button" x-on:click="open = ! open" class="rounded-xl bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 dark:bg-white/10 dark:text-gray-200">
                                 <span x-text="open ? 'Less' : 'Details'"></span>

@@ -211,6 +211,27 @@ class PunchAttendanceSyncTest extends TestCase
         $this->assertStringNotContainsString('OUT OUT', $label);
     }
 
+    public function test_second_visit_keeps_first_in_and_clears_out_while_inside(): void
+    {
+        [$student] = $this->createEnrolledStudent('ROLL-MULTI');
+        $sync = app(PunchAttendanceSyncService::class);
+
+        $sync->syncFromPunch($student, '2026-07-11', 'IN', '14:11:53');
+        $sync->syncFromPunch($student, '2026-07-11', 'OUT', '14:27:02');
+        $sync->syncFromPunch($student, '2026-07-11', 'IN', '16:22:30');
+
+        $attendance = Attendance::query()->first();
+
+        $this->assertSame('14:11:53', $attendance?->checked_in_at?->format('H:i:s'));
+        $this->assertNull($attendance?->checked_out_at);
+
+        $sync->syncFromPunch($student, '2026-07-11', 'OUT', '17:05:00');
+
+        $attendance = $attendance->fresh();
+        $this->assertSame('14:11:53', $attendance?->checked_in_at?->format('H:i:s'));
+        $this->assertSame('17:05:00', $attendance?->checked_out_at?->format('H:i:s'));
+    }
+
     /**
      * @return array{0: Student, 1: Batch}
      */

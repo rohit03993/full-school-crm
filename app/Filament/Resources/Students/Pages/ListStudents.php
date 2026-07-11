@@ -75,9 +75,13 @@ class ListStudents extends ListRecords
                 ->icon(Heroicon::OutlinedUserPlus)
                 ->color('primary')
                 ->modalHeading('Add student')
-                ->modalDescription('Enroll one student with roll number and batch. Fee is set from the course — adjust on the profile if needed.')
+                ->modalDescription(filled(request()->query('roll'))
+                    ? 'Enroll this biometric roll ('.strtoupper((string) request()->query('roll')).') with a batch. Future punches will map automatically.'
+                    : 'Enroll one student with roll number and batch. Fee is set from the course — adjust on the profile if needed.')
                 ->modalSubmitActionLabel('Enroll student')
-                ->fillForm(fn (): array => AddStudentFormSchema::initialState())
+                ->fillForm(fn (): array => AddStudentFormSchema::initialState(
+                    filled(request()->query('roll')) ? (string) request()->query('roll') : null,
+                ))
                 ->form(fn (): array => AddStudentFormSchema::fields())
                 ->action(function (array $data, StudentBulkImportService $imports): void {
                     $batch = Batch::query()->findOrFail((int) $data['batch_id']);
