@@ -30,7 +30,7 @@ class PunchAttendanceProcessor
                 $handled = $this->handleQueueItem($item);
                 $stats['processed']++;
                 $stats['synced'] += $handled['synced'] ? 1 : 0;
-                $stats['notified'] += $handled['whatsapp']['queued'] ? 1 : 0;
+                $stats['notified'] += ($handled['whatsapp']['queued'] ?? false) ? 1 : 0;
             }
         }
 
@@ -42,7 +42,7 @@ class PunchAttendanceProcessor
                 $handled = $this->handleMachinePunch($punch);
                 $stats['processed']++;
                 $stats['synced'] += $handled['synced'] ? 1 : 0;
-                $stats['notified'] += $handled['whatsapp']['queued'] ? 1 : 0;
+                $stats['notified'] += ($handled['whatsapp']['queued'] ?? false) ? 1 : 0;
 
                 Setting::setValue('attendance.last_processed_punch_log_id', (string) $punch->id, 'attendance');
             }
@@ -97,12 +97,12 @@ class PunchAttendanceProcessor
     }
 
     /**
-     * @return array{synced: bool, notified: bool}
+     * @return array{synced: bool, whatsapp: array{queued: bool, message: string}}
      */
     private function handleMachinePunch(object $punch): array
     {
         if ($this->isManualPunchRow($punch)) {
-            return ['synced' => false, 'notified' => false];
+            return $this->emptyPunchResult();
         }
 
         $roll = $this->logs->normalizeRoll((string) ($punch->employee_id ?? ''));
@@ -112,7 +112,7 @@ class PunchAttendanceProcessor
         $student = $this->logs->findStudentByRoll($roll);
 
         if (! $student) {
-            return ['synced' => false, 'notified' => false];
+            return $this->emptyPunchResult();
         }
 
         $state = $this->resolveState($roll, $date, $time);
@@ -121,7 +121,7 @@ class PunchAttendanceProcessor
     }
 
     /**
-     * @return array{synced: bool, notified: bool}
+     * @return array{synced: bool, whatsapp: array{queued: bool, message: string}}
      */
     private function handleQueueItem(object $item): array
     {
@@ -133,7 +133,7 @@ class PunchAttendanceProcessor
             $student = $this->logs->findStudentByRoll($roll);
 
             if (! $student) {
-                return ['synced' => false, 'notified' => false];
+                return $this->emptyPunchResult();
             }
 
             $state = $this->resolveState($roll, $date, $time);
@@ -144,6 +144,17 @@ class PunchAttendanceProcessor
                 ->where('id', $item->id)
                 ->update(['processed' => true, 'processed_at' => now()]);
         }
+    }
+
+    /**
+     * @return array{synced: bool, whatsapp: array{queued: bool, message: string}}
+     */
+    private function emptyPunchResult(): array
+    {
+        return [
+            'synced' => false,
+            'whatsapp' => ['queued' => false, 'message' => ''],
+        ];
     }
 
     /**
