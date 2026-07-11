@@ -21,7 +21,7 @@ class MetaWhatsAppConversationService
     /**
      * @return Collection<int, MetaWhatsAppConversation>
      */
-    public function recentConversations(?string $search = null, int $limit = 50): Collection
+    public function recentConversations(?string $search = null, int $limit = 500): Collection
     {
         if (! Schema::hasTable('meta_whatsapp_messages')) {
             return $this->conversationsFromCampaignsOnly($search, $limit);
@@ -29,6 +29,8 @@ class MetaWhatsAppConversationService
 
         $latestIds = MetaWhatsAppMessage::query()
             ->selectRaw('MAX(id) as id')
+            ->whereNotNull('phone')
+            ->where('phone', '!=', '')
             ->groupBy('phone')
             ->pluck('id');
 
@@ -64,7 +66,7 @@ class MetaWhatsAppConversationService
             ->whereNotNull('student_id')
             ->when($seenStudentIds !== [], fn ($query) => $query->whereNotIn('student_id', array_keys($seenStudentIds)))
             ->orderByDesc('updated_at')
-            ->limit(200)
+            ->limit(max(200, $limit))
             ->get()
             ->unique('student_id')
             ->each(function (WhatsAppCampaignRecipient $recipient) use ($conversations, &$seenPhones): void {
@@ -99,7 +101,7 @@ class MetaWhatsAppConversationService
             ->with(['student:id,name,mobile,status', 'campaign.template'])
             ->whereNotNull('student_id')
             ->orderByDesc('updated_at')
-            ->limit(200)
+            ->limit(max(200, $limit))
             ->get()
             ->unique('student_id')
             ->map(function (WhatsAppCampaignRecipient $recipient): ?MetaWhatsAppConversation {

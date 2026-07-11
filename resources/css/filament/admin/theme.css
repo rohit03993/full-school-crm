@@ -1180,14 +1180,21 @@
 
     .crm-wa-global-inbox__shell {
         @apply grid h-full min-h-0 gap-0 overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm dark:border-white/10 dark:bg-gray-950 lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)];
+        grid-template-rows: minmax(14rem, 42%) minmax(0, 1fr);
+    }
+
+    @media (min-width: 1024px) {
+        .crm-wa-global-inbox__shell {
+            grid-template-rows: minmax(0, 1fr);
+        }
     }
 
     .crm-wa-global-inbox__list {
-        @apply flex min-h-0 flex-col border-b border-gray-200/80 bg-gray-50/70 dark:border-white/10 dark:bg-gray-900/40 lg:border-b-0 lg:border-r;
+        @apply flex min-h-0 flex-col overflow-hidden border-b border-gray-200/80 bg-gray-50/70 dark:border-white/10 dark:bg-gray-900/40 lg:border-b-0 lg:border-r;
     }
 
     .crm-wa-global-inbox__list-head {
-        @apply border-b border-gray-200/70 px-4 py-4 dark:border-white/10;
+        @apply shrink-0 border-b border-gray-200/70 px-4 py-4 dark:border-white/10;
     }
 
     .crm-wa-global-inbox__list-title {
@@ -1199,7 +1206,7 @@
     }
 
     .crm-wa-global-inbox__search {
-        @apply relative border-b border-gray-200/70 px-3 py-3 dark:border-white/10;
+        @apply relative shrink-0 border-b border-gray-200/70 px-3 py-3 dark:border-white/10;
     }
 
     .crm-wa-global-inbox__search-icon {
@@ -1212,6 +1219,7 @@
 
     .crm-wa-global-inbox__items {
         @apply min-h-0 flex-1 overflow-y-auto overscroll-contain;
+        -webkit-overflow-scrolling: touch;
     }
 
     .crm-wa-global-inbox__item {

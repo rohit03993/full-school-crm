@@ -4,7 +4,13 @@
             <div class="crm-wa-global-inbox__list-head">
                 <div>
                     <h2 class="crm-wa-global-inbox__list-title">Recent chats</h2>
-                    <p class="crm-wa-global-inbox__list-sub">All WhatsApp conversations — students and unknown numbers</p>
+                    <p class="crm-wa-global-inbox__list-sub">
+                        @if ($inboxLoaded)
+                            {{ count($conversations) }} conversation{{ count($conversations) === 1 ? '' : 's' }} — scroll for more
+                        @else
+                            All WhatsApp conversations — students and unknown numbers
+                        @endif
+                    </p>
                 </div>
             </div>
 

@@ -103,7 +103,7 @@ class WhatsAppInboxPage extends Page
 
         try {
             $this->conversations = app(MetaWhatsAppConversationService::class)
-                ->recentConversations($this->search)
+                ->recentConversations($this->search, 500)
                 ->map(fn (MetaWhatsAppConversation $conversation): array => $conversation->toArray())
                 ->values()
                 ->all();
