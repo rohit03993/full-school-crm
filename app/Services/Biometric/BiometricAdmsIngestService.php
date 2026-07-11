@@ -1,0 +1,281 @@
+<?php
+
+namespace App\Services\Biometric;
+
+use App\Models\BiometricDevice;
+use App\Models\BiometricPunch;
+use App\Services\Punch\PunchAttendanceProcessor;
+use App\Services\Punch\PunchLogService;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Throwable;
+
+class BiometricAdmsIngestService
+{
+    public function __construct(
+        protected PunchLogService $punchLogs,
+        protected PunchAttendanceProcessor $processor,
+    ) {}
+
+    public function findAllowedDevice(string $serial): ?BiometricDevice
+    {
+        $serial = strtoupper(trim($serial));
+
+        if ($serial === '') {
+            return null;
+        }
+
+        $device = BiometricDevice::query()
+            ->whereRaw('UPPER(serial_number) = ?', [$serial])
+            ->first();
+
+        if (! $device) {
+            return null;
+        }
+
+        if (config('biometric.require_allowlist', true) && ! $device->is_active) {
+            return null;
+        }
+
+        return $device;
+    }
+
+    public function handshakeOptions(BiometricDevice $device): string
+    {
+        $sn = $device->serial_number;
+        $attStamp = $device->attlog_stamp ?: 'None';
+        $operStamp = $device->operlog_stamp ?: '9999';
+        $tz = config('biometric.timezone', config('app.timezone', 'Asia/Kolkata'));
+
+        $device->touchSeen();
+
+        return implode("\n", [
+            "GET OPTION FROM: {$sn}",
+            "ATTLOGStamp={$attStamp}",
+            "OPERLOGStamp={$operStamp}",
+            'ATTPHOTOStamp=None',
+            'ErrorDelay=30',
+            'Delay=10',
+            'TransTimes=00:00;14:05',
+            'TransInterval=1',
+            'TransFlag=TransData AttLog OpLog',
+            "TimeZone={$tz}",
+            'Realtime=1',
+            'Encrypt=None',
+        ])."\n";
+    }
+
+    /**
+     * @return array{accepted: int, mirrored: int, duplicates: int, errors: int}
+     */
+    public function ingestAttLog(BiometricDevice $device, string $body, ?string $stamp = null): array
+    {
+        $stats = ['accepted' => 0, 'mirrored' => 0, 'duplicates' => 0, 'errors' => 0];
+        $lines = preg_split("/\r\n|\n|\r/", trim($body)) ?: [];
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if ($line === '') {
+                continue;
+            }
+
+            try {
+                $parsed = $this->parseAttLogLine($line);
+
+                if ($parsed === null) {
+                    $stats['errors']++;
+                    Log::warning('biometric.adms.attlog_parse_failed', [
+                        'serial' => $device->serial_number,
+                        'line' => $line,
+                    ]);
+
+                    continue;
+                }
+
+                $result = $this->storePunch($device, $parsed, $line, [
+                    'stamp' => $stamp,
+                    'table' => 'ATTLOG',
+                ]);
+
+                if ($result === 'duplicate') {
+                    $stats['duplicates']++;
+                } elseif ($result === 'mirrored') {
+                    $stats['accepted']++;
+                    $stats['mirrored']++;
+                } else {
+                    $stats['accepted']++;
+                    $stats['errors']++;
+                }
+            } catch (Throwable $exception) {
+                $stats['errors']++;
+                Log::error('biometric.adms.attlog_ingest_failed', [
+                    'serial' => $device->serial_number,
+                    'line' => $line,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        if ($stamp !== null && $stamp !== '') {
+            $device->touchSeen($stamp, null);
+        } else {
+            $device->touchSeen();
+        }
+
+        if ($stats['mirrored'] > 0 && config('biometric.process_inline', true)) {
+            try {
+                $this->processor->processPending();
+            } catch (Throwable $exception) {
+                Log::warning('biometric.adms.process_inline_failed', [
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        return $stats;
+    }
+
+    /**
+     * @param  array{user_pin: string, punched_at: Carbon, punch_status: ?int, verify_type: ?int, work_code: ?string}  $parsed
+     */
+    protected function storePunch(BiometricDevice $device, array $parsed, string $rawLine, array $meta): string
+    {
+        $existing = BiometricPunch::query()
+            ->where('serial_number', $device->serial_number)
+            ->where('user_pin', $parsed['user_pin'])
+            ->where('punched_at', $parsed['punched_at']->format('Y-m-d H:i:s'))
+            ->where('punch_status', $parsed['punch_status'])
+            ->first();
+
+        if ($existing) {
+            return 'duplicate';
+        }
+
+        return DB::transaction(function () use ($device, $parsed, $rawLine, $meta): string {
+            $punch = BiometricPunch::query()->create([
+                'biometric_device_id' => $device->id,
+                'serial_number' => $device->serial_number,
+                'user_pin' => $parsed['user_pin'],
+                'punched_at' => $parsed['punched_at'],
+                'punch_status' => $parsed['punch_status'],
+                'verify_type' => $parsed['verify_type'],
+                'work_code' => $parsed['work_code'],
+                'process_status' => BiometricPunch::STATUS_PENDING,
+                'raw_line' => $rawLine,
+                'raw_payload' => $meta,
+            ]);
+
+            $device->recordPunchReceived();
+
+            $punchLogId = $this->mirrorToPunchLogs($device, $parsed);
+
+            if ($punchLogId === null) {
+                $punch->update([
+                    'process_status' => BiometricPunch::STATUS_FAILED,
+                    'process_error' => 'Could not write punch_logs row.',
+                ]);
+
+                return 'failed';
+            }
+
+            $punch->update([
+                'punch_log_id' => $punchLogId,
+                'process_status' => BiometricPunch::STATUS_MIRRORED,
+                'process_error' => null,
+            ]);
+
+            return 'mirrored';
+        });
+    }
+
+    /**
+     * @param  array{user_pin: string, punched_at: Carbon, punch_status: ?int, verify_type: ?int, work_code: ?string}  $parsed
+     */
+    protected function mirrorToPunchLogs(BiometricDevice $device, array $parsed): ?int
+    {
+        $table = $this->punchLogs->punchTable();
+
+        if (! Schema::hasTable($table)) {
+            return null;
+        }
+
+        $employeeId = $this->punchLogs->normalizeRoll($parsed['user_pin']);
+        $date = $parsed['punched_at']->toDateString();
+        $time = $parsed['punched_at']->format('H:i:s');
+
+        $duplicate = DB::table($table)
+            ->where('employee_id', $employeeId)
+            ->where('punch_date', $date)
+            ->where('punch_time', $time)
+            ->when(Schema::hasColumn($table, 'device_name'), fn ($q) => $q->where('device_name', $device->name))
+            ->exists();
+
+        if ($duplicate) {
+            $id = DB::table($table)
+                ->where('employee_id', $employeeId)
+                ->where('punch_date', $date)
+                ->where('punch_time', $time)
+                ->value('id');
+
+            return $id ? (int) $id : null;
+        }
+
+        $payload = [
+            'employee_id' => $employeeId,
+            'punch_date' => $date,
+            'punch_time' => $time,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn($table, 'device_name')) {
+            $payload['device_name'] = $device->name;
+        }
+
+        if (Schema::hasColumn($table, 'area_name')) {
+            $payload['area_name'] = $device->location;
+        }
+
+        if (Schema::hasColumn($table, 'is_manual')) {
+            $payload['is_manual'] = false;
+        }
+
+        return (int) DB::table($table)->insertGetId($payload);
+    }
+
+    /**
+     * @return array{user_pin: string, punched_at: Carbon, punch_status: ?int, verify_type: ?int, work_code: ?string}|null
+     */
+    protected function parseAttLogLine(string $line): ?array
+    {
+        $parts = preg_split("/\t+/", $line) ?: [];
+
+        if (count($parts) < 2) {
+            $parts = preg_split('/\s{2,}|\s/', $line) ?: [];
+        }
+
+        $pin = trim((string) ($parts[0] ?? ''));
+        $when = trim((string) ($parts[1] ?? ''));
+
+        if ($pin === '' || $when === '') {
+            return null;
+        }
+
+        try {
+            $punchedAt = Carbon::parse($when, config('biometric.timezone', config('app.timezone')));
+        } catch (Throwable) {
+            return null;
+        }
+
+        return [
+            'user_pin' => $pin,
+            'punched_at' => $punchedAt,
+            'punch_status' => isset($parts[2]) && is_numeric($parts[2]) ? (int) $parts[2] : null,
+            'verify_type' => isset($parts[3]) && is_numeric($parts[3]) ? (int) $parts[3] : null,
+            'work_code' => isset($parts[4]) ? trim((string) $parts[4]) : null,
+        ];
+    }
+}

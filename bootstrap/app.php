@@ -11,6 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        then: function (): void {
+            require __DIR__.'/../routes/biometric.php';
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
@@ -19,6 +22,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhooks/meta/whatsapp',
             'api/v1/campaign/t1/api/v2',
             'campaign/t1/api/v2',
+            'iclock/*',
+            'iclock',
         ]);
 
         $middleware->alias([

@@ -43,7 +43,7 @@ class ManageAttendanceBiometricPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Connect EasyTimePro punch device data to Academics → Attendance.';
+        return 'ADMS cloud server for ZKTeco devices, plus punch_logs bridge to Academics → Attendance.';
     }
 
     public function content(Schema $schema): Schema
