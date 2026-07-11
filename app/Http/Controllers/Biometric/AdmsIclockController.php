@@ -63,11 +63,11 @@ class AdmsIclockController
     {
         $serial = strtoupper(trim((string) $request->query('SN', $request->query('sn', ''))));
 
-        if ($serial !== '' && ($device = $this->ingest->findAllowedDevice($serial))) {
-            $device->touchSeen();
+        if ($serial === '' || ! ($device = $this->ingest->findAllowedDevice($serial))) {
+            return $this->plain('OK');
         }
 
-        return $this->plain('OK');
+        return $this->plain($this->ingest->pendingDeviceCommands($device));
     }
 
     public function devicecmd(Request $request): Response

@@ -24,8 +24,10 @@
             · Raw punches: <strong>{{ number_format($status['raw_punch_count'] ?? 0) }}</strong>
         </p>
         <p class="mt-2 text-xs text-amber-800 dark:text-amber-200">
-            Machine clock: CRM handshake sends <code>TimeZone=330</code> (IST minutes) and server
-            <code>DateTime</code>. If the display was wrong after connecting to ADMS, pull this fix and wait for the next poll — do not keep resetting the clock manually.
+            Machine clock: CRM sends <code>TimeZone=330</code> (IST) on handshake and again via
+            <code>/iclock/getrequest</code> every minute. If the display shows UTC (~5h30m behind),
+            pull latest, then reboot the device once so it picks up the command. Confirm Cloud Server
+            points only to this CRM (not EasyWDMS at the same time).
         </p>
         <div class="mt-4">
             <a

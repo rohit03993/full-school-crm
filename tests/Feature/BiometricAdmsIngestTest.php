@@ -46,7 +46,8 @@ class BiometricAdmsIngestTest extends TestCase
         $response->assertSee('Realtime=1', false);
         // K40 expects minutes east of UTC (IST = 330), not Asia/Kolkata.
         $response->assertSee('TimeZone=330', false);
-        $response->assertSee('DateTime=', false);
+        $response->assertSee('SyncTime=60', false);
+        $response->assertDontSee('DateTime=', false);
     }
 
     public function test_attlog_is_stored_and_mirrored_to_punch_logs(): void
@@ -107,7 +108,7 @@ class BiometricAdmsIngestTest extends TestCase
         $this->assertSame(0, DB::table('punch_logs')->count());
     }
 
-    public function test_getrequest_returns_ok(): void
+    public function test_getrequest_pushes_timezone_set_option(): void
     {
         BiometricDevice::query()->create([
             'name' => 'Reception',
@@ -115,6 +116,12 @@ class BiometricAdmsIngestTest extends TestCase
             'is_active' => true,
         ]);
 
+        $first = $this->get('/iclock/getrequest?SN=K40TEST001');
+        $first->assertOk();
+        $first->assertSee('SET OPTION TimeZone=330', false);
+        $this->assertMatchesRegularExpression('/C:\d+:SET OPTION TimeZone=330/', $first->getContent());
+
+        // Within sync interval → no repeat command.
         $this->get('/iclock/getrequest?SN=K40TEST001')->assertOk()->assertSee('OK', false);
     }
 }

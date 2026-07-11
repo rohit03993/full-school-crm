@@ -49,12 +49,11 @@ class BiometricAdmsIngestService
         $operStamp = $device->operlog_stamp ?: '9999';
         // K40 / ADMS expect UTC offset in minutes (IST = 330), not "Asia/Kolkata".
         $tzMinutes = $this->deviceTimezoneOffsetMinutes();
-        $serverTime = Carbon::now(config('biometric.timezone', config('app.timezone', 'Asia/Kolkata')))
-            ->format('Y-m-d H:i:s');
 
         $device->touchSeen();
 
-        return implode("\n", [
+        // CRLF + SyncTime: device applies TimeZone with the HTTP Date (GMT) header.
+        return implode("\r\n", [
             "GET OPTION FROM: {$sn}",
             "ATTLOGStamp={$attStamp}",
             "OPERLOGStamp={$operStamp}",
@@ -65,10 +64,36 @@ class BiometricAdmsIngestService
             'TransInterval=1',
             'TransFlag=TransData AttLog OpLog',
             "TimeZone={$tzMinutes}",
-            "DateTime={$serverTime}",
+            'SyncTime=60',
             'Realtime=1',
             'Encrypt=None',
-        ])."\n";
+        ])."\r\n";
+    }
+
+    /**
+     * Force TimeZone onto the device via heartbeat — options=all often runs only once at boot.
+     * Without this, a wrong first handshake leaves the clock stuck on UTC (IST − 5h30m).
+     */
+    public function pendingDeviceCommands(BiometricDevice $device): string
+    {
+        $interval = max(30, (int) config('biometric.time_sync_interval_seconds', 60));
+        $cacheKey = 'biometric:adms:tz_sync:'.strtoupper($device->serial_number);
+        $lastSyncedAt = (int) cache()->get($cacheKey, 0);
+
+        if ($lastSyncedAt > 0 && (now()->getTimestamp() - $lastSyncedAt) < $interval) {
+            $device->touchSeen();
+
+            return 'OK';
+        }
+
+        cache()->put($cacheKey, now()->getTimestamp(), now()->addDay());
+        $device->touchSeen();
+
+        $tzMinutes = $this->deviceTimezoneOffsetMinutes();
+        $cmdId = now()->getTimestamp();
+
+        // C:CmdID:SET OPTION Key=Value — applied on next /iclock/getrequest poll.
+        return "C:{$cmdId}:SET OPTION TimeZone={$tzMinutes}\r\n";
     }
 
     /**

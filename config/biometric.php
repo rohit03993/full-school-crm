@@ -36,4 +36,7 @@ return [
      */
     'timezone_offset_minutes' => env('BIOMETRIC_ADMS_TZ_OFFSET_MINUTES'),
 
+    /** How often to re-push TimeZone via /iclock/getrequest (seconds). */
+    'time_sync_interval_seconds' => (int) env('BIOMETRIC_ADMS_TIME_SYNC_SECONDS', 60),
+
 ];
