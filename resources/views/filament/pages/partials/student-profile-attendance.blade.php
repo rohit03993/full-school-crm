@@ -11,19 +11,26 @@
         <div class="rounded-xl bg-primary-500/5 px-4 py-3 ring-1 ring-primary-500/15 dark:bg-primary-500/10">
             <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Active batch</p>
             <p class="mt-0.5 text-base font-bold text-gray-950 dark:text-white">{{ $activeBatch->name }}</p>
-            @if ($attendancePercentage !== null)
+            @if ($attendancePercentage !== null && $attendanceSummary)
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     Attendance: <span class="font-bold text-emerald-700 dark:text-emerald-400">{{ $attendancePercentage }}%</span>
-                    <span class="text-gray-400">·</span> {{ $attendanceRecords->count() }} day(s) recorded
+                    <span class="text-gray-400">·</span>
+                    {{ $attendanceSummary['credited_days'] }}/{{ $attendanceSummary['expected_days'] }} working days
+                    <span class="text-gray-400">({{ $attendanceSummary['period_label'] }})</span>
+                </p>
+            @elseif ($attendancePercentage !== null)
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    Attendance: <span class="font-bold text-emerald-700 dark:text-emerald-400">{{ $attendancePercentage }}%</span>
                 </p>
             @else
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">No attendance recorded yet for this batch.</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">No working days in range yet for this month’s attendance %.</p>
             @endif
         </div>
 
         <div class="rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-600 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10">
             <p class="font-semibold text-gray-950 dark:text-white">What appears here</p>
             <ul class="mt-2 list-inside list-disc space-y-1">
+                <li><strong>%</strong> — This month: credited days (Present{{ config('attendance.percentage.credit_leave', true) ? ' + Leave' : '' }}) ÷ working days from the 1st (or batch join) to today. Sundays excluded.</li>
                 <li><strong>Status</strong> — Present (from IN), Absent, or Leave</li>
                 <li><strong>Check-in / Check-out</strong> — times from biometric or manual IN/OUT (same on Attendance screen)</li>
                 <li><strong>Source</strong> — Biometric device, Manual IN/OUT, or roll-call only (A/L)</li>

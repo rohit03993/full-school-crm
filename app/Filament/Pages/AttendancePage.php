@@ -357,6 +357,16 @@ class AttendancePage extends Page
             $body .= " {$failed} could not check in (missing roll number?).";
         }
 
+        if ($checkedIn === 0 && $failed > 0) {
+            Notification::make()
+                ->title('No students checked in')
+                ->body($body.' Manual attendance is today only if the date filter is in the past.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         Notification::make()
             ->title($checkedIn > 0 ? 'Bulk check-in complete' : 'No students checked in')
             ->body($body)
@@ -390,7 +400,18 @@ class AttendancePage extends Page
         }
 
         $batch = Batch::query()->findOrFail($batchId);
-        $stats = $manualBatch->save($batch, $date, $this->marks, Auth::user());
+
+        try {
+            $stats = $manualBatch->save($batch, $date, $this->marks, Auth::user());
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Cannot save attendance')
+                ->body(collect($exception->errors())->flatten()->first() ?: 'Manual attendance is today only.')
+                ->warning()
+                ->send();
+
+            return;
+        }
 
         $body = "{$stats['saved']} record(s) saved for {$batch->name} · ".$this->formatAttendanceDate($date);
 
@@ -656,6 +677,9 @@ class AttendancePage extends Page
                 DatePicker::make('date')
                     ->label('Date')
                     ->required()
+                    ->minDate(now()->startOfDay())
+                    ->maxDate(now())
+                    ->helperText('Manual attendance is today only — backdating is blocked.')
                     ->native(false),
             ]);
     }

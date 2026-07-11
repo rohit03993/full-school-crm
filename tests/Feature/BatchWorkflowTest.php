@@ -12,6 +12,7 @@ use App\Enums\StudentStatus;
 use App\Models\Batch;
 use App\Models\BatchStudent;
 use App\Models\Course;
+use App\Models\Attendance;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\AdmissionService;
@@ -60,8 +61,10 @@ class BatchWorkflowTest extends TestCase
         $this->assertSame(2, BatchStudent::query()->where('student_id', $student->id)->count());
     }
 
-    public function test_attendance_percentage_is_based_on_present_records(): void
+    public function test_attendance_percentage_is_month_to_date_working_days(): void
     {
+        $this->travelTo('2026-06-02 12:00:00');
+
         $staff = $this->createStaffUser();
         $student = $this->createEnrolledStudent($staff);
         $course = Course::query()->firstOrFail();
@@ -69,19 +72,53 @@ class BatchWorkflowTest extends TestCase
 
         app(BatchService::class)->assign($student, $batch, $staff);
 
-        $attendance = app(AttendanceService::class);
+        $batchStudent = BatchStudent::query()
+            ->where('student_id', $student->id)
+            ->where('batch_id', $batch->id)
+            ->where('is_active', true)
+            ->firstOrFail();
+        $batchStudent->forceFill(['assigned_at' => '2026-06-01 08:00:00'])->save();
 
-        $attendance->saveBatchAttendance($batch, '2026-06-01', [
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $student->id,
+            'attendance_date' => '2026-06-01',
+            'status' => AttendanceStatus::Present,
+            'marked_by_user_id' => $staff->id,
+        ]);
+
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $student->id,
+            'attendance_date' => '2026-06-02',
+            'status' => AttendanceStatus::Absent,
+            'marked_by_user_id' => $staff->id,
+        ]);
+
+        $summary = app(AttendanceService::class)->monthToDateSummaryForStudent($student->fresh());
+
+        // 1 Jun–2 Jun = 2 working days (Mon–Tue); 1 present → 50%
+        $this->assertSame(50.0, $summary['percentage']);
+        $this->assertSame(1, $summary['present_days']);
+        $this->assertSame(2, $summary['expected_days']);
+    }
+
+    public function test_manual_batch_attendance_rejects_backdated_dates(): void
+    {
+        $this->travelTo('2026-06-10 12:00:00');
+
+        $staff = $this->createStaffUser();
+        $student = $this->createEnrolledStudent($staff);
+        $course = Course::query()->firstOrFail();
+        $batch = $this->createBatch($course, $staff, 'No Backdate Batch');
+
+        app(BatchService::class)->assign($student, $batch, $staff);
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+
+        app(AttendanceService::class)->saveBatchAttendance($batch, '2026-06-01', [
             $student->id => AttendanceStatus::Present->value,
         ], $staff);
-
-        $attendance->saveBatchAttendance($batch, '2026-06-02', [
-            $student->id => AttendanceStatus::Absent->value,
-        ], $staff);
-
-        $percentage = $attendance->percentageForStudent($student->fresh());
-
-        $this->assertSame(50.0, $percentage);
     }
 
     public function test_section_can_be_deleted_when_no_published_results(): void

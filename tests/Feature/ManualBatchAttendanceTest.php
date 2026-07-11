@@ -82,6 +82,8 @@ class ManualBatchAttendanceTest extends TestCase
 
     public function test_absent_uses_roll_call_source(): void
     {
+        $this->travelTo('2026-06-20 10:00:00');
+
         [$student, $batch, $staff] = $this->createEnrolledStudent('ROLL-ABS');
 
         app(ManualBatchAttendanceService::class)->save(
@@ -96,6 +98,34 @@ class ManualBatchAttendanceTest extends TestCase
         $this->assertSame(AttendanceStatus::Absent, $attendance->status);
         $this->assertSame('roll_call', $attendance->punch_source);
         $this->assertNull($attendance->checked_in_at);
+    }
+
+    public function test_manual_save_rejects_backdated_date(): void
+    {
+        $this->travelTo('2026-06-20 10:00:00');
+
+        [$student, $batch, $staff] = $this->createEnrolledStudent('ROLL-BACK');
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+
+        app(ManualBatchAttendanceService::class)->save(
+            $batch,
+            '2026-06-19',
+            [$student->id => AttendanceStatus::Absent->value],
+            $staff,
+        );
+    }
+
+    public function test_manual_in_rejects_backdated_date(): void
+    {
+        $this->travelTo('2026-06-20 10:00:00');
+
+        [$student, , $staff] = $this->createEnrolledStudent('ROLL-BACK-IN');
+
+        $result = app(ManualBatchAttendanceService::class)->manualIn($student, '2026-06-19', $staff);
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('today', strtolower($result['message']));
     }
 
     /**

@@ -9,13 +9,16 @@ use App\Models\BatchStudent;
 use App\Models\Enrollment;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\AttendanceService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ManualBatchAttendanceService
 {
     public function __construct(
         protected PunchAttendanceProcessor $processor,
         protected PunchLogService $logs,
+        protected AttendanceService $attendance,
     ) {}
 
     /**
@@ -27,6 +30,10 @@ class ManualBatchAttendanceService
      */
     public function manualIn(Student $student, string $date, User $staff): array
     {
+        if ($blocked = $this->manualDateBlockedResult($date)) {
+            return $blocked;
+        }
+
         $roll = $this->rollForStudent($student);
 
         if ($roll === null) {
@@ -56,6 +63,10 @@ class ManualBatchAttendanceService
      */
     public function manualOut(Student $student, string $date, User $staff): array
     {
+        if ($blocked = $this->manualDateBlockedResult($date)) {
+            return $blocked;
+        }
+
         $roll = $this->rollForStudent($student);
 
         if ($roll === null) {
@@ -82,6 +93,8 @@ class ManualBatchAttendanceService
      */
     public function save(Batch $batch, string $date, array $marks, User $staff): array
     {
+        $this->attendance->assertManualDateIsToday($date);
+
         $activeStudentIds = BatchStudent::query()
             ->where('batch_id', $batch->id)
             ->where('is_active', true)
@@ -145,6 +158,24 @@ class ManualBatchAttendanceService
         });
 
         return $stats;
+    }
+
+    /**
+     * @return array{ok: false, message: string, whatsapp: null}|null
+     */
+    private function manualDateBlockedResult(string $date): ?array
+    {
+        try {
+            $this->attendance->assertManualDateIsToday($date);
+        } catch (ValidationException $exception) {
+            return [
+                'ok' => false,
+                'message' => (string) ($exception->errors()['date'][0] ?? 'Manual attendance can only be marked for today.'),
+                'whatsapp' => null,
+            ];
+        }
+
+        return null;
     }
 
     private function rollForStudent(Student $student): ?string

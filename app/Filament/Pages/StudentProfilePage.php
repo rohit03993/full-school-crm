@@ -151,6 +151,9 @@ class StudentProfilePage extends Page
 
     public ?float $attendancePercentage = null;
 
+    /** @var array{percentage: float, present_days: int, leave_days: int, credited_days: int, expected_days: int, period_label: string}|null */
+    public ?array $attendanceSummary = null;
+
     /**
      * @var array<int, Collection<int, ActivityAttendance>>
      */
@@ -1570,6 +1573,7 @@ class StudentProfilePage extends Page
         if (! $this->activeBatch) {
             $this->attendanceRecords = new Collection;
             $this->attendancePercentage = null;
+            $this->attendanceSummary = null;
 
             return;
         }
@@ -1581,7 +1585,8 @@ class StudentProfilePage extends Page
             ->limit(CrmPagination::PER_PAGE)
             ->get();
 
-        $this->attendancePercentage = app(AttendanceService::class)->percentageForStudent($this->record);
+        $this->attendanceSummary = app(AttendanceService::class)->monthToDateSummaryForStudent($this->record);
+        $this->attendancePercentage = $this->attendanceSummary['percentage'] ?? null;
     }
 
     public function loadHomeworkTab(): void
@@ -2866,6 +2871,7 @@ class StudentProfilePage extends Page
                                     'activeBatch' => $this->activeBatch,
                                     'attendanceRecords' => $this->attendanceRecords,
                                     'attendancePercentage' => $this->attendancePercentage,
+                                    'attendanceSummary' => $this->attendanceSummary,
                                     'student' => $this->record,
                                 ]),
                         ]),

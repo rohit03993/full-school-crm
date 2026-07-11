@@ -25,4 +25,20 @@ return [
 
     'process_batch_size' => (int) env('ATTENDANCE_PUNCH_PROCESS_BATCH', 100),
 
+    /*
+    | Student attendance % on profile / counters / marksheets.
+    | month_to_date = Present(+Leave) ÷ working days from 1st of month → today
+    | (or from batch join date if later). Sundays excluded by default (India coaching).
+    */
+    'percentage' => [
+        'period' => env('ATTENDANCE_PERCENTAGE_PERIOD', 'month_to_date'),
+        /** Carbon dayOfWeek values treated as non-working (0 = Sunday). */
+        'weekend_days' => array_map(
+            'intval',
+            array_filter(explode(',', (string) env('ATTENDANCE_WEEKEND_DAYS', '0')), fn (string $v): bool => $v !== ''),
+        ) ?: [0],
+        /** Count approved Leave toward the numerator (not as absent). */
+        'credit_leave' => env('ATTENDANCE_PERCENTAGE_CREDIT_LEAVE', true),
+    ],
+
 ];

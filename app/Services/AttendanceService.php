@@ -19,10 +19,27 @@ class AttendanceService
     ) {}
 
     /**
+     * Manual / roll-call attendance may only be marked for today.
+     */
+    public function assertManualDateIsToday(string $date): void
+    {
+        $selected = Carbon::parse($date)->toDateString();
+        $today = now()->toDateString();
+
+        if ($selected !== $today) {
+            throw ValidationException::withMessages([
+                'date' => 'Manual attendance can only be marked for today. Backdated entries are not allowed.',
+            ]);
+        }
+    }
+
+    /**
      * @param  array<int, string>  $marks  student_id => attendance status value
      */
     public function saveBatchAttendance(Batch $batch, string $date, array $marks, User $staff): int
     {
+        $this->assertManualDateIsToday($date);
+
         $activeStudentIds = BatchStudent::query()
             ->where('batch_id', $batch->id)
             ->where('is_active', true)
@@ -87,30 +104,108 @@ class AttendanceService
 
     public function percentageForStudent(Student $student): ?float
     {
+        return $this->monthToDateSummaryForStudent($student)['percentage'] ?? null;
+    }
+
+    /**
+     * Month-to-date attendance: credited days ÷ working days (1st → today, from batch join if later).
+     *
+     * @return array{
+     *     percentage: float,
+     *     present_days: int,
+     *     leave_days: int,
+     *     credited_days: int,
+     *     expected_days: int,
+     *     period_label: string,
+     * }|null
+     */
+    public function monthToDateSummaryForStudent(Student $student): ?array
+    {
         $student->loadMissing('activeBatchStudent');
 
-        $batchId = $student->activeBatchStudent?->batch_id;
+        $batchStudent = $student->activeBatchStudent;
+        $batchId = $batchStudent?->batch_id;
 
         if (! $batchId) {
             return null;
         }
 
-        $total = Attendance::query()
-            ->where('batch_id', $batchId)
-            ->where('student_id', $student->id)
-            ->count();
+        $today = now()->startOfDay();
+        $monthStart = $today->copy()->startOfMonth();
+        $joined = $batchStudent->assigned_at
+            ? Carbon::parse($batchStudent->assigned_at)->startOfDay()
+            : $monthStart;
+        $from = $joined->greaterThan($monthStart) ? $joined : $monthStart;
 
-        if ($total === 0) {
+        if ($from->greaterThan($today)) {
             return null;
         }
 
-        $present = Attendance::query()
+        $workingDates = $this->workingDatesBetween($from, $today);
+        $expected = count($workingDates);
+
+        if ($expected === 0) {
+            return null;
+        }
+
+        $rows = Attendance::query()
             ->where('batch_id', $batchId)
             ->where('student_id', $student->id)
-            ->where('status', AttendanceStatus::Present)
-            ->count();
+            ->whereBetween('attendance_date', [$from->toDateString(), $today->toDateString()])
+            ->get(['attendance_date', 'status']);
 
-        return round(($present / $total) * 100, 1);
+        $presentDates = [];
+        $leaveDates = [];
+
+        foreach ($rows as $row) {
+            $date = $row->attendance_date->toDateString();
+
+            if (! in_array($date, $workingDates, true)) {
+                continue;
+            }
+
+            if ($row->status === AttendanceStatus::Present) {
+                $presentDates[$date] = true;
+            } elseif ($row->status === AttendanceStatus::Leave) {
+                $leaveDates[$date] = true;
+            }
+        }
+
+        $presentDays = count($presentDates);
+        $leaveDays = count(array_diff_key($leaveDates, $presentDates));
+        $creditLeave = (bool) config('attendance.percentage.credit_leave', true);
+        $creditedDays = $presentDays + ($creditLeave ? $leaveDays : 0);
+        $percentage = round(($creditedDays / $expected) * 100, 1);
+
+        return [
+            'percentage' => $percentage,
+            'present_days' => $presentDays,
+            'leave_days' => $leaveDays,
+            'credited_days' => $creditedDays,
+            'expected_days' => $expected,
+            'period_label' => $from->format('d M').' – '.$today->format('d M Y'),
+        ];
+    }
+
+    /**
+     * @return list<string> Y-m-d dates
+     */
+    public function workingDatesBetween(Carbon $from, Carbon $to): array
+    {
+        $weekendDays = array_map('intval', config('attendance.percentage.weekend_days', [0]));
+        $dates = [];
+        $cursor = $from->copy()->startOfDay();
+        $end = $to->copy()->startOfDay();
+
+        while ($cursor->lte($end)) {
+            if (! in_array($cursor->dayOfWeek, $weekendDays, true)) {
+                $dates[] = $cursor->toDateString();
+            }
+
+            $cursor->addDay();
+        }
+
+        return $dates;
     }
 
     /**
