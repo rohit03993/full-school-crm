@@ -40,7 +40,8 @@ class PunchAttendanceSyncService
             if ($existing) {
                 $payload = [
                     'status' => AttendanceStatus::Present,
-                    'punch_source' => $existing->punch_source ?? $source,
+                    // Latest punch wins so manual batch / profile source stays accurate.
+                    'punch_source' => $source,
                     'marked_by_user_id' => $markedByUserId ?? $existing->marked_by_user_id ?? $staffId,
                 ];
 
@@ -73,10 +74,16 @@ class PunchAttendanceSyncService
         if ($existing) {
             // Keep last OUT of the day when multiple visits exist.
             if ($existing->checked_out_at === null || $checkedInAt->gt($existing->checked_out_at)) {
-                $existing->update([
+                $payload = [
                     'checked_out_at' => $checkedInAt,
-                    'punch_source' => $existing->punch_source ?? $source,
-                ]);
+                    'punch_source' => $source,
+                ];
+
+                if ($markedByUserId) {
+                    $payload['marked_by_user_id'] = $markedByUserId;
+                }
+
+                $existing->update($payload);
             }
         }
     }

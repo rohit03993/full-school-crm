@@ -104,7 +104,7 @@ class PunchLogService
         }
 
         return AttendanceManualPunch::query()
-            ->selectRaw('enrollment_number as employee_id, punch_date, punch_time, 1 as is_manual, state')
+            ->with('markedBy:id,name')
             ->where('enrollment_number', $this->normalizeRoll($roll))
             ->whereDate('punch_date', $date)
             ->orderBy('punch_time')
@@ -117,6 +117,8 @@ class PunchLogService
                     : (string) $row->punch_time,
                 'is_manual' => 1,
                 'state' => $row->state,
+                'marked_by_user_id' => $row->marked_by_user_id,
+                'marked_by_name' => $row->markedBy?->name,
             ]);
     }
 

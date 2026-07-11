@@ -85,6 +85,9 @@ class PunchInOutCalculator
                 } elseif ($currentPairIndex >= 0 && isset($entries[$currentPairIndex])) {
                     $entries[$currentPairIndex]['out'] = (string) $p->punch_time;
                     $entries[$currentPairIndex]['is_manual_out'] = (bool) ($p->is_manual ?? false);
+                    $entries[$currentPairIndex]['marked_by_out'] = filled($p->marked_by_name ?? null)
+                        ? (string) $p->marked_by_name
+                        : null;
                 }
 
                 $lastAcceptedTime = $current;
@@ -195,6 +198,8 @@ class PunchInOutCalculator
             'is_manual_in' => (bool) ($p->is_manual ?? false),
             'is_manual_out' => null,
             'is_auto_out' => false,
+            'marked_by_in' => filled($p->marked_by_name ?? null) ? (string) $p->marked_by_name : null,
+            'marked_by_out' => null,
         ];
     }
 

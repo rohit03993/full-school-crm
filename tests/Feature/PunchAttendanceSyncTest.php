@@ -121,8 +121,9 @@ class PunchAttendanceSyncTest extends TestCase
 
         $label = \App\Support\AttendanceSourceLabel::forRecord($attendance->fresh(), $student->fresh(['activeEnrollment']));
 
-        $this->assertStringContainsString('Manual IN', $label);
-        $this->assertStringContainsString('Gate-1 OUT', $label);
+        $this->assertStringContainsString('Manually marked', $label);
+        $this->assertStringContainsString($staff->name, $label);
+        $this->assertStringContainsString('Gate-1', $label);
     }
 
     public function test_auto_out_persists_checkout_for_past_open_attendance(): void
@@ -207,7 +208,9 @@ class PunchAttendanceSyncTest extends TestCase
 
         $label = \App\Support\AttendanceSourceLabel::forRecord($attendance->fresh(), $student->fresh(['activeEnrollment']));
 
-        $this->assertSame('Manual IN · Auto OUT', $label);
+        $this->assertStringContainsString('Manually marked', $label);
+        $this->assertStringContainsString($staff->name, $label);
+        $this->assertStringContainsString('Auto OUT', $label);
         $this->assertStringNotContainsString('OUT OUT', $label);
     }
 

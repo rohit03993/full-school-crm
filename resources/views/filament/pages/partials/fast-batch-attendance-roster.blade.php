@@ -1,6 +1,6 @@
 @php
     /** @var \Illuminate\Support\Collection<int, \App\Models\BatchStudent> $roster */
-    /** @var array<int, array{status: string, checked_in_at: ?string, checked_out_at: ?string, is_inside: bool, punch_source?: ?string}> $attendanceSnapshot */
+    /** @var array<int, array{status: string, checked_in_at: ?string, checked_out_at: ?string, is_inside: bool, punch_source?: ?string, marked_by_name?: ?string, source_label?: string}> $attendanceSnapshot */
 
     $rows = $roster->map(function ($row) use ($attendanceSnapshot): array {
         $student = $row->student;
@@ -9,6 +9,7 @@
         $checkedOut = $snapshot['checked_out_at'] ?? null;
         $isInside = (bool) ($snapshot['is_inside'] ?? false);
         $source = $snapshot['punch_source'] ?? null;
+        $staffName = $snapshot['marked_by_name'] ?? null;
         $attendance = $checkedIn !== null ? 'present' : 'absent';
         $track = $checkedOut !== null ? 'out' : ($isInside ? 'in' : 'pending');
         $roll = $student->activeEnrollment?->enrollment_number;
@@ -24,7 +25,9 @@
             'attendance' => $attendance,
             'track' => $track,
             'source' => $source,
-            'source_label' => \App\Support\AttendanceSourceLabel::for($source),
+            'source_label' => $snapshot['source_label']
+                ?? \App\Support\AttendanceSourceLabel::for($source, $staffName),
+            'source_is_manual' => \App\Support\AttendanceSourceLabel::isManual($source),
             'sort' => match ($attendance) {
                 'absent' => 0,
                 default => $track === 'in' ? 1 : 2,
@@ -262,10 +265,10 @@
                         <span class="text-[10px] font-semibold uppercase text-gray-400 md:hidden">Source</span>
                         @if ($row['checked_in'] || $row['checked_out'])
                             <span @class([
-                                'inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide',
-                                'bg-sky-500/10 text-sky-800 dark:text-sky-300' => ($row['source'] ?? null) === 'biometric' || ($row['source'] ?? null) === 'punch',
-                                'bg-violet-500/10 text-violet-800 dark:text-violet-300' => ($row['source'] ?? null) === 'manual',
-                                'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300' => ! in_array($row['source'] ?? null, ['biometric', 'punch', 'manual'], true),
+                                'inline-flex max-w-[9.5rem] items-start rounded-md px-1.5 py-0.5 text-[10px] leading-snug',
+                                'bg-violet-500/10 font-medium text-violet-800 dark:text-violet-200' => $row['source_is_manual'],
+                                'bg-sky-500/10 font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300' => ! $row['source_is_manual'] && in_array($row['source'] ?? null, ['biometric', 'punch'], true),
+                                'bg-gray-100 font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300' => ! $row['source_is_manual'] && ! in_array($row['source'] ?? null, ['biometric', 'punch'], true),
                             ])>
                                 {{ $row['source_label'] }}
                             </span>

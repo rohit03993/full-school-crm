@@ -1677,6 +1677,7 @@ class StudentProfilePage extends Page
         $this->attendancePage = min(max(1, $this->attendancePage), $this->attendanceLastPage);
 
         $this->attendanceRecords = $query
+            ->with('markedBy:id,name')
             ->orderByDesc('attendance_date')
             ->forPage($this->attendancePage, $perPage)
             ->get();

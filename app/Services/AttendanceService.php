@@ -294,18 +294,22 @@ class AttendanceService
      *     checked_in_at: ?string,
      *     checked_out_at: ?string,
      *     is_inside: bool,
-     *     punch_source: ?string
+     *     punch_source: ?string,
+     *     marked_by_name: ?string,
+     *     source_label: string
      * }>
      */
     public function punchSnapshotForBatchDate(Batch $batch, string $date): array
     {
         return Attendance::query()
+            ->with('markedBy:id,name')
             ->where('batch_id', $batch->id)
             ->whereDate('attendance_date', $date)
             ->get()
             ->mapWithKeys(function (Attendance $row): array {
                 $checkedIn = $row->checked_in_at?->format('H:i');
                 $checkedOut = $row->checked_out_at?->format('H:i');
+                $staffName = $row->markedBy?->name;
 
                 return [
                     $row->student_id => [
@@ -314,6 +318,8 @@ class AttendanceService
                         'checked_out_at' => $checkedOut,
                         'is_inside' => $checkedIn !== null && $checkedOut === null,
                         'punch_source' => $row->punch_source,
+                        'marked_by_name' => $staffName,
+                        'source_label' => \App\Support\AttendanceSourceLabel::for($row->punch_source, $staffName),
                     ],
                 ];
             })

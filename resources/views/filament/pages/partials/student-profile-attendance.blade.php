@@ -154,7 +154,7 @@
                                         </div>
                                     @endif
                                 </td>
-                                <td class="px-4 py-2.5 text-xs text-gray-600 dark:text-gray-300 align-top">
+                                <td class="px-4 py-2.5 text-[11px] leading-snug text-gray-600 dark:text-gray-300 align-top">
                                     {{ \App\Support\AttendanceSourceLabel::forRecord($record, $student) }}
                                 </td>
                             </tr>

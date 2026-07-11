@@ -112,7 +112,7 @@ class AttendancePage extends Page
     public array $marks = [];
 
     /**
-     * @var array<int, array{status: string, checked_in_at: ?string, checked_out_at: ?string, is_inside: bool, punch_source?: ?string}>
+     * @var array<int, array{status: string, checked_in_at: ?string, checked_out_at: ?string, is_inside: bool, punch_source?: ?string, marked_by_name?: ?string, source_label?: string}>
      */
     public array $attendanceSnapshot = [];
 

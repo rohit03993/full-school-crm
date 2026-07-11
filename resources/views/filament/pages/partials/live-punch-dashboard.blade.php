@@ -224,7 +224,9 @@
                                             <p class="text-[10px] font-semibold uppercase text-emerald-600 dark:text-emerald-400">In</p>
                                             <p class="mt-0.5 font-mono text-sm font-bold text-gray-950 dark:text-white">{{ $pair['in'] ?? '—' }}</p>
                                             @if (! empty($pair['is_manual_in']))
-                                                <p class="mt-1 text-[10px] font-semibold text-amber-600">Manual</p>
+                                                <p class="mt-1 text-[10px] leading-snug text-violet-700 dark:text-violet-300">
+                                                    {{ \App\Support\AttendanceSourceLabel::manualMarked($pair['marked_by_in'] ?? null) }}
+                                                </p>
                                             @elseif (filled($pair['device_in'] ?? null))
                                                 <p class="mt-1 truncate text-[10px] text-gray-500">{{ $pair['device_in'] }}</p>
                                             @endif
@@ -235,7 +237,9 @@
                                             @if (! empty($pair['is_auto_out']))
                                                 <p class="mt-1 text-[10px] font-semibold text-gray-500">Auto OUT</p>
                                             @elseif (! empty($pair['is_manual_out']))
-                                                <p class="mt-1 text-[10px] font-semibold text-amber-600">Manual</p>
+                                                <p class="mt-1 text-[10px] leading-snug text-violet-700 dark:text-violet-300">
+                                                    {{ \App\Support\AttendanceSourceLabel::manualMarked($pair['marked_by_out'] ?? null) }}
+                                                </p>
                                             @elseif (filled($pair['device_out'] ?? null))
                                                 <p class="mt-1 truncate text-[10px] text-gray-500">{{ $pair['device_out'] }}</p>
                                             @endif
