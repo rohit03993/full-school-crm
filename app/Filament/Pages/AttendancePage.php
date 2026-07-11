@@ -112,7 +112,7 @@ class AttendancePage extends Page
     public array $marks = [];
 
     /**
-     * @var array<int, array{status: string, checked_in_at: ?string, checked_out_at: ?string, is_inside: bool, punch_source?: ?string, marked_by_name?: ?string, source_label?: string}>
+     * @var array<int, array{status?: ?string, checked_in_at: ?string, checked_out_at: ?string, is_inside: bool, can_in?: bool, can_out?: bool, visit_count?: int, pairs?: list<array<string, mixed>>, punch_source?: ?string, marked_by_name?: ?string, source_label?: string}>
      */
     public array $attendanceSnapshot = [];
 
@@ -337,7 +337,12 @@ class AttendancePage extends Page
                 continue;
             }
 
-            if (($this->attendanceSnapshot[$student->id]['checked_in_at'] ?? null) !== null) {
+            if (! ($this->attendanceSnapshot[$student->id]['can_in'] ?? true)) {
+                continue;
+            }
+
+            // Still absent for the day — only auto check-in students with no punches yet.
+            if (($this->attendanceSnapshot[$student->id]['visit_count'] ?? 0) > 0) {
                 continue;
             }
 

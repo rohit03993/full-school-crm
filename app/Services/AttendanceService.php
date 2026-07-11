@@ -290,10 +290,14 @@ class AttendanceService
 
     /**
      * @return array<int, array{
-     *     status: string,
+     *     status: ?string,
      *     checked_in_at: ?string,
      *     checked_out_at: ?string,
      *     is_inside: bool,
+     *     can_in: bool,
+     *     can_out: bool,
+     *     visit_count: int,
+     *     pairs: list<array<string, mixed>>,
      *     punch_source: ?string,
      *     marked_by_name: ?string,
      *     source_label: string
@@ -301,29 +305,90 @@ class AttendanceService
      */
     public function punchSnapshotForBatchDate(Batch $batch, string $date): array
     {
-        return Attendance::query()
+        $attendanceByStudent = Attendance::query()
             ->with('markedBy:id,name')
             ->where('batch_id', $batch->id)
             ->whereDate('attendance_date', $date)
             ->get()
-            ->mapWithKeys(function (Attendance $row): array {
-                $checkedIn = $row->checked_in_at?->format('H:i');
-                $checkedOut = $row->checked_out_at?->format('H:i');
-                $staffName = $row->markedBy?->name;
+            ->keyBy('student_id');
 
-                return [
-                    $row->student_id => [
-                        'status' => $row->status->value,
-                        'checked_in_at' => $checkedIn,
-                        'checked_out_at' => $checkedOut,
-                        'is_inside' => $checkedIn !== null && $checkedOut === null,
-                        'punch_source' => $row->punch_source,
-                        'marked_by_name' => $staffName,
-                        'source_label' => \App\Support\AttendanceSourceLabel::for($row->punch_source, $staffName),
-                    ],
-                ];
-            })
-            ->all();
+        $roster = BatchStudent::query()
+            ->where('batch_id', $batch->id)
+            ->where('is_active', true)
+            ->with(['student.activeEnrollment'])
+            ->get();
+
+        $dashboard = app(\App\Services\Punch\LivePunchDashboardService::class);
+        $snapshot = [];
+
+        foreach ($roster as $batchStudent) {
+            $student = $batchStudent->student;
+
+            if (! $student) {
+                continue;
+            }
+
+            $attendance = $attendanceByStudent->get($student->id);
+            $roll = $student->activeEnrollment?->enrollment_number;
+            $dayRow = filled($roll)
+                ? $dashboard->studentDayRow((string) $roll, $date, $student)
+                : null;
+
+            $pairs = $dayRow['pairs'] ?? [];
+            $currentState = $dayRow['current_state'] ?? null;
+            $isInside = $currentState === 'IN'
+                || ($currentState === null
+                    && $attendance?->checked_in_at !== null
+                    && $attendance?->checked_out_at === null);
+
+            $lastPair = $pairs !== [] ? $pairs[array_key_last($pairs)] : null;
+            $checkedIn = $lastPair['in'] ?? $attendance?->checked_in_at?->format('H:i');
+            $checkedOut = filled($lastPair['out'] ?? null)
+                ? (string) $lastPair['out']
+                : ($isInside ? null : $attendance?->checked_out_at?->format('H:i'));
+
+            if (is_string($checkedIn) && strlen($checkedIn) > 5) {
+                $checkedIn = substr($checkedIn, 0, 5);
+            }
+            if (is_string($checkedOut) && strlen($checkedOut) > 5) {
+                $checkedOut = substr($checkedOut, 0, 5);
+            }
+
+            $staffName = $attendance?->markedBy?->name;
+            $punchSource = $attendance?->punch_source;
+            $sourceLabel = $attendance
+                ? \App\Support\AttendanceSourceLabel::forRecord($attendance, $student)
+                : '—';
+
+            if ($pairs !== [] && $lastPair) {
+                if (! empty($lastPair['is_manual_in']) || ! empty($lastPair['is_manual_out'])) {
+                    $punchSource = 'manual';
+                    $staffName = $lastPair['marked_by_out']
+                        ?? $lastPair['marked_by_in']
+                        ?? $staffName;
+                } elseif (filled($lastPair['device_in'] ?? null) || filled($lastPair['device_out'] ?? null)) {
+                    $punchSource = 'biometric';
+                }
+            }
+
+            $snapshot[$student->id] = [
+                'status' => $attendance?->status->value,
+                'checked_in_at' => $checkedIn,
+                'checked_out_at' => $checkedOut,
+                'is_inside' => $isInside,
+                'can_in' => ! $isInside,
+                'can_out' => $isInside,
+                'visit_count' => count($pairs),
+                'pairs' => $pairs,
+                'punch_source' => $punchSource,
+                'marked_by_name' => $staffName,
+                'source_label' => $sourceLabel !== '—'
+                    ? $sourceLabel
+                    : \App\Support\AttendanceSourceLabel::for($punchSource, $staffName),
+            ];
+        }
+
+        return $snapshot;
     }
 
     /**

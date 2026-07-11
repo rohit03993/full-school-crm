@@ -116,6 +116,34 @@ class ManualBatchAttendanceTest extends TestCase
         );
     }
 
+    public function test_manual_in_rejects_when_already_inside(): void
+    {
+        $this->travelTo('2026-06-20 08:30:00');
+
+        [$student, , $staff] = $this->createEnrolledStudent('ROLL-DBL');
+        $service = app(ManualBatchAttendanceService::class);
+
+        $this->assertTrue($service->manualIn($student, '2026-06-20', $staff)['ok']);
+
+        $this->travelTo('2026-06-20 09:00:00');
+        $again = $service->manualIn($student->fresh(), '2026-06-20', $staff);
+
+        $this->assertFalse($again['ok']);
+        $this->assertStringContainsString('Already inside', $again['message']);
+    }
+
+    public function test_manual_out_rejects_when_not_inside(): void
+    {
+        $this->travelTo('2026-06-20 08:30:00');
+
+        [$student, , $staff] = $this->createEnrolledStudent('ROLL-NOIN');
+
+        $result = app(ManualBatchAttendanceService::class)->manualOut($student, '2026-06-20', $staff);
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('Not inside', $result['message']);
+    }
+
     public function test_manual_in_rejects_backdated_date(): void
     {
         $this->travelTo('2026-06-20 10:00:00');

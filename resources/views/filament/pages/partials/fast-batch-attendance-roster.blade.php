@@ -1,6 +1,6 @@
 @php
     /** @var \Illuminate\Support\Collection<int, \App\Models\BatchStudent> $roster */
-    /** @var array<int, array{status: string, checked_in_at: ?string, checked_out_at: ?string, is_inside: bool, punch_source?: ?string, marked_by_name?: ?string, source_label?: string}> $attendanceSnapshot */
+    /** @var array<int, array{status?: ?string, checked_in_at: ?string, checked_out_at: ?string, is_inside: bool, can_in?: bool, can_out?: bool, visit_count?: int, pairs?: list<array<string, mixed>>, punch_source?: ?string, marked_by_name?: ?string, source_label?: string}> $attendanceSnapshot */
 
     $rows = $roster->map(function ($row) use ($attendanceSnapshot): array {
         $student = $row->student;
@@ -8,10 +8,14 @@
         $checkedIn = $snapshot['checked_in_at'] ?? null;
         $checkedOut = $snapshot['checked_out_at'] ?? null;
         $isInside = (bool) ($snapshot['is_inside'] ?? false);
+        $canIn = (bool) ($snapshot['can_in'] ?? ! $isInside);
+        $canOut = (bool) ($snapshot['can_out'] ?? $isInside);
+        $pairs = $snapshot['pairs'] ?? [];
+        $visitCount = (int) ($snapshot['visit_count'] ?? count($pairs));
         $source = $snapshot['punch_source'] ?? null;
         $staffName = $snapshot['marked_by_name'] ?? null;
-        $attendance = $checkedIn !== null ? 'present' : 'absent';
-        $track = $checkedOut !== null ? 'out' : ($isInside ? 'in' : 'pending');
+        $attendance = ($checkedIn !== null || $visitCount > 0) ? 'present' : 'absent';
+        $track = $isInside ? 'in' : ($visitCount > 0 || $checkedOut !== null ? 'out' : 'pending');
         $roll = $student->activeEnrollment?->enrollment_number;
 
         return [
@@ -22,6 +26,10 @@
             'checked_in' => $checkedIn,
             'checked_out' => $checkedOut,
             'is_inside' => $isInside,
+            'can_in' => $canIn,
+            'can_out' => $canOut,
+            'pairs' => $pairs,
+            'visit_count' => $visitCount,
             'attendance' => $attendance,
             'track' => $track,
             'source' => $source,
@@ -74,7 +82,7 @@
                     Class attendance today
                 </p>
                 <p class="text-[11px] text-gray-500 dark:text-gray-400">
-                    Present = IN at least once today. IN/OUT times show if they are still inside. Tap Absent for the full absent list.
+                    Present = IN at least once today. Visits list every IN→OUT pair. Only the next action is enabled (IN or OUT).
                 </p>
             </div>
             @if ($absent > 0)
@@ -183,10 +191,9 @@
     </div>
 
     <div class="fi-section overflow-hidden rounded-2xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
-        <div class="hidden grid-cols-[minmax(0,1.4fr)_7rem_7rem_6.5rem_9rem] gap-2 border-b border-gray-100 bg-gray-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400 md:grid">
+        <div class="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_7rem_9rem] gap-2 border-b border-gray-100 bg-gray-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400 md:grid">
             <div>Student</div>
-            <div>IN</div>
-            <div>OUT</div>
+            <div>Visits (IN / OUT)</div>
             <div>Source</div>
             <div class="text-right">Actions</div>
         </div>
@@ -203,7 +210,7 @@
                         'track' => $row['track'],
                     ]) }})"
                     @class([
-                        'grid grid-cols-1 items-center gap-2 px-3 py-2 md:grid-cols-[minmax(0,1.4fr)_7rem_7rem_6.5rem_9rem] md:gap-2',
+                        'grid grid-cols-1 items-start gap-2 px-3 py-2.5 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_7rem_9rem] md:items-center md:gap-2',
                         'bg-white dark:bg-gray-900' => $row['attendance'] === 'absent',
                         'bg-emerald-50/50 dark:bg-emerald-500/5' => $row['track'] === 'in',
                         'bg-gray-50/70 dark:bg-white/[0.03]' => $row['track'] === 'out',
@@ -232,30 +239,40 @@
                                     @endif
                                     @if ($row['attendance'] === 'absent')
                                         <span class="ml-1 rounded bg-rose-500/10 px-1 py-0.5 text-[10px] font-bold uppercase text-rose-700 dark:text-rose-300">Absent</span>
+                                    @elseif ($row['is_inside'])
+                                        <span class="ml-1 rounded bg-emerald-500/10 px-1 py-0.5 text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300">Inside</span>
+                                    @elseif ($row['visit_count'] > 0)
+                                        <span class="ml-1 rounded bg-gray-500/10 px-1 py-0.5 text-[10px] font-bold uppercase text-gray-600 dark:text-gray-300">Out</span>
                                     @endif
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-between gap-2 md:block">
-                        <span class="text-[10px] font-semibold uppercase text-gray-400 md:hidden">IN</span>
-                        @if ($row['checked_in'])
-                            <span class="font-mono text-sm font-semibold text-emerald-700 dark:text-emerald-300">{{ $row['checked_in'] }}</span>
-                        @else
-                            <span class="text-sm text-gray-400">—</span>
-                        @endif
-                    </div>
-
-                    <div class="flex items-center justify-between gap-2 md:block">
-                        <span class="text-[10px] font-semibold uppercase text-gray-400 md:hidden">OUT</span>
-                        @if ($row['checked_out'])
-                            <span class="font-mono text-sm font-semibold text-rose-700 dark:text-rose-300">{{ $row['checked_out'] }}</span>
-                        @elseif ($row['is_inside'])
-                            <span class="inline-flex items-center gap-1 text-xs font-bold uppercase text-emerald-700 dark:text-emerald-300">
-                                <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span>
-                                Inside
-                            </span>
+                    <div class="min-w-0">
+                        <span class="mb-1 block text-[10px] font-semibold uppercase text-gray-400 md:hidden">Visits</span>
+                        @if ($row['pairs'] !== [])
+                            <div class="space-y-1">
+                                @foreach ($row['pairs'] as $index => $pair)
+                                    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono text-[11px] leading-snug">
+                                        <span class="text-[9px] font-bold uppercase tracking-wide text-gray-400">
+                                            V{{ $index + 1 }}
+                                        </span>
+                                        <span class="text-emerald-700 dark:text-emerald-300">
+                                            {{ filled($pair['in'] ?? null) ? substr((string) $pair['in'], 0, 5) : '—' }}
+                                        </span>
+                                        <span class="text-gray-300 dark:text-gray-600">→</span>
+                                        @if (filled($pair['out'] ?? null))
+                                            <span class="text-rose-700 dark:text-rose-300">{{ substr((string) $pair['out'], 0, 5) }}</span>
+                                        @else
+                                            <span class="font-sans text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300">Inside</span>
+                                        @endif
+                                        @if (filled($pair['duration_label'] ?? null))
+                                            <span class="font-sans text-[10px] text-gray-400">{{ $pair['duration_label'] }}</span>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
                         @else
                             <span class="text-sm text-gray-400">—</span>
                         @endif
@@ -263,12 +280,12 @@
 
                     <div class="flex items-center justify-between gap-2 md:block">
                         <span class="text-[10px] font-semibold uppercase text-gray-400 md:hidden">Source</span>
-                        @if ($row['checked_in'] || $row['checked_out'])
+                        @if ($row['visit_count'] > 0)
                             <span @class([
                                 'inline-flex max-w-[9.5rem] items-start rounded-md px-1.5 py-0.5 text-[10px] leading-snug',
-                                'bg-violet-500/10 font-medium text-violet-800 dark:text-violet-200' => $row['source_is_manual'],
-                                'bg-sky-500/10 font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300' => ! $row['source_is_manual'] && in_array($row['source'] ?? null, ['biometric', 'punch'], true),
-                                'bg-gray-100 font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300' => ! $row['source_is_manual'] && ! in_array($row['source'] ?? null, ['biometric', 'punch'], true),
+                                'bg-violet-500/10 font-medium text-violet-800 dark:text-violet-200' => $row['source_is_manual'] || str_contains(strtolower($row['source_label']), 'manually marked'),
+                                'bg-sky-500/10 font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300' => ! ($row['source_is_manual'] || str_contains(strtolower($row['source_label']), 'manually marked')) && in_array($row['source'] ?? null, ['biometric', 'punch'], true),
+                                'bg-gray-100 font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300' => ! ($row['source_is_manual'] || str_contains(strtolower($row['source_label']), 'manually marked')) && ! in_array($row['source'] ?? null, ['biometric', 'punch'], true),
                             ])>
                                 {{ $row['source_label'] }}
                             </span>
@@ -283,13 +300,14 @@
                                 type="button"
                                 wire:click="markManualInForStudent({{ $row['id'] }})"
                                 wire:loading.attr="disabled"
-                                wire:target="markManualInForStudent({{ $row['id'] }})"
+                                wire:target="markManualInForStudent({{ $row['id'] }}),markManualOutForStudent({{ $row['id'] }})"
+                                @disabled(! $row['can_in'])
                                 @class([
-                                    'min-w-[3.25rem] rounded-md px-2.5 py-1.5 text-xs font-extrabold uppercase tracking-wide transition disabled:opacity-60',
-                                    'bg-emerald-500 text-white' => $row['checked_in'] !== null,
-                                    'text-gray-500 hover:bg-white hover:text-emerald-700 dark:hover:bg-white/10' => $row['checked_in'] === null,
+                                    'min-w-[3.25rem] rounded-md px-2.5 py-1.5 text-xs font-extrabold uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-35',
+                                    'bg-emerald-500 text-white shadow-sm' => $row['can_in'],
+                                    'text-gray-400' => ! $row['can_in'],
                                 ])
-                                title="Manual check-in"
+                                title="{{ $row['can_in'] ? 'Manual check-in' : 'Already inside — mark OUT first' }}"
                             >
                                 <span wire:loading.remove wire:target="markManualInForStudent({{ $row['id'] }})">IN</span>
                                 <span wire:loading wire:target="markManualInForStudent({{ $row['id'] }})">…</span>
@@ -298,14 +316,14 @@
                                 type="button"
                                 wire:click="markManualOutForStudent({{ $row['id'] }})"
                                 wire:loading.attr="disabled"
-                                wire:target="markManualOutForStudent({{ $row['id'] }})"
-                                @disabled($row['checked_in'] === null)
+                                wire:target="markManualInForStudent({{ $row['id'] }}),markManualOutForStudent({{ $row['id'] }})"
+                                @disabled(! $row['can_out'])
                                 @class([
-                                    'min-w-[3.25rem] rounded-md px-2.5 py-1.5 text-xs font-extrabold uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-40',
-                                    'bg-rose-500 text-white' => $row['checked_out'] !== null,
-                                    'text-gray-500 hover:bg-white hover:text-rose-700 dark:hover:bg-white/10' => $row['checked_out'] === null,
+                                    'min-w-[3.25rem] rounded-md px-2.5 py-1.5 text-xs font-extrabold uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-35',
+                                    'bg-rose-500 text-white shadow-sm' => $row['can_out'],
+                                    'text-gray-400' => ! $row['can_out'],
                                 ])
-                                title="Manual check-out"
+                                title="{{ $row['can_out'] ? 'Manual check-out' : 'Not inside — mark IN first' }}"
                             >
                                 <span wire:loading.remove wire:target="markManualOutForStudent({{ $row['id'] }})">OUT</span>
                                 <span wire:loading wire:target="markManualOutForStudent({{ $row['id'] }})">…</span>

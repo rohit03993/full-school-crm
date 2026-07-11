@@ -44,6 +44,16 @@ class ManualBatchAttendanceService
             ];
         }
 
+        $dayRow = app(LivePunchDashboardService::class)->studentDayRow($roll, $date, $student);
+
+        if (($dayRow['current_state'] ?? null) === 'IN') {
+            return [
+                'ok' => false,
+                'message' => 'Already inside. Mark OUT first.',
+                'whatsapp' => null,
+            ];
+        }
+
         $time = now()->format('H:i:s');
         $result = $this->processor->handleManualPunch($student, $roll, $date, $time, 'IN', $staff);
 
@@ -73,6 +83,16 @@ class ManualBatchAttendanceService
             return [
                 'ok' => false,
                 'message' => 'Add an active enrollment roll number before check-out.',
+                'whatsapp' => null,
+            ];
+        }
+
+        $dayRow = app(LivePunchDashboardService::class)->studentDayRow($roll, $date, $student);
+
+        if (($dayRow['current_state'] ?? null) !== 'IN') {
+            return [
+                'ok' => false,
+                'message' => 'Not inside. Mark IN first.',
                 'whatsapp' => null,
             ];
         }
