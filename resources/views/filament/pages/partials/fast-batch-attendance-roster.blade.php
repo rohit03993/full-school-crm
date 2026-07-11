@@ -191,10 +191,9 @@
     </div>
 
     <div class="fi-section overflow-hidden rounded-2xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
-        <div class="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_7rem_9rem] gap-2 border-b border-gray-100 bg-gray-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400 md:grid">
+        <div class="hidden grid-cols-[minmax(0,1.15fr)_minmax(0,1.85fr)_9rem] gap-3 border-b border-gray-100 bg-gray-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400 md:grid">
             <div>Student</div>
-            <div>Visits (IN / OUT)</div>
-            <div>Source</div>
+            <div>Visits · source per punch</div>
             <div class="text-right">Actions</div>
         </div>
 
@@ -210,7 +209,7 @@
                         'track' => $row['track'],
                     ]) }})"
                     @class([
-                        'grid grid-cols-1 items-start gap-2 px-3 py-2.5 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_7rem_9rem] md:items-center md:gap-2',
+                        'grid grid-cols-1 items-start gap-3 px-3 py-3 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1.85fr)_9rem] md:items-center',
                         'bg-white dark:bg-gray-900' => $row['attendance'] === 'absent',
                         'bg-emerald-50/50 dark:bg-emerald-500/5' => $row['track'] === 'in',
                         'bg-gray-50/70 dark:bg-white/[0.03]' => $row['track'] === 'out',
@@ -250,47 +249,51 @@
                     </div>
 
                     <div class="min-w-0">
-                        <span class="mb-1 block text-[10px] font-semibold uppercase text-gray-400 md:hidden">Visits</span>
+                        <span class="mb-1.5 block text-[10px] font-semibold uppercase text-gray-400 md:hidden">Visits</span>
                         @if ($row['pairs'] !== [])
-                            <div class="space-y-1">
+                            <div class="space-y-2.5">
                                 @foreach ($row['pairs'] as $index => $pair)
-                                    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono text-[11px] leading-snug">
-                                        <span class="text-[9px] font-bold uppercase tracking-wide text-gray-400">
-                                            V{{ $index + 1 }}
-                                        </span>
-                                        <span class="text-emerald-700 dark:text-emerald-300">
-                                            {{ filled($pair['in'] ?? null) ? substr((string) $pair['in'], 0, 5) : '—' }}
-                                        </span>
-                                        <span class="text-gray-300 dark:text-gray-600">→</span>
-                                        @if (filled($pair['out'] ?? null))
-                                            <span class="text-rose-700 dark:text-rose-300">{{ substr((string) $pair['out'], 0, 5) }}</span>
-                                        @else
-                                            <span class="font-sans text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300">Inside</span>
-                                        @endif
-                                        @if (filled($pair['duration_label'] ?? null))
-                                            <span class="font-sans text-[10px] text-gray-400">{{ $pair['duration_label'] }}</span>
-                                        @endif
+                                    <div class="rounded-lg bg-white/80 px-2.5 py-2 ring-1 ring-gray-950/5 dark:bg-gray-950/40 dark:ring-white/10">
+                                        <div class="mb-1.5 flex items-center justify-between gap-2">
+                                            <span class="text-[9px] font-bold uppercase tracking-wide text-gray-400">Visit {{ $index + 1 }}</span>
+                                            @if (filled($pair['duration_label'] ?? null))
+                                                <span class="text-[10px] text-gray-400">{{ $pair['duration_label'] }}</span>
+                                            @endif
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div class="min-w-0">
+                                                <p class="text-[9px] font-semibold uppercase text-emerald-600 dark:text-emerald-400">In</p>
+                                                <p class="font-mono text-[12px] font-bold text-emerald-700 dark:text-emerald-300">
+                                                    {{ filled($pair['in'] ?? null) ? substr((string) $pair['in'], 0, 5) : '—' }}
+                                                </p>
+                                                @include('filament.pages.partials.punch-source-chip', [
+                                                    'isManual' => ! empty($pair['is_manual_in']),
+                                                    'device' => $pair['device_in'] ?? null,
+                                                    'staffName' => $pair['marked_by_in'] ?? null,
+                                                ])
+                                            </div>
+                                            <div class="min-w-0">
+                                                <p class="text-[9px] font-semibold uppercase text-rose-600 dark:text-rose-400">Out</p>
+                                                @if (filled($pair['out'] ?? null))
+                                                    <p class="font-mono text-[12px] font-bold text-rose-700 dark:text-rose-300">
+                                                        {{ substr((string) $pair['out'], 0, 5) }}
+                                                    </p>
+                                                    @include('filament.pages.partials.punch-source-chip', [
+                                                        'isManual' => ! empty($pair['is_manual_out']),
+                                                        'isAuto' => ! empty($pair['is_auto_out']),
+                                                        'device' => $pair['device_out'] ?? null,
+                                                        'staffName' => $pair['marked_by_out'] ?? null,
+                                                    ])
+                                                @else
+                                                    <p class="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-300">Inside</p>
+                                                @endif
+                                            </div>
+                                        </div>
                                     </div>
                                 @endforeach
                             </div>
                         @else
                             <span class="text-sm text-gray-400">—</span>
-                        @endif
-                    </div>
-
-                    <div class="flex items-center justify-between gap-2 md:block">
-                        <span class="text-[10px] font-semibold uppercase text-gray-400 md:hidden">Source</span>
-                        @if ($row['visit_count'] > 0)
-                            <span @class([
-                                'inline-flex max-w-[9.5rem] items-start rounded-md px-1.5 py-0.5 text-[10px] leading-snug',
-                                'bg-violet-500/10 font-medium text-violet-800 dark:text-violet-200' => $row['source_is_manual'] || str_contains(strtolower($row['source_label']), 'manually marked'),
-                                'bg-sky-500/10 font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300' => ! ($row['source_is_manual'] || str_contains(strtolower($row['source_label']), 'manually marked')) && in_array($row['source'] ?? null, ['biometric', 'punch'], true),
-                                'bg-gray-100 font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300' => ! ($row['source_is_manual'] || str_contains(strtolower($row['source_label']), 'manually marked')) && ! in_array($row['source'] ?? null, ['biometric', 'punch'], true),
-                            ])>
-                                {{ $row['source_label'] }}
-                            </span>
-                        @else
-                            <span class="text-xs text-gray-400">—</span>
                         @endif
                     </div>
 

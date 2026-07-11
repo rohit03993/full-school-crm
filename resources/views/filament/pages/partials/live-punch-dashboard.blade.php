@@ -219,42 +219,32 @@
                                             <span class="rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-700 dark:text-sky-300">{{ $pair['duration_label'] }}</span>
                                         @endif
                                     </div>
-                                    <div class="mt-3 grid grid-cols-2 gap-3">
-                                        <div>
-                                            <p class="text-[10px] font-semibold uppercase text-emerald-600 dark:text-emerald-400">In</p>
-                                            <p class="mt-0.5 font-mono text-sm font-bold text-gray-950 dark:text-white">{{ $pair['in'] ?? '—' }}</p>
-                                            @if (! empty($pair['is_manual_in']))
-                                                <p class="mt-1 text-[10px] leading-snug text-violet-700 dark:text-violet-300">
-                                                    {{ \App\Support\AttendanceSourceLabel::manualMarked($pair['marked_by_in'] ?? null) }}
-                                                </p>
-                                            @elseif (filled($pair['device_in'] ?? null))
-                                                <p class="mt-1 truncate text-[10px] text-gray-500">{{ $pair['device_in'] }}</p>
-                                            @endif
+                                    <div class="mt-3 grid grid-cols-2 gap-4">
+                                        <div class="min-w-0 space-y-0.5">
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">In</p>
+                                            <p class="font-mono text-sm font-bold text-gray-950 dark:text-white">{{ $pair['in'] ?? '—' }}</p>
+                                            @include('filament.pages.partials.punch-source-chip', [
+                                                'isManual' => ! empty($pair['is_manual_in']),
+                                                'device' => $pair['device_in'] ?? null,
+                                                'staffName' => $pair['marked_by_in'] ?? null,
+                                            ])
                                         </div>
-                                        <div>
-                                            <p class="text-[10px] font-semibold uppercase text-rose-600 dark:text-rose-400">Out</p>
-                                            <p class="mt-0.5 font-mono text-sm font-bold text-gray-950 dark:text-white">{{ $pair['out'] ?? '—' }}</p>
-                                            @if (! empty($pair['is_auto_out']))
-                                                <p class="mt-1 text-[10px] font-semibold text-gray-500">Auto OUT</p>
-                                            @elseif (! empty($pair['is_manual_out']))
-                                                <p class="mt-1 text-[10px] leading-snug text-violet-700 dark:text-violet-300">
-                                                    {{ \App\Support\AttendanceSourceLabel::manualMarked($pair['marked_by_out'] ?? null) }}
-                                                </p>
-                                            @elseif (filled($pair['device_out'] ?? null))
-                                                <p class="mt-1 truncate text-[10px] text-gray-500">{{ $pair['device_out'] }}</p>
+                                        <div class="min-w-0 space-y-0.5">
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-rose-600 dark:text-rose-400">Out</p>
+                                            <p class="font-mono text-sm font-bold text-gray-950 dark:text-white">{{ $pair['out'] ?? '—' }}</p>
+                                            @if (filled($pair['out'] ?? null) || ! empty($pair['is_auto_out']))
+                                                @include('filament.pages.partials.punch-source-chip', [
+                                                    'isManual' => ! empty($pair['is_manual_out']),
+                                                    'isAuto' => ! empty($pair['is_auto_out']),
+                                                    'device' => $pair['device_out'] ?? null,
+                                                    'staffName' => $pair['marked_by_out'] ?? null,
+                                                ])
                                             @endif
                                         </div>
                                     </div>
                                 </div>
                             @endforeach
                         </div>
-
-                        @if ($row['is_mapped'])
-                            <div class="mt-4 flex flex-wrap gap-2">
-                                <button type="button" wire:click="markManualPunch('{{ $row['roll'] }}', 'IN')" class="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500">Manual IN</button>
-                                <button type="button" wire:click="markManualPunch('{{ $row['roll'] }}', 'OUT')" class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-500">Manual OUT</button>
-                            </div>
-                        @endif
 
                         <div class="mt-4 flex flex-wrap gap-2">
                             @foreach (['in' => 'IN WhatsApp', 'out' => 'OUT WhatsApp'] as $key => $label)

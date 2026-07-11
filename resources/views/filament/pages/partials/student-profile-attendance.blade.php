@@ -60,7 +60,7 @@
             <p class="font-semibold text-gray-950 dark:text-white">How to read this</p>
             <ul class="mt-2 list-inside list-disc space-y-1">
                 <li><strong>%</strong> — Selected month: Present(+Leave) ÷ working days (Sundays excluded)</li>
-                <li><strong>Visits</strong> — Each biometric/manual IN→OUT pair for that day (same as Live attendance)</li>
+                <li><strong>Visits</strong> — Each IN→OUT pair with source under the punch (machine or manually marked)</li>
                 <li>Use month filter + Print/PDF for parent or file copies. Full class reports: Reports menu.</li>
             </ul>
         </div>
@@ -74,8 +74,7 @@
                         <tr>
                             <th class="px-4 py-2.5">Date</th>
                             <th class="px-4 py-2.5">Status</th>
-                            <th class="px-4 py-2.5" colspan="2">Visits (IN / OUT)</th>
-                            <th class="px-4 py-2.5">Source</th>
+                            <th class="px-4 py-2.5">Visits · source per punch</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-white/10">
@@ -123,23 +122,44 @@
                                         @endif
                                     </div>
                                 </td>
-                                <td class="px-4 py-2.5 align-top" colspan="2">
+                                <td class="px-4 py-2.5 align-top">
                                     @if ($pairs !== [])
-                                        <div class="space-y-2">
+                                        <div class="space-y-2.5">
                                             @foreach ($pairs as $index => $pair)
-                                                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono text-xs">
-                                                    <span class="text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                                                        Visit {{ $index + 1 }}
-                                                    </span>
-                                                    <span class="text-emerald-700 dark:text-emerald-300">
-                                                        IN {{ $pair['in'] ?? '—' }}
-                                                    </span>
-                                                    <span class="text-rose-700 dark:text-rose-300">
-                                                        OUT {{ filled($pair['out'] ?? null) ? $pair['out'] : '—' }}
-                                                    </span>
-                                                    @if (filled($pair['duration_label'] ?? null))
-                                                        <span class="text-gray-400">{{ $pair['duration_label'] }}</span>
-                                                    @endif
+                                                <div class="rounded-lg bg-gray-50 px-2.5 py-2 ring-1 ring-gray-950/5 dark:bg-white/5 dark:ring-white/10">
+                                                    <div class="mb-1.5 flex items-center justify-between gap-2">
+                                                        <span class="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                                                            Visit {{ $index + 1 }}
+                                                        </span>
+                                                        @if (filled($pair['duration_label'] ?? null))
+                                                            <span class="text-[10px] text-gray-400">{{ $pair['duration_label'] }}</span>
+                                                        @endif
+                                                    </div>
+                                                    <div class="grid grid-cols-2 gap-3">
+                                                        <div class="min-w-0">
+                                                            <p class="text-[9px] font-semibold uppercase text-emerald-600 dark:text-emerald-400">In</p>
+                                                            <p class="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-300">{{ $pair['in'] ?? '—' }}</p>
+                                                            @include('filament.pages.partials.punch-source-chip', [
+                                                                'isManual' => ! empty($pair['is_manual_in']),
+                                                                'device' => $pair['device_in'] ?? null,
+                                                                'staffName' => $pair['marked_by_in'] ?? null,
+                                                            ])
+                                                        </div>
+                                                        <div class="min-w-0">
+                                                            <p class="text-[9px] font-semibold uppercase text-rose-600 dark:text-rose-400">Out</p>
+                                                            @if (filled($pair['out'] ?? null) || ! empty($pair['is_auto_out']))
+                                                                <p class="font-mono text-xs font-bold text-rose-700 dark:text-rose-300">{{ $pair['out'] ?? '—' }}</p>
+                                                                @include('filament.pages.partials.punch-source-chip', [
+                                                                    'isManual' => ! empty($pair['is_manual_out']),
+                                                                    'isAuto' => ! empty($pair['is_auto_out']),
+                                                                    'device' => $pair['device_out'] ?? null,
+                                                                    'staffName' => $pair['marked_by_out'] ?? null,
+                                                                ])
+                                                            @else
+                                                                <p class="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-300">Inside</p>
+                                                            @endif
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             @endforeach
                                         </div>
@@ -153,9 +173,6 @@
                                             </span>
                                         </div>
                                     @endif
-                                </td>
-                                <td class="px-4 py-2.5 text-[11px] leading-snug text-gray-600 dark:text-gray-300 align-top">
-                                    {{ \App\Support\AttendanceSourceLabel::forRecord($record, $student) }}
                                 </td>
                             </tr>
                         @endforeach
