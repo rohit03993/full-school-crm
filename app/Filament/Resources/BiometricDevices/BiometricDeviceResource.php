@@ -93,9 +93,49 @@ class BiometricDeviceResource extends Resource
                 TextColumn::make('serial_number')->label('SN')->searchable()->copyable(),
                 TextColumn::make('location')->toggleable(),
                 IconColumn::make('is_active')->boolean()->label('Active'),
-                TextColumn::make('last_seen_at')->dateTime('d M Y H:i')->placeholder('—'),
-                TextColumn::make('last_punch_at')->dateTime('d M Y H:i')->placeholder('—'),
-                TextColumn::make('today_punch_count')->label('Today')->alignCenter(),
+                TextColumn::make('adms_link')
+                    ->label('ADMS link')
+                    ->state(function (BiometricDevice $record): string {
+                        if (! $record->is_active) {
+                            return 'Inactive';
+                        }
+
+                        if ($record->last_seen_at?->gt(now()->subMinutes(5))) {
+                            return 'Online';
+                        }
+
+                        if ($record->last_seen_at?->gt(now()->subHour())) {
+                            return 'Idle';
+                        }
+
+                        return $record->last_seen_at ? 'Offline' : 'Never seen';
+                    })
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'Online' => 'success',
+                        'Idle' => 'warning',
+                        'Inactive' => 'gray',
+                        default => 'danger',
+                    })
+                    ->description(fn (BiometricDevice $record): ?string => $record->last_seen_at
+                        ? 'Seen '.$record->last_seen_at->diffForHumans()
+                        : null),
+                TextColumn::make('last_seen_at')
+                    ->label('Last seen')
+                    ->dateTime('d M Y H:i')
+                    ->placeholder('—')
+                    ->description('Heartbeat / poll from machine'),
+                TextColumn::make('last_punch_at')
+                    ->label('Last punch')
+                    ->dateTime('d M Y H:i')
+                    ->placeholder('—')
+                    ->description('Last attendance event received'),
+                TextColumn::make('today_punch_count')
+                    ->label('Today')
+                    ->alignCenter()
+                    ->state(fn (BiometricDevice $record): int => $record->today_punch_count_date?->isToday()
+                        ? (int) $record->today_punch_count
+                        : 0),
             ])
             ->defaultSort('name');
     }
