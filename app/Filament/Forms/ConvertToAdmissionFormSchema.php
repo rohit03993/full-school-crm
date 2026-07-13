@@ -5,7 +5,6 @@ namespace App\Filament\Forms;
 use App\Models\Course;
 use App\Models\Enquiry;
 use App\Services\ConvertToAdmissionPresenter;
-use App\Support\DefaultCourse;
 use App\Support\InstituteProfile;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
@@ -51,10 +50,14 @@ class ConvertToAdmissionFormSchema
                 ->afterStateUpdated(function (mixed $state, callable $set) use ($convertible, $presenter): void {
                     $enquiry = $convertible->firstWhere('id', (int) $state);
 
-                    if ($enquiry && ! $presenter->enquiryNeedsCourseSelection($enquiry)) {
+                    if (
+                        $enquiry
+                        && ! $presenter->enquiryNeedsCourseSelection($enquiry)
+                        && InstituteProfile::isEnrollableCourseId((int) $enquiry->course_id)
+                    ) {
                         $set('course_id', $enquiry->course_id);
                     } else {
-                        $set('course_id', null);
+                        $set('course_id', self::defaultEnrollableCourseId());
                     }
                 });
         } else {
@@ -65,12 +68,12 @@ class ConvertToAdmissionFormSchema
         $fields[] = Select::make('course_id')
             ->label('Course for admission')
             ->options(fn (): array => self::courseOptions())
-            ->getOptionLabelUsing(fn ($value): ?string => Course::query()->find($value)?->admissionSelectLabel())
+            ->getOptionLabelUsing(fn ($value): ?string => self::courseOptions()[(int) $value] ?? null)
             ->required()
             ->searchable()
             ->live()
             ->native(false)
-            ->helperText('Fees are set after enrollment via Adjust Fees on the student profile.');
+            ->helperText('Only programmes with an active section in the current school year are listed. Fees are set after enrollment via Adjust Fees on the student profile.');
 
         $fields[] = Placeholder::make('course_fee_zero_warning')
             ->label('')
@@ -97,16 +100,7 @@ class ConvertToAdmissionFormSchema
      */
     public static function courseOptions(): array
     {
-        return InstituteProfile::adminCoursesQuery(Course::query())
-            ->active()
-            ->where('code', '!=', DefaultCourse::UNDECIDED_CODE)
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get()
-            ->mapWithKeys(fn (Course $course): array => [
-                $course->id => $course->admissionSelectLabel(),
-            ])
-            ->all();
+        return InstituteProfile::enrollableCourseAdmissionOptions();
     }
 
     /**
@@ -120,10 +114,25 @@ class ConvertToAdmissionFormSchema
         $enquiry = self::resolveEnquiry($convertible, $presenter, $enquiryId);
 
         if (! $enquiry || $presenter->enquiryNeedsCourseSelection($enquiry)) {
-            return null;
+            return self::defaultEnrollableCourseId();
         }
 
-        return $enquiry->course_id;
+        if (InstituteProfile::isEnrollableCourseId((int) $enquiry->course_id)) {
+            return $enquiry->course_id;
+        }
+
+        return self::defaultEnrollableCourseId();
+    }
+
+    protected static function defaultEnrollableCourseId(): ?int
+    {
+        $options = self::courseOptions();
+
+        if (count($options) === 1) {
+            return (int) array_key_first($options);
+        }
+
+        return null;
     }
 
     /**

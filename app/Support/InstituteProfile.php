@@ -2,9 +2,11 @@
 
 namespace App\Support;
 
+use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\InstituteType;
 use App\Enums\ProgrammeCategory;
+use App\Models\AcademicSession;
 use App\Models\Course;
 use App\Models\Setting;
 use Illuminate\Database\Eloquent\Builder;
@@ -101,6 +103,49 @@ class InstituteProfile
             ->where('status', CourseStatus::Active)
             ->where('show_on_website', true)
             ->whereHas('batches');
+    }
+
+    /**
+     * Active programmes that have at least one active section (optionally in the current school year).
+     *
+     * @param  Builder<Course>  $query
+     * @return Builder<Course>
+     */
+    public static function enrollableCoursesQuery(?int $sessionId = null): Builder
+    {
+        $sessionId ??= AcademicSession::current()?->id;
+
+        $query = self::adminCoursesQuery(
+            Course::query()->active(),
+        );
+
+        $query->whereHas('batches', function (Builder $batch) use ($sessionId): void {
+            $batch->where('status', BatchStatus::Active);
+
+            if ($sessionId !== null) {
+                $batch->where('academic_session_id', $sessionId);
+            }
+        });
+
+        return $query->orderBy('name')->orderBy('id');
+    }
+
+    public static function isEnrollableCourseId(int $courseId, ?int $sessionId = null): bool
+    {
+        return self::enrollableCoursesQuery($sessionId)->whereKey($courseId)->exists();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function enrollableCourseAdmissionOptions(): array
+    {
+        return self::enrollableCoursesQuery()
+            ->get()
+            ->mapWithKeys(fn (Course $course): array => [
+                $course->id => $course->admissionSelectLabel(),
+            ])
+            ->all();
     }
 
     /**

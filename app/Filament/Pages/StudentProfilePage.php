@@ -81,6 +81,7 @@ use App\Services\WhatsAppTemplateCatalog;
 use App\Support\FeePlanCalculator;
 use App\Support\FeePlanSubmissionGuard;
 use App\Support\CrmHint;
+use App\Support\InstituteProfile;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -2247,10 +2248,22 @@ class StudentProfilePage extends Page
                     $courseId = (int) ($data['course_id'] ?? 0);
                     $course = \App\Models\Course::query()->find($courseId);
 
-                    if (! $course || (float) $course->fee <= 0) {
+                    if (! $course || ! InstituteProfile::isEnrollableCourseId($courseId)) {
+                        Notification::make()
+                            ->title('No section for this class')
+                            ->body('Add a section under Academics → Classes for the current school year, or pick a listed programme.')
+                            ->danger()
+                            ->send();
+
+                        $action->halt();
+
+                        return;
+                    }
+
+                    if ((float) $course->fee <= 0) {
                         Notification::make()
                             ->title('Course fee not set')
-                            ->body('Update the fee for this course in Classes admin before converting.')
+                            ->body('Update the fee for this class under Academics → Classes before converting.')
                             ->danger()
                             ->send();
 
@@ -2268,7 +2281,9 @@ class StudentProfilePage extends Page
                         $courseId = (int) ($mounted['course_id'] ?? 0);
                         $course = \App\Models\Course::query()->find($courseId);
 
-                        return ! $course || (float) $course->fee <= 0;
+                        return ! $course
+                            || (float) $course->fee <= 0
+                            || ! InstituteProfile::isEnrollableCourseId($courseId);
                     });
                 })
                 ->action(function (array $data, ConvertToAdmissionPresenter $presenter, AdmissionService $admissions): void {
