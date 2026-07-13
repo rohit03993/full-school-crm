@@ -112,8 +112,8 @@
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Main fee discounts from admission or Adjust Fees, and approved charge adjustments, will appear here.</p>
         </div>
     @else
-        <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <div class="overflow-x-auto">
+            <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+            <x-crm.responsive-table>
                 <table class="w-full min-w-[760px] text-left text-sm">
                     <thead>
                         <tr class="border-b border-gray-100 bg-gray-50/70 text-[10px] uppercase tracking-wider text-gray-500 dark:border-white/10 dark:bg-white/[0.02]">
@@ -130,15 +130,15 @@
                     <tbody class="divide-y divide-gray-100 dark:divide-white/5">
                         @foreach ($history as $entry)
                             <tr class="hover:bg-gray-50/70 dark:hover:bg-white/[0.02]" wire:key="disc-hist-{{ $entry->source }}-{{ $entry->occurredAt->timestamp }}-{{ $entry->studentId }}-{{ $entry->label }}">
-                                <td class="px-5 py-3 text-gray-600 dark:text-gray-400">{{ $entry->occurredAt->format('d M Y H:i') }}</td>
-                                <td class="px-4 py-3">
+                                <td class="px-5 py-3 text-gray-600 dark:text-gray-400" data-label="Date">{{ $entry->occurredAt->format('d M Y H:i') }}</td>
+                                <td class="px-4 py-3" data-label="Student">
                                     @if ($entry->studentId)
                                         <a href="{{ \App\Filament\Pages\StudentProfilePage::getUrl(['record' => $entry->studentId]) }}" class="font-medium text-primary-600 hover:underline dark:text-primary-400">{{ $entry->studentName }}</a>
                                     @else
                                         <span class="text-gray-700 dark:text-gray-300">{{ $entry->studentName }}</span>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3" data-label="Type">
                                     <span @class([
                                         'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
                                         'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' => $entry->kind === 'tuition_discount',
@@ -146,22 +146,22 @@
                                         'bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300' => $entry->kind === 'misc_waive_off',
                                     ])>{{ $entry->kindLabel }}</span>
                                 </td>
-                                <td class="px-4 py-3 text-gray-800 dark:text-gray-200">{{ $entry->label }}</td>
-                                <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300">− ₹{{ number_format($entry->amount, 2) }}</td>
-                                <td class="px-4 py-3">
+                                <td class="crm-responsive-table__title px-4 py-3 text-gray-800 dark:text-gray-200" data-label="">{{ $entry->label }}</td>
+                                <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300" data-label="Amount">− ₹{{ number_format($entry->amount, 2) }}</td>
+                                <td class="px-4 py-3" data-label="Status">
                                     <span @class([
                                         'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
                                         'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' => $entry->status === 'approved',
                                         'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200' => $entry->status === 'pending',
                                     ])>{{ $entry->statusLabel }}</span>
                                 </td>
-                                <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ $entry->actorName }}</td>
-                                <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ $entry->reason ?: '—' }}</td>
+                                <td class="px-4 py-3 text-gray-600 dark:text-gray-400" data-label="By">{{ $entry->actorName }}</td>
+                                <td class="px-4 py-3 text-gray-600 dark:text-gray-400" data-label="Reason">{{ $entry->reason ?: '—' }}</td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-crm.responsive-table>
         </div>
     @endif
 </div>

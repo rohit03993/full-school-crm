@@ -276,7 +276,7 @@
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Headers were auto-matched. Change any mapping that looks wrong before previewing.</p>
             </div>
 
-            <div class="overflow-x-auto">
+            <x-crm.responsive-table>
                 <table class="min-w-full text-sm">
                     <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
                         <tr>
@@ -295,9 +295,9 @@
                                 $isRequired = in_array($mappedField, ['roll_number', 'name'], true);
                             @endphp
                             <tr class="transition hover:bg-gray-50/80 dark:hover:bg-white/[0.02]">
-                                <td class="px-4 py-3 font-medium text-gray-950 dark:text-white">{{ $header }}</td>
-                                <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ $fileRows[0][$index] ?? '—' }}</td>
-                                <td class="px-4 py-3">
+                                <td class="crm-responsive-table__title px-4 py-3 font-medium text-gray-950 dark:text-white" data-label="">{{ $header }}</td>
+                                <td class="px-4 py-3 text-gray-500 dark:text-gray-400" data-label="Sample">{{ $fileRows[0][$index] ?? '—' }}</td>
+                                <td class="crm-responsive-table__actions px-4 py-3" data-label="Maps to">
                                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                                         <x-crm.select
                                             wire:model="columnMapping.{{ $index }}"
@@ -320,7 +320,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-crm.responsive-table>
 
             <div class="flex flex-col-reverse gap-2 border-t border-gray-100 px-4 py-4 dark:border-white/10 sm:flex-row sm:justify-between sm:px-6">
                 <button type="button" wire:click="goToStep(1)" class="inline-flex items-center justify-center rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5">

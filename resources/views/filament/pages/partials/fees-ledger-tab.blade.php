@@ -51,7 +51,7 @@
             @if (empty($ledgerSummary['collection_rows'] ?? []))
                 <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">No fee collections in this period.</p>
             @else
-                <div class="overflow-x-auto">
+                <x-crm.responsive-table>
                     <table class="w-full min-w-[320px] text-left text-sm">
                         <thead class="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500 dark:border-white/10 dark:text-gray-400">
                             <tr>
@@ -62,13 +62,13 @@
                         <tbody class="divide-y divide-gray-100 dark:divide-white/10">
                             @foreach ($ledgerSummary['collection_rows'] as $row)
                                 <tr>
-                                    <td class="px-4 py-3 font-medium text-gray-950 dark:text-white sm:px-6">{{ $row['label'] }}</td>
-                                    <td class="px-4 py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">₹{{ number_format((float) $row['amount'], 2) }}</td>
+                                    <td class="crm-responsive-table__title px-4 py-3 font-medium text-gray-950 dark:text-white sm:px-6" data-label="">{{ $row['label'] }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400" data-label="Received">₹{{ number_format((float) $row['amount'], 2) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
-                </div>
+                </x-crm.responsive-table>
             @endif
         </div>
 
@@ -80,7 +80,7 @@
             @if (empty($ledgerSummary['income_rows'] ?? []) && (float) ($ledgerSummary['fees_receivable'] ?? 0) <= 0)
                 <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">No fee income activity yet.</p>
             @else
-                <div class="overflow-x-auto">
+                <x-crm.responsive-table>
                     <table class="w-full min-w-[320px] text-left text-sm">
                         <thead class="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500 dark:border-white/10 dark:text-gray-400">
                             <tr>
@@ -91,19 +91,19 @@
                         <tbody class="divide-y divide-gray-100 dark:divide-white/10">
                             @foreach ($ledgerSummary['income_rows'] as $row)
                                 <tr>
-                                    <td class="px-4 py-3 font-medium text-gray-950 dark:text-white sm:px-6">{{ $row['label'] }}</td>
-                                    <td class="px-4 py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">₹{{ number_format((float) $row['amount'], 2) }}</td>
+                                    <td class="crm-responsive-table__title px-4 py-3 font-medium text-gray-950 dark:text-white sm:px-6" data-label="">{{ $row['label'] }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400" data-label="Amount">₹{{ number_format((float) $row['amount'], 2) }}</td>
                                 </tr>
                             @endforeach
                             @if ((float) ($ledgerSummary['fees_receivable'] ?? 0) > 0)
                                 <tr>
-                                    <td class="px-4 py-3 font-medium text-gray-950 dark:text-white sm:px-6">Fees receivable (outstanding)</td>
-                                    <td class="px-4 py-3 text-right font-semibold text-amber-600 dark:text-amber-400">₹{{ number_format((float) $ledgerSummary['fees_receivable'], 2) }}</td>
+                                    <td class="crm-responsive-table__title px-4 py-3 font-medium text-gray-950 dark:text-white sm:px-6" data-label="">Fees receivable (outstanding)</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-amber-600 dark:text-amber-400" data-label="Amount">₹{{ number_format((float) $ledgerSummary['fees_receivable'], 2) }}</td>
                                 </tr>
                             @endif
                         </tbody>
                     </table>
-                </div>
+                </x-crm.responsive-table>
             @endif
         </div>
     </div>
@@ -128,7 +128,7 @@
                             </p>
                         </div>
                     </div>
-                    <div class="mt-3 overflow-x-auto">
+                    <x-crm.responsive-table>
                         <table class="w-full min-w-[480px] text-left text-xs">
                             <thead class="text-gray-500 dark:text-gray-400">
                                 <tr>
@@ -140,13 +140,13 @@
                             <tbody>
                                 @foreach ($presented['lines'] as $line)
                                     <tr>
-                                        <td class="py-1 pr-3 text-gray-800 dark:text-gray-200">
+                                        <td class="crm-responsive-table__title py-1 pr-3 text-gray-800 dark:text-gray-200" data-label="">
                                             {{ $line->label }}
                                             @if ($line->detail)
                                                 <span class="block text-[11px] text-gray-500 dark:text-gray-400">{{ $line->detail }}</span>
                                             @endif
                                         </td>
-                                        <td class="py-1 pr-3">
+                                        <td class="py-1 pr-3" data-label="Side">
                                             <span @class([
                                                 'inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
                                                 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $line->side === 'credit',
@@ -159,14 +159,14 @@
                                             'py-1 text-right font-semibold',
                                             'text-emerald-600 dark:text-emerald-400' => $line->side === 'credit',
                                             'text-amber-600 dark:text-amber-400' => $line->side === 'debit',
-                                        ])>
+                                        ]) data-label="Amount">
                                             ₹{{ number_format($line->amount, 2) }}
                                         </td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
-                    </div>
+                    </x-crm.responsive-table>
                 </div>
             @empty
                 <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">No entries in this period.</p>

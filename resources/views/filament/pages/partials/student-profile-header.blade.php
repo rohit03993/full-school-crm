@@ -23,13 +23,13 @@
     @endphp
 
     <div class="fi-student-profile-shell overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-        <div class="px-4 py-4 sm:px-6 sm:py-5">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="px-3 py-3 sm:px-6 sm:py-5">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <div class="min-w-0 flex-1">
-                    <h2 class="truncate text-lg font-bold text-gray-950 sm:text-xl dark:text-white">{{ $record->name }}</h2>
+                    <h2 class="truncate text-base font-bold text-gray-950 sm:text-xl dark:text-white">{{ $record->name }}</h2>
                     <div class="mt-1 flex items-center gap-2">
                         <p class="text-base font-semibold text-primary-600 dark:text-primary-400">{{ $record->mobile }}</p>
-                        @include('filament.pages.partials.student-call-button', ['record' => $record])
+                        @include('filament.pages.partials.student-call-button', ['record' => $record, 'hideOnMobile' => true])
                     </div>
                     @if ($record->activeEnrollment)
                         <p class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
@@ -92,7 +92,7 @@
         </div>
 
         <div @class([
-            'grid gap-2 border-t border-gray-100 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4 dark:border-white/10',
+            'grid gap-1.5 border-t border-gray-100 px-3 py-2 sm:gap-3 sm:px-6 sm:py-4 dark:border-white/10',
             'grid-cols-2' => $columnCount <= 2,
             'grid-cols-2 sm:grid-cols-3' => $columnCount === 3,
             'grid-cols-2 sm:grid-cols-4' => $columnCount === 4,
@@ -117,3 +117,5 @@
         </div>
     </div>
 @endif
+
+@include('filament.pages.partials.student-profile-mobile-call-bar', ['record' => $record])

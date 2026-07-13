@@ -24,8 +24,29 @@
             @endif
         </div>
 
-        <p class="fi-crm-scroll-hint">Swipe horizontally to view all columns.</p>
-        <div class="overflow-x-auto rounded-xl ring-1 ring-gray-200 dark:ring-white/10">
+        <p class="fi-crm-scroll-hint hidden md:block">Swipe horizontally to view all columns on desktop.</p>
+
+        <div class="space-y-2 md:hidden">
+            @forelse ($report['rows'] as $rowIndex => $row)
+                <div class="rounded-xl bg-white p-3 ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-white/10">
+                    @foreach ($report['columns'] as $colIndex => $column)
+                        <div @class([
+                            'flex items-start justify-between gap-3 py-1.5 text-sm',
+                            'border-b border-gray-100 pb-2 mb-1 font-semibold text-gray-950 dark:border-white/10 dark:text-white' => $colIndex === 0,
+                        ])>
+                            <span class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-gray-500">{{ $column }}</span>
+                            <span class="text-right text-gray-700 dark:text-gray-300">{{ $row[$colIndex] ?? '—' }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            @empty
+                <p class="rounded-xl bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:bg-white/5 dark:text-gray-400">
+                    No records for the selected filters.
+                </p>
+            @endforelse
+        </div>
+
+        <div class="hidden overflow-x-auto rounded-xl ring-1 ring-gray-200 md:block dark:ring-white/10">
             <table class="min-w-full text-left text-sm">
                 <thead class="bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
                     <tr>

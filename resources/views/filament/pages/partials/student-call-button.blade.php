@@ -1,9 +1,17 @@
+@php
+    $hideOnMobile = $hideOnMobile ?? false;
+@endphp
+
 @if ($record->isCallable())
     @php
         $telUrl = $record->telUrl();
         $notConnectedAttempts = (int) ($record->not_connected_attempts_count ?? 0);
     @endphp
-    <div class="flex items-center gap-1.5">
+    <div @class([
+        'items-center gap-1.5',
+        'hidden sm:flex' => $hideOnMobile,
+        'flex' => ! $hideOnMobile,
+    ])>
         <button
             type="button"
             onclick="window.CrmPendingCall.start({{ $record->id }}, @js($record->name), @js($record->mobile), @js($telUrl), {{ $notConnectedAttempts }})"

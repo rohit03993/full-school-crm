@@ -158,7 +158,47 @@
         @endif
     </div>
 
-    <div class="overflow-x-auto rounded-xl ring-1 ring-gray-200 dark:ring-white/10">
+    <div class="mb-4 space-y-2 md:hidden">
+        @foreach ($markSheet['rows'] as $row)
+            <div class="rounded-xl bg-white p-3 ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-white/10">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <p class="font-semibold text-gray-950 dark:text-white">{{ $row['student_name'] }}</p>
+                        <p class="font-mono text-xs text-gray-500">{{ $row['roll_number'] }}</p>
+                    </div>
+                    @if (in_array($status['status'] ?? 'none', ['published', 'issued'], true))
+                        @php($sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null)
+                        <div class="text-right">
+                            <p class="text-[10px] font-semibold uppercase text-gray-500">Rank</p>
+                            <p class="text-sm font-bold text-gray-800 dark:text-gray-200">{{ $sheet?->rank ?? '—' }}</p>
+                        </div>
+                    @endif
+                </div>
+                <dl class="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3 dark:border-white/10">
+                    @foreach ($markSheet['subjects'] as $subject)
+                        <div class="rounded-lg bg-gray-50 px-2.5 py-2 dark:bg-white/5">
+                            <dt class="truncate text-[10px] font-semibold uppercase text-gray-500">{{ $subject }}</dt>
+                            <dd class="mt-0.5 text-sm font-semibold text-gray-800 dark:text-gray-200">{{ $row['scores'][$subject] ?? '—' }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+                @if (($canIssueMarksheet ?? false) && ($status['status'] ?? '') === 'issued')
+                    @php($sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null)
+                    <div class="mt-3 border-t border-gray-100 pt-3 dark:border-white/10">
+                        @if ($sheet?->hasPdf())
+                            <a href="{{ route('admin.marksheets.preview', $sheet) }}" target="_blank" class="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-600 ring-1 ring-primary-200 dark:bg-primary-500/10 dark:text-primary-400">
+                                View PDF marksheet
+                            </a>
+                        @else
+                            <span class="text-xs text-gray-400">No marksheet PDF</span>
+                        @endif
+                    </div>
+                @endif
+            </div>
+        @endforeach
+    </div>
+
+    <div class="hidden overflow-x-auto rounded-xl ring-1 ring-gray-200 md:block dark:ring-white/10">
         <table class="w-full min-w-[32rem] text-left text-sm">
             <thead class="bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
                 <tr>

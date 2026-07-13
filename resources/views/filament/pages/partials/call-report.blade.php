@@ -101,7 +101,7 @@
                 <p class="text-sm text-gray-500 dark:text-gray-400">No calls match these filters.</p>
             </div>
         @else
-            <div class="overflow-x-auto">
+            <x-crm.responsive-table>
                 <table class="min-w-full divide-y divide-gray-100 dark:divide-white/10">
                     <thead class="bg-gray-50 dark:bg-white/5">
                         <tr>
@@ -120,21 +120,21 @@
                                 $isNew = (int) ($firstCallIds[$call->student_id] ?? 0) === (int) $call->id;
                             @endphp
                             <tr class="hover:bg-gray-50/80 dark:hover:bg-white/5">
-                                <td class="whitespace-nowrap px-4 py-3">
+                                <td class="whitespace-nowrap px-4 py-3" data-label="When">
                                     <p class="text-sm font-medium text-gray-950 dark:text-white">{{ $call->called_at?->format('d M Y, h:i A') }}</p>
                                     <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ $call->call_direction->label() }}</p>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="crm-responsive-table__title px-4 py-3" data-label="">
                                     <p class="text-sm font-medium text-gray-950 dark:text-white">{{ $call->student?->name ?? '—' }}</p>
                                     <p class="text-xs text-gray-500 dark:text-gray-400">{{ $call->student?->mobile ?? '—' }}</p>
                                     @if ($call->enquiry?->course)
                                         <p class="mt-0.5 text-xs text-gray-400">{{ $call->enquiry->course->name }}</p>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" data-label="Caller">
                                     {{ $call->staff?->name ?? '—' }}
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3" data-label="Status">
                                     <span @class([
                                         'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
                                         'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' => $call->call_status->isConnected(),
@@ -146,7 +146,7 @@
                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $call->visit_status_changed_to->label() }}</p>
                                     @endif
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3" data-label="Type">
                                     <span @class([
                                         'inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
                                         'bg-primary-500/10 text-primary-700 dark:text-primary-300' => $isNew,
@@ -155,10 +155,10 @@
                                         {{ $isNew ? 'New' : 'Follow-up' }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300" data-label="Notes">
                                     {{ $call->call_notes ? \Illuminate\Support\Str::limit($call->call_notes, 80) : '—' }}
                                 </td>
-                                <td class="whitespace-nowrap px-4 py-3 text-right">
+                                <td class="crm-responsive-table__actions whitespace-nowrap px-4 py-3 text-right" data-label="">
                                     @if ($call->student_id)
                                         <a
                                             href="{{ StudentProfilePage::getUrl(['record' => $call->student_id, 'tab' => 'calls']) }}"
@@ -172,7 +172,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-crm.responsive-table>
 
             @if ($calls->hasPages())
                 <div class="border-t border-gray-100 px-4 py-3 dark:border-white/10">

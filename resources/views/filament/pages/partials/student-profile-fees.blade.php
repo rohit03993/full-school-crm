@@ -209,41 +209,43 @@
                                 @if ($discountTimeline->isEmpty())
                                     <p class="px-5 py-8 text-center text-sm text-gray-500">No discount or waive-off entries yet.</p>
                                 @else
-                                    <table class="w-full min-w-[640px] text-left text-sm">
-                                        <thead class="sticky top-0 bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 dark:bg-gray-900">
-                                            <tr>
-                                                <th class="px-5 py-3 font-semibold">Date</th>
-                                                <th class="px-4 py-3 font-semibold">Type</th>
-                                                <th class="px-4 py-3 font-semibold">Item</th>
-                                                <th class="px-4 py-3 font-semibold text-right">Amount</th>
-                                                <th class="px-4 py-3 font-semibold">Status</th>
-                                                <th class="px-4 py-3 font-semibold">By</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-gray-100 dark:divide-white/5">
-                                            @foreach ($discountTimeline as $entry)
+                                    <x-crm.responsive-table>
+                                        <table class="w-full min-w-[640px] text-left text-sm">
+                                            <thead class="sticky top-0 bg-gray-50 text-[10px] uppercase tracking-wider text-gray-500 dark:bg-gray-900">
                                                 <tr>
-                                                    <td class="px-5 py-3 text-gray-600 dark:text-gray-400">{{ $entry->occurredAt->format('d M Y H:i') }}</td>
-                                                    <td class="px-4 py-3 text-gray-800 dark:text-gray-200">{{ $entry->kindLabel }}</td>
-                                                    <td class="px-4 py-3 text-gray-800 dark:text-gray-200">
-                                                        <p>{{ $entry->label }}</p>
-                                                        @if ($entry->reason)
-                                                            <p class="mt-0.5 text-xs text-gray-500">{{ $entry->reason }}</p>
-                                                        @endif
-                                                    </td>
-                                                    <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300">− ₹{{ number_format($entry->amount, 2) }}</td>
-                                                    <td class="px-4 py-3">
-                                                        <span @class([
-                                                            'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                                                            'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' => $entry->status === 'approved',
-                                                            'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200' => $entry->status === 'pending',
-                                                        ])>{{ $entry->statusLabel }}</span>
-                                                    </td>
-                                                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ $entry->actorName }}</td>
+                                                    <th class="px-5 py-3 font-semibold">Date</th>
+                                                    <th class="px-4 py-3 font-semibold">Type</th>
+                                                    <th class="px-4 py-3 font-semibold">Item</th>
+                                                    <th class="px-4 py-3 font-semibold text-right">Amount</th>
+                                                    <th class="px-4 py-3 font-semibold">Status</th>
+                                                    <th class="px-4 py-3 font-semibold">By</th>
                                                 </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-100 dark:divide-white/5">
+                                                @foreach ($discountTimeline as $entry)
+                                                    <tr>
+                                                        <td class="px-5 py-3 text-gray-600 dark:text-gray-400" data-label="Date">{{ $entry->occurredAt->format('d M Y H:i') }}</td>
+                                                        <td class="px-4 py-3 text-gray-800 dark:text-gray-200" data-label="Type">{{ $entry->kindLabel }}</td>
+                                                        <td class="crm-responsive-table__title px-4 py-3 text-gray-800 dark:text-gray-200" data-label="">
+                                                            <p>{{ $entry->label }}</p>
+                                                            @if ($entry->reason)
+                                                                <p class="mt-0.5 text-xs text-gray-500">{{ $entry->reason }}</p>
+                                                            @endif
+                                                        </td>
+                                                        <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300" data-label="Amount">− ₹{{ number_format($entry->amount, 2) }}</td>
+                                                        <td class="px-4 py-3" data-label="Status">
+                                                            <span @class([
+                                                                'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                                                'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' => $entry->status === 'approved',
+                                                                'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200' => $entry->status === 'pending',
+                                                            ])>{{ $entry->statusLabel }}</span>
+                                                        </td>
+                                                        <td class="px-4 py-3 text-gray-600 dark:text-gray-400" data-label="By">{{ $entry->actorName }}</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </x-crm.responsive-table>
                                 @endif
                             </div>
                         </div>
@@ -318,7 +320,7 @@
                         <p class="text-xs text-gray-500">{{ $installments->count() }} installments · sorted by due date</p>
                     </div>
                 </div>
-                <div class="overflow-x-auto">
+                <x-crm.responsive-table>
                     <table class="w-full min-w-[540px] text-left text-sm">
                         <thead>
                             <tr class="border-b border-gray-100 bg-gray-50/60 text-[10px] uppercase tracking-wider text-gray-500 dark:border-white/10 dark:bg-white/[0.02]">
@@ -345,18 +347,18 @@
                                     'transition-colors hover:bg-gray-50/80 dark:hover:bg-white/[0.02]',
                                     'opacity-60' => $isPaid,
                                 ])>
-                                    <td class="px-5 py-3 font-medium text-gray-900 dark:text-white">{{ $installment->label }}</td>
-                                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ $installment->due_date?->format('d M Y') ?? '—' }}</td>
-                                    <td class="px-4 py-3 text-right font-medium text-emerald-600 dark:text-emerald-400">₹{{ number_format((float) $installment->paid_amount, 0) }}</td>
-                                    <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">₹{{ number_format((float) $installment->pending_amount, 0) }}</td>
-                                    <td class="px-4 py-3">
+                                    <td class="crm-responsive-table__title px-5 py-3 font-medium text-gray-900 dark:text-white" data-label="">{{ $installment->label }}</td>
+                                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400" data-label="Due date">{{ $installment->due_date?->format('d M Y') ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-right font-medium text-emerald-600 dark:text-emerald-400" data-label="Paid">₹{{ number_format((float) $installment->paid_amount, 0) }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white" data-label="Balance">₹{{ number_format((float) $installment->pending_amount, 0) }}</td>
+                                    <td class="px-4 py-3" data-label="Status">
                                         <span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $statusClass }}">{{ $status }}</span>
                                     </td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
-                </div>
+                </x-crm.responsive-table>
             </div>
         @endif
 
@@ -371,7 +373,7 @@
                         <p class="text-xs text-gray-500">Hostel, materials, late fees, GST — paid separately via Add Payment. Discount / waive-off needs admin approval.</p>
                     </div>
                 </div>
-                <div class="overflow-x-auto">
+                <x-crm.responsive-table>
                     <table class="w-full min-w-[520px] text-left text-sm">
                         <thead>
                             <tr class="border-b border-gray-100 bg-gray-50/60 text-[10px] uppercase tracking-wider text-gray-500 dark:border-white/10 dark:bg-white/[0.02]">
@@ -406,7 +408,7 @@
                                     'transition-colors hover:bg-gray-50/80 dark:hover:bg-white/[0.02]',
                                     'bg-red-50/40 dark:bg-red-500/5' => $charge->kind === FeeMiscChargeKind::LateFeePenalty,
                                 ]) wire:key="misc-{{ $charge->id }}">
-                                    <td class="px-5 py-3">
+                                    <td class="crm-responsive-table__title px-5 py-3" data-label="">
                                         <div class="flex flex-wrap items-center gap-2">
                                             @if ($typeBadge)
                                                 <span @class([
@@ -421,13 +423,13 @@
                                             <p class="mt-0.5 text-[11px] text-gray-500">Due {{ $charge->due_date->format('d M Y') }}</p>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">₹{{ number_format((float) $charge->amount, 0) }}</td>
-                                    <td class="px-4 py-3 text-right font-medium text-emerald-600 dark:text-emerald-400">₹{{ number_format($chargePaid, 0) }}</td>
-                                    <td class="px-4 py-3 text-right font-semibold text-amber-700 dark:text-amber-300">₹{{ number_format($chargePending, 0) }}</td>
-                                    <td class="px-4 py-3">
+                                    <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300" data-label="Amount">₹{{ number_format((float) $charge->amount, 0) }}</td>
+                                    <td class="px-4 py-3 text-right font-medium text-emerald-600 dark:text-emerald-400" data-label="Paid">₹{{ number_format($chargePaid, 0) }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-amber-700 dark:text-amber-300" data-label="Due">₹{{ number_format($chargePending, 0) }}</td>
+                                    <td class="px-4 py-3" data-label="Status">
                                         <span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $statusClass }}">{{ $statusLabel }}</span>
                                     </td>
-                                    <td class="px-4 py-3 text-right">
+                                    <td class="crm-responsive-table__actions px-4 py-3 text-right" data-label="">
                                         <div class="flex flex-wrap items-center justify-end gap-2">
                                             @if ($charge->isPayableSeparately() && ($canCollectFees ?? false))
                                                 <button
@@ -515,7 +517,7 @@
                             @endforeach
                         </tbody>
                     </table>
-                </div>
+                </x-crm.responsive-table>
             </div>
         @endif
 

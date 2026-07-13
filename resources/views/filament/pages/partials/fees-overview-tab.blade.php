@@ -36,7 +36,7 @@
         @if ($defaulters->isEmpty())
             <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">No overdue installments right now.</p>
         @else
-            <div class="overflow-x-auto">
+            <x-crm.responsive-table>
                 <table class="w-full min-w-[640px] text-left text-sm">
                     <thead class="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500 dark:border-white/10 dark:text-gray-400">
                         <tr>
@@ -50,7 +50,7 @@
                     <tbody class="divide-y divide-gray-100 dark:divide-white/10">
                         @foreach ($defaulters as $row)
                             <tr class="hover:bg-gray-50/80 dark:hover:bg-white/5">
-                                <td class="px-4 py-3 sm:px-6">
+                                <td class="crm-responsive-table__title px-4 py-3 sm:px-6" data-label="">
                                     <a href="{{ $row['profile_url'] }}" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">
                                         {{ $row['student_name'] }}
                                     </a>
@@ -61,23 +61,23 @@
                                         @endif
                                     </p>
                                 </td>
-                                <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $row['course_name'] ?? '—' }}</td>
-                                <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
+                                <td class="px-4 py-3 text-gray-700 dark:text-gray-300" data-label="Course">{{ $row['course_name'] ?? '—' }}</td>
+                                <td class="px-4 py-3 text-gray-700 dark:text-gray-300" data-label="Due">
                                     {{ $row['next_due_date'] ? \Illuminate\Support\Carbon::parse($row['next_due_date'])->format('d M Y') : '—' }}
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3" data-label="Days late">
                                     <span class="inline-flex rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-semibold text-red-800 dark:text-red-300">
                                         {{ $row['days_overdue'] }} day(s)
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 text-right font-semibold text-red-700 dark:text-red-300">
+                                <td class="px-4 py-3 text-right font-semibold text-red-700 dark:text-red-300" data-label="Overdue">
                                     ₹{{ number_format((float) $row['pending_amount'], 2) }}
                                 </td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-crm.responsive-table>
         @endif
     </div>
 </div>

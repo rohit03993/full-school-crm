@@ -50,7 +50,7 @@
             <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
                 <h2 class="text-base font-bold text-gray-950 dark:text-white">Download report cards</h2>
             </div>
-            <div class="overflow-x-auto">
+            <x-crm.responsive-table>
                 <table class="w-full min-w-[28rem] text-left text-sm">
                     <thead class="bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
                         <tr>
@@ -62,18 +62,18 @@
                     <tbody class="divide-y divide-gray-100 dark:divide-white/10">
                         @foreach ($generatedReports as $report)
                             <tr>
-                                <td class="px-4 py-2.5 font-mono">{{ $report['roll_number'] }}</td>
-                                <td class="px-4 py-2.5 font-medium text-gray-950 dark:text-white">{{ $report['student_name'] }}</td>
-                                <td class="px-4 py-2.5 text-right">
-                                    <a href="{{ route('admin.marksheets.consolidated.download', ['path' => $report['pdf_path']]) }}" class="text-xs font-semibold text-primary-600 hover:underline">
-                                        Download
+                                <td class="px-4 py-2.5 font-mono" data-label="Roll">{{ $report['roll_number'] }}</td>
+                                <td class="crm-responsive-table__title px-4 py-2.5 font-medium text-gray-950 dark:text-white" data-label="">{{ $report['student_name'] }}</td>
+                                <td class="crm-responsive-table__actions px-4 py-2.5 text-right" data-label="">
+                                    <a href="{{ route('admin.marksheets.consolidated.download', ['path' => $report['pdf_path']]) }}" class="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-600 ring-1 ring-primary-200 hover:underline dark:bg-primary-500/10 dark:text-primary-400">
+                                        Download PDF
                                     </a>
                                 </td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-crm.responsive-table>
         </div>
     @endif
 

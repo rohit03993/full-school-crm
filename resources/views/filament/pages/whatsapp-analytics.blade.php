@@ -89,7 +89,7 @@
             @if ($categoryRows === [])
                 <p class="text-sm text-gray-500">No outbound messages in this period.</p>
             @else
-                <div class="overflow-x-auto">
+                <x-crm.responsive-table>
                     <table class="min-w-full text-sm">
                         <thead>
                             <tr class="text-left text-xs uppercase text-gray-500">
@@ -101,14 +101,14 @@
                         <tbody>
                             @foreach ($categoryRows as $category => $row)
                                 <tr class="border-t border-gray-100 dark:border-white/10">
-                                    <td class="py-2 pr-3 font-medium">{{ $this->categoryLabel((string) $category) }}</td>
-                                    <td class="py-2 pr-3 tabular-nums">{{ number_format((int) ($row['volume'] ?? $row['count'] ?? 0)) }}</td>
-                                    <td class="py-2 tabular-nums font-semibold">{{ $this->formatMoney((float) ($row['cost'] ?? $row['cost_inr'] ?? 0), $currency) }}</td>
+                                    <td class="crm-responsive-table__title py-2 pr-3 font-medium" data-label="">{{ $this->categoryLabel((string) $category) }}</td>
+                                    <td class="py-2 pr-3 tabular-nums" data-label="Volume">{{ number_format((int) ($row['volume'] ?? $row['count'] ?? 0)) }}</td>
+                                    <td class="py-2 tabular-nums font-semibold" data-label="Cost">{{ $this->formatMoney((float) ($row['cost'] ?? $row['cost_inr'] ?? 0), $currency) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
-                </div>
+                </x-crm.responsive-table>
             @endif
         </section>
 
@@ -118,7 +118,7 @@
             @if ($sourceRows === [])
                 <p class="text-sm text-gray-500">No source breakdown yet.</p>
             @else
-                <div class="overflow-x-auto">
+                <x-crm.responsive-table>
                     <table class="min-w-full text-sm">
                         <thead>
                             <tr class="text-left text-xs uppercase text-gray-500">
@@ -130,14 +130,14 @@
                         <tbody>
                             @foreach ($sourceRows as $source => $row)
                                 <tr class="border-t border-gray-100 dark:border-white/10">
-                                    <td class="py-2 pr-3 font-medium">{{ $this->sourceLabel((string) $source) }}</td>
-                                    <td class="py-2 pr-3 tabular-nums">{{ number_format((int) ($row['count'] ?? 0)) }}</td>
-                                    <td class="py-2 tabular-nums font-semibold">{{ $this->formatMoney((float) ($row['cost_inr'] ?? 0)) }}</td>
+                                    <td class="crm-responsive-table__title py-2 pr-3 font-medium" data-label="">{{ $this->sourceLabel((string) $source) }}</td>
+                                    <td class="py-2 pr-3 tabular-nums" data-label="Messages">{{ number_format((int) ($row['count'] ?? 0)) }}</td>
+                                    <td class="py-2 tabular-nums font-semibold" data-label="Est. cost">{{ $this->formatMoney((float) ($row['cost_inr'] ?? 0)) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
-                </div>
+                </x-crm.responsive-table>
             @endif
         </section>
     </div>
@@ -151,7 +151,7 @@
         @if (($data['campaigns'] ?? []) === [])
             <p class="text-sm text-gray-500">No campaigns were sent in this date range.</p>
         @else
-            <div class="overflow-x-auto">
+            <x-crm.responsive-table>
                 <table class="min-w-full text-sm">
                     <thead>
                         <tr class="text-left text-xs uppercase text-gray-500">
@@ -167,22 +167,22 @@
                     <tbody>
                         @foreach ($data['campaigns'] as $campaign)
                             <tr class="border-t border-gray-100 dark:border-white/10">
-                                <td class="px-2 py-2">
+                                <td class="crm-responsive-table__title px-2 py-2" data-label="">
                                     <a href="{{ $this->campaignViewUrl((int) $campaign['id']) }}" class="font-medium text-primary-600 hover:underline dark:text-primary-400">
                                         {{ $campaign['name'] }}
                                     </a>
                                 </td>
-                                <td class="px-2 py-2">{{ $campaign['template'] ?? '—' }}</td>
-                                <td class="px-2 py-2">{{ $campaign['batch'] ?? '—' }}</td>
-                                <td class="px-2 py-2 tabular-nums">{{ number_format((int) $campaign['sent_count']) }}</td>
-                                <td class="px-2 py-2 tabular-nums">{{ number_format((int) $campaign['failed_count']) }}</td>
-                                <td class="px-2 py-2 tabular-nums font-semibold">{{ $this->formatMoney((float) $campaign['estimated_total_cost_inr']) }}</td>
-                                <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-500">{{ $campaign['shot_at'] }}</td>
+                                <td class="px-2 py-2" data-label="Template">{{ $campaign['template'] ?? '—' }}</td>
+                                <td class="px-2 py-2" data-label="Batch">{{ $campaign['batch'] ?? '—' }}</td>
+                                <td class="px-2 py-2 tabular-nums" data-label="Sent">{{ number_format((int) $campaign['sent_count']) }}</td>
+                                <td class="px-2 py-2 tabular-nums" data-label="Failed">{{ number_format((int) $campaign['failed_count']) }}</td>
+                                <td class="px-2 py-2 tabular-nums font-semibold" data-label="Est. cost">{{ $this->formatMoney((float) $campaign['estimated_total_cost_inr']) }}</td>
+                                <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-500" data-label="When">{{ $campaign['shot_at'] }}</td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-crm.responsive-table>
         @endif
     </section>
 </div>

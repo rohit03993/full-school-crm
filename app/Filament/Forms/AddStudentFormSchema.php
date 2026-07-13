@@ -45,6 +45,7 @@ class AddStudentFormSchema
         return [
             Placeholder::make('add_student_intro')
                 ->label('')
+                ->extraAttributes(['class' => 'fi-add-student-form-marker'])
                 ->content(new HtmlString(
                     '<p class="text-sm text-gray-600 dark:text-gray-400">'
                     .'Register one student and enroll them immediately — course fee is taken from the batch. '

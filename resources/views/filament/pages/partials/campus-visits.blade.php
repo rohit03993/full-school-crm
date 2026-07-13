@@ -92,7 +92,7 @@
     </div>
   @else
     <div class="fi-section overflow-hidden rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
-      <div class="overflow-x-auto">
+      <x-crm.responsive-table>
         <table class="min-w-full divide-y divide-gray-100 dark:divide-white/10">
           <thead class="bg-gray-50 dark:bg-white/5">
             <tr>
@@ -111,14 +111,14 @@
                 $isEnrolled = $visit->student?->activeEnrollment !== null;
               @endphp
               <tr class="hover:bg-gray-50/80 dark:hover:bg-white/5">
-                <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-950 dark:text-white">
+                <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-950 dark:text-white" data-label="Date">
                   {{ $visit->visit_date?->format('d M Y') ?? '—' }}
                 </td>
-                <td class="px-4 py-3">
+                <td class="crm-responsive-table__title px-4 py-3" data-label="">
                   <p class="text-sm font-medium text-gray-950 dark:text-white">{{ $visit->student?->name ?? '—' }}</p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">{{ $visit->student?->mobile ?? '—' }}</p>
                 </td>
-                <td class="px-4 py-3">
+                <td class="px-4 py-3" data-label="Type">
                   <span @class([
                     'inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1',
                     'bg-emerald-500/15 text-emerald-700 ring-emerald-500/20 dark:text-emerald-400' => $isEnrolled,
@@ -127,16 +127,16 @@
                     {{ $isEnrolled ? 'Enrolled' : 'Prospect' }}
                   </span>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" data-label="Course">
                   {{ $visit->enquiry?->course?->name ?? 'Not decided' }}
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" data-label="Status">
                   {{ $visit->status?->label() ?? '—' }}
                 </td>
-                <td class="px-4 py-3 text-sm font-medium text-gray-950 dark:text-white">
+                <td class="px-4 py-3 text-sm font-medium text-gray-950 dark:text-white" data-label="Logged by">
                   {{ $visit->staff?->name ?? '—' }}
                 </td>
-                <td class="whitespace-nowrap px-4 py-3 text-right">
+                <td class="crm-responsive-table__actions whitespace-nowrap px-4 py-3 text-right" data-label="">
                   @if ($visit->student_id)
                     <a
                       href="{{ StudentProfilePage::getUrl(['record' => $visit->student_id]) }}"
@@ -150,7 +150,7 @@
             @endforeach
           </tbody>
         </table>
-      </div>
+      </x-crm.responsive-table>
     </div>
 
     <div class="pt-2">

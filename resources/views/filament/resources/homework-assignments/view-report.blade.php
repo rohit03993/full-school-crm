@@ -14,7 +14,7 @@
             </p>
         @endif
     </div>
-    <div class="overflow-x-auto">
+    <x-crm.responsive-table>
         <table class="w-full min-w-[32rem] text-left text-sm">
             <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
                 <tr>
@@ -28,19 +28,19 @@
             <tbody class="divide-y divide-gray-100 dark:divide-white/10">
                 @forelse ($report as $row)
                     <tr>
-                        <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $row['student']->name }}</td>
-                        <td class="px-4 py-3 font-mono text-gray-700 dark:text-gray-300">
+                        <td class="crm-responsive-table__title px-4 py-3 font-medium text-gray-900 dark:text-white" data-label="">{{ $row['student']->name }}</td>
+                        <td class="px-4 py-3 font-mono text-gray-700 dark:text-gray-300" data-label="{{ \App\Support\StudentLabels::rollNumberLabel() }}">
                             {{ $row['student']->activeEnrollment?->enrollment_number ?? '—' }}
                         </td>
-                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ $row['student']->mobile }}</td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300" data-label="Mobile">{{ $row['student']->mobile }}</td>
+                        <td class="px-4 py-3" data-label="Viewed">
                             @if ($row['viewed'])
                                 <span class="text-emerald-600 dark:text-emerald-400">Yes</span>
                             @else
                                 <span class="text-gray-400">No</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ $row['viewed_at'] ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300" data-label="Viewed at">{{ $row['viewed_at'] ?? '—' }}</td>
                     </tr>
                 @empty
                     <tr>
@@ -51,7 +51,7 @@
                 @endforelse
             </tbody>
         </table>
-    </div>
+    </x-crm.responsive-table>
     @if ($report->hasPages())
         <div class="border-t border-gray-200 px-4 py-3 dark:border-white/10">
             {{ $report->links() }}

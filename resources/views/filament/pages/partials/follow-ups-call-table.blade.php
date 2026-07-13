@@ -18,7 +18,7 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">{{ $empty }}</p>
         </div>
     @else
-        <div class="overflow-x-auto">
+        <x-crm.responsive-table>
             <table class="min-w-full divide-y divide-gray-100 dark:divide-white/10">
                 <thead class="bg-gray-50 dark:bg-white/5">
                     <tr>
@@ -38,7 +38,7 @@
                             $enquiry = $student->enquiries->first();
                         @endphp
                         <tr class="hover:bg-gray-50/80 dark:hover:bg-white/5">
-                            <td class="whitespace-nowrap px-4 py-3">
+                            <td class="whitespace-nowrap px-4 py-3" data-label="Callback">
                                 <p class="text-sm font-semibold text-gray-950 dark:text-white">{{ $followUpAt?->format('d M Y, h:i A') }}</p>
                                 <p @class([
                                     'mt-0.5 text-xs font-medium',
@@ -47,14 +47,14 @@
                                     'text-gray-500 dark:text-gray-400' => ! $isOverdue && ! $isDueToday,
                                 ])>{{ $worklist->followUpStatusLabel($followUpAt) }}</p>
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="crm-responsive-table__title px-4 py-3" data-label="">
                                 <p class="text-sm font-medium text-gray-950 dark:text-white">{{ $student->name }}</p>
                                 <p class="text-xs text-gray-500 dark:text-gray-400">{{ $student->mobile ?? '—' }}</p>
                             </td>
-                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" data-label="Course">
                                 {{ $enquiry?->course?->name ?? 'Not decided' }}
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Last call">
                                 @if ($student->last_call_at)
                                     <p class="text-sm text-gray-700 dark:text-gray-300">{{ $student->last_call_at->format('d M Y') }}</p>
                                     <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -67,7 +67,7 @@
                                     <p class="text-sm text-gray-500 dark:text-gray-400">Not called</p>
                                 @endif
                             </td>
-                            <td class="whitespace-nowrap px-4 py-3 text-right">
+                            <td class="crm-responsive-table__actions whitespace-nowrap px-4 py-3 text-right" data-label="">
                                 <a
                                     href="{{ StudentProfilePage::getUrl(['record' => $student->id]) }}"
                                     class="inline-flex items-center rounded-lg bg-primary-50 px-2.5 py-1.5 text-xs font-semibold text-primary-700 ring-1 ring-primary-200 hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-500/30"
@@ -79,6 +79,6 @@
                     @endforeach
                 </tbody>
             </table>
-        </div>
+        </x-crm.responsive-table>
     @endif
 </div>

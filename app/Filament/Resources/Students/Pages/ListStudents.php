@@ -79,6 +79,7 @@ class ListStudents extends ListRecords
                     ? 'Enroll this biometric roll ('.strtoupper((string) request()->query('roll')).') with a batch. Future punches will map automatically.'
                     : 'Enroll one student with roll number and batch. Fee is set from the course — adjust on the profile if needed.')
                 ->modalSubmitActionLabel('Enroll student')
+                ->modalWidth('2xl')
                 ->fillForm(fn (): array => AddStudentFormSchema::initialState(
                     filled(request()->query('roll')) ? (string) request()->query('roll') : null,
                 ))

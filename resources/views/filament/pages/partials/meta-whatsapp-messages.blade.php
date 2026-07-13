@@ -25,7 +25,7 @@
     </div>
 
     <div class="crm-meta-wa-log__table fi-ta rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-        <div class="overflow-x-auto">
+        <x-crm.responsive-table>
             <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-white/10">
                 <thead class="bg-gray-50 dark:bg-white/5">
                     <tr class="text-left text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -50,11 +50,11 @@
                             };
                         @endphp
                         <tr class="hover:bg-gray-50/80 dark:hover:bg-white/5">
-                            <td class="px-4 py-3 whitespace-nowrap text-gray-700 dark:text-gray-200">
+                            <td class="px-4 py-3 whitespace-nowrap text-gray-700 dark:text-gray-200" data-label="When">
                                 <span class="block font-medium">{{ $message->created_at?->format('d M Y') }}</span>
                                 <span class="text-xs text-gray-500">{{ $message->created_at?->format('h:i A') }}</span>
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3" data-label="Direction">
                                 <span @class([
                                     'crm-wa-pill',
                                     'crm-wa-pill--in' => $message->direction === 'inbound',
@@ -63,7 +63,7 @@
                                     {{ $message->direction === 'inbound' ? 'Parent' : 'School' }}
                                 </span>
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="crm-responsive-table__title px-4 py-3" data-label="">
                                 @if ($message->student)
                                     <a
                                         href="{{ StudentProfilePage::getUrl(['record' => $message->student_id]).'?tab=messages' }}"
@@ -75,14 +75,14 @@
                                     <span class="text-gray-400">—</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-300">{{ $message->phone }}</td>
-                            <td class="px-4 py-3">
+                            <td class="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-300" data-label="Phone">{{ $message->phone }}</td>
+                            <td class="px-4 py-3" data-label="Status">
                                 <span @class(['crm-wa-status font-medium capitalize', $statusClass])>
                                     {{ $status?->label() ?? $message->status }}
                                 </span>
                             </td>
-                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200">{{ $message->template_name ?? '—' }}</td>
-                            <td class="px-4 py-3 max-w-xs text-xs leading-relaxed text-gray-600 dark:text-gray-300">
+                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200" data-label="Template">{{ $message->template_name ?? '—' }}</td>
+                            <td class="px-4 py-3 max-w-xs text-xs leading-relaxed text-gray-600 dark:text-gray-300" data-label="Preview">
                                 {{ \Illuminate\Support\Str::limit($message->body_preview, 120) }}
                             </td>
                         </tr>
@@ -96,7 +96,7 @@
                     @endforelse
                 </tbody>
             </table>
-        </div>
+        </x-crm.responsive-table>
 
         <div class="border-t border-gray-200 px-4 py-3 dark:border-white/10">
             {{ $messages->links() }}
