@@ -258,17 +258,11 @@
         }
 
         .fi-student-profile-tabs .fi-tabs-tab-list {
-            @apply sticky top-0 z-20 mx-0 flex flex-nowrap gap-1 overflow-x-auto pb-1 scroll-smooth;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-        }
-
-        .fi-student-profile-tabs .fi-tabs-tab-list::-webkit-scrollbar {
-            display: none;
+            @apply sticky top-0 z-20 mx-0 flex flex-wrap gap-1 overflow-x-hidden pb-1;
         }
 
         .fi-student-profile-tabs .fi-tabs-tab {
-            @apply min-w-[5.5rem] shrink-0;
+            @apply min-w-0 flex-1 basis-[calc(33.333%-0.35rem)] shrink;
         }
 
         .fi-student-profile-dossier-banners > div {
@@ -286,10 +280,6 @@
 
         .fi-tabs-tab {
             @apply shrink-0 touch-manipulation text-sm;
-        }
-
-        .fi-ta-ctn {
-            @apply -mx-1 overflow-visible;
         }
 
         .fi-ta-header-toolbar {
@@ -750,17 +740,11 @@
     }
 
     .fi-student-profile-tabs .fi-tabs-tab-list {
-        @apply flex flex-nowrap gap-1 overflow-x-auto rounded-2xl border border-gray-200/80 bg-gradient-to-b from-gray-50 to-gray-100/80 p-1.5 shadow-sm dark:border-white/10 dark:from-gray-900 dark:to-gray-950/80;
-        scrollbar-width: none;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .fi-student-profile-tabs .fi-tabs-tab-list::-webkit-scrollbar {
-        display: none;
+        @apply flex flex-wrap gap-1 overflow-x-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-b from-gray-50 to-gray-100/80 p-1.5 shadow-sm dark:border-white/10 dark:from-gray-900 dark:to-gray-950/80;
     }
 
     .fi-student-profile-tabs .fi-tabs-tab {
-        @apply relative min-w-[6.5rem] shrink-0 flex-col gap-1 rounded-xl border border-transparent px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 transition-all duration-200 sm:min-w-[7.5rem] sm:flex-row sm:gap-2 sm:py-2.5 sm:text-xs sm:normal-case sm:tracking-normal dark:text-gray-400;
+        @apply relative min-w-0 flex-1 basis-[calc(33.333%-0.35rem)] flex-col gap-1 rounded-xl border border-transparent px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 transition-all duration-200 sm:basis-auto sm:min-w-[7rem] sm:shrink-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-2.5 sm:text-xs sm:normal-case sm:tracking-normal dark:text-gray-400;
     }
 
     .fi-student-profile-tabs .fi-tabs-tab .fi-icon {
@@ -1503,7 +1487,7 @@
     /* Responsive data tables — card rows on mobile (use with x-crm.responsive-table) */
     @media (max-width: 767px) {
         .crm-responsive-table {
-            @apply max-w-full overflow-visible;
+            @apply max-w-full overflow-x-hidden;
         }
 
         .crm-responsive-table > table {
@@ -1591,11 +1575,35 @@
     html.fi {
         overflow-x: hidden;
         max-width: 100%;
+        height: auto;
     }
 
     html.fi body.fi-body {
         overflow-x: hidden;
+        overflow-y: auto;
         max-width: 100%;
+        height: auto;
+        min-height: 100dvh;
+    }
+
+    /* One vertical scroll (document only) — no nested page scrollbars */
+    .fi-body .fi-layout,
+    .fi-body .fi-main-ctn,
+    .fi-body .fi-main,
+    .fi-body .fi-page,
+    .fi-body .fi-page-main,
+    .fi-body .fi-page-content,
+    .fi-body .fi-schemas {
+        height: auto !important;
+        min-height: 0 !important;
+        overflow-x: hidden !important;
+        overflow-y: visible !important;
+    }
+
+    .fi-ta-ctn {
+        margin-inline: 0 !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
     }
 
     .fi-ta-content-ctn {
@@ -1663,7 +1671,31 @@
         overflow: hidden;
     }
 
+    .fi-student-profile-tabs .fi-tabs-tab-list {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        overflow-x: hidden !important;
+        overflow-y: visible !important;
+    }
+
+    .fi-student-profile-tabs .fi-tabs-tab {
+        flex: 1 1 calc(33.333% - 0.35rem) !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
     .fi-student-profile-tabs .fi-tabs-panel {
         overflow-x: hidden;
+        max-width: 100%;
+    }
+
+    .crm-responsive-table {
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+
+    .crm-responsive-table > table {
+        min-width: 0 !important;
+        max-width: 100% !important;
     }
 }
