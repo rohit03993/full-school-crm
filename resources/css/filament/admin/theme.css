@@ -247,22 +247,22 @@
             @apply px-2;
         }
 
-        .fi-tabs-tab-list {
+        .fi-tabs {
             @apply mx-0 flex flex-nowrap gap-1 overflow-x-auto pb-1 scroll-smooth;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
         }
 
-        .fi-tabs-tab-list::-webkit-scrollbar {
+        .fi-tabs::-webkit-scrollbar {
             display: none;
         }
 
-        .fi-student-profile-tabs .fi-tabs-tab-list {
-            @apply sticky top-0 z-20 mx-0 flex flex-wrap gap-1 overflow-x-hidden pb-1;
+        .fi-student-profile-tabs > .fi-tabs {
+            @apply sticky top-0 z-20 flex-wrap overflow-x-hidden;
         }
 
-        .fi-student-profile-tabs .fi-tabs-tab {
-            @apply min-w-0 flex-1 basis-[calc(33.333%-0.35rem)] shrink;
+        .fi-student-profile-tabs .fi-tabs-item {
+            @apply min-w-0 flex-1 basis-[calc(33.333%-0.35rem)] shrink whitespace-normal;
         }
 
         .fi-student-profile-dossier-banners > div {
@@ -274,11 +274,11 @@
             @apply text-xs;
         }
 
-        .fi-student-profile-tabs .fi-tabs-panel {
-            @apply mt-3 p-3;
+        .fi-student-profile-tabs .fi-sc-tabs-tab.fi-active {
+            @apply mt-3 overflow-x-hidden p-3;
         }
 
-        .fi-tabs-tab {
+        .fi-tabs-item {
             @apply shrink-0 touch-manipulation text-sm;
         }
 
@@ -398,7 +398,7 @@
             @apply max-w-full overflow-hidden;
         }
 
-        .fi-student-profile-tabs .fi-tabs-panel {
+        .fi-student-profile-tabs .fi-sc-tabs-tab.fi-active {
             @apply overflow-x-hidden;
         }
 
@@ -735,44 +735,40 @@
         @apply mt-1;
     }
 
-    .fi-student-profile-tabs .fi-tabs {
-        @apply gap-0;
+    .fi-student-profile-tabs > .fi-tabs {
+        @apply flex-wrap gap-1 overflow-x-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-b from-gray-50 to-gray-100/80 p-1.5 shadow-sm dark:border-white/10 dark:from-gray-900 dark:to-gray-950/80;
     }
 
-    .fi-student-profile-tabs .fi-tabs-tab-list {
-        @apply flex flex-wrap gap-1 overflow-x-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-b from-gray-50 to-gray-100/80 p-1.5 shadow-sm dark:border-white/10 dark:from-gray-900 dark:to-gray-950/80;
+    .fi-student-profile-tabs .fi-tabs-item {
+        @apply relative min-w-0 flex-1 basis-[calc(33.333%-0.35rem)] flex-col gap-1 whitespace-normal rounded-xl border border-transparent px-2 py-2 text-[10px] font-semibold uppercase tracking-wide sm:basis-auto sm:min-w-[7rem] sm:shrink-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-2.5 sm:text-xs sm:normal-case sm:tracking-normal;
     }
 
-    .fi-student-profile-tabs .fi-tabs-tab {
-        @apply relative min-w-0 flex-1 basis-[calc(33.333%-0.35rem)] flex-col gap-1 rounded-xl border border-transparent px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500 transition-all duration-200 sm:basis-auto sm:min-w-[7rem] sm:shrink-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-2.5 sm:text-xs sm:normal-case sm:tracking-normal dark:text-gray-400;
-    }
-
-    .fi-student-profile-tabs .fi-tabs-tab .fi-icon {
+    .fi-student-profile-tabs .fi-tabs-item .fi-icon {
         @apply h-4 w-4 shrink-0 opacity-70 transition-opacity;
     }
 
-    .fi-student-profile-tabs .fi-tabs-tab:hover {
+    .fi-student-profile-tabs .fi-tabs-item:hover {
         @apply border-gray-200/60 bg-white/60 text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200;
     }
 
-    .fi-student-profile-tabs .fi-tabs-tab:hover .fi-icon {
+    .fi-student-profile-tabs .fi-tabs-item:hover .fi-icon {
         @apply opacity-100;
     }
 
-    .fi-student-profile-tabs .fi-tabs-tab[aria-selected='true'] {
+    .fi-student-profile-tabs .fi-tabs-item.fi-active {
         @apply border-primary-200/80 bg-white text-primary-700 shadow-md ring-1 ring-primary-500/10 dark:border-primary-500/30 dark:bg-gray-900 dark:text-primary-400 dark:ring-primary-400/20;
     }
 
-    .fi-student-profile-tabs .fi-tabs-tab[aria-selected='true']::before {
+    .fi-student-profile-tabs .fi-tabs-item.fi-active::before {
         content: '';
         @apply absolute inset-x-2 top-0 h-0.5 rounded-full bg-primary-500 dark:bg-primary-400;
     }
 
-    .fi-student-profile-tabs .fi-tabs-tab[aria-selected='true'] .fi-icon {
+    .fi-student-profile-tabs .fi-tabs-item.fi-active .fi-icon {
         @apply text-primary-600 opacity-100 dark:text-primary-400;
     }
 
-    .fi-student-profile-tabs .fi-tabs-panel {
+    .fi-student-profile-tabs .fi-sc-tabs-tab.fi-active {
         @apply mt-4 rounded-2xl border border-gray-200/60 bg-white p-4 shadow-sm sm:p-5 dark:border-white/10 dark:bg-gray-900/50;
     }
 
@@ -1575,15 +1571,12 @@
     html.fi {
         overflow-x: hidden;
         max-width: 100%;
-        height: auto;
     }
 
     html.fi body.fi-body {
         overflow-x: hidden;
-        overflow-y: auto;
+        overflow-y: visible;
         max-width: 100%;
-        height: auto;
-        min-height: 100dvh;
     }
 
     /* One vertical scroll (document only) — no nested page scrollbars */
@@ -1671,20 +1664,22 @@
         overflow: hidden;
     }
 
-    .fi-student-profile-tabs .fi-tabs-tab-list {
+    .fi-student-profile-tabs > .fi-tabs {
         display: flex !important;
         flex-wrap: wrap !important;
         overflow-x: hidden !important;
         overflow-y: visible !important;
-    }
-
-    .fi-student-profile-tabs .fi-tabs-tab {
-        flex: 1 1 calc(33.333% - 0.35rem) !important;
-        min-width: 0 !important;
         max-width: 100% !important;
     }
 
-    .fi-student-profile-tabs .fi-tabs-panel {
+    .fi-student-profile-tabs .fi-tabs-item {
+        flex: 1 1 calc(33.333% - 0.35rem) !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+    }
+
+    .fi-student-profile-tabs .fi-sc-tabs-tab.fi-active {
         overflow-x: hidden;
         max-width: 100%;
     }
