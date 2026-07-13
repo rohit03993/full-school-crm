@@ -133,7 +133,8 @@
     /* Safe area + no horizontal page scroll on phones/tablets */
     .fi-body {
         padding-top: env(safe-area-inset-top);
-        overflow-x: clip;
+        overflow-x: hidden;
+        max-width: 100%;
     }
 
     @media (max-width: 1023px) {
@@ -142,15 +143,29 @@
         .fi-main-ctn,
         .fi-page,
         .fi-page-main,
+        .fi-page-content,
         .fi-section,
-        .fi-section-content-ctn {
+        .fi-section-content-ctn,
+        .fi-schemas,
+        .fi-schemas > * {
             max-width: 100%;
-            overflow-x: clip;
+            min-width: 0;
+            overflow-x: hidden;
         }
 
         /* Filament resource tables — stacked cards without sideways scroll */
+        .fi-ta-ctn {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
         .fi-ta-content-ctn {
-            overflow-x: clip !important;
+            overflow-x: hidden !important;
+        }
+
+        .fi-ta-content {
+            max-width: 100%;
+            min-width: 0;
         }
 
         .fi-ta-table.fi-ta-table-stacked-on-mobile {
@@ -233,8 +248,13 @@
         }
 
         .fi-tabs-tab-list {
-            @apply -mx-1 flex-nowrap gap-1 overflow-x-auto pb-1 scroll-smooth;
+            @apply mx-0 flex flex-nowrap gap-1 overflow-x-auto pb-1 scroll-smooth;
             -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+
+        .fi-tabs-tab-list::-webkit-scrollbar {
+            display: none;
         }
 
         .fi-student-profile-tabs .fi-tabs-tab-list {
@@ -381,11 +401,15 @@
         }
 
         .fi-student-profile-shell {
-            @apply -mx-0.5;
+            @apply mx-0;
+        }
+
+        .fi-student-profile-tabs {
+            @apply max-w-full overflow-hidden;
         }
 
         .fi-student-profile-tabs .fi-tabs-panel {
-            @apply p-3;
+            @apply overflow-x-hidden;
         }
 
         .fi-student-profile-dossier {
@@ -1507,12 +1531,17 @@
         }
 
         .crm-responsive-table td {
-            @apply flex items-start justify-between gap-3 border-0 px-0 py-1.5 text-left text-sm;
+            @apply grid min-w-0 grid-cols-[minmax(5rem,38%)_minmax(0,1fr)] items-start gap-x-3 gap-y-0.5 border-0 px-0 py-1.5 text-left text-sm;
         }
 
         .crm-responsive-table td::before {
             content: attr(data-label);
-            @apply shrink-0 max-w-[42%] text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400;
+            @apply col-start-1 max-w-full text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400;
+        }
+
+        .crm-responsive-table td > * {
+            @apply col-start-2 min-w-0 max-w-full;
+            overflow-wrap: anywhere;
         }
 
         .crm-responsive-table td[data-label='']::before,
@@ -1523,11 +1552,19 @@
         }
 
         .crm-responsive-table td.crm-responsive-table__title {
-            @apply mb-1 block border-b border-gray-100 pb-2 font-semibold text-gray-950 dark:border-white/10 dark:text-white;
+            @apply col-span-2 mb-1 block border-b border-gray-100 pb-2 font-semibold text-gray-950 dark:border-white/10 dark:text-white;
+        }
+
+        .crm-responsive-table td.crm-responsive-table__title > * {
+            @apply col-span-2;
         }
 
         .crm-responsive-table td.crm-responsive-table__actions {
-            @apply mt-1 block border-t border-gray-100 pt-2 dark:border-white/10;
+            @apply col-span-2 mt-1 block border-t border-gray-100 pt-2 dark:border-white/10;
+        }
+
+        .crm-responsive-table td.crm-responsive-table__actions > * {
+            @apply col-span-2 w-full;
         }
 
         .crm-responsive-table td.crm-responsive-table__actions > a,
@@ -1546,5 +1583,87 @@
         .crm-responsive-table .text-right {
             text-align: right !important;
         }
+    }
+}
+
+/* Mobile overflow — unlayered so it wins over Filament table CSS */
+@media (max-width: 1023px) {
+    html.fi {
+        overflow-x: hidden;
+        max-width: 100%;
+    }
+
+    html.fi body.fi-body {
+        overflow-x: hidden;
+        max-width: 100%;
+    }
+
+    .fi-ta-content-ctn {
+        overflow-x: hidden !important;
+    }
+
+    .fi-ta-table.fi-ta-table-stacked-on-mobile {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
+    .fi-ta-table.fi-ta-table-stacked-on-mobile tbody > tr > .fi-ta-cell:not(.fi-ta-selection-cell) {
+        display: grid !important;
+        grid-template-columns: minmax(5rem, 36%) minmax(0, 1fr);
+        column-gap: 0.75rem;
+        align-items: start;
+        max-width: 100%;
+        box-sizing: border-box;
+        padding-inline: 0.75rem !important;
+    }
+
+    .fi-ta-table-stacked-on-mobile .fi-ta-cell-label {
+        grid-column: 1;
+        padding-top: 0.125rem !important;
+        font-size: 0.625rem;
+        line-height: 1.25;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .fi-ta-table-stacked-on-mobile .fi-ta-cell-content {
+        grid-column: 2;
+        min-width: 0;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .fi-ta-table-stacked-on-mobile tbody > tr > .fi-ta-cell:has(.fi-ta-actions) {
+        display: block !important;
+    }
+
+    .fi-ta-table-stacked-on-mobile .fi-ta-text,
+    .fi-ta-table-stacked-on-mobile .fi-ta-text-item {
+        min-width: 0;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    .fi-ta-table-stacked-on-mobile .fi-badge {
+        white-space: normal;
+        max-width: 100%;
+    }
+
+    .fi-ta-filters-before-content-ctn,
+    .fi-ta-filters-after-content-ctn {
+        width: auto !important;
+        max-width: min(14rem, 100vw) !important;
+    }
+
+    .fi-student-profile-tabs {
+        max-width: 100%;
+        overflow: hidden;
+    }
+
+    .fi-student-profile-tabs .fi-tabs-panel {
+        overflow-x: hidden;
     }
 }

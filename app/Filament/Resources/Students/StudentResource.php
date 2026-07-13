@@ -120,6 +120,7 @@ class StudentResource extends Resource
                     })
                     ->placeholder('—')
                     ->toggleable()
+                    ->hiddenFrom('md')
                     ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees)),
                 TextColumn::make('fee_status')
                     ->label('Fee status')
@@ -132,15 +133,18 @@ class StudentResource extends Resource
                     })
                     ->placeholder('—')
                     ->toggleable()
+                    ->hiddenFrom('md')
                     ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees)),
                 TextColumn::make('activeEnrollment.academicSession.name')
                     ->label('Session')
                     ->placeholder('—')
-                    ->toggleable(),
+                    ->toggleable()
+                    ->hiddenFrom('md'),
                 TextColumn::make('activeBatchStudent.batch.name')
                     ->label('Batch')
                     ->placeholder('—')
-                    ->toggleable(),
+                    ->toggleable()
+                    ->hiddenFrom('md'),
                 TextColumn::make('status')
                     ->badge()
                     ->color(fn (StudentStatus $state): string => match ($state) {
