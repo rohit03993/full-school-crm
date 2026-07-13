@@ -2874,6 +2874,7 @@ class StudentProfilePage extends Page
                 ]),
             Tabs::make('Student Profile')
                 ->livewireProperty('profileTab')
+                ->scrollable(false)
                 ->extraAttributes(['class' => 'fi-student-profile-tabs'])
                 ->tabs([
                     'overview' => Tab::make('Overview')

@@ -130,18 +130,22 @@
         @apply pb-0;
     }
 
-    /* Safe area + no horizontal page scroll on phones/tablets */
+    /* Safe area — clip horizontal bleed only (do not set overflow-y on body) */
     .fi-body {
         padding-top: env(safe-area-inset-top);
-        overflow-x: hidden;
         max-width: 100%;
     }
 
     @media (max-width: 1023px) {
+        .fi-body {
+            overflow-x: clip;
+        }
+
         .fi-layout,
         .fi-main,
         .fi-main-ctn,
         .fi-page,
+        .fi-page-header-main-ctn,
         .fi-page-main,
         .fi-page-content,
         .fi-section,
@@ -150,7 +154,16 @@
         .fi-schemas > * {
             max-width: 100%;
             min-width: 0;
-            overflow-x: hidden;
+            overflow-x: clip;
+        }
+
+        /* Filament pins main to viewport height — drop that on phones so only the page scrolls */
+        .fi-layout,
+        .fi-main-ctn,
+        .fi-main {
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
         }
 
         /* Filament resource tables — stacked cards without sideways scroll */
@@ -1569,13 +1582,12 @@
 /* Mobile overflow — unlayered so it wins over Filament table CSS */
 @media (max-width: 1023px) {
     html.fi {
-        overflow-x: hidden;
+        overflow-x: clip;
         max-width: 100%;
     }
 
     html.fi body.fi-body {
-        overflow-x: hidden;
-        overflow-y: visible;
+        overflow-x: clip;
         max-width: 100%;
     }
 
@@ -1584,13 +1596,19 @@
     .fi-body .fi-main-ctn,
     .fi-body .fi-main,
     .fi-body .fi-page,
+    .fi-body .fi-page-header-main-ctn,
     .fi-body .fi-page-main,
     .fi-body .fi-page-content,
     .fi-body .fi-schemas {
         height: auto !important;
         min-height: 0 !important;
-        overflow-x: hidden !important;
-        overflow-y: visible !important;
+        max-height: none !important;
+        overflow-x: clip !important;
+    }
+
+    /* Sidebar nav has its own scroll — hide when drawer is closed on mobile */
+    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-nav {
+        overflow: hidden !important;
     }
 
     .fi-ta-ctn {
@@ -1667,8 +1685,7 @@
     .fi-student-profile-tabs > .fi-tabs {
         display: flex !important;
         flex-wrap: wrap !important;
-        overflow-x: hidden !important;
-        overflow-y: visible !important;
+        overflow-x: clip !important;
         max-width: 100% !important;
     }
 
