@@ -21,7 +21,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
     @stack('head')
 </head>
-<body class="min-h-screen bg-navy-50 text-navy-900 antialiased pb-portal-nav lg:pb-0">
+<body class="min-h-screen bg-navy-50 pt-[env(safe-area-inset-top)] text-navy-900 antialiased pb-portal-nav lg:pb-0">
     @if (! $__env->hasSection('hide_bottom_nav'))
         @include('portal.partials.portal-navigation')
     @endif
@@ -139,6 +139,8 @@
         })();
     </script>
 
-    <x-pwa.install-prompt context="portal" />
+    @if (session()->has('student_portal_id'))
+        <x-pwa.install-prompt context="portal" />
+    @endif
 </body>
 </html>

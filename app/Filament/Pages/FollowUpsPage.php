@@ -7,7 +7,6 @@ use App\Enums\LicenseFeature;
 use App\Services\FollowUpWorklistService;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
-use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Pages\Page;
@@ -51,7 +50,13 @@ class FollowUpsPage extends Page
 
     public function getSubheading(): ?string
     {
-        return CrmHint::text('followups');
+        $viewer = Auth::user();
+
+        if ($viewer && app(FollowUpWorklistService::class)->canViewAllFollowUps($viewer)) {
+            return 'All staff follow-ups — each row shows who is responsible so you can follow up with them.';
+        }
+
+        return 'Your assigned follow-ups and call callbacks. Open a profile to log the call and schedule the next date.';
     }
 
     /**
@@ -84,20 +89,29 @@ class FollowUpsPage extends Page
 
     public function mount(FollowUpWorklistService $worklist): void
     {
-        $this->dueVisits = $worklist->dueAndOverdue();
-        $this->upcomingVisits = $worklist->upcoming();
-        $this->dueCallFollowUps = $worklist->dueCallFollowUps();
-        $this->upcomingCallFollowUps = $worklist->upcomingCallFollowUps();
+        $viewer = Auth::user();
+        abort_unless($viewer, 403);
 
-        $this->dueVisitsTotal = $worklist->dueAndOverdueCount();
-        $this->upcomingVisitsTotal = $worklist->upcomingVisitsCount();
-        $this->dueCallFollowUpsTotal = $worklist->dueCallFollowUpCount();
-        $this->upcomingCallFollowUpsTotal = $worklist->upcomingCallFollowUpsCount();
+        $this->dueVisits = $worklist->dueAndOverdue($viewer);
+        $this->upcomingVisits = $worklist->upcoming($viewer);
+        $this->dueCallFollowUps = $worklist->dueCallFollowUps($viewer);
+        $this->upcomingCallFollowUps = $worklist->upcomingCallFollowUps($viewer);
+
+        $this->dueVisitsTotal = $worklist->dueAndOverdueCount($viewer);
+        $this->upcomingVisitsTotal = $worklist->upcomingVisitsCount($viewer);
+        $this->dueCallFollowUpsTotal = $worklist->dueCallFollowUpCount($viewer);
+        $this->upcomingCallFollowUpsTotal = $worklist->upcomingCallFollowUpsCount($viewer);
     }
 
     public static function getNavigationBadge(): ?string
     {
-        $count = app(FollowUpWorklistService::class)->totalDueCount();
+        $viewer = Auth::user();
+
+        if (! $viewer) {
+            return null;
+        }
+
+        $count = app(FollowUpWorklistService::class)->totalDueCount($viewer);
 
         return $count > 0 ? (string) $count : null;
     }
@@ -122,6 +136,9 @@ class FollowUpsPage extends Page
                     'upcomingCallFollowUpsTotal' => $this->upcomingCallFollowUpsTotal,
                     'listLimit' => FollowUpWorklistService::LIST_LIMIT,
                     'worklist' => app(FollowUpWorklistService::class),
+                    'canViewAllFollowUps' => Auth::user()
+                        ? app(FollowUpWorklistService::class)->canViewAllFollowUps(Auth::user())
+                        : false,
                 ]),
         ]);
     }

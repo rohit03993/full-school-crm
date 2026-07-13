@@ -2,7 +2,7 @@
     use App\Filament\Pages\StudentProfilePage;
 @endphp
 
-<div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+<div class="fi-section max-w-full overflow-x-clip rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
     <div class="border-b border-gray-100 px-4 py-4 sm:px-6 dark:border-white/10">
         <h3 class="text-base font-semibold text-gray-950 dark:text-white">{{ $title }}</h3>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $description }}</p>
@@ -26,7 +26,9 @@
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Student</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Course</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Visit</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Staff</th>
+                        @if ($canViewAllFollowUps ?? false)
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Staff</th>
+                        @endif
                         <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"></th>
                     </tr>
                 </thead>
@@ -60,9 +62,17 @@
                                     <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ $visit->status->label() }}</p>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" data-label="Staff">
-                                {{ $visit->staff?->name ?? '—' }}
-                            </td>
+                            @if ($canViewAllFollowUps ?? false)
+                                <td class="px-4 py-3" data-label="Staff">
+                                    @if ($visit->staff?->name)
+                                        <span class="inline-flex items-center rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-800 ring-1 ring-primary-200 dark:bg-primary-500/10 dark:text-primary-200 dark:ring-primary-500/30">
+                                            {{ $visit->staff->name }}
+                                        </span>
+                                    @else
+                                        <span class="text-sm text-gray-500 dark:text-gray-400">—</span>
+                                    @endif
+                                </td>
+                            @endif
                             <td class="crm-responsive-table__actions whitespace-nowrap px-4 py-3 text-right" data-label="">
                                 @if ($visit->student_id)
                                     <a

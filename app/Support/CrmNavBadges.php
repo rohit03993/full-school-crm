@@ -26,9 +26,15 @@ class CrmNavBadges
         return app(MyLeadsService::class)->stats($staff)['uncalled'];
     }
 
-    public static function followUpsDue(): int
+    public static function followUpsDue(?User $staff = null): int
     {
-        return app(FollowUpWorklistService::class)->totalDueCount();
+        $staff ??= Auth::user();
+
+        if (! $staff) {
+            return 0;
+        }
+
+        return app(FollowUpWorklistService::class)->totalDueCount($staff);
     }
 
     public static function admissionsPendingAction(): int

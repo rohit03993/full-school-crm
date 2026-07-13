@@ -7,8 +7,8 @@
 @endphp
 
 @if ($showLogCallModal ?? false)
-    <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" wire:click.self="closeLogCallModal">
-        <div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white shadow-xl dark:bg-gray-900 sm:rounded-2xl">
+    <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:items-center sm:p-4" wire:click.self="closeLogCallModal">
+        <div class="mb-[max(0.25rem,env(safe-area-inset-bottom))] max-h-[min(90dvh,calc(100dvh-max(0.75rem,env(safe-area-inset-top))-0.75rem))] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl dark:bg-gray-900 sm:mb-0 sm:max-h-[90vh] sm:rounded-2xl">
             <div class="sticky top-0 border-b border-gray-100 bg-white px-4 py-4 dark:border-white/10 dark:bg-gray-900 sm:px-6">
                 <div class="flex items-center justify-between gap-3">
                     <div>

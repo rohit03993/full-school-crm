@@ -43,8 +43,14 @@ function dismissInstallPrompt() {
     hideBanner();
 }
 
+function shouldOfferInstallByContext() {
+    const context = pwaContext();
+
+    return context === 'public' || context === 'portal';
+}
+
 function canOfferInstall() {
-    return ! isStandalone();
+    return shouldOfferInstallByContext() && ! isStandalone();
 }
 
 function canUseNativeInstall() {

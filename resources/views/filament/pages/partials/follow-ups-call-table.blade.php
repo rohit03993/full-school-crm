@@ -2,7 +2,7 @@
     use App\Filament\Pages\StudentProfilePage;
 @endphp
 
-<div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+<div class="fi-section max-w-full overflow-x-clip rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
     <div class="border-b border-gray-100 px-4 py-4 sm:px-6 dark:border-white/10">
         <h3 class="text-base font-semibold text-gray-950 dark:text-white">{{ $title }}</h3>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $description }}</p>
@@ -25,6 +25,9 @@
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Callback</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Student</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Course</th>
+                        @if ($canViewAllFollowUps ?? false)
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Assigned to</th>
+                        @endif
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Last call</th>
                         <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"></th>
                     </tr>
@@ -54,6 +57,20 @@
                             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" data-label="Course">
                                 {{ $enquiry?->course?->name ?? 'Not decided' }}
                             </td>
+                            @if ($canViewAllFollowUps ?? false)
+                                @php
+                                    $assigneeName = $worklist->callFollowUpAssigneeName($student);
+                                @endphp
+                                <td class="px-4 py-3" data-label="Assigned to">
+                                    @if ($assigneeName)
+                                        <span class="inline-flex items-center rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-800 ring-1 ring-primary-200 dark:bg-primary-500/10 dark:text-primary-200 dark:ring-primary-500/30">
+                                            {{ $assigneeName }}
+                                        </span>
+                                    @else
+                                        <span class="text-sm text-gray-500 dark:text-gray-400">Unassigned</span>
+                                    @endif
+                                </td>
+                            @endif
                             <td class="px-4 py-3" data-label="Last call">
                                 @if ($student->last_call_at)
                                     <p class="text-sm text-gray-700 dark:text-gray-300">{{ $student->last_call_at->format('d M Y') }}</p>

@@ -130,6 +130,59 @@
         @apply pb-0;
     }
 
+    /* Safe area + no horizontal page scroll on phones/tablets */
+    .fi-body {
+        padding-top: env(safe-area-inset-top);
+        overflow-x: clip;
+    }
+
+    @media (max-width: 1023px) {
+        .fi-layout,
+        .fi-main,
+        .fi-main-ctn,
+        .fi-page,
+        .fi-page-main,
+        .fi-section,
+        .fi-section-content-ctn {
+            max-width: 100%;
+            overflow-x: clip;
+        }
+
+        /* Filament resource tables — stacked cards without sideways scroll */
+        .fi-ta-content-ctn {
+            overflow-x: clip !important;
+        }
+
+        .fi-ta-table.fi-ta-table-stacked-on-mobile {
+            @apply min-w-0 w-full;
+        }
+
+        .fi-ta-table-stacked-on-mobile > tbody > tr {
+            @apply mb-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10;
+        }
+
+        .fi-ta-table-stacked-on-mobile .fi-ta-cell-label {
+            @apply text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400;
+        }
+
+        .fi-ta-table-stacked-on-mobile .fi-ta-cell-content {
+            @apply text-sm text-gray-950 dark:text-white;
+        }
+
+        .fi-ta-table-stacked-on-mobile .fi-ta-actions {
+            @apply mt-2 border-t border-gray-100 pt-2 dark:border-white/10;
+        }
+
+        .fi-ta-table-stacked-on-mobile .fi-ta-actions .fi-ac {
+            @apply w-full flex-wrap gap-2;
+        }
+
+        .fi-ta-table-stacked-on-mobile .fi-ta-actions .fi-btn,
+        .fi-ta-table-stacked-on-mobile .fi-ta-actions a {
+            @apply min-h-10 flex-1 justify-center;
+        }
+    }
+
     /* Stacked tables on mobile — card-style rows */
     @media (max-width: 1023px) {
         .fi-ta-stack .fi-ta-record {
@@ -257,13 +310,17 @@
             @apply gap-2;
         }
 
-        /* Modals — nearly full screen on phones */
+        /* Modals — fit screen with top safe-area gap */
         .fi-modal-window:not(.fi-modal-window-size-screen) {
-            @apply mx-2 max-h-[92dvh] w-[calc(100%-1rem)] max-w-none;
+            @apply mx-2 w-[calc(100%-1rem)] max-w-none;
+            margin-top: max(0.75rem, env(safe-area-inset-top));
+            margin-bottom: max(0.5rem, env(safe-area-inset-bottom));
+            max-height: calc(100dvh - max(0.75rem, env(safe-area-inset-top)) - max(0.5rem, env(safe-area-inset-bottom)));
         }
 
         .fi-modal-content {
-            @apply max-h-[calc(92dvh-8rem)] overflow-y-auto;
+            max-height: calc(100dvh - max(0.75rem, env(safe-area-inset-top)) - max(0.5rem, env(safe-area-inset-bottom)) - 9rem);
+            @apply overflow-y-auto;
         }
 
         .fi-modal-footer .fi-btn {
@@ -321,6 +378,18 @@
 
         .fi-student-profile-actions .fi-btn {
             @apply w-full justify-center;
+        }
+
+        .fi-student-profile-shell {
+            @apply -mx-0.5;
+        }
+
+        .fi-student-profile-tabs .fi-tabs-panel {
+            @apply p-3;
+        }
+
+        .fi-student-profile-dossier {
+            @apply rounded-xl;
         }
     }
 
@@ -586,11 +655,11 @@
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
-        @apply flex w-full flex-wrap justify-start gap-1.5 rounded-2xl border border-gray-200/80 bg-white p-2 shadow-sm dark:border-white/10 dark:bg-gray-900 lg:justify-end;
+        @apply grid w-full grid-cols-2 gap-1.5 rounded-2xl border border-gray-200/80 bg-white p-2 shadow-sm dark:border-white/10 dark:bg-gray-900 lg:flex lg:flex-wrap lg:justify-end;
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn {
-        @apply min-h-9 shrink-0 rounded-xl text-xs font-semibold shadow-none sm:text-sm;
+        @apply min-h-10 w-full flex-none rounded-xl px-2 text-[11px] font-semibold shadow-none sm:min-h-9 sm:w-auto sm:shrink-0 sm:px-3 sm:text-sm;
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-gray.fi-btn-outlined {
@@ -1410,11 +1479,11 @@
     /* Responsive data tables — card rows on mobile (use with x-crm.responsive-table) */
     @media (max-width: 767px) {
         .crm-responsive-table {
-            @apply overflow-visible;
+            @apply max-w-full overflow-visible;
         }
 
         .crm-responsive-table > table {
-            @apply block min-w-0 w-full;
+            @apply block min-w-0 w-full max-w-full;
         }
 
         .crm-responsive-table thead {

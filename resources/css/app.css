@@ -185,7 +185,7 @@
     }
 
     .crm-pwa-ios-guide {
-        @apply fixed inset-0 z-[70] hidden items-end justify-center bg-black/45 p-4 sm:items-center;
+        @apply fixed inset-0 z-[70] hidden items-end justify-center bg-black/45 p-4 pt-[max(0.75rem,env(safe-area-inset-top))] sm:items-center;
     }
 
     .crm-pwa-ios-guide--open {
