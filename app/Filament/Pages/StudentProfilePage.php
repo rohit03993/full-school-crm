@@ -2245,46 +2245,32 @@ class StudentProfilePage extends Page
                     return ConvertToAdmissionFormSchema::fields($convertible, $presenter);
                 })
                 ->before(function (array $data, Action $action): void {
-                    $courseId = (int) ($data['course_id'] ?? 0);
-                    $course = \App\Models\Course::query()->find($courseId);
-
-                    if (! $course || ! InstituteProfile::isEnrollableCourseId($courseId)) {
-                        Notification::make()
-                            ->title('No section for this class')
-                            ->body('Add a section under Academics → Classes for the current school year, or pick a listed programme.')
-                            ->danger()
-                            ->send();
-
-                        $action->halt();
-
-                        return;
-                    }
-
-                    if ((float) $course->fee <= 0) {
-                        Notification::make()
-                            ->title('Course fee not set')
-                            ->body('Update the fee for this class under Academics → Classes before converting.')
-                            ->danger()
-                            ->send();
-
-                        $action->halt();
-                    }
-                })
-                ->modalSubmitAction(function (Action $action): Action {
-                    return $action->disabled(function (): bool {
-                        $mounted = $this->mountedActionsData[0] ?? [];
-
-                        if (! is_array($mounted)) {
-                            return true;
-                        }
-
-                        $courseId = (int) ($mounted['course_id'] ?? 0);
+                    if (! ConvertToAdmissionFormSchema::canSubmit($data)) {
+                        $courseId = (int) ($data['course_id'] ?? 0);
                         $course = \App\Models\Course::query()->find($courseId);
 
-                        return ! $course
-                            || (float) $course->fee <= 0
-                            || ! InstituteProfile::isEnrollableCourseId($courseId);
-                    });
+                        if (! $course || ! InstituteProfile::isEnrollableCourseId($courseId)) {
+                            Notification::make()
+                                ->title('No section for this class')
+                                ->body('Add a section under Academics → Classes for the current school year, or pick a listed programme.')
+                                ->danger()
+                                ->send();
+                        } elseif ((float) $course->fee <= 0) {
+                            Notification::make()
+                                ->title('Course fee not set')
+                                ->body('Update the fee for this class under Academics → Classes before converting.')
+                                ->danger()
+                                ->send();
+                        } else {
+                            Notification::make()
+                                ->title('Select a course')
+                                ->body('Choose the programme for admission before submitting.')
+                                ->warning()
+                                ->send();
+                        }
+
+                        $action->halt();
+                    }
                 })
                 ->action(function (array $data, ConvertToAdmissionPresenter $presenter, AdmissionService $admissions): void {
                     $convertible = $presenter->convertibleEnquiries($this->record);

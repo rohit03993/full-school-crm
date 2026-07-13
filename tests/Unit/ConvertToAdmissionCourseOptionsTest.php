@@ -69,4 +69,40 @@ class ConvertToAdmissionCourseOptionsTest extends TestCase
         $this->assertTrue(InstituteProfile::isEnrollableCourseId($enrollable->id));
         $this->assertFalse(InstituteProfile::isEnrollableCourseId($orphan->id));
     }
+
+    public function test_can_submit_when_enrollable_course_selected(): void
+    {
+        $session = AcademicSession::query()->create([
+            'name' => '2026–27',
+            'code' => '2026-27',
+            'starts_on' => '2026-04-01',
+            'ends_on' => '2027-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
+
+        $trainer = User::factory()->create(['is_active' => true]);
+
+        $course = Course::query()->create([
+            'name' => '12th JEE',
+            'code' => 'JEE-12B',
+            'programme_category' => ProgrammeCategory::Coaching,
+            'duration' => 1,
+            'duration_type' => DurationType::Years,
+            'fee' => 185000,
+            'status' => CourseStatus::Active,
+        ]);
+
+        Batch::query()->create([
+            'name' => '12th JEE-A',
+            'section' => 'A',
+            'course_id' => $course->id,
+            'academic_session_id' => $session->id,
+            'trainer_user_id' => $trainer->id,
+            'status' => BatchStatus::Active,
+        ]);
+
+        $this->assertTrue(ConvertToAdmissionFormSchema::canSubmit(['course_id' => $course->id]));
+        $this->assertFalse(ConvertToAdmissionFormSchema::canSubmit(['course_id' => null]));
+    }
 }

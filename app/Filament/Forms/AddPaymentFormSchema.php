@@ -142,16 +142,16 @@ class AddPaymentFormSchema
                         $flexible,
                     ),
                     ...self::miscFields($payableMisc, $defaultMisc),
-                    DatePicker::make('payment_date')
-                        ->label('Payment date')
-                        ->default(now())
-                        ->required()
-                        ->native(false)
-                        ->maxDate(now()),
-                    TextInput::make('amount')
-                        ->label('Amount (₹)')
-                        ->numeric()
-                        ->required()
+            DatePicker::make('payment_date')
+                ->label('Payment date')
+                ->default(now())
+                ->required()
+                ->native(false)
+                ->maxDate(now()),
+            TextInput::make('amount')
+                ->label('Amount (₹)')
+                ->numeric()
+                ->required()
                         ->minValue(1)
                         ->live(debounce: 300)
                         ->default((string) $initialAmount)
@@ -171,41 +171,41 @@ class AddPaymentFormSchema
                             ? 'Partial payments are allowed on misc charges.'
                             : 'You may pay more than one installment; extra reduces future dues automatically.'),
                     ...self::tuitionShortfallFields($feeStructure, $payableInstallments, $defaultInstallment, $flexible),
-                    Select::make('payment_mode')
-                        ->label('Payment mode')
-                        ->options(collect(PaymentMode::cases())->mapWithKeys(
-                            fn (PaymentMode $mode) => [$mode->value => $mode->label()],
-                        ))
-                        ->required()
-                        ->native(false)
-                        ->live(),
-                    TextInput::make('voucher_number')
-                        ->label('Voucher number')
-                        ->maxLength(100)
-                        ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Cash->value)
-                        ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Cash->value),
-                    TextInput::make('transaction_id')
-                        ->label('Transaction ID')
-                        ->maxLength(100)
-                        ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Online->value)
-                        ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Online->value),
-                    TextInput::make('utr_number')
-                        ->label('UTR number')
-                        ->maxLength(100)
-                        ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Upi->value)
-                        ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Upi->value),
+            Select::make('payment_mode')
+                ->label('Payment mode')
+                ->options(collect(PaymentMode::cases())->mapWithKeys(
+                    fn (PaymentMode $mode) => [$mode->value => $mode->label()],
+                ))
+                ->required()
+                ->native(false)
+                ->live(),
+            TextInput::make('voucher_number')
+                ->label('Voucher number')
+                ->maxLength(100)
+                ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Cash->value)
+                ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Cash->value),
+            TextInput::make('transaction_id')
+                ->label('Transaction ID')
+                ->maxLength(100)
+                ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Online->value)
+                ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Online->value),
+            TextInput::make('utr_number')
+                ->label('UTR number')
+                ->maxLength(100)
+                ->visible(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Upi->value)
+                ->required(fn (Get $get): bool => $get('payment_mode') === PaymentMode::Upi->value),
                 ]),
             Section::make('Proof')
                 ->compact()
                 ->schema([
-                    FileUpload::make('proof_image')
-                        ->label('Payment proof')
+            FileUpload::make('proof_image')
+                ->label('Payment proof')
                         ->helperText('JPG, PNG or PDF · max 5 MB')
-                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
-                        ->maxSize(5120)
-                        ->required()
-                        ->disk('local')
-                        ->directory('temp-payment-proofs')
+                ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+                ->maxSize(5120)
+                ->required()
+                ->disk('local')
+                ->directory('temp-payment-proofs')
                         ->visibility('private')
                         ->columnSpanFull(),
                 ]),

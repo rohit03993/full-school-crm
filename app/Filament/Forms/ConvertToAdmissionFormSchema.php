@@ -61,8 +61,7 @@ class ConvertToAdmissionFormSchema
                     }
                 });
         } else {
-            $fields[] = Hidden::make('enquiry_id')
-                ->default($convertible->first()?->id);
+            $fields[] = Hidden::make('enquiry_id');
         }
 
         $fields[] = Select::make('course_id')
@@ -93,6 +92,26 @@ class ConvertToAdmissionFormSchema
             ->columnSpanFull();
 
         return $fields;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function canSubmit(array $data): bool
+    {
+        $courseId = (int) ($data['course_id'] ?? 0);
+
+        if ($courseId <= 0) {
+            return false;
+        }
+
+        $course = Course::query()->find($courseId);
+
+        if (! $course || (float) $course->fee <= 0) {
+            return false;
+        }
+
+        return InstituteProfile::isEnrollableCourseId($courseId);
     }
 
     /**
