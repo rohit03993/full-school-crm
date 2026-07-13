@@ -79,9 +79,9 @@ class WhatsAppTemplateCatalog
     /**
      * @return list<string>
      */
-    public function orphanedPalTemplateNames(): array
+    public function orphanedLocalTemplateNames(): array
     {
-        if (! $this->resolver->metaOverridesPalDigital()) {
+        if (! $this->resolver->isMetaActive()) {
             return [];
         }
 
@@ -97,13 +97,19 @@ class WhatsAppTemplateCatalog
             ->all();
     }
 
+    /** @deprecated Use orphanedLocalTemplateNames() */
+    public function orphanedPalTemplateNames(): array
+    {
+        return $this->orphanedLocalTemplateNames();
+    }
+
     protected function baseQuery(): Builder
     {
         $query = WhatsAppTemplate::query()
             ->where('is_active', true)
             ->orderBy('name');
 
-        if ($this->resolver->metaOverridesPalDigital()) {
+        if ($this->resolver->isMetaActive()) {
             $metaNames = $this->metaReadyTemplateNames();
 
             if ($metaNames === []) {

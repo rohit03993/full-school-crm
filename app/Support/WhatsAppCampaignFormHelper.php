@@ -62,7 +62,7 @@ class WhatsAppCampaignFormHelper
 
         $body = filled($template->body)
             ? e($template->body)
-            : '<span class="text-gray-500 dark:text-gray-400">No preview text returned from Pal Digital.</span>';
+            : '<span class="text-gray-500 dark:text-gray-400">No preview text returned from Meta for this template.</span>';
 
         $badges = self::paramBadgeHtml($template);
 

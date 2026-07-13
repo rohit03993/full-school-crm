@@ -21,10 +21,8 @@ use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\WhatsAppTemplate;
-use App\Services\PalDigitalTemplateSyncService;
 use App\Services\WhatsAppCampaignService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -189,58 +187,6 @@ class WhatsAppCampaignServiceTest extends TestCase
         ], $admin);
 
         $this->assertSame(['Rohit', '20 Jun 2026'], $campaign->campaignVariable('_manual'));
-    }
-
-    public function test_template_sync_creates_local_templates_from_waservice_api(): void
-    {
-        config([
-            'services.pal_digital.api_key' => 'wsk.test.key',
-            'services.pal_digital.api_url' => 'https://wa.paldigital.in/api/v1/campaign/t1/api/v2',
-        ]);
-
-        WhatsAppTemplate::query()->create([
-            'name' => 'Old manual template',
-            'param_count' => 1,
-            'param_mappings' => ['student.name'],
-            'provider_meta' => ['source' => 'waservice_manual_register'],
-        ]);
-
-        Http::fake([
-            'https://wa.paldigital.in/api/v1/integrations/api-campaigns*' => Http::response([
-                [
-                    'id' => 'camp-1',
-                    'name' => 'Test announcement',
-                    'status' => 'live',
-                    'campaign_type' => 'api',
-                    'template_name' => 'test_announcement',
-                    'template_language' => 'en',
-                    'preview_text' => 'Hello {{1}}, class {{2}} on {{3}}.',
-                    'body_variables' => ['name', 'batch', 'date'],
-                    'param_count' => 3,
-                ],
-            ], 200),
-        ]);
-
-        $result = app(PalDigitalTemplateSyncService::class)->sync();
-
-        $this->assertSame('success', $result['status']);
-        $this->assertSame(1, $result['synced']);
-        $this->assertSame(1, $result['removed']);
-
-        $this->assertDatabaseHas('whatsapp_templates', [
-            'name' => 'Test announcement',
-            'param_count' => 3,
-            'body' => 'Hello {{1}}, class {{2}} on {{3}}.',
-        ]);
-
-        $this->assertDatabaseMissing('whatsapp_templates', [
-            'name' => 'Old manual template',
-        ]);
-
-        $template = WhatsAppTemplate::query()->where('name', 'Test announcement')->firstOrFail();
-        $this->assertSame(['student.name', 'batch.name', 'campaign.date'], $template->param_mappings);
-        $this->assertSame('waservice_api_sync', data_get($template->provider_meta, 'source'));
-        $this->assertSame(['name', 'batch', 'date'], data_get($template->provider_meta, 'body_variables'));
     }
 
     protected function createSuperAdmin(): User

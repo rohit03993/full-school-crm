@@ -117,7 +117,7 @@ class CrmDoctorCommand extends Command
         }
 
         if (($whatsapp['meta_enabled'] ?? false) && ($whatsapp['meta_configured'] ?? false)) {
-            $orphaned = app(WhatsAppTemplateCatalog::class)->orphanedPalTemplateNames();
+            $orphaned = app(WhatsAppTemplateCatalog::class)->orphanedLocalTemplateNames();
 
             if ($orphaned !== []) {
                 $sample = implode(', ', array_slice($orphaned, 0, 5));

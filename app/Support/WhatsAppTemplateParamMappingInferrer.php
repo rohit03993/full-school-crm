@@ -5,7 +5,7 @@ namespace App\Support;
 class WhatsAppTemplateParamMappingInferrer
 {
     /**
-     * Map normalized Pal Digital / Meta body variable labels to CRM data sources.
+     * Map normalized Meta body variable labels to CRM data sources.
      *
      * @var array<string, string>
      */

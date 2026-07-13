@@ -187,7 +187,7 @@ trait InteractsWithStudentWhatsAppInbox
             return null;
         }
 
-        $orphaned = $catalog->orphanedPalTemplateNames();
+        $orphaned = $catalog->orphanedLocalTemplateNames();
 
         if ($orphaned === []) {
             return null;
@@ -242,7 +242,7 @@ trait InteractsWithStudentWhatsAppInbox
                 $this->metaSessionOpen = $threadService->sessionOpenForPhone((string) $phone);
             }
 
-            $this->metaRoutingActive = $resolver->metaOverridesPalDigital();
+            $this->metaRoutingActive = $resolver->isMetaActive();
             $this->whatsappProviderLabel = $resolver->activeProviderLabel();
         } catch (\Throwable $exception) {
             report($exception);

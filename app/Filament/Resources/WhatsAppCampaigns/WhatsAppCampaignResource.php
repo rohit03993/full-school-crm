@@ -243,7 +243,7 @@ class WhatsAppCampaignResource extends Resource
                 ->columns(2)
                 ->collapsed(fn (WhatsAppCampaign $record): bool => (int) $record->total_recipients > 15),
             Section::make('Message preview')
-                ->description('Shows the actual text sent when available; otherwise the Pal Digital template sample.')
+                ->description('Shows the actual text sent when available; otherwise the Meta template sample.')
                 ->schema([
                     TextEntry::make('resolved_message_preview')
                         ->label('')

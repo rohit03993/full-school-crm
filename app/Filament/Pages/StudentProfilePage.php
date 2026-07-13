@@ -244,7 +244,7 @@ class StudentProfilePage extends Page
 
     public bool $metaRoutingActive = false;
 
-    public string $whatsappProviderLabel = 'Pal Digital';
+    public string $whatsappProviderLabel = 'Meta WhatsApp';
 
     /**
      * @var Collection<int, \App\Models\HomeworkAssignment>
@@ -931,7 +931,7 @@ class StudentProfilePage extends Page
             return null;
         }
 
-        $orphaned = $catalog->orphanedPalTemplateNames();
+        $orphaned = $catalog->orphanedLocalTemplateNames();
 
         if ($orphaned === []) {
             return null;
@@ -959,7 +959,7 @@ class StudentProfilePage extends Page
                 ->values()
                 ->all();
             $this->metaSessionOpen = $threadService->sessionOpenForStudent($this->record);
-            $this->metaRoutingActive = $resolver->metaOverridesPalDigital();
+            $this->metaRoutingActive = $resolver->isMetaActive();
             $this->whatsappProviderLabel = $resolver->activeProviderLabel();
         } catch (\Throwable $exception) {
             report($exception);

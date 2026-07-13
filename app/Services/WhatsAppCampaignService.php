@@ -18,7 +18,6 @@ use Illuminate\Support\Collection;
 class WhatsAppCampaignService
 {
     public function __construct(
-        protected PalDigitalWhatsAppService $whatsapp,
         protected WhatsAppTemplateParamResolver $paramResolver,
     ) {}
 

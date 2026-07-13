@@ -5,13 +5,13 @@ namespace App\Services;
 use App\Enums\WhatsAppProvider;
 use App\Models\MetaWhatsAppTemplate;
 use App\Support\CrmNavigation;
+use App\Support\WhatsAppTemplateParams;
 
 class WhatsAppDispatchService
 {
     public function __construct(
         protected WhatsAppProviderResolver $resolver,
         protected MetaWhatsAppService $meta,
-        protected PalDigitalWhatsAppService $palDigital,
     ) {}
 
     public function activeProvider(): ?WhatsAppProvider
@@ -47,9 +47,7 @@ class WhatsAppDispatchService
         ?string $languageCode = null,
         array $logContext = [],
     ): array {
-        $provider = $this->activeProvider();
-
-        if ($provider === null) {
+        if (! $this->isConfigured()) {
             return [
                 'status' => 'failed',
                 'error' => $this->configurationError(),
@@ -57,20 +55,17 @@ class WhatsAppDispatchService
             ];
         }
 
-        $templateParams = PalDigitalWhatsAppService::normalizeTemplateParams($templateParams, $expectedParamCount);
+        $templateParams = WhatsAppTemplateParams::normalize($templateParams, $expectedParamCount);
 
         if (blank($templateName)) {
             return [
                 'status' => 'failed',
                 'error' => 'WhatsApp template name is required.',
-                'provider' => $provider->value,
+                'provider' => WhatsAppProvider::Meta->value,
             ];
         }
 
-        return match ($provider) {
-            WhatsAppProvider::Meta => $this->sendViaMeta($phone, $templateName, $templateParams, $languageCode, $expectedParamCount, $logContext),
-            WhatsAppProvider::PalDigital => $this->sendViaPalDigital($phone, $templateName, $templateParams, $userName, $expectedParamCount),
-        };
+        return $this->sendViaMeta($phone, $templateName, $templateParams, $languageCode, $expectedParamCount, $logContext);
     }
 
     /**
@@ -109,30 +104,6 @@ class WhatsAppDispatchService
         );
 
         $result['provider'] = WhatsAppProvider::Meta->value;
-
-        return $result;
-    }
-
-    /**
-     * @param  list<string>  $templateParams
-     * @return array{status: string, response?: mixed, error?: string, message_id?: string, provider: string}
-     */
-    protected function sendViaPalDigital(
-        string $phone,
-        string $templateName,
-        array $templateParams,
-        ?string $userName,
-        int $expectedParamCount,
-    ): array {
-        $result = $this->palDigital->send(
-            $phone,
-            $templateParams,
-            $templateName,
-            $userName,
-            $expectedParamCount,
-        );
-
-        $result['provider'] = WhatsAppProvider::PalDigital->value;
 
         return $result;
     }

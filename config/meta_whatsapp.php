@@ -7,7 +7,7 @@ return [
     | Meta WhatsApp Cloud API
     |--------------------------------------------------------------------------
     |
-    | Direct Meta integration (parallel to Pal Digital / waservice).
+    | Direct Meta Cloud API integration.
     | Credentials are usually stored in the database via Setup → Meta WhatsApp.
     |
     */

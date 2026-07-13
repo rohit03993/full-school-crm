@@ -44,6 +44,6 @@ class WhatsAppTemplateCatalogTest extends TestCase
         $catalog = app(WhatsAppTemplateCatalog::class);
 
         $this->assertSame(['first_try'], $catalog->selectableTemplates()->pluck('name')->all());
-        $this->assertSame(['old_pal_only'], $catalog->orphanedPalTemplateNames());
+        $this->assertSame(['old_pal_only'], $catalog->orphanedLocalTemplateNames());
     }
 }

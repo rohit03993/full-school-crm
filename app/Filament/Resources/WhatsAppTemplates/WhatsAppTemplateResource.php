@@ -49,8 +49,8 @@ class WhatsAppTemplateResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Pal Digital template')
-                ->description('Name must match a live API campaign in Pal Digital (waservice), or the Meta template name linked to that campaign.')
+            Section::make('WhatsApp template')
+                ->description('Name must match an approved Meta template synced in WhatsApp → Templates.')
                 ->schema([
                     TextInput::make('name')
                         ->required()

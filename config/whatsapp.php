@@ -30,7 +30,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Homework WhatsApp (Pal Digital live API campaign name)
+    | Homework WhatsApp (Meta live campaign name)
     |--------------------------------------------------------------------------
     |
     | Template should accept: student name, roll number, homework title, portal link.

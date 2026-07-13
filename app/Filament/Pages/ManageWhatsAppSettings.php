@@ -5,14 +5,11 @@ namespace App\Filament\Pages;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
-use App\Services\PalDigitalTemplateSyncService;
-use App\Services\PalDigitalWhatsAppService;
 use App\Services\WhatsAppProviderResolver;
 use App\Services\WhatsAppSettingsService;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
-use App\Support\CrmNotification;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -28,7 +25,6 @@ use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 use UnitEnum;
 
@@ -95,39 +91,7 @@ class ManageWhatsAppSettings extends Page
                 ->label('')
                 ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderActiveProviderNotice())
                 ->columnSpanFull()
-                ->visible(fn (): bool => app(WhatsAppProviderResolver::class)->metaOverridesPalDigital()),
-            Section::make('Legacy — Pal Digital / waservice')
-                ->description('Deprecated — this CRM sends WhatsApp only via Meta Cloud API.')
-                ->collapsed()
-                ->visible(false)
-                ->schema([
-                    Placeholder::make('api_key_status')
-                        ->label('')
-                        ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderApiKeyStatus())
-                        ->columnSpanFull(),
-                    TextInput::make('pal_digital_api_key')
-                        ->label('Replace integration key')
-                        ->password()
-                        ->revealable()
-                        ->placeholder('Leave blank to keep the saved key')
-                        ->helperText('Only paste a new wsk. key here when replacing. If a key is already saved, leave this empty when saving other settings.')
-                        ->extraInputAttributes([
-                            'autocomplete' => 'new-password',
-                            'autocorrect' => 'off',
-                            'autocapitalize' => 'off',
-                            'spellcheck' => 'false',
-                            'data-1p-ignore' => 'true',
-                            'data-lpignore' => 'true',
-                            'data-form-type' => 'other',
-                        ]),
-                    TextInput::make('pal_digital_api_url')
-                        ->label('Send API URL')
-                        ->placeholder('https://wa.paldigital.in/api/v1')
-                        ->required(fn (WhatsAppSettingsService $settings): bool => ! $settings->hasStoredApiKey())
-                        ->helperText('Base /api/v1 is auto-completed to the send endpoint if needed.')
-                        ->columnSpanFull(),
-                ])
-                ->columns(2),
+                ->visible(fn (): bool => app(WhatsAppProviderResolver::class)->isMetaActive()),
             Section::make('Live campaigns for automations')
                 ->description(fn (): string => 'Pick a **live** campaign from '.CrmNavigation::whatsAppMenu('Live campaigns').'. Each campaign links to an approved Meta template.')
                 ->schema([
@@ -257,115 +221,20 @@ class ManageWhatsAppSettings extends Page
         if (! $result['ok']) {
             Notification::make()
                 ->title('Could not save settings')
-                ->body($result['message'] ?? 'Check the API key and URL.')
+                ->body($result['message'] ?? 'Check automation settings and try again.')
                 ->danger()
                 ->send();
 
             return;
         }
 
-        $this->refillWhatsAppForm($settings);
-
-        $metaActive = app(WhatsAppProviderResolver::class)->metaOverridesPalDigital();
-
-        $body = $metaActive
-            ? 'Automation and campaign settings are saved. Sends route through Meta.'
-            : ($settings->hasValidStoredApiKey()
-                ? 'Campaign and automation settings are saved.'
-                : 'Settings saved. Paste a valid wsk. integration key to connect Pal Digital.');
-
-        $body .= $settings->ignoredReplaceKeyNotice((bool) ($result['ignored_invalid_key_field'] ?? false));
+        $this->form->fill($settings->getFormData());
 
         Notification::make()
-            ->title($metaActive ? 'Automations saved' : 'WhatsApp settings saved')
-            ->body(trim($body))
+            ->title('Automations saved')
+            ->body('Automation and campaign settings are saved. Sends route through Meta Cloud API.')
             ->success()
             ->send();
-    }
-
-    public function syncTemplates(
-        WhatsAppSettingsService $settings,
-        PalDigitalTemplateSyncService $sync,
-    ): void {
-        $saved = $settings->saveCredentials($this->form->getState(), strictKey: false);
-
-        if (! $saved['ok']) {
-            Notification::make()
-                ->title('Could not sync templates')
-                ->body($saved['message'] ?? 'Fix the API key first.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        if (! $settings->hasValidStoredApiKey()) {
-            Notification::make()
-                ->title('Could not sync templates')
-                ->body('Save a valid wsk. integration key first.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        $result = $sync->sync();
-
-        $this->refillWhatsAppForm($settings);
-
-        $body = $result['message'].$settings->ignoredReplaceKeyNotice((bool) ($saved['ignored_invalid_key_field'] ?? false));
-
-        CrmNotification::sendOutcome(
-            $result['synced'].' template(s) synced',
-            trim($body),
-            $result['status'] === 'success',
-            warningOnFailure: true,
-        );
-    }
-
-    public function testConnection(
-        WhatsAppSettingsService $settings,
-        PalDigitalWhatsAppService $whatsapp,
-    ): void {
-        $saved = $settings->saveCredentials($this->form->getState(), strictKey: false);
-
-        if (! $saved['ok']) {
-            Notification::make()
-                ->title('Connection check failed')
-                ->body($saved['message'] ?? 'Fix the API key first.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        if (! $settings->hasValidStoredApiKey()) {
-            Notification::make()
-                ->title('Connection check failed')
-                ->body('Save a valid wsk. integration key first.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        $result = $whatsapp->validateConnection();
-
-        $this->refillWhatsAppForm($settings);
-
-        $body = $result['message'].$settings->ignoredReplaceKeyNotice((bool) ($saved['ignored_invalid_key_field'] ?? false));
-
-        CrmNotification::sendOutcome(
-            $result['status'] === 'success' ? 'Connection OK' : 'Connection check failed',
-            trim($body),
-            $result['status'] === 'success',
-        );
-    }
-
-    protected function refillWhatsAppForm(WhatsAppSettingsService $settings): void
-    {
-        $this->form->fill($settings->getFormData());
-        $this->data['pal_digital_api_key'] = '';
     }
 
     public function content(Schema $schema): Schema
@@ -382,17 +251,6 @@ class ManageWhatsAppSettings extends Page
             ->livewireSubmitHandler('save')
             ->footer([
                 Actions::make([
-                    Action::make('syncTemplates')
-                        ->label('Sync templates')
-                        ->icon('heroicon-o-arrow-path')
-                        ->action('syncTemplates')
-                        ->visible(fn (): bool => ! app(WhatsAppProviderResolver::class)->metaOverridesPalDigital()),
-                    Action::make('testConnection')
-                        ->label('Test connection')
-                        ->icon('heroicon-o-signal')
-                        ->color('gray')
-                        ->action('testConnection')
-                        ->visible(fn (): bool => ! app(WhatsAppProviderResolver::class)->metaOverridesPalDigital()),
                     Action::make('save')
                         ->label('Save settings')
                         ->submit('save')

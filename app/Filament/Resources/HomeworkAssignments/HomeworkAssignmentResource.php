@@ -118,7 +118,7 @@ class HomeworkAssignmentResource extends Resource
                             ->all())
                         ->searchable()
                         ->visible(fn (callable $get): bool => (bool) $get('send_whatsapp'))
-                        ->helperText('Live API campaign name in Pal Digital (4 params: name, roll, title, link).'),
+                        ->helperText('Live API campaign linked to an approved Meta template (4 params: name, roll, title, link).'),
                 ])
                 ->columns(2),
         ]);

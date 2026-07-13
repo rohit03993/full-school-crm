@@ -67,10 +67,4 @@ class WhatsAppProviderResolver
     {
         return $this->metaSettings->isEnabled() && $this->meta->isConfigured();
     }
-
-    /** @deprecated Use isMetaActive() */
-    public function metaOverridesPalDigital(): bool
-    {
-        return $this->isMetaActive();
-    }
 }

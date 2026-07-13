@@ -20,7 +20,7 @@ class CrmHint
         'setup.meeting_for' => 'Choose what appears in the Meeting for dropdown on Search Student and enquiry forms — e.g. Enquiry, Admission, Marketing. Reorder, rename, add, or hide options here.',
         'setup.site_content' => 'Controls the public website: logo, phone number, homepage text, and gallery. Changes go live immediately after Save.',
         'setup.institute_settings' => 'Receipt and ID card PDF branding. Institute name and phone come from Website → Site Content — set logo here for printed documents.',
-        'setup.meta_whatsapp' => 'Each school stores its own Meta WhatsApp credentials in this CRM (Taskbook uses Taskbook\'s WABA, Folks India uses theirs). When enabled, all sends route through Meta Cloud API — no separate waservice server needed.',
+        'setup.meta_whatsapp' => 'Each school stores its own Meta WhatsApp credentials in this CRM (Taskbook uses Taskbook\'s WABA, Folks India uses theirs). When enabled, all sends route through Meta Cloud API.',
         'setup.whatsapp' => 'Map punch IN/OUT, post-call, and batch attendance to live API campaigns. Create campaigns under Live campaigns first, then pick them here.',
         'whatsapp.live_campaigns' => 'Live API campaigns — like AiSensy campaignName. Go live to use in automations, bulk sends, and external POST triggers.',
         'whatsapp.live_campaigns.create' => 'Pick an approved template and a unique campaign name. After saving, open the campaign and click Go live.',
@@ -28,7 +28,7 @@ class CrmHint
         'meta_whatsapp.inbox' => 'WhatsApp inbox — all recent chats (students and unknown numbers). Select a conversation to reply, send templates, or open a student profile.',
         'meta_whatsapp.analytics' => 'Spend and volume from Meta pricing_analytics (official) plus per-campaign estimates in CRM. Filter by date like AiSensy campaign reports.',
         'students.profile.messages' => 'Send an approved template from the left panel — only the fields that template needs appear. Student name and roll number are pre-filled when possible.',
-        'setup.biometric' => 'EasyTimePro writes punches to punch_logs on the same MySQL server. Match device employee ID to student roll number, then configure parent messages under WhatsApp (Pal Digital) → Automations.',
+        'setup.biometric' => 'EasyTimePro writes punches to punch_logs on the same MySQL server. Match device employee ID to student roll number, then configure parent messages under WhatsApp → Automations.',
 
         'courses.list' => 'Programme fees and subjects — open from Classes & sections → Programme & fee.',
         'courses.create' => 'Use a short unique code (e.g. SCH-12-SCI). Fee and duration show on the website and flow into admissions. Optionally add subjects shared by every section under this programme.',
