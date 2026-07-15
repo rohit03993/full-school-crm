@@ -90,6 +90,7 @@ class StaffRolePermissions
                 CrmPermission::AttendanceMark,
                 CrmPermission::AttendanceWorkshops,
                 CrmPermission::MarksImport,
+                CrmPermission::FeesCollect,
                 CrmPermission::FeesAdjustStructure,
                 CrmPermission::FeesWaivePenalty,
                 CrmPermission::LeadsReassign,

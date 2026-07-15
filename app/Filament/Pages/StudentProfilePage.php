@@ -484,7 +484,9 @@ class StudentProfilePage extends Page
             $tabs[] = 'messages';
         }
 
-        if ($this->licensed(LicenseFeature::Fees) && $this->record->activeEnrollment !== null) {
+        if ($this->licensed(LicenseFeature::Fees)
+            && $this->record->activeEnrollment !== null
+            && $this->userCanViewFees()) {
             $tabs[] = 'fees';
             $tabs[] = 'receipts';
         }
@@ -1352,6 +1354,11 @@ class StudentProfilePage extends Page
         return CrmAccess::can(Auth::user(), $permission);
     }
 
+    protected function userCanViewFees(): bool
+    {
+        return CrmAccess::canViewFees(Auth::user());
+    }
+
     public function getCanManageAdmissionFeePlanProperty(): bool
     {
         if (! $this->licensed(LicenseFeature::Fees) || ! $this->userCan(CrmPermission::FeesAdjustStructure)) {
@@ -1434,6 +1441,8 @@ class StudentProfilePage extends Page
 
     public function loadFeesTab(): void
     {
+        abort_unless($this->userCanViewFees(), 403);
+
         if ($this->feesTabLoaded) {
             return;
         }
@@ -1563,6 +1572,8 @@ class StudentProfilePage extends Page
 
     public function loadReceiptsTab(): void
     {
+        abort_unless($this->userCanViewFees(), 403);
+
         if ($this->receiptsTabLoaded) {
             return;
         }
@@ -2960,7 +2971,8 @@ class StudentProfilePage extends Page
                     'fees' => Tab::make('Fees')
                         ->icon('heroicon-o-banknotes')
                         ->visible(fn (): bool => $this->licensed(LicenseFeature::Fees)
-                            && $this->record->activeEnrollment !== null)
+                            && $this->record->activeEnrollment !== null
+                            && $this->userCanViewFees())
                         ->schema([
                             View::make('filament.pages.partials.student-profile-fees')
                                 ->viewData(fn (): array => [
@@ -2989,7 +3001,8 @@ class StudentProfilePage extends Page
                     'receipts' => Tab::make('Receipts')
                         ->icon('heroicon-o-receipt-percent')
                         ->visible(fn (): bool => $this->licensed(LicenseFeature::Fees)
-                            && $this->record->activeEnrollment !== null)
+                            && $this->record->activeEnrollment !== null
+                            && $this->userCanViewFees())
                         ->schema([
                             View::make('filament.pages.partials.student-profile-receipts')
                                 ->viewData(fn (): array => [

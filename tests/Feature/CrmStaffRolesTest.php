@@ -95,13 +95,29 @@ class CrmStaffRolesTest extends TestCase
         $user = User::factory()->create(['is_active' => true]);
         $user->assignRole(RoleName::Staff->value);
 
-        $this->assertTrue($user->canCrm(CrmPermission::FeesCollect));
+        $this->assertFalse($user->canCrm(CrmPermission::FeesCollect));
         $this->assertTrue($user->canCrm(CrmPermission::LeadsCall));
         $this->assertFalse($user->canCrm(CrmPermission::CasesViewAll));
         $this->assertFalse($user->canCrm(CrmPermission::AttendanceMark));
         $this->assertFalse($user->canCrm(CrmPermission::MarksImport));
         $this->assertFalse($user->canCrm(CrmPermission::WhatsappCampaigns));
         $this->assertFalse($user->canCrm(CrmPermission::SettingsManage));
+    }
+
+    public function test_counsellor_cannot_view_fees_tab_on_student_profile(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole(StaffJobRole::Counsellor->value);
+
+        $this->assertFalse(\App\Support\CrmAccess::canViewFees($user));
+    }
+
+    public function test_accountant_can_view_fees_tab_on_student_profile(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole(StaffJobRole::Accountant->value);
+
+        $this->assertTrue(\App\Support\CrmAccess::canViewFees($user));
     }
 
     public function test_counsellor_cannot_access_tests_or_messaging_menus(): void

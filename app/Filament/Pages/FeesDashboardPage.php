@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Services\AccountingLedgerService;
 use App\Services\FeesDashboardService;
@@ -74,12 +73,7 @@ class FeesDashboardPage extends Page
             return false;
         }
 
-        return CrmAccess::canAny(
-            Auth::user(),
-            CrmPermission::FeesCollect,
-            CrmPermission::FeesAdjustStructure,
-            CrmPermission::DashboardFinanceStats,
-        );
+        return CrmAccess::canViewFees(Auth::user());
     }
 
     public function getSubheading(): ?string

@@ -14,6 +14,7 @@ use App\Models\AcademicSession;
 use App\Models\Course;
 use App\Models\Student;
 use App\Services\FeesDashboardService;
+use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
@@ -110,7 +111,7 @@ class StudentResource extends Resource
                     ->placeholder('—')
                     ->sortable()
                     ->color(fn ($state): string => (float) ($state ?? 0) > 0 ? 'warning' : 'success')
-                    ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees)),
+                    ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees) || ! CrmAccess::canViewFees(Auth::user())),
                 TextColumn::make('fee_next_due')
                     ->label('Next due')
                     ->state(function (Student $record): ?string {
@@ -121,7 +122,7 @@ class StudentResource extends Resource
                     ->placeholder('—')
                     ->toggleable()
                     ->hiddenFrom('md')
-                    ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees)),
+                    ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees) || ! CrmAccess::canViewFees(Auth::user())),
                 TextColumn::make('fee_status')
                     ->label('Fee status')
                     ->badge()
@@ -134,7 +135,7 @@ class StudentResource extends Resource
                     ->placeholder('—')
                     ->toggleable()
                     ->hiddenFrom('md')
-                    ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees)),
+                    ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees) || ! CrmAccess::canViewFees(Auth::user())),
                 TextColumn::make('activeEnrollment.academicSession.name')
                     ->label('Session')
                     ->placeholder('—')

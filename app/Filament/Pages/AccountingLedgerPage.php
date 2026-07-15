@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
@@ -21,12 +20,7 @@ class AccountingLedgerPage extends Page
             return false;
         }
 
-        return CrmAccess::canAny(
-            Auth::user(),
-            CrmPermission::DashboardFinanceStats,
-            CrmPermission::FeesCollect,
-            CrmPermission::FeesAdjustStructure,
-        );
+        return CrmAccess::canViewFees(Auth::user());
     }
 
     public function mount(): void

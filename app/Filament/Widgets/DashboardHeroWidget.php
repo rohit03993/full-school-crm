@@ -134,7 +134,8 @@ class DashboardHeroWidget extends Widget
             'tagline' => $branding['tagline'],
             'todayLabel' => now()->format('l, j F Y'),
             'isOwner' => $isOwner,
-            'showFeesSummary' => FeatureGate::enabled(LicenseFeature::Fees),
+            'showFeesSummary' => FeatureGate::enabled(LicenseFeature::Fees)
+                && CrmAccess::canViewFees($user),
             'showEnquirySummary' => FeatureGate::enabled(LicenseFeature::Enquiries),
             'showAttendanceSummary' => FeatureGate::enabled(LicenseFeature::Attendance),
             'showAdmissionsSummary' => FeatureGate::enabled(LicenseFeature::Admissions),

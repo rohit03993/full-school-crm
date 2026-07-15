@@ -35,6 +35,19 @@ class CrmAccess
         return false;
     }
 
+    /**
+     * Super Admin, accountant (collect / finance stats), or anyone with fee-structure access.
+     */
+    public static function canViewFees(?User $user): bool
+    {
+        return self::canAny(
+            $user,
+            CrmPermission::FeesCollect,
+            CrmPermission::FeesAdjustStructure,
+            CrmPermission::DashboardFinanceStats,
+        );
+    }
+
     public static function hasPanelAccess(?User $user): bool
     {
         if (! $user?->is_active) {
