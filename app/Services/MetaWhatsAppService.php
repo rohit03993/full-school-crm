@@ -485,6 +485,151 @@ class MetaWhatsAppService
     }
 
     /**
+     * Send a login/authentication OTP using an approved Meta template.
+     * Optionally includes a button parameter (copy-code / URL button) when enabled in settings.
+     *
+     * @return array{status: string, response?: mixed, error?: string, message_id?: string}
+     */
+    public function sendAuthenticationOtp(
+        string $phone,
+        string $otp,
+        string $templateName,
+        ?string $languageCode = null,
+        ?string $contactName = null,
+    ): array {
+        if (! $this->isConfigured()) {
+            return ['status' => 'failed', 'error' => 'WhatsApp is not configured. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').' and save credentials.'];
+        }
+
+        $destination = $this->destinationE164($phone);
+
+        if (! $destination) {
+            return ['status' => 'failed', 'error' => 'Invalid Indian mobile number.'];
+        }
+
+        $otp = trim($otp);
+        $templateName = trim($templateName);
+
+        if ($templateName === '') {
+            return ['status' => 'failed', 'error' => 'OTP template name is not set. Save it under WhatsApp setup.'];
+        }
+
+        if (! preg_match('/^\d{4,8}$/', $otp)) {
+            return ['status' => 'failed', 'error' => 'Invalid OTP format.'];
+        }
+
+        $languageCode = trim((string) ($languageCode ?: $this->defaultLanguage())) ?: 'en';
+        $includeButton = filter_var(
+            Setting::getValue('meta_whatsapp.otp_include_button_param', config('meta_whatsapp.otp_include_button_param', true)),
+            FILTER_VALIDATE_BOOLEAN,
+        );
+
+        $components = $this->buildBodyComponents([$otp]);
+
+        if ($includeButton) {
+            $components[] = [
+                'type' => 'button',
+                'sub_type' => 'url',
+                'index' => '0',
+                'parameters' => [
+                    ['type' => 'text', 'text' => $otp],
+                ],
+            ];
+        }
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to' => $destination,
+            'type' => 'template',
+            'template' => [
+                'name' => $templateName,
+                'language' => ['code' => $languageCode],
+                'components' => $components,
+            ],
+        ];
+
+        $url = $this->graphUrl($this->phoneNumberId().'/messages');
+
+        Log::info('Meta WhatsApp OTP template request', [
+            'url' => $url,
+            'template' => $templateName,
+            'destination' => $destination,
+            'contact' => $contactName,
+        ]);
+
+        try {
+            $response = Http::timeout(30)
+                ->withToken((string) $this->accessToken())
+                ->acceptJson()
+                ->post($url, $payload);
+
+            $data = $response->json();
+
+            Log::info('Meta WhatsApp OTP template response', [
+                'http_status' => $response->status(),
+                'body' => $data,
+            ]);
+
+            if ($response->successful() && is_array($data)) {
+                $messageId = data_get($data, 'messages.0.id');
+
+                $this->logger->recordOutbound(
+                    $phone,
+                    is_string($messageId) ? $messageId : null,
+                    $templateName,
+                    $languageCode,
+                    [$otp],
+                    MetaWhatsAppMessageStatus::Sent,
+                    null,
+                    $data,
+                    null,
+                    'OTP login code',
+                    [
+                        'message_source' => \App\Enums\WhatsAppMessageSource::Automation->value,
+                        'contact_name' => $contactName,
+                    ],
+                );
+
+                return [
+                    'status' => 'success',
+                    'response' => $data,
+                    'message_id' => is_string($messageId) ? $messageId : null,
+                ];
+            }
+
+            $error = $this->parseApiError($data, $response->body());
+
+            $this->logger->recordOutbound(
+                $phone,
+                null,
+                $templateName,
+                $languageCode,
+                [$otp],
+                MetaWhatsAppMessageStatus::Failed,
+                $error,
+                is_array($data) ? $data : null,
+                null,
+                'OTP login code',
+                [
+                    'message_source' => \App\Enums\WhatsAppMessageSource::Automation->value,
+                ],
+            );
+
+            return [
+                'status' => 'failed',
+                'error' => $error,
+                'response' => $data,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Meta WhatsApp OTP send failed', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return ['status' => 'failed', 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
      * @return array{status: string, response?: mixed, error?: string, message_id?: string}
      */
     public function sendText(string $phone, string $text): array

@@ -28,6 +28,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Login OTP (WhatsApp template)
+    |--------------------------------------------------------------------------
+    |
+    | Requires an approved AUTHENTICATION or UTILITY template with one body
+    | variable for the code. Button parameter is optional (copy-code / URL).
+    |
+    */
+
+    'otp_template_name' => env('META_WHATSAPP_OTP_TEMPLATE_NAME', ''),
+
+    'otp_template_language' => env('META_WHATSAPP_OTP_TEMPLATE_LANGUAGE', ''),
+
+    'otp_include_button_param' => filter_var(
+        env('META_WHATSAPP_OTP_INCLUDE_BUTTON', false),
+        FILTER_VALIDATE_BOOLEAN,
+    ),
+
+    'otp_ttl_seconds' => (int) env('META_WHATSAPP_OTP_TTL_SECONDS', 300),
+
+    'otp_pepper' => env('META_WHATSAPP_OTP_PEPPER'),
+
+    /*
+    |--------------------------------------------------------------------------
     | India per-message rates (INR) — Meta WhatsApp pricing fallback
     |--------------------------------------------------------------------------
     |

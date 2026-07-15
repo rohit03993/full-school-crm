@@ -34,6 +34,12 @@ class MetaWhatsAppSettingsService
             'test_template_param_1' => Setting::getValue('meta_whatsapp.test_template_param_1'),
             'test_template_param_2' => Setting::getValue('meta_whatsapp.test_template_param_2'),
             'test_template_param_3' => Setting::getValue('meta_whatsapp.test_template_param_3'),
+            'otp_template_name' => Setting::getValue('meta_whatsapp.otp_template_name', config('meta_whatsapp.otp_template_name')),
+            'otp_template_language' => Setting::getValue('meta_whatsapp.otp_template_language', config('meta_whatsapp.otp_template_language')),
+            'otp_include_button_param' => filter_var(
+                Setting::getValue('meta_whatsapp.otp_include_button_param', config('meta_whatsapp.otp_include_button_param', true)),
+                FILTER_VALIDATE_BOOLEAN,
+            ),
         ];
     }
 
@@ -59,6 +65,14 @@ class MetaWhatsAppSettingsService
             $key = 'test_template_param_'.$index;
             Setting::setValue('meta_whatsapp.'.$key, trim((string) ($data[$key] ?? '')), 'meta_whatsapp');
         }
+
+        Setting::setValue('meta_whatsapp.otp_template_name', trim((string) ($data['otp_template_name'] ?? '')), 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.otp_template_language', trim((string) ($data['otp_template_language'] ?? '')), 'meta_whatsapp');
+        Setting::setValue(
+            'meta_whatsapp.otp_include_button_param',
+            ! empty($data['otp_include_button_param']) ? '1' : '0',
+            'meta_whatsapp',
+        );
 
         Setting::flushValueCache();
 

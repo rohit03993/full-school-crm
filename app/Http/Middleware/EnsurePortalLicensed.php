@@ -19,7 +19,7 @@ class EnsurePortalLicensed
             return $next($request);
         }
 
-        if ($request->routeIs('portal.login', 'portal.login.submit')) {
+        if ($request->routeIs('portal.login', 'portal.login.submit', 'portal.login.otp.send', 'portal.login.otp.verify')) {
             return redirect()
                 ->route('login')
                 ->with('portal_unavailable', 'Student portal is temporarily unavailable. Please contact the institute office.');

@@ -98,9 +98,33 @@ class StudentAuthService
         return true;
     }
 
+    public function findStudentByMobile(string $mobile): ?Student
+    {
+        $digits = \App\Support\IndianMobileNumber::normalize($mobile);
+
+        if ($digits === null) {
+            return null;
+        }
+
+        return Student::query()->where('mobile', $digits)->first();
+    }
+
+    public function loginWithVerifiedOtp(string $mobile): ?Student
+    {
+        $student = $this->findStudentByMobile($mobile);
+
+        if (! $student) {
+            return null;
+        }
+
+        $this->ensurePortalLoginForStudent($student);
+
+        return $student;
+    }
+
     public function portalLoginHint(): string
     {
-        return 'Login with your mobile number and portal password. Use the default password from your institute until you change it.';
+        return 'Login with your mobile number and portal password, or request a 4-digit WhatsApp OTP.';
     }
 
     /**
@@ -159,16 +183,5 @@ class StudentAuthService
             $student->date_of_birth->format('dmY'),
             $student->portal_password,
         );
-    }
-
-    protected function findStudentByMobile(string $mobile): ?Student
-    {
-        $digits = \App\Support\IndianMobileNumber::normalize($mobile);
-
-        if ($digits === null) {
-            return null;
-        }
-
-        return Student::query()->where('mobile', $digits)->first();
     }
 }

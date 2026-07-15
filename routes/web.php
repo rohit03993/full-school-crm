@@ -16,6 +16,7 @@ use App\Http\Controllers\PublicSite\IdCardVerifyController;
 use App\Http\Controllers\PublicSite\CourseController;
 use App\Http\Controllers\PublicSite\HomeController;
 use App\Http\Controllers\PublicSite\LoginController;
+use App\Http\Controllers\Staff\StaffOtpLoginController;
 use App\Http\Controllers\StudentPortal\AuthController;
 use App\Http\Controllers\StudentPortal\DashboardController;
 use App\Http\Controllers\StudentPortal\HomeworkController;
@@ -98,6 +99,17 @@ Route::get('/verify/{enrollment}', IdCardVerifyController::class)->name('id-card
 Route::get('/', HomeController::class)->name('home');
 Route::get('/courses', CourseController::class)->name('courses');
 Route::get('/login', LoginController::class)->name('login');
+
+Route::prefix('staff')->name('staff.')->group(function () {
+    Route::get('/otp-login', [StaffOtpLoginController::class, 'show'])->name('otp-login');
+    Route::post('/otp-login/send', [StaffOtpLoginController::class, 'send'])
+        ->middleware('throttle:5,1')
+        ->name('otp-login.send');
+    Route::post('/otp-login/verify', [StaffOtpLoginController::class, 'verify'])
+        ->middleware('throttle:10,1')
+        ->name('otp-login.verify');
+});
+
 Route::get('/contact', ContactController::class)->name('contact');
 Route::post('/contact/enquiry', [ContactController::class, 'store'])
     ->middleware(['throttle:10,1', 'license.feature:enquiries'])
@@ -108,6 +120,12 @@ Route::prefix('portal')->name('portal.')->middleware(EnsurePortalLicensed::class
     Route::post('/login', [AuthController::class, 'login'])
         ->middleware('throttle:10,1')
         ->name('login.submit');
+    Route::post('/login/otp/send', [AuthController::class, 'sendLoginOtp'])
+        ->middleware('throttle:5,1')
+        ->name('login.otp.send');
+    Route::post('/login/otp/verify', [AuthController::class, 'verifyLoginOtp'])
+        ->middleware('throttle:10,1')
+        ->name('login.otp.verify');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::middleware(EnsureStudentPortalAuth::class)->group(function () {

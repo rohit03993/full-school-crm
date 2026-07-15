@@ -6,6 +6,7 @@ use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
+use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
 
 class Login extends BaseLogin
@@ -30,7 +31,10 @@ class Login extends BaseLogin
             ->tel()
             ->maxLength(14)
             ->placeholder('10-digit mobile or +91…')
-            ->helperText('Mobile with or without +91. Staff sign in with mobile and password.');
+            ->helperText(new HtmlString(
+                'Mobile with or without +91. Staff sign in with mobile and password. '
+                .'<a href="'.e(route('staff.otp-login')).'" class="underline">Or use WhatsApp OTP</a>.'
+            ));
     }
 
     protected function throwFailureValidationException(): never

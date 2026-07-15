@@ -160,6 +160,33 @@ class ManageMetaWhatsAppSettings extends Page
                         ->columnSpanFull(),
                 ])
                 ->columns(2),
+            Section::make('Login OTP template')
+                ->description('Used for staff and student WhatsApp OTP login. Create an approved AUTHENTICATION (or UTILITY) template in Meta with one body variable for the 4-digit code.')
+                ->schema([
+                    Select::make('otp_template_name')
+                        ->label('OTP template')
+                        ->options(fn (): array => MetaWhatsAppTemplate::query()
+                            ->where('is_active', true)
+                            ->orderBy('name')
+                            ->get()
+                            ->mapWithKeys(fn (MetaWhatsAppTemplate $template): array => [
+                                $template->name => $template->name.' ('.$template->language.')',
+                            ])
+                            ->all())
+                        ->searchable()
+                        ->native(false)
+                        ->placeholder('Select approved template')
+                        ->helperText('Required for OTP login. Leave empty to keep password-only login.')
+                        ->columnSpanFull(),
+                    TextInput::make('otp_template_language')
+                        ->label('OTP template language')
+                        ->placeholder('en')
+                        ->helperText('Leave blank to use the default template language above.'),
+                    Toggle::make('otp_include_button_param')
+                        ->label('Include OTP in template button parameter')
+                        ->helperText('Turn on for Meta copy-code / URL authentication templates that also need the code in the button.'),
+                ])
+                ->columns(2),
             Section::make('Recent Meta messages')
                 ->description(fn (): string => 'Last 15 messages for this institute. Full history is under '.CrmNavigation::whatsAppMenu('Message log').'.')
                 ->schema([

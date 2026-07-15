@@ -20,6 +20,12 @@
     @include('partials.vite-assets', ['assets' => ['resources/css/app.css', 'resources/js/app.js']])
 </head>
 <body class="min-h-screen bg-navy-950 text-white antialiased">
+    @php
+        $activeTab = in_array($loginTab ?? 'password', ['password', 'otp'], true) ? ($loginTab ?? 'password') : 'password';
+        if (! ($otpAvailable ?? false)) {
+            $activeTab = 'password';
+        }
+    @endphp
     <div class="relative flex min-h-screen flex-col">
         <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
             <div class="absolute -left-20 top-0 h-72 w-72 rounded-full bg-brand-500/10 blur-3xl"></div>
@@ -36,36 +42,97 @@
                 <p class="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-navy-300">{{ $loginHint ?? 'Login with mobile and password' }}</p>
             </div>
 
-            <form method="POST" action="{{ route('portal.login.submit') }}" class="mt-8 space-y-4 rounded-3xl border border-white/10 bg-white p-5 text-navy-900 shadow-2xl sm:mt-10 sm:p-6">
-                @csrf
-
-                <div>
-                    <label for="mobile" class="mb-1.5 block text-sm font-semibold text-navy-800">Mobile number</label>
-                    <input type="tel" name="mobile" id="mobile" value="{{ old('mobile') }}" maxlength="14" required autocomplete="tel"
-                        inputmode="numeric"
-                        class="portal-input" placeholder="10-digit mobile or +91…">
-                    @error('mobile')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
-                </div>
-
-                <div>
-                    <label for="password" class="mb-1.5 block text-sm font-semibold text-navy-800">Portal password</label>
-                    <div class="relative">
-                        <input type="password" name="password" id="password" maxlength="64" required autocomplete="current-password"
-                            class="portal-input pr-12" placeholder="Institute default password">
-                        <button type="button" id="toggle-password" class="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-navy-400 hover:text-navy-700" aria-label="Show password">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                        </button>
+            <div class="mt-8 rounded-3xl border border-white/10 bg-white p-5 text-navy-900 shadow-2xl sm:mt-10 sm:p-6">
+                @if ($otpAvailable ?? false)
+                    <div class="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-navy-50 p-1">
+                        <a href="{{ route('portal.login', ['tab' => 'password']) }}"
+                           class="rounded-lg px-3 py-2 text-center text-sm font-semibold {{ $activeTab === 'password' ? 'bg-white text-navy-900 shadow' : 'text-navy-500' }}">
+                            Password
+                        </a>
+                        <a href="{{ route('portal.login', ['tab' => 'otp']) }}"
+                           class="rounded-lg px-3 py-2 text-center text-sm font-semibold {{ $activeTab === 'otp' ? 'bg-white text-navy-900 shadow' : 'text-navy-500' }}">
+                            WhatsApp OTP
+                        </a>
                     </div>
-                    @error('password')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
-                </div>
+                @endif
 
-                <button type="submit" class="touch-manipulation w-full rounded-xl bg-brand-500 py-3.5 text-base font-bold text-navy-950 shadow-lg transition hover:bg-brand-400 active:scale-[0.99]">
-                    Sign in
-                </button>
-            </form>
+                @if ($activeTab === 'otp' && ($otpAvailable ?? false))
+                    @if (session('otp_success'))
+                        <p class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ session('otp_success') }}</p>
+                    @endif
+
+                    @unless ($otpSent ?? false)
+                        <form method="POST" action="{{ route('portal.login.otp.send') }}" class="space-y-4">
+                            @csrf
+                            <input type="hidden" name="login_tab" value="otp">
+                            <div>
+                                <label for="otp_mobile" class="mb-1.5 block text-sm font-semibold text-navy-800">Mobile number</label>
+                                <input type="tel" name="mobile" id="otp_mobile" value="{{ old('mobile', $otpMobile) }}" maxlength="14" required autocomplete="tel"
+                                    inputmode="numeric"
+                                    class="portal-input" placeholder="10-digit mobile or +91…">
+                                @error('mobile')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
+                            </div>
+                            <button type="submit" class="touch-manipulation w-full rounded-xl bg-brand-500 py-3.5 text-base font-bold text-navy-950 shadow-lg transition hover:bg-brand-400 active:scale-[0.99]">
+                                Send 4-digit OTP
+                            </button>
+                        </form>
+                    @else
+                        <form method="POST" action="{{ route('portal.login.otp.verify') }}" class="space-y-4">
+                            @csrf
+                            <input type="hidden" name="login_tab" value="otp">
+                            <input type="hidden" name="mobile" value="{{ old('mobile', $otpMobile) }}">
+                            <p class="text-sm text-navy-600">Code sent to <strong>{{ old('mobile', $otpMobile) }}</strong> on WhatsApp.</p>
+                            <div>
+                                <label for="otp" class="mb-1.5 block text-sm font-semibold text-navy-800">4-digit OTP</label>
+                                <input type="text" name="otp" id="otp" maxlength="4" required autocomplete="one-time-code"
+                                    inputmode="numeric" pattern="\d{4}"
+                                    class="portal-input tracking-[0.4em] text-center text-lg font-semibold" placeholder="••••">
+                                @error('otp')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
+                            </div>
+                            <button type="submit" class="touch-manipulation w-full rounded-xl bg-brand-500 py-3.5 text-base font-bold text-navy-950 shadow-lg transition hover:bg-brand-400 active:scale-[0.99]">
+                                Verify &amp; sign in
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ route('portal.login.otp.send') }}" class="mt-3">
+                            @csrf
+                            <input type="hidden" name="mobile" value="{{ old('mobile', $otpMobile) }}">
+                            <button type="submit" class="w-full text-sm font-semibold text-brand-700 hover:text-brand-800">Resend OTP</button>
+                        </form>
+                    @endunless
+                @else
+                    <form method="POST" action="{{ route('portal.login.submit') }}" class="space-y-4">
+                        @csrf
+                        <input type="hidden" name="login_tab" value="password">
+
+                        <div>
+                            <label for="mobile" class="mb-1.5 block text-sm font-semibold text-navy-800">Mobile number</label>
+                            <input type="tel" name="mobile" id="mobile" value="{{ old('mobile') }}" maxlength="14" required autocomplete="tel"
+                                inputmode="numeric"
+                                class="portal-input" placeholder="10-digit mobile or +91…">
+                            @error('mobile')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+
+                        <div>
+                            <label for="password" class="mb-1.5 block text-sm font-semibold text-navy-800">Portal password</label>
+                            <div class="relative">
+                                <input type="password" name="password" id="password" maxlength="64" required autocomplete="current-password"
+                                    class="portal-input pr-12" placeholder="Institute default password">
+                                <button type="button" id="toggle-password" class="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-navy-400 hover:text-navy-700" aria-label="Show password">
+                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            @error('password')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+
+                        <button type="submit" class="touch-manipulation w-full rounded-xl bg-brand-500 py-3.5 text-base font-bold text-navy-950 shadow-lg transition hover:bg-brand-400 active:scale-[0.99]">
+                            Sign in
+                        </button>
+                    </form>
+                @endif
+            </div>
 
             <nav class="mt-8 flex flex-col items-center gap-3 text-sm text-navy-300 sm:flex-row sm:justify-center sm:gap-6">
                 <a href="{{ route('login') }}" class="font-medium transition hover:text-white">Other login options</a>
@@ -77,6 +144,7 @@
     <script>
         document.getElementById('toggle-password')?.addEventListener('click', function () {
             const input = document.getElementById('password');
+            if (!input) return;
             const isHidden = input.type === 'password';
             input.type = isHidden ? 'text' : 'password';
             this.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
