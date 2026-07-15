@@ -240,7 +240,7 @@ class WhatsAppTemplateParamMappingInferrer
     }
 
     /**
-     * Standard punch / attendance template slots used across Folks and Meta templates.
+     * Standard punch / attendance template slots used across Meta templates.
      *
      * @return list<string|null>
      */

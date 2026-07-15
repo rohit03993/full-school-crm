@@ -98,7 +98,7 @@ class WhatsAppLiveCampaignResource extends Resource
                 ])
                 ->columns(2),
             Section::make('External API')
-                ->description('AiSensy-compatible trigger for attendance systems, Taskbook, etc.')
+                ->description('AiSensy-compatible trigger for attendance systems and other external devices.')
                 ->schema([
                     Placeholder::make('api_docs')
                         ->label('')

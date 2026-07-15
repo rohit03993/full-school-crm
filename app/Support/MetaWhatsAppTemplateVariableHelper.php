@@ -21,7 +21,7 @@ class MetaWhatsAppTemplateVariableHelper
         3 => '9:15 AM',
         4 => '20 Jun 2026',
         5 => 'Class 12-A',
-        6 => 'Folks India',
+        6 => 'Your Institute',
     ];
 
     public static function labelForIndex(int $index): string

@@ -59,7 +59,7 @@ class InspectWhatsAppMediaCommand extends Command
             $this->newLine();
             $this->components->warn('WhatsApp media cannot be saved until storage is writable. On the server (as root):');
             $this->line('  mkdir -p '.$mediaDir);
-            $this->line('  chown -R folksindia:folksindia '.$privateDir);
+            $this->line('  chown -R www-data:www-data '.$privateDir);
             $this->line('  chmod -R 775 '.$privateDir);
             $this->newLine();
         }

@@ -91,7 +91,7 @@ class ManageMetaWhatsAppSettings extends Page
         return $schema->components([
             CrmHint::placeholder('setup.meta_whatsapp'),
             Section::make('Overview')
-                ->description('Credentials and templates are stored only for this institute in this CRM — each school (Taskbook, Folks India, etc.) has its own Meta WhatsApp Business account.')
+                ->description('Credentials and templates are stored only for this institute — each school or coaching has its own Meta WhatsApp Business account.')
                 ->schema([
                     Placeholder::make('dashboard_stats')
                         ->label('')
