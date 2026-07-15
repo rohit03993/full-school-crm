@@ -21,6 +21,69 @@ class MetaWhatsAppServiceTest extends TestCase
         $this->assertSame(['Rohit', '123', '—', '—'], $params);
     }
 
+    public function test_build_body_components_adds_parameter_name_for_named_templates(): void
+    {
+        $service = app(MetaWhatsAppService::class);
+
+        $components = $service->buildBodyComponents(
+            ['Aarav', '20171000001', '18:49:42', '2026-07-15'],
+            ['student_name', 'roll_number', 'check_in_time', 'date'],
+        );
+
+        $this->assertSame('student_name', $components[0]['parameters'][0]['parameter_name']);
+        $this->assertSame('roll_number', $components[0]['parameters'][1]['parameter_name']);
+        $this->assertSame('Aarav', $components[0]['parameters'][0]['text']);
+        $this->assertArrayNotHasKey('parameter_name', $service->buildBodyComponents(['Aarav'], ['1'])[0]['parameters'][0]);
+    }
+
+    public function test_send_named_template_includes_parameter_name_in_payload(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.phone_number_id' => '1234567890',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+        ]);
+
+        \App\Models\MetaWhatsAppTemplate::query()->create([
+            'name' => 'parent_attendance_manual_in',
+            'language' => 'en_US',
+            'status' => 'APPROVED',
+            'param_count' => 4,
+            'body' => 'Dear Parent, {{student_name}} {{roll_number}} {{check_in_time}} {{date}}',
+            'components' => [],
+            'provider_meta' => [
+                'body_variables' => ['student_name', 'roll_number', 'check_in_time', 'date'],
+            ],
+            'param_mappings' => ['student.name', 'student.enrollment_number', 'campaign.time', 'campaign.date'],
+            'is_active' => true,
+            'synced_at' => now(),
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/1234567890/messages' => Http::response([
+                'messages' => [['id' => 'wamid.NAMED123']],
+            ], 200),
+        ]);
+
+        $result = app(MetaWhatsAppService::class)->sendTemplate(
+            '9811223344',
+            'parent_attendance_manual_in',
+            ['Aarav', '20171000001', '18:49:42', '2026-07-15'],
+            'en_US',
+            4,
+        );
+
+        $this->assertSame('success', $result['status']);
+
+        Http::assertSent(function ($request): bool {
+            $params = $request->data()['template']['components'][0]['parameters'] ?? [];
+
+            return ($params[0]['parameter_name'] ?? null) === 'student_name'
+                && ($params[2]['parameter_name'] ?? null) === 'check_in_time'
+                && ($params[3]['text'] ?? null) === '2026-07-15';
+        });
+    }
+
     public function test_send_posts_meta_template_payload(): void
     {
         config([

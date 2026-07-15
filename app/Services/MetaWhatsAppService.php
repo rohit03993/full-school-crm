@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Setting;
+use App\Models\MetaWhatsAppTemplate;
 use App\Enums\MetaWhatsAppMessageStatus;
 use App\Support\CrmNavigation;
 use Illuminate\Support\Facades\Crypt;
@@ -42,7 +43,8 @@ class MetaWhatsAppService
         }
 
         $bodyParams = self::normalizeBodyParams($bodyParams, $expectedParamCount);
-        $components = $this->buildBodyComponents($bodyParams);
+        $parameterNames = $this->resolveNamedBodyParameterNames($templateName, $languageCode);
+        $components = $this->buildBodyComponents($bodyParams, $parameterNames);
 
         $payload = [
             'messaging_product' => 'whatsapp',
@@ -134,23 +136,79 @@ class MetaWhatsAppService
 
     /**
      * @param  list<string>  $bodyParams
+     * @param  list<string>  $parameterNames  Named Meta template variables (e.g. student_name). Empty = positional {{1}} {{2}}.
      * @return list<array<string, mixed>>
      */
-    public function buildBodyComponents(array $bodyParams): array
+    public function buildBodyComponents(array $bodyParams, array $parameterNames = []): array
     {
         if ($bodyParams === []) {
             return [];
         }
 
+        $parameters = [];
+
+        foreach (array_values($bodyParams) as $index => $value) {
+            $entry = [
+                'type' => 'text',
+                'text' => $value,
+            ];
+
+            $name = trim((string) ($parameterNames[$index] ?? ''));
+
+            if ($name !== '' && ! preg_match('/^\d+$/', $name)) {
+                $entry['parameter_name'] = $name;
+            }
+
+            $parameters[] = $entry;
+        }
+
         return [
             [
                 'type' => 'body',
-                'parameters' => array_map(
-                    fn (string $value): array => ['type' => 'text', 'text' => $value],
-                    $bodyParams,
-                ),
+                'parameters' => $parameters,
             ],
         ];
+    }
+
+    /**
+     * Meta named-parameter templates require `parameter_name` on each body value.
+     * Positional templates ({{1}}, {{2}}) leave this empty.
+     *
+     * @return list<string>
+     */
+    public function resolveNamedBodyParameterNames(string $templateName, string $languageCode): array
+    {
+        $template = MetaWhatsAppTemplate::query()
+            ->where('name', $templateName)
+            ->where('language', $languageCode)
+            ->first();
+
+        if ($template === null) {
+            $template = MetaWhatsAppTemplate::query()
+                ->where('name', $templateName)
+                ->orderByDesc('synced_at')
+                ->first();
+        }
+
+        $variables = data_get($template?->provider_meta, 'body_variables', []);
+
+        if (! is_array($variables) || $variables === []) {
+            return [];
+        }
+
+        $names = [];
+
+        foreach ($variables as $variable) {
+            $name = trim((string) $variable);
+
+            if ($name === '' || preg_match('/^\d+$/', $name) === 1) {
+                return [];
+            }
+
+            $names[] = $name;
+        }
+
+        return $names;
     }
 
     /**
