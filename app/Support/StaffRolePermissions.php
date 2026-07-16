@@ -60,6 +60,10 @@ class StaffRolePermissions
                 CrmPermission::FeesAdjustStructure,
                 CrmPermission::FeesWaivePenalty,
                 CrmPermission::ReportsView,
+                CrmPermission::CasesView,
+                CrmPermission::CasesOpen,
+                CrmPermission::CasesAssign,
+                CrmPermission::CasesClose,
             ],
             StaffJobRole::AcademicCoordinator->value => [
                 CrmPermission::StudentsView,
@@ -67,11 +71,19 @@ class StaffRolePermissions
                 CrmPermission::AttendanceWorkshops,
                 CrmPermission::MarksImport,
                 CrmPermission::HomeworkManage,
+                CrmPermission::CasesView,
+                CrmPermission::CasesOpen,
+                CrmPermission::CasesAssign,
+                CrmPermission::CasesClose,
             ],
             StaffJobRole::MessagingCoordinator->value => [
                 CrmPermission::StudentsView,
                 CrmPermission::WhatsappCampaigns,
                 CrmPermission::HomeworkManage,
+                CrmPermission::CasesView,
+                CrmPermission::CasesOpen,
+                CrmPermission::CasesAssign,
+                CrmPermission::CasesClose,
             ],
         ];
     }

@@ -187,4 +187,31 @@ class CrmStaffRolesTest extends TestCase
         $this->assertFalse(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::canAccess());
         $this->assertTrue(\App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource::canAccess());
     }
+
+    public function test_every_job_role_can_access_my_work_and_own_cases(): void
+    {
+        foreach (StaffJobRole::cases() as $role) {
+            $user = User::factory()->create(['is_active' => true]);
+            $user->assignRole($role->value);
+            $this->actingAs($user);
+
+            $this->assertTrue(
+                $user->canCrm(CrmPermission::CasesView),
+                "{$role->value} should view own cases",
+            );
+            $this->assertTrue(
+                \App\Filament\Pages\MyMeetingsPage::canAccess(),
+                "{$role->value} should access My work",
+            );
+
+            if ($role === StaffJobRole::AdmissionOfficer) {
+                $this->assertTrue($user->canCrm(CrmPermission::CasesViewAll));
+            } else {
+                $this->assertFalse(
+                    $user->canCrm(CrmPermission::CasesViewAll),
+                    "{$role->value} should not view all institute cases",
+                );
+            }
+        }
+    }
 }
