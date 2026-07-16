@@ -25,25 +25,23 @@ class AttendanceDisplayController extends Controller
     {
         $batchId = $this->parseBatchId($request);
         $stateFilter = $this->parseStateFilter($request);
-        $latest = $this->display->latestPunchToday();
+        $maxId = $this->display->maxPunchLogId();
+        $live = $this->display->liveFeed(0, $batchId, $stateFilter);
         $institute = InstituteSettings::forDocuments();
-
-        if ($latest !== null && ! $this->display->matchesFiltersPublic($latest, $batchId, $stateFilter)) {
-            $latest = null;
-        }
 
         return view('display.attendance', [
             'instituteName' => $institute['name'] ?? config('app.name'),
             'instituteLogo' => InstituteSettings::panelLogoUrl(),
             'token' => (string) $request->route('token'),
-            'latestPunch' => $latest,
-            'maxPunchId' => $this->display->maxPunchLogId(),
-            'pollIntervalMs' => max(1000, (int) config('attendance_display.poll_interval_ms', 2500)),
+            'latestPunch' => $live['latest'],
+            'maxPunchId' => $maxId,
+            'pollIntervalMs' => max(1000, (int) config('attendance_display.poll_interval_ms', 2000)),
+            'summaryPollIntervalMs' => max(5000, (int) config('attendance_display.summary_poll_interval_ms', 15000)),
             'cardDurationMs' => max(3000, (int) config('attendance_display.card_duration_ms', 10000)),
             'latestUrl' => route('display.attendance.latest', ['token' => $request->route('token')]),
             'batchOptions' => $this->display->batchOptions(),
             'initialSummary' => $this->display->summaryForToday($batchId),
-            'initialRecent' => $this->display->recentPunchesToday(10, $batchId, $stateFilter),
+            'initialRecent' => $live['recent'],
             'initialBatchId' => $batchId,
             'initialState' => $stateFilter,
         ]);
@@ -54,18 +52,30 @@ class AttendanceDisplayController extends Controller
         $sinceId = max(0, (int) $request->query('since', 0));
         $batchId = $this->parseBatchId($request);
         $stateFilter = $this->parseStateFilter($request);
+        $sections = strtolower(trim((string) $request->query('sections', 'live,summary')));
+        $includeSummary = str_contains($sections, 'summary');
 
-        return response()->json([
-            'punches' => $this->display->punchesSince($sinceId, 20, $batchId, $stateFilter),
-            'recent' => $this->display->recentPunchesToday(10, $batchId, $stateFilter),
-            'summary' => $this->display->summaryForToday($batchId),
-            'batch_options' => $this->display->batchOptions(),
-            'max_id' => $this->display->maxPunchLogId(),
+        $live = $this->display->liveFeed($sinceId, $batchId, $stateFilter);
+
+        $payload = [
+            'latest' => $live['latest'],
+            'recent' => $live['recent'],
+            'punches' => $live['punches'],
+            'max_id' => $live['max_id'],
             'filters' => [
                 'batch_id' => $batchId,
                 'state' => $stateFilter,
             ],
-        ]);
+        ];
+
+        if ($includeSummary) {
+            $payload['summary'] = $this->display->summaryForToday($batchId);
+        }
+
+        return response()
+            ->json($payload)
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache');
     }
 
     private function parseBatchId(Request $request): ?int

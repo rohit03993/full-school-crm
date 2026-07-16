@@ -98,8 +98,15 @@ class AttendanceDisplayTest extends TestCase
         $response->assertJsonPath('punches.0.roll', 'DISP-101');
         $response->assertJsonPath('punches.0.name', $student->name);
         $response->assertJsonPath('punches.0.state', 'IN');
-        $response->assertJsonPath('punches.0.source', 'Gate-1');
-        $response->assertJsonPath('punches.0.is_mapped', true);
+        $response->assertJsonStructure([
+            'latest',
+            'punches',
+            'recent',
+            'summary' => ['present_today', 'inside_now', 'checked_out', 'by_batch'],
+            'max_id',
+            'filters',
+        ]);
+        $response->assertJsonPath('latest.roll', 'DISP-101');
     }
 
     public function test_latest_api_returns_manual_punch(): void
@@ -144,8 +151,8 @@ class AttendanceDisplayTest extends TestCase
             'punches',
             'recent',
             'summary' => ['present_today', 'inside_now', 'checked_out', 'by_batch'],
-            'batch_options',
             'max_id',
+            'filters',
         ]);
     }
 
@@ -176,6 +183,35 @@ class AttendanceDisplayTest extends TestCase
         $response->assertJsonPath('summary.present_today', 1);
         $response->assertJsonPath('summary.by_batch.0.present', 1);
         $response->assertJsonCount(1, 'recent');
+    }
+
+    public function test_latest_api_live_only_skips_summary(): void
+    {
+        $this->createEnrolledStudent('DISP-404');
+
+        $this->settings->regenerateToken();
+        $this->settings->enable(true);
+        $token = (string) $this->settings->token();
+
+        DB::table('punch_logs')->insert([
+            'employee_id' => 'DISP-404',
+            'punch_date' => now()->toDateString(),
+            'punch_time' => '11:00:00',
+            'device_name' => 'Gate-1',
+            'is_manual' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson(route('display.attendance.latest', [
+            'token' => $token,
+            'since' => 0,
+            'sections' => 'live',
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonMissingPath('summary');
+        $response->assertJsonPath('latest.roll', 'DISP-404');
     }
 
     public function test_display_page_loads_when_enabled(): void

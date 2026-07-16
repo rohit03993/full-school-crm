@@ -276,6 +276,7 @@
 <div class="screen" id="app"
      data-latest-url="{{ $latestUrl }}"
      data-poll-ms="{{ $pollIntervalMs }}"
+     data-summary-poll-ms="{{ $summaryPollIntervalMs }}"
      data-card-ms="{{ $cardDurationMs }}"
      data-since="{{ $maxPunchId }}">
     <header class="header">
@@ -362,7 +363,8 @@
     const app = document.getElementById('app');
     const latestUrl = app.dataset.latestUrl;
     let sinceId = parseInt(app.dataset.since || '0', 10);
-    const pollMs = parseInt(app.dataset.pollMs || '2500', 10);
+    const pollMs = parseInt(app.dataset.pollMs || '2000', 10);
+    const summaryPollMs = parseInt(app.dataset.summaryPollMs || '15000', 10);
     const cardMs = parseInt(app.dataset.cardMs || '10000', 10);
     const container = document.getElementById('card-container');
     const idle = document.getElementById('idle-screen');
@@ -375,6 +377,10 @@
     let activeSnippetId = null;
     let knownRecentIds = new Set();
     let firstRecentRender = true;
+    let lastShownPunchId = @json($latestPunch['id'] ?? 0);
+    let lastSummaryAt = 0;
+    let lastSummaryJson = '';
+    let pollInFlight = false;
 
     const initialBatch = @json($initialBatchId);
     const initialState = @json($initialState);
@@ -443,9 +449,10 @@
         }
     }
 
-    function filterParams() {
+    function filterParams(includeSummary) {
         const params = new URLSearchParams();
         params.set('since', String(sinceId));
+        params.set('sections', includeSummary ? 'live,summary' : 'live');
         if (filterBatch) params.set('batch_id', filterBatch);
         if (filterState) params.set('state', filterState);
         return params;
@@ -660,27 +667,62 @@
         }, cardMs);
     }
 
-    async function poll() {
+    async function poll(forceSummary = false) {
+        if (pollInFlight) return;
+        pollInFlight = true;
+
+        const wantSummary = forceSummary || (Date.now() - lastSummaryAt >= summaryPollMs);
+
         try {
-            const response = await fetch(`${latestUrl}?${filterParams()}`, {
+            const response = await fetch(`${latestUrl}?${filterParams(wantSummary)}`, {
                 headers: { 'Accept': 'application/json' },
                 cache: 'no-store',
             });
             if (!response.ok) return;
             const data = await response.json();
+
+            if (data.summary) {
+                const summaryJson = JSON.stringify(data.summary);
+                if (summaryJson !== lastSummaryJson) {
+                    renderStats(data.summary);
+                    lastSummaryJson = summaryJson;
+                }
+                lastSummaryAt = Date.now();
+            }
+
             window.__lastRecent = data.recent || [];
-            renderStats(data.summary);
             renderRecent(window.__lastRecent);
+
+            if (typeof data.max_id === 'number' && data.max_id > sinceId) {
+                sinceId = data.max_id;
+            }
+
+            const latest = data.latest || null;
+            if (latest && latest.id > lastShownPunchId) {
+                lastShownPunchId = latest.id;
+                renderCard(latest);
+                return;
+            }
+
             const punches = data.punches || [];
-            if (typeof data.max_id === 'number' && data.max_id > sinceId) sinceId = data.max_id;
-            if (punches.length > 0) renderCard(punches[punches.length - 1]);
+            if (punches.length > 0) {
+                const punch = punches[punches.length - 1];
+                if (punch.id > lastShownPunchId) {
+                    lastShownPunchId = punch.id;
+                    renderCard(punch);
+                }
+            }
         } catch (e) { /* retry */ }
+        finally {
+            pollInFlight = false;
+        }
     }
 
     function onFilterChange() {
         syncUrlFilters();
         syncPickerHighlight();
-        poll();
+        lastSummaryAt = 0;
+        poll(true);
     }
 
     clearFilterBtn.addEventListener('click', () => {
@@ -696,12 +738,17 @@
     renderStats(@json($initialSummary));
     renderRecent(window.__lastRecent);
     @if ($latestPunch)
+    lastShownPunchId = @json($latestPunch['id']);
     renderCard(@json($latestPunch));
     @endif
 
     updateClock();
     setInterval(updateClock, 1000);
-    setInterval(poll, pollMs);
+    poll(true);
+    setInterval(() => poll(false), pollMs);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') poll(true);
+    });
 })();
 </script>
 </body>
