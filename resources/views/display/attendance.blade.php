@@ -278,6 +278,7 @@
      data-poll-ms="{{ $pollIntervalMs }}"
      data-summary-poll-ms="{{ $summaryPollIntervalMs }}"
      data-card-ms="{{ $cardDurationMs }}"
+     data-card-queue-ms="{{ $cardQueueDurationMs }}"
      data-since="{{ $maxPunchId }}">
     <header class="header">
         <div class="brand">
@@ -365,7 +366,8 @@
     let sinceId = parseInt(app.dataset.since || '0', 10);
     const pollMs = parseInt(app.dataset.pollMs || '2000', 10);
     const summaryPollMs = parseInt(app.dataset.summaryPollMs || '15000', 10);
-    const cardMs = parseInt(app.dataset.cardMs || '10000', 10);
+    const cardSoloMs = parseInt(app.dataset.cardMs || '5000', 10);
+    const cardQueueMs = parseInt(app.dataset.cardQueueMs || '2500', 10);
     const container = document.getElementById('card-container');
     const idle = document.getElementById('idle-screen');
     const recentList = document.getElementById('recent-list');
@@ -374,7 +376,11 @@
     let filterBatch = '';
     let filterState = '';
     let hideTimer = null;
+    let hideFadeTimer = null;
     let activeSnippetId = null;
+    let cardShowing = false;
+    let punchQueue = [];
+    let queuedPunchIds = new Set();
     let knownRecentIds = new Set();
     let firstRecentRender = true;
     let lastRecentSignature = '';
@@ -754,7 +760,82 @@
         syncUrlFilters();
     }
 
-    function renderCard(punch) {
+    function clearCardTimers() {
+        if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+        }
+        if (hideFadeTimer) {
+            clearTimeout(hideFadeTimer);
+            hideFadeTimer = null;
+        }
+    }
+
+    function resetCardQueue() {
+        punchQueue = [];
+        queuedPunchIds = new Set();
+        clearCardTimers();
+        cardShowing = false;
+        activeSnippetId = null;
+        container.innerHTML = '';
+        idle.style.display = 'block';
+        syncActiveRecentHighlight();
+    }
+
+    function cardDisplayMs() {
+        return punchQueue.length > 0 ? cardQueueMs : cardSoloMs;
+    }
+
+    function scheduleCardHide() {
+        clearCardTimers();
+        hideTimer = setTimeout(() => {
+            container.querySelector('.card')?.classList.remove('visible');
+            hideFadeTimer = setTimeout(() => {
+                container.innerHTML = '';
+                idle.style.display = 'block';
+                activeSnippetId = null;
+                syncActiveRecentHighlight();
+                cardShowing = false;
+                showNextInQueue();
+            }, 350);
+        }, cardDisplayMs());
+    }
+
+    function enqueuePunches(punches) {
+        if (!punches || punches.length === 0) return;
+
+        const sorted = [...punches].sort((a, b) => a.id - b.id);
+        let added = false;
+
+        sorted.forEach(punch => {
+            if (punch.id <= lastShownPunchId) return;
+            if (queuedPunchIds.has(punch.id)) return;
+            queuedPunchIds.add(punch.id);
+            punchQueue.push(punch);
+            added = true;
+        });
+
+        if (!added) return;
+
+        if (cardShowing) {
+            scheduleCardHide();
+            return;
+        }
+
+        showNextInQueue();
+    }
+
+    function showNextInQueue() {
+        if (cardShowing || punchQueue.length === 0) return;
+
+        const punch = punchQueue.shift();
+        lastShownPunchId = punch.id;
+        renderCardNow(punch);
+        cardShowing = true;
+        scheduleCardHide();
+    }
+
+    function renderCardNow(punch) {
         activeSnippetId = punch.id;
         syncActiveRecentHighlight();
         const isIn = punch.state === 'IN';
@@ -780,16 +861,17 @@
                 </div>
             </article>`;
         idle.style.display = 'none';
-        if (hideTimer) clearTimeout(hideTimer);
-        hideTimer = setTimeout(() => {
-            container.querySelector('.card')?.classList.remove('visible');
-            setTimeout(() => {
-                container.innerHTML = '';
-                idle.style.display = 'block';
-                activeSnippetId = null;
-                syncActiveRecentHighlight();
-            }, 350);
-        }, cardMs);
+    }
+
+    function ingestNewPunches(punches, latest) {
+        if (punches && punches.length > 0) {
+            enqueuePunches(punches);
+            return;
+        }
+
+        if (latest && latest.id > lastShownPunchId && !queuedPunchIds.has(latest.id)) {
+            enqueuePunches([latest]);
+        }
     }
 
     async function poll(forceSummary = false) {
@@ -827,21 +909,7 @@
                 sinceId = data.max_id;
             }
 
-            const latest = data.latest || null;
-            if (latest && latest.id > lastShownPunchId) {
-                lastShownPunchId = latest.id;
-                renderCard(latest);
-                return;
-            }
-
-            const punches = data.punches || [];
-            if (punches.length > 0) {
-                const punch = punches[punches.length - 1];
-                if (punch.id > lastShownPunchId) {
-                    lastShownPunchId = punch.id;
-                    renderCard(punch);
-                }
-            }
+            ingestNewPunches(data.punches || [], data.latest || null);
         } catch (e) { /* retry */ }
         finally {
             pollInFlight = false;
@@ -854,6 +922,7 @@
         lastSummaryAt = 0;
         lastRecentSignature = '';
         firstRecentRender = true;
+        resetCardQueue();
         poll(true);
     }
 
@@ -871,7 +940,10 @@
     renderRecent(window.__lastRecent, true);
     @if ($latestPunch)
     lastShownPunchId = @json($latestPunch['id']);
-    renderCard(@json($latestPunch));
+    queuedPunchIds.add(lastShownPunchId);
+    renderCardNow(@json($latestPunch));
+    cardShowing = true;
+    scheduleCardHide();
     @endif
 
     updateClock();

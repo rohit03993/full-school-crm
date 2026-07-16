@@ -12,8 +12,11 @@ return [
     |
     */
 
-    /** How long a punch card stays on screen (milliseconds) in the browser. */
-    'card_duration_ms' => (int) env('ATTENDANCE_DISPLAY_CARD_MS', 10000),
+    /** How long the big card stays when no other punch is waiting (milliseconds). */
+    'card_duration_ms' => (int) env('ATTENDANCE_DISPLAY_CARD_MS', 5000),
+
+    /** Shorter display when more punches are queued (milliseconds). */
+    'card_queue_duration_ms' => (int) env('ATTENDANCE_DISPLAY_CARD_QUEUE_MS', 2500),
 
     /** Fast poll for new punches + latest-10 list (milliseconds). */
     'poll_interval_ms' => (int) env('ATTENDANCE_DISPLAY_POLL_MS', 2000),
