@@ -41,6 +41,7 @@ class CrmStaffRolesTest extends TestCase
 
         $this->assertTrue($user->canCrm(CrmPermission::LeadsCall));
         $this->assertTrue($user->canCrm(CrmPermission::FeesCollect));
+        $this->assertTrue($user->canCrm(CrmPermission::FeesAdjustStructure));
         $this->assertTrue($user->canCrm(CrmPermission::AttendanceMark));
         $this->assertTrue($user->canCrm(CrmPermission::WhatsappCampaigns));
         $this->assertFalse($user->canCrm(CrmPermission::SettingsManage));
@@ -79,6 +80,34 @@ class CrmStaffRolesTest extends TestCase
 
         $this->assertTrue($user->canCrm(CrmPermission::FeesCollect));
         $this->assertTrue($user->can('create', \App\Models\Payment::class));
+        $this->assertFalse($user->canCrm(CrmPermission::FeesAdjustStructure));
+    }
+
+    public function test_fee_adjuster_can_adjust_structure_but_not_collect_by_default(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole(StaffJobRole::FeeAdjuster->value);
+
+        $this->assertTrue($user->canCrm(CrmPermission::FeesAdjustStructure));
+        $this->assertTrue($user->canCrm(CrmPermission::FeesWaivePenalty));
+        $this->assertTrue(\App\Support\CrmAccess::canViewFees($user));
+        $this->assertTrue($user->can('update', new \App\Models\Payment));
+        $this->assertFalse($user->canCrm(CrmPermission::FeesCollect));
+        $this->assertFalse($user->can('create', \App\Models\Payment::class));
+    }
+
+    public function test_accountant_plus_fee_adjuster_can_collect_and_adjust(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->syncRoles([
+            StaffJobRole::Accountant->value,
+            StaffJobRole::FeeAdjuster->value,
+        ]);
+
+        $this->assertTrue($user->canCrm(CrmPermission::FeesCollect));
+        $this->assertTrue($user->canCrm(CrmPermission::FeesAdjustStructure));
+        $this->assertTrue($user->can('create', \App\Models\Payment::class));
+        $this->assertTrue($user->can('update', new \App\Models\Payment));
     }
 
     public function test_admission_officer_can_approve_admissions(): void

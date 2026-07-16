@@ -11,6 +11,7 @@ enum StaffJobRole: string
     case Counsellor = 'counsellor';
     case AdmissionOfficer = 'admission_officer';
     case Accountant = 'accountant';
+    case FeeAdjuster = 'fee_adjuster';
     case AcademicCoordinator = 'academic_coordinator';
     case MessagingCoordinator = 'messaging_coordinator';
 
@@ -20,6 +21,7 @@ enum StaffJobRole: string
             self::Counsellor => 'Counsellor (calls & leads)',
             self::AdmissionOfficer => 'Admission officer',
             self::Accountant => 'Accountant (fees)',
+            self::FeeAdjuster => 'Fee adjuster (discounts & structure)',
             self::AcademicCoordinator => 'Academic coordinator',
             self::MessagingCoordinator => 'Messaging (WhatsApp)',
         };
@@ -31,6 +33,7 @@ enum StaffJobRole: string
             self::Counsellor => 'Assigned to Call, call queue, log calls, follow-ups',
             self::AdmissionOfficer => 'Enquiries, admissions, student edits, imports',
             self::Accountant => 'Collect fees, receipts, fee reports',
+            self::FeeAdjuster => 'Adjust fee plan, discounts, installments; request waive/discount',
             self::AcademicCoordinator => 'Batch attendance, workshops, tests & marks upload',
             self::MessagingCoordinator => 'WhatsApp campaigns and bulk messaging',
         };

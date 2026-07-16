@@ -53,6 +53,14 @@ class StaffRolePermissions
                 CrmPermission::CasesAssign,
                 CrmPermission::CasesClose,
             ],
+            StaffJobRole::FeeAdjuster->value => [
+                CrmPermission::DashboardFinanceStats,
+                CrmPermission::StudentsView,
+                CrmPermission::AdmissionsView,
+                CrmPermission::FeesAdjustStructure,
+                CrmPermission::FeesWaivePenalty,
+                CrmPermission::ReportsView,
+            ],
             StaffJobRole::AcademicCoordinator->value => [
                 CrmPermission::StudentsView,
                 CrmPermission::AttendanceMark,

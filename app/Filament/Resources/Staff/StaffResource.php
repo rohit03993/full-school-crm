@@ -100,7 +100,7 @@ class StaffResource extends Resource
                         ->default(true),
                 ]),
             Section::make('Access & roles')
-                ->description('Tick every function this person should have. Permissions from all selected roles are combined — e.g. Counsellor + Accountant gives both calling and fee collection.')
+                ->description('Tick every function this person should have. Permissions from all selected roles are combined — e.g. Accountant + Fee adjuster can collect and change fee plans.')
                 ->schema([
                     Toggle::make('is_super_admin')
                         ->label('Super Admin (full access)')
@@ -115,7 +115,7 @@ class StaffResource extends Resource
                             ->all())
                         ->columns(1)
                         ->disabled(fn (callable $get): bool => (bool) $get('is_super_admin'))
-                        ->helperText('Select one or more — or all four for a full operations login without Super Admin.'),
+                        ->helperText('Select one or more roles. Combine Accountant + Fee adjuster when someone should both collect fees and change discounts/structure.'),
                 ]),
             Section::make('Staff Profile')
                 ->columns(2)
