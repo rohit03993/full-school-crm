@@ -43,7 +43,7 @@ class ManageAttendanceBiometricPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'ADMS cloud server for ZKTeco devices, plus punch_logs bridge to Academics → Attendance.';
+        return 'ADMS cloud server for ZKTeco devices, Face Verify gate status, and punch_logs bridge to Academics → Attendance.';
     }
 
     public function content(Schema $schema): Schema

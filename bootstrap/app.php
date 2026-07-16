@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhooks/meta/whatsapp',
             'api/v1/campaign/t1/api/v2',
             'campaign/t1/api/v2',
+            'api/face-verify/approve',
             'iclock/*',
             'iclock',
         ]);
@@ -39,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('crm:send-fee-reminders')->dailyAt('09:00');
         $schedule->command('attendance:process-punches')->everyMinute();
         $schedule->command('attendance:auto-out')->everyMinute();
+        $schedule->command('face-verify:sweep')->everyMinute()->withoutOverlapping();
         $schedule->command('crm:process-queue')->everyMinute()->withoutOverlapping();
         $schedule->command('whatsapp:process-pending')->everyMinute()->withoutOverlapping();
     })

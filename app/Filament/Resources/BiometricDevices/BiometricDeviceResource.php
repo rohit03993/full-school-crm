@@ -76,6 +76,17 @@ class BiometricDeviceResource extends Resource
                     Toggle::make('is_active')
                         ->label('Active (allow punches)')
                         ->default(true),
+                    Toggle::make('requires_face_verify')
+                        ->label('Require face verification')
+                        ->helperText('When enabled, RFID punches wait for Face Verify PASS before attendance is marked.')
+                        ->default(false)
+                        ->live(),
+                    TextInput::make('face_verify_device_id')
+                        ->label('Face Verify device ID')
+                        ->helperText('UUID of the Android kiosk registered in Face API for this gate.')
+                        ->maxLength(64)
+                        ->visible(fn ($get): bool => (bool) $get('requires_face_verify'))
+                        ->required(fn ($get): bool => (bool) $get('requires_face_verify')),
                     Textarea::make('notes')
                         ->label('Notes')
                         ->rows(3)
@@ -93,6 +104,12 @@ class BiometricDeviceResource extends Resource
                 TextColumn::make('serial_number')->label('SN')->searchable()->copyable(),
                 TextColumn::make('location')->toggleable(),
                 IconColumn::make('is_active')->boolean()->label('Active'),
+                IconColumn::make('requires_face_verify')->boolean()->label('Face gate')->toggleable(),
+                TextColumn::make('face_verify_device_id')
+                    ->label('Face device')
+                    ->limit(12)
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('adms_link')
                     ->label('ADMS link')
                     ->state(function (BiometricDevice $record): string {

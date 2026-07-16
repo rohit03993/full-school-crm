@@ -4,6 +4,7 @@ namespace App\Services\Biometric;
 
 use App\Models\BiometricDevice;
 use App\Models\BiometricPunch;
+use App\Services\FaceVerify\FaceVerifyGateService;
 use App\Services\Punch\PunchAttendanceProcessor;
 use App\Services\Punch\PunchLogService;
 use Illuminate\Support\Carbon;
@@ -17,6 +18,7 @@ class BiometricAdmsIngestService
     public function __construct(
         protected PunchLogService $punchLogs,
         protected PunchAttendanceProcessor $processor,
+        protected FaceVerifyGateService $faceVerify,
     ) {}
 
     public function findAllowedDevice(string $serial): ?BiometricDevice
@@ -117,11 +119,11 @@ class BiometricAdmsIngestService
     }
 
     /**
-     * @return array{accepted: int, mirrored: int, duplicates: int, errors: int}
+     * @return array{accepted: int, mirrored: int, pending_face: int, duplicates: int, errors: int}
      */
     public function ingestAttLog(BiometricDevice $device, string $body, ?string $stamp = null): array
     {
-        $stats = ['accepted' => 0, 'mirrored' => 0, 'duplicates' => 0, 'errors' => 0];
+        $stats = ['accepted' => 0, 'mirrored' => 0, 'pending_face' => 0, 'duplicates' => 0, 'errors' => 0];
         $lines = preg_split("/\r\n|\n|\r/", trim($body)) ?: [];
 
         foreach ($lines as $line) {
@@ -154,6 +156,9 @@ class BiometricAdmsIngestService
                 } elseif ($result === 'mirrored') {
                     $stats['accepted']++;
                     $stats['mirrored']++;
+                } elseif ($result === 'pending_face') {
+                    $stats['accepted']++;
+                    $stats['pending_face']++;
                 } else {
                     $stats['accepted']++;
                     $stats['errors']++;
@@ -203,7 +208,9 @@ class BiometricAdmsIngestService
             return 'duplicate';
         }
 
-        return DB::transaction(function () use ($device, $parsed, $rawLine, $meta): string {
+        $gateFace = $this->faceVerify->shouldGateDevice($device);
+
+        $punch = DB::transaction(function () use ($device, $parsed, $rawLine, $meta, $gateFace): BiometricPunch|string {
             $punch = BiometricPunch::query()->create([
                 'biometric_device_id' => $device->id,
                 'serial_number' => $device->serial_number,
@@ -218,6 +225,10 @@ class BiometricAdmsIngestService
             ]);
 
             $device->recordPunchReceived();
+
+            if ($gateFace) {
+                return $punch;
+            }
 
             $punchLogId = $this->mirrorToPunchLogs($device, $parsed);
 
@@ -238,6 +249,20 @@ class BiometricAdmsIngestService
 
             return 'mirrored';
         });
+
+        if (! $gateFace) {
+            return is_string($punch) ? $punch : 'failed';
+        }
+
+        /** @var BiometricPunch $punch */
+        $faceResult = $this->faceVerify->holdPunchForVerification(
+            $device,
+            $punch,
+            $parsed['user_pin'],
+            $parsed['punched_at'],
+        );
+
+        return $faceResult === 'pending' ? 'pending_face' : $faceResult;
     }
 
     /**

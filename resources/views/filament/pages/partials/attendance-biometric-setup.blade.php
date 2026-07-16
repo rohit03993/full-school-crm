@@ -53,6 +53,9 @@
                                 @unless ($device['is_active'])
                                     <span class="ml-1 text-xs font-normal text-rose-600">inactive</span>
                                 @endunless
+                                @if (! empty($device['requires_face_verify']))
+                                    <span class="ml-1 text-xs font-normal text-teal-700 dark:text-teal-300">face gate</span>
+                                @endif
                             </p>
                             <p class="font-mono text-xs text-gray-500">{{ $device['serial'] }}</p>
                         </div>
@@ -88,6 +91,58 @@
                 <strong>{{ number_format($status['punch_row_count']) }}</strong> row(s) currently stored.
             @endif
         </p>
+    </div>
+
+    <div @class([
+        'fi-section rounded-2xl p-5 shadow-sm ring-1 sm:p-6',
+        'ring-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-500/5' => ($status['face_verify_enabled'] ?? false) && ($status['face_verify_health'] ?? '') === 'Healthy',
+        'ring-amber-500/30 bg-amber-50/50 dark:bg-amber-500/5' => ($status['face_verify_enabled'] ?? false) && ($status['face_verify_health'] ?? '') !== 'Healthy',
+        'ring-gray-950/5 dark:ring-white/10' => ! ($status['face_verify_enabled'] ?? false),
+    ])>
+        <p class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Face Verify gate</p>
+        <h2 class="mt-1 text-lg font-bold text-gray-950 dark:text-white">
+            @if ($status['face_verify_enabled'] ?? false)
+                Face Verify enabled
+            @else
+                Face Verify disabled
+            @endif
+        </h2>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            RFID punches on gated devices wait for a signed PASS callback before writing
+            <code class="font-mono text-xs">punch_logs</code>. Non-gated devices keep the current immediate attendance flow.
+        </p>
+        <dl class="mt-4 grid gap-3 sm:grid-cols-2">
+            <div class="rounded-xl bg-white/80 p-3 text-xs dark:bg-black/20">
+                <dt class="text-gray-500">API URL</dt>
+                <dd class="mt-1 break-all font-mono text-gray-900 dark:text-gray-100">{{ $status['face_verify_api_url'] ?: '—' }}</dd>
+            </div>
+            <div class="rounded-xl bg-white/80 p-3 text-xs dark:bg-black/20">
+                <dt class="text-gray-500">Health</dt>
+                <dd class="mt-1 font-semibold text-gray-900 dark:text-gray-100">{{ $status['face_verify_health'] ?? '—' }}</dd>
+            </div>
+            <div class="rounded-xl bg-white/80 p-3 text-xs dark:bg-black/20">
+                <dt class="text-gray-500">Callback URL</dt>
+                <dd class="mt-1 break-all font-mono text-gray-900 dark:text-gray-100">{{ $status['face_verify_callback_url'] ?? url('/api/face-verify/approve') }}</dd>
+            </div>
+            <div class="rounded-xl bg-white/80 p-3 text-xs dark:bg-black/20">
+                <dt class="text-gray-500">Pending verifications</dt>
+                <dd class="mt-1 font-semibold text-gray-900 dark:text-gray-100">{{ number_format($status['face_verify_pending_count'] ?? 0) }}</dd>
+            </div>
+        </dl>
+        <div class="mt-4 flex flex-wrap gap-2">
+            <a
+                href="{{ \App\Filament\Resources\FaceVerificationRequests\FaceVerificationRequestResource::getUrl() }}"
+                class="inline-flex rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-500"
+            >
+                Review face verifications
+            </a>
+            <a
+                href="{{ \App\Filament\Resources\BiometricDevices\BiometricDeviceResource::getUrl() }}"
+                class="inline-flex rounded-lg bg-gray-900/5 px-3 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-900/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+            >
+                Configure gated devices
+            </a>
+        </div>
     </div>
 
     <div class="fi-section rounded-2xl p-5 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 sm:p-6">

@@ -12,6 +12,8 @@ class BiometricDevice extends Model
         'serial_number',
         'location',
         'is_active',
+        'requires_face_verify',
+        'face_verify_device_id',
         'attlog_stamp',
         'operlog_stamp',
         'last_seen_at',
@@ -25,6 +27,7 @@ class BiometricDevice extends Model
     {
         return [
             'is_active' => 'boolean',
+            'requires_face_verify' => 'boolean',
             'last_seen_at' => 'datetime',
             'last_punch_at' => 'datetime',
             'today_punch_count_date' => 'date',
@@ -35,6 +38,11 @@ class BiometricDevice extends Model
     public function punches(): HasMany
     {
         return $this->hasMany(BiometricPunch::class);
+    }
+
+    public function faceVerificationRequests(): HasMany
+    {
+        return $this->hasMany(FaceVerificationRequest::class);
     }
 
     public function touchSeen(?string $attlogStamp = null, ?string $operlogStamp = null): void

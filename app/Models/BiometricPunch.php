@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class BiometricPunch extends Model
 {
@@ -43,5 +44,10 @@ class BiometricPunch extends Model
     public function device(): BelongsTo
     {
         return $this->belongsTo(BiometricDevice::class, 'biometric_device_id');
+    }
+
+    public function faceVerificationRequest(): HasOne
+    {
+        return $this->hasOne(FaceVerificationRequest::class);
     }
 }

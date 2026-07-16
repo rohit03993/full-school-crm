@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Students;
 
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
+use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Pages\StudentProfilePage;
@@ -13,6 +14,7 @@ use App\Filament\Support\CrmTable;
 use App\Models\AcademicSession;
 use App\Models\Course;
 use App\Models\Student;
+use App\Services\FaceVerify\FaceVerifyGateService;
 use App\Services\FeesDashboardService;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
@@ -20,6 +22,7 @@ use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
 use App\Support\InstituteProfile;
 use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -28,6 +31,7 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Throwable;
 use UnitEnum;
 
 class StudentResource extends Resource
@@ -212,6 +216,33 @@ class StudentResource extends Resource
                     ->label('Open profile')
                     ->icon(Heroicon::OutlinedUser)
                     ->url(fn (Student $record): string => StudentProfilePage::getUrl(['record' => $record->id])),
+                Action::make('syncFaceVerify')
+                    ->label('Sync to Face API')
+                    ->icon(Heroicon::OutlinedArrowPath)
+                    ->visible(fn (): bool => (bool) config('face_verify.enabled', false)
+                        && (Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false))
+                    ->requiresConfirmation()
+                    ->modalHeading('Sync student to Face API')
+                    ->modalDescription('Upserts this student into Face Verify so the kiosk can enroll by roll number.')
+                    ->action(function (Student $record): void {
+                        try {
+                            $response = app(FaceVerifyGateService::class)->syncStudent($record);
+
+                            Notification::make()
+                                ->title('Synced to Face API')
+                                ->body('Roll '.$record->activeEnrollment?->enrollment_number.' is ready for kiosk enrollment.')
+                                ->success()
+                                ->send();
+
+                            unset($response);
+                        } catch (Throwable $exception) {
+                            Notification::make()
+                                ->title('Face API sync failed')
+                                ->body($exception->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
             ])
             ->recordUrl(fn (Student $record): string => StudentProfilePage::getUrl(['record' => $record->id]))
             ->emptyStateHeading('No students found')
