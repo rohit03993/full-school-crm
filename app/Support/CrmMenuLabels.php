@@ -264,6 +264,11 @@ final class CrmMenuLabels
         return 'Biometric setup';
     }
 
+    public static function attendanceDisplay(): string
+    {
+        return 'Attendance display';
+    }
+
     public static function websiteContent(): string
     {
         return 'Website content';

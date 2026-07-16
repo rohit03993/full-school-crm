@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\PaymentProofDownloadController;
 use App\Http\Controllers\Admin\ReceiptDownloadController;
 use App\Http\Controllers\Pwa\ManifestController;
 use App\Http\Controllers\Pwa\PwaIconController;
+use App\Http\Controllers\Display\AttendanceDisplayController;
 use App\Http\Controllers\PublicSite\ContactController;
 use App\Http\Controllers\PublicSite\IdCardVerifyController;
 use App\Http\Controllers\PublicSite\CourseController;
@@ -95,6 +96,21 @@ Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
 });
 
 Route::get('/verify/{enrollment}', IdCardVerifyController::class)->name('id-card.verify');
+
+Route::get('/display/attendance/photo/{document}', [AttendanceDisplayController::class, 'photo'])
+    ->middleware('throttle:120,1')
+    ->name('display.attendance.photo');
+
+Route::prefix('display/attendance')
+    ->name('display.attendance.')
+    ->middleware(['attendance.display'])
+    ->group(function (): void {
+        Route::get('/{token}', [AttendanceDisplayController::class, 'show'])
+            ->name('show');
+        Route::get('/{token}/latest', [AttendanceDisplayController::class, 'latest'])
+            ->middleware('throttle:120,1')
+            ->name('latest');
+    });
 
 Route::get('/', HomeController::class)->name('home');
 Route::get('/courses', CourseController::class)->name('courses');

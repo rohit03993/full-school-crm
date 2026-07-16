@@ -29,6 +29,7 @@ class CrmHint
         'meta_whatsapp.analytics' => 'Spend and volume from Meta pricing_analytics (official) plus per-campaign estimates in CRM. Filter by date like AiSensy campaign reports.',
         'students.profile.messages' => 'Send an approved template from the left panel — only the fields that template needs appear. Student name and roll number are pre-filled when possible.',
         'setup.biometric' => 'EasyTimePro writes punches to punch_logs on the same MySQL server. Match device employee ID to student roll number, then configure parent messages under WhatsApp → Automations.',
+        'attendance.display' => 'Reception TV screen — read-only. Shows the latest IN/OUT punch with student photo from their profile. Works for biometric device and manual Live IN/OUT. Does not change attendance logic.',
 
         'courses.list' => 'Programme fees and subjects — open from Classes & sections → Programme & fee.',
         'courses.create' => 'Use a short unique code (e.g. SCH-12-SCI). Fee and duration show on the website and flow into admissions. Optionally add subjects shared by every section under this programme.',
