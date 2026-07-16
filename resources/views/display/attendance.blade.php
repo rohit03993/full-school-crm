@@ -68,56 +68,65 @@
 
         .classes-panel {
             background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 1rem; padding: 0.75rem 0.85rem;
+            border-radius: 0.85rem; padding: 0.5rem 0.65rem 0.6rem;
         }
         .classes-head {
             display: flex; align-items: center; justify-content: space-between;
-            gap: 0.75rem; margin-bottom: 0.65rem; flex-wrap: wrap;
+            gap: 0.5rem; margin-bottom: 0.45rem; flex-wrap: wrap;
         }
         .classes-head h2 {
-            margin: 0; font-size: 0.78rem; text-transform: uppercase;
+            margin: 0; font-size: 0.68rem; text-transform: uppercase;
             letter-spacing: 0.08em; color: #94a3b8; font-weight: 800;
         }
-        .classes-head p { margin: 0; font-size: 0.72rem; color: #64748b; }
+        .classes-head p { margin: 0; font-size: 0.65rem; color: #64748b; }
         .clear-filter {
             border: 1px solid rgba(148,163,184,0.3); background: transparent;
-            color: #cbd5e1; border-radius: 999px; padding: 0.25rem 0.65rem;
-            font-size: 0.72rem; font-weight: 600; cursor: pointer;
+            color: #cbd5e1; border-radius: 999px; padding: 0.15rem 0.5rem;
+            font-size: 0.65rem; font-weight: 600; cursor: pointer;
         }
         .clear-filter:hover { border-color: #fbbf24; color: #fbbf24; }
         .classes-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 0.55rem;
-            max-height: 9.5rem;
-            overflow-y: auto;
-            padding-right: 0.15rem;
+            grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+            gap: 0.35rem;
         }
-        .classes-grid::-webkit-scrollbar { width: 6px; }
-        .classes-grid::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.35); border-radius: 999px; }
+        @media (min-width: 1400px) {
+            .classes-grid { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+        }
+        @media (min-width: 1200px) and (max-width: 1399px) {
+            .classes-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+        }
         .class-card {
-            background: #1e293b; border: 1px solid rgba(148,163,184,0.2);
-            border-radius: 0.75rem; padding: 0.65rem 0.75rem;
+            background: #1e293b; border: 1px solid rgba(148,163,184,0.18);
+            border-radius: 0.55rem; padding: 0.38rem 0.45rem 0.42rem;
             cursor: pointer; transition: border-color 0.15s, background 0.15s;
-            text-align: left; width: 100%;
+            text-align: left; width: 100%; min-height: 0;
         }
         .class-card:hover { border-color: rgba(251,191,36,0.45); background: #243044; }
-        .class-card.selected { border-color: #3b82f6; background: rgba(59,130,246,0.12); box-shadow: inset 0 0 0 1px rgba(59,130,246,0.25); }
+        .class-card.selected {
+            border-color: #3b82f6; background: rgba(59,130,246,0.14);
+            box-shadow: inset 0 0 0 1px rgba(59,130,246,0.3);
+        }
         .class-name {
-            font-size: 0.82rem; font-weight: 700; color: #f1f5f9; line-height: 1.3;
-            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+            font-size: 0.64rem; font-weight: 700; color: #e2e8f0; line-height: 1.25;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .class-stats {
-            margin-top: 0.45rem; display: flex; align-items: baseline; justify-content: space-between; gap: 0.35rem;
+        .class-line {
+            margin-top: 0.2rem;
+            display: flex; align-items: center; justify-content: space-between; gap: 0.2rem;
         }
-        .class-present { font-size: 1.15rem; font-weight: 800; color: #34d399; font-variant-numeric: tabular-nums; }
-        .class-present span { font-size: 0.72rem; font-weight: 600; color: #94a3b8; }
-        .class-meta { font-size: 0.68rem; color: #94a3b8; margin-top: 0.25rem; }
+        .class-present {
+            font-size: 0.78rem; font-weight: 800; color: #34d399;
+            font-variant-numeric: tabular-nums; line-height: 1;
+        }
+        .class-present span { font-size: 0.62rem; font-weight: 600; color: #64748b; }
+        .class-in { font-size: 0.58rem; font-weight: 700; color: #60a5fa; white-space: nowrap; }
         .class-bar {
-            margin-top: 0.4rem; height: 4px; border-radius: 999px;
-            background: rgba(148,163,184,0.2); overflow: hidden;
+            margin-top: 0.28rem; height: 3px; border-radius: 999px;
+            background: rgba(148,163,184,0.18); overflow: hidden;
         }
         .class-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #059669, #34d399); }
+        .class-pct { margin-top: 0.15rem; font-size: 0.55rem; color: #64748b; font-variant-numeric: tabular-nums; }
 
         .content { flex: 1; display: grid; grid-template-columns: 1fr min(380px, 36%); gap: 0.85rem; min-height: 0; align-items: stretch; }
         @media (max-width: 1100px) { .content { grid-template-columns: 1fr; } }
@@ -322,8 +331,8 @@
     <section class="classes-panel">
         <div class="classes-head">
             <div>
-                <h2>Class-wise today</h2>
-                <p>Click a class to filter the screen</p>
+                <h2>Class-wise today · <span id="class-count">{{ count($initialSummary['by_batch'] ?? []) }}</span> classes</h2>
+                <p>Click a tile to filter · hover for full name</p>
             </div>
             <button type="button" class="clear-filter" id="clear-filter" hidden>Show all classes</button>
         </div>
@@ -547,6 +556,14 @@
         firstRecentRender = false;
     }
 
+    function shortClassLabel(name) {
+        if (!name) return '';
+        let n = String(name).trim();
+        n = n.replace(/\s*\(\d{4}[-–]\d{2,4}\)\s*$/i, '');
+        n = n.replace(/\s*\(\d{4}\)\s*$/i, '');
+        return n.length > 22 ? n.slice(0, 20) + '…' : n;
+    }
+
     function renderClassGrid(batches) {
         const batchRow = document.getElementById('batch-row');
         if (!batches || batches.length === 0) {
@@ -558,15 +575,16 @@
             const present = b.present || 0;
             const pct = total > 0 ? Math.round((present / total) * 100) : 0;
             const selected = filterBatch && String(b.batch_id) === filterBatch ? ' selected' : '';
+            const label = shortClassLabel(b.batch_name);
             return `
-                <button type="button" class="class-card${selected}" data-batch-id="${b.batch_id}" title="${escapeHtml(b.batch_name)}">
-                    <div class="class-name">${escapeHtml(b.batch_name)}</div>
-                    <div class="class-stats">
-                        <div class="class-present">${present}<span> / ${total}</span></div>
-                        <div class="class-meta">${b.inside} inside</div>
+                <button type="button" class="class-card${selected}" data-batch-id="${b.batch_id}" title="${escapeHtml(b.batch_name)} — ${present}/${total} present, ${b.inside} inside">
+                    <div class="class-name">${escapeHtml(label)}</div>
+                    <div class="class-line">
+                        <div class="class-present">${present}<span>/${total}</span></div>
+                        <div class="class-in">${b.inside} in</div>
                     </div>
                     <div class="class-bar"><div class="class-bar-fill" style="width:${pct}%"></div></div>
-                    <div class="class-meta">${b.absent} absent · ${pct}% present</div>
+                    <div class="class-pct">${pct}% · ${b.absent} abs</div>
                 </button>`;
         }).join('');
 
@@ -599,6 +617,8 @@
         document.getElementById('stat-out').textContent = summary.checked_out ?? 0;
         document.getElementById('stat-absent').textContent = summary.absent ?? 0;
         renderClassGrid(summary.by_batch || []);
+        const countEl = document.getElementById('class-count');
+        if (countEl) countEl.textContent = String((summary.by_batch || []).length);
         syncUrlFilters();
     }
 
