@@ -140,6 +140,42 @@ class AttendanceDisplayTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('punches.0.state', 'IN');
         $response->assertJsonPath('punches.0.source', 'Manual');
+        $response->assertJsonStructure([
+            'punches',
+            'recent',
+            'summary' => ['present_today', 'inside_now', 'checked_out', 'by_batch'],
+            'batch_options',
+            'max_id',
+        ]);
+    }
+
+    public function test_latest_api_includes_class_wise_summary(): void
+    {
+        $this->createEnrolledStudent('DISP-303');
+
+        $this->settings->regenerateToken();
+        $this->settings->enable(true);
+        $token = (string) $this->settings->token();
+
+        DB::table('punch_logs')->insert([
+            'employee_id' => 'DISP-303',
+            'punch_date' => now()->toDateString(),
+            'punch_time' => '08:00:00',
+            'device_name' => 'Gate-1',
+            'is_manual' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->getJson(route('display.attendance.latest', [
+            'token' => $token,
+            'since' => 0,
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('summary.present_today', 1);
+        $response->assertJsonPath('summary.by_batch.0.present', 1);
+        $response->assertJsonCount(1, 'recent');
     }
 
     public function test_display_page_loads_when_enabled(): void
@@ -151,7 +187,8 @@ class AttendanceDisplayTest extends TestCase
         $this->get(route('display.attendance.show', ['token' => $token]))
             ->assertOk()
             ->assertSee('Live attendance display', false)
-            ->assertSee('Waiting for attendance', false);
+            ->assertSee('Present today', false)
+            ->assertSee('Latest 10 punches', false);
     }
 
     public function test_unsigned_photo_route_is_rejected(): void

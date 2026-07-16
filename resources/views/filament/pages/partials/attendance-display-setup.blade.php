@@ -88,6 +88,13 @@
                     </a>
                 </div>
                 <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">Keep this link private. Anyone with the link can see names and photos when punches happen.</p>
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Optional filters on the TV URL:
+                    <code class="rounded bg-white/80 px-1 py-0.5 text-[11px] dark:bg-black/20">?batch_id=5</code>
+                    for one class,
+                    <code class="rounded bg-white/80 px-1 py-0.5 text-[11px] dark:bg-black/20">?state=IN</code>
+                    for check-ins only.
+                </p>
             </div>
         @endif
     </div>

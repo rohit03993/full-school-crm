@@ -13,12 +13,136 @@ class AttendanceDisplayService
         protected PunchLogService $logs,
         protected PunchInOutCalculator $calculator,
         protected AttendanceDisplaySettingsService $settings,
+        protected LivePunchDashboardService $dashboard,
+        protected PunchBatchRosterService $roster,
     ) {}
+
+    /**
+     * @return list<array{id: int, name: string}>
+     */
+    public function batchOptions(): array
+    {
+        return $this->dashboard->activeBatchOptions();
+    }
+
+    /**
+     * @return array{
+     *     present_today: int,
+     *     inside_now: int,
+     *     checked_out: int,
+     *     absent: int,
+     *     total_students: int,
+     *     by_batch: list<array<string, mixed>>,
+     * }
+     */
+    public function summaryForToday(?int $batchId = null): array
+    {
+        $date = now()->toDateString();
+
+        if ($batchId !== null) {
+            $roster = $this->roster->rosterForBatch($batchId, $date);
+            $inside = collect($roster['present'])
+                ->where('current_state', 'IN')
+                ->count();
+            $present = (int) ($roster['counts']['present'] ?? 0);
+
+            return [
+                'present_today' => $present,
+                'inside_now' => $inside,
+                'checked_out' => max(0, $present - $inside),
+                'absent' => (int) ($roster['counts']['absent'] ?? 0),
+                'total_students' => (int) ($roster['counts']['total'] ?? 0),
+                'by_batch' => [[
+                    'batch_id' => $batchId,
+                    'batch_name' => $roster['batch_name'] ?? 'Batch',
+                    'present' => $present,
+                    'inside' => $inside,
+                    'absent' => (int) ($roster['counts']['absent'] ?? 0),
+                    'total' => (int) ($roster['counts']['total'] ?? 0),
+                ]],
+            ];
+        }
+
+        $stats = $this->dashboard->dashboardForDate($date)['stats'] ?? [
+            'total' => 0,
+            'inside' => 0,
+            'out' => 0,
+        ];
+
+        $byBatch = [];
+        $totalStudents = 0;
+        $totalAbsent = 0;
+
+        foreach ($this->batchOptions() as $batch) {
+            $roster = $this->roster->rosterForBatch((int) $batch['id'], $date);
+            $inside = collect($roster['present'])
+                ->where('current_state', 'IN')
+                ->count();
+            $present = (int) ($roster['counts']['present'] ?? 0);
+
+            $byBatch[] = [
+                'batch_id' => (int) $batch['id'],
+                'batch_name' => (string) $batch['name'],
+                'present' => $present,
+                'inside' => $inside,
+                'absent' => (int) ($roster['counts']['absent'] ?? 0),
+                'total' => (int) ($roster['counts']['total'] ?? 0),
+            ];
+
+            $totalStudents += (int) ($roster['counts']['total'] ?? 0);
+            $totalAbsent += (int) ($roster['counts']['absent'] ?? 0);
+        }
+
+        usort($byBatch, fn (array $a, array $b): int => strcmp((string) $a['batch_name'], (string) $b['batch_name']));
+
+        return [
+            'present_today' => (int) ($stats['total'] ?? 0),
+            'inside_now' => (int) ($stats['inside'] ?? 0),
+            'checked_out' => (int) ($stats['out'] ?? 0),
+            'absent' => $totalAbsent,
+            'total_students' => $totalStudents,
+            'by_batch' => $byBatch,
+        ];
+    }
 
     /**
      * @return list<array<string, mixed>>
      */
-    public function punchesSince(int $sinceId, int $limit = 20): array
+    public function recentPunchesToday(int $limit = 10, ?int $batchId = null, ?string $stateFilter = null): array
+    {
+        if (! $this->logs->punchTableExists()) {
+            return [];
+        }
+
+        $rows = DB::table($this->logs->punchTable())
+            ->where('punch_date', now()->toDateString())
+            ->orderByDesc('id')
+            ->limit(80)
+            ->get();
+
+        $snippets = [];
+
+        foreach ($rows as $row) {
+            $event = $this->formatPunchRow($row);
+
+            if ($event === null || ! $this->matchesFilters($event, $batchId, $stateFilter)) {
+                continue;
+            }
+
+            $snippets[] = $this->punchSnippet($event);
+
+            if (count($snippets) >= max(1, min($limit, 20))) {
+                break;
+            }
+        }
+
+        return $snippets;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function punchesSince(int $sinceId, int $limit = 20, ?int $batchId = null, ?string $stateFilter = null): array
     {
         if (! $this->logs->punchTableExists()) {
             return [];
@@ -37,9 +161,11 @@ class AttendanceDisplayService
         foreach ($rows as $row) {
             $event = $this->formatPunchRow($row);
 
-            if ($event !== null) {
-                $events[] = $event;
+            if ($event === null || ! $this->matchesFilters($event, $batchId, $stateFilter)) {
+                continue;
             }
+
+            $events[] = $event;
         }
 
         return $events;
@@ -96,6 +222,7 @@ class AttendanceDisplayService
             'id' => (int) $row->id,
             'roll' => $roll,
             'name' => $student?->name ?? 'Unknown student',
+            'batch_id' => $student?->activeBatchStudent?->batch_id,
             'batch' => $student?->activeBatchStudent?->batch?->name,
             'course' => $student?->activeEnrollment?->course?->name,
             'mobile' => $student?->mobile,
@@ -108,6 +235,48 @@ class AttendanceDisplayService
             'photo_url' => $this->photoUrlForStudent($student),
             'is_mapped' => $student !== null,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $punch
+     * @return array<string, mixed>
+     */
+    public function punchSnippet(array $punch): array
+    {
+        return [
+            'id' => $punch['id'],
+            'roll' => $punch['roll'],
+            'name' => $punch['name'],
+            'batch' => $punch['batch'] ?? null,
+            'state' => $punch['state'],
+            'time' => $punch['time'],
+            'photo_url' => $punch['photo_url'] ?? null,
+            'initials' => $punch['initials'] ?? '?',
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    public function matchesFiltersPublic(array $event, ?int $batchId, ?string $stateFilter): bool
+    {
+        return $this->matchesFilters($event, $batchId, $stateFilter);
+    }
+
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    private function matchesFilters(array $event, ?int $batchId, ?string $stateFilter): bool
+    {
+        if ($batchId !== null && (int) ($event['batch_id'] ?? 0) !== $batchId) {
+            return false;
+        }
+
+        if ($stateFilter !== null && strtoupper($stateFilter) !== ($event['state'] ?? '')) {
+            return false;
+        }
+
+        return true;
     }
 
     private function photoUrlForStudent(?Student $student): ?string

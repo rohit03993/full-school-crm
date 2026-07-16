@@ -23,8 +23,14 @@ class AttendanceDisplayController extends Controller
 
     public function show(Request $request): View
     {
+        $batchId = $this->parseBatchId($request);
+        $stateFilter = $this->parseStateFilter($request);
         $latest = $this->display->latestPunchToday();
         $institute = InstituteSettings::forDocuments();
+
+        if ($latest !== null && ! $this->display->matchesFiltersPublic($latest, $batchId, $stateFilter)) {
+            $latest = null;
+        }
 
         return view('display.attendance', [
             'instituteName' => $institute['name'] ?? config('app.name'),
@@ -35,18 +41,51 @@ class AttendanceDisplayController extends Controller
             'pollIntervalMs' => max(1000, (int) config('attendance_display.poll_interval_ms', 2500)),
             'cardDurationMs' => max(3000, (int) config('attendance_display.card_duration_ms', 10000)),
             'latestUrl' => route('display.attendance.latest', ['token' => $request->route('token')]),
+            'batchOptions' => $this->display->batchOptions(),
+            'initialSummary' => $this->display->summaryForToday($batchId),
+            'initialRecent' => $this->display->recentPunchesToday(10, $batchId, $stateFilter),
+            'initialBatchId' => $batchId,
+            'initialState' => $stateFilter,
         ]);
     }
 
     public function latest(Request $request): JsonResponse
     {
         $sinceId = max(0, (int) $request->query('since', 0));
-        $punches = $this->display->punchesSince($sinceId);
+        $batchId = $this->parseBatchId($request);
+        $stateFilter = $this->parseStateFilter($request);
 
         return response()->json([
-            'punches' => $punches,
+            'punches' => $this->display->punchesSince($sinceId, 20, $batchId, $stateFilter),
+            'recent' => $this->display->recentPunchesToday(10, $batchId, $stateFilter),
+            'summary' => $this->display->summaryForToday($batchId),
+            'batch_options' => $this->display->batchOptions(),
             'max_id' => $this->display->maxPunchLogId(),
+            'filters' => [
+                'batch_id' => $batchId,
+                'state' => $stateFilter,
+            ],
         ]);
+    }
+
+    private function parseBatchId(Request $request): ?int
+    {
+        $batchId = $request->query('batch_id');
+
+        if (! filled($batchId)) {
+            return null;
+        }
+
+        $batchId = (int) $batchId;
+
+        return $batchId > 0 ? $batchId : null;
+    }
+
+    private function parseStateFilter(Request $request): ?string
+    {
+        $state = strtoupper(trim((string) $request->query('state', '')));
+
+        return in_array($state, ['IN', 'OUT'], true) ? $state : null;
     }
 
     public function photo(Request $request, Document $document): StreamedResponse
