@@ -377,6 +377,7 @@
     let activeSnippetId = null;
     let knownRecentIds = new Set();
     let firstRecentRender = true;
+    let lastRecentSignature = '';
     let lastShownPunchId = @json($latestPunch['id'] ?? 0);
     let lastSummaryAt = 0;
     let lastSummaryJson = '';
@@ -514,52 +515,176 @@
         return n.length > 36 ? n.slice(0, 34) + '…' : n;
     }
 
-    function renderRecent(recent) {
+    function recentSignature(recent) {
+        if (!recent || recent.length === 0) return '';
+        return recent.map(item => `${item.id}:${item.state}:${item.time}:${item.roll}`).join('|');
+    }
+
+    function syncActiveRecentHighlight() {
+        recentList.querySelectorAll('.feed-item').forEach(el => {
+            const id = parseInt(el.dataset.id, 10);
+            el.classList.toggle('active', activeSnippetId !== null && id === activeSnippetId);
+        });
+    }
+
+    function setFeedPhoto(photoWrap, item) {
+        const photoId = item.photo_id ? String(item.photo_id) : '';
+        const existingImg = photoWrap.querySelector('img');
+
+        if (item.photo_url) {
+            if (existingImg && (existingImg.dataset.photoId === photoId || existingImg.src === item.photo_url)) {
+                return;
+            }
+            photoWrap.textContent = '';
+            const img = document.createElement('img');
+            img.src = item.photo_url;
+            img.alt = '';
+            if (photoId) img.dataset.photoId = photoId;
+            photoWrap.appendChild(img);
+            return;
+        }
+
+        if (existingImg) {
+            photoWrap.textContent = '';
+        }
+        if (photoWrap.textContent !== (item.initials || '?')) {
+            photoWrap.textContent = item.initials || '?';
+        }
+    }
+
+    function updateFeedItem(el, item, index, isNew) {
+        const stateClass = item.state === 'IN' ? 'in' : 'out';
+        el.className = `feed-item ${stateClass}${activeSnippetId === item.id ? ' active' : ''}${isNew ? ' new-item' : ''}${index === 0 ? ' latest' : ''}`;
+        el.dataset.id = String(item.id);
+
+        setFeedPhoto(el.querySelector('.feed-photo'), item);
+
+        const nameEl = el.querySelector('.feed-name');
+        if (nameEl) {
+            nameEl.textContent = item.name || '';
+            nameEl.title = item.name || '';
+        }
+
+        const timeEl = el.querySelector('.feed-time');
+        if (timeEl) timeEl.textContent = formatTimeFull(item.time);
+
+        const rollEl = el.querySelector('.feed-roll');
+        if (rollEl) rollEl.textContent = item.roll || '';
+
+        const classEl = el.querySelector('.feed-class');
+        if (item.batch) {
+            if (!classEl) {
+                const body = el.querySelector('.feed-body');
+                if (body) {
+                    const div = document.createElement('div');
+                    div.className = 'feed-class';
+                    body.appendChild(div);
+                }
+            }
+            const target = el.querySelector('.feed-class');
+            if (target) {
+                target.textContent = shortBatch(item.batch);
+                target.title = item.batch;
+            }
+        } else if (classEl) {
+            classEl.remove();
+        }
+
+        const badgeEl = el.querySelector('.feed-badge');
+        if (badgeEl) {
+            badgeEl.textContent = item.state;
+            badgeEl.className = `feed-badge ${stateClass}`;
+        }
+
+        const agoEl = el.querySelector('.feed-ago');
+        const ago = timeAgo(item.time);
+        if (ago) {
+            if (!agoEl) {
+                const side = el.querySelector('.feed-side');
+                if (side) {
+                    const span = document.createElement('span');
+                    span.className = 'feed-ago';
+                    side.appendChild(span);
+                }
+            }
+            const target = el.querySelector('.feed-ago');
+            if (target) target.textContent = ago;
+        } else if (agoEl) {
+            agoEl.remove();
+        }
+    }
+
+    function createFeedItem(item, index, isNew) {
+        const el = document.createElement('article');
+        el.innerHTML = `
+            <div class="feed-photo"></div>
+            <div class="feed-body">
+                <div class="feed-top">
+                    <div class="feed-name"></div>
+                    <div class="feed-time"></div>
+                </div>
+                <span class="feed-roll"></span>
+            </div>
+            <div class="feed-side">
+                <span class="feed-badge"></span>
+            </div>`;
+        updateFeedItem(el, item, index, isNew);
+        return el;
+    }
+
+    function renderRecent(recent, force = false) {
         const countEl = document.getElementById('recent-count');
         const total = recent?.length || 0;
         countEl.textContent = total ? `${total} shown` : '0 today';
 
         if (!recent || recent.length === 0) {
-            recentList.innerHTML = `
-                <div class="empty-recent">
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.21a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
-                    No punches yet today.<br>New check-ins will appear here instantly.
-                </div>`;
+            if (!recentList.querySelector('.empty-recent')) {
+                recentList.innerHTML = `
+                    <div class="empty-recent">
+                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.21a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+                        No punches yet today.<br>New check-ins will appear here instantly.
+                    </div>`;
+            }
             knownRecentIds = new Set();
+            lastRecentSignature = '';
             firstRecentRender = true;
             return;
         }
 
-        const newIds = new Set();
-        recentList.innerHTML = recent.map((item, index) => {
-            const stateClass = item.state === 'IN' ? 'in' : 'out';
-            const isActive = activeSnippetId === item.id ? ' active' : '';
-            const isNew = !firstRecentRender && !knownRecentIds.has(item.id) ? ' new-item' : '';
-            const isLatest = index === 0 ? ' latest' : '';
-            newIds.add(item.id);
-            const photo = item.photo_url
-                ? `<img src="${escapeHtml(item.photo_url)}" alt="">`
-                : escapeHtml(item.initials || '?');
-            const ago = timeAgo(item.time);
-            return `
-                <article class="feed-item ${stateClass}${isActive}${isNew}${isLatest}" data-id="${item.id}">
-                    <div class="feed-photo">${photo}</div>
-                    <div class="feed-body">
-                        <div class="feed-top">
-                            <div class="feed-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
-                            <div class="feed-time">${escapeHtml(formatTimeFull(item.time))}</div>
-                        </div>
-                        <span class="feed-roll">${escapeHtml(item.roll)}</span>
-                        ${item.batch ? `<div class="feed-class" title="${escapeHtml(item.batch)}">${escapeHtml(shortBatch(item.batch))}</div>` : ''}
-                    </div>
-                    <div class="feed-side">
-                        <span class="feed-badge ${stateClass}">${item.state}</span>
-                        ${ago ? `<span class="feed-ago">${ago}</span>` : ''}
-                    </div>
-                </article>`;
-        }).join('');
+        const signature = recentSignature(recent);
+        if (!force && signature === lastRecentSignature) {
+            syncActiveRecentHighlight();
+            return;
+        }
 
-        knownRecentIds = newIds;
+        const incomingIds = new Set(recent.map(item => item.id));
+        const existingById = new Map();
+
+        recentList.querySelectorAll('.feed-item').forEach(el => {
+            const id = parseInt(el.dataset.id, 10);
+            if (!incomingIds.has(id)) {
+                el.remove();
+            } else {
+                existingById.set(id, el);
+            }
+        });
+
+        const emptyState = recentList.querySelector('.empty-recent');
+        if (emptyState) emptyState.remove();
+
+        recent.forEach((item, index) => {
+            const isNew = !firstRecentRender && !knownRecentIds.has(item.id);
+            let el = existingById.get(item.id);
+            if (el) {
+                updateFeedItem(el, item, index, isNew);
+            } else {
+                el = createFeedItem(item, index, isNew);
+            }
+            recentList.appendChild(el);
+        });
+
+        knownRecentIds = new Set(recent.map(item => item.id));
+        lastRecentSignature = signature;
         firstRecentRender = false;
     }
 
@@ -631,7 +756,7 @@
 
     function renderCard(punch) {
         activeSnippetId = punch.id;
-        renderRecent(window.__lastRecent || []);
+        syncActiveRecentHighlight();
         const isIn = punch.state === 'IN';
         const photoHtml = punch.photo_url
             ? `<img src="${escapeHtml(punch.photo_url)}" alt="">`
@@ -662,7 +787,7 @@
                 container.innerHTML = '';
                 idle.style.display = 'block';
                 activeSnippetId = null;
-                renderRecent(window.__lastRecent || []);
+                syncActiveRecentHighlight();
             }, 350);
         }, cardMs);
     }
@@ -691,7 +816,12 @@
             }
 
             window.__lastRecent = data.recent || [];
-            renderRecent(window.__lastRecent);
+            const recentSig = recentSignature(window.__lastRecent);
+            if (recentSig !== lastRecentSignature) {
+                renderRecent(window.__lastRecent);
+            } else {
+                syncActiveRecentHighlight();
+            }
 
             if (typeof data.max_id === 'number' && data.max_id > sinceId) {
                 sinceId = data.max_id;
@@ -722,6 +852,8 @@
         syncUrlFilters();
         syncPickerHighlight();
         lastSummaryAt = 0;
+        lastRecentSignature = '';
+        firstRecentRender = true;
         poll(true);
     }
 
@@ -736,7 +868,7 @@
     applyInitialPickerLabels();
     window.__lastRecent = @json($initialRecent);
     renderStats(@json($initialSummary));
-    renderRecent(window.__lastRecent);
+    renderRecent(window.__lastRecent, true);
     @if ($latestPunch)
     lastShownPunchId = @json($latestPunch['id']);
     renderCard(@json($latestPunch));

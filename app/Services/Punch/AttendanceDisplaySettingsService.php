@@ -3,6 +3,7 @@
 namespace App\Services\Punch;
 
 use App\Models\Setting;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
@@ -82,15 +83,20 @@ class AttendanceDisplaySettingsService
             return null;
         }
 
-        $ttl = max(5, (int) config('attendance_display.photo_url_ttl_minutes', 360));
+        $ttlMinutes = max(5, (int) config('attendance_display.photo_url_ttl_minutes', 360));
+        $cacheKey = 'attendance_display.photo_url.'.$fingerprint.'.'.$documentId;
 
-        return URL::temporarySignedRoute(
-            'display.attendance.photo',
-            now()->addMinutes($ttl),
-            [
-                'document' => $documentId,
-                'display' => $fingerprint,
-            ],
+        return Cache::remember(
+            $cacheKey,
+            now()->addMinutes($ttlMinutes),
+            fn (): string => URL::temporarySignedRoute(
+                'display.attendance.photo',
+                now()->addMinutes($ttlMinutes),
+                [
+                    'document' => $documentId,
+                    'display' => $fingerprint,
+                ],
+            ),
         );
     }
 }

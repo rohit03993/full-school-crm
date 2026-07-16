@@ -261,6 +261,8 @@ class AttendanceDisplayService
             ? (string) $row->device_name
             : (filled($row->area_name ?? null) ? (string) $row->area_name : null);
 
+        $photo = $student?->profilePhoto();
+
         return [
             'id' => (int) $row->id,
             'roll' => $roll,
@@ -275,6 +277,7 @@ class AttendanceDisplayService
             'date_label' => \Illuminate\Support\Carbon::parse($date)->format('d M Y'),
             'source' => $isManual ? 'Manual' : ($device ?? 'Device'),
             'initials' => $student?->initials() ?? '?',
+            'photo_id' => ($photo !== null && $photo->isImage()) ? (int) $photo->id : null,
             'photo_url' => $this->photoUrlForStudent($student),
             'is_mapped' => $student !== null,
         ];
@@ -313,6 +316,7 @@ class AttendanceDisplayService
             'batch' => $punch['batch'] ?? null,
             'state' => $punch['state'],
             'time' => $punch['time'],
+            'photo_id' => $punch['photo_id'] ?? null,
             'photo_url' => $punch['photo_url'] ?? null,
             'initials' => $punch['initials'] ?? '?',
         ];
