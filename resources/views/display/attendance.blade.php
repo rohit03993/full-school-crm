@@ -119,8 +119,8 @@
         }
         .class-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #059669, #34d399); }
 
-        .content { flex: 1; display: grid; grid-template-columns: 1fr min(300px, 30%); gap: 0.85rem; min-height: 0; }
-        @media (max-width: 960px) { .content { grid-template-columns: 1fr; } }
+        .content { flex: 1; display: grid; grid-template-columns: 1fr min(380px, 36%); gap: 0.85rem; min-height: 0; align-items: stretch; }
+        @media (max-width: 1100px) { .content { grid-template-columns: 1fr; } }
         .hero { display: grid; place-items: center; min-height: 16rem; }
         .card {
             width: min(720px, 100%); border-radius: 1.35rem; overflow: hidden;
@@ -151,34 +151,111 @@
         .idle h2 { margin: 0 0 0.3rem; font-size: 1.2rem; }
         .idle p { margin: 0; color: #94a3b8; line-height: 1.45; font-size: 0.88rem; }
         .recent-panel {
-            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 1rem; display: flex; flex-direction: column; min-height: 16rem; overflow: hidden;
+            background: linear-gradient(180deg, rgba(30,41,59,0.95) 0%, rgba(15,23,42,0.98) 100%);
+            border: 1px solid rgba(148,163,184,0.18);
+            border-radius: 1.1rem;
+            display: flex; flex-direction: column;
+            min-height: 20rem; max-height: calc(100vh - 15rem);
+            overflow: hidden;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
         }
-        .recent-panel h3 {
-            margin: 0; padding: 0.75rem 0.85rem; font-size: 0.72rem;
-            text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
+        .recent-head {
+            display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            background: rgba(0,0,0,0.15);
         }
-        .recent-list { flex: 1; overflow: auto; padding: 0.45rem; display: grid; gap: 0.4rem; }
-        .snippet {
-            display: grid; grid-template-columns: 36px 1fr auto; gap: 0.5rem; align-items: center;
-            padding: 0.4rem 0.5rem; border-radius: 0.65rem;
-            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
+        .recent-head h3 {
+            margin: 0; font-size: 0.72rem; text-transform: uppercase;
+            letter-spacing: 0.1em; color: #cbd5e1; font-weight: 800;
         }
-        .snippet.active { border-color: rgba(251,191,36,0.45); background: rgba(251,191,36,0.08); }
-        .snippet-thumb {
-            width: 36px; height: 36px; border-radius: 0.5rem; overflow: hidden;
-            background: rgba(255,255,255,0.06); display: grid; place-items: center;
-            font-size: 0.7rem; font-weight: 800; color: #64748b;
+        .recent-count {
+            font-size: 0.68rem; font-weight: 700; color: #94a3b8;
+            background: rgba(255,255,255,0.06); border-radius: 999px;
+            padding: 0.2rem 0.55rem; font-variant-numeric: tabular-nums;
         }
-        .snippet-thumb img { width: 100%; height: 100%; object-fit: cover; }
-        .snippet-name { font-size: 0.78rem; font-weight: 700; line-height: 1.2; }
-        .snippet-meta { font-size: 0.65rem; color: #94a3b8; margin-top: 0.08rem; }
-        .snippet-state { font-size: 0.6rem; font-weight: 800; padding: 0.18rem 0.4rem; border-radius: 999px; text-align: center; }
-        .snippet-state.in { background: rgba(16,185,129,0.18); color: #6ee7b7; }
-        .snippet-state.out { background: rgba(244,63,94,0.18); color: #fda4af; }
-        .snippet-time { font-size: 0.65rem; color: #cbd5e1; font-variant-numeric: tabular-nums; margin-top: 0.12rem; text-align: right; }
-        .empty-recent { padding: 0.85rem; color: #64748b; font-size: 0.82rem; text-align: center; }
+        .recent-list {
+            flex: 1; overflow-y: auto; overflow-x: hidden;
+            padding: 0.55rem; display: flex; flex-direction: column; gap: 0.5rem;
+        }
+        .recent-list::-webkit-scrollbar { width: 5px; }
+        .recent-list::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.35); border-radius: 999px; }
+        .feed-item {
+            position: relative;
+            display: grid;
+            grid-template-columns: 52px 1fr auto;
+            gap: 0.65rem;
+            align-items: center;
+            padding: 0.65rem 0.7rem 0.65rem 0.85rem;
+            border-radius: 0.85rem;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            overflow: hidden;
+            transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+        .feed-item::before {
+            content: '';
+            position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+        }
+        .feed-item.in::before { background: linear-gradient(180deg, #10b981, #059669); }
+        .feed-item.out::before { background: linear-gradient(180deg, #fb7185, #e11d48); }
+        .feed-item:first-child {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(251,191,36,0.28);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .feed-item.active {
+            border-color: rgba(251,191,36,0.55);
+            background: rgba(251,191,36,0.1);
+        }
+        .feed-item.new-item { animation: feedSlideIn 0.45s ease; }
+        @keyframes feedSlideIn {
+            from { opacity: 0; transform: translateX(12px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .feed-photo {
+            width: 52px; height: 52px; border-radius: 0.75rem; overflow: hidden;
+            background: linear-gradient(135deg, #334155, #1e293b);
+            border: 2px solid rgba(148,163,184,0.25);
+            display: grid; place-items: center;
+            font-size: 0.85rem; font-weight: 800; color: #94a3b8;
+            flex-shrink: 0;
+        }
+        .feed-item.in .feed-photo { border-color: rgba(16,185,129,0.45); }
+        .feed-item.out .feed-photo { border-color: rgba(244,63,94,0.45); }
+        .feed-photo img { width: 100%; height: 100%; object-fit: cover; }
+        .feed-body { min-width: 0; }
+        .feed-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.35rem; }
+        .feed-name {
+            font-size: 0.88rem; font-weight: 800; color: #f8fafc; line-height: 1.25;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .feed-time {
+            font-size: 0.82rem; font-weight: 800; color: #fbbf24;
+            font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0;
+        }
+        .feed-roll {
+            display: inline-block; margin-top: 0.2rem;
+            font-size: 0.65rem; font-weight: 700; font-family: ui-monospace, monospace;
+            color: #94a3b8; background: rgba(255,255,255,0.06);
+            padding: 0.12rem 0.4rem; border-radius: 0.35rem;
+        }
+        .feed-class {
+            margin-top: 0.25rem; font-size: 0.72rem; color: #64748b; line-height: 1.3;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .feed-side { display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; flex-shrink: 0; }
+        .feed-badge {
+            font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em;
+            padding: 0.28rem 0.5rem; border-radius: 999px; min-width: 2.4rem; text-align: center;
+        }
+        .feed-badge.in { background: rgba(16,185,129,0.22); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.35); }
+        .feed-badge.out { background: rgba(244,63,94,0.2); color: #fda4af; border: 1px solid rgba(244,63,94,0.35); }
+        .feed-ago { font-size: 0.62rem; color: #64748b; font-variant-numeric: tabular-nums; }
+        .empty-recent {
+            padding: 2rem 1rem; color: #64748b; font-size: 0.85rem; text-align: center; line-height: 1.5;
+        }
+        .empty-recent svg { width: 2.5rem; height: 2.5rem; margin: 0 auto 0.65rem; opacity: 0.45; display: block; }
         .status-dot {
             display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 999px;
             background: #22c55e; margin-right: 0.3rem; animation: pulse 2s infinite;
@@ -262,7 +339,10 @@
             </div>
         </section>
         <aside class="recent-panel">
-            <h3>Latest 10 punches</h3>
+            <div class="recent-head">
+                <h3>Latest punches</h3>
+                <span class="recent-count" id="recent-count">0 today</span>
+            </div>
             <div class="recent-list" id="recent-list"></div>
         </aside>
     </div>
@@ -284,6 +364,8 @@
     let filterState = '';
     let hideTimer = null;
     let activeSnippetId = null;
+    let knownRecentIds = new Set();
+    let firstRecentRender = true;
 
     const initialBatch = @json($initialBatchId);
     const initialState = @json($initialState);
@@ -389,13 +471,80 @@
         return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function formatTime(time) {
+    function formatTimeFull(time) {
         if (!time) return '—';
         const parts = String(time).split(':');
         if (parts.length < 2) return time;
         const d = new Date();
         d.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2] || '0', 10));
         return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+
+    function timeAgo(time) {
+        if (!time) return '';
+        const parts = String(time).split(':');
+        if (parts.length < 2) return '';
+        const d = new Date();
+        d.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2] || '0', 10));
+        const diffSec = Math.round((Date.now() - d.getTime()) / 1000);
+        if (diffSec < 45) return 'Just now';
+        if (diffSec < 3600) return Math.floor(diffSec / 60) + 'm ago';
+        return '';
+    }
+
+    function shortBatch(name) {
+        if (!name) return '';
+        const n = String(name);
+        return n.length > 36 ? n.slice(0, 34) + '…' : n;
+    }
+
+    function renderRecent(recent) {
+        const countEl = document.getElementById('recent-count');
+        const total = recent?.length || 0;
+        countEl.textContent = total ? `${total} shown` : '0 today';
+
+        if (!recent || recent.length === 0) {
+            recentList.innerHTML = `
+                <div class="empty-recent">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.21a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+                    No punches yet today.<br>New check-ins will appear here instantly.
+                </div>`;
+            knownRecentIds = new Set();
+            firstRecentRender = true;
+            return;
+        }
+
+        const newIds = new Set();
+        recentList.innerHTML = recent.map((item, index) => {
+            const stateClass = item.state === 'IN' ? 'in' : 'out';
+            const isActive = activeSnippetId === item.id ? ' active' : '';
+            const isNew = !firstRecentRender && !knownRecentIds.has(item.id) ? ' new-item' : '';
+            const isLatest = index === 0 ? ' latest' : '';
+            newIds.add(item.id);
+            const photo = item.photo_url
+                ? `<img src="${escapeHtml(item.photo_url)}" alt="">`
+                : escapeHtml(item.initials || '?');
+            const ago = timeAgo(item.time);
+            return `
+                <article class="feed-item ${stateClass}${isActive}${isNew}${isLatest}" data-id="${item.id}">
+                    <div class="feed-photo">${photo}</div>
+                    <div class="feed-body">
+                        <div class="feed-top">
+                            <div class="feed-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+                            <div class="feed-time">${escapeHtml(formatTimeFull(item.time))}</div>
+                        </div>
+                        <span class="feed-roll">${escapeHtml(item.roll)}</span>
+                        ${item.batch ? `<div class="feed-class" title="${escapeHtml(item.batch)}">${escapeHtml(shortBatch(item.batch))}</div>` : ''}
+                    </div>
+                    <div class="feed-side">
+                        <span class="feed-badge ${stateClass}">${item.state}</span>
+                        ${ago ? `<span class="feed-ago">${ago}</span>` : ''}
+                    </div>
+                </article>`;
+        }).join('');
+
+        knownRecentIds = newIds;
+        firstRecentRender = false;
     }
 
     function renderClassGrid(batches) {
@@ -453,31 +602,6 @@
         syncUrlFilters();
     }
 
-    function renderRecent(recent) {
-        if (!recent || recent.length === 0) {
-            recentList.innerHTML = '<div class="empty-recent">No punches yet today.</div>';
-            return;
-        }
-        recentList.innerHTML = recent.map(item => {
-            const isActive = activeSnippetId === item.id ? ' active' : '';
-            const thumb = item.photo_url
-                ? `<img src="${escapeHtml(item.photo_url)}" alt="">`
-                : escapeHtml(item.initials || '?');
-            return `
-                <div class="snippet${isActive}">
-                    <div class="snippet-thumb">${item.photo_url ? `<img src="${escapeHtml(item.photo_url)}" alt="">` : thumb}</div>
-                    <div>
-                        <div class="snippet-name">${escapeHtml(item.name)}</div>
-                        <div class="snippet-meta">${escapeHtml(item.roll)}${item.batch ? ' · ' + escapeHtml(item.batch) : ''}</div>
-                    </div>
-                    <div>
-                        <div class="snippet-state ${item.state === 'IN' ? 'in' : 'out'}">${item.state}</div>
-                        <div class="snippet-time">${escapeHtml(formatTime(item.time))}</div>
-                    </div>
-                </div>`;
-        }).join('');
-    }
-
     function renderCard(punch) {
         activeSnippetId = punch.id;
         renderRecent(window.__lastRecent || []);
@@ -499,7 +623,7 @@
                             ${punch.course ? `<div class="meta-row"><span class="label">Course</span><span class="value">${escapeHtml(punch.course)}</span></div>` : ''}
                             <div class="meta-row"><span class="label">Source</span><span class="value">${escapeHtml(punch.source)}</span></div>
                         </div>
-                        <div class="punch-time">${escapeHtml(formatTime(punch.time))}</div>
+                        <div class="punch-time">${escapeHtml(formatTimeFull(punch.time))}</div>
                     </div>
                 </div>
             </article>`;

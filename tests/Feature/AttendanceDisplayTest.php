@@ -188,7 +188,7 @@ class AttendanceDisplayTest extends TestCase
             ->assertOk()
             ->assertSee('Live attendance display', false)
             ->assertSee('Present today', false)
-            ->assertSee('Latest 10 punches', false);
+            ->assertSee('Latest punches', false);
     }
 
     public function test_unsigned_photo_route_is_rejected(): void
