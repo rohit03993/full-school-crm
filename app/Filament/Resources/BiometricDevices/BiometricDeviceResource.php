@@ -77,13 +77,13 @@ class BiometricDeviceResource extends Resource
                         ->label('Active (allow punches)')
                         ->default(true),
                     Toggle::make('requires_face_verify')
-                        ->label('Require face verification')
-                        ->helperText('When enabled, RFID punches wait for Face Verify PASS before attendance is marked.')
+                        ->label('Require face verification (RFID gate)')
+                        ->helperText('Leave OFF for normal card/fingerprint attendance. Only turn ON if this machine must wait for Face Verify after each RFID punch. Camera kiosk attendance uses a separate API and does not need this.')
                         ->default(false)
                         ->live(),
                     TextInput::make('face_verify_device_id')
                         ->label('Face Verify device ID')
-                        ->helperText('UUID of the Android kiosk registered in Face API for this gate.')
+                        ->helperText('UUID of the Android kiosk for this RFID gate only. Not required for camera-only attendance.')
                         ->maxLength(64)
                         ->visible(fn ($get): bool => (bool) $get('requires_face_verify'))
                         ->required(fn ($get): bool => (bool) $get('requires_face_verify')),

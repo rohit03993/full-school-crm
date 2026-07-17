@@ -9,10 +9,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
-class FaceVerifyApproveController extends Controller
+class FaceVerifyCameraPunchController extends Controller
 {
     use AuthenticatesFaceVerifyCallbacks;
 
+    /**
+     * Camera-first attendance: kiosk identified a face (1:N) and asks CRM to mark punch.
+     * Does not touch RFID / ADMS biometric machines.
+     */
     public function __invoke(Request $request, FaceVerifyGateService $gate): JsonResponse
     {
         if (! $gate->isEnabled()) {
@@ -31,10 +35,13 @@ class FaceVerifyApproveController extends Controller
 
         /** @var array<string, mixed> $payload */
         $payload = $request->json()->all();
-        $result = $gate->approvePass($payload);
+        $result = $gate->recordCameraPunch($payload);
 
         if (! ($result['ok'] ?? false)) {
-            $status = ($result['message'] ?? '') === 'Verification request not found.' ? 404 : 422;
+            $status = match ($result['message'] ?? '') {
+                'Student not found.' => 404,
+                default => 422,
+            };
 
             return response()->json($result, $status);
         }
@@ -43,12 +50,18 @@ class FaceVerifyApproveController extends Controller
             $gate->processAttendanceAfterPass();
         }
 
-        Log::info('face_verify.approve_callback', [
-            'crm_request_id' => $payload['crm_request_id'] ?? null,
-            'request_id' => $payload['request_id'] ?? null,
+        Log::info('face_verify.camera_punch', [
+            'enrollment_number' => $payload['enrollment_number'] ?? null,
+            'device_id' => $payload['device_id'] ?? null,
+            'score' => $payload['score'] ?? null,
             'already_processed' => $result['already_processed'] ?? false,
         ]);
 
-        return response()->json(['ok' => true]);
+        return response()->json([
+            'ok' => true,
+            'already_processed' => $result['already_processed'] ?? false,
+            'face_verification_request_id' => $result['face_verification_request_id'] ?? null,
+            'punch_log_id' => $result['punch_log_id'] ?? null,
+        ]);
     }
 }

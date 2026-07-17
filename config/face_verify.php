@@ -26,4 +26,10 @@ return [
 
     'http_timeout_seconds' => (int) env('FACE_VERIFY_HTTP_TIMEOUT_SECONDS', 10),
 
+    /*
+    | Ignore repeat camera-kiosk punches for the same roll within this window.
+    | RFID / ADMS path is unaffected.
+    */
+    'camera_punch_cooldown_seconds' => (int) env('FACE_VERIFY_CAMERA_PUNCH_COOLDOWN_SECONDS', 60),
+
 ];

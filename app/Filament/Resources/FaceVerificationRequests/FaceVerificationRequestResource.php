@@ -79,6 +79,19 @@ class FaceVerificationRequestResource extends Resource
                     ->placeholder('—')
                     ->searchable()
                     ->toggleable(),
+                TextColumn::make('source')
+                    ->label('Source')
+                    ->state(fn (FaceVerificationRequest $record): string => match ((string) data_get($record->meta, 'source')) {
+                        'camera_kiosk' => 'Camera',
+                        'adms' => 'RFID gate',
+                        default => '—',
+                    })
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'Camera' => 'info',
+                        'RFID gate' => 'warning',
+                        default => 'gray',
+                    }),
                 TextColumn::make('biometricDevice.name')
                     ->label('Gate')
                     ->placeholder('—')
@@ -125,6 +138,21 @@ class FaceVerificationRequestResource extends Resource
                         FaceVerificationRequest::STATUS_TIMEOUT => 'TIMEOUT',
                         FaceVerificationRequest::STATUS_ERROR => 'ERROR',
                     ]),
+                SelectFilter::make('source')
+                    ->label('Source')
+                    ->options([
+                        'camera_kiosk' => 'Camera',
+                        'adms' => 'RFID gate',
+                    ])
+                    ->query(function ($query, array $data) {
+                        $value = $data['value'] ?? null;
+
+                        if (! filled($value)) {
+                            return $query;
+                        }
+
+                        return $query->where('meta->source', $value);
+                    }),
             ]);
     }
 

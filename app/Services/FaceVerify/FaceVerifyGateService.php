@@ -215,6 +215,106 @@ class FaceVerifyGateService
         });
     }
 
+    /**
+     * Camera-first attendance: kiosk matched a face (1:N) with no RFID punch.
+     * Leaves ADMS / biometric machines completely untouched.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{
+     *     ok: bool,
+     *     already_processed?: bool,
+     *     message?: string,
+     *     face_verification_request_id?: string,
+     *     punch_log_id?: int
+     * }
+     */
+    public function recordCameraPunch(array $payload): array
+    {
+        $enrollmentNumber = $this->punchLogs->normalizeRoll((string) ($payload['enrollment_number'] ?? ''));
+        $score = isset($payload['score']) ? (float) $payload['score'] : null;
+        $faceDeviceId = trim((string) ($payload['device_id'] ?? ''));
+        $punchedAt = $this->parseTimestamp($payload['timestamp'] ?? null) ?? now();
+
+        if ($enrollmentNumber === '') {
+            return ['ok' => false, 'message' => 'enrollment_number is required.'];
+        }
+
+        $student = $this->punchLogs->findStudentByRoll($enrollmentNumber);
+
+        if (! $student) {
+            return ['ok' => false, 'message' => 'Student not found.'];
+        }
+
+        $cooldownSeconds = max(0, (int) config('face_verify.camera_punch_cooldown_seconds', 60));
+
+        if ($cooldownSeconds > 0) {
+            $recent = FaceVerificationRequest::query()
+                ->where('enrollment_number', $enrollmentNumber)
+                ->where('status', FaceVerificationRequest::STATUS_PASS)
+                ->where('meta->source', 'camera_kiosk')
+                ->where('responded_at', '>=', now()->subSeconds($cooldownSeconds))
+                ->latest('responded_at')
+                ->first();
+
+            if ($recent) {
+                return [
+                    'ok' => true,
+                    'already_processed' => true,
+                    'face_verification_request_id' => $recent->id,
+                    'message' => 'Duplicate camera punch within cooldown window.',
+                ];
+            }
+        }
+
+        $device = $faceDeviceId !== ''
+            ? BiometricDevice::query()->where('face_verify_device_id', $faceDeviceId)->first()
+            : null;
+
+        // Camera punches always use a distinct device label so they never look like ZKTeco ADMS punches.
+        $deviceName = 'Face Camera Kiosk';
+        $areaName = $device?->location;
+
+        return DB::transaction(function () use ($payload, $student, $enrollmentNumber, $score, $faceDeviceId, $punchedAt, $device, $deviceName, $areaName): array {
+            $punchLogId = $this->writePunchLog(
+                enrollmentNumber: $enrollmentNumber,
+                punchedAt: $punchedAt,
+                deviceName: $deviceName,
+                areaName: $areaName,
+            );
+
+            if ($punchLogId === null) {
+                return ['ok' => false, 'message' => 'Could not write punch_logs row.'];
+            }
+
+            $request = FaceVerificationRequest::query()->create([
+                'id' => (string) Str::uuid(),
+                'biometric_punch_id' => null,
+                'biometric_device_id' => $device?->id,
+                'student_id' => $student->id,
+                'enrollment_number' => $enrollmentNumber,
+                'face_device_id' => $faceDeviceId !== '' ? $faceDeviceId : null,
+                'face_request_id' => isset($payload['request_id']) ? (string) $payload['request_id'] : null,
+                'face_student_id' => isset($payload['student_id']) ? (string) $payload['student_id'] : null,
+                'status' => FaceVerificationRequest::STATUS_PASS,
+                'score' => $score,
+                'punched_at' => $punchedAt,
+                'requested_at' => now(),
+                'responded_at' => now(),
+                'meta' => [
+                    'source' => 'camera_kiosk',
+                    'callback_payload' => $payload,
+                ],
+            ]);
+
+            return [
+                'ok' => true,
+                'already_processed' => false,
+                'face_verification_request_id' => $request->id,
+                'punch_log_id' => $punchLogId,
+            ];
+        });
+    }
+
     public function processAttendanceAfterPass(): void
     {
         try {
@@ -223,6 +323,19 @@ class FaceVerifyGateService
             Log::warning('face_verify.process_pending_failed', [
                 'message' => $exception->getMessage(),
             ]);
+        }
+    }
+
+    protected function parseTimestamp(mixed $value): ?Carbon
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (Throwable) {
+            return null;
         }
     }
 

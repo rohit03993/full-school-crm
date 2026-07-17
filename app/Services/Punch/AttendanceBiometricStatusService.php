@@ -38,6 +38,7 @@ class AttendanceBiometricStatusService
      *     face_verify_health: string,
      *     face_verify_pending_count: int,
      *     face_verify_callback_url: string,
+     *     face_verify_camera_punch_url: string,
      * }
      */
     public function status(): array
@@ -87,6 +88,7 @@ class AttendanceBiometricStatusService
                 ? FaceVerificationRequest::query()->where('status', FaceVerificationRequest::STATUS_PENDING)->count()
                 : 0,
             'face_verify_callback_url' => url('/api/face-verify/approve'),
+            'face_verify_camera_punch_url' => url('/api/face-verify/camera-punch'),
         ];
     }
 

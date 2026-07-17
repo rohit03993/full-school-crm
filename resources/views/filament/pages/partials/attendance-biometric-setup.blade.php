@@ -108,8 +108,10 @@
             @endif
         </h2>
         <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-            RFID punches on gated devices wait for a signed PASS callback before writing
-            <code class="font-mono text-xs">punch_logs</code>. Non-gated devices keep the current immediate attendance flow.
+            Two separate paths: <strong>Camera kiosk</strong> marks attendance by roll via
+            <code class="font-mono text-xs">/api/face-verify/camera-punch</code>
+            (does not use ADMS). <strong>RFID gate</strong> only applies when a biometric device has
+            “Require face verification” ON. Leave that OFF to keep normal card/fingerprint attendance.
         </p>
         <dl class="mt-4 grid gap-3 sm:grid-cols-2">
             <div class="rounded-xl bg-white/80 p-3 text-xs dark:bg-black/20">
@@ -121,11 +123,15 @@
                 <dd class="mt-1 font-semibold text-gray-900 dark:text-gray-100">{{ $status['face_verify_health'] ?? '—' }}</dd>
             </div>
             <div class="rounded-xl bg-white/80 p-3 text-xs dark:bg-black/20">
-                <dt class="text-gray-500">Callback URL</dt>
+                <dt class="text-gray-500">RFID gate callback</dt>
                 <dd class="mt-1 break-all font-mono text-gray-900 dark:text-gray-100">{{ $status['face_verify_callback_url'] ?? url('/api/face-verify/approve') }}</dd>
             </div>
             <div class="rounded-xl bg-white/80 p-3 text-xs dark:bg-black/20">
-                <dt class="text-gray-500">Pending verifications</dt>
+                <dt class="text-gray-500">Camera punch URL</dt>
+                <dd class="mt-1 break-all font-mono text-gray-900 dark:text-gray-100">{{ $status['face_verify_camera_punch_url'] ?? url('/api/face-verify/camera-punch') }}</dd>
+            </div>
+            <div class="rounded-xl bg-white/80 p-3 text-xs dark:bg-black/20">
+                <dt class="text-gray-500">Pending RFID verifications</dt>
                 <dd class="mt-1 font-semibold text-gray-900 dark:text-gray-100">{{ number_format($status['face_verify_pending_count'] ?? 0) }}</dd>
             </div>
         </dl>

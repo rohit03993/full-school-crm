@@ -282,6 +282,87 @@ class FaceVerifyIntegrationTest extends TestCase
         );
     }
 
+    public function test_camera_punch_marks_attendance_without_biometric_punch(): void
+    {
+        $this->createEnrolledStudent('FI 0801');
+
+        $payload = [
+            'enrollment_number' => 'FI 0801',
+            'device_id' => 'c4ffc19f-904f-429d-803b-dbc77a77dbc3',
+            'student_id' => 'face-stu-1',
+            'request_id' => 'cam-req-1',
+            'score' => 0.62,
+            'timestamp' => '2026-07-17T10:00:00+05:30',
+        ];
+
+        $raw = json_encode($payload, JSON_UNESCAPED_SLASHES);
+        $signature = hash_hmac('sha256', $raw, 'crm-callback-secret');
+
+        $this->call(
+            'POST',
+            '/api/face-verify/camera-punch',
+            [],
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer crm-service-token',
+                'HTTP_X_FACE_VERIFY_SIGNATURE' => $signature,
+            ],
+            $raw,
+        )->assertOk()->assertJson(['ok' => true, 'already_processed' => false]);
+
+        $this->assertSame(1, DB::table('punch_logs')->where('employee_id', 'FI 0801')->count());
+        $this->assertSame(0, BiometricPunch::query()->count());
+        $this->assertDatabaseHas('face_verification_requests', [
+            'enrollment_number' => 'FI 0801',
+            'status' => FaceVerificationRequest::STATUS_PASS,
+        ]);
+
+        $this->call(
+            'POST',
+            '/api/face-verify/camera-punch',
+            [],
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer crm-service-token',
+                'HTTP_X_FACE_VERIFY_SIGNATURE' => $signature,
+            ],
+            $raw,
+        )->assertOk()->assertJson(['ok' => true, 'already_processed' => true]);
+
+        $this->assertSame(1, DB::table('punch_logs')->where('employee_id', 'FI 0801')->count());
+    }
+
+    public function test_camera_punch_rejects_unknown_student(): void
+    {
+        $payload = [
+            'enrollment_number' => 'MISSING-99',
+            'device_id' => 'c4ffc19f-904f-429d-803b-dbc77a77dbc3',
+            'score' => 0.7,
+            'timestamp' => '2026-07-17T10:00:00+05:30',
+        ];
+
+        $raw = json_encode($payload, JSON_UNESCAPED_SLASHES);
+        $signature = hash_hmac('sha256', $raw, 'crm-callback-secret');
+
+        $this->call(
+            'POST',
+            '/api/face-verify/camera-punch',
+            [],
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer crm-service-token',
+                'HTTP_X_FACE_VERIFY_SIGNATURE' => $signature,
+            ],
+            $raw,
+        )->assertNotFound()->assertJson(['ok' => false, 'message' => 'Student not found.']);
+    }
+
     /**
      * @return array{0: Student, 1: Batch}
      */
