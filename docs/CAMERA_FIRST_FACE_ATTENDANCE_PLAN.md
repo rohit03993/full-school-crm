@@ -83,8 +83,13 @@ Roll sync alone is not enough. Each student needs a one-time face enrollment (ph
 
 ## What Face app (`proxy attend`) still needs
 
-1. Gallery / 1:N identify
-2. Call CRM `camera-punch` on match
-3. Android mode: continuous camera attendance (no RFID wait)
+Implemented in `proxy attend`:
+
+1. Server-side 1:N identify (`POST /camera-identify`)
+2. Signed CRM `camera-punch` callback on match
+3. Android **Camera attendance mode** toggle
+4. Students page **Sync all to Face API** action
+
+Each student still needs one-time face enrollment before identification.
 
 See `proxy attend/docs/CAMERA_ATTENDANCE_MODE.md`.

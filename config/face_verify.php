@@ -32,4 +32,8 @@ return [
     */
     'camera_punch_cooldown_seconds' => (int) env('FACE_VERIFY_CAMERA_PUNCH_COOLDOWN_SECONDS', 60),
 
+    'bulk_sync_chunk_size' => (int) env('FACE_VERIFY_BULK_SYNC_CHUNK_SIZE', 100),
+
+    'bulk_http_timeout_seconds' => (int) env('FACE_VERIFY_BULK_HTTP_TIMEOUT_SECONDS', 60),
+
 ];

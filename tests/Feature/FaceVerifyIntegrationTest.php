@@ -363,6 +363,27 @@ class FaceVerifyIntegrationTest extends TestCase
         )->assertNotFound()->assertJson(['ok' => false, 'message' => 'Student not found.']);
     }
 
+    public function test_bulk_student_sync_posts_expected_payload(): void
+    {
+        [$student] = $this->createEnrolledStudent('FI 0801');
+
+        Http::fake([
+            'https://face-api.test/students/bulk-sync' => Http::response(['synced' => 1], 200),
+        ]);
+
+        $response = app(FaceVerifyGateService::class)->syncStudents([$student]);
+
+        $this->assertSame(['synced' => 1], $response);
+
+        Http::assertSent(function ($request) use ($student) {
+            return $request->url() === 'https://face-api.test/students/bulk-sync'
+                && ($request['students'][0]['enrollment_number'] ?? null) === 'FI 0801'
+                && ($request['students'][0]['name'] ?? null) === $student->name
+                && ($request['students'][0]['crm_student_id'] ?? null) === (string) $student->id
+                && array_key_exists('batch', $request['students'][0]);
+        });
+    }
+
     /**
      * @return array{0: Student, 1: Batch}
      */

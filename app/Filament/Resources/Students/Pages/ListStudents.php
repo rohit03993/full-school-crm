@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Students\Pages;
 
 use App\Enums\CrmPermission;
+use App\Enums\RoleName;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Forms\AddStudentFormSchema;
 use App\Filament\Pages\StudentProfilePage;
@@ -11,6 +12,7 @@ use App\Filament\Resources\Students\StudentResource;
 use App\Models\Batch;
 use App\Models\Student;
 use App\Services\StudentBulkImportService;
+use App\Services\FaceVerify\FaceVerifyGateService;
 use App\Support\CrmAccess;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -22,6 +24,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Auth;
+use Throwable;
 
 class ListStudents extends ListRecords
 {
@@ -116,6 +119,53 @@ class ListStudents extends ListRecords
                         StudentProfilePage::getUrl(['record' => $student->id]),
                         navigate: true,
                     );
+                });
+        }
+
+        if ((bool) config('face_verify.enabled', false)
+            && (Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false)) {
+            $actions[] = Action::make('syncAllFaceVerify')
+                ->label('Sync all to Face API')
+                ->icon(Heroicon::OutlinedArrowPath)
+                ->color('gray')
+                ->requiresConfirmation()
+                ->modalHeading('Sync all active students to Face API')
+                ->modalDescription('Sends roll number, name and batch. Face enrollment is still required once per student.')
+                ->action(function (FaceVerifyGateService $faceVerify): void {
+                    $synced = 0;
+                    $chunkSize = max(1, (int) config('face_verify.bulk_sync_chunk_size', 100));
+
+                    try {
+                        Student::query()
+                            ->whereHas('activeEnrollment')
+                            ->with([
+                                'activeEnrollment.course',
+                                'activeEnrollment.academicSession',
+                                'activeBatchStudent.batch',
+                            ])
+                            ->chunkById($chunkSize, function ($students) use ($faceVerify, &$synced): void {
+                                $response = $faceVerify->syncStudents($students);
+                                if (! array_key_exists('synced', $response)) {
+                                    throw new \RuntimeException('Face API bulk-sync response missing synced count.');
+                                }
+                                $synced += (int) $response['synced'];
+                            });
+
+                        Notification::make()
+                            ->title('Students synced to Face API')
+                            ->body(number_format($synced).' active students are ready for face enrollment.')
+                            ->success()
+                            ->send();
+                    } catch (Throwable $exception) {
+                        Notification::make()
+                            ->title('Face API bulk sync failed')
+                            ->body(
+                                ($synced > 0 ? number_format($synced).' synced before error. ' : '')
+                                .$exception->getMessage()
+                            )
+                            ->danger()
+                            ->send();
+                    }
                 });
         }
 

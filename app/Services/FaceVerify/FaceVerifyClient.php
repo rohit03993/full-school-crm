@@ -39,25 +39,43 @@ class FaceVerifyClient
      */
     public function upsertStudent(Student $student): array
     {
-        $enrollment = $student->activeEnrollment;
-
-        if (! $enrollment || blank($enrollment->enrollment_number)) {
-            throw new InvalidArgumentException('Student has no active enrollment number.');
-        }
-
-        $payload = [
-            'enrollment_number' => strtoupper(trim($enrollment->enrollment_number)),
-            'name' => $student->name,
-            'batch' => $student->activeBatchStudent?->batch?->name
-                ?? $enrollment->course?->name
-                ?? $enrollment->academicSession?->name,
-            'crm_student_id' => (string) $student->id,
-        ];
-
         return $this->request()
-            ->post('/students', $payload)
+            ->post('/students', $this->studentPayload($student))
             ->throw()
             ->json() ?? [];
+    }
+
+    /**
+     * @param  iterable<Student>  $students
+     * @return array{synced: int}
+     */
+    public function upsertStudents(iterable $students): array
+    {
+        $payload = [];
+
+        foreach ($students as $student) {
+            $payload[] = $this->studentPayload($student);
+        }
+
+        if ($payload === []) {
+            return ['synced' => 0];
+        }
+
+        $response = $this->request(timeoutSeconds: max(
+            10,
+            (int) config('face_verify.bulk_http_timeout_seconds', 60),
+        ))
+            ->post('/students/bulk-sync', ['students' => $payload])
+            ->throw()
+            ->json();
+
+        if (! is_array($response) || ! array_key_exists('synced', $response)) {
+            throw new InvalidArgumentException('Face API bulk-sync response missing synced count.');
+        }
+
+        return [
+            'synced' => (int) $response['synced'],
+        ];
     }
 
     /**
@@ -96,17 +114,38 @@ class FaceVerifyClient
         return filled($value) ? (string) $value : null;
     }
 
-    protected function request(): PendingRequest
+    /**
+     * @return array{enrollment_number: string, name: string, batch: ?string, crm_student_id: string}
+     */
+    protected function studentPayload(Student $student): array
+    {
+        $enrollment = $student->activeEnrollment;
+
+        if (! $enrollment || blank($enrollment->enrollment_number)) {
+            throw new InvalidArgumentException('Student has no active enrollment number.');
+        }
+
+        return [
+            'enrollment_number' => strtoupper(trim($enrollment->enrollment_number)),
+            'name' => $student->name,
+            'batch' => $student->activeBatchStudent?->batch?->name
+                ?? $enrollment->course?->name
+                ?? $enrollment->academicSession?->name,
+            'crm_student_id' => (string) $student->id,
+        ];
+    }
+
+    protected function request(?int $timeoutSeconds = null): PendingRequest
     {
         if (! $this->isConfigured()) {
             throw new InvalidArgumentException('Face Verify API URL or service token is not configured.');
         }
 
-        return $this->baseRequest()
+        return $this->baseRequest($timeoutSeconds)
             ->withToken((string) config('face_verify.service_token'));
     }
 
-    protected function baseRequest(): PendingRequest
+    protected function baseRequest(?int $timeoutSeconds = null): PendingRequest
     {
         $baseUrl = rtrim((string) config('face_verify.api_url'), '/');
 
@@ -117,6 +156,6 @@ class FaceVerifyClient
         return Http::baseUrl($baseUrl)
             ->acceptJson()
             ->asJson()
-            ->timeout(max(1, (int) config('face_verify.http_timeout_seconds', 10)));
+            ->timeout(max(1, $timeoutSeconds ?? (int) config('face_verify.http_timeout_seconds', 10)));
     }
 }

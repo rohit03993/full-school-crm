@@ -386,6 +386,26 @@ class FaceVerifyGateService
         return $this->client->upsertStudent($student);
     }
 
+    /**
+     * @param  iterable<Student>  $students
+     * @return array{synced: int}
+     */
+    public function syncStudents(iterable $students): array
+    {
+        $ready = [];
+
+        foreach ($students as $student) {
+            $student->loadMissing([
+                'activeEnrollment.course',
+                'activeEnrollment.academicSession',
+                'activeBatchStudent.batch',
+            ]);
+            $ready[] = $student;
+        }
+
+        return $this->client->upsertStudents($ready);
+    }
+
     protected function findRequest(?string $crmRequestId, ?string $faceRequestId): ?FaceVerificationRequest
     {
         if (filled($crmRequestId)) {
