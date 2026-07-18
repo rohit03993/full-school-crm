@@ -83,7 +83,7 @@ class BiometricDeviceResource extends Resource
                         ->live(),
                     TextInput::make('face_verify_device_id')
                         ->label('Face Verify device ID')
-                        ->helperText('UUID of the Android kiosk for this RFID gate only. Not required for camera-only attendance.')
+                        ->helperText('Kiosk Device ID for this RFID gate (e.g. 1001). Not required for camera-only attendance.')
                         ->maxLength(64)
                         ->visible(fn ($get): bool => (bool) $get('requires_face_verify'))
                         ->required(fn ($get): bool => (bool) $get('requires_face_verify')),

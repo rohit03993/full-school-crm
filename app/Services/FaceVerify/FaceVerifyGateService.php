@@ -333,7 +333,9 @@ class FaceVerifyGateService
         }
 
         try {
-            return Carbon::parse($value);
+            // Kiosk may send UTC (…Z / +00:00). Store wall-clock in app timezone
+            // so Live Punches / punch_logs match India local time.
+            return Carbon::parse($value)->timezone(config('app.timezone', 'Asia/Kolkata'));
         } catch (Throwable) {
             return null;
         }
@@ -438,8 +440,9 @@ class FaceVerifyGateService
         }
 
         $employeeId = $this->punchLogs->normalizeRoll($enrollmentNumber);
-        $date = $punchedAt->toDateString();
-        $time = $punchedAt->format('H:i:s');
+        $local = $punchedAt->copy()->timezone(config('app.timezone', 'Asia/Kolkata'));
+        $date = $local->toDateString();
+        $time = $local->format('H:i:s');
 
         $duplicateQuery = DB::table($table)
             ->where('employee_id', $employeeId)

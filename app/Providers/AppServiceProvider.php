@@ -24,6 +24,12 @@ class AppServiceProvider extends ServiceProvider
     {
         CrmLivewireErrors::register();
 
+        try {
+            app(\App\Services\FaceVerify\FaceVerifyPlatformService::class)->applyConfiguredOverrides();
+        } catch (\Throwable) {
+            // Settings table may not exist during early migrate.
+        }
+
         Table::configureUsing(function (Table $table): void {
             $table
                 ->paginationPageOptions(CrmPagination::perPageOptions())

@@ -58,6 +58,17 @@ Biometric (unchanged):
 }
 ```
 
+## Multi-school (shared Face Platform)
+
+Preferred for Folks + Motion + future schools:
+
+1. One Face host (e.g. `face.taskbook.co.in`)
+2. Vendor **Add client** → client code + device number
+3. CRM **Setup → Face camera connect** → paste Face URL + client code
+4. Same APK Settings → Face URL + device number + token
+
+See `proxy attend/docs/MULTI_TENANT_FACE_PLATFORM.md`.
+
 ### Deploy note
 
 After pulling CRM code on the server:

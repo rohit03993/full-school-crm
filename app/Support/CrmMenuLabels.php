@@ -264,6 +264,11 @@ final class CrmMenuLabels
         return 'Biometric setup';
     }
 
+    public static function facePlatform(): string
+    {
+        return 'Face camera connect';
+    }
+
     public static function attendanceDisplay(): string
     {
         return 'Attendance display';
