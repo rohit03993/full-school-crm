@@ -1858,7 +1858,7 @@ class StudentProfilePage extends Page
 
         $this->validate([
             'discountAmount' => ['nullable', 'numeric', 'min:0'],
-            'uploadPhoto' => ['nullable', 'file', 'max:5120', 'mimes:jpg,jpeg,png,pdf'],
+            'uploadPhoto' => ['nullable', 'file', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
             'uploadAadhaar' => ['nullable', 'file', 'max:5120', 'mimes:jpg,jpeg,png,pdf'],
             'uploadMarksheet' => ['nullable', 'file', 'max:5120', 'mimes:jpg,jpeg,png,pdf'],
             'uploadSignature' => ['nullable', 'file', 'max:5120', 'mimes:jpg,jpeg,png,pdf'],

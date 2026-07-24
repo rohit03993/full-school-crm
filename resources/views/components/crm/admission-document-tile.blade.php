@@ -21,7 +21,7 @@
         'min-h-36' => ! $isSignature,
         'min-h-28' => $isSignature,
     ])>
-        @if ($document && $document->isImage())
+        @if ($document && $document->isImage() && $document->fileExistsOnDisk())
             <button
                 type="button"
                 class="js-media-preview-trigger block w-full cursor-zoom-in"
@@ -39,6 +39,12 @@
                     ])
                 />
             </button>
+        @elseif ($document && ! $document->fileExistsOnDisk())
+            <div class="flex flex-col items-center gap-2 text-center">
+                <p class="text-sm font-medium text-danger-600 dark:text-danger-400">File missing on server</p>
+                <p class="line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{{ $document->original_filename }}</p>
+                <p class="text-[10px] text-gray-400">Re-upload this document from Edit Details.</p>
+            </div>
         @elseif ($document)
             <div class="flex flex-col items-center gap-2 text-center">
                 <div class="flex h-16 w-16 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400">
@@ -54,23 +60,25 @@
     </div>
 
     @if ($document)
-        <div class="flex flex-wrap gap-2 border-t border-gray-100 p-3 dark:border-white/10">
-            @if ($document->isPreviewableInBrowser())
-                <x-crm.media-preview-button
-                    :url="$document->previewUrl()"
-                    :title="$label"
-                    :is-pdf="! $document->isImage()"
-                    label="View"
-                    class="flex-1 justify-center bg-gray-100 text-gray-700 ring-gray-200 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10"
-                />
-            @endif
-            <a
-                href="{{ $document->downloadUrl() }}"
-                class="inline-flex flex-1 items-center justify-center rounded-lg bg-primary-50 px-2 py-1.5 text-xs font-semibold text-primary-700 ring-1 ring-primary-200 hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-500/30"
-            >
-                Download
-            </a>
-        </div>
+        @if ($document->fileExistsOnDisk())
+            <div class="flex flex-wrap gap-2 border-t border-gray-100 p-3 dark:border-white/10">
+                @if ($document->isPreviewableInBrowser())
+                    <x-crm.media-preview-button
+                        :url="$document->previewUrl()"
+                        :title="$label"
+                        :is-pdf="! $document->isImage()"
+                        label="View"
+                        class="flex-1 justify-center bg-gray-100 text-gray-700 ring-gray-200 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10"
+                    />
+                @endif
+                <a
+                    href="{{ $document->downloadUrl() }}"
+                    class="inline-flex flex-1 items-center justify-center rounded-lg bg-primary-50 px-2 py-1.5 text-xs font-semibold text-primary-700 ring-1 ring-primary-200 hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-500/30"
+                >
+                    Download
+                </a>
+            </div>
+        @endif
         <p class="border-t border-gray-100 px-3 py-2 text-[10px] text-gray-400 dark:border-white/10">
             {{ $document->created_at?->format('d M Y, h:i A') }}
         </p>

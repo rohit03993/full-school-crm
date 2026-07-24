@@ -29,7 +29,7 @@
         <div class="relative flex flex-row items-start gap-3 p-3 sm:gap-4 sm:p-5 lg:gap-5">
             {{-- Photo --}}
             <div class="shrink-0">
-                @if ($photo && $photo->isImage())
+                @if ($photo && $photo->isImage() && $photo->fileExistsOnDisk())
                     <button
                         type="button"
                         class="js-media-preview-trigger group relative cursor-zoom-in overflow-hidden rounded-xl shadow-md ring-2 ring-white dark:ring-gray-800 sm:rounded-2xl sm:shadow-lg"
@@ -48,7 +48,7 @@
                         <svg class="h-5 w-5 text-primary-300 dark:text-primary-500/50 sm:h-7 sm:w-7" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                         </svg>
-                        <span class="mt-0.5 text-[9px] text-gray-400 sm:mt-1 sm:text-[10px]">No photo</span>
+                        <span class="mt-0.5 text-[9px] text-gray-400 sm:mt-1 sm:text-[10px]">{{ $photo ? 'File missing' : 'No photo' }}</span>
                     </div>
                 @endif
             </div>

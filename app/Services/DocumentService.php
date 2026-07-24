@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use League\Flysystem\UnableToWriteFile;
+use Throwable;
 
 class DocumentService
 {
@@ -29,16 +32,29 @@ class DocumentService
             ? $documentable->student_id
             : $documentable->getKey();
 
-        $extension = $file->getClientOriginalExtension() ?: $file->extension();
-        $filename = Str::uuid().'.'.strtolower($extension);
-        $path = "documents/{$studentId}/{$type->value}/{$filename}";
+        $extension = strtolower((string) ($file->getClientOriginalExtension() ?: $file->extension() ?: 'bin'));
+        $filename = Str::uuid().'.'.$extension;
+        $directory = "documents/{$studentId}/{$type->value}";
+        $path = "{$directory}/{$filename}";
+        $disk = Storage::disk(self::DISK);
 
-        Storage::disk(self::DISK)->putFileAs(
-            "documents/{$studentId}/{$type->value}",
-            $file,
-            $filename,
-        );
+        try {
+            $stored = $disk->putFileAs($directory, $file, $filename);
+        } catch (UnableToWriteFile|Throwable $exception) {
+            report($exception);
 
+            throw ValidationException::withMessages([
+                $type->value => 'Could not save the file to storage. Check that storage/app/private is writable, then try again.',
+            ]);
+        }
+
+        if ($stored === false || ! $disk->exists($path)) {
+            throw ValidationException::withMessages([
+                $type->value => 'Could not save the file to storage. Check that storage/app/private is writable, then try again.',
+            ]);
+        }
+
+        // Only remove previous files after the new file is confirmed on disk.
         $documentable->documents()
             ->where('type', $type->value)
             ->get()
@@ -47,7 +63,7 @@ class DocumentService
         return $documentable->documents()->create([
             'type' => $type,
             'file_path' => $path,
-            'original_filename' => $file->getClientOriginalName(),
+            'original_filename' => $file->getClientOriginalName() ?: $filename,
             'uploaded_by_user_id' => $uploader?->id,
         ]);
     }
@@ -81,7 +97,7 @@ class DocumentService
             );
         }
 
-        throw \Illuminate\Validation\ValidationException::withMessages([
+        throw ValidationException::withMessages([
             'photo' => 'Please upload a valid JPG or PNG photo.',
         ]);
     }

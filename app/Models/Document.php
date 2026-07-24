@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Enums\DocumentType;
+use App\Services\DocumentService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Facades\Storage;
 
 class Document extends Model
 {
@@ -37,16 +39,32 @@ class Document extends Model
 
     public function isImage(): bool
     {
-        $extension = strtolower(pathinfo($this->original_filename, PATHINFO_EXTENSION));
-
-        return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true);
+        return in_array($this->extension(), ['jpg', 'jpeg', 'png', 'gif', 'webp'], true);
     }
 
     public function isPreviewableInBrowser(): bool
     {
-        $extension = strtolower(pathinfo($this->original_filename, PATHINFO_EXTENSION));
+        return in_array($this->extension(), ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'], true);
+    }
 
-        return in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'], true);
+    public function extension(): string
+    {
+        $fromOriginal = strtolower((string) pathinfo((string) $this->original_filename, PATHINFO_EXTENSION));
+
+        if ($fromOriginal !== '') {
+            return $fromOriginal;
+        }
+
+        return strtolower((string) pathinfo((string) $this->file_path, PATHINFO_EXTENSION));
+    }
+
+    public function fileExistsOnDisk(): bool
+    {
+        if (blank($this->file_path)) {
+            return false;
+        }
+
+        return Storage::disk(DocumentService::DISK)->exists($this->file_path);
     }
 
     public function downloadUrl(): string

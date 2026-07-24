@@ -356,9 +356,11 @@ class StudentCounterService
         }
 
         $admission = $enrollment->admission;
+        $photo = $admission?->documentForType(DocumentType::Photo)
+            ?? $student->profilePhoto();
 
         return [
-            'photo' => $admission?->documentForType(DocumentType::Photo),
+            'photo' => $photo,
             'enrollment' => $enrollment,
             'admission' => $admission,
             'fees' => $enrollment->feeStructure,

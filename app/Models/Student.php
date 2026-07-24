@@ -190,15 +190,27 @@ class Student extends Model
     {
         $admission = $this->activeEnrollment?->admission;
 
-        if (! $admission && $this->relationLoaded('admissions')) {
-            $admission = $this->admissions->first();
+        if ($admission) {
+            $photo = $admission->documentForType(DocumentType::Photo);
+
+            if ($photo) {
+                return $photo;
+            }
         }
 
-        if (! $admission) {
-            return null;
+        $admissions = $this->relationLoaded('admissions')
+            ? $this->admissions
+            : $this->admissions()->with('documents')->latest()->get();
+
+        foreach ($admissions as $row) {
+            $photo = $row->documentForType(DocumentType::Photo);
+
+            if ($photo) {
+                return $photo;
+            }
         }
 
-        return $admission->documentForType(DocumentType::Photo);
+        return null;
     }
 
     public function initials(): string
