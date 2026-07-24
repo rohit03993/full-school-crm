@@ -9,7 +9,7 @@ class CrmCleanupCommand extends Command
 {
     protected $signature = 'crm:cleanup';
 
-    protected $description = 'Remove stale Livewire uploads and orphan CRM files (old receipts, documents, proofs).';
+    protected $description = 'Remove stale Livewire uploads and orphan CRM files (receipts, ID cards, payment proofs — never student documents).';
 
     public function handle(StorageCleanupService $cleanup): int
     {

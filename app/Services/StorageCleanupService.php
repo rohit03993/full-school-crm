@@ -82,7 +82,9 @@ class StorageCleanupService
         $disk = Storage::disk(self::DISK);
         $deleted = 0;
 
-        foreach (['documents', 'receipts', 'id_cards', 'payments'] as $root) {
+        // Never auto-delete under documents/ — student photos/ID proofs are critical.
+        // A path-mismatch bug here would wipe files while DB rows remain ("File missing on server").
+        foreach (['receipts', 'id_cards', 'payments'] as $root) {
             if (! $disk->exists($root)) {
                 continue;
             }
@@ -98,14 +100,23 @@ class StorageCleanupService
                 ->in($absoluteRoot);
 
             foreach ($finder as $file) {
-                $relativePath = $this->toRelativeStoragePath($file->getRealPath());
+                $realPath = $file->getRealPath();
+
+                if ($realPath === false) {
+                    continue;
+                }
+
+                $relativePath = $this->toRelativeStoragePath($realPath);
 
                 if ($relativePath === null || isset($validPaths[$relativePath])) {
                     continue;
                 }
 
-                if (@unlink($file->getRealPath())) {
+                if (@unlink($realPath)) {
                     $deleted++;
+                    logger()->info('crm:cleanup removed orphan stored file', [
+                        'path' => $relativePath,
+                    ]);
                 }
             }
 
@@ -161,13 +172,16 @@ class StorageCleanupService
 
     protected function toRelativeStoragePath(string $absolutePath): ?string
     {
-        $root = rtrim(Storage::disk(self::DISK)->path(''), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
+        $configuredRoot = rtrim(Storage::disk(self::DISK)->path(''), DIRECTORY_SEPARATOR);
+        $root = realpath($configuredRoot) ?: $configuredRoot;
+        $root = rtrim(str_replace('\\', '/', $root), '/').'/';
+        $absolute = str_replace('\\', '/', $absolutePath);
 
-        if (! str_starts_with($absolutePath, $root)) {
+        if (! str_starts_with($absolute, $root)) {
             return null;
         }
 
-        return $this->normalizePath(substr($absolutePath, strlen($root)));
+        return $this->normalizePath(substr($absolute, strlen($root)));
     }
 
     protected function normalizePath(string $path): string
