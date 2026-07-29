@@ -75,6 +75,7 @@ use App\Services\StudentWhatsAppThreadService;
 use App\Services\WhatsAppProviderResolver;
 use App\Support\StudentWhatsAppThreadItem;
 use App\Support\StudentWhatsAppTemplateComposer;
+use App\Services\FaceVerify\FaceVerifyClient;
 use App\Services\VisitMeetingAssignmentService;
 use App\Services\WhatsAppCampaignService;
 use App\Services\WhatsAppTemplateCatalog;
@@ -2799,6 +2800,87 @@ class StudentProfilePage extends Page
                     }
                 })
                 ->visible(fn (): bool => $this->userCan(CrmPermission::StudentsEdit)),
+            Action::make('pullFacePhoto')
+                ->label('Pull Face Photo')
+                ->icon('heroicon-o-camera')
+                ->button()
+                ->color('gray')
+                ->outlined()
+                ->requiresConfirmation()
+                ->modalHeading('Pull enrollment photo from Face Platform')
+                ->modalDescription('This will download the face enrollment photo from the attendance kiosk and set it as the student\'s profile photo.')
+                ->action(function (): void {
+                    $enrollment = $this->record->activeEnrollment;
+
+                    if (! $enrollment) {
+                        Notification::make()->title('No active enrollment')->warning()->send();
+
+                        return;
+                    }
+
+                    $client = app(FaceVerifyClient::class);
+
+                    try {
+                        $jpeg = $client->getStudentPhoto($enrollment->enrollment_number);
+                    } catch (\Throwable $e) {
+                        Notification::make()
+                            ->title('Face API error')
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->send();
+
+                        return;
+                    }
+
+                    if ($jpeg === null || $jpeg === '') {
+                        Notification::make()
+                            ->title('No face photo available')
+                            ->body('This student has not enrolled their face on the kiosk yet.')
+                            ->warning()
+                            ->send();
+
+                        return;
+                    }
+
+                    $tmpPath = tempnam(sys_get_temp_dir(), 'face_') . '.jpg';
+                    file_put_contents($tmpPath, $jpeg);
+
+                    $uploaded = new \Illuminate\Http\UploadedFile($tmpPath, 'face-enrollment.jpg', 'image/jpeg', null, true);
+
+                    $admission = $enrollment->admission;
+
+                    if (! $admission) {
+                        @unlink($tmpPath);
+                        Notification::make()->title('No admission found for active enrollment')->warning()->send();
+
+                        return;
+                    }
+
+                    try {
+                        app(DocumentService::class)->store($admission, DocumentType::Photo, $uploaded, Auth::user());
+                    } catch (\Throwable $e) {
+                        @unlink($tmpPath);
+                        Notification::make()
+                            ->title('Could not save photo')
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->send();
+
+                        return;
+                    }
+
+                    @unlink($tmpPath);
+                    $this->refreshRecord();
+
+                    Notification::make()
+                        ->title('Face photo saved')
+                        ->body('The kiosk enrollment photo is now the student\'s profile photo.')
+                        ->success()
+                        ->send();
+                })
+                ->visible(fn (): bool => (bool) config('face_verify.enabled', false)
+                    && $this->record->activeEnrollment !== null
+                    && $this->userCan(CrmPermission::StudentsEdit)),
         ];
     }
 

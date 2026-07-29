@@ -100,6 +100,25 @@ class FaceVerifyClient
             ->json() ?? [];
     }
 
+    /**
+     * Download the enrolled face photo from Face Platform.
+     * Returns raw JPEG bytes or null if the student has no enrollment photo.
+     */
+    public function getStudentPhoto(string $studentIdOrRoll): ?string
+    {
+        $response = $this->request(timeoutSeconds: 15)
+            ->accept('image/jpeg')
+            ->get('/students/'.rawurlencode($studentIdOrRoll).'/face-photo');
+
+        if ($response->status() === 404) {
+            return null;
+        }
+
+        $response->throw();
+
+        return $response->body();
+    }
+
     public function isConfigured(): bool
     {
         return filled(config('face_verify.api_url')) && filled(config('face_verify.service_token'));
