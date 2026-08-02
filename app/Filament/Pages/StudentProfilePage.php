@@ -69,6 +69,7 @@ use App\Services\ReceiptService;
 use App\Services\StorageCleanupService;
 use App\Services\StudentCaseService;
 use App\Services\StudentCounterService;
+use App\Services\StudentProfileDeleteService;
 use App\Services\StudentUpdateService;
 use App\Services\MetaWhatsAppInboxService;
 use App\Services\StudentWhatsAppThreadService;
@@ -2881,6 +2882,51 @@ class StudentProfilePage extends Page
                 ->visible(fn (): bool => (bool) config('face_verify.enabled', false)
                     && $this->record->activeEnrollment !== null
                     && $this->userCan(CrmPermission::StudentsEdit)),
+            Action::make('deleteStudent')
+                ->label('Delete Student')
+                ->icon('heroicon-o-trash')
+                ->button()
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading(fn (): string => 'Permanently delete '.$this->record->name.'?')
+                ->modalDescription(function (): string {
+                    $mobile = filled($this->record->mobile)
+                        ? $this->record->mobile
+                        : 'no mobile on file';
+
+                    return 'This permanently removes the student profile, enquiries, admissions, enrollments, fees, payments, attendance, and related records. '
+                        .'The mobile number ('.$mobile.') will be freed for reuse. This cannot be undone.';
+                })
+                ->modalSubmitActionLabel('Yes, delete permanently')
+                ->action(function (StudentProfileDeleteService $deletes): void {
+                    $name = $this->record->name;
+                    $mobile = $this->record->mobile;
+
+                    try {
+                        $deletes->delete($this->record, Auth::user());
+                    } catch (\Illuminate\Validation\ValidationException $exception) {
+                        Notification::make()
+                            ->title('Could not delete student')
+                            ->body(collect($exception->errors())->flatten()->first() ?? 'Only Super Admin can delete students.')
+                            ->danger()
+                            ->send();
+
+                        return;
+                    }
+
+                    Notification::make()
+                        ->title('Student deleted')
+                        ->body(
+                            filled($mobile)
+                                ? $name.' was permanently deleted. Mobile '.$mobile.' is free to use again.'
+                                : $name.' was permanently deleted.'
+                        )
+                        ->success()
+                        ->send();
+
+                    $this->redirect(StudentSearchPage::getUrl());
+                })
+                ->visible(fn (): bool => $this->userIsSuperAdmin()),
         ];
     }
 
