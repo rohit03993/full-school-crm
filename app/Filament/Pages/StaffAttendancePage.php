@@ -4,19 +4,26 @@ namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
+use App\Filament\Resources\Staff\StaffResource;
 use App\Models\StaffAttendance;
 use App\Models\User;
+use App\Services\Punch\ManualStaffAttendanceService;
+use App\Support\AttendanceSourceLabel;
 use App\Support\CrmAccess;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Alignment;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -49,7 +56,7 @@ class StaffAttendancePage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'IN/OUT from the same Face/RFID machines as students (Staff ID = device PIN).';
+        return 'Mark IN/OUT manually here, or from Face/RFID (Staff ID = device PIN). Face sync: Admin → Staff → Sync to Face API, then enroll faces on the Android app under Staff.';
     }
 
     public function mount(): void
@@ -96,13 +103,67 @@ class StaffAttendancePage extends Page
     {
         return $schema->components([
             Form::make([EmbeddedSchema::make('form')])
-                ->id('staffAttendanceFilters'),
+                ->id('staffAttendanceFilters')
+                ->footer([
+                    Actions::make([
+                        Action::make('openStaffList')
+                            ->label('Staff list / Face sync')
+                            ->icon(Heroicon::OutlinedUsers)
+                            ->color('gray')
+                            ->outlined()
+                            ->url(StaffResource::getUrl('index')),
+                    ])->alignment(Alignment::Start),
+                ]),
             View::make('filament.pages.partials.staff-attendance-table')
                 ->viewData(fn (): array => [
                     'rows' => $this->rows(),
                     'date' => $this->data['date'] ?? now()->toDateString(),
+                    'canMarkToday' => ($this->data['date'] ?? now()->toDateString()) === now()->toDateString(),
                 ]),
         ]);
+    }
+
+    public function markManualIn(int $userId, ManualStaffAttendanceService $manual): void
+    {
+        $this->markManual($userId, 'IN', $manual);
+    }
+
+    public function markManualOut(int $userId, ManualStaffAttendanceService $manual): void
+    {
+        $this->markManual($userId, 'OUT', $manual);
+    }
+
+    protected function markManual(int $userId, string $state, ManualStaffAttendanceService $manual): void
+    {
+        $date = (string) ($this->data['date'] ?? now()->toDateString());
+        $staffMember = User::query()->with('staffProfile')->find($userId);
+
+        if (! $staffMember) {
+            Notification::make()->title('Staff not found')->danger()->send();
+
+            return;
+        }
+
+        $result = $state === 'OUT'
+            ? $manual->manualOut($staffMember, $date, Auth::user())
+            : $manual->manualIn($staffMember, $date, Auth::user());
+
+        if (! $result['ok']) {
+            Notification::make()->title($result['message'])->warning()->send();
+
+            return;
+        }
+
+        $body = $result['message'];
+        if (($result['whatsapp']['queued'] ?? false) === true) {
+            $body .= ' WhatsApp queued.';
+        }
+
+        Notification::make()
+            ->title($staffMember->name)
+            ->body($body)
+            ->success()
+            ->send();
     }
 
     /**
@@ -111,22 +172,28 @@ class StaffAttendancePage extends Page
     protected function rows(): Collection
     {
         $date = $this->data['date'] ?? now()->toDateString();
+        $manual = app(ManualStaffAttendanceService::class);
 
         $query = User::query()
             ->where('is_active', true)
             ->whereHas('staffProfile', fn ($q) => $q->whereNotNull('employee_code')->where('employee_code', '!=', ''))
-            ->with(['staffProfile', 'staffAttendances' => fn ($q) => $q->whereDate('attendance_date', $date)])
+            ->with([
+                'staffProfile',
+                'staffAttendances' => fn ($q) => $q->whereDate('attendance_date', $date)->with('markedBy'),
+            ])
             ->orderBy('name');
 
         if (filled($this->data['user_id'] ?? null)) {
             $query->whereKey((int) $this->data['user_id']);
         }
 
-        return $query->get()->map(function (User $user) use ($date): array {
+        return $query->get()->map(function (User $user) use ($date, $manual): array {
             /** @var StaffAttendance|null $attendance */
             $attendance = $user->staffAttendances->first();
+            $inside = $manual->isInside($user, $date);
 
             return [
+                'id' => $user->id,
                 'name' => $user->name,
                 'employee_code' => $user->staffProfile?->employee_code,
                 'designation' => $user->staffProfile?->designation,
@@ -135,6 +202,12 @@ class StaffAttendancePage extends Page
                 'checked_in_at' => $attendance?->checked_in_at?->format('H:i:s'),
                 'checked_out_at' => $attendance?->checked_out_at?->format('H:i:s'),
                 'punch_source' => $attendance?->punch_source,
+                'source_label' => AttendanceSourceLabel::for(
+                    $attendance?->punch_source,
+                    $attendance?->markedBy?->name,
+                ),
+                'can_in' => ! $inside,
+                'can_out' => $inside,
                 'date' => $date,
             ];
         });

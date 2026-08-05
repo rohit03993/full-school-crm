@@ -102,6 +102,43 @@ class PunchAttendanceProcessor
     /**
      * @return array{synced: bool, whatsapp: array{queued: bool, message: string}}
      */
+    public function handleManualStaffPunch(
+        User $staffMember,
+        string $employeeCode,
+        string $date,
+        string $time,
+        string $state,
+        User $actor,
+    ): array {
+        $code = $this->logs->normalizeRoll($employeeCode);
+
+        if ($this->logs->punchTableExists()) {
+            $payload = [
+                'employee_id' => $code,
+                'punch_date' => $date,
+                'punch_time' => $time,
+                'device_name' => 'Manual',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+
+            if ($this->columnExists($this->logs->punchTable(), 'verify_type_char')) {
+                $payload['verify_type_char'] = 'M';
+            }
+
+            if ($this->columnExists($this->logs->punchTable(), 'is_manual')) {
+                $payload['is_manual'] = 1;
+            }
+
+            DB::table($this->logs->punchTable())->insert($payload);
+        }
+
+        return $this->applyStaffPunchEffects($staffMember, $code, $date, $time, $state, $actor);
+    }
+
+    /**
+     * @return array{synced: bool, whatsapp: array{queued: bool, message: string}}
+     */
     private function handleMachinePunch(object $punch): array
     {
         if ($this->isManualPunchRow($punch)) {

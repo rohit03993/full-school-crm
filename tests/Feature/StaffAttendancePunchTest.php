@@ -19,6 +19,7 @@ use App\Models\StaffAttendance;
 use App\Models\StaffProfile;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\Punch\ManualStaffAttendanceService;
 use App\Services\Punch\PunchAttendanceProcessor;
 use App\Services\StaffBulkImportService;
 use App\Support\BiometricPinCollision;
@@ -144,6 +145,43 @@ class StaffAttendancePunchTest extends TestCase
         $this->assertNotNull($user);
         $this->assertSame('STF200', $user->staffProfile?->employee_code);
         $this->assertTrue($user->hasRole(RoleName::Staff->value));
+    }
+
+    public function test_manual_staff_in_and_out(): void
+    {
+        $admin = $this->createSuperAdmin();
+        $staff = $this->createStaffWithCode('STF300');
+        $date = now()->toDateString();
+        $manual = app(ManualStaffAttendanceService::class);
+
+        $in = $manual->manualIn($staff, $date, $admin);
+        $this->assertTrue($in['ok']);
+        $this->assertTrue($manual->isInside($staff, $date));
+
+        $row = StaffAttendance::query()->where('user_id', $staff->id)->first();
+        $this->assertNotNull($row);
+        $this->assertSame('manual', $row->punch_source);
+        $this->assertSame($admin->id, $row->marked_by_user_id);
+
+        $out = $manual->manualOut($staff, $date, $admin);
+        $this->assertTrue($out['ok']);
+        $this->assertFalse($manual->isInside($staff, $date));
+
+        $row->refresh();
+        $this->assertNotNull($row->checked_out_at);
+    }
+
+    public function test_manual_staff_rejects_backdated_date(): void
+    {
+        $admin = $this->createSuperAdmin();
+        $staff = $this->createStaffWithCode('STF301');
+        $manual = app(ManualStaffAttendanceService::class);
+
+        $result = $manual->manualIn($staff, now()->subDay()->toDateString(), $admin);
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('today', strtolower($result['message']));
+        $this->assertSame(0, StaffAttendance::query()->count());
     }
 
     protected function createSuperAdmin(): User
