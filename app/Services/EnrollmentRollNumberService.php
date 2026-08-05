@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Enrollment;
 use App\Models\Payment;
 use App\Models\User;
+use App\Support\BiometricPinCollision;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -77,6 +78,12 @@ class EnrollmentRollNumberService
 
         if ($validator->fails()) {
             throw ValidationException::withMessages($validator->errors()->toArray());
+        }
+
+        if (BiometricPinCollision::studentRollCollidesWithStaffCode($rollNumber)) {
+            throw ValidationException::withMessages([
+                'enrollment_number' => 'This roll number matches a Staff ID. Choose a different roll.',
+            ]);
         }
     }
 

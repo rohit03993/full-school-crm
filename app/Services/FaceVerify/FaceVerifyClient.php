@@ -4,6 +4,7 @@ namespace App\Services\FaceVerify;
 
 use App\Models\FaceVerificationRequest;
 use App\Models\Student;
+use App\Models\User;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
@@ -46,6 +47,20 @@ class FaceVerifyClient
     }
 
     /**
+     * Sync staff to Face Platform using the same /students endpoint.
+     * employee_code is sent as enrollment_number (device PIN / Face external ID).
+     *
+     * @return array<string, mixed>
+     */
+    public function upsertStaff(User $user): array
+    {
+        return $this->request()
+            ->post('/students', $this->staffPayload($user))
+            ->throw()
+            ->json() ?? [];
+    }
+
+    /**
      * @param  iterable<Student>  $students
      * @return array{synced: int}
      */
@@ -57,7 +72,31 @@ class FaceVerifyClient
             $payload[] = $this->studentPayload($student);
         }
 
-        if ($payload === []) {
+        return $this->bulkSyncPersons($payload);
+    }
+
+    /**
+     * @param  iterable<User>  $users
+     * @return array{synced: int}
+     */
+    public function upsertStaffMembers(iterable $users): array
+    {
+        $payload = [];
+
+        foreach ($users as $user) {
+            $payload[] = $this->staffPayload($user);
+        }
+
+        return $this->bulkSyncPersons($payload);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $persons
+     * @return array{synced: int}
+     */
+    protected function bulkSyncPersons(array $persons): array
+    {
+        if ($persons === []) {
             return ['synced' => 0];
         }
 
@@ -65,7 +104,7 @@ class FaceVerifyClient
             10,
             (int) config('face_verify.bulk_http_timeout_seconds', 60),
         ))
-            ->post('/students/bulk-sync', ['students' => $payload])
+            ->post('/students/bulk-sync', ['students' => $persons])
             ->throw()
             ->json();
 
@@ -151,6 +190,29 @@ class FaceVerifyClient
                 ?? $enrollment->course?->name
                 ?? $enrollment->academicSession?->name,
             'crm_student_id' => (string) $student->id,
+            'subject' => 'student',
+        ];
+    }
+
+    /**
+     * @return array{enrollment_number: string, name: string, batch: ?string, crm_student_id: string, subject: string, crm_user_id: string}
+     */
+    protected function staffPayload(User $user): array
+    {
+        $user->loadMissing('staffProfile');
+        $code = strtoupper(trim((string) ($user->staffProfile?->employee_code ?? '')));
+
+        if ($code === '') {
+            throw new InvalidArgumentException('Staff has no employee code (Staff ID).');
+        }
+
+        return [
+            'enrollment_number' => $code,
+            'name' => $user->name,
+            'batch' => $user->staffProfile?->designation ?: 'Staff',
+            'crm_student_id' => 'staff:'.$user->id,
+            'crm_user_id' => (string) $user->id,
+            'subject' => 'staff',
         ];
     }
 

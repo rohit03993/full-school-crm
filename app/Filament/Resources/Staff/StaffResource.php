@@ -6,17 +6,22 @@ use App\Enums\CrmPermission;
 use App\Enums\RoleName;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Enums\StaffJobRole;
+use App\Filament\Pages\BulkStaffImportPage;
 use App\Filament\Resources\Staff\Pages\CreateStaff;
 use App\Filament\Resources\Staff\Pages\EditStaff;
 use App\Filament\Resources\Staff\Pages\ListStaff;
 use App\Filament\Support\CrmTable;
 use App\Models\User;
+use App\Services\FaceVerify\FaceVerifyGateService;
+use App\Support\BiometricPinCollision;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
+use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -29,6 +34,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Throwable;
 use UnitEnum;
 
 class StaffResource extends Resource
@@ -124,9 +130,22 @@ class StaffResource extends Resource
                     TextInput::make('designation')
                         ->maxLength(100),
                     TextInput::make('employee_code')
-                        ->label('Employee Code')
+                        ->label('Staff ID')
+                        ->helperText('Device PIN / Face ID — must not match any student roll number.')
                         ->maxLength(50)
-                        ->unique(ignoreRecord: true),
+                        ->unique(ignoreRecord: true)
+                        ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? strtoupper(trim($state)) : null)
+                        ->rule(function (): \Closure {
+                            return function (string $attribute, mixed $value, \Closure $fail): void {
+                                if (! filled($value)) {
+                                    return;
+                                }
+
+                                if (BiometricPinCollision::staffCodeCollidesWithStudentRoll((string) $value)) {
+                                    $fail('This Staff ID matches a student roll number. Choose a different ID.');
+                                }
+                            };
+                        }),
                     TextInput::make('mobile')
                         ->label('Work Mobile')
                         ->tel()
@@ -167,7 +186,8 @@ class StaffResource extends Resource
                     ->label('Designation')
                     ->placeholder('—'),
                 TextColumn::make('staffProfile.employee_code')
-                    ->label('Employee Code')
+                    ->label('Staff ID')
+                    ->searchable()
                     ->placeholder('—'),
                 IconColumn::make('is_active')
                     ->label('Active')
@@ -194,6 +214,69 @@ class StaffResource extends Resource
                     }),
                 TernaryFilter::make('is_active')
                     ->label('Active'),
+            ])
+            ->recordActions([
+                Action::make('syncFaceVerify')
+                    ->label('Sync to Face API')
+                    ->icon(Heroicon::OutlinedArrowPath)
+                    ->visible(fn (): bool => (bool) config('face_verify.enabled', false)
+                        && (Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false))
+                    ->requiresConfirmation()
+                    ->modalHeading('Sync staff to Face API')
+                    ->modalDescription('Upserts this staff member so the shared kiosk can enroll by Staff ID.')
+                    ->action(function (User $record): void {
+                        try {
+                            app(FaceVerifyGateService::class)->syncStaff($record);
+
+                            Notification::make()
+                                ->title('Synced to Face API')
+                                ->body('Staff ID '.$record->staffProfile?->employee_code.' is ready for kiosk enrollment.')
+                                ->success()
+                                ->send();
+                        } catch (Throwable $exception) {
+                            Notification::make()
+                                ->title('Face API sync failed')
+                                ->body($exception->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+            ])
+            ->headerActions([
+                Action::make('importStaff')
+                    ->label('Import staff')
+                    ->icon(Heroicon::OutlinedArrowUpTray)
+                    ->url(BulkStaffImportPage::getUrl())
+                    ->visible(fn (): bool => CrmAccess::can(Auth::user(), CrmPermission::StaffManage)),
+                Action::make('syncAllFaceVerify')
+                    ->label('Sync all to Face API')
+                    ->icon(Heroicon::OutlinedArrowPath)
+                    ->visible(fn (): bool => (bool) config('face_verify.enabled', false)
+                        && (Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false))
+                    ->requiresConfirmation()
+                    ->action(function (): void {
+                        $users = User::query()
+                            ->where('is_active', true)
+                            ->whereHas('staffProfile', fn (Builder $q) => $q->whereNotNull('employee_code')->where('employee_code', '!=', ''))
+                            ->with('staffProfile')
+                            ->get();
+
+                        try {
+                            $result = app(FaceVerifyGateService::class)->syncStaffMembers($users);
+
+                            Notification::make()
+                                ->title('Staff synced to Face API')
+                                ->body(($result['synced'] ?? 0).' staff member(s) synced.')
+                                ->success()
+                                ->send();
+                        } catch (Throwable $exception) {
+                            Notification::make()
+                                ->title('Face API sync failed')
+                                ->body($exception->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
             ]);
     }
 

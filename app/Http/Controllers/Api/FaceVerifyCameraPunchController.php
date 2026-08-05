@@ -39,7 +39,8 @@ class FaceVerifyCameraPunchController extends Controller
 
         if (! ($result['ok'] ?? false)) {
             $status = match ($result['message'] ?? '') {
-                'Student not found.' => 404,
+                'Student not found.',
+                'Student or staff not found for this ID.' => 404,
                 default => 422,
             };
 

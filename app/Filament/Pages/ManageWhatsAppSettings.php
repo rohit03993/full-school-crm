@@ -161,6 +161,29 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('Used when a specific IN/OUT campaign is left blank.'),
                 ])
                 ->columns(2),
+            Section::make('Staff attendance punch — staff WhatsApp')
+                ->description('Separate templates from parent/student punch messages. Sent to the staff mobile when Staff ID punches IN/OUT on the same machines.')
+                ->icon(Heroicon::OutlinedUserGroup)
+                ->schema([
+                    Toggle::make('staff_punch_autosend_enabled')
+                        ->label('Send staff WhatsApp on IN and OUT')
+                        ->helperText('Uses staff templates only — not the parent punch campaigns above.')
+                        ->columnSpanFull(),
+                    Select::make('staff_punch_in_autosend_live_campaign_id')
+                        ->label('Staff biometric check-in (IN)')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Map template vars to staff.name, staff.employee_code, attendance.time, institute.name.'),
+                    Select::make('staff_punch_out_autosend_live_campaign_id')
+                        ->label('Staff biometric check-out (OUT)')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false),
+                ])
+                ->columns(2),
             Section::make('Post-call auto message')
                 ->description('After a connected outgoing call is logged, queue a WhatsApp using the selected template.')
                 ->collapsed()

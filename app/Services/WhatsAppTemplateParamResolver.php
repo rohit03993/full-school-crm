@@ -28,6 +28,10 @@ class WhatsAppTemplateParamResolver
             'institute.phone' => 'Institute phone',
             'caller.name' => 'Caller / staff name',
             'caller.mobile' => 'Caller mobile',
+            'staff.name' => 'Staff name',
+            'staff.employee_code' => 'Staff ID / employee code',
+            'staff.mobile' => 'Staff mobile',
+            'staff.designation' => 'Staff designation',
             'campaign.topic' => 'Announcement topic',
             'campaign.subject' => 'Announcement subject',
             'campaign.date' => 'Announcement date',
@@ -139,6 +143,54 @@ class WhatsAppTemplateParamResolver
         }
 
         return array_values($params);
+    }
+
+    /**
+     * @param  list<string|null>  $sources
+     * @return list<string>
+     */
+    public function resolveAllForStaff(
+        array $sources,
+        User $staffMember,
+        string $employeeCode,
+        string $date,
+        string $time,
+        string $state,
+        ?User $sender = null,
+    ): array {
+        $institute = InstituteSettings::forDocuments();
+        $staffMember->loadMissing('staffProfile');
+        $params = [];
+
+        foreach (array_values($sources) as $source) {
+            if (! filled($source)) {
+                $params[] = '';
+
+                continue;
+            }
+
+            if (str_starts_with($source, '"') && str_ends_with($source, '"')) {
+                $params[] = trim($source, '"');
+
+                continue;
+            }
+
+            $params[] = match ($source) {
+                'staff.name', 'student.name', 'caller.name' => (string) $staffMember->name,
+                'staff.employee_code', 'student.enrollment_number' => $employeeCode,
+                'staff.mobile', 'student.mobile' => (string) ($staffMember->staffProfile?->mobile ?: $staffMember->mobile),
+                'staff.designation' => (string) ($staffMember->staffProfile?->designation ?? ''),
+                'institute.name' => (string) ($institute['name'] ?? ''),
+                'institute.phone' => (string) ($institute['phone'] ?? ''),
+                'attendance.date' => Carbon::parse($date)->format('d M Y'),
+                'attendance.time', 'campaign.time' => $time,
+                'attendance.status' => $state === 'IN' ? 'Present' : 'Checked out',
+                'caller.mobile' => (string) ($sender?->mobile ?? ''),
+                default => '',
+            };
+        }
+
+        return $params;
     }
 
     /**

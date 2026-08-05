@@ -6,8 +6,10 @@ use App\Models\BiometricDevice;
 use App\Models\BiometricPunch;
 use App\Models\FaceVerificationRequest;
 use App\Models\Student;
+use App\Models\User;
 use App\Services\Punch\PunchAttendanceProcessor;
 use App\Services\Punch\PunchLogService;
+use App\Services\Punch\PunchSubjectResolver;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,6 +23,7 @@ class FaceVerifyGateService
         protected FaceVerifyClient $client,
         protected PunchLogService $punchLogs,
         protected PunchAttendanceProcessor $processor,
+        protected PunchSubjectResolver $subjects,
     ) {}
 
     public function isEnabled(): bool
@@ -54,13 +57,13 @@ class FaceVerifyGateService
         Carbon $punchedAt,
     ): string {
         $enrollmentNumber = $this->punchLogs->normalizeRoll($userPin);
-        $student = $this->punchLogs->findStudentByRoll($enrollmentNumber);
+        $subject = $this->subjects->resolve($enrollmentNumber);
         $faceDeviceId = $this->resolveFaceDeviceId($device);
 
-        if (! $student) {
+        if (! $subject) {
             $punch->update([
                 'process_status' => BiometricPunch::STATUS_IGNORED,
-                'process_error' => 'Face verify skipped: enrollment number not found.',
+                'process_error' => 'Face verify skipped: enrollment / staff ID not found.',
             ]);
 
             return 'ignored';
@@ -79,7 +82,9 @@ class FaceVerifyGateService
             'id' => (string) Str::uuid(),
             'biometric_punch_id' => $punch->id,
             'biometric_device_id' => $device->id,
-            'student_id' => $student->id,
+            'student_id' => $subject['type'] === PunchSubjectResolver::TYPE_STUDENT ? $subject['student']->id : null,
+            'subject' => $subject['type'],
+            'user_id' => $subject['type'] === PunchSubjectResolver::TYPE_STAFF ? $subject['user']->id : null,
             'enrollment_number' => $enrollmentNumber,
             'face_device_id' => $faceDeviceId,
             'status' => FaceVerificationRequest::STATUS_PENDING,
@@ -89,6 +94,7 @@ class FaceVerifyGateService
                 'source' => 'adms',
                 'serial' => $device->serial_number,
                 'user_pin' => $userPin,
+                'subject' => $subject['type'],
             ],
         ]);
 
@@ -239,10 +245,10 @@ class FaceVerifyGateService
             return ['ok' => false, 'message' => 'enrollment_number is required.'];
         }
 
-        $student = $this->punchLogs->findStudentByRoll($enrollmentNumber);
+        $subject = $this->subjects->resolve($enrollmentNumber);
 
-        if (! $student) {
-            return ['ok' => false, 'message' => 'Student not found.'];
+        if (! $subject) {
+            return ['ok' => false, 'message' => 'Student or staff not found for this ID.'];
         }
 
         $cooldownSeconds = max(0, (int) config('face_verify.camera_punch_cooldown_seconds', 60));
@@ -274,7 +280,7 @@ class FaceVerifyGateService
         $deviceName = 'Face Camera Kiosk';
         $areaName = $device?->location;
 
-        return DB::transaction(function () use ($payload, $student, $enrollmentNumber, $score, $faceDeviceId, $punchedAt, $device, $deviceName, $areaName): array {
+        return DB::transaction(function () use ($payload, $subject, $enrollmentNumber, $score, $faceDeviceId, $punchedAt, $device, $deviceName, $areaName): array {
             $punchLogId = $this->writePunchLog(
                 enrollmentNumber: $enrollmentNumber,
                 punchedAt: $punchedAt,
@@ -290,7 +296,9 @@ class FaceVerifyGateService
                 'id' => (string) Str::uuid(),
                 'biometric_punch_id' => null,
                 'biometric_device_id' => $device?->id,
-                'student_id' => $student->id,
+                'student_id' => $subject['type'] === PunchSubjectResolver::TYPE_STUDENT ? $subject['student']->id : null,
+                'subject' => $subject['type'],
+                'user_id' => $subject['type'] === PunchSubjectResolver::TYPE_STAFF ? $subject['user']->id : null,
                 'enrollment_number' => $enrollmentNumber,
                 'face_device_id' => $faceDeviceId !== '' ? $faceDeviceId : null,
                 'face_request_id' => isset($payload['request_id']) ? (string) $payload['request_id'] : null,
@@ -302,6 +310,7 @@ class FaceVerifyGateService
                 'responded_at' => now(),
                 'meta' => [
                     'source' => 'camera_kiosk',
+                    'subject' => $subject['type'],
                     'callback_payload' => $payload,
                 ],
             ]);
@@ -406,6 +415,29 @@ class FaceVerifyGateService
         }
 
         return $this->client->upsertStudents($ready);
+    }
+
+    public function syncStaff(User $user): array
+    {
+        $user->loadMissing('staffProfile');
+
+        return $this->client->upsertStaff($user);
+    }
+
+    /**
+     * @param  iterable<User>  $users
+     * @return array{synced: int}
+     */
+    public function syncStaffMembers(iterable $users): array
+    {
+        $ready = [];
+
+        foreach ($users as $user) {
+            $user->loadMissing('staffProfile');
+            $ready[] = $user;
+        }
+
+        return $this->client->upsertStaffMembers($ready);
     }
 
     protected function findRequest(?string $crmRequestId, ?string $faceRequestId): ?FaceVerificationRequest

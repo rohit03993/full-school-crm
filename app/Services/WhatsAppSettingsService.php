@@ -28,6 +28,9 @@ class WhatsAppSettingsService
             'punch_out_autosend_live_campaign_id' => Setting::getValue('whatsapp.punch_out_autosend_live_campaign_id'),
             'punch_manual_in_autosend_live_campaign_id' => Setting::getValue('whatsapp.punch_manual_in_autosend_live_campaign_id'),
             'punch_manual_out_autosend_live_campaign_id' => Setting::getValue('whatsapp.punch_manual_out_autosend_live_campaign_id'),
+            'staff_punch_autosend_enabled' => (bool) Setting::getValue('whatsapp.staff_punch_autosend_enabled', false),
+            'staff_punch_in_autosend_live_campaign_id' => Setting::getValue('whatsapp.staff_punch_in_autosend_live_campaign_id'),
+            'staff_punch_out_autosend_live_campaign_id' => Setting::getValue('whatsapp.staff_punch_out_autosend_live_campaign_id'),
             'campaign_batch_size' => (int) Setting::getValue('whatsapp.campaign_batch_size', config('whatsapp.batch_size', 10)),
             'campaign_batch_delay_seconds' => (int) Setting::getValue(
                 'whatsapp.campaign_next_batch_delay_seconds',
@@ -109,6 +112,21 @@ class WhatsAppSettingsService
         Setting::setValue(
             'whatsapp.punch_manual_out_autosend_live_campaign_id',
             filled($data['punch_manual_out_autosend_live_campaign_id'] ?? null) ? (string) $data['punch_manual_out_autosend_live_campaign_id'] : '',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.staff_punch_autosend_enabled',
+            ! empty($data['staff_punch_autosend_enabled']) ? '1' : '0',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.staff_punch_in_autosend_live_campaign_id',
+            filled($data['staff_punch_in_autosend_live_campaign_id'] ?? null) ? (string) $data['staff_punch_in_autosend_live_campaign_id'] : '',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.staff_punch_out_autosend_live_campaign_id',
+            filled($data['staff_punch_out_autosend_live_campaign_id'] ?? null) ? (string) $data['staff_punch_out_autosend_live_campaign_id'] : '',
             'whatsapp',
         );
         Setting::setValue(

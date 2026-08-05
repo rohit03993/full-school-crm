@@ -407,7 +407,7 @@ class FaceVerifyIntegrationTest extends TestCase
                 'HTTP_X_FACE_VERIFY_SIGNATURE' => $signature,
             ],
             $raw,
-        )->assertNotFound()->assertJson(['ok' => false, 'message' => 'Student not found.']);
+        )->assertNotFound()->assertJson(['ok' => false, 'message' => 'Student or staff not found for this ID.']);
     }
 
     public function test_bulk_student_sync_posts_expected_payload(): void

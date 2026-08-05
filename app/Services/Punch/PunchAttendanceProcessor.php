@@ -15,6 +15,9 @@ class PunchAttendanceProcessor
         protected PunchInOutCalculator $calculator,
         protected PunchAttendanceSyncService $sync,
         protected PunchWhatsAppService $whatsapp,
+        protected PunchSubjectResolver $subjects,
+        protected StaffPunchAttendanceSyncService $staffSync,
+        protected StaffPunchWhatsAppService $staffWhatsapp,
         protected AttendanceAutoOutService $autoOut,
     ) {}
 
@@ -109,15 +112,19 @@ class PunchAttendanceProcessor
         $date = (string) $punch->punch_date;
         $time = (string) $punch->punch_time;
 
-        $student = $this->logs->findStudentByRoll($roll);
+        $subject = $this->subjects->resolve($roll);
 
-        if (! $student) {
+        if (! $subject) {
             return $this->emptyPunchResult();
         }
 
         $state = $this->resolveState($roll, $date, $time);
 
-        return $this->applyPunchEffects($student, $roll, $date, $time, $state);
+        if ($subject['type'] === PunchSubjectResolver::TYPE_STAFF) {
+            return $this->applyStaffPunchEffects($subject['user'], $roll, $date, $time, $state);
+        }
+
+        return $this->applyPunchEffects($subject['student'], $roll, $date, $time, $state);
     }
 
     /**
@@ -130,15 +137,19 @@ class PunchAttendanceProcessor
         $time = (string) $item->punch_time;
 
         try {
-            $student = $this->logs->findStudentByRoll($roll);
+            $subject = $this->subjects->resolve($roll);
 
-            if (! $student) {
+            if (! $subject) {
                 return $this->emptyPunchResult();
             }
 
             $state = $this->resolveState($roll, $date, $time);
 
-            return $this->applyPunchEffects($student, $roll, $date, $time, $state);
+            if ($subject['type'] === PunchSubjectResolver::TYPE_STAFF) {
+                return $this->applyStaffPunchEffects($subject['user'], $roll, $date, $time, $state);
+            }
+
+            return $this->applyPunchEffects($subject['student'], $roll, $date, $time, $state);
         } finally {
             DB::table('notification_queue')
                 ->where('id', $item->id)
@@ -179,6 +190,43 @@ class PunchAttendanceProcessor
         }
 
         $whatsapp = $this->whatsapp->outcomeForPunch($student, $roll, $date, $time, $state, $staff);
+
+        return ['synced' => $synced, 'whatsapp' => $whatsapp];
+    }
+
+    /**
+     * @return array{synced: bool, whatsapp: array{queued: bool, message: string}}
+     */
+    private function applyStaffPunchEffects(
+        User $staffMember,
+        string $employeeCode,
+        string $date,
+        string $time,
+        string $state,
+        ?User $actor = null,
+    ): array {
+        $synced = false;
+
+        if ($state === 'IN' || $state === 'OUT') {
+            $this->staffSync->syncFromPunch(
+                $staffMember,
+                $date,
+                $state,
+                $time,
+                $actor ? 'manual' : 'biometric',
+                $actor?->id,
+            );
+            $synced = true;
+        }
+
+        $whatsapp = $this->staffWhatsapp->outcomeForPunch(
+            $staffMember,
+            $employeeCode,
+            $date,
+            $time,
+            $state,
+            $actor,
+        );
 
         return ['synced' => $synced, 'whatsapp' => $whatsapp];
     }

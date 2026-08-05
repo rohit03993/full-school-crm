@@ -26,6 +26,8 @@ class FaceVerificationRequest extends Model
         'biometric_punch_id',
         'biometric_device_id',
         'student_id',
+        'subject',
+        'user_id',
         'enrollment_number',
         'face_student_id',
         'face_device_id',
@@ -62,5 +64,10 @@ class FaceVerificationRequest extends Model
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }
