@@ -21,7 +21,10 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Maatwebsite\Excel\Facades\Excel;
@@ -85,8 +88,9 @@ class BulkStaffImportPage extends Page
                         ])
                         ->disk('local')
                         ->directory('temp-staff-imports')
+                        ->visibility('private')
                         ->required()
-                        ->storeFiles(false),
+                        ->maxSize(10240),
                     Placeholder::make('errors')
                         ->label('Row errors')
                         ->content(fn (): HtmlString => new HtmlString(
@@ -135,15 +139,14 @@ class BulkStaffImportPage extends Page
         StudentImportFileReader $reader,
         StaffBulkImportService $importer,
     ): void {
-        $file = $this->data['upload'] ?? null;
+        $parsed = $this->parseUploadedSpreadsheet($reader, $this->data['upload'] ?? null);
 
-        if (! $file instanceof TemporaryUploadedFile) {
+        if ($parsed === null) {
             Notification::make()->title('Choose a file')->warning()->send();
 
             return;
         }
 
-        $parsed = $reader->storeAndParse($file);
         $columns = $importer->guessColumnIndexes($parsed['headers']);
         $result = $importer->importRows(Auth::user(), $parsed['rows'], $columns);
         $reader->deleteStoredFile($parsed['path'] ?? null);
@@ -162,5 +165,57 @@ class BulkStaffImportPage extends Page
             ->body($body)
             ->success()
             ->send();
+    }
+
+    /**
+     * Filament FileUpload may leave TemporaryUploadedFile, an array of files, a stored path, or a Livewire temp name.
+     *
+     * @return array{headers: list<string|null>, rows: list<list<string|null>>, path: ?string}|null
+     */
+    protected function parseUploadedSpreadsheet(StudentImportFileReader $reader, mixed $upload = null): ?array
+    {
+        $upload = $this->resolveUploadValue($upload);
+
+        if ($upload instanceof TemporaryUploadedFile || $upload instanceof UploadedFile) {
+            return $reader->storeAndParse($upload);
+        }
+
+        if (! is_string($upload) || blank($upload)) {
+            return null;
+        }
+
+        if (Storage::disk('local')->exists($upload)) {
+            $absolute = Storage::disk('local')->path($upload);
+
+            if (! is_readable($absolute)) {
+                return null;
+            }
+
+            return [
+                ...$reader->parse($absolute),
+                'path' => $upload,
+            ];
+        }
+
+        try {
+            $temporary = TemporaryUploadedFile::createFromLivewire($upload);
+
+            if ($temporary->exists()) {
+                return $reader->storeAndParse($temporary);
+            }
+        } catch (\Throwable) {
+            // Not a Livewire temporary upload name.
+        }
+
+        return null;
+    }
+
+    protected function resolveUploadValue(mixed $upload): mixed
+    {
+        if (is_array($upload)) {
+            $upload = Arr::first($upload);
+        }
+
+        return $upload;
     }
 }
