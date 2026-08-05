@@ -14,6 +14,7 @@ use App\Filament\Support\CrmTable;
 use App\Models\User;
 use App\Services\FaceVerify\FaceVerifyGateService;
 use App\Support\BiometricPinCollision;
+use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Actions\Action;
