@@ -117,8 +117,8 @@ class StaffAttendancePage extends Page
             View::make('filament.pages.partials.staff-attendance-table')
                 ->viewData(fn (): array => [
                     'rows' => $this->rows(),
-                    'date' => $this->data['date'] ?? now()->toDateString(),
-                    'canMarkToday' => ($this->data['date'] ?? now()->toDateString()) === now()->toDateString(),
+                    'date' => $this->selectedDate(),
+                    'canMarkToday' => $this->selectedDate() === now()->toDateString(),
                 ]),
         ]);
     }
@@ -135,7 +135,7 @@ class StaffAttendancePage extends Page
 
     protected function markManual(int $userId, string $state, ManualStaffAttendanceService $manual): void
     {
-        $date = (string) ($this->data['date'] ?? now()->toDateString());
+        $date = $this->selectedDate();
         $staffMember = User::query()->with('staffProfile')->find($userId);
 
         if (! $staffMember) {
@@ -166,12 +166,19 @@ class StaffAttendancePage extends Page
             ->send();
     }
 
+    protected function selectedDate(): string
+    {
+        $raw = $this->data['date'] ?? now()->toDateString();
+
+        return \Illuminate\Support\Carbon::parse($raw)->toDateString();
+    }
+
     /**
      * @return Collection<int, array<string, mixed>>
      */
     protected function rows(): Collection
     {
-        $date = $this->data['date'] ?? now()->toDateString();
+        $date = $this->selectedDate();
         $manual = app(ManualStaffAttendanceService::class);
 
         $query = User::query()
