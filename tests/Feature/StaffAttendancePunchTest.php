@@ -184,6 +184,28 @@ class StaffAttendancePunchTest extends TestCase
         $this->assertSame(0, StaffAttendance::query()->count());
     }
 
+    public function test_imported_staff_appear_on_staff_resource_list(): void
+    {
+        $admin = $this->createSuperAdmin();
+        $this->actingAs($admin);
+
+        app(StaffBulkImportService::class)->importRows($admin, [
+            ['STF400', 'Listed Teacher', '9876504000', 'Teacher', ''],
+        ], [
+            'staff_id' => 0,
+            'name' => 1,
+            'mobile' => 2,
+            'designation' => 3,
+            'email' => 4,
+        ]);
+
+        $user = User::query()->where('mobile', '9876504000')->first();
+        $this->assertNotNull($user);
+
+        $ids = \App\Filament\Resources\Staff\StaffResource::getEloquentQuery()->pluck('id')->all();
+        $this->assertContains($user->id, $ids);
+    }
+
     protected function createSuperAdmin(): User
     {
         $user = User::factory()->create(['is_active' => true]);

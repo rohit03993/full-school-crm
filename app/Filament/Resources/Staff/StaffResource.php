@@ -73,10 +73,16 @@ class StaffResource extends Resource
         return parent::getEloquentQuery()
             ->with(['roles', 'staffProfile'])
             ->where('is_platform_operator', false)
-            ->whereHas('roles', fn (Builder $query) => $query->whereIn('name', array_merge(
-                [RoleName::SuperAdmin->value],
-                StaffJobRole::values(),
-            )));
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereHas('roles', fn (Builder $roles) => $roles->whereIn('name', array_merge(
+                        [RoleName::SuperAdmin->value, RoleName::Staff->value],
+                        StaffJobRole::values(),
+                    )))
+                    ->orWhereHas('staffProfile', fn (Builder $profile) => $profile
+                        ->whereNotNull('employee_code')
+                        ->where('employee_code', '!=', ''));
+            });
     }
 
     public static function form(Schema $schema): Schema
