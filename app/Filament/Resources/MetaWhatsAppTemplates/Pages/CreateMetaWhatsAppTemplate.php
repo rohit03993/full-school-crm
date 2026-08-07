@@ -40,6 +40,7 @@ class CreateMetaWhatsAppTemplate extends CreateRecord
             'body_variable_samples' => MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
                 $bodyText,
                 $state['body_variable_samples'] ?? [],
+                (string) ($state['name'] ?? ''),
             ),
         ]);
     }

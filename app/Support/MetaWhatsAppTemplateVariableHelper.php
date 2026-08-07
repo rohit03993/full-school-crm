@@ -38,7 +38,7 @@ class MetaWhatsAppTemplateVariableHelper
      * @param  list<array<string, mixed>>  $existingRows
      * @return list<array{index: int, label: string, example: string}>
      */
-    public static function syncRowsFromBody(string $bodyText, array $existingRows = []): array
+    public static function syncRowsFromBody(string $bodyText, array $existingRows = [], ?string $templateName = null): array
     {
         $order = MetaWhatsAppTemplateBuilder::positionalPlaceholderOrder($bodyText);
 
@@ -46,16 +46,22 @@ class MetaWhatsAppTemplateVariableHelper
             ->filter(fn (mixed $row): bool => is_array($row))
             ->keyBy(fn (array $row): int => (int) ($row['index'] ?? 0));
 
+        $feeVariables = FeeReminderWhatsAppTemplate::looksLikeName((string) $templateName)
+            || str_contains(strtolower($bodyText), 'fee reminder')
+            ? FeeReminderWhatsAppTemplate::variables()
+            : [];
+
         $rows = [];
 
         foreach ($order as $index) {
             $previous = $existingByIndex->get($index);
+            $fee = $feeVariables[$index] ?? null;
             $rows[] = [
                 'index' => $index,
-                'label' => self::labelForIndex($index),
+                'label' => $fee['label'] ?? self::labelForIndex($index),
                 'example' => filled($previous['example'] ?? null)
                     ? trim((string) $previous['example'])
-                    : self::defaultSampleForIndex($index),
+                    : ($fee['example'] ?? self::defaultSampleForIndex($index)),
             ];
         }
 

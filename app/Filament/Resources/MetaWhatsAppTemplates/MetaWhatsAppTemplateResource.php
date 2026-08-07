@@ -14,6 +14,7 @@ use App\Models\WhatsAppTemplate;
 use App\Services\WhatsAppTemplateParamResolver;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
+use App\Support\FeeReminderWhatsAppTemplate;
 use App\Support\MetaWhatsAppTemplateBuilder;
 use App\Support\MetaWhatsAppTemplateVariableHelper;
 use Filament\Forms\Components\Placeholder;
@@ -87,13 +88,40 @@ class MetaWhatsAppTemplateResource extends Resource
     protected static function createFormSchema(): array
     {
         return [
+            Placeholder::make('fee_reminder_copy_guide')
+                ->hiddenLabel()
+                ->content(new HtmlString(
+                    '<div class="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-sm dark:border-amber-500/20 dark:bg-amber-500/5">'
+                    .'<p class="font-bold text-gray-950 dark:text-white">Fee reminder template</p>'
+                    .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
+                    .'For daily fee messages: set name to <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>, '
+                    .'category <strong>Utility</strong>, then leave the body blank and blur the name field — CRM fills the approved message and Meta sample values. '
+                    .'After Meta approves, create a Live quick campaign and link it under WhatsApp → Automations → Fee reminders.'
+                    .'</p></div>'
+                ))
+                ->columnSpanFull(),
             TextInput::make('name')
                 ->label('Template name')
                 ->required()
                 ->maxLength(64)
-                ->helperText('Lowercase letters, numbers, underscores — e.g. parent_checkin')
+                ->helperText('For fee reminders use: '.FeeReminderWhatsAppTemplate::NAME.' — lowercase letters, numbers, underscores only.')
                 ->live(onBlur: true)
-                ->afterStateUpdated(fn (callable $set, ?string $state) => $set('name', MetaWhatsAppTemplateBuilder::normalizeName((string) $state))),
+                ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
+                    $normalized = MetaWhatsAppTemplateBuilder::normalizeName((string) $state);
+                    $set('name', $normalized);
+
+                    if (! FeeReminderWhatsAppTemplate::looksLikeName($normalized)) {
+                        return;
+                    }
+
+                    if (filled(trim((string) $get('body_text')))) {
+                        return;
+                    }
+
+                    $set('category', FeeReminderWhatsAppTemplate::CATEGORY);
+                    $set('body_text', FeeReminderWhatsAppTemplate::BODY);
+                    $set('body_variable_samples', FeeReminderWhatsAppTemplate::sampleRows());
+                }),
             Select::make('language')
                 ->options([
                     'en' => 'English (en)',
@@ -118,7 +146,7 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->label('Message body')
                 ->required()
                 ->rows(8)
-                ->helperText('Type {{1}} for student name, {{2}} for roll number, {{3}} for time, {{4}} for date. Sample fields appear automatically below.')
+                ->helperText('Fee reminder: use the auto-filled body for `fee_reminder`. Other templates: {{1}}, {{2}}, … — samples appear below for Meta approval.')
                 ->live(debounce: 400)
                 ->afterStateUpdated(function (?string $state, Set $set, Get $get): void {
                     $set(
@@ -126,6 +154,7 @@ class MetaWhatsAppTemplateResource extends Resource
                         MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
                             (string) $state,
                             $get('body_variable_samples') ?? [],
+                            (string) $get('name'),
                         ),
                     );
                 })

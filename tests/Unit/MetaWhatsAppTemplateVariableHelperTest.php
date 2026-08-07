@@ -34,6 +34,22 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
         $this->assertSame('ROLL-99', $rows[1]['example']);
     }
 
+    public function test_fee_reminder_body_uses_fee_sample_labels(): void
+    {
+        $rows = MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
+            \App\Support\FeeReminderWhatsAppTemplate::BODY,
+            [],
+            'fee_reminder',
+        );
+
+        $this->assertCount(4, $rows);
+        $this->assertSame('Institute name', $rows[0]['label']);
+        $this->assertSame('B.D.M. Kanya Degree College', $rows[0]['example']);
+        $this->assertSame('Student name', $rows[1]['label']);
+        $this->assertSame('Pending amount', $rows[2]['label']);
+        $this->assertSame('Due date', $rows[3]['label']);
+    }
+
     public function test_rows_to_examples_csv_in_order(): void
     {
         $csv = MetaWhatsAppTemplateVariableHelper::rowsToExamplesCsv([
