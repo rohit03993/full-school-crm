@@ -93,6 +93,10 @@ class AdminPanelProvider extends PanelProvider
                 \App\Http\Middleware\EnsureInstituteOnboardingComplete::class,
             ])
             ->renderHook(
+                PanelsRenderHook::TOPBAR_END,
+                fn (): string => view('filament.partials.ask-crm-topbar')->render(),
+            )
+            ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): string => Blade::render('<x-crm.media-preview-dialog />')
                     .view('filament.partials.mobile-bottom-nav')->render()

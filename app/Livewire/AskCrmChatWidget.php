@@ -6,6 +6,7 @@ use App\Enums\CrmPermission;
 use App\Services\AskCrmService;
 use App\Support\CrmAccess;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class AskCrmChatWidget extends Component
@@ -32,6 +33,12 @@ class AskCrmChatWidget extends Component
     public static function canView(): bool
     {
         return CrmAccess::can(Auth::user(), CrmPermission::StudentsView);
+    }
+
+    #[On('open-ask-crm')]
+    public function openChat(): void
+    {
+        $this->open = true;
     }
 
     public function toggle(): void

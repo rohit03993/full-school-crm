@@ -1,98 +1,67 @@
 <div
-    class="pointer-events-none fixed bottom-6 right-4 z-[80] flex flex-col items-end gap-3 sm:right-6 lg:bottom-8"
+    style="position:fixed;right:1.25rem;bottom:1.5rem;z-index:9999;display:flex;flex-direction:column;align-items:flex-end;gap:0.75rem;pointer-events:none;"
 >
     @if ($open)
         <div
             wire:key="ask-crm-panel"
-            class="pointer-events-auto flex h-[min(32rem,70vh)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-gray-900"
+            style="pointer-events:auto;display:flex;flex-direction:column;width:min(22rem,calc(100vw - 2rem));height:min(32rem,70vh);overflow:hidden;border-radius:1rem;border:1px solid #e5e7eb;background:#fff;box-shadow:0 25px 50px rgba(0,0,0,.25);"
         >
-            <div class="flex items-center justify-between gap-2 border-b border-gray-100 bg-amber-500 px-3 py-2.5 text-white dark:border-white/10">
-                <div class="min-w-0">
-                    <p class="truncate text-sm font-semibold">Ask CRM</p>
-                    <p class="truncate text-[11px] text-white/90">Attendance · Fees · Homework</p>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.65rem 0.85rem;background:#f59e0b;color:#fff;">
+                <div style="min-width:0;">
+                    <p style="margin:0;font-size:0.875rem;font-weight:700;">Ask CRM</p>
+                    <p style="margin:0;font-size:0.7rem;opacity:.9;">Attendance · Fees · Homework</p>
                 </div>
                 <button
                     type="button"
                     wire:click="close"
-                    class="rounded-lg p-1.5 hover:bg-white/15"
+                    style="border:0;background:transparent;color:#fff;padding:0.35rem;border-radius:0.5rem;cursor:pointer;"
                     aria-label="Close chat"
                 >
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                    </svg>
+                    ✕
                 </button>
             </div>
 
-            <div class="flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
+            <div style="flex:1;overflow-y:auto;padding:0.75rem;display:flex;flex-direction:column;gap:0.6rem;background:#f9fafb;">
                 @foreach ($messages as $index => $item)
                     @php
                         $safe = e($item['text']);
                         $safe = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $safe) ?? $safe;
                         $safe = nl2br($safe);
+                        $isUser = $item['role'] === 'user';
                     @endphp
                     <div
                         wire:key="ask-crm-w-msg-{{ $index }}"
-                        @class([
-                            'flex',
-                            'justify-end' => $item['role'] === 'user',
-                            'justify-start' => $item['role'] !== 'user',
-                        ])
+                        style="display:flex;justify-content:{{ $isUser ? 'flex-end' : 'flex-start' }};"
                     >
-                        <div
-                            @class([
-                                'max-w-[92%] rounded-2xl px-3 py-2 text-[13px] leading-relaxed',
-                                'bg-amber-500 text-white' => $item['role'] === 'user',
-                                'bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-gray-100' => $item['role'] !== 'user',
-                            ])
-                        >
+                        <div style="max-width:92%;border-radius:1rem;padding:0.55rem 0.75rem;font-size:0.8125rem;line-height:1.45;white-space:normal;background:{{ $isUser ? '#f59e0b' : '#fff' }};color:{{ $isUser ? '#fff' : '#111827' }};border:{{ $isUser ? '0' : '1px solid #e5e7eb' }};">
                             {!! $safe !!}
                         </div>
                     </div>
                 @endforeach
             </div>
 
-            <div class="border-t border-gray-100 px-3 py-2.5 dark:border-white/10">
-                <div class="mb-2 flex flex-wrap gap-1.5">
-                    <button
-                        type="button"
-                        wire:click="askExample('What is Ayyush attendance today?')"
-                        class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300"
-                    >
-                        Attendance
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="askExample('How much fee pending for Ayyush?')"
-                        class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300"
-                    >
-                        Fees
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="askExample('Homework not done for Ayyush this week?')"
-                        class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300"
-                    >
-                        Homework
-                    </button>
+            <div style="border-top:1px solid #e5e7eb;padding:0.65rem 0.75rem;background:#fff;">
+                <div style="display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.5rem;">
+                    <button type="button" wire:click="askExample('What is Ayyush attendance today?')" style="border:0;border-radius:999px;background:#f3f4f6;padding:0.2rem 0.55rem;font-size:0.65rem;font-weight:700;cursor:pointer;">Attendance</button>
+                    <button type="button" wire:click="askExample('How much fee pending for Ayyush?')" style="border:0;border-radius:999px;background:#f3f4f6;padding:0.2rem 0.55rem;font-size:0.65rem;font-weight:700;cursor:pointer;">Fees</button>
+                    <button type="button" wire:click="askExample('Homework not done for Ayyush this week?')" style="border:0;border-radius:999px;background:#f3f4f6;padding:0.2rem 0.55rem;font-size:0.65rem;font-weight:700;cursor:pointer;">Homework</button>
                 </div>
 
-                <form wire:submit="send" class="flex items-end gap-2">
+                <form wire:submit="send" style="display:flex;align-items:flex-end;gap:0.5rem;">
                     <textarea
                         wire:model="message"
                         rows="2"
                         placeholder="Ask about a student…"
-                        class="min-h-[2.5rem] flex-1 resize-none rounded-xl border-gray-200 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                        style="flex:1;min-height:2.5rem;resize:none;border-radius:0.75rem;border:1px solid #d1d5db;padding:0.5rem 0.65rem;font-size:0.875rem;"
                     ></textarea>
                     <button
                         type="submit"
                         wire:loading.attr="disabled"
                         wire:target="send,askExample"
-                        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white hover:bg-amber-400 disabled:opacity-50"
+                        style="height:2.5rem;width:2.5rem;border:0;border-radius:0.75rem;background:#f59e0b;color:#fff;font-weight:700;cursor:pointer;"
                         aria-label="Send"
                     >
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
-                        </svg>
+                        →
                     </button>
                 </form>
             </div>
@@ -102,19 +71,10 @@
     <button
         type="button"
         wire:click="toggle"
-        class="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-3 text-sm font-bold text-white shadow-xl ring-4 ring-amber-500/30 transition hover:bg-amber-400 hover:scale-[1.02]"
+        style="pointer-events:auto;display:inline-flex;align-items:center;gap:0.5rem;border:0;border-radius:999px;background:#f59e0b;color:#fff;padding:0.75rem 1.1rem;font-size:0.875rem;font-weight:800;box-shadow:0 10px 25px rgba(245,158,11,.45);cursor:pointer;"
         aria-label="{{ $open ? 'Close Ask CRM' : 'Open Ask CRM' }}"
     >
-        @if ($open)
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-            </svg>
-            <span>Close</span>
-        @else
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
-            </svg>
-            <span>Ask CRM</span>
-        @endif
+        <span aria-hidden="true">💬</span>
+        <span>{{ $open ? 'Close' : 'Ask CRM' }}</span>
     </button>
 </div>
