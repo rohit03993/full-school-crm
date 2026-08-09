@@ -61,6 +61,7 @@ use App\Services\FeeMiscChargeAdjustmentService;
 use App\Services\FeeMiscChargeService;
 use App\Services\FeeStructureService;
 use App\Services\HomeworkAssignmentService;
+use App\Services\HomeworkCheckService;
 use App\Services\IdCardService;
 use App\Services\LeadAssignmentService;
 use App\Services\PaymentService;
@@ -253,6 +254,11 @@ class StudentProfilePage extends Page
      */
     public Collection $homeworkAssignments;
 
+    /**
+     * @var Collection<int, \App\Models\HomeworkCheck>
+     */
+    public Collection $homeworkChecks;
+
     public ?int $sendWhatsAppTemplateId = null;
 
     /** @var array<int, string> */
@@ -360,6 +366,7 @@ class StudentProfilePage extends Page
         $this->openCaseBanners = [];
         $this->messageThread = [];
         $this->homeworkAssignments = new Collection;
+        $this->homeworkChecks = new Collection;
         $this->documents = new Collection;
         $this->payments = new Collection;
         $this->installments = new Collection;
@@ -1742,6 +1749,8 @@ class StudentProfilePage extends Page
         }
 
         $this->homeworkTabLoaded = true;
+        $this->homeworkChecks = app(HomeworkCheckService::class)
+            ->forStudent((int) $this->record->id);
         $this->homeworkAssignments = app(HomeworkAssignmentService::class)
             ->assignmentsForStudentProfile($this->record);
     }
@@ -3168,6 +3177,7 @@ class StudentProfilePage extends Page
                             View::make('filament.pages.partials.student-profile-homework')
                                 ->viewData(fn (): array => [
                                     'homeworkTabLoaded' => $this->homeworkTabLoaded,
+                                    'checks' => $this->homeworkChecks,
                                     'assignments' => $this->homeworkAssignments,
                                     'portalUrl' => route('portal.homework.index'),
                                 ]),

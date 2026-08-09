@@ -353,4 +353,17 @@ class HomeworkCheckService
             ->limit($limit)
             ->get();
     }
+
+    /**
+     * @return Collection<int, HomeworkCheck>
+     */
+    public function forStudent(int $studentId, int $limit = 50): Collection
+    {
+        return HomeworkCheck::query()
+            ->where('student_id', $studentId)
+            ->with(['batch', 'createdBy'])
+            ->latest()
+            ->limit($limit)
+            ->get();
+    }
 }
