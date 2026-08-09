@@ -6,13 +6,11 @@ use App\Enums\HomeworkCheckNotifyStatus;
 use App\Enums\HomeworkCheckStatus;
 use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
-use App\Enums\WhatsAppRecipientStatus;
 use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
 use App\Models\BatchStudent;
 use App\Models\CourseSubject;
 use App\Models\HomeworkCheck;
-use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\FeatureGate;
@@ -176,9 +174,7 @@ class HomeworkCheckService
         $topic = trim($topic);
 
         if ($topic === '') {
-            throw ValidationException::withMessages([
-                'topic' => 'Enter the homework topic.',
-            ]);
+            $topic = "Today's homework";
         }
 
         $batch = Batch::query()->with('course')->findOrFail($batchId);
@@ -240,6 +236,109 @@ class HomeworkCheckService
             'check' => $check->fresh(),
             'whatsapp' => $outcome,
         ];
+    }
+
+    /**
+     * @param  list<int>  $studentIds
+     * @return array{marked: int, whatsappQueued: int, whatsappFailed: int, errors: list<string>}
+     */
+    public function markMany(
+        User $teacher,
+        int $batchId,
+        array $studentIds,
+        int $courseSubjectId,
+        string $topic,
+        HomeworkCheckStatus $status,
+    ): array {
+        $studentIds = collect($studentIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        $marked = 0;
+        $whatsappQueued = 0;
+        $whatsappFailed = 0;
+        $errors = [];
+
+        foreach ($studentIds as $studentId) {
+            try {
+                $result = $this->mark(
+                    $teacher,
+                    $batchId,
+                    $studentId,
+                    $courseSubjectId,
+                    $topic,
+                    $status,
+                );
+                $marked++;
+
+                if ($status === HomeworkCheckStatus::NotDone) {
+                    if ($result['whatsapp']['queued']) {
+                        $whatsappQueued++;
+                    } else {
+                        $whatsappFailed++;
+                    }
+                }
+            } catch (ValidationException $exception) {
+                $errors[] = (string) (collect($exception->errors())->flatten()->first() ?? 'Could not mark student '.$studentId);
+            }
+        }
+
+        return compact('marked', 'whatsappQueued', 'whatsappFailed', 'errors');
+    }
+
+    /**
+     * @return Collection<int, array{id: int, name: string, mobile: ?string, last_status: ?string, last_notify: ?string}>
+     */
+    public function rosterForBatch(int $batchId, ?int $courseSubjectId = null, ?string $search = null): Collection
+    {
+        $query = BatchStudent::query()
+            ->where('batch_id', $batchId)
+            ->where('is_active', true)
+            ->with('student')
+            ->whereHas('student', function ($q) use ($search): void {
+                if (filled($search)) {
+                    $q->where('name', 'like', '%'.trim($search).'%');
+                }
+            });
+
+        $latestByStudent = collect();
+
+        if ($courseSubjectId) {
+            $latestByStudent = HomeworkCheck::query()
+                ->where('batch_id', $batchId)
+                ->where('course_subject_id', $courseSubjectId)
+                ->whereDate('created_at', now()->toDateString())
+                ->orderByDesc('id')
+                ->get()
+                ->unique('student_id')
+                ->keyBy('student_id');
+        }
+
+        return $query
+            ->get()
+            ->map(function (BatchStudent $row) use ($latestByStudent): ?array {
+                $student = $row->student;
+                if (! $student) {
+                    return null;
+                }
+
+                /** @var HomeworkCheck|null $latest */
+                $latest = $latestByStudent->get($student->id);
+
+                return [
+                    'id' => $student->id,
+                    'name' => $student->name,
+                    'mobile' => $student->mobile,
+                    'last_status' => $latest?->status?->label(),
+                    'last_notify' => $latest?->notify_status?->label(),
+                ];
+            })
+            ->filter()
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
     }
 
     /**

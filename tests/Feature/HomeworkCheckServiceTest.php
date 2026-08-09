@@ -140,6 +140,62 @@ class HomeworkCheckServiceTest extends TestCase
         );
     }
 
+    public function test_mark_many_not_done_for_selected_students(): void
+    {
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::sequence()
+                ->push(['messages' => [['id' => 'wamid.HWBULK1']]], 200)
+                ->push(['messages' => [['id' => 'wamid.HWBULK2']]], 200),
+        ]);
+
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $second = Student::query()->create([
+            'name' => 'Aman Verma',
+            'mobile' => '9123456780',
+            'status' => StudentStatus::Enrolled,
+        ]);
+        BatchStudent::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $second->id,
+            'is_active' => true,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $teacher->id,
+        ]);
+        $this->enableHomeworkNotDoneAutomation();
+
+        $result = app(HomeworkCheckService::class)->markMany(
+            $teacher,
+            $batch->id,
+            [$student->id, $second->id],
+            $subject->id,
+            '',
+            HomeworkCheckStatus::NotDone,
+        );
+
+        $this->assertSame(2, $result['marked']);
+        $this->assertSame(2, $result['whatsappQueued']);
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $student->id,
+            'topic' => "Today's homework",
+            'status' => 'not_done',
+        ]);
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $second->id,
+            'status' => 'not_done',
+        ]);
+    }
+
+    public function test_roster_lists_batch_students(): void
+    {
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+
+        $roster = app(HomeworkCheckService::class)->rosterForBatch($batch->id, $subject->id);
+
+        $this->assertCount(1, $roster);
+        $this->assertSame($student->id, $roster->first()['id']);
+        unset($teacher);
+    }
+
     public function test_homework_check_page_is_accessible_with_permission(): void
     {
         [$teacher] = $this->seedClass();
