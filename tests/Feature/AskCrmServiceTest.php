@@ -109,9 +109,30 @@ class AskCrmServiceTest extends TestCase
 
         Livewire::test(AskCrmPage::class)
             ->assertSuccessful()
-            ->set('message', 'help')
+            ->assertSee('bottom-right');
+    }
+
+    public function test_ask_crm_floating_widget_answers_questions(): void
+    {
+        $admin = $this->createSuperAdmin();
+        $this->actingAs($admin);
+        [$student, $batch] = $this->createEnrolledStudent('Ayyush Sharma');
+
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $student->id,
+            'attendance_date' => now()->toDateString(),
+            'status' => AttendanceStatus::Present,
+            'checked_in_at' => now()->setTime(9, 12),
+            'marked_by_user_id' => $admin->id,
+        ]);
+
+        Livewire::test(\App\Livewire\AskCrmChatWidget::class)
+            ->call('toggle')
+            ->assertSet('open', true)
+            ->set('message', 'What is Ayyush attendance today?')
             ->call('send')
-            ->assertSee('attendance today');
+            ->assertSee('Present');
     }
 
     /**

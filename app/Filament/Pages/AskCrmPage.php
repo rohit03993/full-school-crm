@@ -25,6 +25,8 @@ class AskCrmPage extends Page
 
     protected static ?string $navigationLabel = 'Ask CRM';
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $title = 'Ask CRM';
 
     protected static ?string $slug = 'ask-crm';

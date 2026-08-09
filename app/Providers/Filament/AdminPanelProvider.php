@@ -96,7 +96,8 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_END,
                 fn (): string => Blade::render('<x-crm.media-preview-dialog />')
                     .view('filament.partials.mobile-bottom-nav')->render()
-                    .view('filament.partials.pending-call-flow')->render(),
+                    .view('filament.partials.pending-call-flow')->render()
+                    .view('filament.partials.ask-crm-widget')->render(),
             );
     }
 }
