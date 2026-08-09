@@ -52,31 +52,28 @@ class AskCrmService
         if (! filled($name)) {
             return $this->result(
                 $intent,
-                'Please include the student name — for example: “What is Ayyush’s attendance today?”',
+                'Please include the student name — for example: “tell me attendance of Ayyush”.',
             );
         }
 
-        $search = $this->students->search(null, $name);
+        $resolved = $this->resolveStudent($name);
 
-        if ($search['outcome'] === StudentSearchService::OUTCOME_NOT_FOUND) {
+        if ($resolved['outcome'] === StudentSearchService::OUTCOME_NOT_FOUND) {
             return $this->result(
                 $intent,
                 'I couldn’t find a student matching “'.$name.'”. Try a fuller name, or check spelling.',
             );
         }
 
-        if ($search['outcome'] === StudentSearchService::OUTCOME_MULTIPLE) {
-            /** @var Collection<int, Student> $matches */
-            $matches = $search['students'];
-
+        if ($resolved['outcome'] === StudentSearchService::OUTCOME_MULTIPLE) {
             return $this->result(
                 $intent,
-                $this->multipleStudentsReply($name, $matches),
+                $this->multipleStudentsReply($name, $resolved['students']),
             );
         }
 
         /** @var Student $student */
-        $student = $search['student']->loadMissing([
+        $student = $resolved['student']->loadMissing([
             'activeEnrollment.feeStructure',
             'activeBatchStudent.batch',
         ]);
@@ -92,32 +89,142 @@ class AskCrmService
         return $this->result($intent, $reply, (int) $student->id);
     }
 
+    /**
+     * Exact search first, then light fuzzy match for small spelling differences (aayush / ayyush).
+     *
+     * @return array{outcome: string, student: ?Student, students: Collection<int, Student>}
+     */
+    protected function resolveStudent(string $name): array
+    {
+        $search = $this->students->search(null, $name);
+
+        if ($search['outcome'] !== StudentSearchService::OUTCOME_NOT_FOUND) {
+            return $search;
+        }
+
+        $needle = mb_strtolower(trim($name));
+        $collapsed = preg_replace('/(.)\1+/u', '$1', $needle) ?? $needle;
+        $prefixes = array_values(array_unique(array_filter([
+            mb_substr($needle, 0, 2),
+            mb_substr($collapsed, 0, 2),
+            mb_substr($needle, 0, 1),
+        ], fn (string $prefix): bool => mb_strlen($prefix) >= 1)));
+
+        if ($prefixes === []) {
+            return $search;
+        }
+
+        $candidates = Student::query()
+            ->with([
+                'activeEnrollment',
+                'activeBatchStudent.batch',
+            ])
+            ->where(function ($query) use ($prefixes): void {
+                foreach ($prefixes as $prefix) {
+                    $query->orWhereRaw('LOWER(name) LIKE ?', [$prefix.'%']);
+                }
+            })
+            ->orderBy('name')
+            ->limit(50)
+            ->get();
+
+        $scored = $candidates
+            ->map(function (Student $student) use ($needle, $collapsed): ?array {
+                $first = mb_strtolower((string) str($student->name)->before(' '));
+                $full = mb_strtolower($student->name);
+                $firstCollapsed = preg_replace('/(.)\1+/u', '$1', $first) ?? $first;
+                $distance = min(
+                    levenshtein($needle, $first),
+                    levenshtein($collapsed, $first),
+                    levenshtein($collapsed, $firstCollapsed),
+                    levenshtein($needle, $full),
+                );
+
+                if ($distance > 2) {
+                    return null;
+                }
+
+                return ['student' => $student, 'distance' => $distance];
+            })
+            ->filter()
+            ->sortBy('distance')
+            ->values();
+
+        if ($scored->isEmpty()) {
+            return $search;
+        }
+
+        $bestDistance = (int) $scored->first()['distance'];
+        $best = $scored->where('distance', $bestDistance)->pluck('student')->values();
+
+        if ($best->count() === 1) {
+            return [
+                'outcome' => StudentSearchService::OUTCOME_FOUND,
+                'student' => $best->first(),
+                'students' => new Collection,
+            ];
+        }
+
+        return [
+            'outcome' => StudentSearchService::OUTCOME_MULTIPLE,
+            'student' => null,
+            'students' => $best,
+        ];
+    }
+
     public function detectIntent(string $question): AskCrmIntent
     {
-        $q = mb_strtolower($question);
+        $q = $this->normalizeQuestion($question);
 
-        if (preg_match('/\b(help|what can you|examples?|how (do|to) ask)\b/u', $q)) {
+        if ($this->containsAny($q, ['help', 'what can you', 'example', 'examples', 'how to ask', 'what do you do'])) {
             return AskCrmIntent::Help;
         }
 
-        if (preg_match('/\b(fee|fees|pending|balance|due|dues|outstanding)\b/u', $q)) {
+        $mentionsFee = $this->containsAny($q, [
+            'fee', 'fees', 'pending', 'balance', 'due', 'dues', 'outstanding', 'bakaya', 'baaki fee', 'kitna fee',
+        ]);
+        $mentionsHomework = $this->containsAny($q, [
+            'homework', 'home work', ' hw ', 'not done', 'assignment', 'ghar ka kaam',
+        ]) || preg_match('/\bhw\b/u', $q);
+        $mentionsAttendance = $this->containsAny($q, [
+            'attendance', 'attendence', 'present', 'absent', 'punch', 'check in', 'check-in', 'checked in',
+            'aaya', 'ayi', 'kitne din', 'kitna attendance',
+        ]);
+        $mentionsMonth = $this->containsAny($q, [
+            'percent', 'percentage', '%', 'this month', 'month', 'monthly', 'mtd', 'month to date',
+        ]);
+
+        // Prefer the most specific topic when several keywords appear.
+        if ($mentionsFee && ! $mentionsAttendance && ! $mentionsHomework) {
             return AskCrmIntent::FeePending;
         }
 
-        if (preg_match('/\b(homework|home\s*work|\bhw\b|not\s*done)\b/u', $q)) {
+        if ($mentionsHomework && ! $mentionsAttendance) {
             return AskCrmIntent::HomeworkWeek;
         }
 
-        if (preg_match('/\b(percent|percentage|%|this month|month to date|mtd)\b/u', $q)
-            && preg_match('/\b(attendance|present|absent)\b/u', $q)) {
-            return AskCrmIntent::AttendanceMonth;
+        if ($mentionsFee && ($mentionsAttendance || $mentionsHomework)) {
+            // "fee pending" usually wins when fee words are strong.
+            if ($this->containsAny($q, ['fee', 'fees', 'balance', 'dues', 'bakaya'])) {
+                return AskCrmIntent::FeePending;
+            }
         }
 
-        if (preg_match('/\b(attendance|present|absent|punch|check[\s-]?in)\b/u', $q)) {
-            if (preg_match('/\b(month|percent|percentage|%)\b/u', $q)) {
-                return AskCrmIntent::AttendanceMonth;
-            }
+        if ($mentionsAttendance) {
+            return $mentionsMonth ? AskCrmIntent::AttendanceMonth : AskCrmIntent::AttendanceToday;
+        }
 
+        if ($mentionsFee) {
+            return AskCrmIntent::FeePending;
+        }
+
+        if ($mentionsHomework) {
+            return AskCrmIntent::HomeworkWeek;
+        }
+
+        // Soft fallback: "tell me about X" / "status of X" with a name → attendance today.
+        if ($this->containsAny($q, ['tell me', 'show me', 'status', 'batao', 'btado', 'update'])
+            && filled($this->extractStudentName($question))) {
             return AskCrmIntent::AttendanceToday;
         }
 
@@ -126,26 +233,38 @@ class AskCrmService
 
     public function extractStudentName(string $question): ?string
     {
-        if (preg_match('/\b(?:of|for)\s+([A-Za-z][A-Za-z.\s\']{1,50}?)(?:\s+(?:today|this|for|in|on|please|\?)|$)/u', $question, $matches)) {
-            $name = $this->cleanNameCandidate($matches[1]);
+        $original = trim($question);
+        // 1–4 name tokens; do not start with common English filler words.
+        $namePart = '(?!(?:what|whats|is|are|the|a|an|of|for|tell|me|how|much|show|give|get|please|today|this|month|fee|fees|homework|attendance|attendence|pending|balance|status|about|student)\b)([A-Za-z][A-Za-z.\']+(?:\s+[A-Za-z][A-Za-z.\']+){0,3})';
 
+        // "attendance of Aayush" / "fees for Aayush Yadav"
+        if (preg_match('/\b(?:of|for)\s+'.$namePart.'(?:\s+(?:today|this|month|week|please|now|sir|ji)|\s*[?.!]|$)/ui', $original, $matches)) {
+            $name = $this->cleanNameCandidate($matches[1]);
             if (filled($name)) {
                 return $name;
             }
         }
 
-        if (preg_match('/\b([A-Za-z][A-Za-z.\s\']{1,40}?)(?:[’\']s)\s+(?:attendance|fee|fees|homework|balance|pending)/ui', $question, $matches)) {
+        // "Aayush's attendance" / "Aayush attendance"
+        if (preg_match('/\b'.$namePart.'(?:[’\']s)?\s+(?:attendance|attendence|fee|fees|homework|balance|pending|status)\b/ui', $original, $matches)) {
             $name = $this->cleanNameCandidate($matches[1]);
+            if (filled($name)) {
+                return $name;
+            }
+        }
 
+        // "attendance Aayush" / "fee pending Aayush Yadav"
+        if (preg_match('/\b(?:attendance|attendence|fee|fees|homework|pending|balance)\s+'.$namePart.'(?:\s*[?.!]|$)/ui', $original, $matches)) {
+            $name = $this->cleanNameCandidate($matches[1]);
             if (filled($name)) {
                 return $name;
             }
         }
 
         $stripped = preg_replace(
-            '/\b(what|whats|what\'s|is|are|the|a|an|of|for|today|this|month|percentage|percent|attendance|present|absent|fee|fees|pending|balance|due|dues|homework|home\s*work|not|done|week|how|much|tell|me|about|student|please|can|you|show|check|status|punch)\b/iu',
+            '/\b(what|whats|what\'s|is|are|the|a|an|of|for|today|this|month|monthly|percentage|percent|attendance|attendence|present|absent|fee|fees|pending|balance|due|dues|homework|home\s*work|not|done|week|how|much|tell|me|about|student|please|can|you|show|check|status|punch|give|get|batao|btado|sir|ji|now|update|kitna|kitne)\b/iu',
             ' ',
-            $question,
+            $original,
         ) ?? '';
         $stripped = preg_replace('/[?.,!]/', ' ', $stripped) ?? '';
         $name = $this->cleanNameCandidate($stripped);
@@ -153,10 +272,41 @@ class AskCrmService
         return filled($name) ? $name : null;
     }
 
+    protected function normalizeQuestion(string $question): string
+    {
+        $q = mb_strtolower(trim($question));
+        $q = str_replace(['’', '`'], "'", $q);
+        $q = preg_replace('/[?.,!;:]+/u', ' ', $q) ?? $q;
+        $q = preg_replace('/\s+/u', ' ', $q) ?? $q;
+
+        return ' '.$q.' ';
+    }
+
+    /**
+     * @param  list<string>  $needles
+     */
+    protected function containsAny(string $haystack, array $needles): bool
+    {
+        foreach ($needles as $needle) {
+            if ($needle !== '' && str_contains($haystack, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected function cleanNameCandidate(string $value): ?string
     {
         $value = trim(preg_replace('/\s+/', ' ', $value) ?? '');
         $value = trim($value, " \t\n\r\0\x0B.,'\"-");
+
+        $value = preg_replace(
+            '/\b(what|whats|is|are|the|a|an|of|for|tell|me|how|much|show|give|get|please|attendance|attendence|fee|fees|homework|pending|balance|today|this|month|week|status|about|student)\b/iu',
+            ' ',
+            $value,
+        ) ?? $value;
+        $value = trim(preg_replace('/\s+/', ' ', $value) ?? '');
 
         if ($value === '' || mb_strlen($value) < 2) {
             return null;
@@ -314,11 +464,11 @@ class AskCrmService
 
     protected function helpReply(): string
     {
-        return "I can answer from your CRM data. Try asking:\n"
-            ."• What is Ayyush’s attendance today?\n"
-            ."• What is Ayyush’s attendance this month?\n"
-            ."• How much fee is pending for Ayyush?\n"
-            .'• How many homework Not Done for Ayyush this week?';
+        return "Ask in normal language — I read your CRM data. Examples:\n"
+            ."• tell me attendance of Ayyush\n"
+            ."• Ayyush attendance this month?\n"
+            ."• how much fee pending for Ayyush\n"
+            .'• homework not done for Ayyush this week';
     }
 
     /**

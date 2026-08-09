@@ -25,7 +25,7 @@ class AskCrmChatWidget extends Component
         $this->messages = [
             [
                 'role' => 'assistant',
-                'text' => "Hi — I’m Ask CRM.\n\nAsk about attendance, fees, or homework — for example:\n• What is Ayyush’s attendance today?",
+                'text' => "Hi — I’m Ask CRM.\n\nAsk naturally, for example:\n• tell me attendance of Ayyush\n• how much fee pending for Ayyush\n• homework not done for Ayyush",
             ],
         ];
     }

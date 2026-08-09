@@ -87,7 +87,7 @@ class StudentSearchService
         if (filled($name)) {
             $students = Student::query()
                 ->with($this->searchRelations())
-                ->where('name', 'like', '%'.$name.'%')
+                ->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($name).'%'])
                 ->orderBy('name')
                 ->orderByDesc('updated_at')
                 ->limit(CrmPagination::PER_PAGE)

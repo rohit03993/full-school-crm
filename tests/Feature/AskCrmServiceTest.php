@@ -38,6 +38,27 @@ class AskCrmServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_natural_language_attendance_question(): void
+    {
+        $admin = $this->createSuperAdmin();
+        [$student, $batch] = $this->createEnrolledStudent('Ayyush Sharma');
+
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $student->id,
+            'attendance_date' => now()->toDateString(),
+            'status' => AttendanceStatus::Present,
+            'checked_in_at' => now()->setTime(9, 12),
+            'marked_by_user_id' => $admin->id,
+        ]);
+
+        $result = app(AskCrmService::class)->ask($admin, 'tell me attendance of aayush');
+
+        $this->assertSame(AskCrmIntent::AttendanceToday->value, $result['intent'], $result['reply']);
+        $this->assertSame($student->id, $result['student_id'], $result['reply']);
+        $this->assertStringContainsString('Present', $result['reply']);
+    }
+
     public function test_attendance_today_reply_for_present_student(): void
     {
         $admin = $this->createSuperAdmin();
@@ -98,7 +119,7 @@ class AskCrmServiceTest extends TestCase
 
         $result = app(AskCrmService::class)->ask($admin, 'Homework not done for Ayyush this week?');
 
-        $this->assertSame(AskCrmIntent::HomeworkWeek->value, $result['intent']);
+        $this->assertSame(AskCrmIntent::HomeworkWeek->value, $result['intent'], $result['reply']);
         $this->assertStringContainsString('1 Not Done', $result['reply']);
     }
 
