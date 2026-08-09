@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Models\WhatsAppTemplate;
 use App\Support\CrmNavigation;
 use App\Support\FeeReminderWhatsAppTemplate;
+use App\Support\HomeworkNotDoneWhatsAppTemplate;
 use Illuminate\Support\HtmlString;
 
 class WhatsAppSettingsService
@@ -22,6 +23,8 @@ class WhatsAppSettingsService
             'postcall_autosend_live_campaign_id' => Setting::getValue('whatsapp.postcall_autosend_live_campaign_id'),
             'fee_reminder_autosend_enabled' => (bool) Setting::getValue('whatsapp.fee_reminder_autosend_enabled', false),
             'fee_reminder_live_campaign_id' => Setting::getValue('whatsapp.fee_reminder_live_campaign_id'),
+            'homework_not_done_autosend_enabled' => (bool) Setting::getValue('whatsapp.homework_not_done_autosend_enabled', false),
+            'homework_not_done_live_campaign_id' => Setting::getValue('whatsapp.homework_not_done_live_campaign_id'),
             'attendance_autosend_enabled' => (bool) Setting::getValue('whatsapp.attendance_autosend_enabled', false),
             'attendance_autosend_live_campaign_id' => Setting::getValue('whatsapp.attendance_autosend_live_campaign_id'),
             'punch_autosend_enabled' => (bool) Setting::getValue('whatsapp.punch_autosend_enabled', true),
@@ -78,6 +81,16 @@ class WhatsAppSettingsService
         Setting::setValue(
             'whatsapp.fee_reminder_live_campaign_id',
             filled($data['fee_reminder_live_campaign_id'] ?? null) ? (string) $data['fee_reminder_live_campaign_id'] : '',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.homework_not_done_autosend_enabled',
+            ! empty($data['homework_not_done_autosend_enabled']) ? '1' : '0',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.homework_not_done_live_campaign_id',
+            filled($data['homework_not_done_live_campaign_id'] ?? null) ? (string) $data['homework_not_done_live_campaign_id'] : '',
             'whatsapp',
         );
         Setting::setValue(
@@ -287,6 +300,43 @@ class WhatsAppSettingsService
             .'<thead class="bg-white/60 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-black/20 dark:text-gray-400">'
             .'<tr><th class="px-4 py-2">Var</th><th class="px-4 py-2">Meaning</th><th class="px-4 py-2">CRM map</th><th class="px-4 py-2">Meta sample</th></tr></thead>'
             .'<tbody class="divide-y divide-primary-100 dark:divide-primary-500/10">'.$mappingRows.'</tbody></table></div></div>'
+        );
+    }
+
+    public function renderHomeworkNotDoneTemplateGuide(): HtmlString
+    {
+        $templatesUrl = e(\App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource::getUrl('create'));
+        $campaignsUrl = e(\App\Filament\Resources\WhatsAppLiveCampaigns\WhatsAppLiveCampaignResource::getUrl('create'));
+        $checkUrl = e(\App\Filament\Pages\HomeworkCheckPage::getUrl());
+        $body = e(HomeworkNotDoneWhatsAppTemplate::BODY);
+        $name = e(HomeworkNotDoneWhatsAppTemplate::NAME);
+
+        $mappingRows = '';
+        foreach (HomeworkNotDoneWhatsAppTemplate::variables() as $index => $variable) {
+            $mappingRows .= '<tr class="'.($index % 2 === 0 ? 'bg-white/40 dark:bg-transparent' : '').'">'
+                .'<td class="px-4 py-2 font-mono text-xs">{{'.$index.'}}</td>'
+                .'<td class="px-4 py-2">'.e($variable['label']).'</td>'
+                .'<td class="px-4 py-2 font-mono text-xs">'.e($variable['crm_source']).'</td>'
+                .'<td class="px-4 py-2 text-gray-500">'.e($variable['example']).'</td>'
+                .'</tr>';
+        }
+
+        return new HtmlString(
+            '<div class="overflow-hidden rounded-xl border border-sky-200/60 bg-sky-50/40 dark:border-sky-500/20 dark:bg-sky-500/5">'
+            .'<div class="border-b border-sky-200/60 px-4 py-3 dark:border-sky-500/20">'
+            .'<p class="text-sm font-bold text-gray-950 dark:text-white">Required Meta template — Homework not done</p>'
+            .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
+            .'Separate from share-homework and attendance templates. '
+            .'1) <a href="'.$templatesUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Templates → New</a> '
+            .'name <code class="text-xs">'.$name.'</code>, Utility. '
+            .'2) Live quick campaign with mapping below. '
+            .'3) Teachers mark Not Done on <a href="'.$checkUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Academics → Homework check</a>.</p></div>'
+            .'<div class="px-4 py-3"><pre class="whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.$body.'</pre></div>'
+            .'<div class="overflow-x-auto border-t border-sky-200/60 dark:border-sky-500/20">'
+            .'<table class="w-full min-w-[36rem] text-left text-sm">'
+            .'<thead class="bg-white/60 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-black/20 dark:text-gray-400">'
+            .'<tr><th class="px-4 py-2">Var</th><th class="px-4 py-2">Meaning</th><th class="px-4 py-2">CRM map</th><th class="px-4 py-2">Meta sample</th></tr></thead>'
+            .'<tbody class="divide-y divide-sky-100 dark:divide-sky-500/10">'.$mappingRows.'</tbody></table></div></div>'
         );
     }
 }

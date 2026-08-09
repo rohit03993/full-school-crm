@@ -47,6 +47,9 @@ class WhatsAppTemplateParamResolver
             'fee.installment_label' => 'Installment label (per student)',
             'fee.days_overdue' => 'Days overdue (per student)',
             'fee.penalty_pending' => 'Pending late fee (per student)',
+            'homework.class_section' => 'Homework class / section',
+            'homework.subject' => 'Homework subject',
+            'homework.topic' => 'Homework topic',
         ];
     }
 
@@ -103,6 +106,9 @@ class WhatsAppTemplateParamResolver
             'fee.installment_label' => (string) data_get($this->studentFeeContext($campaign, $student), 'installment_label', ''),
             'fee.days_overdue' => (string) data_get($this->studentFeeContext($campaign, $student), 'days_overdue', ''),
             'fee.penalty_pending' => (string) data_get($this->studentFeeContext($campaign, $student), 'penalty_pending', ''),
+            'homework.class_section' => (string) ($campaign?->campaignVariable('class_section') ?? ''),
+            'homework.subject' => (string) ($campaign?->campaignVariable('subject') ?? ''),
+            'homework.topic' => (string) ($campaign?->campaignVariable('topic') ?? ''),
             default => '',
         };
     }

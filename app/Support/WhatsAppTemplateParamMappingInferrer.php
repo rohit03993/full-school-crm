@@ -93,6 +93,11 @@ class WhatsAppTemplateParamMappingInferrer
         'late_fee' => 'fee.penalty_pending',
         'penalty_amount' => 'fee.penalty_pending',
         'penalty_pending' => 'fee.penalty_pending',
+        'class_section' => 'homework.class_section',
+        'homework_subject' => 'homework.subject',
+        'subject_name' => 'homework.subject',
+        'homework_topic' => 'homework.topic',
+        'topic_name' => 'homework.topic',
         'homework_title' => 'homework.title',
         'homework_link' => 'homework.portal_link',
         'portal_link' => 'homework.portal_link',
@@ -114,6 +119,10 @@ class WhatsAppTemplateParamMappingInferrer
         if (self::looksPositionalOnly($bodyVariables)) {
             if ($templateName && self::looksLikeFeeReminderTemplateName($templateName)) {
                 return self::feeReminderDefaults($paramCount);
+            }
+
+            if ($templateName && self::looksLikeHomeworkNotDoneTemplateName($templateName)) {
+                return self::homeworkNotDoneDefaults($paramCount);
             }
 
             if ($templateName && self::looksLikeMarksTemplateName($templateName)) {
@@ -165,6 +174,41 @@ class WhatsAppTemplateParamMappingInferrer
         }
 
         return false;
+    }
+
+    public static function looksLikeHomeworkNotDoneTemplateName(string $name): bool
+    {
+        $normalized = strtolower(trim($name));
+
+        foreach (['homework_not_done', 'homework_incomplete', 'hw_not_done'] as $needle) {
+            if (str_contains($normalized, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string|null>
+     */
+    public static function homeworkNotDoneDefaults(int $paramCount): array
+    {
+        $defaults = [
+            0 => 'student.name',
+            1 => 'homework.class_section',
+            2 => 'homework.subject',
+            3 => 'homework.topic',
+            4 => 'institute.name',
+        ];
+
+        $sources = [];
+
+        for ($i = 0; $i < $paramCount; $i++) {
+            $sources[] = $defaults[$i] ?? null;
+        }
+
+        return $sources;
     }
 
     public static function looksLikeFeeReminderTemplateName(string $name): bool

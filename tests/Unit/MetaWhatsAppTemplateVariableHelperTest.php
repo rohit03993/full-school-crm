@@ -50,6 +50,22 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
         $this->assertSame('Due date', $rows[3]['label']);
     }
 
+    public function test_homework_not_done_body_uses_homework_sample_labels(): void
+    {
+        $rows = MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
+            \App\Support\HomeworkNotDoneWhatsAppTemplate::BODY,
+            [],
+            'homework_not_done',
+        );
+
+        $this->assertCount(5, $rows);
+        $this->assertSame('Student name', $rows[0]['label']);
+        $this->assertSame('Class / section', $rows[1]['label']);
+        $this->assertSame('Subject', $rows[2]['label']);
+        $this->assertSame('Homework topic', $rows[3]['label']);
+        $this->assertSame('Institute name', $rows[4]['label']);
+    }
+
     public function test_rows_to_examples_csv_in_order(): void
     {
         $csv = MetaWhatsAppTemplateVariableHelper::rowsToExamplesCsv([

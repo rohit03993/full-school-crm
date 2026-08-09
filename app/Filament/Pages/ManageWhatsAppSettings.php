@@ -219,6 +219,27 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('Map {{1}} institute.name, {{2}} student.name, {{3}} fee.pending_amount, {{4}} fee.due_date — then Go live.'),
                 ])
                 ->columns(2),
+            Section::make('Homework not done')
+                ->description('Sent only when a teacher marks Homework check → Not Done. Separate template from share-homework and attendance.')
+                ->icon(Heroicon::OutlinedBookOpen)
+                ->schema([
+                    Placeholder::make('homework_not_done_template_guide')
+                        ->hiddenLabel()
+                        ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderHomeworkNotDoneTemplateGuide())
+                        ->columnSpanFull(),
+                    Toggle::make('homework_not_done_autosend_enabled')
+                        ->label('Send WhatsApp when homework is Not Done')
+                        ->helperText('Never sends when status is Done.')
+                        ->columnSpanFull(),
+                    Select::make('homework_not_done_live_campaign_id')
+                        ->label('Homework not done live campaign')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Map student.name, homework.class_section, homework.subject, homework.topic, institute.name.'),
+                ])
+                ->columns(2),
             Section::make('Campaign processing')
                 ->description('For large campaigns (50+ students): batch size 10–20 and 2–5 second delay between batches is recommended.')
                 ->schema([

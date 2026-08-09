@@ -100,6 +100,12 @@
                                     Subject: {{ $subject->displayLabel() }}
                                 </p>
                             @endif
+                            <a
+                                href="{{ \App\Filament\Pages\HomeworkCheckPage::getUrl() }}"
+                                class="mt-3 inline-flex text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
+                            >
+                                Homework check (Done / Not Done)
+                            </a>
                         </div>
 
                         @if ($isLead)

@@ -46,22 +46,27 @@ class MetaWhatsAppTemplateVariableHelper
             ->filter(fn (mixed $row): bool => is_array($row))
             ->keyBy(fn (array $row): int => (int) ($row['index'] ?? 0));
 
-        $feeVariables = FeeReminderWhatsAppTemplate::looksLikeName((string) $templateName)
-            || str_contains(strtolower($bodyText), 'fee reminder')
-            ? FeeReminderWhatsAppTemplate::variables()
-            : [];
+        $presetVariables = [];
+
+        if (FeeReminderWhatsAppTemplate::looksLikeName((string) $templateName)
+            || str_contains(strtolower($bodyText), 'fee reminder')) {
+            $presetVariables = FeeReminderWhatsAppTemplate::variables();
+        } elseif (HomeworkNotDoneWhatsAppTemplate::looksLikeName((string) $templateName)
+            || str_contains(strtolower($bodyText), 'has not completed the homework')) {
+            $presetVariables = HomeworkNotDoneWhatsAppTemplate::variables();
+        }
 
         $rows = [];
 
         foreach ($order as $index) {
             $previous = $existingByIndex->get($index);
-            $fee = $feeVariables[$index] ?? null;
+            $preset = $presetVariables[$index] ?? null;
             $rows[] = [
                 'index' => $index,
-                'label' => $fee['label'] ?? self::labelForIndex($index),
+                'label' => $preset['label'] ?? self::labelForIndex($index),
                 'example' => filled($previous['example'] ?? null)
                     ? trim((string) $previous['example'])
-                    : ($fee['example'] ?? self::defaultSampleForIndex($index)),
+                    : ($preset['example'] ?? self::defaultSampleForIndex($index)),
             ];
         }
 

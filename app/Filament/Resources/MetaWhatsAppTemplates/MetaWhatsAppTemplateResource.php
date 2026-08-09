@@ -15,6 +15,7 @@ use App\Services\WhatsAppTemplateParamResolver;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeeReminderWhatsAppTemplate;
+use App\Support\HomeworkNotDoneWhatsAppTemplate;
 use App\Support\MetaWhatsAppTemplateBuilder;
 use App\Support\MetaWhatsAppTemplateVariableHelper;
 use Filament\Forms\Components\Placeholder;
@@ -91,36 +92,46 @@ class MetaWhatsAppTemplateResource extends Resource
             Placeholder::make('fee_reminder_copy_guide')
                 ->hiddenLabel()
                 ->content(new HtmlString(
-                    '<div class="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-sm dark:border-amber-500/20 dark:bg-amber-500/5">'
+                    '<div class="space-y-2">'
+                    .'<div class="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-sm dark:border-amber-500/20 dark:bg-amber-500/5">'
                     .'<p class="font-bold text-gray-950 dark:text-white">Fee reminder template</p>'
                     .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
-                    .'For daily fee messages: set name to <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>, '
-                    .'category <strong>Utility</strong>, then leave the body blank and blur the name field — CRM fills the approved message and Meta sample values. '
-                    .'After Meta approves, create a Live quick campaign and link it under WhatsApp → Automations → Fee reminders.'
+                    .'Name <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>, Utility, leave body blank and blur name — auto-fills. Link under Automations → Fee reminders.'
                     .'</p></div>'
+                    .'<div class="rounded-xl border border-sky-200/70 bg-sky-50/50 px-4 py-3 text-sm dark:border-sky-500/20 dark:bg-sky-500/5">'
+                    .'<p class="font-bold text-gray-950 dark:text-white">Homework not done template</p>'
+                    .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
+                    .'Name <code class="text-xs">'.e(HomeworkNotDoneWhatsAppTemplate::NAME).'</code>, Utility, leave body blank and blur name — auto-fills. Link under Automations → Homework not done.'
+                    .'</p></div></div>'
                 ))
                 ->columnSpanFull(),
             TextInput::make('name')
                 ->label('Template name')
                 ->required()
                 ->maxLength(64)
-                ->helperText('For fee reminders use: '.FeeReminderWhatsAppTemplate::NAME.' — lowercase letters, numbers, underscores only.')
+                ->helperText('Examples: '.FeeReminderWhatsAppTemplate::NAME.', '.HomeworkNotDoneWhatsAppTemplate::NAME)
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
                     $normalized = MetaWhatsAppTemplateBuilder::normalizeName((string) $state);
                     $set('name', $normalized);
 
-                    if (! FeeReminderWhatsAppTemplate::looksLikeName($normalized)) {
-                        return;
-                    }
-
                     if (filled(trim((string) $get('body_text')))) {
                         return;
                     }
 
-                    $set('category', FeeReminderWhatsAppTemplate::CATEGORY);
-                    $set('body_text', FeeReminderWhatsAppTemplate::BODY);
-                    $set('body_variable_samples', FeeReminderWhatsAppTemplate::sampleRows());
+                    if (FeeReminderWhatsAppTemplate::looksLikeName($normalized)) {
+                        $set('category', FeeReminderWhatsAppTemplate::CATEGORY);
+                        $set('body_text', FeeReminderWhatsAppTemplate::BODY);
+                        $set('body_variable_samples', FeeReminderWhatsAppTemplate::sampleRows());
+
+                        return;
+                    }
+
+                    if (HomeworkNotDoneWhatsAppTemplate::looksLikeName($normalized)) {
+                        $set('category', HomeworkNotDoneWhatsAppTemplate::CATEGORY);
+                        $set('body_text', HomeworkNotDoneWhatsAppTemplate::BODY);
+                        $set('body_variable_samples', HomeworkNotDoneWhatsAppTemplate::sampleRows());
+                    }
                 }),
             Select::make('language')
                 ->options([
