@@ -6,6 +6,7 @@ use App\Models\ActivitySession;
 use App\Enums\AdmissionStatus;
 use App\Enums\AttendanceStatus;
 use App\Enums\BatchStatus;
+use App\Enums\HomeworkCheckStatus;
 use App\Enums\LeadSource;
 use App\Enums\PaymentMode;
 use App\Enums\ReportType;
@@ -14,9 +15,11 @@ use App\Models\Admission;
 use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\Batch;
+use App\Models\BatchStudent;
 use App\Models\Enquiry;
 use App\Models\FeeStructure;
 use App\Models\FeeInstallment;
+use App\Models\HomeworkCheck;
 use App\Models\Payment;
 use App\Models\Student;
 use App\Support\StudentExamMarksMatrix;
@@ -86,6 +89,7 @@ class ReportService
             ReportType::PaymentModes => $this->paymentModesReport($from, $to),
             ReportType::AuditLogs => $this->auditLogsReport($from, $to, $filters['user_id'] ?? null),
             ReportType::FinancialSummary => $this->financialSummaryReport($from, $to),
+            ReportType::HomeworkCheckSummary => $this->homeworkCheckSummaryReport($from, $to, $filters['batch_id'] ?? null),
         };
 
         $report['generated_at'] = now()->format('d M Y H:i');
@@ -809,5 +813,66 @@ class ReportService
             'columns' => ['Metric', 'Value (₹)'],
             'rows' => $rows,
         ];
+    }
+
+    /**
+     * @return array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>}
+     */
+    protected function homeworkCheckSummaryReport(Carbon $from, Carbon $to, ?int $batchId): array
+    {
+        $checks = HomeworkCheck::query()
+            ->with(['batch'])
+            ->whereBetween('checked_on', [$from->toDateString(), $to->toDateString()])
+            ->when($batchId, fn ($q) => $q->where('batch_id', $batchId))
+            ->orderBy('checked_on')
+            ->orderBy('batch_id')
+            ->get();
+
+        $activeCounts = BatchStudent::query()
+            ->where('is_active', true)
+            ->when($batchId, fn ($q) => $q->where('batch_id', $batchId))
+            ->selectRaw('batch_id, COUNT(*) as total')
+            ->groupBy('batch_id')
+            ->pluck('total', 'batch_id');
+
+        $rows = [];
+
+        $sessions = $checks->groupBy(function (HomeworkCheck $check): string {
+            return implode('|', [
+                (string) $check->batch_id,
+                (string) $check->course_subject_id,
+                $check->checked_on?->toDateString() ?? '',
+            ]);
+        });
+
+        foreach ($sessions as $group) {
+            /** @var HomeworkCheck $first */
+            $first = $group->first();
+            $latest = $group->sortByDesc('id')->unique('student_id');
+            $done = $latest->where('status', HomeworkCheckStatus::Done)->count();
+            $notDone = $latest->where('status', HomeworkCheckStatus::NotDone)->count();
+            $active = (int) ($activeCounts[$first->batch_id] ?? 0);
+            $unmarked = max(0, $active - $latest->count());
+            $donePct = $active > 0 ? (int) round(($done / $active) * 100) : 0;
+
+            $rows[] = [
+                $first->checked_on?->format('d M Y') ?? '—',
+                $first->batch?->name ?? '—',
+                $first->subject_name,
+                $active,
+                $done,
+                $notDone,
+                $unmarked,
+                $donePct.'%',
+            ];
+        }
+
+        usort($rows, fn (array $a, array $b): int => strcmp((string) $a[0], (string) $b[0]) ?: strcmp((string) $a[1], (string) $b[1]));
+
+        return $this->finalizeDetailReport([
+            'title' => 'Homework check Done % · '.$from->format('d M Y').' – '.$to->format('d M Y'),
+            'columns' => ['Date', 'Class', 'Subject', 'Students', 'Done', 'Not Done', 'Unmarked', 'Done %'],
+            'rows' => $rows,
+        ]);
     }
 }

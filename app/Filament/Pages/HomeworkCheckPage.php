@@ -66,6 +66,7 @@ class HomeworkCheckPage extends Page
             'batch_id' => null,
             'course_subject_id' => null,
             'check_date' => now()->toDateString(),
+            'homework_assignment_id' => null,
             'topic' => "Today's homework",
             'student_search' => '',
         ]);
@@ -94,6 +95,7 @@ class HomeworkCheckPage extends Page
                         ->live()
                         ->afterStateUpdated(function (): void {
                             $this->data['course_subject_id'] = null;
+                            $this->data['homework_assignment_id'] = null;
                             $this->selectedStudentIds = [];
                         }),
                     Select::make('course_subject_id')
@@ -124,9 +126,33 @@ class HomeworkCheckPage extends Page
                         ->afterStateUpdated(function (): void {
                             $this->selectedStudentIds = [];
                         }),
+                    Select::make('homework_assignment_id')
+                        ->label('Link portal homework (optional)')
+                        ->options(function () use ($service): array {
+                            $batchId = (int) ($this->data['batch_id'] ?? 0);
+
+                            return $batchId > 0 ? $service->assignmentOptionsForBatch($batchId) : [];
+                        })
+                        ->searchable()
+                        ->native(false)
+                        ->live()
+                        ->placeholder('No linked assignment')
+                        ->visible(fn (): bool => filled($this->data['batch_id'] ?? null))
+                        ->afterStateUpdated(function ($state) use ($service): void {
+                            if (! filled($state)) {
+                                return;
+                            }
+
+                            $options = $service->assignmentOptionsForBatch((int) ($this->data['batch_id'] ?? 0));
+                            $label = $options[(int) $state] ?? null;
+
+                            if (filled($label)) {
+                                $this->data['topic'] = explode(' · ', (string) $label)[0];
+                            }
+                        }),
                     Textarea::make('topic')
                         ->label('Homework topic (optional)')
-                        ->helperText('Included in the WhatsApp message. Defaults to “Today\'s homework” if left blank.')
+                        ->helperText('Included in the WhatsApp message. Defaults to portal homework title or “Today\'s homework”.')
                         ->placeholder("e.g. Chapter 5 – Complete Questions 1 to 10")
                         ->rows(2)
                         ->columnSpanFull()
@@ -147,22 +173,26 @@ class HomeworkCheckPage extends Page
             Form::make([EmbeddedSchema::make('form')])
                 ->id('homeworkCheckForm'),
             View::make('filament.pages.partials.homework-check-actions')
-                ->viewData(fn (): array => [
-                    'rosterReady' => $this->rosterReady(),
-                    'students' => $this->rosterStudents(),
-                    'selectedStudentIds' => $this->selectedStudentIds,
-                    'checkDateLabel' => $this->checkDateLabel(),
-                    'unmarkedCount' => $this->rosterStudents()
-                        ->filter(fn (array $row): bool => blank($row['last_status'] ?? null))
-                        ->count(),
-                    'recent' => filled($this->data['batch_id'] ?? null)
-                        ? app(HomeworkCheckService::class)->recentForBatch(
-                            (int) $this->data['batch_id'],
-                            15,
-                            $this->checkDate(),
-                        )
-                        : collect(),
-                ]),
+                ->viewData(function (): array {
+                    $students = $this->rosterStudents();
+                    $summary = app(HomeworkCheckService::class)->daySummaryFromRoster($students);
+
+                    return [
+                        'rosterReady' => $this->rosterReady(),
+                        'students' => $students,
+                        'selectedStudentIds' => $this->selectedStudentIds,
+                        'checkDateLabel' => $this->checkDateLabel(),
+                        'summary' => $summary,
+                        'unmarkedCount' => $summary['unmarked'],
+                        'recent' => filled($this->data['batch_id'] ?? null)
+                            ? app(HomeworkCheckService::class)->recentForBatch(
+                                (int) $this->data['batch_id'],
+                                15,
+                                $this->checkDate(),
+                            )
+                            : collect(),
+                    ];
+                }),
         ]);
     }
 
@@ -215,6 +245,7 @@ class HomeworkCheckPage extends Page
             (string) ($this->data['topic'] ?? ''),
             HomeworkCheckStatus::NotDone,
             $this->checkDate(),
+            $this->assignmentId(),
         );
 
         $this->selectedStudentIds = [];
@@ -247,6 +278,7 @@ class HomeworkCheckPage extends Page
             (string) ($this->data['topic'] ?? ''),
             $this->checkDate(),
             $this->data['student_search'] ?? null,
+            $this->assignmentId(),
         );
 
         if ($result['marked'] < 1) {
@@ -315,6 +347,7 @@ class HomeworkCheckPage extends Page
                 (string) ($this->data['topic'] ?? ''),
                 $status,
                 $this->checkDate(),
+                $this->assignmentId(),
             );
         } catch (ValidationException $exception) {
             $message = collect($exception->errors())->flatten()->first() ?? 'Could not save.';
@@ -346,6 +379,13 @@ class HomeworkCheckPage extends Page
         }
 
         return Carbon::parse((string) $value)->toDateString();
+    }
+
+    protected function assignmentId(): ?int
+    {
+        $value = (int) ($this->data['homework_assignment_id'] ?? 0);
+
+        return $value > 0 ? $value : null;
     }
 
     protected function checkDateLabel(): string

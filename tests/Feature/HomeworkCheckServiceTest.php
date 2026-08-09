@@ -310,6 +310,63 @@ class HomeworkCheckServiceTest extends TestCase
             ->assertSuccessful();
     }
 
+    public function test_not_done_count_this_week(): void
+    {
+        Http::fake();
+
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+
+        app(HomeworkCheckService::class)->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            'A',
+            HomeworkCheckStatus::NotDone,
+            now()->toDateString(),
+        );
+        app(HomeworkCheckService::class)->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            'B',
+            HomeworkCheckStatus::Done,
+            now()->toDateString(),
+        );
+
+        $this->assertSame(1, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
+    }
+
+    public function test_mark_can_link_portal_homework_assignment(): void
+    {
+        Http::fake();
+
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $assignment = \App\Models\HomeworkAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'created_by_user_id' => $teacher->id,
+            'title' => 'Algebra worksheet',
+            'description' => 'Complete all questions',
+            'content_type' => \App\Enums\HomeworkContentType::Text,
+            'published_at' => now(),
+        ]);
+
+        $result = app(HomeworkCheckService::class)->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            '',
+            HomeworkCheckStatus::Done,
+            now()->toDateString(),
+            $assignment->id,
+        );
+
+        $this->assertSame($assignment->id, $result['check']->homework_assignment_id);
+        $this->assertSame('Algebra worksheet', $result['check']->topic);
+    }
+
     /**
      * @return array{0: User, 1: Batch, 2: Student, 3: CourseSubject}
      */

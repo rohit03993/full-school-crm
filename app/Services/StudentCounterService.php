@@ -3,17 +3,18 @@
 namespace App\Services;
 
 use App\Enums\DocumentType;
-use App\Models\ActivityType;
 use App\Enums\LeadSource;
-use App\Support\MeetingForOptions;
+use App\Enums\LicenseFeature;
 use App\Enums\ProfilePhase;
 use App\Enums\StudentStatus;
+use App\Models\ActivityType;
 use App\Models\Admission;
 use App\Models\Batch;
 use App\Models\Enquiry;
 use App\Models\Student;
 use App\Models\Visit;
-use App\Services\AttendanceService;
+use App\Support\FeatureGate;
+use App\Support\MeetingForOptions;
 use Illuminate\Support\Collection;
 
 class StudentCounterService
@@ -22,6 +23,7 @@ class StudentCounterService
         protected AttendanceService $attendance,
         protected ActivityAttendanceService $activityAttendance,
         protected LeadTimelineService $leadTimeline,
+        protected HomeworkCheckService $homeworkChecks,
     ) {}
     /**
      * @return array{
@@ -379,6 +381,14 @@ class StudentCounterService
             ['label' => 'Batch', 'value' => $student->activeBatchStudent?->batch?->name ?? '—'],
             ['label' => 'Attendance', 'value' => $percentage !== null ? "{$percentage}%" : '—'],
         ];
+
+        if (FeatureGate::enabled(LicenseFeature::Homework)) {
+            $notDoneWeek = $this->homeworkChecks->notDoneCountThisWeek((int) $student->id);
+            $counters[] = [
+                'label' => 'HW Not Done (week)',
+                'value' => $notDoneWeek,
+            ];
+        }
 
         foreach (ActivityType::query()->enabled()->ordered()->get() as $type) {
             if ($type->supportsScoring()) {

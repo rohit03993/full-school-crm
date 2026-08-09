@@ -4,6 +4,25 @@
             Select a <strong>class</strong>, then a <strong>subject</strong> to open the student list.
         </div>
     @else
+        <div class="grid gap-3 sm:grid-cols-4">
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                <p class="text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Done %</p>
+                <p class="mt-1 text-2xl font-bold text-emerald-900 dark:text-emerald-200">{{ $summary['done_pct'] }}%</p>
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
+                <p class="text-[11px] font-bold uppercase tracking-wide text-gray-500">Done</p>
+                <p class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">{{ $summary['done'] }}</p>
+            </div>
+            <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 dark:border-rose-500/20 dark:bg-rose-500/10">
+                <p class="text-[11px] font-bold uppercase tracking-wide text-rose-700 dark:text-rose-300">Not Done</p>
+                <p class="mt-1 text-2xl font-bold text-rose-900 dark:text-rose-200">{{ $summary['not_done'] }}</p>
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
+                <p class="text-[11px] font-bold uppercase tracking-wide text-gray-500">Unmarked</p>
+                <p class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">{{ $summary['unmarked'] }}</p>
+            </div>
+        </div>
+
         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
                 <div>
@@ -53,6 +72,7 @@
                             <th class="px-4 py-2 w-10"></th>
                             <th class="px-4 py-2">Student</th>
                             <th class="px-4 py-2">Mobile</th>
+                            <th class="px-4 py-2">Week ND</th>
                             <th class="px-4 py-2">{{ $checkDateLabel }}</th>
                             <th class="px-4 py-2 text-right">Mark</th>
                         </tr>
@@ -70,6 +90,15 @@
                                 </td>
                                 <td class="px-4 py-2 font-medium">{{ $student['name'] }}</td>
                                 <td class="px-4 py-2 text-gray-500">{{ $student['mobile'] ?: '—' }}</td>
+                                <td class="px-4 py-2 text-xs">
+                                    @if (($student['not_done_week'] ?? 0) > 0)
+                                        <span class="rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+                                            {{ $student['not_done_week'] }}
+                                        </span>
+                                    @else
+                                        <span class="text-gray-400">0</span>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-2 text-xs text-gray-500">
                                     @if ($student['last_status'])
                                         {{ $student['last_status'] }}
@@ -116,7 +145,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
                                     No students found for this class.
                                 </td>
                             </tr>

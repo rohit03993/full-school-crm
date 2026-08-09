@@ -259,6 +259,8 @@ class StudentProfilePage extends Page
      */
     public Collection $homeworkChecks;
 
+    public int $homeworkNotDoneThisWeek = 0;
+
     public ?int $sendWhatsAppTemplateId = null;
 
     /** @var array<int, string> */
@@ -1749,8 +1751,9 @@ class StudentProfilePage extends Page
         }
 
         $this->homeworkTabLoaded = true;
-        $this->homeworkChecks = app(HomeworkCheckService::class)
-            ->forStudent((int) $this->record->id);
+        $service = app(HomeworkCheckService::class);
+        $this->homeworkChecks = $service->forStudent((int) $this->record->id);
+        $this->homeworkNotDoneThisWeek = $service->notDoneCountThisWeek((int) $this->record->id);
         $this->homeworkAssignments = app(HomeworkAssignmentService::class)
             ->assignmentsForStudentProfile($this->record);
     }
@@ -3178,6 +3181,7 @@ class StudentProfilePage extends Page
                                 ->viewData(fn (): array => [
                                     'homeworkTabLoaded' => $this->homeworkTabLoaded,
                                     'checks' => $this->homeworkChecks,
+                                    'notDoneThisWeek' => $this->homeworkNotDoneThisWeek,
                                     'assignments' => $this->homeworkAssignments,
                                     'portalUrl' => route('portal.homework.index'),
                                 ]),

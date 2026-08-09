@@ -13,6 +13,7 @@ class HomeworkCheck extends Model
         'student_id',
         'batch_id',
         'course_subject_id',
+        'homework_assignment_id',
         'subject_name',
         'topic',
         'checked_on',
@@ -46,6 +47,11 @@ class HomeworkCheck extends Model
     public function courseSubject(): BelongsTo
     {
         return $this->belongsTo(CourseSubject::class);
+    }
+
+    public function homeworkAssignment(): BelongsTo
+    {
+        return $this->belongsTo(HomeworkAssignment::class);
     }
 
     public function createdBy(): BelongsTo

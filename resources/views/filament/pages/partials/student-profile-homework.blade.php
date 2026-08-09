@@ -8,6 +8,12 @@
                 <p class="text-xs text-gray-500 dark:text-gray-400">Done / Not Done marks from class homework check.</p>
             </div>
 
+            @if (($notDoneThisWeek ?? 0) > 0)
+                <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                    <span class="font-semibold">{{ $notDoneThisWeek }}</span> Not Done mark(s) this week.
+                </div>
+            @endif
+
             @if ($checks->isEmpty())
                 <p class="text-sm text-gray-500 dark:text-gray-400">No Done / Not Done marks recorded for this student yet.</p>
             @else
@@ -31,13 +37,18 @@
                                     @endphp
                                     <tr wire:key="hw-check-{{ $check->id }}">
                                         <td class="px-4 py-2 whitespace-nowrap text-gray-600 dark:text-gray-300">
-                                            {{ $check->created_at?->format('d M Y H:i') }}
+                                            {{ $check->checked_on?->format('d M Y') ?? $check->created_at?->format('d M Y H:i') }}
                                         </td>
                                         <td class="px-4 py-2 font-medium text-gray-950 dark:text-white">
                                             {{ $check->subject_name }}
                                         </td>
                                         <td class="px-4 py-2 text-gray-600 dark:text-gray-300">
                                             {{ \Illuminate\Support\Str::limit($check->topic, 48) }}
+                                            @if ($check->homeworkAssignment)
+                                                <span class="mt-0.5 block text-[11px] text-primary-600 dark:text-primary-400">
+                                                    Linked: {{ $check->homeworkAssignment->title }}
+                                                </span>
+                                            @endif
                                         </td>
                                         <td class="px-4 py-2">
                                             <span @class([

@@ -62,7 +62,8 @@ class StudentProfileHomeworkTabTest extends TestCase
             ->assertSee('Homework check marks')
             ->assertSee('Not Done')
             ->assertSee('Mathematics')
-            ->assertSee("Today's homework");
+            ->assertSee("Today's homework")
+            ->assertSee('Not Done mark(s) this week');
     }
 
     /**

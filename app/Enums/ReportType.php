@@ -22,6 +22,7 @@ enum ReportType: string
     case PaymentModes = 'payment_modes';
     case AuditLogs = 'audit_logs';
     case FinancialSummary = 'financial_summary';
+    case HomeworkCheckSummary = 'homework_check_summary';
 
     public function label(): string
     {
@@ -44,6 +45,7 @@ enum ReportType: string
             self::PaymentModes => 'Payment mode report',
             self::AuditLogs => 'Audit log report',
             self::FinancialSummary => 'Financial summary',
+            self::HomeworkCheckSummary => 'Homework check (Done %)',
         };
     }
 

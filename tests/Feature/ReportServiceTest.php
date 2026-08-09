@@ -63,6 +63,17 @@ class ReportServiceTest extends TestCase
         $this->assertContains('Student', $report['columns']);
     }
 
+    public function test_homework_check_summary_report_includes_done_percentage(): void
+    {
+        $report = app(ReportService::class)->generate(ReportType::HomeworkCheckSummary, [
+            'date_from' => now()->subDay()->toDateString(),
+            'date_to' => now()->toDateString(),
+        ]);
+
+        $this->assertStringStartsWith('Homework check Done %', $report['title']);
+        $this->assertContains('Done %', $report['columns']);
+    }
+
     protected function createSuperAdmin(): User
     {
         Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);

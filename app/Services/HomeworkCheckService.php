@@ -10,6 +10,7 @@ use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
 use App\Models\BatchStudent;
 use App\Models\CourseSubject;
+use App\Models\HomeworkAssignment;
 use App\Models\HomeworkCheck;
 use App\Models\Student;
 use App\Models\User;
@@ -175,6 +176,7 @@ class HomeworkCheckService
         string $topic,
         HomeworkCheckStatus $status,
         ?string $checkedOn = null,
+        ?int $homeworkAssignmentId = null,
     ): array {
         if (! FeatureGate::enabled(LicenseFeature::Homework)) {
             throw ValidationException::withMessages([
@@ -199,6 +201,21 @@ class HomeworkCheckService
         $batch = Batch::query()->with('course')->findOrFail($batchId);
         $student = Student::query()->findOrFail($studentId);
         $subject = CourseSubject::query()->findOrFail($courseSubjectId);
+        $assignment = null;
+
+        if ($homeworkAssignmentId) {
+            $assignment = HomeworkAssignment::query()->findOrFail($homeworkAssignmentId);
+
+            if ((int) $assignment->batch_id !== $batchId) {
+                throw ValidationException::withMessages([
+                    'homework_assignment_id' => 'Homework assignment does not belong to this class.',
+                ]);
+            }
+
+            if ($topic === "Today's homework") {
+                $topic = $assignment->title;
+            }
+        }
 
         if ((int) $subject->course_id !== (int) $batch->course_id) {
             throw ValidationException::withMessages([
@@ -222,6 +239,7 @@ class HomeworkCheckService
             'student_id' => $student->id,
             'batch_id' => $batch->id,
             'course_subject_id' => $subject->id,
+            'homework_assignment_id' => $assignment?->id,
             'subject_name' => $subject->displayLabel(),
             'topic' => $topic,
             'checked_on' => $checkedOnDate,
@@ -270,6 +288,7 @@ class HomeworkCheckService
         string $topic,
         HomeworkCheckStatus $status,
         ?string $checkedOn = null,
+        ?int $homeworkAssignmentId = null,
     ): array {
         $studentIds = collect($studentIds)
             ->map(fn ($id): int => (int) $id)
@@ -293,6 +312,7 @@ class HomeworkCheckService
                     $topic,
                     $status,
                     $checkedOn,
+                    $homeworkAssignmentId,
                 );
                 $marked++;
 
@@ -321,6 +341,7 @@ class HomeworkCheckService
         string $topic,
         ?string $checkedOn = null,
         ?string $search = null,
+        ?int $homeworkAssignmentId = null,
     ): array {
         $ids = $this->rosterForBatch($batchId, $courseSubjectId, $search, $checkedOn)
             ->filter(fn (array $row): bool => blank($row['last_status']))
@@ -346,6 +367,7 @@ class HomeworkCheckService
             $topic,
             HomeworkCheckStatus::Done,
             $checkedOn,
+            $homeworkAssignmentId,
         );
     }
 
@@ -399,7 +421,7 @@ class HomeworkCheckService
     }
 
     /**
-     * @return Collection<int, array{id: int, name: string, mobile: ?string, check_id: ?int, last_status: ?string, last_notify: ?string, can_resend: bool}>
+     * @return Collection<int, array{id: int, name: string, mobile: ?string, check_id: ?int, last_status: ?string, last_notify: ?string, can_resend: bool, not_done_week: int}>
      */
     public function rosterForBatch(
         int $batchId,
@@ -432,9 +454,12 @@ class HomeworkCheckService
                 ->keyBy('student_id');
         }
 
-        return $query
-            ->get()
-            ->map(function (BatchStudent $row) use ($latestByStudent): ?array {
+        $rows = $query->get();
+        $studentIds = $rows->pluck('student_id')->filter()->map(fn ($id): int => (int) $id)->all();
+        $notDoneWeek = $this->notDoneCountsThisWeek($studentIds);
+
+        return $rows
+            ->map(function (BatchStudent $row) use ($latestByStudent, $notDoneWeek): ?array {
                 $student = $row->student;
                 if (! $student) {
                     return null;
@@ -457,11 +482,96 @@ class HomeworkCheckService
                     'last_status' => $latest?->status?->label(),
                     'last_notify' => $latest?->notify_status?->label(),
                     'can_resend' => $canResend,
+                    'not_done_week' => (int) ($notDoneWeek[$student->id] ?? 0),
                 ];
             })
             ->filter()
             ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function assignmentOptionsForBatch(int $batchId): array
+    {
+        return HomeworkAssignment::query()
+            ->where('batch_id', $batchId)
+            ->orderByDesc('published_at')
+            ->limit(40)
+            ->get()
+            ->mapWithKeys(fn (HomeworkAssignment $assignment): array => [
+                $assignment->id => $assignment->title
+                    .($assignment->published_at ? ' · '.$assignment->published_at->format('d M') : ''),
+            ])
+            ->all();
+    }
+
+    public function notDoneCountThisWeek(int $studentId): int
+    {
+        [$from, $to] = $this->currentWeekDateBounds();
+
+        return HomeworkCheck::query()
+            ->where('student_id', $studentId)
+            ->where('status', HomeworkCheckStatus::NotDone)
+            ->whereDate('checked_on', '>=', $from)
+            ->whereDate('checked_on', '<=', $to)
+            ->count();
+    }
+
+    /**
+     * @param  list<int>  $studentIds
+     * @return array<int, int>
+     */
+    public function notDoneCountsThisWeek(array $studentIds): array
+    {
+        if ($studentIds === []) {
+            return [];
+        }
+
+        [$from, $to] = $this->currentWeekDateBounds();
+
+        return HomeworkCheck::query()
+            ->whereIn('student_id', $studentIds)
+            ->where('status', HomeworkCheckStatus::NotDone)
+            ->whereDate('checked_on', '>=', $from)
+            ->whereDate('checked_on', '<=', $to)
+            ->selectRaw('student_id, COUNT(*) as aggregate')
+            ->groupBy('student_id')
+            ->pluck('aggregate', 'student_id')
+            ->map(fn ($count): int => (int) $count)
+            ->all();
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    protected function currentWeekDateBounds(): array
+    {
+        return [
+            now()->copy()->startOfWeek()->toDateString(),
+            now()->copy()->endOfWeek()->toDateString(),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, array{last_status: ?string}>  $roster
+     * @return array{total: int, done: int, not_done: int, unmarked: int, done_pct: int}
+     */
+    public function daySummaryFromRoster(Collection $roster): array
+    {
+        $total = $roster->count();
+        $done = $roster->where('last_status', HomeworkCheckStatus::Done->label())->count();
+        $notDone = $roster->where('last_status', HomeworkCheckStatus::NotDone->label())->count();
+        $unmarked = max(0, $total - $done - $notDone);
+
+        return [
+            'total' => $total,
+            'done' => $done,
+            'not_done' => $notDone,
+            'unmarked' => $unmarked,
+            'done_pct' => $total > 0 ? (int) round(($done / $total) * 100) : 0,
+        ];
     }
 
     /**
@@ -471,7 +581,7 @@ class HomeworkCheckService
     {
         $query = HomeworkCheck::query()
             ->where('batch_id', $batchId)
-            ->with(['student', 'createdBy']);
+            ->with(['student', 'createdBy', 'homeworkAssignment']);
 
         if (filled($checkedOn)) {
             $query->whereDate('checked_on', $this->normalizeCheckedOn($checkedOn));
@@ -490,7 +600,7 @@ class HomeworkCheckService
     {
         return HomeworkCheck::query()
             ->where('student_id', $studentId)
-            ->with(['batch', 'createdBy'])
+            ->with(['batch', 'createdBy', 'homeworkAssignment'])
             ->latest('id')
             ->limit($limit)
             ->get();
