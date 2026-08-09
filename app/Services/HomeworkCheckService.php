@@ -14,6 +14,7 @@ use App\Models\HomeworkCheck;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\FeatureGate;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -145,6 +146,21 @@ class HomeworkCheckService
             ->all();
     }
 
+    public function normalizeCheckedOn(?string $checkedOn): string
+    {
+        $date = filled($checkedOn)
+            ? Carbon::parse($checkedOn)->toDateString()
+            : now()->toDateString();
+
+        if ($date > now()->toDateString()) {
+            throw ValidationException::withMessages([
+                'check_date' => 'Homework check date cannot be in the future.',
+            ]);
+        }
+
+        return $date;
+    }
+
     /**
      * @return array{
      *     check: HomeworkCheck,
@@ -158,6 +174,7 @@ class HomeworkCheckService
         int $courseSubjectId,
         string $topic,
         HomeworkCheckStatus $status,
+        ?string $checkedOn = null,
     ): array {
         if (! FeatureGate::enabled(LicenseFeature::Homework)) {
             throw ValidationException::withMessages([
@@ -176,6 +193,8 @@ class HomeworkCheckService
         if ($topic === '') {
             $topic = "Today's homework";
         }
+
+        $checkedOnDate = $this->normalizeCheckedOn($checkedOn);
 
         $batch = Batch::query()->with('course')->findOrFail($batchId);
         $student = Student::query()->findOrFail($studentId);
@@ -205,6 +224,7 @@ class HomeworkCheckService
             'course_subject_id' => $subject->id,
             'subject_name' => $subject->displayLabel(),
             'topic' => $topic,
+            'checked_on' => $checkedOnDate,
             'status' => $status,
             'parent_mobile' => filled($student->mobile) ? (string) $student->mobile : null,
             'notify_status' => $status === HomeworkCheckStatus::Done
@@ -249,6 +269,7 @@ class HomeworkCheckService
         int $courseSubjectId,
         string $topic,
         HomeworkCheckStatus $status,
+        ?string $checkedOn = null,
     ): array {
         $studentIds = collect($studentIds)
             ->map(fn ($id): int => (int) $id)
@@ -271,6 +292,7 @@ class HomeworkCheckService
                     $courseSubjectId,
                     $topic,
                     $status,
+                    $checkedOn,
                 );
                 $marked++;
 
@@ -290,10 +312,103 @@ class HomeworkCheckService
     }
 
     /**
-     * @return Collection<int, array{id: int, name: string, mobile: ?string, last_status: ?string, last_notify: ?string}>
+     * @return array{marked: int, whatsappQueued: int, whatsappFailed: int, errors: list<string>}
      */
-    public function rosterForBatch(int $batchId, ?int $courseSubjectId = null, ?string $search = null): Collection
+    public function markRemainingDone(
+        User $teacher,
+        int $batchId,
+        int $courseSubjectId,
+        string $topic,
+        ?string $checkedOn = null,
+        ?string $search = null,
+    ): array {
+        $ids = $this->rosterForBatch($batchId, $courseSubjectId, $search, $checkedOn)
+            ->filter(fn (array $row): bool => blank($row['last_status']))
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
+        if ($ids === []) {
+            return [
+                'marked' => 0,
+                'whatsappQueued' => 0,
+                'whatsappFailed' => 0,
+                'errors' => [],
+            ];
+        }
+
+        return $this->markMany(
+            $teacher,
+            $batchId,
+            $ids,
+            $courseSubjectId,
+            $topic,
+            HomeworkCheckStatus::Done,
+            $checkedOn,
+        );
+    }
+
+    /**
+     * @return array{queued: bool, message: string, check: HomeworkCheck}
+     */
+    public function resendWhatsApp(User $teacher, int $checkId): array
     {
+        $check = HomeworkCheck::query()->with(['student', 'batch.course'])->findOrFail($checkId);
+
+        if (! $this->userCanAccessBatch($teacher, (int) $check->batch_id)) {
+            throw ValidationException::withMessages([
+                'check_id' => 'You are not assigned to this class.',
+            ]);
+        }
+
+        if ($check->status !== HomeworkCheckStatus::NotDone) {
+            throw ValidationException::withMessages([
+                'check_id' => 'WhatsApp can only be resent for Not Done marks.',
+            ]);
+        }
+
+        if ($check->notify_status === HomeworkCheckNotifyStatus::Sent) {
+            throw ValidationException::withMessages([
+                'check_id' => 'WhatsApp was already sent for this mark.',
+            ]);
+        }
+
+        $mobile = trim((string) ($check->student?->mobile ?: $check->parent_mobile));
+
+        $check->update([
+            'parent_mobile' => $mobile !== '' ? $mobile : null,
+            'notify_status' => HomeworkCheckNotifyStatus::Pending,
+            'notified_at' => null,
+        ]);
+
+        $outcome = $this->whatsapp->notifyNotDone($check->fresh(['student', 'batch.course']), $teacher);
+
+        $check->update([
+            'notify_status' => $outcome['queued']
+                ? HomeworkCheckNotifyStatus::Sent
+                : HomeworkCheckNotifyStatus::Failed,
+            'notified_at' => $outcome['queued'] ? now() : null,
+        ]);
+
+        return [
+            'queued' => $outcome['queued'],
+            'message' => $outcome['message'],
+            'check' => $check->fresh(),
+        ];
+    }
+
+    /**
+     * @return Collection<int, array{id: int, name: string, mobile: ?string, check_id: ?int, last_status: ?string, last_notify: ?string, can_resend: bool}>
+     */
+    public function rosterForBatch(
+        int $batchId,
+        ?int $courseSubjectId = null,
+        ?string $search = null,
+        ?string $checkedOn = null,
+    ): Collection {
+        $checkedOnDate = $this->normalizeCheckedOn($checkedOn);
+
         $query = BatchStudent::query()
             ->where('batch_id', $batchId)
             ->where('is_active', true)
@@ -310,7 +425,7 @@ class HomeworkCheckService
             $latestByStudent = HomeworkCheck::query()
                 ->where('batch_id', $batchId)
                 ->where('course_subject_id', $courseSubjectId)
-                ->whereDate('created_at', now()->toDateString())
+                ->whereDate('checked_on', $checkedOnDate)
                 ->orderByDesc('id')
                 ->get()
                 ->unique('student_id')
@@ -327,13 +442,21 @@ class HomeworkCheckService
 
                 /** @var HomeworkCheck|null $latest */
                 $latest = $latestByStudent->get($student->id);
+                $canResend = $latest !== null
+                    && $latest->status === HomeworkCheckStatus::NotDone
+                    && in_array($latest->notify_status, [
+                        HomeworkCheckNotifyStatus::Failed,
+                        HomeworkCheckNotifyStatus::Pending,
+                    ], true);
 
                 return [
                     'id' => $student->id,
                     'name' => $student->name,
                     'mobile' => $student->mobile,
+                    'check_id' => $latest?->id,
                     'last_status' => $latest?->status?->label(),
                     'last_notify' => $latest?->notify_status?->label(),
+                    'can_resend' => $canResend,
                 ];
             })
             ->filter()
@@ -344,12 +467,18 @@ class HomeworkCheckService
     /**
      * @return Collection<int, HomeworkCheck>
      */
-    public function recentForBatch(int $batchId, int $limit = 15): Collection
+    public function recentForBatch(int $batchId, int $limit = 15, ?string $checkedOn = null): Collection
     {
-        return HomeworkCheck::query()
+        $query = HomeworkCheck::query()
             ->where('batch_id', $batchId)
-            ->with(['student', 'createdBy'])
-            ->latest()
+            ->with(['student', 'createdBy']);
+
+        if (filled($checkedOn)) {
+            $query->whereDate('checked_on', $this->normalizeCheckedOn($checkedOn));
+        }
+
+        return $query
+            ->latest('id')
             ->limit($limit)
             ->get();
     }
@@ -362,7 +491,7 @@ class HomeworkCheckService
         return HomeworkCheck::query()
             ->where('student_id', $studentId)
             ->with(['batch', 'createdBy'])
-            ->latest()
+            ->latest('id')
             ->limit($limit)
             ->get();
     }

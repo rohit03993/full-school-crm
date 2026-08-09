@@ -8,6 +8,8 @@ use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Services\HomeworkCheckService;
 use App\Support\CrmNavigation;
+use Carbon\Carbon;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -55,7 +57,7 @@ class HomeworkCheckPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Select class and subject, then mark the student list. WhatsApp is sent only for Not Done (includes subject name).';
+        return 'Select class, subject and date, then mark the list. WhatsApp is sent only for Not Done. Failed sends can be resent.';
     }
 
     public function mount(): void
@@ -63,6 +65,7 @@ class HomeworkCheckPage extends Page
         $this->form->fill([
             'batch_id' => null,
             'course_subject_id' => null,
+            'check_date' => now()->toDateString(),
             'topic' => "Today's homework",
             'student_search' => '',
         ]);
@@ -80,7 +83,7 @@ class HomeworkCheckPage extends Page
 
         return $schema->components([
             Section::make('Class & subject')
-                ->description('Choose the class, then the subject. The student list opens after the subject is selected.')
+                ->description('Choose the class, subject and date. The student list opens after the subject is selected.')
                 ->schema([
                     Select::make('batch_id')
                         ->label('Class')
@@ -111,6 +114,16 @@ class HomeworkCheckPage extends Page
                         ->afterStateUpdated(function (): void {
                             $this->selectedStudentIds = [];
                         }),
+                    DatePicker::make('check_date')
+                        ->label('Check date')
+                        ->native(false)
+                        ->required()
+                        ->maxDate(now())
+                        ->live()
+                        ->visible(fn (): bool => filled($this->data['batch_id'] ?? null))
+                        ->afterStateUpdated(function (): void {
+                            $this->selectedStudentIds = [];
+                        }),
                     Textarea::make('topic')
                         ->label('Homework topic (optional)')
                         ->helperText('Included in the WhatsApp message. Defaults to “Today\'s homework” if left blank.')
@@ -124,7 +137,7 @@ class HomeworkCheckPage extends Page
                         ->live(debounce: 300)
                         ->visible(fn (): bool => $this->rosterReady()),
                 ])
-                ->columns(2),
+                ->columns(3),
         ]);
     }
 
@@ -138,8 +151,16 @@ class HomeworkCheckPage extends Page
                     'rosterReady' => $this->rosterReady(),
                     'students' => $this->rosterStudents(),
                     'selectedStudentIds' => $this->selectedStudentIds,
+                    'checkDateLabel' => $this->checkDateLabel(),
+                    'unmarkedCount' => $this->rosterStudents()
+                        ->filter(fn (array $row): bool => blank($row['last_status'] ?? null))
+                        ->count(),
                     'recent' => filled($this->data['batch_id'] ?? null)
-                        ? app(HomeworkCheckService::class)->recentForBatch((int) $this->data['batch_id'])
+                        ? app(HomeworkCheckService::class)->recentForBatch(
+                            (int) $this->data['batch_id'],
+                            15,
+                            $this->checkDate(),
+                        )
                         : collect(),
                 ]),
         ]);
@@ -193,6 +214,7 @@ class HomeworkCheckPage extends Page
             (int) $this->data['course_subject_id'],
             (string) ($this->data['topic'] ?? ''),
             HomeworkCheckStatus::NotDone,
+            $this->checkDate(),
         );
 
         $this->selectedStudentIds = [];
@@ -205,6 +227,72 @@ class HomeworkCheckPage extends Page
                 .($result['errors'] !== [] ? '. '.implode(' ', array_slice($result['errors'], 0, 2)) : '')
             )
             ->success()
+            ->send();
+    }
+
+    public function markRemainingDone(HomeworkCheckService $service): void
+    {
+        $user = Auth::user();
+
+        if (! $user || ! $this->rosterReady()) {
+            Notification::make()->title('Select class and subject first')->warning()->send();
+
+            return;
+        }
+
+        $result = $service->markRemainingDone(
+            $user,
+            (int) $this->data['batch_id'],
+            (int) $this->data['course_subject_id'],
+            (string) ($this->data['topic'] ?? ''),
+            $this->checkDate(),
+            $this->data['student_search'] ?? null,
+        );
+
+        if ($result['marked'] < 1) {
+            Notification::make()->title('No unmarked students')->body('Everyone already has a mark for this date.')->warning()->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('Marked remaining Done')
+            ->body($result['marked'].' student(s) marked Done. No WhatsApp sent.')
+            ->success()
+            ->send();
+    }
+
+    public function resendWhatsApp(int $checkId, HomeworkCheckService $service): void
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return;
+        }
+
+        try {
+            $result = $service->resendWhatsApp($user, $checkId);
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first() ?? 'Could not resend.';
+            Notification::make()->title((string) $message)->warning()->send();
+
+            return;
+        }
+
+        if ($result['queued']) {
+            Notification::make()
+                ->title('WhatsApp resent')
+                ->body($result['message'])
+                ->success()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('Resend failed')
+            ->body($result['message'])
+            ->warning()
             ->send();
     }
 
@@ -226,6 +314,7 @@ class HomeworkCheckPage extends Page
                 (int) $this->data['course_subject_id'],
                 (string) ($this->data['topic'] ?? ''),
                 $status,
+                $this->checkDate(),
             );
         } catch (ValidationException $exception) {
             $message = collect($exception->errors())->flatten()->first() ?? 'Could not save.';
@@ -244,11 +333,28 @@ class HomeworkCheckPage extends Page
     protected function rosterReady(): bool
     {
         return filled($this->data['batch_id'] ?? null)
-            && filled($this->data['course_subject_id'] ?? null);
+            && filled($this->data['course_subject_id'] ?? null)
+            && filled($this->data['check_date'] ?? null);
+    }
+
+    protected function checkDate(): ?string
+    {
+        $value = $this->data['check_date'] ?? null;
+
+        if (! filled($value)) {
+            return now()->toDateString();
+        }
+
+        return Carbon::parse((string) $value)->toDateString();
+    }
+
+    protected function checkDateLabel(): string
+    {
+        return Carbon::parse($this->checkDate())->format('d M Y');
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array{id: int, name: string, mobile: ?string, last_status: ?string, last_notify: ?string}>
+     * @return \Illuminate\Support\Collection<int, array{id: int, name: string, mobile: ?string, check_id: ?int, last_status: ?string, last_notify: ?string, can_resend: bool}>
      */
     protected function rosterStudents(): \Illuminate\Support\Collection
     {
@@ -260,6 +366,7 @@ class HomeworkCheckPage extends Page
             (int) $this->data['batch_id'],
             (int) $this->data['course_subject_id'],
             $this->data['student_search'] ?? null,
+            $this->checkDate(),
         );
     }
 }

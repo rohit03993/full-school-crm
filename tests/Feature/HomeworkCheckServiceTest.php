@@ -196,6 +196,111 @@ class HomeworkCheckServiceTest extends TestCase
         unset($teacher);
     }
 
+    public function test_mark_remaining_done_only_marks_unmarked_students(): void
+    {
+        Http::fake();
+
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $second = Student::query()->create([
+            'name' => 'Aman Verma',
+            'mobile' => '9123456780',
+            'status' => StudentStatus::Enrolled,
+        ]);
+        BatchStudent::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $second->id,
+            'is_active' => true,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $teacher->id,
+        ]);
+
+        app(HomeworkCheckService::class)->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            'Chapter 1',
+            HomeworkCheckStatus::NotDone,
+            now()->toDateString(),
+        );
+
+        $result = app(HomeworkCheckService::class)->markRemainingDone(
+            $teacher,
+            $batch->id,
+            $subject->id,
+            'Chapter 1',
+            now()->toDateString(),
+        );
+
+        $this->assertSame(1, $result['marked']);
+        $done = \App\Models\HomeworkCheck::query()
+            ->where('student_id', $second->id)
+            ->where('status', 'done')
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($done);
+        $this->assertSame(now()->toDateString(), $done->checked_on?->toDateString());
+    }
+
+    public function test_marks_can_be_saved_for_a_past_date(): void
+    {
+        Http::fake();
+
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $past = now()->subDay()->toDateString();
+
+        $result = app(HomeworkCheckService::class)->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            'Yesterday worksheet',
+            HomeworkCheckStatus::Done,
+            $past,
+        );
+
+        $this->assertSame($past, $result['check']->checked_on?->toDateString());
+
+        $roster = app(HomeworkCheckService::class)->rosterForBatch(
+            $batch->id,
+            $subject->id,
+            null,
+            $past,
+        );
+
+        $this->assertSame('Done', $roster->first()['last_status']);
+    }
+
+    public function test_resend_whatsapp_for_failed_not_done(): void
+    {
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response([
+                'messages' => [['id' => 'wamid.HWRESEND']],
+            ], 200),
+        ]);
+
+        [$teacher, $batch, $student, $subject] = $this->seedClass(mobile: null);
+        $this->enableHomeworkNotDoneAutomation();
+
+        $failed = app(HomeworkCheckService::class)->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            'Essay',
+            HomeworkCheckStatus::NotDone,
+        );
+
+        $this->assertSame(HomeworkCheckNotifyStatus::Failed, $failed['check']->notify_status);
+
+        $student->update(['mobile' => '9876543299']);
+
+        $resent = app(HomeworkCheckService::class)->resendWhatsApp($teacher, $failed['check']->id);
+
+        $this->assertTrue($resent['queued'], $resent['message']);
+        $this->assertSame(HomeworkCheckNotifyStatus::Sent, $resent['check']->notify_status);
+    }
+
     public function test_homework_check_page_is_accessible_with_permission(): void
     {
         [$teacher] = $this->seedClass();

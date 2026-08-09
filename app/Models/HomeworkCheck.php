@@ -15,6 +15,7 @@ class HomeworkCheck extends Model
         'course_subject_id',
         'subject_name',
         'topic',
+        'checked_on',
         'status',
         'parent_mobile',
         'notify_status',
@@ -27,6 +28,7 @@ class HomeworkCheck extends Model
         return [
             'status' => HomeworkCheckStatus::class,
             'notify_status' => HomeworkCheckNotifyStatus::class,
+            'checked_on' => 'date',
             'notified_at' => 'datetime',
         ];
     }

@@ -65,7 +65,7 @@ class HomeworkCheckWhatsAppService
                     'topic' => $check->topic,
                     'subject' => $check->subject_name,
                     'class_section' => $classSection,
-                    'date' => now()->toDateString(),
+                    'date' => $check->checked_on?->toDateString() ?? now()->toDateString(),
                     '_student_ids' => [$student->id],
                     '_homework_check_id' => $check->id,
                 ],

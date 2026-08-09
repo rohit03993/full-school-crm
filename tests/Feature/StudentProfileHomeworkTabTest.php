@@ -44,6 +44,7 @@ class StudentProfileHomeworkTabTest extends TestCase
             'course_subject_id' => $subject->id,
             'subject_name' => 'Mathematics',
             'topic' => "Today's homework",
+            'checked_on' => now()->toDateString(),
             'status' => HomeworkCheckStatus::NotDone,
             'parent_mobile' => $student->mobile,
             'notify_status' => HomeworkCheckNotifyStatus::Sent,
