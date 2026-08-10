@@ -15,6 +15,8 @@ class AskCrmChatWidget extends Component
 
     public string $message = '';
 
+    public ?int $lastStudentId = null;
+
     /**
      * @var list<array{role: string, text: string}>
      */
@@ -25,7 +27,7 @@ class AskCrmChatWidget extends Component
         $this->messages = [
             [
                 'role' => 'assistant',
-                'text' => "Hi — I’m Ask CRM.\n\nAsk naturally, for example:\n• tell me attendance of Ayyush\n• how much fee pending for Ayyush\n• homework not done for Ayyush",
+                'text' => "Hi — I’m Ask CRM.\n\nAsk naturally — I remember the student we’re talking about.\n\nExamples:\n• tell me attendance of Ayyush\n• homework for Abhinav Singh\n• then: has he done or not?",
             ],
         ];
     }
@@ -65,12 +67,18 @@ class AskCrmChatWidget extends Component
         ];
         $this->message = '';
 
-        $result = $askCrm->ask(Auth::user(), $question);
+        $history = array_slice($this->messages, -12);
+
+        $result = $askCrm->ask(Auth::user(), $question, $history, $this->lastStudentId);
 
         $this->messages[] = [
             'role' => 'assistant',
             'text' => $result['reply'],
         ];
+
+        if (filled($result['student_id'] ?? null)) {
+            $this->lastStudentId = (int) $result['student_id'];
+        }
 
         if (count($this->messages) > 40) {
             $this->messages = array_values(array_slice($this->messages, -40));

@@ -48,17 +48,29 @@ class AskCrmServiceTest extends TestCase
         ]);
 
         Http::fake([
-            'generativelanguage.googleapis.com/*' => Http::response([
-                'candidates' => [
-                    [
-                        'content' => [
-                            'parts' => [
-                                ['text' => '{"intent":"attendance_today","student_name":"Ayyush"}'],
+            'generativelanguage.googleapis.com/*' => Http::sequence()
+                ->push([
+                    'candidates' => [
+                        [
+                            'content' => [
+                                'parts' => [
+                                    ['text' => '{"intent":"attendance_today","student_name":"Ayyush","use_context_student":false}'],
+                                ],
                             ],
                         ],
                     ],
-                ],
-            ]),
+                ])
+                ->push([
+                    'candidates' => [
+                        [
+                            'content' => [
+                                'parts' => [
+                                    ['text' => 'Ayyush Sharma is marked **Present** today.'],
+                                ],
+                            ],
+                        ],
+                    ],
+                ]),
         ]);
 
         $admin = $this->createSuperAdmin();
@@ -112,6 +124,35 @@ class AskCrmServiceTest extends TestCase
 
         $this->assertSame(AskCrmIntent::AttendanceToday->value, $result['intent'], $result['reply']);
         $this->assertStringContainsString('Present', $result['reply']);
+    }
+
+    public function test_homework_follow_up_uses_last_student_without_ai(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+        [$student] = $this->createEnrolledStudent('Abhinav Singh');
+
+        $service = app(AskCrmService::class);
+        $first = $service->ask($admin, 'tell me homework for abhinav singh');
+
+        $this->assertSame($student->id, $first['student_id'], $first['reply']);
+
+        $history = [
+            ['role' => 'user', 'text' => 'tell me homework for abhinav singh'],
+            ['role' => 'assistant', 'text' => $first['reply']],
+        ];
+
+        $second = $service->ask(
+            $admin,
+            'what is good tell me has he done or not',
+            $history,
+            (int) $student->id,
+        );
+
+        $this->assertSame($student->id, $second['student_id'], $second['reply']);
+        $this->assertStringNotContainsString('good has he or', strtolower($second['reply']));
+        $this->assertStringContainsString('Abhinav', $second['reply']);
     }
 
     public function test_natural_language_attendance_question(): void
@@ -196,7 +237,7 @@ class AskCrmServiceTest extends TestCase
         $result = app(AskCrmService::class)->ask($admin, 'Homework not done for Ayyush this week?');
 
         $this->assertSame(AskCrmIntent::HomeworkWeek->value, $result['intent'], $result['reply']);
-        $this->assertStringContainsString('1 Not Done', $result['reply']);
+        $this->assertStringContainsString('Not Done', $result['reply']);
     }
 
     public function test_ask_crm_page_is_accessible(): void

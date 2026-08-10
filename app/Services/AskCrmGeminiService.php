@@ -15,21 +15,164 @@ class AskCrmGeminiService
     }
 
     /**
-     * Parse a staff question into intent + student name using Gemini.
+     * Parse intent + student from a turn, using chat history and last student context.
      *
-     * @return array{intent: AskCrmIntent, student_name: ?string}|null
+     * @param  list<array{role: string, text: string}>  $history
+     * @return array{intent: AskCrmIntent, student_name: ?string, use_context_student: bool}|null
      */
-    public function parseQuestion(string $question): ?array
+    public function parseQuestion(
+        string $question,
+        array $history = [],
+        ?int $contextStudentId = null,
+        ?string $contextStudentName = null,
+    ): ?array {
+        if (! $this->isEnabled()) {
+            return null;
+        }
+
+        $prompt = $this->systemPromptForParse($contextStudentId, $contextStudentName)
+            ."\n\nConversation so far:\n".$this->formatHistory($history)
+            ."\n\nLatest user message: ".$question;
+
+        $decoded = $this->requestJson($prompt);
+
+        if ($decoded === null) {
+            return null;
+        }
+
+        $intent = $this->mapIntent($decoded['intent'] ?? null);
+
+        if ($intent === null) {
+            return null;
+        }
+
+        $studentName = $decoded['student_name'] ?? null;
+        $studentName = is_string($studentName) ? trim($studentName) : null;
+
+        if ($studentName === '') {
+            $studentName = null;
+        }
+
+        return [
+            'intent' => $intent,
+            'student_name' => $studentName,
+            'use_context_student' => (bool) ($decoded['use_context_student'] ?? false),
+        ];
+    }
+
+    /**
+     * Compose a natural reply strictly from CRM snapshot data.
+     *
+     * @param  list<array{role: string, text: string}>  $history
+     * @param  array<string, mixed>  $snapshot
+     */
+    public function composeReply(string $question, array $history, array $snapshot): ?string
     {
         if (! $this->isEnabled()) {
             return null;
         }
 
+        $dataJson = json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+        if (! is_string($dataJson)) {
+            return null;
+        }
+
+        $prompt = <<<'PROMPT'
+You are Ask CRM — a friendly assistant for school staff inside their CRM admin panel.
+
+Rules:
+- Answer ONLY using the CRM data JSON below. Never invent numbers, names, or statuses.
+- Be conversational and clear. Short paragraphs are fine.
+- For follow-ups ("has he done?", "what does that mean?"), use the student in the CRM data and the conversation history.
+- If homework today has no marks yet, say homework is not marked yet for today — do not say "looking good" unless data supports it.
+- If fee data says can_view=false, say the user lacks permission to view fees.
+- Use **bold** sparingly for key facts (status, amounts).
+- Do not mention JSON, APIs, or that you are an AI.
+PROMPT;
+
+        $prompt .= "\n\nCRM data:\n".$dataJson;
+        $prompt .= "\n\nConversation so far:\n".$this->formatHistory($history);
+        $prompt .= "\n\nLatest user message: ".$question;
+        $prompt .= "\n\nWrite the assistant reply (plain text, no JSON):";
+
+        return $this->requestText($prompt, temperature: 0.35);
+    }
+
+    /**
+     * @param  list<array{role: string, text: string}>  $history
+     */
+    protected function formatHistory(array $history): string
+    {
+        $lines = [];
+
+        foreach (array_slice($history, -12) as $item) {
+            $role = ($item['role'] ?? '') === 'user' ? 'User' : 'Assistant';
+            $text = trim((string) ($item['text'] ?? ''));
+
+            if ($text !== '') {
+                $lines[] = $role.': '.$text;
+            }
+        }
+
+        return $lines === [] ? '(none)' : implode("\n", $lines);
+    }
+
+    protected function systemPromptForParse(?int $contextStudentId, ?string $contextStudentName): string
+    {
+        $context = $contextStudentId
+            ? 'Last discussed student: '.($contextStudentName ?? 'ID '.$contextStudentId).' (id '.$contextStudentId.').'
+            : 'No student in context yet.';
+
+        return <<<PROMPT
+You parse staff questions for a school CRM chatbot. Reply with JSON only.
+
+{$context}
+
+Schema:
+{
+  "intent": "help" | "attendance_today" | "attendance_month" | "fee_pending" | "homework_week" | "unknown",
+  "student_name": string or null,
+  "use_context_student": boolean
+}
+
+Rules:
+- Set use_context_student=true when the user refers to he/she/his/her/the same student, or asks a follow-up without naming a new student.
+- For follow-ups like "has he done or not?", "what is good?", keep the same student from context and pick the best intent from the conversation (often homework_week).
+- Extract student_name only when a NEW name is mentioned. Never treat words like good, he, done, or not as a name.
+- Understand English and Hinglish.
+PROMPT;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function requestJson(string $prompt): ?array
+    {
+        $text = $this->requestText($prompt, temperature: 0.1, jsonMode: true);
+
+        if ($text === null) {
+            return null;
+        }
+
+        $decoded = json_decode(trim($text), true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    protected function requestText(string $prompt, float $temperature = 0.2, bool $jsonMode = false): ?string
+    {
         $model = (string) config('ask_crm.gemini_model', 'gemini-2.0-flash');
         $apiKey = (string) config('ask_crm.gemini_api_key');
         $timeout = (int) config('ask_crm.gemini_timeout_seconds', 15);
 
         $url = 'https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent';
+
+        $generationConfig = ['temperature' => $temperature];
+
+        if ($jsonMode) {
+            $generationConfig['responseMimeType'] = 'application/json';
+        }
 
         try {
             $response = Http::timeout($timeout)
@@ -39,15 +182,11 @@ class AskCrmGeminiService
                     'contents' => [
                         [
                             'parts' => [
-                                ['text' => $this->systemPrompt()],
-                                ['text' => 'User question: '.$question],
+                                ['text' => $prompt],
                             ],
                         ],
                     ],
-                    'generationConfig' => [
-                        'temperature' => 0.1,
-                        'responseMimeType' => 'application/json',
-                    ],
+                    'generationConfig' => $generationConfig,
                 ]);
 
             if (! $response->successful()) {
@@ -65,29 +204,7 @@ class AskCrmGeminiService
                 return null;
             }
 
-            $decoded = json_decode(trim($text), true);
-
-            if (! is_array($decoded)) {
-                return null;
-            }
-
-            $intent = $this->mapIntent($decoded['intent'] ?? null);
-
-            if ($intent === null) {
-                return null;
-            }
-
-            $studentName = $decoded['student_name'] ?? null;
-            $studentName = is_string($studentName) ? trim($studentName) : null;
-
-            if ($studentName === '') {
-                $studentName = null;
-            }
-
-            return [
-                'intent' => $intent,
-                'student_name' => $studentName,
-            ];
+            return trim($text);
         } catch (\Throwable $exception) {
             Log::warning('Ask CRM Gemini error', [
                 'message' => $exception->getMessage(),
@@ -95,29 +212,6 @@ class AskCrmGeminiService
 
             return null;
         }
-    }
-
-    protected function systemPrompt(): string
-    {
-        return <<<'PROMPT'
-You parse questions from school CRM staff about students. Reply with JSON only — no markdown.
-
-Schema:
-{
-  "intent": one of "help", "attendance_today", "attendance_month", "fee_pending", "homework_week", "unknown",
-  "student_name": string or null
-}
-
-Rules:
-- "help" when the user asks what you can do or wants examples.
-- "attendance_today" for today's attendance, present/absent today, punch/check-in today.
-- "attendance_month" for monthly attendance percentage or "this month" attendance stats.
-- "fee_pending" for fee balance, dues, pending fees, bakaya/baaki.
-- "homework_week" for homework not done this week.
-- Extract the student first name or full name only — never include words like attendance, fee, homework.
-- Understand English and Hinglish (e.g. "aayush aaj aaya?", "fee kitni baaki hai Rahul ki").
-- If no student name is mentioned, set student_name to null.
-PROMPT;
     }
 
     protected function mapIntent(mixed $value): ?AskCrmIntent

@@ -39,6 +39,8 @@ class AskCrmPage extends Page
 
     public string $message = '';
 
+    public ?int $lastStudentId = null;
+
     /**
      * @var list<array{role: string, text: string}>
      */
@@ -86,12 +88,18 @@ class AskCrmPage extends Page
         ];
         $this->message = '';
 
-        $result = $askCrm->ask($user, $question);
+        $history = array_slice($this->messages, -12);
+
+        $result = $askCrm->ask($user, $question, $history, $this->lastStudentId);
 
         $this->messages[] = [
             'role' => 'assistant',
             'text' => $result['reply'],
         ];
+
+        if (filled($result['student_id'] ?? null)) {
+            $this->lastStudentId = (int) $result['student_id'];
+        }
 
         if (count($this->messages) > 40) {
             $this->messages = array_values(array_slice($this->messages, -40));

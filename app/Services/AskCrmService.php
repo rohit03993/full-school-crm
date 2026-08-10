@@ -19,13 +19,19 @@ class AskCrmService
         protected AttendanceService $attendance,
         protected HomeworkCheckService $homeworkChecks,
         protected AskCrmGeminiService $gemini,
+        protected AskCrmStudentDataService $studentData,
     ) {}
 
     /**
+     * @param  list<array{role: string, text: string}>  $history
      * @return array{reply: string, intent: string, student_id: ?int}
      */
-    public function ask(User $user, string $question): array
-    {
+    public function ask(
+        User $user,
+        string $question,
+        array $history = [],
+        ?int $contextStudentId = null,
+    ): array {
         $question = trim(preg_replace('/\s+/', ' ', $question) ?? '');
 
         if ($question === '') {
@@ -35,10 +41,23 @@ class AskCrmService
             );
         }
 
-        [$intent, $name] = $this->resolveIntentAndName($question);
+        $contextStudent = $contextStudentId
+            ? Student::query()->find($contextStudentId)
+            : null;
+
+        [$intent, $name, $useContextStudent] = $this->resolveIntentAndName(
+            $question,
+            $history,
+            $contextStudentId,
+            $contextStudent?->name,
+        );
 
         if ($intent === AskCrmIntent::Help) {
             return $this->result($intent, $this->helpReply());
+        }
+
+        if ($intent === AskCrmIntent::Unknown && $useContextStudent && $contextStudent) {
+            $intent = $this->inferIntentFromHistory($history) ?? AskCrmIntent::Unknown;
         }
 
         if ($intent === AskCrmIntent::Unknown) {
@@ -48,34 +67,52 @@ class AskCrmService
             );
         }
 
-        if (! filled($name)) {
+        $student = null;
+
+        if ($useContextStudent && $contextStudent) {
+            $student = $contextStudent;
+        } elseif (filled($name)) {
+            $resolved = $this->resolveStudent($name);
+
+            if ($resolved['outcome'] === StudentSearchService::OUTCOME_NOT_FOUND) {
+                return $this->result(
+                    $intent,
+                    'I couldn’t find a student matching “'.$name.'”. Try a fuller name, or check spelling.',
+                );
+            }
+
+            if ($resolved['outcome'] === StudentSearchService::OUTCOME_MULTIPLE) {
+                return $this->result(
+                    $intent,
+                    $this->multipleStudentsReply($name, $resolved['students']),
+                );
+            }
+
+            $student = $resolved['student'];
+        } elseif ($contextStudent && $this->isLikelyFollowUp($question)) {
+            $student = $contextStudent;
+        } else {
             return $this->result(
                 $intent,
                 'Please include the student name — for example: “tell me attendance of Ayyush”.',
             );
         }
 
-        $resolved = $this->resolveStudent($name);
-
-        if ($resolved['outcome'] === StudentSearchService::OUTCOME_NOT_FOUND) {
-            return $this->result(
-                $intent,
-                'I couldn’t find a student matching “'.$name.'”. Try a fuller name, or check spelling.',
-            );
-        }
-
-        if ($resolved['outcome'] === StudentSearchService::OUTCOME_MULTIPLE) {
-            return $this->result(
-                $intent,
-                $this->multipleStudentsReply($name, $resolved['students']),
-            );
-        }
-
         /** @var Student $student */
-        $student = $resolved['student']->loadMissing([
+        $student = $student->loadMissing([
             'activeEnrollment.feeStructure',
             'activeBatchStudent.batch',
         ]);
+
+        $snapshot = $this->studentData->snapshot($user, $student);
+
+        if ($this->gemini->isEnabled()) {
+            $composed = $this->gemini->composeReply($question, $history, $snapshot);
+
+            if (filled($composed)) {
+                return $this->result($intent, $composed, (int) $student->id);
+            }
+        }
 
         $reply = match ($intent) {
             AskCrmIntent::AttendanceToday => $this->attendanceTodayReply($student),
@@ -172,13 +209,27 @@ class AskCrmService
     }
 
     /**
-     * @return array{0: AskCrmIntent, 1: ?string}
+     * @param  list<array{role: string, text: string}>  $history
+     * @return array{0: AskCrmIntent, 1: ?string, 2: bool}
      */
-    protected function resolveIntentAndName(string $question): array
-    {
-        $aiParsed = $this->gemini->parseQuestion($question);
+    protected function resolveIntentAndName(
+        string $question,
+        array $history = [],
+        ?int $contextStudentId = null,
+        ?string $contextStudentName = null,
+    ): array {
+        $useContextStudent = false;
+
+        $aiParsed = $this->gemini->parseQuestion(
+            $question,
+            $history,
+            $contextStudentId,
+            $contextStudentName,
+        );
 
         $intent = $aiParsed['intent'] ?? null;
+        $name = $aiParsed['student_name'] ?? null;
+        $useContextStudent = (bool) ($aiParsed['use_context_student'] ?? false);
 
         if ($intent === null || $intent === AskCrmIntent::Unknown) {
             $ruleIntent = $this->detectIntent($question);
@@ -188,13 +239,68 @@ class AskCrmService
             }
         }
 
-        $name = $aiParsed['student_name'] ?? null;
+        if ($contextStudentId && $this->isLikelyFollowUp($question)) {
+            $useContextStudent = true;
 
-        if (! filled($name)) {
+            if ($intent === AskCrmIntent::Unknown) {
+                $intent = $this->inferIntentFromHistory($history) ?? AskCrmIntent::Unknown;
+            }
+        }
+
+        if (! $useContextStudent && ! filled($name)) {
             $name = $this->extractStudentName($question);
         }
 
-        return [$intent ?? AskCrmIntent::Unknown, $name];
+        return [$intent ?? AskCrmIntent::Unknown, $name, $useContextStudent];
+    }
+
+    /**
+     * @param  list<array{role: string, text: string}>  $history
+     */
+    protected function inferIntentFromHistory(array $history): ?AskCrmIntent
+    {
+        $recent = array_slice(array_reverse($history), 0, 6);
+        $blob = mb_strtolower(implode(' ', array_map(
+            fn (array $item): string => (string) ($item['text'] ?? ''),
+            $recent,
+        )));
+
+        if ($this->containsAny(' '.$blob.' ', ['homework', 'home work', 'not done', 'done or not', 'assignment'])) {
+            return AskCrmIntent::HomeworkWeek;
+        }
+
+        if ($this->containsAny(' '.$blob.' ', ['fee', 'fees', 'pending', 'balance', 'dues', 'bakaya'])) {
+            return AskCrmIntent::FeePending;
+        }
+
+        if ($this->containsAny(' '.$blob.' ', ['this month', 'monthly', 'percentage', 'percent'])) {
+            return AskCrmIntent::AttendanceMonth;
+        }
+
+        if ($this->containsAny(' '.$blob.' ', ['attendance', 'attendence', 'present', 'absent', 'punch'])) {
+            return AskCrmIntent::AttendanceToday;
+        }
+
+        return null;
+    }
+
+    protected function isLikelyFollowUp(string $question): bool
+    {
+        if (filled($this->extractStudentName($question))) {
+            return false;
+        }
+
+        $q = $this->normalizeQuestion($question);
+
+        if ($this->containsAny($q, [
+            ' he ', ' she ', ' his ', ' her ', ' him ', ' has he', 'has she',
+            'done or not', 'what is good', 'what about', 'tell me more', 'same student',
+            'that mean', 'means', 'explain', 'clarify', ' uska ', ' uski ', ' uske ',
+        ])) {
+            return true;
+        }
+
+        return (bool) preg_match('/\b(he|she|his|her|him|uska|uski|uske|kya|hai|hain)\b/u', $q);
     }
 
     public function detectIntent(string $question): AskCrmIntent
@@ -287,7 +393,7 @@ class AskCrmService
         }
 
         $stripped = preg_replace(
-            '/\b(what|whats|what\'s|is|are|the|a|an|of|for|today|this|month|monthly|percentage|percent|attendance|attendence|present|absent|fee|fees|pending|balance|due|dues|homework|home\s*work|not|done|week|how|much|tell|me|about|student|please|can|you|show|check|status|punch|give|get|batao|btado|sir|ji|now|update|kitna|kitne)\b/iu',
+            '/\b(what|whats|what\'s|is|are|the|a|an|of|for|today|this|month|monthly|percentage|percent|attendance|attendence|present|absent|fee|fees|pending|balance|due|dues|homework|home\s*work|not|done|week|how|much|tell|me|about|student|please|can|you|show|check|status|punch|give|get|batao|btado|sir|ji|now|update|kitna|kitne|good|or|has|he|she|his|her|him|mean|means)\b/iu',
             ' ',
             $original,
         ) ?? '';
@@ -441,10 +547,35 @@ class AskCrmService
         }
 
         $intro = $this->studentIntro($student);
-        $count = $this->homeworkChecks->notDoneCountThisWeek((int) $student->id);
+        $snapshot = $this->studentData->homeworkSnapshot((int) $student->id);
+        $today = $snapshot['today'] ?? [];
+        $week = $snapshot['this_week'] ?? [];
+
+        if (($today['unmarked_today'] ?? true) && ($today['marked_count'] ?? 0) === 0) {
+            $weekNotDone = (int) ($week['not_done_count'] ?? 0);
+
+            if ($weekNotDone > 0) {
+                return $intro.' has **no homework marked for today yet**, but has **'.$weekNotDone.' Not Done** mark'.($weekNotDone === 1 ? '' : 's').' earlier this week.';
+            }
+
+            return $intro.' has **no homework marked for today yet** and **no Not Done marks this week**. Homework may not have been checked yet.';
+        }
+
+        $todayDone = (int) ($today['done_count'] ?? 0);
+        $todayNotDone = (int) ($today['not_done_count'] ?? 0);
+
+        if ($todayNotDone > 0) {
+            return $intro.' has **Not Done** homework today ('.$todayNotDone.' mark'.($todayNotDone === 1 ? '' : 's').').';
+        }
+
+        if ($todayDone > 0) {
+            return $intro.' has homework marked **Done** today ('.$todayDone.' subject'.($todayDone === 1 ? '' : 's').').';
+        }
+
+        $count = (int) ($week['not_done_count'] ?? 0);
 
         if ($count < 1) {
-            return $intro.' has **no Not Done homework marks this week**. Looking good.';
+            return $intro.' has **no Not Done homework marks this week**.';
         }
 
         return $intro.' has **'.$count.' Not Done** homework mark'.($count === 1 ? '' : 's').' this week.';
