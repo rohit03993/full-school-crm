@@ -36,9 +36,4 @@ enum EnrolledCallPurpose: string
             ->mapWithKeys(fn (self $case): array => [$case->value => $case->label()])
             ->all();
     }
-
-    public function suggestsFollowUp(): bool
-    {
-        return $this === self::CallbackNeeded;
-    }
 }

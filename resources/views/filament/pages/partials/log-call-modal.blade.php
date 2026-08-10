@@ -97,7 +97,7 @@
                     @elseif ($isEnrolledCall)
                         <div>
                             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Call purpose / outcome</label>
-                            <x-crm.select wire:model.live="logCallForm.call_purpose" class="mt-2" required>
+                            <x-crm.select wire:model="logCallForm.call_purpose" class="mt-2" required>
                                 <option value="">Select…</option>
                                 @foreach (EnrolledCallPurpose::options() as $value => $label)
                                     <option value="{{ $value }}">{{ $label }}</option>
@@ -138,25 +138,14 @@
                     $requiresLeadFollowUp = $isLeadCall
                         && ($logCallForm['call_connected'] ?? true)
                         && in_array($logCallForm['visit_status'] ?? '', ['interested', 'follow_up_required', 'admission_ready'], true);
-                    $requiresEnrolledFollowUp = $isEnrolledCall
-                        && ($logCallForm['call_connected'] ?? true)
-                        && ($logCallForm['call_purpose'] ?? '') === 'callback_needed';
-                    $requiresFollowUp = $requiresLeadFollowUp || $requiresEnrolledFollowUp;
-                    $showFollowUp = $isLeadCall || $isEnrolledCall;
                 @endphp
-                @if ($showFollowUp)
+                @if ($isLeadCall)
                 <div>
                     <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Next follow-up @if ($requiresFollowUp) <span class="text-danger-600">*</span> @endif
+                        Next follow-up @if ($requiresLeadFollowUp) <span class="text-danger-600">*</span> @endif
                     </label>
-                    <input type="datetime-local" wire:model="logCallForm.next_followup_at" class="mt-1 w-full rounded-lg border-gray-300 text-sm dark:border-white/10 dark:bg-gray-800" @if ($requiresFollowUp) required @endif>
-                    @if ($isEnrolledCall)
-                        @if ($requiresEnrolledFollowUp)
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Required for callback. Optional reminder on this student — not a sales lead queue item.</p>
-                        @else
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Optional. Pick date and time for a callback reminder on this student.</p>
-                        @endif
-                    @elseif ($requiresLeadFollowUp)
+                    <input type="datetime-local" wire:model="logCallForm.next_followup_at" class="mt-1 w-full rounded-lg border-gray-300 text-sm dark:border-white/10 dark:bg-gray-800" @if ($requiresLeadFollowUp) required @endif>
+                    @if ($requiresLeadFollowUp)
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Required. The lead appears in the telecaller queue on this date (not before).</p>
                     @else
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Optional. Pick date and time — the call queue shows this lead on that date.</p>

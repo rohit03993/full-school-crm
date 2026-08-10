@@ -92,7 +92,6 @@ class CallLogService
             'duration_minutes' => 'nullable|integer|min:0|max:600',
             'tags' => 'nullable|array',
             'tags.*' => 'string|max:50',
-            'next_followup_at' => 'nullable|date',
         ];
 
         if ($connected) {
@@ -124,18 +123,8 @@ class CallLogService
             ]);
         }
 
-        if ($connected && $purpose?->suggestsFollowUp()) {
-            Validator::make($validated, [
-                'next_followup_at' => 'required|date|after:now',
-            ], [], ['next_followup_at' => 'follow-up date'])->validate();
-        }
-
         $call = DB::transaction(function () use ($student, $staff, $validated, $connected, $direction, $callStatus, $purpose): StudentCall {
             $lockedStudent = Student::query()->whereKey($student->id)->lockForUpdate()->firstOrFail();
-
-            $nextFollowup = filled($validated['next_followup_at'] ?? null)
-                ? Carbon::parse($validated['next_followup_at'])
-                : null;
 
             $call = StudentCall::query()->create([
                 'student_id' => $lockedStudent->id,
@@ -149,7 +138,7 @@ class CallLogService
                 'tags' => $validated['tags'] ?? [],
                 'call_purpose' => $purpose?->value,
                 'visit_status_changed_to' => null,
-                'next_followup_at' => $nextFollowup,
+                'next_followup_at' => null,
                 'called_at' => now(),
             ]);
 
@@ -157,11 +146,6 @@ class CallLogService
             $lockedStudent->last_call_at = $call->called_at;
             $lockedStudent->last_call_status = $call->call_status;
             $lockedStudent->last_call_notes = filled($call->call_notes) ? $call->call_notes : $lockedStudent->last_call_notes;
-
-            if ($nextFollowup !== null) {
-                $lockedStudent->next_call_followup_at = $nextFollowup;
-            }
-
             $lockedStudent->save();
 
             $this->audit->log(

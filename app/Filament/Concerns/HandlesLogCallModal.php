@@ -2,7 +2,6 @@
 
 namespace App\Filament\Concerns;
 
-use App\Enums\EnrolledCallPurpose;
 use App\Enums\LicenseFeature;
 use App\Enums\VisitStatus;
 use App\Models\Student;
@@ -100,23 +99,6 @@ trait HandlesLogCallModal
 
         if ($visitStatus && in_array($visitStatus, CallLogService::TERMINAL_VISIT_STATUSES, true)) {
             $this->logCallForm['next_followup_at'] = null;
-        }
-    }
-
-    public function updatedLogCallFormCallPurpose(?string $value): void
-    {
-        if ($this->logCallContext !== 'enrolled') {
-            return;
-        }
-
-        if (! ($this->logCallForm['call_connected'] ?? false) || blank($value)) {
-            return;
-        }
-
-        $purpose = EnrolledCallPurpose::tryFrom($value);
-
-        if ($purpose?->suggestsFollowUp()) {
-            $this->logCallForm['next_followup_at'] = now()->addDay()->setTime(10, 0)->format('Y-m-d\TH:i');
         }
     }
 

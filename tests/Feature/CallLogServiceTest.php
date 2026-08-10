@@ -102,18 +102,17 @@ class CallLogServiceTest extends TestCase
         $this->assertSame(1, $student->total_calls);
     }
 
-    public function test_enrolled_callback_sets_follow_up_without_visit_status(): void
+    public function test_enrolled_callback_skips_follow_up_and_visit_status(): void
     {
         $staff = $this->createStaffUser();
         [$student, $enquiry] = $this->createEnrolledStudentWithEnquiry($staff);
-        $followUp = now()->addDay()->setTime(10, 0);
 
         $call = app(CallLogService::class)->logForEnrolledStudent($student->fresh(['activeEnrollment']), $staff, [
             'call_connected' => true,
             'who_answered' => 'mother',
             'call_purpose' => EnrolledCallPurpose::CallbackNeeded->value,
             'call_notes' => 'Parent asked for a callback tomorrow about documents.',
-            'next_followup_at' => $followUp->format('Y-m-d H:i:s'),
+            'next_followup_at' => now()->addDay()->format('Y-m-d H:i:s'),
         ]);
 
         $enquiry->refresh();
@@ -121,8 +120,8 @@ class CallLogServiceTest extends TestCase
 
         $this->assertSame(VisitStatus::Interested, $enquiry->latest_visit_status);
         $this->assertSame(EnrolledCallPurpose::CallbackNeeded, $call->call_purpose);
-        $this->assertNotNull($student->next_call_followup_at);
-        $this->assertTrue($student->next_call_followup_at->equalTo($followUp));
+        $this->assertNull($call->next_followup_at);
+        $this->assertNull($student->next_call_followup_at);
     }
 
     public function test_case_call_still_skips_lead_pipeline(): void
