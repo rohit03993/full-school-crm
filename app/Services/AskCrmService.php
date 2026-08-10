@@ -288,6 +288,30 @@ class AskCrmService
             return AskCrmIntent::HomeworkWeek;
         }
 
+        if ($this->containsAny(' '.$blob.' ', ['receipt', 'payment', 'paid on'])) {
+            return AskCrmIntent::FeePending;
+        }
+
+        if ($this->containsAny(' '.$blob.' ', ['call', 'called', 'telecall'])) {
+            return AskCrmIntent::StudentProfile;
+        }
+
+        if ($this->containsAny(' '.$blob.' ', ['visit', 'campus', 'walk in'])) {
+            return AskCrmIntent::StudentProfile;
+        }
+
+        if ($this->containsAny(' '.$blob.' ', ['exam', 'marks', 'test', 'mock'])) {
+            return AskCrmIntent::StudentProfile;
+        }
+
+        if ($this->containsAny(' '.$blob.' ', ['case', 'complaint'])) {
+            return AskCrmIntent::StudentProfile;
+        }
+
+        if ($this->containsAny(' '.$blob.' ', ['whatsapp', 'message', 'msg'])) {
+            return AskCrmIntent::StudentProfile;
+        }
+
         if ($this->containsAny(' '.$blob.' ', ['fee', 'fees', 'pending', 'balance', 'dues', 'bakaya'])) {
             return AskCrmIntent::FeePending;
         }

@@ -39,6 +39,35 @@ class AskCrmServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_full_profile_snapshot_has_all_tab_sections(): void
+    {
+        $admin = $this->createSuperAdmin();
+        [$student] = $this->createEnrolledStudent('Aarav Bindal', withFees: true);
+
+        $snapshot = app(\App\Services\AskCrmStudentDataService::class)->snapshot($admin, $student);
+
+        foreach ([
+            'student',
+            'profile_summary',
+            'overview',
+            'visits',
+            'calls',
+            'cases',
+            'messages',
+            'documents',
+            'fees',
+            'receipts',
+            'attendance',
+            'homework',
+            'exams',
+        ] as $section) {
+            $this->assertArrayHasKey($section, $snapshot, 'Missing snapshot section: '.$section);
+        }
+
+        $this->assertSame('Aarav Bindal', $snapshot['student']['name']);
+        $this->assertTrue($snapshot['fees']['can_view'] ?? false);
+    }
+
     public function test_gemini_parsing_when_ai_enabled(): void
     {
         config([

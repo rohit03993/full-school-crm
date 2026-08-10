@@ -22,4 +22,6 @@ return [
 
     'gemini_timeout_seconds' => (int) env('GEMINI_TIMEOUT_SECONDS', 15),
 
+    'snapshot_list_limit' => (int) env('ASK_CRM_SNAPSHOT_LIST_LIMIT', 25),
+
 ];
