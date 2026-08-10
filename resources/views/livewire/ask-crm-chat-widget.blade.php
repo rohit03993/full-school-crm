@@ -97,6 +97,7 @@
             <div style="border-top:1px solid #e5e7eb;padding:0.65rem 0.75rem;background:#fff;">
                 <div style="display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.5rem;">
                     <button type="button" wire:click="askExample('Tell me about my tasks')" wire:loading.attr="disabled" wire:target="send,askExample" style="border:0;border-radius:999px;background:#fef3c7;padding:0.2rem 0.55rem;font-size:0.65rem;font-weight:700;cursor:pointer;">My tasks</button>
+                    <button type="button" wire:click="askExample('Who is absent in my batch today?')" wire:loading.attr="disabled" wire:target="send,askExample" style="border:0;border-radius:999px;background:#fef3c7;padding:0.2rem 0.55rem;font-size:0.65rem;font-weight:700;cursor:pointer;">My batch</button>
                     @if ($canAskAttendance)
                         <button type="button" wire:click="askExample('What is Ayyush attendance today?')" wire:loading.attr="disabled" wire:target="send,askExample" style="border:0;border-radius:999px;background:#f3f4f6;padding:0.2rem 0.55rem;font-size:0.65rem;font-weight:700;cursor:pointer;">Attendance</button>
                     @endif

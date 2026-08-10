@@ -24,6 +24,7 @@ class AskCrmService
         protected AskCrmStudentDataService $studentData,
         protected AskCrmStaffAssistService $staffAssist,
         protected AskCrmStaffDataService $staffData,
+        protected AskCrmBatchDataService $batchData,
     ) {}
 
     /**
@@ -66,8 +67,8 @@ class AskCrmService
             $contextStudent?->name,
         );
 
-        // Staff work / how-to intents never require a student name.
-        if (in_array($intent, [AskCrmIntent::Help, AskCrmIntent::MyTasks, AskCrmIntent::HowTo], true)) {
+        // Staff work / how-to / batch intents never require a student name.
+        if (in_array($intent, [AskCrmIntent::Help, AskCrmIntent::MyTasks, AskCrmIntent::HowTo, AskCrmIntent::BatchStatus], true)) {
             return $this->staffIntentReply($user, $intent, $question, $history);
         }
 
@@ -115,6 +116,10 @@ class AskCrmService
 
         // If still unknown and no student — try staff help before failing.
         if ($intent === AskCrmIntent::Unknown && ! filled($name) && ! $useContextStudent) {
+            if ($this->looksLikeBatchQuestion($question)) {
+                return $this->staffIntentReply($user, AskCrmIntent::BatchStatus, $question, $history);
+            }
+
             if ($this->looksLikeStaffWorkQuestion($question)) {
                 return $this->staffIntentReply($user, AskCrmIntent::MyTasks, $question, $history);
             }
@@ -258,6 +263,10 @@ class AskCrmService
             return $this->result(AskCrmIntent::HowTo, $reply);
         }
 
+        if ($intent === AskCrmIntent::BatchStatus) {
+            return $this->batchStatusIntentReply($user, $question, $history);
+        }
+
         $snapshot = $this->staffData->myTasksSnapshot($user);
         $reply = $this->myTasksReply($snapshot);
 
@@ -272,6 +281,161 @@ class AskCrmService
         $reply .= $this->staffWorkLinks($snapshot);
 
         return $this->result(AskCrmIntent::MyTasks, $reply);
+    }
+
+    /**
+     * @param  list<array{role: string, text: string}>  $history
+     * @return array{reply: string, intent: string, student_id: ?int, student_name: ?string, clear_context: bool}
+     */
+    protected function batchStatusIntentReply(User $user, string $question, array $history): array
+    {
+        $batchLabel = $this->extractBatchLabel($question) ?? 'my batch';
+        $referencedDate = $this->extractReferencedDate($question);
+        $snapshot = $this->batchData->batchStatusSnapshot($user, $batchLabel, $referencedDate);
+        $reply = $this->batchStatusReply($question, $snapshot);
+
+        if ($this->gemini->isEnabled() && ($snapshot['access']['allowed'] ?? false)) {
+            $composed = $this->gemini->composeStaffReply($question, $history, $snapshot);
+
+            if (filled($composed)) {
+                $reply = $composed;
+            }
+        }
+
+        $links = $snapshot['links'] ?? [];
+        $parts = [];
+        if (filled($links['attendance'] ?? null)) {
+            $parts[] = '[Attendance]('.$links['attendance'].')';
+        }
+        if (filled($links['homework'] ?? null)) {
+            $parts[] = '[Homework check]('.$links['homework'].')';
+        }
+        if (filled($links['my_classes'] ?? null)) {
+            $parts[] = '[My classes]('.$links['my_classes'].')';
+        }
+        if ($parts !== []) {
+            $reply .= "\n\n---\n".implode(' · ', $parts);
+        }
+
+        return $this->result(AskCrmIntent::BatchStatus, $reply);
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
+    protected function batchStatusReply(string $question, array $snapshot): string
+    {
+        $batch = $snapshot['batch'] ?? [];
+
+        if ($batch['not_found'] ?? false) {
+            $suggestions = $batch['ambiguous'] ?? [];
+            $extra = $suggestions !== []
+                ? "\nDid you mean: ".implode(', ', $suggestions).'?'
+                : "\nTry the full class name, or ask “absent in my batch today”.";
+
+            return 'I couldn’t find a class matching “'.($batch['resolved_from'] ?? '').'”.'.$extra;
+        }
+
+        if (! ($snapshot['access']['allowed'] ?? false)) {
+            return 'You don’t have access to **'.($batch['name'] ?? 'that class').'**. Ask an admin to assign you in My classes.';
+        }
+
+        $name = (string) ($batch['name'] ?? 'Class');
+        $q = $this->normalizeQuestion($question);
+        $wantsHomework = $this->containsAny($q, ['homework', 'home work', ' hw ', 'not done', 'assignment']);
+        $wantsAbsent = $this->containsAny($q, ['absent', 'absentees', 'not present', 'kaun absent', 'kitne absent']);
+
+        $lines = ['**'.$name.'** — '.now()->format('d M Y')];
+
+        if ($wantsHomework || ! $wantsAbsent) {
+            $homework = $snapshot['homework'] ?? [];
+            if (($homework['enabled'] ?? false) === false && array_key_exists('enabled', $homework)) {
+                $lines[] = 'Homework is not enabled on this licence.';
+            } elseif (is_array($homework)) {
+                $today = $homework['today'] ?? [];
+                $notDoneCount = (int) ($today['not_done_count'] ?? 0);
+                $weekCount = (int) ($homework['this_week_not_done_count'] ?? 0);
+
+                $lines[] = '';
+                $lines[] = 'Homework today: **'.$notDoneCount.' Not Done** (marked '.(int) ($today['marked_count'] ?? 0).')';
+                $lines[] = 'Students with Not Done this week: **'.$weekCount.'**';
+
+                foreach (array_slice($today['not_done'] ?? [], 0, 8) as $row) {
+                    $lines[] = '• '.($row['name'] ?? 'Student')
+                        .(filled($row['subject'] ?? null) ? ' — '.$row['subject'] : '');
+                }
+            }
+        }
+
+        if ($wantsAbsent || ! $wantsHomework) {
+            $attendance = $snapshot['attendance_today'] ?? [];
+            if (($attendance['enabled'] ?? false) === false && array_key_exists('enabled', $attendance)) {
+                $lines[] = 'Attendance is not enabled on this licence.';
+            } elseif (is_array($attendance)) {
+                $counts = $attendance['counts'] ?? [];
+                $lines[] = '';
+                $lines[] = 'Attendance: **'.(int) ($counts['absent'] ?? 0).' Absent**, '
+                    .(int) ($counts['not_marked'] ?? 0).' not marked, '
+                    .(int) ($counts['present_or_leave'] ?? 0).' Present/Leave '
+                    .'(of '.(int) ($counts['total'] ?? 0).')';
+
+                foreach (array_slice($attendance['absent_or_unmarked'] ?? [], 0, 10) as $row) {
+                    $lines[] = '• '.($row['name'] ?? 'Student')
+                        .(filled($row['status'] ?? null) ? ' — '.$row['status'] : '');
+                }
+            }
+        }
+
+        return implode("\n", $lines);
+    }
+
+    public function extractBatchLabel(string $question): ?string
+    {
+        $original = trim($question);
+
+        if (preg_match('/\b(?:in|for)\s+(?:the\s+)?(my\s+batch|my\s+class|my\s+classes)\b/iu', $original, $matches)) {
+            return mb_strtolower(trim($matches[1]));
+        }
+
+        if (preg_match('/\b(?:in|for)\s+(?:the\s+)?(.+?)\s+(?:today|aaj|this\s+week|homework|absent|attendance|hw)\b/iu', $original, $matches)) {
+            $label = trim($matches[1], " \t\n\r\0\x0B.,");
+            $label = preg_replace('/\b(the|class|batch|students?)\b/iu', ' ', $label) ?? $label;
+            $label = trim(preg_replace('/\s+/', ' ', $label) ?? '');
+
+            if (mb_strlen($label) >= 2) {
+                return $label;
+            }
+        }
+
+        if (preg_match('/\b(?:in|for)\s+(?:the\s+)?([A-Za-z0-9][A-Za-z0-9 .()\-\/]{1,40})\s*$/iu', $original, $matches)) {
+            $label = trim($matches[1], " \t\n\r\0\x0B.,");
+            if (mb_strlen($label) >= 2 && ! preg_match('/\b(today|homework|absent|status)\b/iu', $label)) {
+                return $label;
+            }
+        }
+
+        if (preg_match('/\b(my\s+batch|my\s+class)\b/iu', $original)) {
+            return 'my batch';
+        }
+
+        return null;
+    }
+
+    protected function looksLikeBatchQuestion(string $question): bool
+    {
+        $q = $this->normalizeQuestion($question);
+
+        if ($this->containsAny($q, [
+            'absent in', 'absentees in', 'who is absent', 'kaun absent', 'kitne absent',
+            'homework not done in', 'hw not done in', 'not done in', 'absent today in',
+            'attendance of class', 'attendance in', 'batch me', 'class me',
+            'in my batch', 'in my class', 'my batch today', 'my class today',
+        ])) {
+            return true;
+        }
+
+        return (bool) preg_match('/\b(absent|homework|hw|attendance).{0,40}\b(batch|class)\b/u', $q)
+            || (bool) preg_match('/\b(batch|class).{0,40}\b(absent|homework|hw|not done)\b/u', $q);
     }
 
     /**
@@ -389,7 +553,7 @@ class AskCrmService
                 ."1. Go to **Academics → Homework check**\n"
                 ."2. Choose batch, subject, and date\n"
                 ."3. Mark Done / Not Done for each student\n\n"
-                .'Tip: ask “ABHINAV SINGH homework status” to check one student quickly.';
+                .'Tip: ask “who has homework not done in my batch today?” for a quick list.';
         }
 
         if ($this->containsAny($q, ['attendance', 'present', 'absent'])) {
@@ -397,7 +561,7 @@ class AskCrmService
                 ."1. Open **Academics → Attendance** (or your class roster)\n"
                 ."2. Select batch and date\n"
                 ."3. Mark Present / Absent / Leave\n\n"
-                .'Tip: ask “attendance of [student] today” for a quick check.';
+                .'Tip: ask “who is absent in Class 11 JEE today?” for absentees.';
         }
 
         if ($this->containsAny($q, ['call', 'queue', 'lead'])) {
@@ -408,12 +572,28 @@ class AskCrmService
                 .'Tip: ask “tell me about my tasks” for your due counts.';
         }
 
-        if ($this->containsAny($q, ['batch', 'assign', 'enrol'])) {
+        if ($this->containsAny($q, ['admission', 'enrol', 'enroll', 'convert'])) {
+            return "To convert an enquiry to admission:\n"
+                ."1. Open the student / enquiry profile\n"
+                ."2. Use **Convert to admission** (or Admissions flow)\n"
+                ."3. Confirm course/session, then set up fees\n\n"
+                .'After enrolment, assign a batch so attendance and homework work.';
+        }
+
+        if ($this->containsAny($q, ['batch', 'assign class', 'assign'])) {
             return "To assign a student to a batch:\n"
                 ."1. Open the student profile\n"
                 ."2. Click **Assign Batch**\n"
                 ."3. Choose the class/batch and save\n\n"
                 .'The student then appears in attendance and homework for that batch.';
+        }
+
+        if ($this->containsAny($q, ['whatsapp', 'campaign', 'message'])) {
+            return "To send WhatsApp from CRM:\n"
+                ."1. Open the student profile → **Messages** tab (or WhatsApp campaigns)\n"
+                ."2. Pick a template / write the message\n"
+                ."3. Send — delivery status shows on the thread\n\n"
+                .'Tip: ask “… whatsapp message for parent” to get a copy-paste parent message.';
         }
 
         if ($this->containsAny($q, ['case', 'complaint'])) {
@@ -424,12 +604,20 @@ class AskCrmService
                 .'Tip: ask “cases open for this student” after talking about them.';
         }
 
-        return "I can help with CRM how-tos and your work queues.\n\n"
+        if ($this->containsAny($q, ['custom field', 'extra field', 'setup'])) {
+            return "To add custom fields (blood group, previous school, etc.):\n"
+                ."1. Go to **Setup → Custom fields**\n"
+                ."2. Choose Student or Enquiry\n"
+                ."3. Add label/type and save\n\n"
+                .'Fields then appear on student/enquiry forms.';
+        }
+
+        return "I can help with CRM how-tos, your work queues, and class lists.\n\n"
             ."Try:\n"
-            ."• how do I record a fee payment?\n"
-            ."• how do I mark homework?\n"
-            ."• how do I mark attendance?\n"
             ."• tell me about my tasks\n"
+            ."• who is absent in my batch today?\n"
+            ."• how do I record a fee payment?\n"
+            ."• how do I assign a batch?\n"
             .'• homework for Abhinav Singh';
     }
 
@@ -443,6 +631,8 @@ class AskCrmService
             'follow ups', 'follow-ups', 'what should i do', 'what do i have',
             'today work', 'work today', 'tasks today', 'my pending',
             'tell me about my', 'show my tasks', 'show my work',
+            'mere tasks', 'mere task', 'mera kaam', 'mere kaam', 'aaj ke tasks',
+            'tasks kya', 'kaam kya',
         ]);
     }
 
@@ -1171,6 +1361,10 @@ class AskCrmService
             return AskCrmIntent::HowTo;
         }
 
+        if ($this->looksLikeBatchQuestion($question)) {
+            return AskCrmIntent::BatchStatus;
+        }
+
         if ($this->looksLikeStaffWorkQuestion($question)) {
             return AskCrmIntent::MyTasks;
         }
@@ -1253,10 +1447,18 @@ class AskCrmService
         $original = preg_replace('/\s*(?:--|—|–)\s*/u', ' — ', $original) ?? $original;
 
         // 1–4 name tokens; do not start with common English filler words.
-        $namePart = '(?!(?:what|whats|is|are|the|a|an|of|for|tell|me|how|much|show|give|get|please|today|this|month|fee|fees|homework|attendance|attendence|pending|balance|status|about|student|many|installment|installments|amount)\b)([A-Za-z][A-Za-z.\']+(?:\s+[A-Za-z][A-Za-z.\']+){0,3})';
+        $namePart = '(?!(?:what|whats|is|are|the|a|an|of|for|tell|me|how|much|show|give|get|please|today|this|month|fee|fees|homework|attendance|attendence|pending|balance|status|about|student|many|installment|installments|amount|ka|ki|ke|kitna|kitne)\b)([A-Za-z][A-Za-z.\']+(?:\s+[A-Za-z][A-Za-z.\']+){0,3})';
 
         // "ABHINAV SINGH - homework for 9 aug 2026" / "AARJAV JAIN — how many installments..."
         if (preg_match('/^'.$namePart.'\s*(?:—|–|-|:)\s*/ui', $original, $matches)) {
+            $name = $this->cleanNameCandidate($matches[1]);
+            if (filled($name)) {
+                return $name;
+            }
+        }
+
+        // "Ayyush Sharma ka fee..." / "Ayyush ka attendance"
+        if (preg_match('/\b'.$namePart.'\s+(?:ka|ki|ke)\s+(?:fee|fees|homework|attendance|attendence|balance|pending|status|installment|installments)\b/ui', $original, $matches)) {
             $name = $this->cleanNameCandidate($matches[1]);
             if (filled($name)) {
                 return $name;
@@ -1296,7 +1498,7 @@ class AskCrmService
         }
 
         $stripped = preg_replace(
-            '/\b(what|whats|what\'s|is|are|the|a|an|of|for|today|this|month|monthly|percentage|percent|attendance|attendence|present|absent|fee|fees|pending|balance|due|dues|homework|home\s*work|not|done|week|how|much|many|tell|me|about|student|please|can|you|show|check|status|punch|give|get|batao|btado|sir|ji|now|update|kitna|kitne|good|or|has|he|she|his|her|him|mean|means|installment|installments|amount|have|it|and|what|aaj|school|aaya|ayi|kya|hai|hain|parent|whatsapp|message|copy|send)\b/iu',
+            '/\b(what|whats|what\'s|is|are|the|a|an|of|for|today|this|month|monthly|percentage|percent|attendance|attendence|present|absent|fee|fees|pending|balance|due|dues|homework|home\s*work|not|done|week|how|much|many|tell|me|about|student|please|can|you|show|check|status|punch|give|get|batao|btado|sir|ji|now|update|kitna|kitne|good|or|has|he|she|his|her|him|mean|means|installment|installments|amount|have|it|and|what|aaj|school|aaya|ayi|kya|hai|hain|parent|whatsapp|message|copy|send|ka|ki|ke)\b/iu',
             ' ',
             $original,
         ) ?? '';
@@ -1350,7 +1552,7 @@ class AskCrmService
         $value = trim($value, " \t\n\r\0\x0B.,'\"-");
 
         $value = preg_replace(
-            '/\b(what|whats|is|are|the|a|an|of|for|tell|me|how|much|show|give|get|please|attendance|attendence|fee|fees|homework|pending|balance|today|this|month|week|status|about|student)\b/iu',
+            '/\b(what|whats|is|are|the|a|an|of|for|tell|me|how|much|show|give|get|please|attendance|attendence|fee|fees|homework|pending|balance|today|this|month|week|status|about|student|ka|ki|ke|kitna|kitne)\b/iu',
             ' ',
             $value,
         ) ?? $value;
@@ -1654,9 +1856,10 @@ class AskCrmService
 
     protected function helpReply(): string
     {
-        return "I’m your CRM assistant for staff — ask about **your work** or **any student**.\n\n"
+        return "I’m your CRM assistant for staff — ask about **your work**, **a class**, or **any student**.\n\n"
             ."Your work:\n"
             ."• tell me about my tasks\n"
+            ."• who is absent in my batch today?\n"
             ."• how do I record a fee payment?\n\n"
             ."Students:\n"
             ."• ABHINAV SINGH - homework for 9 Aug 2026\n"

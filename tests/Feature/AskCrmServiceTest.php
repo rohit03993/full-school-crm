@@ -50,6 +50,7 @@ class AskCrmServiceTest extends TestCase
 
         foreach ([
             'student',
+            'custom_fields',
             'profile_summary',
             'overview',
             'visits',
@@ -750,6 +751,116 @@ class AskCrmServiceTest extends TestCase
         $this->assertSame(AskCrmIntent::HowTo->value, $result['intent'], $result['reply']);
         $this->assertStringContainsString('Add Payment', $result['reply']);
         $this->assertStringContainsString('Fees', $result['reply']);
+    }
+
+    public function test_batch_absent_question_lists_students(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $this->travelTo('2026-08-10 10:00:00');
+
+        $admin = $this->createSuperAdmin();
+        [$presentStudent, $batch] = $this->createEnrolledStudent('Present Student');
+        $absentStudent = Student::query()->create([
+            'name' => 'Absent Student',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2010-01-01',
+            'gender' => Gender::Male,
+            'mobile' => '9876500088',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        BatchStudent::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $absentStudent->id,
+            'is_active' => true,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $admin->id,
+        ]);
+
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $presentStudent->id,
+            'attendance_date' => '2026-08-10',
+            'status' => AttendanceStatus::Present,
+            'marked_by_user_id' => $admin->id,
+        ]);
+
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $absentStudent->id,
+            'attendance_date' => '2026-08-10',
+            'status' => AttendanceStatus::Absent,
+            'marked_by_user_id' => $admin->id,
+        ]);
+
+        $result = app(AskCrmService::class)->ask($admin, 'Who is absent in 10-A today?');
+
+        $this->assertSame(AskCrmIntent::BatchStatus->value, $result['intent'], $result['reply']);
+        $this->assertStringContainsString('Absent Student', $result['reply']);
+        $this->assertStringContainsString('Absent', $result['reply']);
+    }
+
+    public function test_batch_homework_not_done_question(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $this->travelTo('2026-08-10 10:00:00');
+
+        $admin = $this->createSuperAdmin();
+        [$student, $batch] = $this->createEnrolledStudent('Homework Skipper');
+        $subject = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'Maths',
+            'code' => 'M01',
+            'default_max_marks' => 100,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        HomeworkCheck::query()->create([
+            'student_id' => $student->id,
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'subject_name' => 'Maths',
+            'topic' => 'Algebra',
+            'checked_on' => '2026-08-10',
+            'status' => HomeworkCheckStatus::NotDone,
+            'notify_status' => HomeworkCheckNotifyStatus::Failed,
+            'created_by_user_id' => $admin->id,
+        ]);
+
+        $result = app(AskCrmService::class)->ask($admin, 'homework not done in 10-A today');
+
+        $this->assertSame(AskCrmIntent::BatchStatus->value, $result['intent'], $result['reply']);
+        $this->assertStringContainsString('Homework Skipper', $result['reply']);
+        $this->assertStringContainsString('Not Done', $result['reply']);
+    }
+
+    public function test_hinglish_my_tasks_and_student_fee(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+        [$student] = $this->createEnrolledStudent('Ayyush Sharma', withFees: true);
+
+        $tasks = app(AskCrmService::class)->ask($admin, 'aaj mere tasks kya hain');
+        $this->assertSame(AskCrmIntent::MyTasks->value, $tasks['intent'], $tasks['reply']);
+
+        $fee = app(AskCrmService::class)->ask($admin, 'Ayyush Sharma ka fee kitna pending hai');
+        $this->assertSame($student->id, $fee['student_id'], $fee['reply']);
+        $this->assertStringContainsString('2,500.00', $fee['reply']);
+    }
+
+    public function test_how_to_assign_batch_question(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+        $result = app(AskCrmService::class)->ask($admin, 'How do I assign a batch?');
+
+        $this->assertSame(AskCrmIntent::HowTo->value, $result['intent'], $result['reply']);
+        $this->assertStringContainsString('Assign Batch', $result['reply']);
     }
 
     public function test_ask_crm_page_is_accessible(): void

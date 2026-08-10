@@ -139,13 +139,14 @@ You parse staff questions for a school CRM chatbot. Reply with JSON only.
 
 Schema:
 {
-  "intent": "help" | "my_tasks" | "how_to" | "attendance_today" | "attendance_month" | "fee_pending" | "homework_week" | "student_profile" | "unknown",
+  "intent": "help" | "my_tasks" | "how_to" | "batch_status" | "attendance_today" | "attendance_month" | "fee_pending" | "homework_week" | "student_profile" | "unknown",
   "student_name": string or null,
   "use_context_student": boolean
 }
 
 Rules:
 - Use my_tasks for: my tasks, my work, call queue, pending calls, my meetings, my cases, what should I do today, follow-ups due. student_name must be null.
+- Use batch_status for: who is absent in Class X, homework not done in my batch, absentees today in a class. student_name must be null.
 - Use how_to for: how do I..., how to..., steps to..., CRM process questions. student_name must be null.
 - Set use_context_student=true when the user says this student, the same student, for him/her, or asks a follow-up starting with "and ...".
 - For follow-ups like "has he done or not?", "what about 9 Aug 2026?", keep the same student and pick homework_week, attendance_today, or student_profile from context.
@@ -281,6 +282,7 @@ PROMPT;
             'help' => AskCrmIntent::Help,
             'my_tasks' => AskCrmIntent::MyTasks,
             'how_to' => AskCrmIntent::HowTo,
+            'batch_status' => AskCrmIntent::BatchStatus,
             'attendance_today' => AskCrmIntent::AttendanceToday,
             'attendance_month' => AskCrmIntent::AttendanceMonth,
             'fee_pending' => AskCrmIntent::FeePending,

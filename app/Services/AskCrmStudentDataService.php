@@ -43,6 +43,7 @@ class AskCrmStudentDataService
         $student->loadMissing([
             'activeEnrollment.feeStructure.installments',
             'activeEnrollment.feeStructure.penalties',
+            'activeEnrollment.feeStructure.miscCharges',
             'activeEnrollment.course',
             'activeEnrollment.academicSession',
             'activeEnrollment.admission',
@@ -61,6 +62,7 @@ class AskCrmStudentDataService
                 'source' => 'student_profile_tabs',
             ],
             'student' => $this->studentIdentity($student, $batch?->name),
+            'custom_fields' => $this->customFieldsSnapshot($student),
             'profile_summary' => $this->profileSummary($student),
             'overview' => $this->overviewSnapshot($student),
             'visits' => $this->visitsSnapshot($student),
@@ -429,6 +431,60 @@ class AskCrmStudentDataService
             'installment_count' => count($installments),
             'installments' => $installments,
             'penalties' => $penalties,
+            'misc_charges' => $fees->miscCharges
+                ->take($this->listLimit())
+                ->map(fn ($row): array => [
+                    'label' => $row->label ?? $row->description ?? 'Charge',
+                    'kind' => $row->kind?->label() ?? (string) $row->kind,
+                    'amount' => (float) ($row->amount ?? 0),
+                    'pending_amount' => (float) $row->pendingAmount(),
+                    'status' => $row->status?->label() ?? (string) $row->status,
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function customFieldsSnapshot(Student $student): array
+    {
+        $definitions = app(CustomFieldService::class)->activeDefinitions(CustomFieldService::ENTITY_STUDENT);
+        $data = is_array($student->custom_data) ? $student->custom_data : [];
+
+        if ($definitions === [] && $data === []) {
+            return ['enabled' => true, 'fields' => []];
+        }
+
+        $fields = [];
+
+        foreach ($definitions as $definition) {
+            $key = $definition->field_key;
+            $value = $data[$key] ?? null;
+
+            $fields[] = [
+                'key' => $key,
+                'label' => $definition->label,
+                'value' => $value,
+            ];
+        }
+
+        foreach ($data as $key => $value) {
+            if (collect($fields)->contains(fn (array $row): bool => $row['key'] === $key)) {
+                continue;
+            }
+
+            $fields[] = [
+                'key' => $key,
+                'label' => $key,
+                'value' => $value,
+            ];
+        }
+
+        return [
+            'enabled' => true,
+            'fields' => $fields,
         ];
     }
 

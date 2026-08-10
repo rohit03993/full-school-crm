@@ -76,6 +76,7 @@ class AskCrmSessionService
                     ."Ask about **your work** (calls, meetings, cases) or **any student** (homework, fees, attendance).\n\n"
                     ."Tips:\n"
                     ."• tell me about my tasks\n"
+                    ."• who is absent in my batch today?\n"
                     ."• Include a student name — e.g. ABHINAV SINGH - homework for 9 Aug 2026\n"
                     ."• Ask “whatsapp message for parent” to get copy-paste text for parents\n"
                     ."• Follow up on the same student — e.g. what about 9 Aug 2026?\n"
