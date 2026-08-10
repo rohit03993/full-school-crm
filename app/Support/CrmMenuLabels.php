@@ -141,6 +141,11 @@ final class CrmMenuLabels
         return 'All students';
     }
 
+    public static function studentCalls(): string
+    {
+        return 'Calls';
+    }
+
     public static function admissions(): string
     {
         return 'Admissions';
