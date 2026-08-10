@@ -18,6 +18,7 @@ class AskCrmService
         protected StudentSearchService $students,
         protected AttendanceService $attendance,
         protected HomeworkCheckService $homeworkChecks,
+        protected AskCrmGeminiService $gemini,
     ) {}
 
     /**
@@ -34,7 +35,7 @@ class AskCrmService
             );
         }
 
-        $intent = $this->detectIntent($question);
+        [$intent, $name] = $this->resolveIntentAndName($question);
 
         if ($intent === AskCrmIntent::Help) {
             return $this->result($intent, $this->helpReply());
@@ -46,8 +47,6 @@ class AskCrmService
                 "I’m not sure I understood that yet.\n\n".$this->helpReply(),
             );
         }
-
-        $name = $this->extractStudentName($question);
 
         if (! filled($name)) {
             return $this->result(
@@ -170,6 +169,32 @@ class AskCrmService
             'student' => null,
             'students' => $best,
         ];
+    }
+
+    /**
+     * @return array{0: AskCrmIntent, 1: ?string}
+     */
+    protected function resolveIntentAndName(string $question): array
+    {
+        $aiParsed = $this->gemini->parseQuestion($question);
+
+        $intent = $aiParsed['intent'] ?? null;
+
+        if ($intent === null || $intent === AskCrmIntent::Unknown) {
+            $ruleIntent = $this->detectIntent($question);
+
+            if ($intent === null || ($intent === AskCrmIntent::Unknown && $ruleIntent !== AskCrmIntent::Unknown)) {
+                $intent = $ruleIntent;
+            }
+        }
+
+        $name = $aiParsed['student_name'] ?? null;
+
+        if (! filled($name)) {
+            $name = $this->extractStudentName($question);
+        }
+
+        return [$intent ?? AskCrmIntent::Unknown, $name];
     }
 
     public function detectIntent(string $question): AskCrmIntent

@@ -30,6 +30,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\AskCrmService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -37,6 +38,81 @@ use Tests\TestCase;
 class AskCrmServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_gemini_parsing_when_ai_enabled(): void
+    {
+        config([
+            'ask_crm.use_ai' => true,
+            'ask_crm.gemini_api_key' => 'test-key',
+            'ask_crm.gemini_model' => 'gemini-2.0-flash',
+        ]);
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [
+                                ['text' => '{"intent":"attendance_today","student_name":"Ayyush"}'],
+                            ],
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $admin = $this->createSuperAdmin();
+        [$student, $batch] = $this->createEnrolledStudent('Ayyush Sharma');
+
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $student->id,
+            'attendance_date' => now()->toDateString(),
+            'status' => AttendanceStatus::Present,
+            'checked_in_at' => now()->setTime(9, 12),
+            'marked_by_user_id' => $admin->id,
+        ]);
+
+        $result = app(AskCrmService::class)->ask($admin, 'aayush aaj school aaya kya?');
+
+        $this->assertSame(AskCrmIntent::AttendanceToday->value, $result['intent'], $result['reply']);
+        $this->assertSame($student->id, $result['student_id'], $result['reply']);
+        $this->assertStringContainsString('Present', $result['reply']);
+
+        Http::assertSent(function ($request): bool {
+            return str_contains($request->url(), 'generativelanguage.googleapis.com')
+                && str_contains($request->url(), 'key=test-key');
+        });
+    }
+
+    public function test_falls_back_to_rules_when_gemini_fails(): void
+    {
+        config([
+            'ask_crm.use_ai' => true,
+            'ask_crm.gemini_api_key' => 'test-key',
+        ]);
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response('error', 500),
+        ]);
+
+        $admin = $this->createSuperAdmin();
+        [$student, $batch] = $this->createEnrolledStudent('Ayyush Sharma');
+
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $student->id,
+            'attendance_date' => now()->toDateString(),
+            'status' => AttendanceStatus::Present,
+            'checked_in_at' => now()->setTime(9, 12),
+            'marked_by_user_id' => $admin->id,
+        ]);
+
+        $result = app(AskCrmService::class)->ask($admin, 'tell me attendance of aayush');
+
+        $this->assertSame(AskCrmIntent::AttendanceToday->value, $result['intent'], $result['reply']);
+        $this->assertStringContainsString('Present', $result['reply']);
+    }
 
     public function test_natural_language_attendance_question(): void
     {
