@@ -23,6 +23,7 @@ class AskCrmService
         protected AskCrmGeminiService $gemini,
         protected AskCrmStudentDataService $studentData,
         protected AskCrmStaffAssistService $staffAssist,
+        protected AskCrmStaffDataService $staffData,
     ) {}
 
     /**
@@ -40,7 +41,7 @@ class AskCrmService
         if ($question === '') {
             return $this->result(
                 AskCrmIntent::Help,
-                'Please type a question — for example: “What is Ayyush’s attendance today?”',
+                'Please type a question — for example: “Tell me about my tasks” or “homework for Abhinav Singh”.',
             );
         }
 
@@ -64,6 +65,11 @@ class AskCrmService
             $contextStudentId,
             $contextStudent?->name,
         );
+
+        // Staff work / how-to intents never require a student name.
+        if (in_array($intent, [AskCrmIntent::Help, AskCrmIntent::MyTasks, AskCrmIntent::HowTo], true)) {
+            return $this->staffIntentReply($user, $intent, $question, $history);
+        }
 
         $referencedDate = $this->extractReferencedDate($question);
         $isFollowUp = $this->isLikelyFollowUp($question) || filled($referencedDate);
@@ -93,10 +99,6 @@ class AskCrmService
             }
         }
 
-        if ($intent === AskCrmIntent::Help) {
-            return $this->result($intent, $this->helpReply());
-        }
-
         if ($intent === AskCrmIntent::Unknown && $contextStudent && ($useContextStudent || $isFollowUp)) {
             $intent = $this->inferIntentFromHistory($history) ?? AskCrmIntent::StudentProfile;
             $useContextStudent = true;
@@ -109,6 +111,22 @@ class AskCrmService
 
         if ($intent === AskCrmIntent::Unknown && $this->canResolveStudent($name, $useContextStudent, $contextStudent, $question, $isFollowUp)) {
             $intent = $this->inferIntentFromQuestion($question) ?? AskCrmIntent::StudentProfile;
+        }
+
+        // If still unknown and no student — try staff help before failing.
+        if ($intent === AskCrmIntent::Unknown && ! filled($name) && ! $useContextStudent) {
+            if ($this->looksLikeStaffWorkQuestion($question)) {
+                return $this->staffIntentReply($user, AskCrmIntent::MyTasks, $question, $history);
+            }
+
+            if ($this->looksLikeHowToQuestion($question)) {
+                return $this->staffIntentReply($user, AskCrmIntent::HowTo, $question, $history);
+            }
+
+            return $this->result(
+                $intent,
+                "I’m not sure I understood that yet.\n\n".$this->helpReply(),
+            );
         }
 
         if ($intent === AskCrmIntent::Unknown) {
@@ -126,6 +144,10 @@ class AskCrmService
             $resolved = $this->resolveStudent($name);
 
             if ($resolved['outcome'] === StudentSearchService::OUTCOME_NOT_FOUND) {
+                if ($this->looksLikeStaffWorkQuestion($question)) {
+                    return $this->staffIntentReply($user, AskCrmIntent::MyTasks, $question, $history);
+                }
+
                 return $this->result(
                     $intent,
                     'I couldn’t find a student matching “'.$name.'”. Try a fuller name, or check spelling.',
@@ -149,9 +171,13 @@ class AskCrmService
         } elseif ($contextStudent && $isFollowUp) {
             $student = $contextStudent;
         } else {
+            if ($this->looksLikeStaffWorkQuestion($question)) {
+                return $this->staffIntentReply($user, AskCrmIntent::MyTasks, $question, $history);
+            }
+
             return $this->result(
                 $intent,
-                'Please include the student name — for example: “tell me attendance of Ayyush”.',
+                'Please include the student name — for example: “tell me attendance of Ayyush”. Or ask “tell me about my tasks” for your work queue.',
             );
         }
 
@@ -203,6 +229,231 @@ class AskCrmService
             : $this->helpReply();
 
         return $this->studentResult($user, $student, $intent, $fallback, $snapshot, $question, $referencedDate);
+    }
+
+    /**
+     * @param  list<array{role: string, text: string}>  $history
+     * @return array{reply: string, intent: string, student_id: ?int, student_name: ?string, clear_context: bool}
+     */
+    protected function staffIntentReply(User $user, AskCrmIntent $intent, string $question, array $history): array
+    {
+        if ($intent === AskCrmIntent::Help) {
+            return $this->result($intent, $this->helpReply());
+        }
+
+        if ($intent === AskCrmIntent::HowTo) {
+            $reply = $this->howToReply($question);
+
+            if ($this->gemini->isEnabled()) {
+                $composed = $this->gemini->composeStaffReply($question, $history, [
+                    'mode' => 'how_to',
+                    'guide' => $reply,
+                ]);
+
+                if (filled($composed)) {
+                    $reply = $composed;
+                }
+            }
+
+            return $this->result(AskCrmIntent::HowTo, $reply);
+        }
+
+        $snapshot = $this->staffData->myTasksSnapshot($user);
+        $reply = $this->myTasksReply($snapshot);
+
+        if ($this->gemini->isEnabled()) {
+            $composed = $this->gemini->composeStaffReply($question, $history, $snapshot);
+
+            if (filled($composed)) {
+                $reply = $composed;
+            }
+        }
+
+        $reply .= $this->staffWorkLinks($snapshot);
+
+        return $this->result(AskCrmIntent::MyTasks, $reply);
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
+    protected function myTasksReply(array $snapshot): string
+    {
+        $counts = $snapshot['counts'] ?? [];
+        $name = $snapshot['meta']['user_name'] ?? 'there';
+
+        $lines = [
+            'Hi '.$name.' — here’s your CRM work for today:',
+            '',
+            '• Call queue due: **'.(int) ($counts['call_queue_due'] ?? 0).'**',
+            '• Calls made today: **'.(int) ($counts['calls_today'] ?? 0).'** (connected '.(int) ($counts['connected_today'] ?? 0).')',
+            '• Follow-ups due: **'.(int) ($counts['followups_due_total'] ?? 0).'**',
+            '• Open meetings: **'.(int) ($counts['meetings_open'] ?? 0).'**',
+            '• Open cases assigned to you: **'.(int) ($counts['cases_open'] ?? 0).'**',
+            '• Exam marks pending: **'.(int) ($counts['exam_marks_pending'] ?? 0).'**',
+        ];
+
+        $queue = collect($snapshot['call_queue'] ?? [])->take(5);
+        if ($queue->isNotEmpty()) {
+            $lines[] = '';
+            $lines[] = '**Top call queue:**';
+            foreach ($queue as $lead) {
+                $label = $lead['follow_up_queue_label'] ?? 'Due';
+                $lines[] = '• '.$lead['name'].' — '.$label;
+            }
+        }
+
+        $meetings = collect($snapshot['meetings_open'] ?? [])->take(3);
+        if ($meetings->isNotEmpty()) {
+            $lines[] = '';
+            $lines[] = '**Open meetings:**';
+            foreach ($meetings as $meeting) {
+                $lines[] = '• '.($meeting['student_name'] ?? 'Student')
+                    .(filled($meeting['enquiry_number'] ?? null) ? ' ('.$meeting['enquiry_number'].')' : '');
+            }
+        }
+
+        $cases = collect($snapshot['cases_open'] ?? [])->take(3);
+        if ($cases->isNotEmpty()) {
+            $lines[] = '';
+            $lines[] = '**Open cases:**';
+            foreach ($cases as $case) {
+                $lines[] = '• **'.($case['case_number'] ?? 'Case').'** — '.($case['title'] ?? '')
+                    .(filled($case['student_name'] ?? null) ? ' ('.$case['student_name'].')' : '');
+            }
+        }
+
+        $fees = $snapshot['fees_institute'] ?? [];
+        if (($fees['enabled'] ?? false) && ((float) ($fees['overdue_amount'] ?? 0) > 0 || (int) ($fees['overdue_students_count'] ?? 0) > 0)) {
+            $lines[] = '';
+            $lines[] = '**Fees (institute):** '.(int) ($fees['overdue_students_count'] ?? 0)
+                .' students overdue · ₹'.number_format((float) ($fees['overdue_amount'] ?? 0), 2);
+        }
+
+        $total = (int) ($counts['call_queue_due'] ?? 0)
+            + (int) ($counts['followups_due_total'] ?? 0)
+            + (int) ($counts['meetings_open'] ?? 0)
+            + (int) ($counts['cases_open'] ?? 0)
+            + (int) ($counts['exam_marks_pending'] ?? 0);
+
+        if ($total === 0) {
+            $lines[] = '';
+            $lines[] = 'You’re clear on personal queues right now. Ask about any student by name when needed.';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
+    protected function staffWorkLinks(array $snapshot): string
+    {
+        $links = $snapshot['links'] ?? [];
+        $parts = [];
+
+        if (filled($links['call_queue'] ?? null)) {
+            $parts[] = '[Call queue]('.$links['call_queue'].')';
+        }
+        if (filled($links['my_work'] ?? null)) {
+            $parts[] = '[My work]('.$links['my_work'].')';
+        }
+        if (filled($links['follow_ups'] ?? null)) {
+            $parts[] = '[Follow-ups]('.$links['follow_ups'].')';
+        }
+        if (filled($links['my_classes'] ?? null)) {
+            $parts[] = '[My classes]('.$links['my_classes'].')';
+        }
+
+        if ($parts === []) {
+            return '';
+        }
+
+        return "\n\n---\n".implode(' · ', $parts);
+    }
+
+    protected function howToReply(string $question): string
+    {
+        $q = $this->normalizeQuestion($question);
+
+        if ($this->containsAny($q, ['fee', 'payment', 'receipt', 'collect'])) {
+            return "To record a fee payment:\n"
+                ."1. Open the student profile → **Fees** tab\n"
+                ."2. Click **Add Payment**\n"
+                ."3. Enter amount, mode, and save — a receipt is generated\n\n"
+                .'Tip: ask “fee pending for [student name]” first to confirm the balance.';
+        }
+
+        if ($this->containsAny($q, ['homework', 'hw ', ' check'])) {
+            return "To mark homework:\n"
+                ."1. Go to **Academics → Homework check**\n"
+                ."2. Choose batch, subject, and date\n"
+                ."3. Mark Done / Not Done for each student\n\n"
+                .'Tip: ask “ABHINAV SINGH homework status” to check one student quickly.';
+        }
+
+        if ($this->containsAny($q, ['attendance', 'present', 'absent'])) {
+            return "To mark attendance:\n"
+                ."1. Open **Academics → Attendance** (or your class roster)\n"
+                ."2. Select batch and date\n"
+                ."3. Mark Present / Absent / Leave\n\n"
+                .'Tip: ask “attendance of [student] today” for a quick check.';
+        }
+
+        if ($this->containsAny($q, ['call', 'queue', 'lead'])) {
+            return "To work your call list:\n"
+                ."1. Open **Call queue** (or My call list)\n"
+                ."2. Call the next lead and log Connected / Not connected\n"
+                ."3. Set a follow-up if needed\n\n"
+                .'Tip: ask “tell me about my tasks” for your due counts.';
+        }
+
+        if ($this->containsAny($q, ['batch', 'assign', 'enrol'])) {
+            return "To assign a student to a batch:\n"
+                ."1. Open the student profile\n"
+                ."2. Click **Assign Batch**\n"
+                ."3. Choose the class/batch and save\n\n"
+                .'The student then appears in attendance and homework for that batch.';
+        }
+
+        if ($this->containsAny($q, ['case', 'complaint'])) {
+            return "To open or manage a student case:\n"
+                ."1. Open student profile → **Cases** tab (or **My work → My cases**)\n"
+                ."2. Open a new case or update an assigned one\n"
+                ."3. Add notes and close when resolved\n\n"
+                .'Tip: ask “cases open for this student” after talking about them.';
+        }
+
+        return "I can help with CRM how-tos and your work queues.\n\n"
+            ."Try:\n"
+            ."• how do I record a fee payment?\n"
+            ."• how do I mark homework?\n"
+            ."• how do I mark attendance?\n"
+            ."• tell me about my tasks\n"
+            .'• homework for Abhinav Singh';
+    }
+
+    protected function looksLikeStaffWorkQuestion(string $question): bool
+    {
+        $q = $this->normalizeQuestion($question);
+
+        return $this->containsAny($q, [
+            ' my tasks', ' my task', ' my work', 'my queue', 'call queue',
+            'pending calls', 'my calls', 'my meetings', 'my cases',
+            'follow ups', 'follow-ups', 'what should i do', 'what do i have',
+            'today work', 'work today', 'tasks today', 'my pending',
+            'tell me about my', 'show my tasks', 'show my work',
+        ]);
+    }
+
+    protected function looksLikeHowToQuestion(string $question): bool
+    {
+        $q = $this->normalizeQuestion($question);
+
+        return $this->containsAny($q, [
+            'how do i', 'how to', 'how can i', 'steps to', 'guide for',
+            'kaise', 'kaise kare', 'help with',
+        ]);
     }
 
     /**
@@ -291,6 +542,7 @@ class AskCrmService
             'homework', 'attendance', 'attendence', 'status', 'pending', 'balance',
             'fee', 'fees', 'present', 'absent', 'case', 'cases', 'done', 'not',
             'parent', 'whatsapp', 'message', 'copy',
+            'tasks', 'task', 'queue', 'work',
         ] as $phrase) {
             if (str_contains($lower, $phrase)) {
                 return false;
@@ -301,7 +553,7 @@ class AskCrmService
             'student', 'cases', 'case', 'open', 'this', 'the', 'and', 'child',
             'homework', 'attendance', 'status', 'pending', 'balance', 'fee', 'fees',
             'present', 'absent', 'done', 'not', 'singh', 'kumar', 'sharma', 'gupta',
-            'parent', 'whatsapp', 'message', 'copy',
+            'parent', 'whatsapp', 'message', 'copy', 'tasks', 'task', 'queue', 'work',
         ], true)) {
             return false;
         }
@@ -915,6 +1167,14 @@ class AskCrmService
             return AskCrmIntent::Help;
         }
 
+        if ($this->looksLikeHowToQuestion($question)) {
+            return AskCrmIntent::HowTo;
+        }
+
+        if ($this->looksLikeStaffWorkQuestion($question)) {
+            return AskCrmIntent::MyTasks;
+        }
+
         $mentionsFee = $this->containsAny($q, [
             'fee', 'fees', 'pending', 'balance', 'due', 'dues', 'outstanding', 'bakaya', 'baaki fee', 'kitna fee',
             'installment', 'installments', 'payment schedule', 'tuition', 'kitne installment',
@@ -1394,14 +1654,16 @@ class AskCrmService
 
     protected function helpReply(): string
     {
-        return "Ask in normal language — I read your CRM data (same as the student profile).\n"
-            ."Examples:\n"
+        return "I’m your CRM assistant for staff — ask about **your work** or **any student**.\n\n"
+            ."Your work:\n"
+            ."• tell me about my tasks\n"
+            ."• how do I record a fee payment?\n\n"
+            ."Students:\n"
             ."• ABHINAV SINGH - homework for 9 Aug 2026\n"
             ."• ABHINAV SINGH homework status — whatsapp message for parent\n"
-            ."• what about 9 Aug 2026? (follow-up after a student)\n"
             ."• how much fee pending for Ayyush\n"
-            ."• and cases open for this student\n"
-            .'• say “ask about someone else” to switch students';
+            ."• and cases open for this student\n\n"
+            .'Use **Clear chat** anytime to start fresh.';
     }
 
     /**

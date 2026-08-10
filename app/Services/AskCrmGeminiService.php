@@ -139,19 +139,64 @@ You parse staff questions for a school CRM chatbot. Reply with JSON only.
 
 Schema:
 {
-  "intent": "help" | "attendance_today" | "attendance_month" | "fee_pending" | "homework_week" | "student_profile" | "unknown",
+  "intent": "help" | "my_tasks" | "how_to" | "attendance_today" | "attendance_month" | "fee_pending" | "homework_week" | "student_profile" | "unknown",
   "student_name": string or null,
   "use_context_student": boolean
 }
 
 Rules:
+- Use my_tasks for: my tasks, my work, call queue, pending calls, my meetings, my cases, what should I do today, follow-ups due. student_name must be null.
+- Use how_to for: how do I..., how to..., steps to..., CRM process questions. student_name must be null.
 - Set use_context_student=true when the user says this student, the same student, for him/her, or asks a follow-up starting with "and ...".
 - For follow-ups like "has he done or not?", "what about 9 Aug 2026?", keep the same student and pick homework_week, attendance_today, or student_profile from context.
 - Use student_profile for open questions about the student when topic is unclear but they mean the same student.
-- Extract student_name only when a NEW name is mentioned. Never treat words like good, he, done, aug, or dates as a name.
+- Extract student_name only when a NEW person name is mentioned. Never treat words like good, he, done, aug, tasks, work, queue, or dates as a name.
 - Strip dates from student_name — never include "9 aug 2026" in student_name.
 - Understand English and Hinglish.
 PROMPT;
+    }
+
+    /**
+     * Compose a natural staff-work / how-to reply from CRM staff snapshot.
+     *
+     * @param  list<array{role: string, text: string}>  $history
+     * @param  array<string, mixed>  $snapshot
+     */
+    public function composeStaffReply(string $question, array $history, array $snapshot): ?string
+    {
+        if (! $this->isEnabled()) {
+            return null;
+        }
+
+        $dataJson = json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+        if (! is_string($dataJson)) {
+            return null;
+        }
+
+        $prompt = <<<'PROMPT'
+You are Ask CRM — a friendly staff assistant inside a school CRM admin panel.
+
+You help with:
+1) Personal work queues (calls, meetings, cases, follow-ups, exam marks)
+2) How-to guidance for using the CRM
+
+Rules:
+- Answer ONLY using the CRM data / guide JSON below. Never invent counts or student names.
+- Be warm, clear, and practical — like a helpful teammate.
+- For my_tasks: summarize counts first, then list a few top items if present.
+- Mention useful next steps (open Call queue, My work, etc.) without inventing URLs.
+- For how_to: keep steps short and numbered.
+- Use **bold** sparingly for key numbers.
+- Do not mention JSON, APIs, or that you are an AI.
+PROMPT;
+
+        $prompt .= "\n\nCRM staff data:\n".$dataJson;
+        $prompt .= "\n\nConversation so far:\n".$this->formatHistory($history);
+        $prompt .= "\n\nLatest user message: ".$question;
+        $prompt .= "\n\nWrite the assistant reply (plain text, no JSON):";
+
+        return $this->requestText($prompt, temperature: 0.35);
     }
 
     /**
@@ -234,6 +279,8 @@ PROMPT;
 
         return match ($value) {
             'help' => AskCrmIntent::Help,
+            'my_tasks' => AskCrmIntent::MyTasks,
+            'how_to' => AskCrmIntent::HowTo,
             'attendance_today' => AskCrmIntent::AttendanceToday,
             'attendance_month' => AskCrmIntent::AttendanceMonth,
             'fee_pending' => AskCrmIntent::FeePending,

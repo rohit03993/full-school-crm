@@ -96,6 +96,7 @@
 
             <div style="border-top:1px solid #e5e7eb;padding:0.65rem 0.75rem;background:#fff;">
                 <div style="display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.5rem;">
+                    <button type="button" wire:click="askExample('Tell me about my tasks')" wire:loading.attr="disabled" wire:target="send,askExample" style="border:0;border-radius:999px;background:#fef3c7;padding:0.2rem 0.55rem;font-size:0.65rem;font-weight:700;cursor:pointer;">My tasks</button>
                     @if ($canAskAttendance)
                         <button type="button" wire:click="askExample('What is Ayyush attendance today?')" wire:loading.attr="disabled" wire:target="send,askExample" style="border:0;border-radius:999px;background:#f3f4f6;padding:0.2rem 0.55rem;font-size:0.65rem;font-weight:700;cursor:pointer;">Attendance</button>
                     @endif
@@ -106,13 +107,14 @@
                         <button type="button" wire:click="askExample('ABHINAV SINGH - homework for 9 aug 2026')" wire:loading.attr="disabled" wire:target="send,askExample" style="border:0;border-radius:999px;background:#f3f4f6;padding:0.2rem 0.55rem;font-size:0.65rem;font-weight:700;cursor:pointer;">Homework</button>
                         <button type="button" wire:click="askExample('ABHINAV SINGH homework status — whatsapp message for parent')" wire:loading.attr="disabled" wire:target="send,askExample" style="border:0;border-radius:999px;background:#f3f4f6;padding:0.2rem 0.55rem;font-size:0.65rem;font-weight:700;cursor:pointer;">Parent msg</button>
                     @endif
+                    <button type="button" wire:click="askExample('How do I record a fee payment?')" wire:loading.attr="disabled" wire:target="send,askExample" style="border:0;border-radius:999px;background:#f3f4f6;padding:0.2rem 0.55rem;font-size:0.65rem;font-weight:700;cursor:pointer;">How-to</button>
                 </div>
 
                 <form wire:submit="send" style="display:flex;align-items:flex-end;gap:0.5rem;">
                     <textarea
                         wire:model="message"
                         rows="2"
-                        placeholder="Ask about a student…"
+                        placeholder="Ask about your tasks or a student…"
                         wire:loading.attr="disabled"
                         wire:target="send,askExample"
                         style="flex:1;min-height:2.5rem;resize:none;border-radius:0.75rem;border:1px solid #d1d5db;padding:0.5rem 0.65rem;font-size:0.875rem;"

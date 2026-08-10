@@ -724,6 +724,34 @@ class AskCrmServiceTest extends TestCase
         $this->assertStringContainsString('[Fees](', $result['reply']);
     }
 
+    public function test_my_tasks_question_does_not_search_for_student_name(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+
+        $result = app(AskCrmService::class)->ask($admin, 'Tell me about my tasks');
+
+        $this->assertSame(AskCrmIntent::MyTasks->value, $result['intent'], $result['reply']);
+        $this->assertNull($result['student_id']);
+        $this->assertStringContainsString('Call queue due', $result['reply']);
+        $this->assertStringNotContainsString('couldn’t find a student', strtolower($result['reply']));
+        $this->assertStringNotContainsString('matching', strtolower($result['reply']));
+    }
+
+    public function test_how_to_fee_payment_question(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+
+        $result = app(AskCrmService::class)->ask($admin, 'How do I record a fee payment?');
+
+        $this->assertSame(AskCrmIntent::HowTo->value, $result['intent'], $result['reply']);
+        $this->assertStringContainsString('Add Payment', $result['reply']);
+        $this->assertStringContainsString('Fees', $result['reply']);
+    }
+
     public function test_ask_crm_page_is_accessible(): void
     {
         $admin = $this->createSuperAdmin();

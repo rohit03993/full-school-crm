@@ -72,10 +72,11 @@ class AskCrmSessionService
         return [
             [
                 'role' => 'assistant',
-                'text' => "Hi — I’m Ask CRM.\n\n"
-                    ."I read the same data as the student profile — attendance, homework, fees, calls, visits, exams, and more.\n\n"
+                'text' => "Hi — I’m Ask CRM, your staff helper.\n\n"
+                    ."Ask about **your work** (calls, meetings, cases) or **any student** (homework, fees, attendance).\n\n"
                     ."Tips:\n"
-                    ."• Include the student name — e.g. ABHINAV SINGH - homework for 9 Aug 2026\n"
+                    ."• tell me about my tasks\n"
+                    ."• Include a student name — e.g. ABHINAV SINGH - homework for 9 Aug 2026\n"
                     ."• Ask “whatsapp message for parent” to get copy-paste text for parents\n"
                     ."• Follow up on the same student — e.g. what about 9 Aug 2026?\n"
                     ."• Use **New student** or say “ask about someone else” to switch\n"
