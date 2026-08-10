@@ -22,6 +22,7 @@ class AskCrmService
         protected HomeworkCheckService $homeworkChecks,
         protected AskCrmGeminiService $gemini,
         protected AskCrmStudentDataService $studentData,
+        protected AskCrmStaffAssistService $staffAssist,
     ) {}
 
     /**
@@ -166,7 +167,7 @@ class AskCrmService
             $dateReply = $this->dateSpecificReply($user, $student, $intent, $referencedDate, $snapshot);
 
             if (filled($dateReply)) {
-                return $this->result($intent, $dateReply, (int) $student->id, $student->name);
+                return $this->studentResult($user, $student, $intent, $dateReply, $snapshot, $question, $referencedDate);
             }
         }
 
@@ -186,14 +187,14 @@ class AskCrmService
         };
 
         if (filled($reply)) {
-            return $this->result($intent, $reply, (int) $student->id, $student->name);
+            return $this->studentResult($user, $student, $intent, $reply, $snapshot, $question, $referencedDate);
         }
 
         if ($this->gemini->isEnabled()) {
             $composed = $this->gemini->composeReply($question, $history, $snapshot);
 
             if (filled($composed)) {
-                return $this->result($intent, $composed, (int) $student->id, $student->name);
+                return $this->studentResult($user, $student, $intent, $composed, $snapshot, $question, $referencedDate);
             }
         }
 
@@ -201,7 +202,25 @@ class AskCrmService
             ? $this->profileOverviewReply($user, $student, $snapshot)
             : $this->helpReply();
 
-        return $this->result($intent, $fallback, (int) $student->id, $student->name);
+        return $this->studentResult($user, $student, $intent, $fallback, $snapshot, $question, $referencedDate);
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @return array{reply: string, intent: string, student_id: ?int, student_name: ?string, clear_context: bool}
+     */
+    protected function studentResult(
+        User $user,
+        Student $student,
+        AskCrmIntent $intent,
+        string $reply,
+        array $snapshot,
+        string $question,
+        ?string $referencedDate = null,
+    ): array {
+        $reply = $this->staffAssist->enhance($user, $student, $intent, $reply, $snapshot, $question, $referencedDate);
+
+        return $this->result($intent, $reply, (int) $student->id, $student->name);
     }
 
     /**
@@ -271,6 +290,7 @@ class AskCrmService
             'how many', 'what amount', 'installment', 'installments',
             'homework', 'attendance', 'attendence', 'status', 'pending', 'balance',
             'fee', 'fees', 'present', 'absent', 'case', 'cases', 'done', 'not',
+            'parent', 'whatsapp', 'message', 'copy',
         ] as $phrase) {
             if (str_contains($lower, $phrase)) {
                 return false;
@@ -281,6 +301,7 @@ class AskCrmService
             'student', 'cases', 'case', 'open', 'this', 'the', 'and', 'child',
             'homework', 'attendance', 'status', 'pending', 'balance', 'fee', 'fees',
             'present', 'absent', 'done', 'not', 'singh', 'kumar', 'sharma', 'gupta',
+            'parent', 'whatsapp', 'message', 'copy',
         ], true)) {
             return false;
         }
@@ -946,9 +967,29 @@ class AskCrmService
         return AskCrmIntent::Unknown;
     }
 
+    protected function stripParentWhatsAppPhrases(string $question): string
+    {
+        $question = trim($question);
+
+        foreach ([
+            'whatsapp message for parent',
+            'whatsapp for parent',
+            'message for parent',
+            'parent whatsapp',
+            'whatsapp copy for parent',
+            'whatsapp msg for parent',
+            'parent message',
+        ] as $phrase) {
+            $question = (string) preg_replace('/\s*(?:—|--|–|-)?\s*'.preg_quote($phrase, '/').'\s*$/iu', '', $question);
+        }
+
+        return trim($question);
+    }
+
     public function extractStudentName(string $question): ?string
     {
         $original = trim($question);
+        $original = $this->stripParentWhatsAppPhrases($original);
         $original = preg_replace('/\s*(?:--|—|–)\s*/u', ' — ', $original) ?? $original;
 
         // 1–4 name tokens; do not start with common English filler words.
@@ -995,7 +1036,7 @@ class AskCrmService
         }
 
         $stripped = preg_replace(
-            '/\b(what|whats|what\'s|is|are|the|a|an|of|for|today|this|month|monthly|percentage|percent|attendance|attendence|present|absent|fee|fees|pending|balance|due|dues|homework|home\s*work|not|done|week|how|much|many|tell|me|about|student|please|can|you|show|check|status|punch|give|get|batao|btado|sir|ji|now|update|kitna|kitne|good|or|has|he|she|his|her|him|mean|means|installment|installments|amount|have|it|and|what|aaj|school|aaya|ayi|kya|hai|hain)\b/iu',
+            '/\b(what|whats|what\'s|is|are|the|a|an|of|for|today|this|month|monthly|percentage|percent|attendance|attendence|present|absent|fee|fees|pending|balance|due|dues|homework|home\s*work|not|done|week|how|much|many|tell|me|about|student|please|can|you|show|check|status|punch|give|get|batao|btado|sir|ji|now|update|kitna|kitne|good|or|has|he|she|his|her|him|mean|means|installment|installments|amount|have|it|and|what|aaj|school|aaya|ayi|kya|hai|hain|parent|whatsapp|message|copy|send)\b/iu',
             ' ',
             $original,
         ) ?? '';
@@ -1356,6 +1397,7 @@ class AskCrmService
         return "Ask in normal language — I read your CRM data (same as the student profile).\n"
             ."Examples:\n"
             ."• ABHINAV SINGH - homework for 9 Aug 2026\n"
+            ."• ABHINAV SINGH homework status — whatsapp message for parent\n"
             ."• what about 9 Aug 2026? (follow-up after a student)\n"
             ."• how much fee pending for Ayyush\n"
             ."• and cases open for this student\n"

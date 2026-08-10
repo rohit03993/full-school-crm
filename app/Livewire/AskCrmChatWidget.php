@@ -6,6 +6,7 @@ use App\Enums\CrmPermission;
 use App\Services\AskCrmService;
 use App\Services\AskCrmSessionService;
 use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
@@ -198,6 +199,12 @@ class AskCrmChatWidget extends Component
 
     public function render()
     {
-        return view('livewire.ask-crm-chat-widget');
+        $user = Auth::user();
+
+        return view('livewire.ask-crm-chat-widget', [
+            'canAskFees' => $user && FeatureGate::enabled(\App\Enums\LicenseFeature::Fees) && CrmAccess::canViewFees($user),
+            'canAskHomework' => FeatureGate::enabled(\App\Enums\LicenseFeature::Homework),
+            'canAskAttendance' => FeatureGate::enabled(\App\Enums\LicenseFeature::Attendance),
+        ]);
     }
 }

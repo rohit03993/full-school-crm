@@ -663,6 +663,67 @@ class AskCrmServiceTest extends TestCase
         $this->assertStringNotContainsString('more than one student', strtolower($result['reply']));
     }
 
+    public function test_homework_reply_includes_parent_whatsapp_copy_and_profile_link(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $this->travelTo('2026-08-10 10:00:00');
+
+        $admin = $this->createSuperAdmin();
+        [$student, $batch] = $this->createEnrolledStudent('Abhinav Singh');
+        $subject = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'Maths',
+            'code' => 'M01',
+            'default_max_marks' => 100,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        HomeworkCheck::query()->create([
+            'student_id' => $student->id,
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'subject_name' => 'Maths',
+            'topic' => "Today's homework",
+            'checked_on' => '2026-08-09',
+            'status' => HomeworkCheckStatus::NotDone,
+            'notify_status' => HomeworkCheckNotifyStatus::Failed,
+            'created_by_user_id' => $admin->id,
+        ]);
+
+        $result = app(AskCrmService::class)->ask(
+            $admin,
+            'ABHINAV SINGH homework status — whatsapp message for parent',
+        );
+
+        $this->assertSame($student->id, $result['student_id'], $result['reply']);
+        $this->assertStringContainsString('Not Done', $result['reply']);
+        $this->assertStringContainsString('Parent WhatsApp copy', $result['reply']);
+        $this->assertStringContainsString('Dear Parent', $result['reply']);
+        $this->assertStringContainsString('[Open profile](', $result['reply']);
+        $this->assertStringContainsString('[Homework](', $result['reply']);
+    }
+
+    public function test_fee_reply_includes_parent_whatsapp_copy_when_requested(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+        [$student] = $this->createEnrolledStudent('Ayyush Sharma', withFees: true);
+
+        $result = app(AskCrmService::class)->ask(
+            $admin,
+            'How much fee pending for Ayyush Sharma — whatsapp message for parent',
+        );
+
+        $this->assertSame(AskCrmIntent::FeePending->value, $result['intent'], $result['reply']);
+        $this->assertStringContainsString('2,500.00', $result['reply']);
+        $this->assertStringContainsString('Dear Parent', $result['reply']);
+        $this->assertStringContainsString('Tuition fee pending', $result['reply']);
+        $this->assertStringContainsString('[Fees](', $result['reply']);
+    }
+
     public function test_ask_crm_page_is_accessible(): void
     {
         $admin = $this->createSuperAdmin();
