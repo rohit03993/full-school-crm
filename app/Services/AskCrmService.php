@@ -71,6 +71,14 @@ class AskCrmService
             $useContextStudent = true;
         }
 
+        if ($contextStudent && $this->questionMentionsStudentName($question, $contextStudent->name)) {
+            $useContextStudent = true;
+
+            if (filled($name) && ! $this->nameLikelyMatchesStudent($name, $contextStudent->name)) {
+                $name = null;
+            }
+        }
+
         if (! filled($name) || ! $this->isPlausiblePersonName($name)) {
             $name = null;
         }
@@ -124,13 +132,19 @@ class AskCrmService
             }
 
             if ($resolved['outcome'] === StudentSearchService::OUTCOME_MULTIPLE) {
-                return $this->result(
-                    $intent,
-                    $this->multipleStudentsReply($name, $resolved['students']),
-                );
-            }
+                $resolved = $this->disambiguateMultipleStudents($resolved, $question, $contextStudent);
 
-            $student = $resolved['student'];
+                if ($resolved['outcome'] === StudentSearchService::OUTCOME_FOUND) {
+                    $student = $resolved['student'];
+                } else {
+                    return $this->result(
+                        $intent,
+                        $this->multipleStudentsReply($name, $resolved['students']),
+                    );
+                }
+            } else {
+                $student = $resolved['student'];
+            }
         } elseif ($contextStudent && $isFollowUp) {
             $student = $contextStudent;
         } else {
@@ -255,17 +269,165 @@ class AskCrmService
             'someone else', 'another student', 'different student', 'other student',
             'cases open', 'open cases', 'open case', 'for this', 'for the', 'and cases',
             'how many', 'what amount', 'installment', 'installments',
+            'homework', 'attendance', 'attendence', 'status', 'pending', 'balance',
+            'fee', 'fees', 'present', 'absent', 'case', 'cases', 'done', 'not',
         ] as $phrase) {
             if (str_contains($lower, $phrase)) {
                 return false;
             }
         }
 
-        if (in_array($lower, ['student', 'cases', 'case', 'open', 'this', 'the', 'and', 'child'], true)) {
+        if (in_array($lower, [
+            'student', 'cases', 'case', 'open', 'this', 'the', 'and', 'child',
+            'homework', 'attendance', 'status', 'pending', 'balance', 'fee', 'fees',
+            'present', 'absent', 'done', 'not', 'singh', 'kumar', 'sharma', 'gupta',
+        ], true)) {
+            return false;
+        }
+
+        $tokens = $this->nameTokens($lower);
+
+        foreach ($tokens as $token) {
+            if (in_array($token, [
+                'aaj', 'school', 'aaya', 'ayi', 'kya', 'hai', 'hain', 'batao', 'btado',
+                'what', 'whats', 'how', 'tell', 'show', 'please', 'need', 'want', 'check',
+                'homework', 'attendance', 'status', 'pending', 'balance', 'fee', 'fees',
+                'present', 'absent', 'done', 'not', 'today', 'week', 'month', 'student',
+            ], true)) {
+                return false;
+            }
+        }
+
+        if (count($tokens) === 1 && mb_strlen($tokens[0]) < 4) {
             return false;
         }
 
         return true;
+    }
+
+    protected function questionMentionsStudentName(string $question, string $studentName): bool
+    {
+        $question = mb_strtolower($question);
+        $studentName = mb_strtolower(trim($studentName));
+
+        if ($studentName === '') {
+            return false;
+        }
+
+        if (str_contains($question, $studentName)) {
+            return true;
+        }
+
+        $tokens = $this->nameTokens($studentName);
+
+        if (count($tokens) < 2) {
+            return false;
+        }
+
+        foreach ($tokens as $token) {
+            if (mb_strlen($token) < 2 || ! str_contains($question, $token)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected function nameLikelyMatchesStudent(string $candidate, string $studentName): bool
+    {
+        $candidate = mb_strtolower(trim($candidate));
+        $studentName = mb_strtolower(trim($studentName));
+
+        if ($candidate === '' || $studentName === '') {
+            return false;
+        }
+
+        if ($candidate === $studentName || str_contains($studentName, $candidate) || str_contains($candidate, $studentName)) {
+            return true;
+        }
+
+        $candidateTokens = $this->nameTokens($candidate);
+        $studentTokens = $this->nameTokens($studentName);
+
+        return count(array_intersect($candidateTokens, $studentTokens)) >= min(2, count($studentTokens));
+    }
+
+    protected function isBetterNameCandidate(?string $current, ?string $candidate): bool
+    {
+        if (! filled($candidate) || ! $this->isPlausiblePersonName($candidate)) {
+            return false;
+        }
+
+        if (! filled($current)) {
+            return true;
+        }
+
+        if (! $this->isPlausiblePersonName($current)) {
+            return true;
+        }
+
+        $currentTokens = $this->nameTokens($current);
+        $candidateTokens = $this->nameTokens($candidate);
+
+        if (count($candidateTokens) > count($currentTokens)) {
+            return true;
+        }
+
+        if (count($currentTokens) === 1 && count($candidateTokens) >= 2) {
+            return true;
+        }
+
+        return mb_strlen($candidate) > mb_strlen($current) + 2;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function nameTokens(string $value): array
+    {
+        $value = mb_strtolower(trim($value));
+        $parts = preg_split('/\s+/u', $value) ?: [];
+
+        return array_values(array_filter($parts, fn (string $part): bool => mb_strlen($part) >= 2));
+    }
+
+    /**
+     * @param  array{outcome: string, student: ?Student, students: Collection<int, Student>}  $resolved
+     * @return array{outcome: string, student: ?Student, students: Collection<int, Student>}
+     */
+    protected function disambiguateMultipleStudents(array $resolved, string $question, ?Student $contextStudent): array
+    {
+        $students = $resolved['students'];
+
+        if ($contextStudent && $this->questionMentionsStudentName($question, $contextStudent->name)) {
+            $match = $students->firstWhere('id', $contextStudent->id);
+
+            if ($match instanceof Student) {
+                return [
+                    'outcome' => StudentSearchService::OUTCOME_FOUND,
+                    'student' => $match,
+                    'students' => new Collection,
+                ];
+            }
+        }
+
+        $ruleName = $this->extractStudentName($question);
+
+        if (filled($ruleName)) {
+            $exact = $students->first(
+                fn (Student $student): bool => mb_strtolower($student->name) === mb_strtolower($ruleName),
+            );
+
+            if ($exact instanceof Student) {
+                return [
+                    'outcome' => StudentSearchService::OUTCOME_FOUND,
+                    'student' => $exact,
+                    'students' => new Collection,
+                ];
+            }
+        }
+
+        return $resolved;
     }
 
     protected function isCaseQuestion(string $question): bool
@@ -417,6 +579,18 @@ class AskCrmService
             ? $this->cleanNameCandidate($this->stripDatePhrases((string) $aiParsed['student_name']))
             : null;
         $useContextStudent = (bool) ($aiParsed['use_context_student'] ?? false);
+        $ruleName = $this->extractStudentName($question);
+
+        if ($this->isBetterNameCandidate($name, $ruleName)) {
+            $name = $ruleName;
+        } elseif (! filled($name)) {
+            $name = $ruleName;
+        }
+
+        if ($contextStudentId && $contextStudentName && filled($ruleName)
+            && $this->nameLikelyMatchesStudent($ruleName, $contextStudentName)) {
+            $useContextStudent = true;
+        }
 
         if ($intent === null || $intent === AskCrmIntent::Unknown) {
             $ruleIntent = $this->detectIntent($question);
@@ -788,6 +962,14 @@ class AskCrmService
             }
         }
 
+        // "ABHINAV SINGH what is the homework status"
+        if (preg_match('/^'.$namePart.'\s+(?:what|whats|what\'s|how|tell|show|please|can|could|i|need|want|give|check|is|are)\b/ui', $original, $matches)) {
+            $name = $this->cleanNameCandidate($matches[1]);
+            if (filled($name)) {
+                return $name;
+            }
+        }
+
         // "attendance of Aayush" / "fees for Aayush Yadav"
         if (preg_match('/\b(?:of|for)\s+'.$namePart.'(?:\s+(?:today|this|month|week|please|now|sir|ji)|\s*[?.!]|$)/ui', $original, $matches)) {
             $name = $this->cleanNameCandidate($matches[1]);
@@ -813,7 +995,7 @@ class AskCrmService
         }
 
         $stripped = preg_replace(
-            '/\b(what|whats|what\'s|is|are|the|a|an|of|for|today|this|month|monthly|percentage|percent|attendance|attendence|present|absent|fee|fees|pending|balance|due|dues|homework|home\s*work|not|done|week|how|much|many|tell|me|about|student|please|can|you|show|check|status|punch|give|get|batao|btado|sir|ji|now|update|kitna|kitne|good|or|has|he|she|his|her|him|mean|means|installment|installments|amount|have|it|and|what)\b/iu',
+            '/\b(what|whats|what\'s|is|are|the|a|an|of|for|today|this|month|monthly|percentage|percent|attendance|attendence|present|absent|fee|fees|pending|balance|due|dues|homework|home\s*work|not|done|week|how|much|many|tell|me|about|student|please|can|you|show|check|status|punch|give|get|batao|btado|sir|ji|now|update|kitna|kitne|good|or|has|he|she|his|her|him|mean|means|installment|installments|amount|have|it|and|what|aaj|school|aaya|ayi|kya|hai|hain)\b/iu',
             ' ',
             $original,
         ) ?? '';

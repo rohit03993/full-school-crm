@@ -122,6 +122,11 @@ class AskCrmGoldenQuestionsTest extends TestCase
                 ['case', 'Abhinav'],
                 null,
             ],
+            'full name before homework status' => [
+                'ABHINAV SINGH what is the homework status',
+                ['Not Done', 'Abhinav'],
+                AskCrmIntent::HomeworkWeek->value,
+            ],
         ];
     }
 

@@ -539,6 +539,105 @@ class AskCrmServiceTest extends TestCase
         $this->assertNull(app(AskCrmSessionService::class)->load()['last_student_id'] ?? null);
     }
 
+    public function test_homework_status_with_full_name_uses_context_student(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $this->travelTo('2026-08-10 10:00:00');
+
+        $admin = $this->createSuperAdmin();
+        [$student, $batch] = $this->createEnrolledStudent('Abhinav Singh');
+        $subject = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'Maths',
+            'code' => 'M01',
+            'default_max_marks' => 100,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        HomeworkCheck::query()->create([
+            'student_id' => $student->id,
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'subject_name' => 'Maths',
+            'topic' => "Today's homework",
+            'checked_on' => '2026-08-09',
+            'status' => HomeworkCheckStatus::NotDone,
+            'notify_status' => HomeworkCheckNotifyStatus::Failed,
+            'created_by_user_id' => $admin->id,
+        ]);
+
+        $result = app(AskCrmService::class)->ask(
+            $admin,
+            'ABHINAV SINGH what is the homework status',
+            [],
+            (int) $student->id,
+        );
+
+        $this->assertSame($student->id, $result['student_id'], $result['reply']);
+        $this->assertStringContainsString('Not Done', $result['reply']);
+        $this->assertStringNotContainsString('more than one student', strtolower($result['reply']));
+        $this->assertStringNotContainsString('matching', strtolower($result['reply']));
+    }
+
+    public function test_ai_wrong_name_is_overridden_by_full_name_in_question(): void
+    {
+        config([
+            'ask_crm.use_ai' => true,
+            'ask_crm.gemini_api_key' => 'test-key',
+            'ask_crm.gemini_model' => 'gemini-2.0-flash',
+        ]);
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [
+                                ['text' => '{"intent":"homework_week","student_name":"SINGH","use_context_student":false}'],
+                            ],
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $this->travelTo('2026-08-10 10:00:00');
+
+        $admin = $this->createSuperAdmin();
+        [$student, $batch] = $this->createEnrolledStudent('Abhinav Singh');
+        $subject = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'Maths',
+            'code' => 'M01',
+            'default_max_marks' => 100,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        HomeworkCheck::query()->create([
+            'student_id' => $student->id,
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'subject_name' => 'Maths',
+            'topic' => "Today's homework",
+            'checked_on' => '2026-08-09',
+            'status' => HomeworkCheckStatus::NotDone,
+            'notify_status' => HomeworkCheckNotifyStatus::Failed,
+            'created_by_user_id' => $admin->id,
+        ]);
+
+        $result = app(AskCrmService::class)->ask(
+            $admin,
+            'ABHINAV SINGH what is the homework status',
+        );
+
+        $this->assertSame($student->id, $result['student_id'], $result['reply']);
+        $this->assertStringContainsString('Not Done', $result['reply']);
+        $this->assertStringNotContainsString('more than one student', strtolower($result['reply']));
+    }
+
     public function test_ask_crm_page_is_accessible(): void
     {
         $admin = $this->createSuperAdmin();
