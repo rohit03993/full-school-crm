@@ -2,8 +2,15 @@
     use App\Enums\CallDirection;
     use App\Enums\CallQuickTag;
     use App\Enums\CallStatus;
+    use App\Enums\EnrolledCallPurpose;
+    use App\Enums\EnrolledCallQuickTag;
     use App\Enums\VisitStatus;
     use App\Enums\WhoAnswered;
+
+    $callContext = $logCallContext ?? (($logCallModalMode ?? null) === 'case' ? 'case' : 'lead');
+    $isEnrolledCall = $callContext === 'enrolled';
+    $isCaseCall = $callContext === 'case';
+    $isLeadCall = $callContext === 'lead';
 @endphp
 
 @if ($showLogCallModal ?? false)
@@ -12,7 +19,13 @@
             <div class="sticky top-0 border-b border-gray-100 bg-white px-4 py-4 dark:border-white/10 dark:bg-gray-900 sm:px-6">
                 <div class="flex items-center justify-between gap-3">
                     <div>
-                        <h3 class="text-lg font-bold text-gray-950 dark:text-white">Log call result</h3>
+                        <h3 class="text-lg font-bold text-gray-950 dark:text-white">
+                            @if ($isEnrolledCall)
+                                Log student call
+                            @else
+                                Log call result
+                            @endif
+                        </h3>
                         @if (filled($logCallLeadName ?? null))
                             <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
                                 {{ $logCallLeadName }}
@@ -21,9 +34,14 @@
                                 @endif
                             </p>
                         @endif
-                        @if (($logCallModalMode ?? null) === 'case' && filled($logCallCaseNumber ?? null))
+                        @if ($isCaseCall && filled($logCallCaseNumber ?? null))
                             <p class="mt-1 text-xs font-semibold text-primary-700 dark:text-primary-300">
                                 Logging call on case {{ $logCallCaseNumber }}
+                            </p>
+                        @endif
+                        @if ($isEnrolledCall)
+                            <p class="mt-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                Enrolled student — service call (not lead pipeline)
                             </p>
                         @endif
                     </div>
@@ -66,16 +84,26 @@
                             @endforeach
                         </x-crm.select>
                     </div>
-                    @if (($logCallModalMode ?? null) !== 'case')
-                    <div>
-                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Lead status after call</label>
-                        <x-crm.select wire:model.live="logCallForm.visit_status" class="mt-2" required>
-                            <option value="">Select…</option>
-                            @foreach (VisitStatus::cases() as $status)
-                                <option value="{{ $status->value }}">{{ $status->label() }}</option>
-                            @endforeach
-                        </x-crm.select>
-                    </div>
+                    @if ($isLeadCall)
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Lead status after call</label>
+                            <x-crm.select wire:model.live="logCallForm.visit_status" class="mt-2" required>
+                                <option value="">Select…</option>
+                                @foreach (VisitStatus::cases() as $status)
+                                    <option value="{{ $status->value }}">{{ $status->label() }}</option>
+                                @endforeach
+                            </x-crm.select>
+                        </div>
+                    @elseif ($isEnrolledCall)
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Call purpose / outcome</label>
+                            <x-crm.select wire:model.live="logCallForm.call_purpose" class="mt-2" required>
+                                <option value="">Select…</option>
+                                @foreach (EnrolledCallPurpose::options() as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </x-crm.select>
+                        </div>
                     @endif
                 @endif
 
@@ -96,7 +124,7 @@
                     <div>
                         <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Quick tags</p>
                         <div class="mt-2 grid grid-cols-2 gap-2">
-                            @foreach (CallQuickTag::options() as $value => $label)
+                            @foreach (($isEnrolledCall ? EnrolledCallQuickTag::options() : CallQuickTag::options()) as $value => $label)
                                 <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
                                     <input type="checkbox" wire:model="logCallForm.tags" value="{{ $value }}" class="rounded border-gray-300">
                                     {{ $label }}
@@ -107,17 +135,28 @@
                 @endif
 
                 @php
-                    $requiresFollowUp = ($logCallModalMode ?? null) !== 'case'
+                    $requiresLeadFollowUp = $isLeadCall
                         && ($logCallForm['call_connected'] ?? true)
                         && in_array($logCallForm['visit_status'] ?? '', ['interested', 'follow_up_required', 'admission_ready'], true);
+                    $requiresEnrolledFollowUp = $isEnrolledCall
+                        && ($logCallForm['call_connected'] ?? true)
+                        && ($logCallForm['call_purpose'] ?? '') === 'callback_needed';
+                    $requiresFollowUp = $requiresLeadFollowUp || $requiresEnrolledFollowUp;
+                    $showFollowUp = $isLeadCall || $isEnrolledCall;
                 @endphp
-                @if (($logCallModalMode ?? null) !== 'case')
+                @if ($showFollowUp)
                 <div>
                     <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                         Next follow-up @if ($requiresFollowUp) <span class="text-danger-600">*</span> @endif
                     </label>
                     <input type="datetime-local" wire:model="logCallForm.next_followup_at" class="mt-1 w-full rounded-lg border-gray-300 text-sm dark:border-white/10 dark:bg-gray-800" @if ($requiresFollowUp) required @endif>
-                    @if ($requiresFollowUp)
+                    @if ($isEnrolledCall)
+                        @if ($requiresEnrolledFollowUp)
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Required for callback. Optional reminder on this student — not a sales lead queue item.</p>
+                        @else
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Optional. Pick date and time for a callback reminder on this student.</p>
+                        @endif
+                    @elseif ($requiresLeadFollowUp)
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Required. The lead appears in the telecaller queue on this date (not before).</p>
                     @else
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Optional. Pick date and time — the call queue shows this lead on that date.</p>

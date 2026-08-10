@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\CallDirection;
 use App\Enums\CallStatus;
+use App\Enums\EnrolledCallPurpose;
 use App\Enums\VisitStatus;
 use App\Enums\WhoAnswered;
 use App\Models\Enquiry;
@@ -43,9 +44,148 @@ class CallLogService
     ) {}
 
     /**
+     * Lead / enquiry telecall path (visit status + queue follow-up).
+     */
+    public function isLeadCallContext(Student $student): bool
+    {
+        return ! $this->isEnrolledCallContext($student);
+    }
+
+    /**
+     * Enrolled student service call (no lead pipeline side effects).
+     */
+    public function isEnrolledCallContext(Student $student): bool
+    {
+        $student->loadMissing('activeEnrollment');
+
+        if ($student->activeEnrollment !== null) {
+            return true;
+        }
+
+        return $student->status === \App\Enums\StudentStatus::Enrolled;
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     public function log(Student $student, User $staff, array $data): StudentCall
+    {
+        if ($this->isEnrolledCallContext($student)) {
+            return $this->logForEnrolledStudent($student, $staff, $data);
+        }
+
+        return $this->logLeadCall($student, $staff, $data);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function logForEnrolledStudent(Student $student, User $staff, array $data): StudentCall
+    {
+        $connected = (bool) ($data['call_connected'] ?? false);
+        $direction = CallDirection::tryFrom((string) ($data['call_direction'] ?? 'outgoing'))
+            ?? CallDirection::Outgoing;
+
+        $rules = [
+            'call_connected' => 'required|boolean',
+            'call_direction' => 'nullable|in:outgoing,incoming',
+            'duration_minutes' => 'nullable|integer|min:0|max:600',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string|max:50',
+            'next_followup_at' => 'nullable|date',
+        ];
+
+        if ($connected) {
+            $rules['who_answered'] = 'required|in:'.implode(',', array_keys(WhoAnswered::options()));
+            $rules['call_purpose'] = 'required|in:'.implode(',', array_column(EnrolledCallPurpose::cases(), 'value'));
+            $rules['call_notes'] = 'required|string|min:10|max:2000';
+        } else {
+            $rules['call_status'] = 'required|in:'.implode(',', array_column(CallStatus::cases(), 'value'));
+            $rules['call_notes'] = 'nullable|string|max:2000';
+        }
+
+        $validated = Validator::make($data, $rules, [
+            'call_notes.required' => 'Please add call notes (at least 10 characters) when the call connected.',
+            'call_notes.min' => 'Call notes must be at least 10 characters when connected.',
+            'call_purpose.required' => 'Please select the call purpose / outcome.',
+        ])->validate();
+
+        $callStatus = $connected
+            ? CallStatus::Connected
+            : CallStatus::from($validated['call_status']);
+
+        $purpose = $connected
+            ? EnrolledCallPurpose::from($validated['call_purpose'])
+            : null;
+
+        if ($student->is_call_blocked) {
+            throw ValidationException::withMessages([
+                'student' => 'This number is blocked from calling after repeated failed attempts.',
+            ]);
+        }
+
+        if ($connected && $purpose?->suggestsFollowUp()) {
+            Validator::make($validated, [
+                'next_followup_at' => 'required|date|after:now',
+            ], [], ['next_followup_at' => 'follow-up date'])->validate();
+        }
+
+        $call = DB::transaction(function () use ($student, $staff, $validated, $connected, $direction, $callStatus, $purpose): StudentCall {
+            $lockedStudent = Student::query()->whereKey($student->id)->lockForUpdate()->firstOrFail();
+
+            $nextFollowup = filled($validated['next_followup_at'] ?? null)
+                ? Carbon::parse($validated['next_followup_at'])
+                : null;
+
+            $call = StudentCall::query()->create([
+                'student_id' => $lockedStudent->id,
+                'enquiry_id' => null,
+                'user_id' => $staff->id,
+                'call_status' => $callStatus,
+                'call_direction' => $direction,
+                'who_answered' => $connected ? WhoAnswered::from($validated['who_answered']) : null,
+                'duration_minutes' => (int) ($validated['duration_minutes'] ?? 0),
+                'call_notes' => $validated['call_notes'] ?? null,
+                'tags' => $validated['tags'] ?? [],
+                'call_purpose' => $purpose?->value,
+                'visit_status_changed_to' => null,
+                'next_followup_at' => $nextFollowup,
+                'called_at' => now(),
+            ]);
+
+            $lockedStudent->total_calls = (int) $lockedStudent->total_calls + 1;
+            $lockedStudent->last_call_at = $call->called_at;
+            $lockedStudent->last_call_status = $call->call_status;
+            $lockedStudent->last_call_notes = filled($call->call_notes) ? $call->call_notes : $lockedStudent->last_call_notes;
+
+            if ($nextFollowup !== null) {
+                $lockedStudent->next_call_followup_at = $nextFollowup;
+            }
+
+            $lockedStudent->save();
+
+            $this->audit->log(
+                action: 'Enrolled Student Call Logged',
+                auditable: $call,
+                newValues: [
+                    'student_id' => $lockedStudent->id,
+                    'call_status' => $callStatus->value,
+                    'call_purpose' => $purpose?->value,
+                    'staff_user_id' => $staff->id,
+                ],
+                user: $staff,
+            );
+
+            return $call->load(['staff']);
+        });
+
+        return $call;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function logLeadCall(Student $student, User $staff, array $data): StudentCall
     {
         $connected = (bool) ($data['call_connected'] ?? false);
         $direction = CallDirection::tryFrom((string) ($data['call_direction'] ?? 'outgoing'))

@@ -86,6 +86,15 @@ class CallQueuePage extends Page
         return (int) $this->currentStudentId === $studentId;
     }
 
+    protected function logCallTargetStudent(): ?Student
+    {
+        if (! $this->currentStudentId) {
+            return null;
+        }
+
+        return Student::query()->find($this->currentStudentId);
+    }
+
     public function refreshQueue(CallQueueService $queue): void
     {
         $staff = Auth::user();
@@ -172,6 +181,7 @@ class CallQueuePage extends Page
                     'scheduledLeads' => collect($this->scheduledLeads),
                     'showLogCallModal' => $this->showLogCallModal,
                     'logCallForm' => $this->logCallForm,
+                    'logCallContext' => $this->logCallContext,
                     'logCallModalMode' => 'queue',
                     'logCallLeadName' => $this->currentLead['name'] ?? null,
                     'logCallLeadPhone' => $this->currentLead['mobile_display'] ?? null,

@@ -2947,6 +2947,11 @@ class StudentProfilePage extends Page
         return (int) $this->record->id === $studentId;
     }
 
+    protected function logCallTargetStudent(): ?Student
+    {
+        return $this->record;
+    }
+
     protected function studentForCloseMeeting(): Student
     {
         return $this->record;
@@ -2964,6 +2969,8 @@ class StudentProfilePage extends Page
 
     public function submitLogCall(CallLogService $callLog): void
     {
+        $wasCaseCall = (bool) $this->logCallStudentCaseId;
+
         if (! $this->persistLogCall($this->record, $callLog)) {
             return;
         }
@@ -2978,7 +2985,7 @@ class StudentProfilePage extends Page
         $this->loadCallsTab();
         $this->loadVisitsTab();
         $this->loadCasesTab();
-        $this->profileTab = $this->logCallStudentCaseId ? 'cases' : 'calls';
+        $this->profileTab = $wasCaseCall ? 'cases' : 'calls';
 
         Notification::make()
             ->title('Call logged')
@@ -3006,6 +3013,7 @@ class StudentProfilePage extends Page
                 ->viewData(fn (): array => [
                     'showLogCallModal' => $this->showLogCallModal,
                     'logCallForm' => $this->logCallForm,
+                    'logCallContext' => $this->logCallContext,
                     'logCallModalMode' => $this->logCallStudentCaseId ? 'case' : 'profile',
                     'logCallLeadName' => $this->record->name,
                     'logCallLeadPhone' => $this->record->mobile,

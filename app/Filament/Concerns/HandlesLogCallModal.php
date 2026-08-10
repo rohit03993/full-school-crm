@@ -2,11 +2,12 @@
 
 namespace App\Filament\Concerns;
 
+use App\Enums\EnrolledCallPurpose;
 use App\Enums\LicenseFeature;
 use App\Enums\VisitStatus;
-use App\Support\FeatureGate;
 use App\Models\Student;
 use App\Services\CallLogService;
+use App\Support\FeatureGate;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -19,6 +20,11 @@ trait HandlesLogCallModal
     public ?int $logCallStudentCaseId = null;
 
     /**
+     * lead | enrolled | case
+     */
+    public string $logCallContext = 'lead';
+
+    /**
      * @var array<string, mixed>
      */
     public array $logCallForm = [
@@ -27,6 +33,7 @@ trait HandlesLogCallModal
         'call_status' => null,
         'who_answered' => null,
         'visit_status' => null,
+        'call_purpose' => null,
         'duration_minutes' => null,
         'call_notes' => null,
         'tags' => [],
@@ -34,6 +41,8 @@ trait HandlesLogCallModal
     ];
 
     abstract protected function pendingCallMatchesStudent(int $studentId): bool;
+
+    abstract protected function logCallTargetStudent(): ?Student;
 
     #[On('open-pending-call-log')]
     public function openPendingCallLog(int $studentId): void
@@ -57,7 +66,10 @@ trait HandlesLogCallModal
             return;
         }
 
+        $preserveCaseId = $this->logCallStudentCaseId;
         $this->resetLogCallForm();
+        $this->logCallStudentCaseId = $preserveCaseId;
+        $this->logCallContext = $this->resolveLogCallContext($this->logCallTargetStudent());
         $this->showLogCallModal = true;
     }
 
@@ -68,6 +80,10 @@ trait HandlesLogCallModal
 
     public function updatedLogCallFormVisitStatus(?string $value): void
     {
+        if ($this->logCallContext !== 'lead') {
+            return;
+        }
+
         if (! ($this->logCallForm['call_connected'] ?? false) || blank($value)) {
             return;
         }
@@ -87,15 +103,47 @@ trait HandlesLogCallModal
         }
     }
 
+    public function updatedLogCallFormCallPurpose(?string $value): void
+    {
+        if ($this->logCallContext !== 'enrolled') {
+            return;
+        }
+
+        if (! ($this->logCallForm['call_connected'] ?? false) || blank($value)) {
+            return;
+        }
+
+        $purpose = EnrolledCallPurpose::tryFrom($value);
+
+        if ($purpose?->suggestsFollowUp()) {
+            $this->logCallForm['next_followup_at'] = now()->addDay()->setTime(10, 0)->format('Y-m-d\TH:i');
+        }
+    }
+
+    protected function resolveLogCallContext(?Student $student): string
+    {
+        if ($this->logCallStudentCaseId) {
+            return 'case';
+        }
+
+        if ($student && app(CallLogService::class)->isEnrolledCallContext($student)) {
+            return 'enrolled';
+        }
+
+        return 'lead';
+    }
+
     protected function resetLogCallForm(): void
     {
         $this->logCallStudentCaseId = null;
+        $this->logCallContext = 'lead';
         $this->logCallForm = [
             'call_direction' => 'outgoing',
             'call_connected' => true,
             'call_status' => null,
             'who_answered' => null,
             'visit_status' => null,
+            'call_purpose' => null,
             'duration_minutes' => null,
             'call_notes' => null,
             'tags' => [],
@@ -118,6 +166,8 @@ trait HandlesLogCallModal
             if ($this->logCallStudentCaseId) {
                 $case = \App\Models\StudentCase::query()->findOrFail($this->logCallStudentCaseId);
                 $callLog->logForCase($case, Auth::user(), $this->logCallForm);
+            } elseif ($callLog->isEnrolledCallContext($student)) {
+                $callLog->logForEnrolledStudent($student, Auth::user(), $this->logCallForm);
             } else {
                 $callLog->log($student, Auth::user(), $this->logCallForm);
             }

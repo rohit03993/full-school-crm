@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\CallDirection;
 use App\Enums\CallStatus;
+use App\Enums\EnrolledCallPurpose;
 use App\Enums\VisitStatus;
 use App\Enums\WhatsAppAutoStatus;
 use App\Enums\WhoAnswered;
@@ -24,6 +25,7 @@ class StudentCall extends Model
         'duration_minutes',
         'call_notes',
         'tags',
+        'call_purpose',
         'visit_status_changed_to',
         'next_followup_at',
         'called_at',
@@ -36,6 +38,7 @@ class StudentCall extends Model
             'call_direction' => CallDirection::class,
             'whatsapp_auto_status' => WhatsAppAutoStatus::class,
             'who_answered' => WhoAnswered::class,
+            'call_purpose' => EnrolledCallPurpose::class,
             'visit_status_changed_to' => VisitStatus::class,
             'next_followup_at' => 'datetime',
             'called_at' => 'datetime',

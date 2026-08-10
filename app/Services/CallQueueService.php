@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\CallStatus;
+use App\Enums\StudentStatus;
 use App\Filament\Pages\StudentProfilePage;
 use App\Models\Enquiry;
 use App\Models\Student;
@@ -86,12 +87,20 @@ class CallQueueService
     }
 
     /**
+     * Telecall lead queue: calling-assigned enquiries that are not enrolled students.
+     *
+     * Rare edge case: if `calling_assigned_at` was never cleared after admission, the student
+     * is still intentionally excluded here — enrolled contacts use profile/case Log (service),
+     * not the sales Call Queue. Re-appear only after enrollment ends and they are re-assigned.
+     *
      * @return Builder<Student>
      */
     protected function assignedLeadQuery(User $staff): Builder
     {
         return Student::query()
             ->where('is_call_blocked', false)
+            ->where('status', '!=', StudentStatus::Enrolled)
+            ->whereDoesntHave('activeEnrollment')
             ->whereNotIn('id', $this->studentIdsExcludedByNotConnectedCap())
             ->whereHas('enquiries', function ($query) use ($staff): void {
                 $query->where('meeting_with_user_id', $staff->id)

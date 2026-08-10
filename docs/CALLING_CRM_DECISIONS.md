@@ -5,6 +5,7 @@
 | **WhatsApp provider** | **Pal Digital** WhatsApp API (not AiSensy). Built natively in school-crm Phase D. |
 | **Who can call** | **All staff** can log calls. **`student_calls.user_id`** records who called. |
 | **Lead assignment** | **`enquiries.meeting_with_user_id`** — call queue prioritises assigned (+ unassigned) leads. |
+| **Enrolled vs lead calls** | **Dual mode** — profile Log uses lead VisitStatus for prospects; enrolled students get service outcomes (`call_purpose`) and never update `latest_visit_status`. Call Queue excludes enrolled (even if calling assignment was left after admission). |
 | **3-strike block** | **Yes** — permanent block after **3 not-connected** attempts. |
 | **Mobile UI** | **Yes** — mobile-friendly Filament pages (Call Queue first). |
 | **Telephony** | **`tel:` links** only — staff use phone dialer; CRM logs outcomes. |

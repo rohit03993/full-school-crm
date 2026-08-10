@@ -159,6 +159,7 @@
     @include('filament.pages.partials.log-call-modal', [
         'showLogCallModal' => $showLogCallModal,
         'logCallForm' => $logCallForm,
+        'logCallContext' => $logCallContext ?? 'lead',
         'logCallModalMode' => $logCallModalMode ?? 'queue',
         'logCallLeadName' => $logCallLeadName ?? null,
         'logCallLeadPhone' => $logCallLeadPhone ?? null,

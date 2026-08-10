@@ -2,12 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AdmissionStatus;
 use App\Enums\CourseStatus;
+use App\Enums\EnrollmentStatus;
 use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Enums\VisitStatus;
+use App\Models\Admission;
 use App\Models\Course;
+use App\Models\Enrollment;
 use App\Models\Enquiry;
 use App\Models\Student;
 use App\Models\User;
@@ -91,6 +95,50 @@ class CallQueueServiceTest extends TestCase
         ]);
 
         $this->assertSame(1, $queue->dueQueueCount($staff));
+    }
+
+    public function test_enrolled_student_is_excluded_from_lead_call_queue(): void
+    {
+        [$staff, $student] = $this->createAssignedLead();
+
+        $this->assertSame(1, app(CallQueueService::class)->dueQueueCount($staff));
+
+        $student->update(['status' => StudentStatus::Enrolled]);
+
+        $course = Course::query()->firstOrFail();
+        $enquiry = $student->enquiries()->latest()->firstOrFail();
+
+        $admission = Admission::query()->create([
+            'student_id' => $student->id,
+            'enquiry_id' => $enquiry->id,
+            'admission_number' => 'ADM-Q-'.$student->id,
+            'course_fee' => 50000,
+            'discount_amount' => 0,
+            'net_fee' => 50000,
+            'use_installment_plan' => false,
+            'status' => AdmissionStatus::Approved,
+            'approved_at' => now(),
+            'submitted_at' => now(),
+        ]);
+
+        Enrollment::query()->create([
+            'student_id' => $student->id,
+            'admission_id' => $admission->id,
+            'course_id' => $course->id,
+            'enrollment_number' => 'ENR-Q-'.$student->id,
+            'enrolled_at' => now(),
+            'status' => EnrollmentStatus::Enrolled,
+            'is_active' => true,
+        ]);
+
+        // Calling assignment intentionally left in place (rare post-admission edge case).
+        $this->assertNotNull($enquiry->fresh()->calling_assigned_at);
+
+        $queue = app(CallQueueService::class);
+
+        $this->assertSame(0, $queue->dueQueueCount($staff));
+        $this->assertFalse($queue->dueQueue($staff)->contains('id', $student->id));
+        $this->assertSame(0, $queue->scheduledQueueCount($staff));
     }
 
     public function test_lead_timeline_merges_visits_and_calls_without_duplicates(): void
