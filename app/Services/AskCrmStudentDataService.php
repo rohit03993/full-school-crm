@@ -392,6 +392,7 @@ class AskCrmStudentDataService
                 'label' => $row->label,
                 'amount' => (float) $row->amount,
                 'paid_amount' => (float) $row->paid_amount,
+                'pending_amount' => (float) $row->pending_amount,
                 'due_date' => $row->due_date?->toDateString(),
                 'status' => $row->statusLabel(),
             ])
@@ -425,6 +426,7 @@ class AskCrmStudentDataService
             'total_pending_formatted' => number_format($totalPending, 2),
             'is_clear' => $tuitionPending <= 0.009,
             'discount_summary' => $discountSummary,
+            'installment_count' => count($installments),
             'installments' => $installments,
             'penalties' => $penalties,
         ];

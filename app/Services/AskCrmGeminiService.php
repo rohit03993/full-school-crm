@@ -89,6 +89,7 @@ Rules:
 - For follow-ups ("has he done?", "what about 9 Aug?", "last call?", "exam marks?"), use the same student and conversation history.
 - Use meta.referenced_date, homework.on_referenced_date, and attendance.on_referenced_date for specific dates.
 - Use homework.history_by_date, attendance.recent_days, calls.recent, visits.recent, receipts.recent, exams.activity_types as needed.
+- Use fees.installments and fees.installment_count for payment schedule / installment questions (same as Fees tab).
 - overview.academic_record has Class 10/12 and graduation percentages (profile Overview tab).
 - cases, fees, receipts respect can_view — tell the user if they lack permission.
 - If homework is not marked for a date, say clearly there is no record — do not guess Done or Not Done.

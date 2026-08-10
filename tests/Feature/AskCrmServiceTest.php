@@ -24,6 +24,7 @@ use App\Models\Course;
 use App\Models\CourseSubject;
 use App\Models\Enquiry;
 use App\Models\Enrollment;
+use App\Models\FeeInstallment;
 use App\Models\FeeStructure;
 use App\Models\HomeworkCheck;
 use App\Models\Student;
@@ -271,6 +272,36 @@ class AskCrmServiceTest extends TestCase
         $this->assertSame($student->id, $result['student_id']);
         $this->assertStringContainsString('Present', $result['reply']);
         $this->assertStringContainsString('Ayyush', $result['reply']);
+    }
+
+    public function test_installment_question_with_dashed_student_name(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+        [$student] = $this->createEnrolledStudent('Aarjav Jain', withFees: true);
+
+        $feeStructure = $student->activeEnrollment?->feeStructure;
+        $this->assertNotNull($feeStructure);
+
+        FeeInstallment::query()->create([
+            'fee_structure_id' => $feeStructure->id,
+            'label' => 'Installment 1',
+            'amount' => 185000,
+            'paid_amount' => 0,
+            'pending_amount' => 185000,
+            'sort_order' => 1,
+        ]);
+
+        $result = app(AskCrmService::class)->ask(
+            $admin,
+            'AARJAV JAIN -- how many installments it have and of what amount',
+        );
+
+        $this->assertSame(AskCrmIntent::FeePending->value, $result['intent'], $result['reply']);
+        $this->assertSame($student->id, $result['student_id'], $result['reply']);
+        $this->assertStringContainsString('1 installment', $result['reply']);
+        $this->assertStringContainsString('185,000.00', $result['reply']);
     }
 
     public function test_fee_pending_reply(): void

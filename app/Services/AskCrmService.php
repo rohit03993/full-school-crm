@@ -70,6 +70,10 @@ class AskCrmService
             $useContextStudent = true;
         }
 
+        if ($intent === AskCrmIntent::Unknown && $this->canResolveStudent($name, $useContextStudent, $contextStudent, $question, $isFollowUp)) {
+            $intent = $this->inferIntentFromQuestion($question) ?? AskCrmIntent::StudentProfile;
+        }
+
         if ($intent === AskCrmIntent::Unknown) {
             return $this->result(
                 $intent,
@@ -135,9 +139,13 @@ class AskCrmService
         $reply = match ($intent) {
             AskCrmIntent::AttendanceToday => $this->attendanceTodayReply($student),
             AskCrmIntent::AttendanceMonth => $this->attendanceMonthReply($student),
-            AskCrmIntent::FeePending => $this->feePendingReply($user, $student),
+            AskCrmIntent::FeePending => $this->isInstallmentQuestion($question)
+                ? $this->feeInstallmentsReply($user, $student, $snapshot)
+                : $this->feePendingReply($user, $student),
             AskCrmIntent::HomeworkWeek => $this->homeworkWeekReply($student),
-            AskCrmIntent::StudentProfile => $this->profileOverviewReply($user, $student, $snapshot),
+            AskCrmIntent::StudentProfile => $this->isInstallmentQuestion($question)
+                ? $this->feeInstallmentsReply($user, $student, $snapshot)
+                : $this->profileOverviewReply($user, $student, $snapshot),
             default => $this->helpReply(),
         };
 
@@ -312,7 +320,7 @@ class AskCrmService
             return AskCrmIntent::StudentProfile;
         }
 
-        if ($this->containsAny(' '.$blob.' ', ['fee', 'fees', 'pending', 'balance', 'dues', 'bakaya'])) {
+        if ($this->containsAny(' '.$blob.' ', ['fee', 'fees', 'pending', 'balance', 'dues', 'bakaya', 'installment', 'tuition'])) {
             return AskCrmIntent::FeePending;
         }
 
@@ -325,6 +333,69 @@ class AskCrmService
         }
 
         return null;
+    }
+
+    protected function canResolveStudent(
+        ?string $name,
+        bool $useContextStudent,
+        ?Student $contextStudent,
+        string $question,
+        bool $isFollowUp,
+    ): bool {
+        if ($useContextStudent && $contextStudent) {
+            return true;
+        }
+
+        if (filled($name)) {
+            return true;
+        }
+
+        if ($contextStudent && $isFollowUp) {
+            return true;
+        }
+
+        return filled($this->extractStudentName($question));
+    }
+
+    protected function inferIntentFromQuestion(string $question): ?AskCrmIntent
+    {
+        $q = $this->normalizeQuestion($question);
+
+        if ($this->isInstallmentQuestion($question)) {
+            return AskCrmIntent::FeePending;
+        }
+
+        if ($this->containsAny($q, ['homework', 'home work', 'not done', 'assignment'])) {
+            return AskCrmIntent::HomeworkWeek;
+        }
+
+        if ($this->containsAny($q, ['fee', 'fees', 'pending', 'balance', 'dues', 'bakaya', 'receipt', 'payment'])) {
+            return AskCrmIntent::FeePending;
+        }
+
+        if ($this->containsAny($q, ['this month', 'monthly', 'percentage', 'percent'])) {
+            return AskCrmIntent::AttendanceMonth;
+        }
+
+        if ($this->containsAny($q, ['attendance', 'attendence', 'present', 'absent', 'punch'])) {
+            return AskCrmIntent::AttendanceToday;
+        }
+
+        if ($this->containsAny($q, ['call', 'called', 'visit', 'exam', 'marks', 'case', 'whatsapp', 'message'])) {
+            return AskCrmIntent::StudentProfile;
+        }
+
+        return null;
+    }
+
+    protected function isInstallmentQuestion(string $question): bool
+    {
+        $q = $this->normalizeQuestion($question);
+
+        return $this->containsAny($q, [
+            'installment', 'installments', 'payment schedule', 'due date',
+            'kitne installment', 'how many installment', 'fee plan', 'fee structure',
+        ]);
     }
 
     protected function isLikelyFollowUp(string $question): bool
@@ -468,6 +539,7 @@ class AskCrmService
 
         $mentionsFee = $this->containsAny($q, [
             'fee', 'fees', 'pending', 'balance', 'due', 'dues', 'outstanding', 'bakaya', 'baaki fee', 'kitna fee',
+            'installment', 'installments', 'payment schedule', 'tuition', 'kitne installment',
         ]);
         $mentionsHomework = $this->containsAny($q, [
             'homework', 'home work', ' hw ', 'not done', 'assignment', 'ghar ka kaam',
@@ -520,8 +592,18 @@ class AskCrmService
     public function extractStudentName(string $question): ?string
     {
         $original = trim($question);
+        $original = preg_replace('/\s*(?:--|—|–)\s*/u', ' — ', $original) ?? $original;
+
         // 1–4 name tokens; do not start with common English filler words.
-        $namePart = '(?!(?:what|whats|is|are|the|a|an|of|for|tell|me|how|much|show|give|get|please|today|this|month|fee|fees|homework|attendance|attendence|pending|balance|status|about|student)\b)([A-Za-z][A-Za-z.\']+(?:\s+[A-Za-z][A-Za-z.\']+){0,3})';
+        $namePart = '(?!(?:what|whats|is|are|the|a|an|of|for|tell|me|how|much|show|give|get|please|today|this|month|fee|fees|homework|attendance|attendence|pending|balance|status|about|student|many|installment|installments|amount)\b)([A-Za-z][A-Za-z.\']+(?:\s+[A-Za-z][A-Za-z.\']+){0,3})';
+
+        // "AARJAV JAIN — how many installments..."
+        if (preg_match('/^'.$namePart.'\s*(?:—|:)\s*/ui', $original, $matches)) {
+            $name = $this->cleanNameCandidate($matches[1]);
+            if (filled($name)) {
+                return $name;
+            }
+        }
 
         // "attendance of Aayush" / "fees for Aayush Yadav"
         if (preg_match('/\b(?:of|for)\s+'.$namePart.'(?:\s+(?:today|this|month|week|please|now|sir|ji)|\s*[?.!]|$)/ui', $original, $matches)) {
@@ -548,11 +630,11 @@ class AskCrmService
         }
 
         $stripped = preg_replace(
-            '/\b(what|whats|what\'s|is|are|the|a|an|of|for|today|this|month|monthly|percentage|percent|attendance|attendence|present|absent|fee|fees|pending|balance|due|dues|homework|home\s*work|not|done|week|how|much|tell|me|about|student|please|can|you|show|check|status|punch|give|get|batao|btado|sir|ji|now|update|kitna|kitne|good|or|has|he|she|his|her|him|mean|means)\b/iu',
+            '/\b(what|whats|what\'s|is|are|the|a|an|of|for|today|this|month|monthly|percentage|percent|attendance|attendence|present|absent|fee|fees|pending|balance|due|dues|homework|home\s*work|not|done|week|how|much|many|tell|me|about|student|please|can|you|show|check|status|punch|give|get|batao|btado|sir|ji|now|update|kitna|kitne|good|or|has|he|she|his|her|him|mean|means|installment|installments|amount|have|it|and|what)\b/iu',
             ' ',
             $original,
         ) ?? '';
-        $stripped = preg_replace('/[?.,!]/', ' ', $stripped) ?? '';
+        $stripped = preg_replace('/[?.,!—–-]/', ' ', $stripped) ?? '';
         $name = $this->cleanNameCandidate($stripped);
 
         return filled($name) ? $name : null;
@@ -693,6 +775,58 @@ class AskCrmService
         }
 
         return $reply;
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
+    protected function feeInstallmentsReply(User $user, Student $student, array $snapshot): string
+    {
+        if (! FeatureGate::enabled(LicenseFeature::Fees)) {
+            return 'Fees is not enabled on this licence.';
+        }
+
+        $fees = $snapshot['fees'] ?? [];
+
+        if (! ($fees['enabled'] ?? false)) {
+            return 'Fees is not enabled on this licence.';
+        }
+
+        if (! ($fees['can_view'] ?? false)) {
+            return 'You don’t have permission to view fee details. Ask an admin if you need access.';
+        }
+
+        if (! ($fees['has_fee_structure'] ?? false)) {
+            return $this->studentIntro($student).' has no active fee structure on file.';
+        }
+
+        $installments = $fees['installments'] ?? [];
+        $intro = $this->studentIntro($student);
+
+        if ($installments === []) {
+            $netFee = (float) ($fees['net_fee'] ?? 0);
+            $pending = (float) ($fees['tuition_pending'] ?? 0);
+
+            return $intro.' has **no installment schedule** — net tuition is **₹'.number_format($netFee, 2)
+                .'** with **₹'.number_format($pending, 2).'** remaining.';
+        }
+
+        $count = (int) ($fees['installment_count'] ?? count($installments));
+        $lines = collect($installments)->map(function (array $row): string {
+            $label = (string) ($row['label'] ?? 'Installment');
+            $amount = (float) ($row['amount'] ?? 0);
+            $paid = (float) ($row['paid_amount'] ?? 0);
+            $balance = (float) ($row['pending_amount'] ?? max(0, $amount - $paid));
+            $due = filled($row['due_date'] ?? null) ? ' · due '.$row['due_date'] : '';
+            $status = filled($row['status'] ?? null) ? ' · '.$row['status'] : '';
+
+            return '• **'.$label.'**: ₹'.number_format($amount, 2)
+                .$due
+                .' (paid ₹'.number_format($paid, 2).', balance ₹'.number_format($balance, 2).')'
+                .$status;
+        })->implode("\n");
+
+        return $intro.' has **'.$count.' installment'.($count === 1 ? '' : 's')."**:\n".$lines;
     }
 
     protected function homeworkWeekReply(Student $student): string
