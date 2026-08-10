@@ -46,6 +46,24 @@ class AskCrmSessionService
         session()->forget(self::SESSION_KEY);
     }
 
+    public function clearStudentContext(): void
+    {
+        if (! $this->isActive()) {
+            return;
+        }
+
+        $data = $this->load();
+
+        session([
+            self::SESSION_KEY => [
+                'active' => true,
+                'messages' => $data['messages'] ?? $this->defaultMessages(),
+                'last_student_id' => null,
+                'last_student_name' => null,
+            ],
+        ]);
+    }
+
     /**
      * @return list<array{role: string, text: string}>
      */
@@ -56,10 +74,10 @@ class AskCrmSessionService
                 'role' => 'assistant',
                 'text' => "Hi — I’m Ask CRM.\n\n"
                     ."I read the same data as the student profile — attendance, homework, fees, calls, visits, exams, and more.\n\n"
-                    ."Examples:\n"
-                    ."• homework for Abhinav Singh\n"
-                    ."• what about 9 Aug 2026?\n"
-                    ."• then: and cases open for this student",
+                    ."Tips:\n"
+                    ."• Include the student name — e.g. ABHINAV SINGH - homework for 9 Aug 2026\n"
+                    ."• Follow up on the same student — e.g. what about 9 Aug 2026?\n"
+                    ."• Use **New student** or say “ask about someone else” to switch",
             ],
         ];
     }

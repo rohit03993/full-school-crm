@@ -7,14 +7,18 @@ use App\Services\AskCrmService;
 use App\Services\AskCrmSessionService;
 use App\Support\CrmAccess;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Throwable;
 
 class AskCrmChatWidget extends Component
 {
     public bool $open = false;
 
     public bool $hasActiveSession = false;
+
+    public bool $isSending = false;
 
     public string $message = '';
 
@@ -62,39 +66,77 @@ class AskCrmChatWidget extends Component
         $this->endSession($session);
     }
 
+    public function clearStudentContext(AskCrmSessionService $session): void
+    {
+        $this->lastStudentId = null;
+        $this->lastStudentName = null;
+        $session->clearStudentContext();
+        $this->hasActiveSession = $session->isActive();
+
+        $this->messages[] = [
+            'role' => 'assistant',
+            'text' => 'Student context cleared. Ask about someone else — include their name in your question.',
+        ];
+
+        $session->save($this->messages, null, null);
+        $this->dispatch('ask-crm-scroll-bottom');
+    }
+
     public function send(AskCrmService $askCrm, AskCrmSessionService $session): void
     {
         $question = trim($this->message);
 
-        if ($question === '' || ! Auth::user()) {
+        if ($question === '' || ! Auth::user() || $this->isSending) {
             return;
         }
+
+        $this->isSending = true;
 
         $this->messages[] = [
             'role' => 'user',
             'text' => $question,
         ];
         $this->message = '';
+        $this->dispatch('ask-crm-scroll-bottom');
 
-        $history = array_slice($this->messages, -12);
+        try {
+            $history = array_slice($this->messages, -12);
 
-        $result = $askCrm->ask(Auth::user(), $question, $history, $this->lastStudentId);
+            $result = $askCrm->ask(Auth::user(), $question, $history, $this->lastStudentId);
 
-        $this->messages[] = [
-            'role' => 'assistant',
-            'text' => $result['reply'],
-        ];
+            $this->messages[] = [
+                'role' => 'assistant',
+                'text' => $result['reply'],
+            ];
 
-        if (filled($result['student_id'] ?? null)) {
-            $this->lastStudentId = (int) $result['student_id'];
-            $this->lastStudentName = $result['student_name'] ?? $this->lastStudentName;
+            if ($result['clear_context'] ?? false) {
+                $this->lastStudentId = null;
+                $this->lastStudentName = null;
+            } elseif (filled($result['student_id'] ?? null)) {
+                $this->lastStudentId = (int) $result['student_id'];
+                $this->lastStudentName = $result['student_name'] ?? $this->lastStudentName;
+            }
+
+            if (count($this->messages) > 40) {
+                $this->messages = array_values(array_slice($this->messages, -40));
+            }
+
+            $this->persistToSession($session);
+        } catch (Throwable $exception) {
+            Log::warning('Ask CRM widget send failed', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            $this->messages[] = [
+                'role' => 'assistant',
+                'text' => 'Sorry — something went wrong while fetching CRM data. Please try again in a moment.',
+            ];
+
+            $this->persistToSession($session);
+        } finally {
+            $this->isSending = false;
+            $this->dispatch('ask-crm-scroll-bottom');
         }
-
-        if (count($this->messages) > 40) {
-            $this->messages = array_values(array_slice($this->messages, -40));
-        }
-
-        $this->persistToSession($session);
     }
 
     public function askExample(string $question, AskCrmService $askCrm, AskCrmSessionService $session): void
@@ -139,6 +181,7 @@ class AskCrmChatWidget extends Component
         $this->lastStudentName = null;
         $this->message = '';
         $this->hasActiveSession = false;
+        $this->isSending = false;
     }
 
     public function render()

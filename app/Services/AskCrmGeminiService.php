@@ -88,6 +88,7 @@ Rules:
 - Be conversational and clear. Short paragraphs are fine.
 - For follow-ups ("has he done?", "what about 9 Aug?", "last call?", "exam marks?"), use the same student and conversation history.
 - Use meta.referenced_date, homework.on_referenced_date, and attendance.on_referenced_date for specific dates.
+- For general homework status, use homework.today, homework.this_week, AND homework.recent_checks (latest Not Done may be yesterday).
 - Use homework.history_by_date, attendance.recent_days, calls.recent, visits.recent, receipts.recent, exams.activity_types as needed.
 - Use fees.installments and fees.installment_count for payment schedule / installment questions (same as Fees tab).
 - overview.academic_record has Class 10/12 and graduation percentages (profile Overview tab).
@@ -148,6 +149,7 @@ Rules:
 - For follow-ups like "has he done or not?", "what about 9 Aug 2026?", keep the same student and pick homework_week, attendance_today, or student_profile from context.
 - Use student_profile for open questions about the student when topic is unclear but they mean the same student.
 - Extract student_name only when a NEW name is mentioned. Never treat words like good, he, done, aug, or dates as a name.
+- Strip dates from student_name — never include "9 aug 2026" in student_name.
 - Understand English and Hinglish.
 PROMPT;
     }

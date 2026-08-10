@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\AskCrmIntent;
 use App\Enums\AttendanceStatus;
+use App\Enums\HomeworkCheckStatus;
 use App\Enums\LicenseFeature;
 use App\Models\Attendance;
 use App\Models\Student;
@@ -25,7 +26,7 @@ class AskCrmService
 
     /**
      * @param  list<array{role: string, text: string}>  $history
-     * @return array{reply: string, intent: string, student_id: ?int, student_name: ?string}
+     * @return array{reply: string, intent: string, student_id: ?int, student_name: ?string, clear_context: bool}
      */
     public function ask(
         User $user,
@@ -39,6 +40,14 @@ class AskCrmService
             return $this->result(
                 AskCrmIntent::Help,
                 'Please type a question — for example: “What is Ayyush’s attendance today?”',
+            );
+        }
+
+        if ($this->wantsNewStudentContext($question) && ! filled($this->extractStudentName($question))) {
+            return $this->result(
+                AskCrmIntent::Help,
+                'Got it — I cleared the previous student. Ask about someone else, for example: “homework for Priya Sharma”.',
+                clearContext: true,
             );
         }
 
@@ -64,6 +73,15 @@ class AskCrmService
 
         if (! filled($name) || ! $this->isPlausiblePersonName($name)) {
             $name = null;
+        }
+
+        if (filled($name) && $contextStudent) {
+            $resolved = $this->resolveStudent($name);
+
+            if ($resolved['outcome'] === StudentSearchService::OUTCOME_FOUND
+                && (int) $resolved['student']->id !== (int) $contextStudent->id) {
+                $useContextStudent = false;
+            }
         }
 
         if ($intent === AskCrmIntent::Help) {
@@ -130,14 +148,6 @@ class AskCrmService
 
         $snapshot = $this->studentData->snapshot($user, $student, $referencedDate);
 
-        if ($this->gemini->isEnabled()) {
-            $composed = $this->gemini->composeReply($question, $history, $snapshot);
-
-            if (filled($composed)) {
-                return $this->result($intent, $composed, (int) $student->id, $student->name);
-            }
-        }
-
         if (filled($referencedDate)) {
             $dateReply = $this->dateSpecificReply($user, $student, $intent, $referencedDate, $snapshot);
 
@@ -152,16 +162,32 @@ class AskCrmService
             AskCrmIntent::FeePending => $this->isInstallmentQuestion($question)
                 ? $this->feeInstallmentsReply($user, $student, $snapshot)
                 : $this->feePendingReply($user, $student),
-            AskCrmIntent::HomeworkWeek => $this->homeworkWeekReply($student),
+            AskCrmIntent::HomeworkWeek => $this->homeworkWeekReply($student, $snapshot),
             AskCrmIntent::StudentProfile => match (true) {
                 $this->isCaseQuestion($question) => $this->casesOpenReply($user, $student, $snapshot),
                 $this->isInstallmentQuestion($question) => $this->feeInstallmentsReply($user, $student, $snapshot),
-                default => $this->profileOverviewReply($user, $student, $snapshot),
+                default => null,
             },
-            default => $this->helpReply(),
+            default => null,
         };
 
-        return $this->result($intent, $reply, (int) $student->id, $student->name);
+        if (filled($reply)) {
+            return $this->result($intent, $reply, (int) $student->id, $student->name);
+        }
+
+        if ($this->gemini->isEnabled()) {
+            $composed = $this->gemini->composeReply($question, $history, $snapshot);
+
+            if (filled($composed)) {
+                return $this->result($intent, $composed, (int) $student->id, $student->name);
+            }
+        }
+
+        $fallback = $intent === AskCrmIntent::StudentProfile
+            ? $this->profileOverviewReply($user, $student, $snapshot)
+            : $this->helpReply();
+
+        return $this->result($intent, $fallback, (int) $student->id, $student->name);
     }
 
     /**
@@ -190,6 +216,17 @@ class AskCrmService
         return null;
     }
 
+    protected function wantsNewStudentContext(string $question): bool
+    {
+        $q = $this->normalizeQuestion($question);
+
+        return $this->containsAny($q, [
+            ' someone else', ' another student', ' different student', ' new student',
+            ' switch student', ' change student', ' other student', ' clear context',
+            ' new person', ' kisi aur', ' dusra student', ' naya student',
+        ]) || (bool) preg_match('/\b(ask|talk|tell)\s+(about|me)\s+(someone|another)\b/u', trim($question));
+    }
+
     protected function refersToContextStudent(string $question): bool
     {
         $q = $this->normalizeQuestion($question);
@@ -215,6 +252,7 @@ class AskCrmService
 
         foreach ([
             'this student', 'the student', 'that student', 'same student',
+            'someone else', 'another student', 'different student', 'other student',
             'cases open', 'open cases', 'open case', 'for this', 'for the', 'and cases',
             'how many', 'what amount', 'installment', 'installments',
         ] as $phrase) {
@@ -375,7 +413,9 @@ class AskCrmService
         );
 
         $intent = $aiParsed['intent'] ?? null;
-        $name = $aiParsed['student_name'] ?? null;
+        $name = filled($aiParsed['student_name'] ?? null)
+            ? $this->cleanNameCandidate($this->stripDatePhrases((string) $aiParsed['student_name']))
+            : null;
         $useContextStudent = (bool) ($aiParsed['use_context_student'] ?? false);
 
         if ($intent === null || $intent === AskCrmIntent::Unknown) {
@@ -627,7 +667,10 @@ class AskCrmService
             $notDone = (int) ($homework['not_done_count'] ?? 0);
 
             if ($notDone > 0 && $done === 0) {
-                return $intro.' homework on '.$formattedDate.' was marked **Not Done** ('.$notDone.' subject'.($notDone === 1 ? '' : 's').').';
+                $details = $this->homeworkCheckDetails($checks, HomeworkCheckStatus::NotDone->label());
+
+                return $intro.' homework on '.$formattedDate.' was marked **Not Done**'
+                    .($details !== '' ? ': '.$details.'.' : ' ('.$notDone.' subject'.($notDone === 1 ? '' : 's').').');
             }
 
             if ($done > 0 && $notDone === 0) {
@@ -737,8 +780,8 @@ class AskCrmService
         // 1–4 name tokens; do not start with common English filler words.
         $namePart = '(?!(?:what|whats|is|are|the|a|an|of|for|tell|me|how|much|show|give|get|please|today|this|month|fee|fees|homework|attendance|attendence|pending|balance|status|about|student|many|installment|installments|amount)\b)([A-Za-z][A-Za-z.\']+(?:\s+[A-Za-z][A-Za-z.\']+){0,3})';
 
-        // "AARJAV JAIN — how many installments..."
-        if (preg_match('/^'.$namePart.'\s*(?:—|:)\s*/ui', $original, $matches)) {
+        // "ABHINAV SINGH - homework for 9 aug 2026" / "AARJAV JAIN — how many installments..."
+        if (preg_match('/^'.$namePart.'\s*(?:—|–|-|:)\s*/ui', $original, $matches)) {
             $name = $this->cleanNameCandidate($matches[1]);
             if (filled($name)) {
                 return $name;
@@ -804,8 +847,22 @@ class AskCrmService
         return false;
     }
 
+    protected function stripDatePhrases(string $text): string
+    {
+        $text = preg_replace('/\b\d{4}-\d{2}-\d{2}\b/', ' ', $text) ?? $text;
+        $text = preg_replace('/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}\b/', ' ', $text) ?? $text;
+
+        $months = 'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
+        $text = preg_replace('/\b\d{1,2}\s+'.$months.'\s+\d{2,4}\b/i', ' ', $text) ?? $text;
+        $text = preg_replace('/\b'.$months.'\s+\d{1,2},?\s+\d{2,4}\b/i', ' ', $text) ?? $text;
+        $text = preg_replace('/\b(for|on|at)\s+\d{1,2}\b/i', ' ', $text) ?? $text;
+
+        return trim(preg_replace('/\s+/', ' ', $text) ?? '');
+    }
+
     protected function cleanNameCandidate(string $value): ?string
     {
+        $value = $this->stripDatePhrases($value);
         $value = trim(preg_replace('/\s+/', ' ', $value) ?? '');
         $value = trim($value, " \t\n\r\0\x0B.,'\"-");
 
@@ -973,16 +1030,21 @@ class AskCrmService
         return $intro.' has **'.$count.' installment'.($count === 1 ? '' : 's')."**:\n".$lines;
     }
 
-    protected function homeworkWeekReply(Student $student): string
+    /**
+     * @param  array<string, mixed>|null  $snapshot
+     */
+    protected function homeworkWeekReply(Student $student, ?array $snapshot = null): string
     {
         if (! FeatureGate::enabled(LicenseFeature::Homework)) {
             return 'Homework is not enabled on this licence.';
         }
 
         $intro = $this->studentIntro($student);
-        $snapshot = $this->studentData->homeworkSnapshot((int) $student->id);
-        $today = $snapshot['today'] ?? [];
-        $week = $snapshot['this_week'] ?? [];
+        $homework = is_array($snapshot['homework'] ?? null)
+            ? $snapshot['homework']
+            : $this->studentData->homeworkSnapshot((int) $student->id);
+        $today = $homework['today'] ?? [];
+        $week = $homework['this_week'] ?? [];
 
         if (($today['unmarked_today'] ?? true) && ($today['marked_count'] ?? 0) === 0) {
             $weekNotDone = (int) ($week['not_done_count'] ?? 0);
@@ -991,7 +1053,13 @@ class AskCrmService
                 return $intro.' has **no homework marked for today yet**, but has **'.$weekNotDone.' Not Done** mark'.($weekNotDone === 1 ? '' : 's').' earlier this week.';
             }
 
-            return $intro.' has **no homework marked for today yet** and **no Not Done marks this week**. Homework may not have been checked yet.';
+            $recentNotDone = $this->latestNotDoneHomeworkCheck($homework);
+
+            if ($recentNotDone !== null) {
+                return $this->recentNotDoneHomeworkReply($intro, $recentNotDone);
+            }
+
+            return $intro.' has **no homework marked for today yet** and **no recent Not Done marks**. Homework may not have been checked yet.';
         }
 
         $todayDone = (int) ($today['done_count'] ?? 0);
@@ -1012,6 +1080,56 @@ class AskCrmService
         }
 
         return $intro.' has **'.$count.' Not Done** homework mark'.($count === 1 ? '' : 's').' this week.';
+    }
+
+    /**
+     * @param  array<string, mixed>  $homework
+     * @return array<string, mixed>|null
+     */
+    protected function latestNotDoneHomeworkCheck(array $homework): ?array
+    {
+        foreach ($homework['recent_checks'] ?? [] as $check) {
+            if (! is_array($check)) {
+                continue;
+            }
+
+            if (($check['status'] ?? '') === HomeworkCheckStatus::NotDone->label()) {
+                return $check;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $check
+     */
+    protected function recentNotDoneHomeworkReply(string $intro, array $check): string
+    {
+        $date = filled($check['date'] ?? null)
+            ? Carbon::parse((string) $check['date'])->format('d M Y')
+            : 'a recent date';
+        $subject = trim((string) ($check['subject'] ?? 'homework'));
+        $topic = trim((string) ($check['topic'] ?? ''));
+        $detail = $topic !== '' ? $subject.' — '.$topic : $subject;
+
+        return $intro.' has **no homework marked for today**. Latest check: **Not Done** on '.$date.' ('.$detail.').';
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $checks
+     */
+    protected function homeworkCheckDetails(Collection $checks, string $statusLabel): string
+    {
+        return $checks
+            ->where('status', $statusLabel)
+            ->map(function (array $check): string {
+                $subject = trim((string) ($check['subject'] ?? 'Subject'));
+                $topic = trim((string) ($check['topic'] ?? ''));
+
+                return $topic !== '' ? $subject.' — '.$topic : $subject;
+            })
+            ->implode('; ');
     }
 
     protected function studentIntro(Student $student): string
@@ -1055,22 +1173,29 @@ class AskCrmService
     {
         return "Ask in normal language — I read your CRM data (same as the student profile).\n"
             ."Examples:\n"
-            ."• tell me homework for Abhinav Singh\n"
-            ."• what about 9 Aug 2026? (after asking about a student)\n"
+            ."• ABHINAV SINGH - homework for 9 Aug 2026\n"
+            ."• what about 9 Aug 2026? (follow-up after a student)\n"
             ."• how much fee pending for Ayyush\n"
-            .'• Ayyush attendance this month';
+            ."• and cases open for this student\n"
+            .'• say “ask about someone else” to switch students';
     }
 
     /**
-     * @return array{reply: string, intent: string, student_id: ?int, student_name: ?string}
+     * @return array{reply: string, intent: string, student_id: ?int, student_name: ?string, clear_context: bool}
      */
-    protected function result(AskCrmIntent $intent, string $reply, ?int $studentId = null, ?string $studentName = null): array
-    {
+    protected function result(
+        AskCrmIntent $intent,
+        string $reply,
+        ?int $studentId = null,
+        ?string $studentName = null,
+        bool $clearContext = false,
+    ): array {
         return [
             'reply' => $reply,
             'intent' => $intent->value,
             'student_id' => $studentId,
             'student_name' => $studentName,
+            'clear_context' => $clearContext,
         ];
     }
 }

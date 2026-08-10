@@ -376,6 +376,169 @@ class AskCrmServiceTest extends TestCase
         $this->assertStringContainsString('Not Done', $result['reply']);
     }
 
+    public function test_homework_name_dash_and_date_in_one_question(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $this->travelTo('2026-08-10 10:00:00');
+
+        $admin = $this->createSuperAdmin();
+        [$student, $batch] = $this->createEnrolledStudent('Abhinav Singh');
+        $subject = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'Maths',
+            'code' => 'M01',
+            'default_max_marks' => 100,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        HomeworkCheck::query()->create([
+            'student_id' => $student->id,
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'subject_name' => 'Maths',
+            'topic' => "Today's homework",
+            'checked_on' => '2026-08-09',
+            'status' => HomeworkCheckStatus::NotDone,
+            'notify_status' => HomeworkCheckNotifyStatus::Failed,
+            'created_by_user_id' => $admin->id,
+        ]);
+
+        $result = app(AskCrmService::class)->ask(
+            $admin,
+            'ABHINAV SINGH - homework for 9 aug 2026',
+        );
+
+        $this->assertSame($student->id, $result['student_id'], $result['reply']);
+        $this->assertStringContainsString('Not Done', $result['reply']);
+        $this->assertStringContainsString('09 Aug 2026', $result['reply']);
+        $this->assertStringContainsString('Maths', $result['reply']);
+    }
+
+    public function test_homework_status_shows_recent_not_done_outside_calendar_week(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $this->travelTo('2026-08-10 10:00:00');
+
+        $admin = $this->createSuperAdmin();
+        [$student, $batch] = $this->createEnrolledStudent('Abhinav Singh');
+        $subject = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'Maths',
+            'code' => 'M01',
+            'default_max_marks' => 100,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        HomeworkCheck::query()->create([
+            'student_id' => $student->id,
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'subject_name' => 'Maths',
+            'topic' => "Today's homework",
+            'checked_on' => '2026-08-09',
+            'status' => HomeworkCheckStatus::NotDone,
+            'notify_status' => HomeworkCheckNotifyStatus::Failed,
+            'created_by_user_id' => $admin->id,
+        ]);
+
+        $result = app(AskCrmService::class)->ask(
+            $admin,
+            'ABHINAV SINGH — I need homework status',
+        );
+
+        $this->assertSame($student->id, $result['student_id'], $result['reply']);
+        $this->assertStringContainsString('Not Done', $result['reply']);
+        $this->assertStringContainsString('09 Aug 2026', $result['reply']);
+    }
+
+    public function test_ask_about_someone_else_clears_context(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+        [$student] = $this->createEnrolledStudent('Abhinav Singh');
+
+        $service = app(AskCrmService::class);
+        $first = $service->ask($admin, 'tell me homework for abhinav singh');
+
+        $this->assertSame($student->id, $first['student_id']);
+
+        $second = $service->ask(
+            $admin,
+            'ask about someone else',
+            [
+                ['role' => 'user', 'text' => 'tell me homework for abhinav singh'],
+                ['role' => 'assistant', 'text' => $first['reply']],
+            ],
+            (int) $student->id,
+        );
+
+        $this->assertTrue($second['clear_context'] ?? false);
+        $this->assertNull($second['student_id']);
+        $this->assertStringContainsString('cleared', strtolower($second['reply']));
+    }
+
+    public function test_new_student_name_overrides_previous_context(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+        [$abhinav, $batch] = $this->createEnrolledStudent('Abhinav Singh');
+        $ayyush = Student::query()->create([
+            'name' => 'Ayyush Sharma',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2010-01-01',
+            'gender' => Gender::Male,
+            'mobile' => '9876500099',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        BatchStudent::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $ayyush->id,
+            'is_active' => true,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $admin->id,
+        ]);
+
+        $service = app(AskCrmService::class);
+        $service->ask($admin, 'homework for abhinav singh', [], (int) $abhinav->id);
+
+        $result = $service->ask(
+            $admin,
+            'attendance for ayyush sharma today',
+            [],
+            (int) $abhinav->id,
+        );
+
+        $this->assertSame($ayyush->id, $result['student_id'], $result['reply']);
+    }
+
+    public function test_widget_clear_student_context_keeps_session(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+        $this->actingAs($admin);
+        [$student] = $this->createEnrolledStudent('Aarjav Jain', withFees: true);
+
+        Livewire::test(\App\Livewire\AskCrmChatWidget::class)
+            ->set('message', 'How much fee pending for Aarjav Jain?')
+            ->call('send')
+            ->assertSet('lastStudentId', $student->id)
+            ->call('clearStudentContext')
+            ->assertSet('lastStudentId', null)
+            ->assertSet('lastStudentName', null)
+            ->assertSet('hasActiveSession', true);
+
+        $this->assertTrue(app(AskCrmSessionService::class)->isActive());
+        $this->assertNull(app(AskCrmSessionService::class)->load()['last_student_id'] ?? null);
+    }
+
     public function test_ask_crm_page_is_accessible(): void
     {
         $admin = $this->createSuperAdmin();

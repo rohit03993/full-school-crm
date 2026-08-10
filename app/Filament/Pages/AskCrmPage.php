@@ -84,6 +84,22 @@ class AskCrmPage extends Page
         Notification::make()->title('Chat ended')->body('Ask CRM session cleared.')->success()->send();
     }
 
+    public function clearStudentContext(AskCrmSessionService $session): void
+    {
+        $this->lastStudentId = null;
+        $this->lastStudentName = null;
+        $session->clearStudentContext();
+
+        $this->messages[] = [
+            'role' => 'assistant',
+            'text' => 'Student context cleared. Ask about someone else — include their name in your question.',
+        ];
+
+        $session->save($this->messages, null, null);
+
+        Notification::make()->title('New student')->body('Previous student context cleared.')->success()->send();
+    }
+
     public function send(AskCrmService $askCrm, AskCrmSessionService $session): void
     {
         $question = trim($this->message);
@@ -115,7 +131,10 @@ class AskCrmPage extends Page
             'text' => $result['reply'],
         ];
 
-        if (filled($result['student_id'] ?? null)) {
+        if ($result['clear_context'] ?? false) {
+            $this->lastStudentId = null;
+            $this->lastStudentName = null;
+        } elseif (filled($result['student_id'] ?? null)) {
             $this->lastStudentId = (int) $result['student_id'];
             $this->lastStudentName = $result['student_name'] ?? $this->lastStudentName;
         }
