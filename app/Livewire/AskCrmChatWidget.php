@@ -17,6 +17,8 @@ class AskCrmChatWidget extends Component
 
     public ?int $lastStudentId = null;
 
+    public ?string $lastStudentName = null;
+
     /**
      * @var list<array{role: string, text: string}>
      */
@@ -78,6 +80,7 @@ class AskCrmChatWidget extends Component
 
         if (filled($result['student_id'] ?? null)) {
             $this->lastStudentId = (int) $result['student_id'];
+            $this->lastStudentName = $result['student_name'] ?? $this->lastStudentName;
         }
 
         if (count($this->messages) > 40) {

@@ -41,6 +41,8 @@ class AskCrmPage extends Page
 
     public ?int $lastStudentId = null;
 
+    public ?string $lastStudentName = null;
+
     /**
      * @var list<array{role: string, text: string}>
      */
@@ -99,6 +101,10 @@ class AskCrmPage extends Page
 
         if (filled($result['student_id'] ?? null)) {
             $this->lastStudentId = (int) $result['student_id'];
+        }
+
+        if (filled($result['student_name'] ?? null)) {
+            $this->lastStudentName = $result['student_name'];
         }
 
         if (count($this->messages) > 40) {

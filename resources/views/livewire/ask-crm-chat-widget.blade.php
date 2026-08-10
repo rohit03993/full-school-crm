@@ -9,7 +9,13 @@
             <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.65rem 0.85rem;background:#f59e0b;color:#fff;">
                 <div style="min-width:0;">
                     <p style="margin:0;font-size:0.875rem;font-weight:700;">Ask CRM</p>
-                    <p style="margin:0;font-size:0.7rem;opacity:.9;">Attendance · Fees · Homework</p>
+                    <p style="margin:0;font-size:0.7rem;opacity:.9;">
+                        @if ($lastStudentName)
+                            Talking about: {{ $lastStudentName }}
+                        @else
+                            Full student profile · ask naturally
+                        @endif
+                    </p>
                 </div>
                 <button
                     type="button"

@@ -25,7 +25,7 @@ class AskCrmService
 
     /**
      * @param  list<array{role: string, text: string}>  $history
-     * @return array{reply: string, intent: string, student_id: ?int}
+     * @return array{reply: string, intent: string, student_id: ?int, student_name: ?string}
      */
     public function ask(
         User $user,
@@ -42,6 +42,8 @@ class AskCrmService
             );
         }
 
+        $contextStudentId = $contextStudentId ?? $this->inferStudentIdFromHistory($history);
+
         $contextStudent = $contextStudentId
             ? Student::query()->find($contextStudentId)
             : null;
@@ -55,6 +57,14 @@ class AskCrmService
 
         $referencedDate = $this->extractReferencedDate($question);
         $isFollowUp = $this->isLikelyFollowUp($question) || filled($referencedDate);
+
+        if ($contextStudent && ($this->refersToContextStudent($question) || $isFollowUp)) {
+            $useContextStudent = true;
+        }
+
+        if (! filled($name) || ! $this->isPlausiblePersonName($name)) {
+            $name = null;
+        }
 
         if ($intent === AskCrmIntent::Help) {
             return $this->result($intent, $this->helpReply());
@@ -124,7 +134,7 @@ class AskCrmService
             $composed = $this->gemini->composeReply($question, $history, $snapshot);
 
             if (filled($composed)) {
-                return $this->result($intent, $composed, (int) $student->id);
+                return $this->result($intent, $composed, (int) $student->id, $student->name);
             }
         }
 
@@ -132,7 +142,7 @@ class AskCrmService
             $dateReply = $this->dateSpecificReply($user, $student, $intent, $referencedDate, $snapshot);
 
             if (filled($dateReply)) {
-                return $this->result($intent, $dateReply, (int) $student->id);
+                return $this->result($intent, $dateReply, (int) $student->id, $student->name);
             }
         }
 
@@ -143,13 +153,123 @@ class AskCrmService
                 ? $this->feeInstallmentsReply($user, $student, $snapshot)
                 : $this->feePendingReply($user, $student),
             AskCrmIntent::HomeworkWeek => $this->homeworkWeekReply($student),
-            AskCrmIntent::StudentProfile => $this->isInstallmentQuestion($question)
-                ? $this->feeInstallmentsReply($user, $student, $snapshot)
-                : $this->profileOverviewReply($user, $student, $snapshot),
+            AskCrmIntent::StudentProfile => match (true) {
+                $this->isCaseQuestion($question) => $this->casesOpenReply($user, $student, $snapshot),
+                $this->isInstallmentQuestion($question) => $this->feeInstallmentsReply($user, $student, $snapshot),
+                default => $this->profileOverviewReply($user, $student, $snapshot),
+            },
             default => $this->helpReply(),
         };
 
-        return $this->result($intent, $reply, (int) $student->id);
+        return $this->result($intent, $reply, (int) $student->id, $student->name);
+    }
+
+    /**
+     * @param  list<array{role: string, text: string}>  $history
+     */
+    protected function inferStudentIdFromHistory(array $history): ?int
+    {
+        foreach (array_reverse($history) as $item) {
+            if (($item['role'] ?? '') !== 'user') {
+                continue;
+            }
+
+            $name = $this->extractStudentName((string) ($item['text'] ?? ''));
+
+            if (! filled($name) || ! $this->isPlausiblePersonName($name)) {
+                continue;
+            }
+
+            $resolved = $this->resolveStudent($name);
+
+            if ($resolved['outcome'] === StudentSearchService::OUTCOME_FOUND) {
+                return (int) $resolved['student']->id;
+            }
+        }
+
+        return null;
+    }
+
+    protected function refersToContextStudent(string $question): bool
+    {
+        $q = $this->normalizeQuestion($question);
+
+        if ($this->containsAny($q, [
+            ' this student', ' the student', ' that student', ' same student',
+            ' for this student', ' about this student', ' this child', ' the child',
+            ' for him', ' for her', ' about him', ' about her', ' uska ', ' uski ', ' uske ',
+        ])) {
+            return true;
+        }
+
+        return (bool) preg_match('/\b(this|that|same|the)\s+(student|child)\b/u', $q);
+    }
+
+    protected function isPlausiblePersonName(string $value): bool
+    {
+        $lower = mb_strtolower(trim($value));
+
+        if ($lower === '' || mb_strlen($lower) < 2) {
+            return false;
+        }
+
+        foreach ([
+            'this student', 'the student', 'that student', 'same student',
+            'cases open', 'open cases', 'open case', 'for this', 'for the', 'and cases',
+            'how many', 'what amount', 'installment', 'installments',
+        ] as $phrase) {
+            if (str_contains($lower, $phrase)) {
+                return false;
+            }
+        }
+
+        if (in_array($lower, ['student', 'cases', 'case', 'open', 'this', 'the', 'and', 'child'], true)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function isCaseQuestion(string $question): bool
+    {
+        $q = $this->normalizeQuestion($question);
+
+        return $this->containsAny($q, [
+            ' case', ' cases', 'open case', 'open cases', 'complaint', 'grievance',
+        ]) || (bool) preg_match('/\bcases?\s+open\b/u', $q);
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
+    protected function casesOpenReply(User $user, Student $student, array $snapshot): string
+    {
+        $cases = $snapshot['cases'] ?? [];
+        $intro = $this->studentIntro($student);
+
+        if (! ($cases['enabled'] ?? false)) {
+            return $intro.' — cases are only for enrolled students.';
+        }
+
+        if (($cases['can_view'] ?? true) === false) {
+            return 'You don’t have permission to view student cases.';
+        }
+
+        $openCases = $cases['open_cases'] ?? [];
+
+        if ($openCases === []) {
+            return $intro.' has **no open cases** right now.';
+        }
+
+        $lines = collect($openCases)->map(function (array $case): string {
+            return '• **'.$case['case_number'].'** — '.$case['title']
+                .' ('.$case['type_label'].') · assignee: '.$case['assignee_name']
+                .' · opened '.$case['opened_at_label'];
+        })->implode("\n");
+
+        $count = count($openCases);
+
+        return $intro.' has **'.$count.' open case'.($count === 1 ? '' : 's')."**:\n".$lines;
     }
 
     /**
@@ -266,16 +386,22 @@ class AskCrmService
             }
         }
 
-        if ($contextStudentId && $this->isLikelyFollowUp($question)) {
+        if ($contextStudentId && ($this->refersToContextStudent($question) || $this->isLikelyFollowUp($question))) {
             $useContextStudent = true;
 
             if ($intent === AskCrmIntent::Unknown) {
-                $intent = $this->inferIntentFromHistory($history) ?? AskCrmIntent::Unknown;
+                $intent = $this->inferIntentFromQuestion($question)
+                    ?? $this->inferIntentFromHistory($history)
+                    ?? AskCrmIntent::StudentProfile;
             }
         }
 
         if (! $useContextStudent && ! filled($name)) {
             $name = $this->extractStudentName($question);
+        }
+
+        if (filled($name) && ! $this->isPlausiblePersonName($name)) {
+            $name = null;
         }
 
         return [$intent ?? AskCrmIntent::Unknown, $name, $useContextStudent];
@@ -381,7 +507,11 @@ class AskCrmService
             return AskCrmIntent::AttendanceToday;
         }
 
-        if ($this->containsAny($q, ['call', 'called', 'visit', 'exam', 'marks', 'case', 'whatsapp', 'message'])) {
+        if ($this->containsAny($q, ['call', 'called', 'visit', 'exam', 'marks', 'whatsapp', 'message'])) {
+            return AskCrmIntent::StudentProfile;
+        }
+
+        if ($this->isCaseQuestion($question)) {
             return AskCrmIntent::StudentProfile;
         }
 
@@ -400,7 +530,17 @@ class AskCrmService
 
     protected function isLikelyFollowUp(string $question): bool
     {
-        if (filled($this->extractStudentName($question))) {
+        if ($this->refersToContextStudent($question)) {
+            return true;
+        }
+
+        if (preg_match('/^\s*and\b/iu', trim($question))) {
+            return true;
+        }
+
+        $name = $this->extractStudentName($question);
+
+        if (filled($name) && $this->isPlausiblePersonName($name)) {
             return false;
         }
 
@@ -680,6 +820,10 @@ class AskCrmService
             return null;
         }
 
+        if (! $this->isPlausiblePersonName($value)) {
+            return null;
+        }
+
         return $value;
     }
 
@@ -918,14 +1062,15 @@ class AskCrmService
     }
 
     /**
-     * @return array{reply: string, intent: string, student_id: ?int}
+     * @return array{reply: string, intent: string, student_id: ?int, student_name: ?string}
      */
-    protected function result(AskCrmIntent $intent, string $reply, ?int $studentId = null): array
+    protected function result(AskCrmIntent $intent, string $reply, ?int $studentId = null, ?string $studentName = null): array
     {
         return [
             'reply' => $reply,
             'intent' => $intent->value,
             'student_id' => $studentId,
+            'student_name' => $studentName,
         ];
     }
 }

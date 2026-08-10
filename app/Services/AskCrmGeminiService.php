@@ -144,7 +144,7 @@ Schema:
 }
 
 Rules:
-- Set use_context_student=true when the user refers to he/she/his/her/the same student, asks a follow-up, or mentions a date about the current student.
+- Set use_context_student=true when the user says this student, the same student, for him/her, or asks a follow-up starting with "and ...".
 - For follow-ups like "has he done or not?", "what about 9 Aug 2026?", keep the same student and pick homework_week, attendance_today, or student_profile from context.
 - Use student_profile for open questions about the student when topic is unclear but they mean the same student.
 - Extract student_name only when a NEW name is mentioned. Never treat words like good, he, done, aug, or dates as a name.

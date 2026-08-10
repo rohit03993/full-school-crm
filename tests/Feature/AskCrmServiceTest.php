@@ -274,6 +274,35 @@ class AskCrmServiceTest extends TestCase
         $this->assertStringContainsString('Ayyush', $result['reply']);
     }
 
+    public function test_cases_follow_up_this_student_remembers_context(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+        [$student] = $this->createEnrolledStudent('Aarjav Jain', withFees: true);
+
+        $service = app(AskCrmService::class);
+        $first = $service->ask($admin, 'AARJAV JAIN -- how many installments it have and of what amount');
+
+        $this->assertSame($student->id, $first['student_id'], $first['reply']);
+
+        $history = [
+            ['role' => 'user', 'text' => 'AARJAV JAIN -- how many installments it have and of what amount'],
+            ['role' => 'assistant', 'text' => $first['reply']],
+        ];
+
+        $second = $service->ask(
+            $admin,
+            'and cases open for this student',
+            $history,
+            (int) $student->id,
+        );
+
+        $this->assertSame($student->id, $second['student_id'], $second['reply']);
+        $this->assertStringContainsString('Aarjav', $second['reply']);
+        $this->assertStringContainsString('case', strtolower($second['reply']));
+    }
+
     public function test_installment_question_with_dashed_student_name(): void
     {
         config(['ask_crm.use_ai' => false]);
