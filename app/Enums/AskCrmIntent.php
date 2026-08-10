@@ -9,5 +9,6 @@ enum AskCrmIntent: string
     case AttendanceMonth = 'attendance_month';
     case FeePending = 'fee_pending';
     case HomeworkWeek = 'homework_week';
+    case StudentProfile = 'student_profile';
     case Unknown = 'unknown';
 }

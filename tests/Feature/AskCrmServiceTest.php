@@ -126,6 +126,52 @@ class AskCrmServiceTest extends TestCase
         $this->assertStringContainsString('Present', $result['reply']);
     }
 
+    public function test_homework_date_follow_up_uses_last_student(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+        [$student, $batch] = $this->createEnrolledStudent('Abhinav Singh');
+        $subject = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'Math',
+            'code' => 'M',
+            'default_max_marks' => 100,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        HomeworkCheck::query()->create([
+            'student_id' => $student->id,
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'subject_name' => 'Math',
+            'topic' => 'Worksheet',
+            'checked_on' => '2026-08-09',
+            'status' => HomeworkCheckStatus::Done,
+            'notify_status' => HomeworkCheckNotifyStatus::Failed,
+            'created_by_user_id' => $admin->id,
+        ]);
+
+        $service = app(AskCrmService::class);
+        $first = $service->ask($admin, 'tell me homework for abhinav singh');
+        $history = [
+            ['role' => 'user', 'text' => 'tell me homework for abhinav singh'],
+            ['role' => 'assistant', 'text' => $first['reply']],
+        ];
+
+        $second = $service->ask(
+            $admin,
+            'what about the 9 aug 2026',
+            $history,
+            (int) $student->id,
+        );
+
+        $this->assertSame($student->id, $second['student_id'], $second['reply']);
+        $this->assertStringContainsString('Done', $second['reply']);
+        $this->assertStringContainsString('Abhinav', $second['reply']);
+    }
+
     public function test_homework_follow_up_uses_last_student_without_ai(): void
     {
         config(['ask_crm.use_ai' => false]);

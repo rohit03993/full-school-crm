@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class AskCrmService
@@ -52,12 +53,21 @@ class AskCrmService
             $contextStudent?->name,
         );
 
+        $referencedDate = $this->extractReferencedDate($question);
+        $isFollowUp = $this->isLikelyFollowUp($question) || filled($referencedDate);
+
         if ($intent === AskCrmIntent::Help) {
             return $this->result($intent, $this->helpReply());
         }
 
-        if ($intent === AskCrmIntent::Unknown && $useContextStudent && $contextStudent) {
-            $intent = $this->inferIntentFromHistory($history) ?? AskCrmIntent::Unknown;
+        if ($intent === AskCrmIntent::Unknown && $contextStudent && ($useContextStudent || $isFollowUp)) {
+            $intent = $this->inferIntentFromHistory($history) ?? AskCrmIntent::StudentProfile;
+            $useContextStudent = true;
+        }
+
+        if ($intent === AskCrmIntent::Unknown && $this->gemini->isEnabled() && $contextStudent && filled($name) === false && $isFollowUp) {
+            $intent = AskCrmIntent::StudentProfile;
+            $useContextStudent = true;
         }
 
         if ($intent === AskCrmIntent::Unknown) {
@@ -89,7 +99,7 @@ class AskCrmService
             }
 
             $student = $resolved['student'];
-        } elseif ($contextStudent && $this->isLikelyFollowUp($question)) {
+        } elseif ($contextStudent && $isFollowUp) {
             $student = $contextStudent;
         } else {
             return $this->result(
@@ -104,7 +114,7 @@ class AskCrmService
             'activeBatchStudent.batch',
         ]);
 
-        $snapshot = $this->studentData->snapshot($user, $student);
+        $snapshot = $this->studentData->snapshot($user, $student, $referencedDate);
 
         if ($this->gemini->isEnabled()) {
             $composed = $this->gemini->composeReply($question, $history, $snapshot);
@@ -114,11 +124,20 @@ class AskCrmService
             }
         }
 
+        if (filled($referencedDate)) {
+            $dateReply = $this->dateSpecificReply($user, $student, $intent, $referencedDate, $snapshot);
+
+            if (filled($dateReply)) {
+                return $this->result($intent, $dateReply, (int) $student->id);
+            }
+        }
+
         $reply = match ($intent) {
             AskCrmIntent::AttendanceToday => $this->attendanceTodayReply($student),
             AskCrmIntent::AttendanceMonth => $this->attendanceMonthReply($student),
             AskCrmIntent::FeePending => $this->feePendingReply($user, $student),
             AskCrmIntent::HomeworkWeek => $this->homeworkWeekReply($student),
+            AskCrmIntent::StudentProfile => $this->profileOverviewReply($user, $student, $snapshot),
             default => $this->helpReply(),
         };
 
@@ -296,11 +315,123 @@ class AskCrmService
             ' he ', ' she ', ' his ', ' her ', ' him ', ' has he', 'has she',
             'done or not', 'what is good', 'what about', 'tell me more', 'same student',
             'that mean', 'means', 'explain', 'clarify', ' uska ', ' uski ', ' uske ',
+            'and on', 'on that day', 'that date', 'that day',
         ])) {
             return true;
         }
 
+        if ($this->extractReferencedDate($question) !== null) {
+            return true;
+        }
+
         return (bool) preg_match('/\b(he|she|his|her|him|uska|uski|uske|kya|hai|hain)\b/u', $q);
+    }
+
+    public function extractReferencedDate(string $question): ?string
+    {
+        $question = trim($question);
+
+        if (preg_match('/\b(\d{4})-(\d{2})-(\d{2})\b/', $question, $matches)) {
+            return $this->safeDate((int) $matches[1], (int) $matches[2], (int) $matches[3]);
+        }
+
+        if (preg_match('/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/', $question, $matches)) {
+            return $this->safeDate((int) $matches[3], (int) $matches[2], (int) $matches[1]);
+        }
+
+        if (preg_match('/\b(\d{1,2})\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{4})\b/i', $question, $matches)) {
+            return $this->parseNaturalDate($matches[1].' '.$matches[2].' '.$matches[3]);
+        }
+
+        if (preg_match('/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2}),?\s+(\d{4})\b/i', $question, $matches)) {
+            return $this->parseNaturalDate($matches[1].' '.$matches[2].' '.$matches[3]);
+        }
+
+        return null;
+    }
+
+    protected function parseNaturalDate(string $value): ?string
+    {
+        try {
+            return Carbon::parse($value)->toDateString();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    protected function safeDate(int $year, int $month, int $day): ?string
+    {
+        if (! checkdate($month, $day, $year)) {
+            return null;
+        }
+
+        return sprintf('%04d-%02d-%02d', $year, $month, $day);
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
+    protected function dateSpecificReply(User $user, Student $student, AskCrmIntent $intent, string $date, array $snapshot): ?string
+    {
+        $intro = $this->studentIntro($student);
+        $formattedDate = Carbon::parse($date)->format('d M Y');
+
+        if ($intent === AskCrmIntent::HomeworkWeek || $intent === AskCrmIntent::StudentProfile) {
+            $homework = $snapshot['homework']['on_referenced_date'] ?? null;
+
+            if (! is_array($homework)) {
+                return null;
+            }
+
+            if (! ($homework['marked'] ?? false)) {
+                return $intro.' has **no homework check recorded** for '.$formattedDate.'.';
+            }
+
+            $checks = collect($homework['checks'] ?? []);
+            $done = (int) ($homework['done_count'] ?? 0);
+            $notDone = (int) ($homework['not_done_count'] ?? 0);
+
+            if ($notDone > 0 && $done === 0) {
+                return $intro.' homework on '.$formattedDate.' was marked **Not Done** ('.$notDone.' subject'.($notDone === 1 ? '' : 's').').';
+            }
+
+            if ($done > 0 && $notDone === 0) {
+                return $intro.' homework on '.$formattedDate.' was marked **Done** ('.$done.' subject'.($done === 1 ? '' : 's').').';
+            }
+
+            return $intro.' on '.$formattedDate.': **Done '.$done.'**, **Not Done '.$notDone.'**.';
+        }
+
+        if ($intent === AskCrmIntent::AttendanceToday || $intent === AskCrmIntent::AttendanceMonth || $intent === AskCrmIntent::StudentProfile) {
+            $attendance = $snapshot['attendance']['on_referenced_date']['record'] ?? null;
+
+            if (! is_array($attendance)) {
+                return null;
+            }
+
+            $status = (string) ($attendance['status'] ?? 'not_marked');
+
+            if ($status === 'not_marked') {
+                return $intro.' has **no attendance mark** for '.$formattedDate.'.';
+            }
+
+            return $intro.' was **'.$status.'** on '.$formattedDate.'.';
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
+    protected function profileOverviewReply(User $user, Student $student, array $snapshot): string
+    {
+        $intro = $this->studentIntro($student);
+        $counters = collect($snapshot['profile_summary']['counters'] ?? [])
+            ->map(fn (array $item): string => ($item['label'] ?? '').': '.($item['value'] ?? '—'))
+            ->implode(' · ');
+
+        return $intro."\n".$counters;
     }
 
     public function detectIntent(string $question): AskCrmIntent
@@ -620,11 +751,12 @@ class AskCrmService
 
     protected function helpReply(): string
     {
-        return "Ask in normal language — I read your CRM data. Examples:\n"
-            ."• tell me attendance of Ayyush\n"
-            ."• Ayyush attendance this month?\n"
+        return "Ask in normal language — I read your CRM data (same as the student profile).\n"
+            ."Examples:\n"
+            ."• tell me homework for Abhinav Singh\n"
+            ."• what about 9 Aug 2026? (after asking about a student)\n"
             ."• how much fee pending for Ayyush\n"
-            .'• homework not done for Ayyush this week';
+            .'• Ayyush attendance this month';
     }
 
     /**

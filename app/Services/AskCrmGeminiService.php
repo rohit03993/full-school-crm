@@ -81,13 +81,19 @@ class AskCrmGeminiService
         $prompt = <<<'PROMPT'
 You are Ask CRM — a friendly assistant for school staff inside their CRM admin panel.
 
+The CRM data JSON is the same information shown on the student profile (attendance, fees, homework, counters).
+
 Rules:
 - Answer ONLY using the CRM data JSON below. Never invent numbers, names, or statuses.
 - Be conversational and clear. Short paragraphs are fine.
-- For follow-ups ("has he done?", "what does that mean?"), use the student in the CRM data and the conversation history.
-- If homework today has no marks yet, say homework is not marked yet for today — do not say "looking good" unless data supports it.
+- For follow-ups ("has he done?", "what about 9 Aug?", "what does that mean?"), use the same student and conversation history.
+- Use meta.referenced_date, homework.on_referenced_date, and attendance.on_referenced_date when the user asks about a specific date.
+- Use homework.history_by_date and homework.recent_checks for past homework questions.
+- Use attendance.recent_days for past attendance questions.
+- If homework is not marked for a date, say clearly it was not checked / no record — do not guess Done or Not Done.
 - If fee data says can_view=false, say the user lacks permission to view fees.
-- Use **bold** sparingly for key facts (status, amounts).
+- profile_summary.counters shows the same chips as the student profile header.
+- Use **bold** sparingly for key facts (status, amounts, dates).
 - Do not mention JSON, APIs, or that you are an AI.
 PROMPT;
 
@@ -131,15 +137,16 @@ You parse staff questions for a school CRM chatbot. Reply with JSON only.
 
 Schema:
 {
-  "intent": "help" | "attendance_today" | "attendance_month" | "fee_pending" | "homework_week" | "unknown",
+  "intent": "help" | "attendance_today" | "attendance_month" | "fee_pending" | "homework_week" | "student_profile" | "unknown",
   "student_name": string or null,
   "use_context_student": boolean
 }
 
 Rules:
-- Set use_context_student=true when the user refers to he/she/his/her/the same student, or asks a follow-up without naming a new student.
-- For follow-ups like "has he done or not?", "what is good?", keep the same student from context and pick the best intent from the conversation (often homework_week).
-- Extract student_name only when a NEW name is mentioned. Never treat words like good, he, done, or not as a name.
+- Set use_context_student=true when the user refers to he/she/his/her/the same student, asks a follow-up, or mentions a date about the current student.
+- For follow-ups like "has he done or not?", "what about 9 Aug 2026?", keep the same student and pick homework_week, attendance_today, or student_profile from context.
+- Use student_profile for open questions about the student when topic is unclear but they mean the same student.
+- Extract student_name only when a NEW name is mentioned. Never treat words like good, he, done, aug, or dates as a name.
 - Understand English and Hinglish.
 PROMPT;
     }
@@ -228,6 +235,7 @@ PROMPT;
             'attendance_month' => AskCrmIntent::AttendanceMonth,
             'fee_pending' => AskCrmIntent::FeePending,
             'homework_week' => AskCrmIntent::HomeworkWeek,
+            'student_profile' => AskCrmIntent::StudentProfile,
             'unknown' => AskCrmIntent::Unknown,
             default => null,
         };
