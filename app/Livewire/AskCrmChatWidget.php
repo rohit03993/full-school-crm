@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Enums\CrmPermission;
 use App\Services\AskCrmService;
+use App\Services\AskCrmSessionService;
 use App\Support\CrmAccess;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
@@ -12,6 +13,8 @@ use Livewire\Component;
 class AskCrmChatWidget extends Component
 {
     public bool $open = false;
+
+    public bool $hasActiveSession = false;
 
     public string $message = '';
 
@@ -24,14 +27,9 @@ class AskCrmChatWidget extends Component
      */
     public array $messages = [];
 
-    public function mount(): void
+    public function mount(AskCrmSessionService $session): void
     {
-        $this->messages = [
-            [
-                'role' => 'assistant',
-                'text' => "Hi — I’m Ask CRM.\n\nI read the same data as the student profile — attendance, homework, fees, calls, visits, exams, and more.\n\nExamples:\n• homework for Abhinav Singh\n• what about 9 Aug 2026?\n• last call for Aarav?",
-            ],
-        ];
+        $this->restoreFromSession($session);
     }
 
     public static function canView(): bool
@@ -47,15 +45,24 @@ class AskCrmChatWidget extends Component
 
     public function toggle(): void
     {
-        $this->open = ! $this->open;
+        if ($this->open) {
+            $this->close(app(AskCrmSessionService::class));
+
+            return;
+        }
+
+        $this->open = true;
     }
 
-    public function close(): void
+    public function close(?AskCrmSessionService $session = null): void
     {
+        $session ??= app(AskCrmSessionService::class);
+
         $this->open = false;
+        $this->endSession($session);
     }
 
-    public function send(AskCrmService $askCrm): void
+    public function send(AskCrmService $askCrm, AskCrmSessionService $session): void
     {
         $question = trim($this->message);
 
@@ -86,13 +93,52 @@ class AskCrmChatWidget extends Component
         if (count($this->messages) > 40) {
             $this->messages = array_values(array_slice($this->messages, -40));
         }
+
+        $this->persistToSession($session);
     }
 
-    public function askExample(string $question, AskCrmService $askCrm): void
+    public function askExample(string $question, AskCrmService $askCrm, AskCrmSessionService $session): void
     {
         $this->open = true;
         $this->message = $question;
-        $this->send($askCrm);
+        $this->send($askCrm, $session);
+    }
+
+    protected function restoreFromSession(AskCrmSessionService $session): void
+    {
+        if (! $session->isActive()) {
+            $this->messages = $session->defaultMessages();
+            $this->hasActiveSession = false;
+
+            return;
+        }
+
+        $data = $session->load();
+
+        $this->messages = is_array($data['messages'] ?? null) && $data['messages'] !== []
+            ? $data['messages']
+            : $session->defaultMessages();
+        $this->lastStudentId = isset($data['last_student_id']) ? (int) $data['last_student_id'] : null;
+        $this->lastStudentName = is_string($data['last_student_name'] ?? null)
+            ? $data['last_student_name']
+            : null;
+        $this->hasActiveSession = true;
+    }
+
+    protected function persistToSession(AskCrmSessionService $session): void
+    {
+        $session->save($this->messages, $this->lastStudentId, $this->lastStudentName);
+        $this->hasActiveSession = true;
+    }
+
+    protected function endSession(AskCrmSessionService $session): void
+    {
+        $session->clear();
+        $this->messages = $session->defaultMessages();
+        $this->lastStudentId = null;
+        $this->lastStudentName = null;
+        $this->message = '';
+        $this->hasActiveSession = false;
     }
 
     public function render()

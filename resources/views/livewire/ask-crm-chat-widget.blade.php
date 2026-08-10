@@ -21,7 +21,7 @@
                     type="button"
                     wire:click="close"
                     style="border:0;background:transparent;color:#fff;padding:0.35rem;border-radius:0.5rem;cursor:pointer;"
-                    aria-label="Close chat"
+                    aria-label="End chat and clear session"
                 >
                     ✕
                 </button>
@@ -78,9 +78,9 @@
         type="button"
         wire:click="toggle"
         style="pointer-events:auto;display:inline-flex;align-items:center;gap:0.5rem;border:0;border-radius:999px;background:#f59e0b;color:#fff;padding:0.75rem 1.1rem;font-size:0.875rem;font-weight:800;box-shadow:0 10px 25px rgba(245,158,11,.45);cursor:pointer;"
-        aria-label="{{ $open ? 'Close Ask CRM' : 'Open Ask CRM' }}"
+        aria-label="{{ $open ? 'End Ask CRM session' : ($hasActiveSession ? 'Resume Ask CRM chat' : 'Open Ask CRM') }}"
     >
         <span aria-hidden="true">💬</span>
-        <span>{{ $open ? 'Close' : 'Ask CRM' }}</span>
+        <span>{{ $open ? 'End chat' : ($hasActiveSession ? 'Resume chat' : 'Ask CRM') }}</span>
     </button>
 </div>

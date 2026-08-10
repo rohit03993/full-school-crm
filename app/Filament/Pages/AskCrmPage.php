@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Enums\CrmPermission;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Services\AskCrmService;
+use App\Services\AskCrmSessionService;
 use App\Support\CrmNavigation;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -53,22 +54,37 @@ class AskCrmPage extends Page
         return 'Ask about attendance, fees, or homework using student names from your CRM.';
     }
 
-    public function mount(): void
+    public function mount(AskCrmSessionService $session): void
     {
-        $this->messages = [
-            [
-                'role' => 'assistant',
-                'text' => "Hi — I’m Ask CRM.\n\n"
-                    ."Ask me things like:\n"
-                    ."• What is Ayyush’s attendance today?\n"
-                    ."• What is Ayyush’s attendance this month?\n"
-                    ."• How much fee is pending for Ayyush?\n"
-                    .'• How many homework Not Done for Ayyush this week?',
-            ],
-        ];
+        if (! $session->isActive()) {
+            $this->messages = $session->defaultMessages();
+
+            return;
+        }
+
+        $data = $session->load();
+
+        $this->messages = is_array($data['messages'] ?? null) && $data['messages'] !== []
+            ? $data['messages']
+            : $session->defaultMessages();
+        $this->lastStudentId = isset($data['last_student_id']) ? (int) $data['last_student_id'] : null;
+        $this->lastStudentName = is_string($data['last_student_name'] ?? null)
+            ? $data['last_student_name']
+            : null;
     }
 
-    public function send(AskCrmService $askCrm): void
+    public function endChat(AskCrmSessionService $session): void
+    {
+        $session->clear();
+        $this->messages = $session->defaultMessages();
+        $this->lastStudentId = null;
+        $this->lastStudentName = null;
+        $this->message = '';
+
+        Notification::make()->title('Chat ended')->body('Ask CRM session cleared.')->success()->send();
+    }
+
+    public function send(AskCrmService $askCrm, AskCrmSessionService $session): void
     {
         $question = trim($this->message);
 
@@ -101,20 +117,19 @@ class AskCrmPage extends Page
 
         if (filled($result['student_id'] ?? null)) {
             $this->lastStudentId = (int) $result['student_id'];
-        }
-
-        if (filled($result['student_name'] ?? null)) {
-            $this->lastStudentName = $result['student_name'];
+            $this->lastStudentName = $result['student_name'] ?? $this->lastStudentName;
         }
 
         if (count($this->messages) > 40) {
             $this->messages = array_values(array_slice($this->messages, -40));
         }
+
+        $session->save($this->messages, $this->lastStudentId, $this->lastStudentName);
     }
 
-    public function askExample(string $question, AskCrmService $askCrm): void
+    public function askExample(string $question, AskCrmService $askCrm, AskCrmSessionService $session): void
     {
         $this->message = $question;
-        $this->send($askCrm);
+        $this->send($askCrm, $session);
     }
 }

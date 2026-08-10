@@ -30,6 +30,7 @@ use App\Models\HomeworkCheck;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\AskCrmService;
+use App\Services\AskCrmSessionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -383,6 +384,35 @@ class AskCrmServiceTest extends TestCase
         Livewire::test(AskCrmPage::class)
             ->assertSuccessful()
             ->assertSee('bottom-right');
+    }
+
+    public function test_ask_crm_session_persists_until_end_chat(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+        $this->actingAs($admin);
+        [$student] = $this->createEnrolledStudent('Aarjav Jain', withFees: true);
+
+        Livewire::test(\App\Livewire\AskCrmChatWidget::class)
+            ->set('message', 'How much fee pending for Aarjav Jain?')
+            ->call('send')
+            ->assertSet('lastStudentId', $student->id)
+            ->assertSet('hasActiveSession', true);
+
+        $this->assertTrue(app(AskCrmSessionService::class)->isActive());
+
+        Livewire::test(\App\Livewire\AskCrmChatWidget::class)
+            ->assertSet('lastStudentId', $student->id)
+            ->assertSet('hasActiveSession', true)
+            ->assertSet('lastStudentName', 'Aarjav Jain');
+
+        Livewire::test(\App\Livewire\AskCrmChatWidget::class)
+            ->call('close')
+            ->assertSet('hasActiveSession', false)
+            ->assertSet('lastStudentId', null);
+
+        $this->assertFalse(app(AskCrmSessionService::class)->isActive());
     }
 
     public function test_ask_crm_floating_widget_answers_questions(): void
