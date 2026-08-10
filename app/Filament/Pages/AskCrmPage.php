@@ -100,6 +100,17 @@ class AskCrmPage extends Page
         Notification::make()->title('New student')->body('Previous student context cleared.')->success()->send();
     }
 
+    public function clearChat(AskCrmSessionService $session): void
+    {
+        $this->messages = $session->defaultMessages();
+        $this->lastStudentId = null;
+        $this->lastStudentName = null;
+        $this->message = '';
+        $session->save($this->messages, null, null);
+
+        Notification::make()->title('Chat cleared')->body('Started a fresh Ask CRM conversation.')->success()->send();
+    }
+
     public function send(AskCrmService $askCrm, AskCrmSessionService $session): void
     {
         $question = trim($this->message);

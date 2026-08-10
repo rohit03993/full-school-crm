@@ -18,6 +18,18 @@
                     </p>
                 </div>
                 <div style="display:flex;align-items:center;gap:0.25rem;flex-shrink:0;">
+                    @if (count($messages) > 1)
+                        <button
+                            type="button"
+                            wire:click="clearChat"
+                            wire:loading.attr="disabled"
+                            wire:target="clearChat"
+                            style="border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.12);color:#fff;padding:0.25rem 0.45rem;border-radius:999px;font-size:0.62rem;font-weight:700;cursor:pointer;"
+                            title="Clear chat history and start fresh"
+                        >
+                            Clear chat
+                        </button>
+                    @endif
                     @if ($lastStudentName)
                         <button
                             type="button"
@@ -34,7 +46,7 @@
                         type="button"
                         wire:click="close"
                         style="border:0;background:transparent;color:#fff;padding:0.35rem;border-radius:0.5rem;cursor:pointer;"
-                        aria-label="End chat and clear session"
+                        aria-label="End chat and close session"
                     >
                         ✕
                     </button>

@@ -82,6 +82,18 @@ class AskCrmChatWidget extends Component
         $this->dispatch('ask-crm-scroll-bottom');
     }
 
+    public function clearChat(AskCrmSessionService $session): void
+    {
+        $this->messages = $session->defaultMessages();
+        $this->lastStudentId = null;
+        $this->lastStudentName = null;
+        $this->message = '';
+        $this->isSending = false;
+        $session->save($this->messages, null, null);
+        $this->hasActiveSession = true;
+        $this->dispatch('ask-crm-scroll-bottom');
+    }
+
     public function send(AskCrmService $askCrm, AskCrmSessionService $session): void
     {
         $question = trim($this->message);

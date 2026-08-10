@@ -539,6 +539,31 @@ class AskCrmServiceTest extends TestCase
         $this->assertNull(app(AskCrmSessionService::class)->load()['last_student_id'] ?? null);
     }
 
+    public function test_widget_clear_chat_resets_messages_and_keeps_session(): void
+    {
+        config(['ask_crm.use_ai' => false]);
+
+        $admin = $this->createSuperAdmin();
+        $this->actingAs($admin);
+        [$student] = $this->createEnrolledStudent('Aarjav Jain', withFees: true);
+
+        Livewire::test(\App\Livewire\AskCrmChatWidget::class)
+            ->set('message', 'How much fee pending for Aarjav Jain?')
+            ->call('send')
+            ->assertSet('lastStudentId', $student->id)
+            ->assertSet('hasActiveSession', true)
+            ->call('clearChat')
+            ->assertSet('lastStudentId', null)
+            ->assertSet('lastStudentName', null)
+            ->assertSet('hasActiveSession', true)
+            ->assertSee('Hi — I’m Ask CRM');
+
+        $session = app(AskCrmSessionService::class);
+        $this->assertTrue($session->isActive());
+        $this->assertNull($session->load()['last_student_id'] ?? null);
+        $this->assertCount(1, $session->load()['messages'] ?? []);
+    }
+
     public function test_homework_status_with_full_name_uses_context_student(): void
     {
         config(['ask_crm.use_ai' => false]);

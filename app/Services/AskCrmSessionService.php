@@ -77,7 +77,8 @@ class AskCrmSessionService
                     ."Tips:\n"
                     ."• Include the student name — e.g. ABHINAV SINGH - homework for 9 Aug 2026\n"
                     ."• Follow up on the same student — e.g. what about 9 Aug 2026?\n"
-                    ."• Use **New student** or say “ask about someone else” to switch",
+                    ."• Use **New student** or say “ask about someone else” to switch\n"
+                    .'• Use **Clear chat** to start a fresh conversation',
             ],
         ];
     }
