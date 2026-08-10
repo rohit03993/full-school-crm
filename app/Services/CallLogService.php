@@ -90,8 +90,6 @@ class CallLogService
             'call_connected' => 'required|boolean',
             'call_direction' => 'nullable|in:outgoing,incoming',
             'duration_minutes' => 'nullable|integer|min:0|max:600',
-            'tags' => 'nullable|array',
-            'tags.*' => 'string|max:50',
         ];
 
         if ($connected) {
@@ -117,13 +115,16 @@ class CallLogService
             ? EnrolledCallPurpose::from($validated['call_purpose'])
             : null;
 
+        // Purpose is the tag — no separate quick-tag selection for enrolled service calls.
+        $tags = $purpose !== null ? [$purpose->value] : [];
+
         if ($student->is_call_blocked) {
             throw ValidationException::withMessages([
                 'student' => 'This number is blocked from calling after repeated failed attempts.',
             ]);
         }
 
-        $call = DB::transaction(function () use ($student, $staff, $validated, $connected, $direction, $callStatus, $purpose): StudentCall {
+        $call = DB::transaction(function () use ($student, $staff, $validated, $connected, $direction, $callStatus, $purpose, $tags): StudentCall {
             $lockedStudent = Student::query()->whereKey($student->id)->lockForUpdate()->firstOrFail();
 
             $call = StudentCall::query()->create([
@@ -135,7 +136,7 @@ class CallLogService
                 'who_answered' => $connected ? WhoAnswered::from($validated['who_answered']) : null,
                 'duration_minutes' => (int) ($validated['duration_minutes'] ?? 0),
                 'call_notes' => $validated['call_notes'] ?? null,
-                'tags' => $validated['tags'] ?? [],
+                'tags' => $tags,
                 'call_purpose' => $purpose?->value,
                 'visit_status_changed_to' => null,
                 'next_followup_at' => null,

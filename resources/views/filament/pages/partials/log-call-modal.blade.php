@@ -3,7 +3,6 @@
     use App\Enums\CallQuickTag;
     use App\Enums\CallStatus;
     use App\Enums\EnrolledCallPurpose;
-    use App\Enums\EnrolledCallQuickTag;
     use App\Enums\VisitStatus;
     use App\Enums\WhoAnswered;
 
@@ -126,11 +125,11 @@
                     @endif
                 </div>
 
-                @if ($logCallForm['call_connected'] ?? true)
+                @if (($logCallForm['call_connected'] ?? true) && $isLeadCall)
                     <div>
                         <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Quick tags</p>
                         <div class="mt-2 grid grid-cols-2 gap-2">
-                            @foreach (($isEnrolledCall ? EnrolledCallQuickTag::options() : CallQuickTag::options()) as $value => $label)
+                            @foreach (CallQuickTag::options() as $value => $label)
                                 <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
                                     <input type="checkbox" wire:model="logCallForm.tags" value="{{ $value }}" class="rounded border-gray-300">
                                     {{ $label }}

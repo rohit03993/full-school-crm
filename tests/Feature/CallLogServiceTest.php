@@ -89,7 +89,6 @@ class CallLogServiceTest extends TestCase
             'who_answered' => 'father',
             'call_purpose' => EnrolledCallPurpose::FeeQuery->value,
             'call_notes' => 'Discussed pending fee installment with parent on phone.',
-            'tags' => ['fee_due'],
         ]);
 
         $enquiry->refresh();
@@ -97,6 +96,7 @@ class CallLogServiceTest extends TestCase
 
         $this->assertSame(VisitStatus::Interested, $enquiry->latest_visit_status);
         $this->assertSame(EnrolledCallPurpose::FeeQuery, $call->call_purpose);
+        $this->assertSame([EnrolledCallPurpose::FeeQuery->value], $call->tags);
         $this->assertNull($call->visit_status_changed_to);
         $this->assertNull($call->enquiry_id);
         $this->assertSame(1, $student->total_calls);

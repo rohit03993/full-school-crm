@@ -26,6 +26,11 @@
                                 {{ $call->studentCase->case_number }}
                             </span>
                         @endif
+                        @if ($call->call_purpose)
+                            <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                {{ $call->call_purpose->label() }}
+                            </span>
+                        @endif
                         @if ($call->visit_status_changed_to)
                             <span class="inline-flex rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
                                 {{ $call->visit_status_changed_to->label() }}
@@ -59,7 +64,7 @@
                         </p>
                     @endif
 
-                    @if (filled($call->tags))
+                    @if (filled($call->tags) && ! $call->call_purpose)
                         <div class="mt-2 flex flex-wrap gap-1">
                             @foreach ($call->tags as $tag)
                                 <span class="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-gray-600 dark:bg-white/10 dark:text-gray-300">{{ $tag }}</span>
