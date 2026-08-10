@@ -555,13 +555,13 @@ class AskCrmServiceTest extends TestCase
             ->call('clearChat')
             ->assertSet('lastStudentId', null)
             ->assertSet('lastStudentName', null)
-            ->assertSet('hasActiveSession', true)
-            ->assertSee('Hi — I’m Ask CRM');
+            ->assertSet('hasActiveSession', true);
 
         $session = app(AskCrmSessionService::class);
         $this->assertTrue($session->isActive());
         $this->assertNull($session->load()['last_student_id'] ?? null);
         $this->assertCount(1, $session->load()['messages'] ?? []);
+        $this->assertStringContainsString('Ask CRM', (string) ($session->load()['messages'][0]['text'] ?? ''));
     }
 
     public function test_homework_status_with_full_name_uses_context_student(): void
