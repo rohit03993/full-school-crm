@@ -1,12 +1,78 @@
 <div class="mt-4 space-y-4">
+    @if ($confirmNotDoneOpen)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+            <div
+                class="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+                wire:key="hw-confirm-not-done"
+            >
+                <h3 class="text-base font-semibold text-gray-950 dark:text-white">Send WhatsApp for Not Done?</h3>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                    You selected <strong>{{ $selectedCount }}</strong> student(s) for
+                    <strong>{{ $subjectLabel }}</strong> on <strong>{{ $checkDateLabel }}</strong>.
+                </p>
+                <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-gray-700 dark:text-gray-200">
+                    <li>
+                        WhatsApp will be attempted for
+                        <strong>{{ $selectedWithMobile }}</strong> student(s) who have a mobile number.
+                    </li>
+                    @if ($selectedWithoutMobile > 0)
+                        <li>
+                            <strong>{{ $selectedWithoutMobile }}</strong> have no mobile — they will be marked Not Done
+                            but WhatsApp cannot be sent.
+                        </li>
+                    @endif
+                    <li>Done students are not messaged. Only this Not Done submit sends WhatsApp.</li>
+                </ul>
+                <div class="mt-5 flex flex-wrap justify-end gap-2">
+                    <button
+                        type="button"
+                        wire:click="cancelMarkSelectedNotDone"
+                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="confirmMarkSelectedNotDone"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmMarkSelectedNotDone"
+                        class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white hover:bg-rose-500 disabled:opacity-50"
+                    >
+                        <span wire:loading.remove wire:target="confirmMarkSelectedNotDone">
+                            Yes, mark Not Done &amp; send
+                        </span>
+                        <span wire:loading wire:target="confirmMarkSelectedNotDone">Sending…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if (! $rosterReady)
         <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400">
-            Select a <strong>class</strong>, then a <strong>subject</strong> to open the student list.
+            Select a <strong>class</strong>. Subject will auto-fill if you teach only one; otherwise pick the subject, then the student list opens.
         </div>
     @else
+        @if (count($otherSubjectsToday) > 1)
+            <div class="flex flex-wrap gap-2">
+                @foreach ($otherSubjectsToday as $subjectRow)
+                    <div @class([
+                        'rounded-xl border px-3 py-2 text-xs',
+                        'border-primary-300 bg-primary-50 dark:border-primary-500/40 dark:bg-primary-500/10' => $subjectRow['is_active'],
+                        'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900' => ! $subjectRow['is_active'],
+                    ])>
+                        <p class="font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">{{ $subjectRow['label'] }}</p>
+                        <p class="mt-1 text-gray-500">
+                            Done {{ $subjectRow['done'] }} · ND {{ $subjectRow['not_done'] }} · Open {{ $subjectRow['unmarked'] }}
+                        </p>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
         <div class="grid gap-3 sm:grid-cols-4">
             <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-500/20 dark:bg-emerald-500/10">
-                <p class="text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Done %</p>
+                <p class="text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Done % · {{ $subjectLabel }}</p>
                 <p class="mt-1 text-2xl font-bold text-emerald-900 dark:text-emerald-200">{{ $summary['done_pct'] }}%</p>
             </div>
             <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
@@ -26,9 +92,11 @@
         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
                 <div>
-                    <p class="text-sm font-semibold text-gray-950 dark:text-white">Students · {{ $checkDateLabel }}</p>
+                    <p class="text-sm font-semibold text-gray-950 dark:text-white">
+                        {{ $subjectLabel }} · {{ $checkDateLabel }}
+                    </p>
                     <p class="text-xs text-gray-500 dark:text-gray-400">
-                        Done = save only. Not Done = save + WhatsApp. Unmarked can be bulk-marked Done.
+                        Tick students who did <strong>not</strong> finish, then Submit. The system will ask before sending WhatsApp.
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
@@ -41,26 +109,25 @@
                     </button>
                     <button
                         type="button"
-                        wire:click="markSelectedNotDone"
+                        wire:click="requestMarkSelectedNotDone"
                         wire:loading.attr="disabled"
-                        wire:target="markSelectedNotDone,markStudentDone,markStudentNotDone,markRemainingDone,resendWhatsApp"
+                        wire:target="requestMarkSelectedNotDone,confirmMarkSelectedNotDone,markRemainingDone"
                         class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-rose-500 disabled:opacity-50"
                     >
-                        <span wire:loading.remove wire:target="markSelectedNotDone">Mark Not Done</span>
-                        <span wire:loading wire:target="markSelectedNotDone">Sending…</span>
+                        Submit Not Done
+                        @if (count($selectedStudentIds) > 0)
+                            ({{ count($selectedStudentIds) }})
+                        @endif
                     </button>
                     <button
                         type="button"
                         wire:click="markRemainingDone"
                         wire:loading.attr="disabled"
-                        wire:target="markSelectedNotDone,markStudentDone,markStudentNotDone,markRemainingDone,resendWhatsApp"
+                        wire:target="requestMarkSelectedNotDone,confirmMarkSelectedNotDone,markRemainingDone"
                         @disabled($unmarkedCount < 1)
                         class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-500 disabled:opacity-50"
                     >
-                        <span wire:loading.remove wire:target="markRemainingDone">
-                            Mark remaining Done{{ $unmarkedCount > 0 ? ' ('.$unmarkedCount.')' : '' }}
-                        </span>
-                        <span wire:loading wire:target="markRemainingDone">Saving…</span>
+                        Mark remaining Done{{ $unmarkedCount > 0 ? ' ('.$unmarkedCount.')' : '' }}
                     </button>
                 </div>
             </div>
@@ -74,7 +141,7 @@
                             <th class="px-4 py-2">Mobile</th>
                             <th class="px-4 py-2">Week ND</th>
                             <th class="px-4 py-2">{{ $checkDateLabel }}</th>
-                            <th class="px-4 py-2 text-right">Mark</th>
+                            <th class="px-4 py-2 text-right">Quick</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -120,27 +187,16 @@
                                         —
                                     @endif
                                 </td>
-                                <td class="px-4 py-2">
-                                    <div class="flex justify-end gap-1">
-                                        <button
-                                            type="button"
-                                            wire:click="markStudentDone({{ $student['id'] }})"
-                                            wire:loading.attr="disabled"
-                                            wire:target="markStudentDone({{ $student['id'] }}),markStudentNotDone({{ $student['id'] }}),markSelectedNotDone,markRemainingDone"
-                                            class="min-w-[3.5rem] rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-extrabold uppercase text-white disabled:opacity-50"
-                                        >
-                                            Done
-                                        </button>
-                                        <button
-                                            type="button"
-                                            wire:click="markStudentNotDone({{ $student['id'] }})"
-                                            wire:loading.attr="disabled"
-                                            wire:target="markStudentDone({{ $student['id'] }}),markStudentNotDone({{ $student['id'] }}),markSelectedNotDone,markRemainingDone"
-                                            class="min-w-[4.5rem] rounded-md bg-rose-600 px-2.5 py-1.5 text-xs font-extrabold uppercase text-white disabled:opacity-50"
-                                        >
-                                            Not Done
-                                        </button>
-                                    </div>
+                                <td class="px-4 py-2 text-right">
+                                    <button
+                                        type="button"
+                                        wire:click="markStudentDone({{ $student['id'] }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="markStudentDone({{ $student['id'] }})"
+                                        class="rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-extrabold uppercase text-white disabled:opacity-50"
+                                    >
+                                        Done
+                                    </button>
                                 </td>
                             </tr>
                         @empty

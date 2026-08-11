@@ -330,7 +330,7 @@ class WhatsAppSettingsService
             .'1) <a href="'.$templatesUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Templates → New</a> '
             .'name <code class="text-xs">'.$name.'</code>, Utility. '
             .'2) Live quick campaign with mapping below. '
-            .'3) Teachers mark Not Done on <a href="'.$checkUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Academics → Homework check</a>.</p></div>'
+            .'3) Teachers open <a href="'.$checkUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Academics → Homework check</a>, select students, Submit Not Done, then confirm WhatsApp count.</p></div>'
             .'<div class="px-4 py-3"><pre class="whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.$body.'</pre></div>'
             .'<div class="overflow-x-auto border-t border-sky-200/60 dark:border-sky-500/20">'
             .'<table class="w-full min-w-[36rem] text-left text-sm">'

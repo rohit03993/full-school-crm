@@ -220,7 +220,7 @@ class ManageWhatsAppSettings extends Page
                 ])
                 ->columns(2),
             Section::make('Homework not done')
-                ->description('Sent only when a teacher marks Homework check → Not Done. Separate template from share-homework and attendance.')
+                ->description('Sent when staff submit Not Done on Academics → Homework check (after confirmation). Separate from share-homework.')
                 ->icon(Heroicon::OutlinedBookOpen)
                 ->schema([
                     Placeholder::make('homework_not_done_template_guide')

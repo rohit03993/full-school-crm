@@ -55,9 +55,11 @@ class HomeworkCheckPage extends Page
     /** @var list<int|string> */
     public array $selectedStudentIds = [];
 
+    public bool $confirmNotDoneOpen = false;
+
     public function getSubheading(): ?string
     {
-        return 'Select class, subject and date, then mark the list. WhatsApp is sent only for Not Done. Failed sends can be resent.';
+        return 'Subject fills automatically when you teach only one. Select students who did not finish, Submit, then confirm WhatsApp count.';
     }
 
     public function mount(): void
@@ -66,7 +68,6 @@ class HomeworkCheckPage extends Page
             'batch_id' => null,
             'course_subject_id' => null,
             'check_date' => now()->toDateString(),
-            'homework_assignment_id' => null,
             'topic' => "Today's homework",
             'student_search' => '',
         ]);
@@ -84,7 +85,7 @@ class HomeworkCheckPage extends Page
 
         return $schema->components([
             Section::make('Class & subject')
-                ->description('Choose the class, subject and date. The student list opens after the subject is selected.')
+                ->description('Choose class and date. Subject is auto-selected when you are assigned to only one subject for that class.')
                 ->schema([
                     Select::make('batch_id')
                         ->label('Class')
@@ -93,10 +94,11 @@ class HomeworkCheckPage extends Page
                         ->required()
                         ->native(false)
                         ->live()
-                        ->afterStateUpdated(function (): void {
-                            $this->data['course_subject_id'] = null;
-                            $this->data['homework_assignment_id'] = null;
+                        ->afterStateUpdated(function () use ($service, $user): void {
                             $this->selectedStudentIds = [];
+                            $this->confirmNotDoneOpen = false;
+                            $this->data['course_subject_id'] = null;
+                            $this->autoSelectSubject($service, $user);
                         }),
                     Select::make('course_subject_id')
                         ->label('Subject')
@@ -112,9 +114,11 @@ class HomeworkCheckPage extends Page
                         ->required()
                         ->native(false)
                         ->live()
+                        ->helperText(fn (): ?string => $this->subjectHelperText($service, $user))
                         ->visible(fn (): bool => filled($this->data['batch_id'] ?? null))
                         ->afterStateUpdated(function (): void {
                             $this->selectedStudentIds = [];
+                            $this->confirmNotDoneOpen = false;
                         }),
                     DatePicker::make('check_date')
                         ->label('Check date')
@@ -125,35 +129,12 @@ class HomeworkCheckPage extends Page
                         ->visible(fn (): bool => filled($this->data['batch_id'] ?? null))
                         ->afterStateUpdated(function (): void {
                             $this->selectedStudentIds = [];
-                        }),
-                    Select::make('homework_assignment_id')
-                        ->label('Link portal homework (optional)')
-                        ->options(function () use ($service): array {
-                            $batchId = (int) ($this->data['batch_id'] ?? 0);
-
-                            return $batchId > 0 ? $service->assignmentOptionsForBatch($batchId) : [];
-                        })
-                        ->searchable()
-                        ->native(false)
-                        ->live()
-                        ->placeholder('No linked assignment')
-                        ->visible(fn (): bool => filled($this->data['batch_id'] ?? null))
-                        ->afterStateUpdated(function ($state) use ($service): void {
-                            if (! filled($state)) {
-                                return;
-                            }
-
-                            $options = $service->assignmentOptionsForBatch((int) ($this->data['batch_id'] ?? 0));
-                            $label = $options[(int) $state] ?? null;
-
-                            if (filled($label)) {
-                                $this->data['topic'] = explode(' · ', (string) $label)[0];
-                            }
+                            $this->confirmNotDoneOpen = false;
                         }),
                     Textarea::make('topic')
                         ->label('Homework topic (optional)')
-                        ->helperText('Included in the WhatsApp message. Defaults to portal homework title or “Today\'s homework”.')
-                        ->placeholder("e.g. Chapter 5 – Complete Questions 1 to 10")
+                        ->helperText('Included in the WhatsApp as {{4}}. Defaults to “Today\'s homework”.')
+                        ->placeholder('e.g. Chapter 5 – Complete Questions 1 to 10')
                         ->rows(2)
                         ->columnSpanFull()
                         ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
@@ -176,24 +157,39 @@ class HomeworkCheckPage extends Page
                 ->viewData(function (): array {
                     $students = $this->rosterStudents();
                     $summary = app(HomeworkCheckService::class)->daySummaryFromRoster($students);
+                    $selected = $this->selectedStudentsPayload($students);
 
                     return [
                         'rosterReady' => $this->rosterReady(),
                         'students' => $students,
                         'selectedStudentIds' => $this->selectedStudentIds,
                         'checkDateLabel' => $this->checkDateLabel(),
+                        'subjectLabel' => $this->subjectLabel(),
                         'summary' => $summary,
                         'unmarkedCount' => $summary['unmarked'],
+                        'confirmNotDoneOpen' => $this->confirmNotDoneOpen,
+                        'selectedCount' => $selected['count'],
+                        'selectedWithMobile' => $selected['with_mobile'],
+                        'selectedWithoutMobile' => $selected['without_mobile'],
+                        'otherSubjectsToday' => $this->otherSubjectsToday(),
                         'recent' => filled($this->data['batch_id'] ?? null)
                             ? app(HomeworkCheckService::class)->recentForBatch(
                                 (int) $this->data['batch_id'],
-                                15,
+                                20,
                                 $this->checkDate(),
                             )
                             : collect(),
                     ];
                 }),
         ]);
+    }
+
+    public function updatedDataBatchId(mixed $value): void
+    {
+        $this->selectedStudentIds = [];
+        $this->confirmNotDoneOpen = false;
+        $this->data['course_subject_id'] = null;
+        $this->autoSelectSubject(app(HomeworkCheckService::class), Auth::user());
     }
 
     public function toggleSelectAll(): void
@@ -209,30 +205,38 @@ class HomeworkCheckPage extends Page
         $this->selectedStudentIds = $ids;
     }
 
-    public function markStudentDone(int $studentId, HomeworkCheckService $service): void
+    public function requestMarkSelectedNotDone(): void
     {
-        $this->markOne($service, $studentId, HomeworkCheckStatus::Done);
-    }
-
-    public function markStudentNotDone(int $studentId, HomeworkCheckService $service): void
-    {
-        $this->markOne($service, $studentId, HomeworkCheckStatus::NotDone);
-    }
-
-    public function markSelectedNotDone(HomeworkCheckService $service): void
-    {
-        $user = Auth::user();
-
-        if (! $user || ! $this->rosterReady()) {
-            Notification::make()->title('Select class and subject first')->warning()->send();
+        if (! $this->rosterReady()) {
+            Notification::make()->title('Select class, subject and date first')->warning()->send();
 
             return;
         }
 
-        $ids = collect($this->selectedStudentIds)->map(fn ($id): int => (int) $id)->filter()->unique()->values()->all();
+        $ids = $this->normalizedSelectedIds();
 
         if ($ids === []) {
             Notification::make()->title('Select at least one student')->warning()->send();
+
+            return;
+        }
+
+        $this->confirmNotDoneOpen = true;
+    }
+
+    public function cancelMarkSelectedNotDone(): void
+    {
+        $this->confirmNotDoneOpen = false;
+    }
+
+    public function confirmMarkSelectedNotDone(HomeworkCheckService $service): void
+    {
+        $user = Auth::user();
+        $ids = $this->normalizedSelectedIds();
+
+        if (! $user || ! $this->rosterReady() || $ids === []) {
+            $this->confirmNotDoneOpen = false;
+            Notification::make()->title('Select class, subject and students first')->warning()->send();
 
             return;
         }
@@ -245,15 +249,17 @@ class HomeworkCheckPage extends Page
             (string) ($this->data['topic'] ?? ''),
             HomeworkCheckStatus::NotDone,
             $this->checkDate(),
-            $this->assignmentId(),
+            null,
         );
 
         $this->selectedStudentIds = [];
+        $this->confirmNotDoneOpen = false;
 
         Notification::make()
-            ->title('Marked Not Done')
+            ->title('Submitted Not Done')
             ->body(
-                $result['marked'].' student(s). WhatsApp queued: '.$result['whatsappQueued']
+                $result['marked'].' student(s) for '.$this->subjectLabel().'. '
+                .'WhatsApp queued: '.$result['whatsappQueued']
                 .($result['whatsappFailed'] > 0 ? ', failed: '.$result['whatsappFailed'] : '')
                 .($result['errors'] !== [] ? '. '.implode(' ', array_slice($result['errors'], 0, 2)) : '')
             )
@@ -266,7 +272,7 @@ class HomeworkCheckPage extends Page
         $user = Auth::user();
 
         if (! $user || ! $this->rosterReady()) {
-            Notification::make()->title('Select class and subject first')->warning()->send();
+            Notification::make()->title('Select class, subject and date first')->warning()->send();
 
             return;
         }
@@ -278,7 +284,7 @@ class HomeworkCheckPage extends Page
             (string) ($this->data['topic'] ?? ''),
             $this->checkDate(),
             $this->data['student_search'] ?? null,
-            $this->assignmentId(),
+            null,
         );
 
         if ($result['marked'] < 1) {
@@ -292,6 +298,11 @@ class HomeworkCheckPage extends Page
             ->body($result['marked'].' student(s) marked Done. No WhatsApp sent.')
             ->success()
             ->send();
+    }
+
+    public function markStudentDone(int $studentId, HomeworkCheckService $service): void
+    {
+        $this->markOne($service, $studentId, HomeworkCheckStatus::Done);
     }
 
     public function resendWhatsApp(int $checkId, HomeworkCheckService $service): void
@@ -333,7 +344,7 @@ class HomeworkCheckPage extends Page
         $user = Auth::user();
 
         if (! $user || ! $this->rosterReady()) {
-            Notification::make()->title('Select class and subject first')->warning()->send();
+            Notification::make()->title('Select class, subject and date first')->warning()->send();
 
             return;
         }
@@ -347,7 +358,7 @@ class HomeworkCheckPage extends Page
                 (string) ($this->data['topic'] ?? ''),
                 $status,
                 $this->checkDate(),
-                $this->assignmentId(),
+                null,
             );
         } catch (ValidationException $exception) {
             $message = collect($exception->errors())->flatten()->first() ?? 'Could not save.';
@@ -357,10 +368,42 @@ class HomeworkCheckPage extends Page
         }
 
         Notification::make()
-            ->title($status === HomeworkCheckStatus::Done ? 'Marked Done' : 'Marked Not Done')
-            ->body($result['whatsapp']['message'] ?? '')
+            ->title('Marked Done')
+            ->body($result['whatsapp']['message'] ?? 'Saved. No WhatsApp sent.')
             ->success()
             ->send();
+    }
+
+    protected function autoSelectSubject(HomeworkCheckService $service, mixed $user): void
+    {
+        if (! $user || ! filled($this->data['batch_id'] ?? null)) {
+            return;
+        }
+
+        $options = $service->subjectOptionsForBatch($user, (int) $this->data['batch_id']);
+
+        if (count($options) === 1) {
+            $this->data['course_subject_id'] = (int) array_key_first($options);
+        }
+    }
+
+    protected function subjectHelperText(HomeworkCheckService $service, mixed $user): ?string
+    {
+        if (! $user || ! filled($this->data['batch_id'] ?? null)) {
+            return null;
+        }
+
+        $options = $service->subjectOptionsForBatch($user, (int) $this->data['batch_id']);
+
+        if (count($options) === 1) {
+            return 'Auto-selected — you are assigned to only this subject for this class.';
+        }
+
+        if (count($options) > 1) {
+            return 'Class subjects load automatically. Pick which subject you are checking now (e.g. Physics), then select students.';
+        }
+
+        return 'No subjects found for this class.';
     }
 
     protected function rosterReady(): bool
@@ -381,16 +424,104 @@ class HomeworkCheckPage extends Page
         return Carbon::parse((string) $value)->toDateString();
     }
 
-    protected function assignmentId(): ?int
-    {
-        $value = (int) ($this->data['homework_assignment_id'] ?? 0);
-
-        return $value > 0 ? $value : null;
-    }
-
     protected function checkDateLabel(): string
     {
         return Carbon::parse($this->checkDate())->format('d M Y');
+    }
+
+    protected function subjectLabel(): string
+    {
+        $user = Auth::user();
+        $batchId = (int) ($this->data['batch_id'] ?? 0);
+        $subjectId = (int) ($this->data['course_subject_id'] ?? 0);
+
+        if (! $user || $batchId < 1 || $subjectId < 1) {
+            return 'Subject';
+        }
+
+        $options = app(HomeworkCheckService::class)->subjectOptionsForBatch($user, $batchId);
+
+        return (string) ($options[$subjectId] ?? $options[(string) $subjectId] ?? 'Subject');
+    }
+
+    /**
+     * @return list<int>
+     */
+    protected function normalizedSelectedIds(): array
+    {
+        return collect($this->selectedStudentIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, array{id: int, mobile: ?string}>  $students
+     * @return array{count: int, with_mobile: int, without_mobile: int}
+     */
+    protected function selectedStudentsPayload(\Illuminate\Support\Collection $students): array
+    {
+        $ids = $this->normalizedSelectedIds();
+        $selected = $students->whereIn('id', $ids);
+        $withMobile = $selected->filter(fn (array $row): bool => filled($row['mobile'] ?? null))->count();
+
+        return [
+            'count' => $selected->count(),
+            'with_mobile' => $withMobile,
+            'without_mobile' => max(0, $selected->count() - $withMobile),
+        ];
+    }
+
+    /**
+     * Other subjects checked today for this class (so Phy/Chem/Maths progress is visible).
+     *
+     * @return list<array{id: int, label: string, done: int, not_done: int, unmarked: int}>
+     */
+    protected function otherSubjectsToday(): array
+    {
+        $user = Auth::user();
+
+        if (! $user || ! filled($this->data['batch_id'] ?? null)) {
+            return [];
+        }
+
+        $grid = app(HomeworkCheckService::class)->multiSubjectGridForBatch(
+            $user,
+            (int) $this->data['batch_id'],
+            $this->checkDate(),
+            null,
+        );
+
+        $activeSubjectId = (int) ($this->data['course_subject_id'] ?? 0);
+        $studentCount = count($grid['students']);
+        $rows = [];
+
+        foreach ($grid['subjects'] as $subject) {
+            $done = 0;
+            $notDone = 0;
+
+            foreach ($grid['students'] as $student) {
+                $status = $student['cells'][$subject['id']]['status'] ?? null;
+                if ($status === HomeworkCheckStatus::Done->label()) {
+                    $done++;
+                } elseif ($status === HomeworkCheckStatus::NotDone->label()) {
+                    $notDone++;
+                }
+            }
+
+            $rows[] = [
+                'id' => $subject['id'],
+                'label' => $subject['label'],
+                'is_active' => $subject['id'] === $activeSubjectId,
+                'done' => $done,
+                'not_done' => $notDone,
+                'unmarked' => max(0, $studentCount - $done - $notDone),
+            ];
+        }
+
+        return $rows;
     }
 
     /**

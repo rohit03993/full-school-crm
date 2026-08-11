@@ -575,6 +575,128 @@ class HomeworkCheckService
     }
 
     /**
+     * Students × subjects grid for one class/date (Phy / Chem / Maths in one screen).
+     *
+     * @return array{
+     *     subjects: list<array{id: int, label: string}>,
+     *     students: list<array{
+     *         id: int,
+     *         name: string,
+     *         mobile: ?string,
+     *         not_done_week: int,
+     *         cells: array<int, array{
+     *             status: ?string,
+     *             notify: ?string,
+     *             check_id: ?int,
+     *             can_resend: bool
+     *         }>
+     *     }>,
+     *     summary: array{total: int, done: int, not_done: int, unmarked: int, done_pct: int}
+     * }
+     */
+    public function multiSubjectGridForBatch(
+        User $user,
+        int $batchId,
+        ?string $checkedOn = null,
+        ?string $search = null,
+    ): array {
+        $checkedOnDate = $this->normalizeCheckedOn($checkedOn);
+        $subjectOptions = $this->subjectOptionsForBatch($user, $batchId);
+
+        $subjects = collect($subjectOptions)
+            ->map(fn (string $label, int|string $id): array => [
+                'id' => (int) $id,
+                'label' => $label,
+            ])
+            ->values()
+            ->all();
+
+        $subjectIds = collect($subjects)->pluck('id')->all();
+
+        $students = $this->rosterForBatch($batchId, null, $search, $checkedOnDate)
+            ->map(fn (array $row): array => [
+                'id' => (int) $row['id'],
+                'name' => (string) $row['name'],
+                'mobile' => $row['mobile'] ?? null,
+                'not_done_week' => (int) ($row['not_done_week'] ?? 0),
+                'cells' => [],
+            ])
+            ->values();
+
+        $checksByStudentSubject = collect();
+
+        if ($subjectIds !== [] && $students->isNotEmpty()) {
+            $checksByStudentSubject = HomeworkCheck::query()
+                ->where('batch_id', $batchId)
+                ->whereIn('course_subject_id', $subjectIds)
+                ->whereDate('checked_on', $checkedOnDate)
+                ->orderByDesc('id')
+                ->get()
+                ->groupBy(fn (HomeworkCheck $check): string => $check->student_id.'-'.$check->course_subject_id)
+                ->map(fn (Collection $group): HomeworkCheck => $group->first());
+        }
+
+        $done = 0;
+        $notDone = 0;
+        $totalCells = 0;
+
+        $students = $students->map(function (array $student) use (
+            $subjects,
+            $checksByStudentSubject,
+            &$done,
+            &$notDone,
+            &$totalCells,
+        ): array {
+            $cells = [];
+
+            foreach ($subjects as $subject) {
+                $totalCells++;
+                $key = $student['id'].'-'.$subject['id'];
+                /** @var HomeworkCheck|null $latest */
+                $latest = $checksByStudentSubject->get($key);
+
+                $canResend = $latest !== null
+                    && $latest->status === HomeworkCheckStatus::NotDone
+                    && in_array($latest->notify_status, [
+                        HomeworkCheckNotifyStatus::Failed,
+                        HomeworkCheckNotifyStatus::Pending,
+                    ], true);
+
+                if ($latest?->status === HomeworkCheckStatus::Done) {
+                    $done++;
+                } elseif ($latest?->status === HomeworkCheckStatus::NotDone) {
+                    $notDone++;
+                }
+
+                $cells[$subject['id']] = [
+                    'status' => $latest?->status?->label(),
+                    'notify' => $latest?->notify_status?->label(),
+                    'check_id' => $latest?->id,
+                    'can_resend' => $canResend,
+                ];
+            }
+
+            $student['cells'] = $cells;
+
+            return $student;
+        })->all();
+
+        $unmarked = max(0, $totalCells - $done - $notDone);
+
+        return [
+            'subjects' => $subjects,
+            'students' => $students,
+            'summary' => [
+                'total' => $totalCells,
+                'done' => $done,
+                'not_done' => $notDone,
+                'unmarked' => $unmarked,
+                'done_pct' => $totalCells > 0 ? (int) round(($done / $totalCells) * 100) : 0,
+            ],
+        ];
+    }
+
+    /**
      * @return Collection<int, HomeworkCheck>
      */
     public function recentForBatch(int $batchId, int $limit = 15, ?string $checkedOn = null): Collection

@@ -310,6 +310,120 @@ class HomeworkCheckServiceTest extends TestCase
             ->assertSuccessful();
     }
 
+    public function test_multi_subject_grid_shows_separate_cells_per_subject(): void
+    {
+        Http::fake();
+
+        [$teacher, $batch, $student, $maths] = $this->seedClass();
+        $physics = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'Physics',
+            'code' => 'PHY',
+            'default_max_marks' => 100,
+            'sort_order' => 2,
+            'is_active' => true,
+        ]);
+        $chemistry = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'Chemistry',
+            'code' => 'CHEM',
+            'default_max_marks' => 100,
+            'sort_order' => 3,
+            'is_active' => true,
+        ]);
+
+        $service = app(HomeworkCheckService::class);
+
+        $service->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $physics->id,
+            'Laws of motion',
+            HomeworkCheckStatus::NotDone,
+        );
+        $service->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $maths->id,
+            'Integrals',
+            HomeworkCheckStatus::Done,
+        );
+
+        $grid = $service->multiSubjectGridForBatch($teacher, $batch->id, now()->toDateString());
+
+        $subjectIds = collect($grid['subjects'])->pluck('id')->all();
+        $this->assertContains($physics->id, $subjectIds);
+        $this->assertContains($chemistry->id, $subjectIds);
+        $this->assertContains($maths->id, $subjectIds);
+
+        $row = collect($grid['students'])->firstWhere('id', $student->id);
+        $this->assertNotNull($row);
+        $this->assertSame('Not Done', $row['cells'][$physics->id]['status']);
+        $this->assertSame('Done', $row['cells'][$maths->id]['status']);
+        $this->assertNull($row['cells'][$chemistry->id]['status']);
+        $this->assertSame(1, $grid['summary']['not_done']);
+        $this->assertSame(1, $grid['summary']['done']);
+        $this->assertSame(1, $grid['summary']['unmarked']);
+    }
+
+    public function test_homework_check_page_marks_cell_for_subject(): void
+    {
+        Http::fake();
+
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $this->actingAs($teacher);
+
+        Livewire::test(HomeworkCheckPage::class)
+            ->fillForm([
+                'batch_id' => $batch->id,
+                'course_subject_id' => $subject->id,
+                'check_date' => now()->toDateString(),
+            ])
+            ->set('selectedStudentIds', [$student->id])
+            ->call('requestMarkSelectedNotDone')
+            ->assertSet('confirmNotDoneOpen', true)
+            ->call('confirmMarkSelectedNotDone')
+            ->assertSet('confirmNotDoneOpen', false)
+            ->assertNotified();
+
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $student->id,
+            'course_subject_id' => $subject->id,
+            'status' => 'not_done',
+        ]);
+    }
+
+    public function test_subject_auto_selects_when_teacher_has_only_one(): void
+    {
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $this->actingAs($teacher);
+
+        \App\Models\BatchStaffAssignment::query()
+            ->where('batch_id', $batch->id)
+            ->where('user_id', $teacher->id)
+            ->delete();
+
+        $teacher->syncRoles([\App\Enums\RoleName::Staff->value]);
+        \Spatie\Permission\Models\Permission::findOrCreate(\App\Enums\CrmPermission::HomeworkManage->value, 'web');
+        $teacher->givePermissionTo(\App\Enums\CrmPermission::HomeworkManage->value);
+
+        \App\Models\BatchStaffAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'user_id' => $teacher->id,
+            'role' => \App\Enums\BatchStaffRole::SubjectTeacher,
+            'course_subject_id' => $subject->id,
+        ]);
+
+        Livewire::test(HomeworkCheckPage::class)
+            ->set('data.check_date', now()->toDateString())
+            ->set('data.batch_id', $batch->id)
+            ->assertSet('data.course_subject_id', $subject->id);
+
+        unset($student);
+    }
+
     public function test_not_done_count_this_week(): void
     {
         Http::fake();
