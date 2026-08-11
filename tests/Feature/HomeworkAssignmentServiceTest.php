@@ -88,8 +88,20 @@ class HomeworkAssignmentServiceTest extends TestCase
             'send_whatsapp' => false,
         ]);
 
-        $fake = \Mockery::mock(\App\Services\WhatsAppDispatchService::class);
+        \App\Models\MetaWhatsAppTemplate::query()->create([
+            'name' => 'homework_api',
+            'language' => 'en',
+            'status' => 'APPROVED',
+            'param_count' => 4,
+            'body' => 'Hi {{1}} {{2}} {{3}} {{4}}',
+            'is_active' => true,
+            'synced_at' => now(),
+        ]);
+
+        $fake = \Mockery::mock(\App\Services\WhatsAppDispatchService::class)->makePartial();
         $fake->shouldReceive('isConfigured')->andReturn(true);
+        $fake->shouldReceive('resolveMetaTemplatePublic')
+            ->andReturn(\App\Models\MetaWhatsAppTemplate::query()->where('name', 'homework_api')->first());
         $fake->shouldReceive('send')
             ->once()
             ->withArgs(function (string $mobile, array $params) use ($student, $assignment): bool {
@@ -107,6 +119,7 @@ class HomeworkAssignmentServiceTest extends TestCase
 
         $this->assertSame(1, $result['sent']);
         $this->assertSame(0, $result['failed']);
+        $this->assertSame('homework_api', $result['template']);
     }
 
     /**

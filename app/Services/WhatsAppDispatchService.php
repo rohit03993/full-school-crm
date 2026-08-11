@@ -112,7 +112,10 @@ class WhatsAppDispatchService
     {
         $query = MetaWhatsAppTemplate::query()
             ->where('name', $templateName)
-            ->where('is_active', true);
+            ->where(function ($inner): void {
+                $inner->where('is_active', true)
+                    ->orWhereRaw('UPPER(status) = ?', ['APPROVED']);
+            });
 
         if (filled($languageCode)) {
             $template = (clone $query)->where('language', $languageCode)->first();
@@ -131,5 +134,10 @@ class WhatsAppDispatchService
         }
 
         return $query->orderBy('language')->first();
+    }
+
+    public function resolveMetaTemplatePublic(string $templateName, ?string $languageCode = null): ?MetaWhatsAppTemplate
+    {
+        return $this->resolveMetaTemplate($templateName, $languageCode);
     }
 }

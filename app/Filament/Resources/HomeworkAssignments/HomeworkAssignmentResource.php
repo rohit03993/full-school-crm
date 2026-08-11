@@ -11,8 +11,8 @@ use App\Filament\Resources\HomeworkAssignments\Pages\ViewHomeworkAssignment;
 use App\Filament\Support\CrmTable;
 use App\Models\Batch;
 use App\Models\HomeworkAssignment;
-use App\Models\WhatsAppTemplate;
 use App\Services\HomeworkAssignmentService;
+use App\Services\HomeworkWhatsAppService;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
@@ -106,19 +106,17 @@ class HomeworkAssignmentResource extends Resource
                         ->columnSpanFull(),
                     Toggle::make('send_whatsapp')
                         ->label('Send WhatsApp with homework link')
-                        ->helperText('Sends to each student’s Mobile. Message includes name, roll, title, and a direct link to view/download (no login).')
+                        ->helperText('Sends to each student’s Mobile: name, roll, title, and public link (no login). Separate from Automations → Homework not done.')
                         ->default(true)
                         ->live(),
                     Select::make('whatsapp_template_name')
                         ->label('WhatsApp template')
-                        ->options(fn (): array => WhatsAppTemplate::query()
-                            ->where('is_active', true)
-                            ->orderBy('name')
-                            ->pluck('name', 'name')
-                            ->all())
+                        ->options(fn (): array => app(HomeworkWhatsAppService::class)->shareTemplateOptions())
+                        ->default(fn (): ?string => app(HomeworkWhatsAppService::class)->defaultShareTemplateName())
                         ->searchable()
+                        ->required(fn (callable $get): bool => (bool) $get('send_whatsapp'))
                         ->visible(fn (callable $get): bool => (bool) $get('send_whatsapp'))
-                        ->helperText('Approved Meta template with 4 params: name, roll, title, public homework link.'),
+                        ->helperText('Pick an APPROVED Meta template with exactly 4 params (name, roll, title, link). Use homework_api / homework_update after Sync.'),
                 ])
                 ->columns(2),
         ]);
@@ -146,11 +144,18 @@ class HomeworkAssignmentResource extends Resource
                             ->state(fn (HomeworkAssignment $record): string => $record->portalUrl())
                             ->copyable()
                             ->columnSpanFull(),
+                        TextEntry::make('whatsapp_sent_count')
+                            ->label('WhatsApp sent')
+                            ->state(fn (HomeworkAssignment $record): string => (string) ((int) $record->whatsapp_sent_count)),
+                        TextEntry::make('whatsapp_failed_count')
+                            ->label('WhatsApp failed')
+                            ->state(fn (HomeworkAssignment $record): string => (string) ((int) $record->whatsapp_failed_count)),
                         TextEntry::make('viewPercentage')
-                            ->label('Viewed')
+                            ->label('Viewed (portal login)')
                             ->state(fn (HomeworkAssignment $record): string => $record->viewedStudentsCount()
                                 .' / '.$record->totalStudentsCount()
-                                .' ('.$record->viewPercentage().'%)'),
+                                .' ('.$record->viewPercentage().'%)'
+                                .' · portal login only, not public /h/ link'),
                         ViewComponent::make('filament.resources.homework-assignments.attachment')
                             ->viewData(fn (HomeworkAssignment $record): array => [
                                 'record' => $record,

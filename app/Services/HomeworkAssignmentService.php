@@ -55,7 +55,9 @@ class HomeworkAssignmentService
 
             $assignment->update([
                 'whatsapp_sent_count' => $result['sent'],
-                'whatsapp_failed_count' => $result['failed'],
+                'whatsapp_failed_count' => $result['failed'] > 0
+                    ? $result['failed']
+                    : ($result['sent'] === 0 && filled($result['error']) ? 1 : 0),
             ]);
         }
 
