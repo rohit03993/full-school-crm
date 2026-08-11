@@ -321,6 +321,8 @@ class MetaWhatsAppTemplateResource extends Resource
         $samples = $data['body_variable_samples'] ?? [];
 
         if (is_array($samples) && $samples !== []) {
+            $data['body_examples'] = MetaWhatsAppTemplateVariableHelper::rowsToExamplesList($samples);
+            // Keep CSV for older callers / logs; prefer body_examples when submitting.
             $data['body_examples_csv'] = MetaWhatsAppTemplateVariableHelper::rowsToExamplesCsv($samples);
         }
 

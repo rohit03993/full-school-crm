@@ -27,6 +27,7 @@ class MetaWhatsAppTemplateBuilder
         ?string $footerText = null,
         ?string $bodyExamplesCsv = null,
         bool $allowCategoryChange = true,
+        ?array $bodyExamples = null,
     ): array {
         $name = self::normalizeName($name);
         $language = trim($language);
@@ -63,7 +64,7 @@ class MetaWhatsAppTemplateBuilder
             ];
         }
 
-        [$bodyComponent, $parameterFormat] = self::buildBodyComponent($bodyText, $bodyExamplesCsv);
+        [$bodyComponent, $parameterFormat] = self::buildBodyComponent($bodyText, $bodyExamplesCsv, $bodyExamples);
         $components[] = $bodyComponent;
 
         if (filled($footerText)) {
@@ -89,9 +90,10 @@ class MetaWhatsAppTemplateBuilder
     }
 
     /**
+     * @param  list<string>|null  $bodyExamples
      * @return array{0: array<string, mixed>, 1: string|null}
      */
-    protected static function buildBodyComponent(string $bodyText, ?string $bodyExamplesCsv): array
+    protected static function buildBodyComponent(string $bodyText, ?string $bodyExamplesCsv, ?array $bodyExamples = null): array
     {
         $indices = self::positionalPlaceholderOrder($bodyText);
 
@@ -103,11 +105,16 @@ class MetaWhatsAppTemplateBuilder
             throw new InvalidArgumentException('Use positional placeholders like {{1}}, {{2}} — not named variables.');
         }
 
-        $examples = self::parseExamplesCsv($bodyExamplesCsv);
+        $examples = is_array($bodyExamples) && $bodyExamples !== []
+            ? array_values(array_filter(array_map(
+                static fn (mixed $value): string => trim((string) $value),
+                $bodyExamples,
+            ), static fn (string $value): bool => $value !== ''))
+            : self::parseExamplesCsv($bodyExamplesCsv);
 
         if (count($examples) < count($indices)) {
             throw new InvalidArgumentException(
-                'The body has '.count($indices).' variable(s). Provide that many comma-separated sample values.'
+                'The body has '.count($indices).' variable(s). Provide that many sample values (one per {{n}}).'
             );
         }
 

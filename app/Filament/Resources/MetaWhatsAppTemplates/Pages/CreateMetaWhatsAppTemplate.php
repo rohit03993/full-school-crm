@@ -6,10 +6,13 @@ use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource;
 use App\Services\MetaWhatsAppTemplateSubmitService;
 use App\Support\MetaWhatsAppTemplateVariableHelper;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
+use Filament\Support\Exceptions\Halt;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Throwable;
 
 class CreateMetaWhatsAppTemplate extends CreateRecord
 {
@@ -28,7 +31,8 @@ class CreateMetaWhatsAppTemplate extends CreateRecord
     {
         parent::mount();
 
-        $state = $this->form->getState();
+        // Use raw state — getState() validates and can fail on an empty create form.
+        $state = $this->form->getRawState();
         $bodyText = (string) ($state['body_text'] ?? '');
 
         if ($bodyText === '') {
@@ -39,7 +43,7 @@ class CreateMetaWhatsAppTemplate extends CreateRecord
             ...$state,
             'body_variable_samples' => MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
                 $bodyText,
-                $state['body_variable_samples'] ?? [],
+                is_array($state['body_variable_samples'] ?? null) ? $state['body_variable_samples'] : [],
                 (string) ($state['name'] ?? ''),
             ),
         ]);
@@ -55,9 +59,30 @@ class CreateMetaWhatsAppTemplate extends CreateRecord
         try {
             return app(MetaWhatsAppTemplateSubmitService::class)->submit($data);
         } catch (InvalidArgumentException $exception) {
+            $message = $exception->getMessage();
+
+            Notification::make()
+                ->title('Could not submit template')
+                ->body($message)
+                ->danger()
+                ->persistent()
+                ->send();
+
             throw ValidationException::withMessages([
-                'body_text' => $exception->getMessage(),
+                'data.body_text' => $message,
+                'body_text' => $message,
             ]);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Could not submit template')
+                ->body($exception->getMessage() ?: 'Unexpected error while submitting to Meta.')
+                ->danger()
+                ->persistent()
+                ->send();
+
+            throw new Halt;
         }
     }
 

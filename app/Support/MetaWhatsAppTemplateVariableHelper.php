@@ -15,6 +15,14 @@ class MetaWhatsAppTemplateVariableHelper
     ];
 
     /** @var array<int, string> */
+    private const HOMEWORK_SHARE_LABELS = [
+        1 => 'Student name',
+        2 => 'Roll number',
+        3 => 'Homework title',
+        4 => 'Public homework link',
+    ];
+
+    /** @var array<int, string> */
     private const INDEX_SAMPLES = [
         1 => 'Rohit Sharma',
         2 => '12-A-042',
@@ -22,6 +30,14 @@ class MetaWhatsAppTemplateVariableHelper
         4 => '20 Jun 2026',
         5 => 'Class 12-A',
         6 => 'Your Institute',
+    ];
+
+    /** @var array<int, string> */
+    private const HOMEWORK_SHARE_SAMPLES = [
+        1 => 'Rohit Sharma',
+        2 => '12-A-042',
+        3 => 'Chapter 5 exercises',
+        4 => 'https://example.com/h/samplePublicHomeworkToken123456',
     ];
 
     public static function labelForIndex(int $index): string
@@ -47,6 +63,7 @@ class MetaWhatsAppTemplateVariableHelper
             ->keyBy(fn (array $row): int => (int) ($row['index'] ?? 0));
 
         $presetVariables = [];
+        $isHomeworkShare = self::looksLikeHomeworkShareTemplate((string) $templateName, $bodyText);
 
         if (FeeReminderWhatsAppTemplate::looksLikeName((string) $templateName)
             || str_contains(strtolower($bodyText), 'fee reminder')) {
@@ -61,16 +78,52 @@ class MetaWhatsAppTemplateVariableHelper
         foreach ($order as $index) {
             $previous = $existingByIndex->get($index);
             $preset = $presetVariables[$index] ?? null;
+            $defaultLabel = $isHomeworkShare
+                ? (self::HOMEWORK_SHARE_LABELS[$index] ?? self::labelForIndex($index))
+                : self::labelForIndex($index);
+            $defaultExample = $isHomeworkShare
+                ? (self::HOMEWORK_SHARE_SAMPLES[$index] ?? self::defaultSampleForIndex($index))
+                : self::defaultSampleForIndex($index);
+
             $rows[] = [
                 'index' => $index,
-                'label' => $preset['label'] ?? self::labelForIndex($index),
+                'label' => $preset['label'] ?? $defaultLabel,
                 'example' => filled($previous['example'] ?? null)
                     ? trim((string) $previous['example'])
-                    : ($preset['example'] ?? self::defaultSampleForIndex($index)),
+                    : ($preset['example'] ?? $defaultExample),
             ];
         }
 
         return $rows;
+    }
+
+    public static function looksLikeHomeworkShareTemplate(string $templateName, string $bodyText): bool
+    {
+        $name = strtolower(trim($templateName));
+        $body = strtolower($bodyText);
+
+        if ($name !== '' && (str_starts_with($name, 'homework_') || str_contains($name, 'homework_update') || str_contains($name, 'homework_api'))) {
+            return ! str_contains($body, 'has not completed the homework');
+        }
+
+        return str_contains($body, 'open homework')
+            || (str_contains($body, 'homework for') && str_contains($body, 'title:'));
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<string>
+     */
+    public static function rowsToExamplesList(array $rows): array
+    {
+        return collect($rows)
+            ->filter(fn (mixed $row): bool => is_array($row))
+            ->sortBy(fn (array $row): int => (int) ($row['index'] ?? 0))
+            ->pluck('example')
+            ->map(fn (mixed $value): string => trim((string) $value))
+            ->filter(fn (string $value): bool => $value !== '')
+            ->values()
+            ->all();
     }
 
     /**

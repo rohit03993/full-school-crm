@@ -20,6 +20,16 @@ class MetaWhatsAppTemplateSubmitService
      */
     public function submit(array $data): MetaWhatsAppTemplate
     {
+        $examples = null;
+
+        if (is_array($data['body_examples'] ?? null) && $data['body_examples'] !== []) {
+            $examples = array_values(array_map(
+                static fn (mixed $value): string => trim((string) $value),
+                $data['body_examples'],
+            ));
+            $examples = array_values(array_filter($examples, static fn (string $value): bool => $value !== ''));
+        }
+
         $payload = MetaWhatsAppTemplateBuilder::buildCreatePayload(
             (string) ($data['name'] ?? ''),
             (string) ($data['language'] ?? 'en'),
@@ -29,6 +39,7 @@ class MetaWhatsAppTemplateSubmitService
             filled($data['footer_text'] ?? null) ? (string) $data['footer_text'] : null,
             filled($data['body_examples_csv'] ?? null) ? (string) $data['body_examples_csv'] : null,
             (bool) ($data['allow_category_change'] ?? true),
+            $examples,
         );
 
         $result = $this->meta->createMessageTemplate($payload);

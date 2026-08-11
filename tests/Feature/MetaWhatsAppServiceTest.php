@@ -286,4 +286,43 @@ class MetaWhatsAppServiceTest extends TestCase
             'status' => 'PENDING',
         ]);
     }
+
+    public function test_template_submit_accepts_url_sample_without_csv_splitting(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.waba_id' => 'waba-1',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/waba-1/message_templates' => Http::response([
+                'id' => 'tpl-hw',
+                'status' => 'PENDING',
+                'category' => 'UTILITY',
+            ], 200),
+        ]);
+
+        $link = 'https://motionagra.in/h/AbCdEfGhIjKlMnOpQrStUvWxYz123456';
+
+        $template = app(\App\Services\MetaWhatsAppTemplateSubmitService::class)->submit([
+            'name' => 'homework_update',
+            'language' => 'en',
+            'category' => 'UTILITY',
+            'body_text' => "Dear Parent,\nHomework for {{1}} (Roll: {{2}})\nTitle: {{3}}\nOpen: {{4}}",
+            'body_examples' => ['Rohit Sharma', '12-A-042', 'Test HW', $link],
+        ]);
+
+        $this->assertSame('PENDING', $template->status);
+        $this->assertSame(4, $template->param_count);
+
+        Http::assertSent(function ($request) use ($link): bool {
+            $body = $request->data();
+            $examples = $body['components'][0]['example']['body_text'][0] ?? null;
+
+            return is_array($examples)
+                && count($examples) === 4
+                && $examples[3] === $link;
+        });
+    }
 }
