@@ -56,6 +56,59 @@ class HomeworkAssignmentServiceTest extends TestCase
         $this->assertTrue($assignments->first()->views->isNotEmpty());
     }
 
+    public function test_create_assigns_public_token_and_public_page_needs_no_login(): void
+    {
+        [, $batch, $staff] = $this->createStudentInBatch();
+
+        $assignment = app(HomeworkAssignmentService::class)->create($staff, [
+            'batch_id' => $batch->id,
+            'title' => 'Public link homework',
+            'description' => 'Open without portal login.',
+            'send_whatsapp' => false,
+        ]);
+
+        $this->assertNotEmpty($assignment->public_token);
+        $this->assertStringContainsString('/h/', $assignment->publicUrl());
+        $this->assertStringNotContainsString('/portal/', $assignment->publicUrl());
+
+        $this->get($assignment->publicUrl())
+            ->assertOk()
+            ->assertSee('Public link homework')
+            ->assertSee('Open without portal login.');
+    }
+
+    public function test_whatsapp_notify_uses_public_homework_link(): void
+    {
+        [$student, $batch, $staff] = $this->createStudentInBatch();
+
+        $assignment = app(HomeworkAssignmentService::class)->create($staff, [
+            'batch_id' => $batch->id,
+            'title' => 'WA share homework',
+            'description' => 'Check link.',
+            'send_whatsapp' => false,
+        ]);
+
+        $fake = \Mockery::mock(\App\Services\WhatsAppDispatchService::class);
+        $fake->shouldReceive('isConfigured')->andReturn(true);
+        $fake->shouldReceive('send')
+            ->once()
+            ->withArgs(function (string $mobile, array $params) use ($student, $assignment): bool {
+                return $mobile === $student->mobile
+                    && $params[0] === $student->name
+                    && $params[2] === 'WA share homework'
+                    && str_contains($params[3], '/h/'.$assignment->public_token);
+            })
+            ->andReturn(['status' => 'success']);
+
+        $this->app->instance(\App\Services\WhatsAppDispatchService::class, $fake);
+        $this->app->forgetInstance(\App\Services\HomeworkWhatsAppService::class);
+
+        $result = app(\App\Services\HomeworkWhatsAppService::class)->notifyBatch($assignment->fresh());
+
+        $this->assertSame(1, $result['sent']);
+        $this->assertSame(0, $result['failed']);
+    }
+
     /**
      * @return array{0: Student, 1: Batch, 2: User}
      */

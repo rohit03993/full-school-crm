@@ -83,6 +83,17 @@
     </div>
 
     <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-gray-900">
+        <h2 class="text-lg font-semibold text-gray-950 dark:text-white">Calling — lead vs enrolled vs cases</h2>
+        <p class="mt-2">When the Calling module is licensed, staff log calls in three ways:</p>
+        <ul class="mt-3 list-disc space-y-2 pl-5">
+            <li><strong>Call Queue</strong> (Calls menu) — work through assigned <em>leads</em> only. Logging a call updates visit status and stays on the enquiry pipeline. Enrolled students never appear here.</li>
+            <li><strong>Student profile → Log call</strong> — for an <em>enrolled</em> student, choose purpose/outcome (fees, attendance, documents, etc.). That does not change lead visit status. For a lead still in enquiry, the same button uses the lead call form.</li>
+            <li><strong>Cases</strong> — when Cases is licensed, open a case and log a case-related call from the case workflow (separate from the lead queue).</li>
+        </ul>
+        <p class="mt-3 text-xs text-gray-500">Call Report and Students → Calls list history; use Export CSV on Call Report for filtered downloads.</p>
+    </div>
+
+    <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-gray-900">
         <h2 class="text-lg font-semibold text-gray-950 dark:text-white">Custom student fields — how to use</h2>
         <ol class="mt-3 list-decimal space-y-2 pl-5">
             <li>Go to <strong>Settings → Custom Fields</strong>.</li>

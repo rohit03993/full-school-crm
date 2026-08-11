@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Enums\CallStatus;
 use App\Enums\BatchStatus;
 use App\Enums\CampusVisitPurpose;
+use App\Enums\CertificateType;
 use App\Enums\LeadSource;
 use App\Models\ActivityAttendance;
 use App\Models\ActivityType;
@@ -38,6 +39,7 @@ use App\Models\Payment;
 use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\StudentCase;
+use App\Models\StudentCertificate;
 use App\Models\User;
 use App\Models\WhatsAppTemplate;
 use App\Services\ActivityAttendanceService;
@@ -69,6 +71,7 @@ use App\Services\PenaltyCalculationService;
 use App\Services\ReceiptService;
 use App\Services\StorageCleanupService;
 use App\Services\StudentCaseService;
+use App\Services\CertificateService;
 use App\Services\StudentCounterService;
 use App\Services\StudentProfileDeleteService;
 use App\Services\StudentUpdateService;
@@ -127,6 +130,8 @@ class StudentProfilePage extends Page
     public bool $callsTabLoaded = false;
 
     public bool $casesTabLoaded = false;
+
+    public bool $certificatesTabLoaded = false;
 
     public bool $messagesTabLoaded = false;
 
@@ -206,6 +211,15 @@ class StudentProfilePage extends Page
      * @var Collection<int, StudentCase>
      */
     public Collection $cases;
+
+    /**
+     * @var Collection<int, StudentCertificate>
+     */
+    public Collection $certificates;
+
+    public string $profileCertificateType = '';
+
+    public string $profileCertificateRemarks = '';
 
     public ?int $expandedCaseId = null;
 
@@ -365,6 +379,8 @@ class StudentProfilePage extends Page
         $this->leadTimeline = collect();
         $this->calls = new Collection;
         $this->cases = new Collection;
+        $this->certificates = new Collection;
+        $this->profileCertificateType = CertificateType::Bonafide->value;
         $this->openCaseBanners = [];
         $this->messageThread = [];
         $this->homeworkAssignments = new Collection;
@@ -462,6 +478,7 @@ class StudentProfilePage extends Page
             'visits' => $this->loadVisitsTab(),
             'calls' => $this->loadCallsTab(),
             'cases' => $this->loadCasesTab(),
+            'certificates' => $this->loadCertificatesTab(),
             'messages' => $this->loadMessagesTab(),
             'documents' => $this->loadDocumentsTab(),
             'fees' => $this->loadFeesTab(),
@@ -487,8 +504,16 @@ class StudentProfilePage extends Page
             $tabs[] = 'calls';
         }
 
-        if ($this->record->activeEnrollment !== null && $this->userCan(CrmPermission::CasesView)) {
+        if ($this->record->activeEnrollment !== null
+            && $this->licensed(LicenseFeature::Cases)
+            && $this->userCan(CrmPermission::CasesView)) {
             $tabs[] = 'cases';
+        }
+
+        if ($this->record->activeEnrollment !== null
+            && $this->licensed(LicenseFeature::Certificates)
+            && $this->userCan(CrmPermission::CertificatesView)) {
+            $tabs[] = 'certificates';
         }
 
         if ($this->licensed(LicenseFeature::WhatsApp)) {
@@ -810,6 +835,62 @@ class StudentProfilePage extends Page
             ->orderByDesc('id')
             ->limit(CrmPagination::PER_PAGE)
             ->get();
+    }
+
+    public function loadCertificatesTab(): void
+    {
+        if ($this->certificatesTabLoaded) {
+            return;
+        }
+
+        $this->certificatesTabLoaded = true;
+        $this->certificates = $this->record->certificates()
+            ->with(['issuedBy', 'enrollment'])
+            ->orderByDesc('issued_on')
+            ->orderByDesc('id')
+            ->limit(CrmPagination::PER_PAGE)
+            ->get();
+    }
+
+    public function issueProfileCertificate(): void
+    {
+        if (! $this->licensed(LicenseFeature::Certificates)
+            || ! $this->userCan(CrmPermission::CertificatesIssue)) {
+            Notification::make()->title('You cannot issue certificates.')->danger()->send();
+
+            return;
+        }
+
+        $this->validate([
+            'profileCertificateType' => 'required|in:'.implode(',', array_column(CertificateType::cases(), 'value')),
+            'profileCertificateRemarks' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            $certificate = app(CertificateService::class)->issue(
+                $this->record,
+                CertificateType::from($this->profileCertificateType),
+                Auth::user(),
+                ['remarks' => $this->profileCertificateRemarks],
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Notification::make()
+                ->title(collect($e->errors())->flatten()->first() ?: 'Could not issue certificate.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->profileCertificateRemarks = '';
+        $this->certificatesTabLoaded = false;
+        $this->loadCertificatesTab();
+
+        Notification::make()
+            ->title('Certificate issued')
+            ->body($certificate->type->label().' · '.$certificate->serial_number)
+            ->success()
+            ->send();
     }
 
     public function updatedSendWhatsAppTemplateId(): void
@@ -3073,6 +3154,7 @@ class StudentProfilePage extends Page
                             ? (string) app(StudentCaseService::class)->openCountForStudent($this->record) ?: null
                             : null)
                         ->visible(fn (): bool => $this->record->activeEnrollment !== null
+                            && $this->licensed(LicenseFeature::Cases)
                             && $this->userCan(CrmPermission::CasesView))
                         ->schema([
                             View::make('filament.pages.partials.student-profile-cases')
@@ -3094,6 +3176,22 @@ class StudentProfilePage extends Page
                                     'openCaseAssigneeId' => $this->openCaseAssigneeId,
                                     'openCaseHandoffNote' => $this->openCaseHandoffNote,
                                     'caseTypeOptions' => CampusVisitPurpose::options(),
+                                ]),
+                        ]),
+                    'certificates' => Tab::make('Certificates')
+                        ->icon('heroicon-o-document-check')
+                        ->visible(fn (): bool => $this->record->activeEnrollment !== null
+                            && $this->licensed(LicenseFeature::Certificates)
+                            && $this->userCan(CrmPermission::CertificatesView))
+                        ->schema([
+                            View::make('filament.pages.partials.student-profile-certificates')
+                                ->viewData(fn (): array => [
+                                    'certificatesTabLoaded' => $this->certificatesTabLoaded,
+                                    'certificates' => $this->certificates,
+                                    'canIssue' => $this->userCan(CrmPermission::CertificatesIssue),
+                                    'typeOptions' => CertificateType::options(),
+                                    'profileCertificateType' => $this->profileCertificateType,
+                                    'profileCertificateRemarks' => $this->profileCertificateRemarks,
                                 ]),
                         ]),
                     'messages' => Tab::make('Messages')

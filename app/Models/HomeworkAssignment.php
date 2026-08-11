@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HomeworkAssignment extends Model
@@ -18,10 +19,40 @@ class HomeworkAssignment extends Model
         'description',
         'content_type',
         'file_path',
+        'public_token',
         'published_at',
         'whatsapp_sent_count',
         'whatsapp_failed_count',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (HomeworkAssignment $assignment): void {
+            if (blank($assignment->public_token)) {
+                $assignment->public_token = static::generateUniquePublicToken();
+            }
+        });
+    }
+
+    public static function generateUniquePublicToken(): string
+    {
+        do {
+            $token = Str::random(48);
+        } while (static::query()->where('public_token', $token)->exists());
+
+        return $token;
+    }
+
+    public function ensurePublicToken(): string
+    {
+        if (filled($this->public_token)) {
+            return (string) $this->public_token;
+        }
+
+        $this->forceFill(['public_token' => static::generateUniquePublicToken()])->save();
+
+        return (string) $this->public_token;
+    }
 
     protected function casts(): array
     {
@@ -51,6 +82,29 @@ class HomeworkAssignment extends Model
     public function portalUrl(): string
     {
         return route('portal.homework.show', $this);
+    }
+
+    public function publicUrl(): string
+    {
+        return route('homework.public.show', ['token' => $this->ensurePublicToken()]);
+    }
+
+    public function publicViewUrl(): ?string
+    {
+        if (! $this->hasFile()) {
+            return null;
+        }
+
+        return route('homework.public.view', ['token' => $this->ensurePublicToken()]);
+    }
+
+    public function publicDownloadUrl(): ?string
+    {
+        if (! $this->hasFile()) {
+            return null;
+        }
+
+        return route('homework.public.download', ['token' => $this->ensurePublicToken()]);
     }
 
     public function portalViewUrl(): ?string

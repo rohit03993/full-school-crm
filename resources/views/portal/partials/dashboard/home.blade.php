@@ -60,6 +60,7 @@
     <div class="lg:col-span-2">
 <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-1 lg:gap-3 xl:grid-cols-2">
     @if ($enrollment)
+    @if ($enrollment && ($showHomework ?? true))
         <a href="{{ route('portal.homework.index') }}" class="portal-quick-action relative">
             @if (($portalNav['homeworkBadge'] ?? 0) > 0)
                 <span class="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
@@ -71,8 +72,9 @@
             </span>
             <span class="text-xs font-bold text-navy-900 sm:text-sm">Homework</span>
         </a>
+    @endif
 
-        @if ($fees)
+        @if (($showFees ?? true) && $fees)
             <button type="button" @click="setTab('fees')" class="portal-quick-action text-left">
                 <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>

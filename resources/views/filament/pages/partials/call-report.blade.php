@@ -84,13 +84,20 @@
             </div>
         </div>
 
-        <div class="mt-3 flex justify-end">
+        <div class="mt-3 flex flex-wrap justify-end gap-2">
             <button
                 type="button"
                 wire:click="resetFilters"
                 class="rounded-lg px-3 py-2 text-sm font-semibold text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 dark:text-gray-300 dark:ring-white/10 dark:hover:bg-white/5"
             >
                 Reset filters
+            </button>
+            <button
+                type="button"
+                wire:click="exportCsv"
+                class="rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500"
+            >
+                Export CSV
             </button>
         </div>
     </div>

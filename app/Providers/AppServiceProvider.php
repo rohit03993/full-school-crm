@@ -3,10 +3,12 @@
 namespace App\Providers;
 
 use App\Http\Responses\LogoutResponse;
+use App\Enums\LicenseFeature;
 use App\Models\Student;
 use App\Services\HomeworkAssignmentService;
 use App\Support\CrmLivewireErrors;
 use App\Support\CrmPagination;
+use App\Support\FeatureGate;
 use App\Support\SiteContent;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
 use Filament\Tables\Table;
@@ -51,6 +53,12 @@ class AppServiceProvider extends ServiceProvider
                 'homeworkBadge' => 0,
                 'hasEnrollment' => false,
                 'hasAdmission' => false,
+                'showFees' => FeatureGate::enabled(LicenseFeature::Fees),
+                'showHomework' => FeatureGate::enabled(LicenseFeature::Homework),
+                'showMarks' => FeatureGate::enabled(LicenseFeature::Marks)
+                    || FeatureGate::enabled(LicenseFeature::Results),
+                'showAttendance' => FeatureGate::enabled(LicenseFeature::Attendance),
+                'showAdmissions' => FeatureGate::enabled(LicenseFeature::Admissions),
                 'student' => null,
             ];
 
@@ -61,9 +69,11 @@ class AppServiceProvider extends ServiceProvider
 
                 if ($student) {
                     $portalNav['hasEnrollment'] = $student->activeEnrollment !== null;
-                    $portalNav['hasAdmission'] = $student->admissions()->exists();
-                    $portalNav['homeworkBadge'] = app(HomeworkAssignmentService::class)
-                        ->unviewedCountForStudent($student);
+                    $portalNav['hasAdmission'] = $portalNav['showAdmissions']
+                        && $student->admissions()->exists();
+                    $portalNav['homeworkBadge'] = $portalNav['showHomework']
+                        ? app(HomeworkAssignmentService::class)->unviewedCountForStudent($student)
+                        : 0;
                     $portalNav['student'] = [
                         'name' => $student->name,
                         'initials' => $student->initials(),

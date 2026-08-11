@@ -21,6 +21,7 @@
       </button>
     @endif
 
+    @if ($canMeetingsTab ?? true)
     <button
       type="button"
       wire:click="switchWorkTab('meetings')"
@@ -35,6 +36,7 @@
         <span class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">{{ $stats['open'] }}</span>
       @endif
     </button>
+    @endif
 
     @if ($canMyCasesTab)
       <button

@@ -105,8 +105,8 @@ class HomeworkAssignmentResource extends Resource
                         ->maxSize(10240)
                         ->columnSpanFull(),
                     Toggle::make('send_whatsapp')
-                        ->label('Send WhatsApp with portal link')
-                        ->helperText('Sends name, roll number, homework title, and link to open homework in the student portal.')
+                        ->label('Send WhatsApp with homework link')
+                        ->helperText('Sends to each student’s Mobile. Message includes name, roll, title, and a direct link to view/download (no login).')
                         ->default(true)
                         ->live(),
                     Select::make('whatsapp_template_name')
@@ -118,7 +118,7 @@ class HomeworkAssignmentResource extends Resource
                             ->all())
                         ->searchable()
                         ->visible(fn (callable $get): bool => (bool) $get('send_whatsapp'))
-                        ->helperText('Live API campaign linked to an approved Meta template (4 params: name, roll, title, link).'),
+                        ->helperText('Approved Meta template with 4 params: name, roll, title, public homework link.'),
                 ])
                 ->columns(2),
         ]);
@@ -136,6 +136,11 @@ class HomeworkAssignmentResource extends Resource
                         TextEntry::make('content_type')->badge(),
                         TextEntry::make('published_at')->dateTime('d M Y, h:i A'),
                         TextEntry::make('description')->columnSpanFull(),
+                        TextEntry::make('publicUrl')
+                            ->label('Public homework link (no login)')
+                            ->state(fn (HomeworkAssignment $record): string => $record->publicUrl())
+                            ->copyable()
+                            ->columnSpanFull(),
                         TextEntry::make('portalUrl')
                             ->label('Student portal link')
                             ->state(fn (HomeworkAssignment $record): string => $record->portalUrl())

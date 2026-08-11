@@ -60,19 +60,32 @@ class MyMeetingsPage extends Page
 
     public static function canAccess(): bool
     {
-        if (! FeatureGate::enabled(LicenseFeature::Enquiries)) {
-            return false;
-        }
-
         $user = Auth::user();
 
         if (! $user || ! $user->is_active) {
             return false;
         }
 
-        return CrmAccess::can($user, CrmPermission::LeadsCall)
+        $enquiriesOn = FeatureGate::enabled(LicenseFeature::Enquiries);
+        $callsOn = FeatureGate::enabled(LicenseFeature::Calls);
+        $casesOn = FeatureGate::enabled(LicenseFeature::Cases);
+
+        if (! $enquiriesOn && ! $callsOn && ! $casesOn) {
+            return false;
+        }
+
+        if ($casesOn && CrmAccess::can($user, CrmPermission::CasesView)) {
+            return true;
+        }
+
+        if (($enquiriesOn || $callsOn) && (
+            CrmAccess::can($user, CrmPermission::LeadsCall)
             || $user->hasRole(RoleName::Staff->value)
-            || CrmAccess::can($user, CrmPermission::CasesView);
+        )) {
+            return true;
+        }
+
+        return false;
     }
 
     public string $workTab = 'meetings';
@@ -125,10 +138,14 @@ class MyMeetingsPage extends Page
             $this->workTab = 'all_cases';
         } elseif ($requestedTab === 'my_cases' && $this->canMyCasesTab()) {
             $this->workTab = 'my_cases';
-        } elseif ($requestedTab === 'meetings') {
+        } elseif ($requestedTab === 'meetings' && $this->canMeetingsTab()) {
             $this->workTab = 'meetings';
         } elseif ($this->canAllCasesTab()) {
             $this->workTab = 'all_cases';
+        } elseif ($this->canMyCasesTab()) {
+            $this->workTab = 'my_cases';
+        } elseif ($this->canMeetingsTab()) {
+            $this->workTab = 'meetings';
         }
 
         $this->refreshStats();
@@ -141,6 +158,10 @@ class MyMeetingsPage extends Page
         }
 
         if ($tab === 'all_cases' && ! $this->canAllCasesTab()) {
+            return;
+        }
+
+        if ($tab === 'meetings' && ! $this->canMeetingsTab()) {
             return;
         }
 
@@ -210,9 +231,17 @@ class MyMeetingsPage extends Page
             return;
         }
 
-        $this->stats = app(VisitMeetingAssignmentService::class)->statsForStaff($staff);
-        $this->callStats = app(MyLeadsService::class)->stats($staff);
-        $this->caseStats = app(StudentCaseService::class)->statsForAssignee($staff);
+        if ($this->canMeetingsTab()) {
+            $this->stats = app(VisitMeetingAssignmentService::class)->statsForStaff($staff);
+        }
+
+        if (FeatureGate::enabled(LicenseFeature::Calls) || FeatureGate::enabled(LicenseFeature::Enquiries)) {
+            $this->callStats = app(MyLeadsService::class)->stats($staff);
+        }
+
+        if ($this->canMyCasesTab()) {
+            $this->caseStats = app(StudentCaseService::class)->statsForAssignee($staff);
+        }
 
         if ($this->canAllCasesTab()) {
             $this->allCaseStats = app(StudentCaseService::class)->statsAll();
@@ -223,14 +252,23 @@ class MyMeetingsPage extends Page
     {
         $user = Auth::user();
 
-        return $user && CrmAccess::can($user, CrmPermission::CasesView);
+        return $user
+            && FeatureGate::enabled(LicenseFeature::Cases)
+            && CrmAccess::can($user, CrmPermission::CasesView);
     }
 
     public function canAllCasesTab(): bool
     {
         $user = Auth::user();
 
-        return $user && CrmAccess::can($user, CrmPermission::CasesViewAll);
+        return $user
+            && FeatureGate::enabled(LicenseFeature::Cases)
+            && CrmAccess::can($user, CrmPermission::CasesViewAll);
+    }
+
+    public function canMeetingsTab(): bool
+    {
+        return FeatureGate::enabled(LicenseFeature::Enquiries);
     }
 
     public static function shouldRegisterNavigation(): bool
@@ -275,7 +313,8 @@ class MyMeetingsPage extends Page
                     'workTab' => $this->workTab,
                     'canMyCasesTab' => $this->canMyCasesTab(),
                     'canAllCasesTab' => $this->canAllCasesTab(),
-                    'meetings' => $staff
+                    'canMeetingsTab' => $this->canMeetingsTab(),
+                    'meetings' => $staff && $this->canMeetingsTab() && $this->workTab === 'meetings'
                         ? app(VisitMeetingAssignmentService::class)->paginateForStaff(
                             $staff,
                             $this->statusFilter,

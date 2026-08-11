@@ -186,6 +186,7 @@ Use this section to steer the agent when opening this project.
 - [ ] README for installers
 - [ ] Deployment doc (CloudPanel checklist from Folks India learnings)
 - [x] Optional: installer wizard or setup command (First-run setup wizard)
+- [x] Module architecture plan — **`docs/MODULE_ARCHITECTURE.md`** (toggleable modules; Connect+ parity without bus)
 
 ### Phase G4 — Coaching-specific tweaks (if needed)
 

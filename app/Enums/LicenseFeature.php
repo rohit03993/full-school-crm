@@ -10,6 +10,8 @@ enum LicenseFeature: string
     case Enquiries = 'enquiries';
     case Calls = 'calls';
     case Admissions = 'admissions';
+    case Cases = 'cases';
+    case Certificates = 'certificates';
     case WhatsApp = 'whatsapp';
     case Portal = 'portal';
     case Reports = 'reports';
@@ -21,37 +23,41 @@ enum LicenseFeature: string
     public function label(): string
     {
         return match ($this) {
-            self::Attendance => 'Attendance',
-            self::Marks => 'Marks & activities',
-            self::Fees => 'Fees & collections',
-            self::Enquiries => 'Leads & enquiries',
-            self::Calls => 'Calling CRM',
-            self::Admissions => 'Admissions',
-            self::WhatsApp => 'WhatsApp messaging',
-            self::Portal => 'Student portal',
-            self::Reports => 'Reports',
-            self::Results => 'Result declaration',
-            self::Marksheets => 'PDF marksheets',
-            self::Homework => 'Homework',
-            self::Website => 'Public website',
+            self::Attendance => 'Attendance Management',
+            self::Marks => 'Marks & Exams Management',
+            self::Fees => 'Fees Management',
+            self::Enquiries => 'Leads & Enquiries Management',
+            self::Calls => 'Calling Management',
+            self::Admissions => 'Admissions Management',
+            self::Cases => 'Student Cases Management',
+            self::Certificates => 'Certificates Management',
+            self::WhatsApp => 'WhatsApp Management',
+            self::Portal => 'Student Portal',
+            self::Reports => 'Reports Management',
+            self::Results => 'Results Declaration',
+            self::Marksheets => 'Marksheets Management',
+            self::Homework => 'Homework Management',
+            self::Website => 'Website CMS',
         };
     }
 
     public function description(): string
     {
         return match ($this) {
-            self::Attendance => 'Batch and session attendance.',
-            self::Marks => 'Activity marks, imports, and academics.',
+            self::Attendance => 'Batch and session attendance, biometric and face punch.',
+            self::Marks => 'Activity marks, exam windows, and academics.',
             self::Fees => 'Fee dashboard, installments, and collections.',
-            self::Enquiries => 'Enquiry pipeline, follow-ups, and campus visits.',
-            self::Calls => 'Call queue, tracking, and call reports.',
+            self::Enquiries => 'Enquiry pipeline, campus visits, and lead follow-ups.',
+            self::Calls => 'Call queue, dual-mode call logging, and call reports.',
             self::Admissions => 'Admission records and enrolment workflow.',
-            self::WhatsApp => 'Templates and bulk WhatsApp campaigns.',
+            self::Cases => 'Enrolled-student support cases: open, transfer, close.',
+            self::Certificates => 'Issue TC, bonafide, character, and fee certificates.',
+            self::WhatsApp => 'Templates, inbox, and bulk WhatsApp campaigns.',
             self::Portal => 'Student/parent login portal.',
             self::Reports => 'Operational and academic reports.',
             self::Results => 'Publish exam results to students.',
             self::Marksheets => 'Issue downloadable PDF marksheets.',
-            self::Homework => 'Homework assignments and sharing.',
+            self::Homework => 'Homework assignments and checking.',
             self::Website => 'Public site content and branding.',
         };
     }

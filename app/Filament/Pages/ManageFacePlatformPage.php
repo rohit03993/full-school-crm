@@ -2,10 +2,12 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Services\FaceVerify\FaceVerifyPlatformService;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
+use App\Support\FeatureGate;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -52,6 +54,10 @@ class ManageFacePlatformPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Attendance)) {
+            return false;
+        }
+
         return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
     }
 

@@ -25,6 +25,7 @@ use App\Http\Controllers\StudentPortal\IdCardDownloadController as PortalIdCardD
 use App\Http\Controllers\StudentPortal\ReceiptDownloadController as PortalReceiptDownloadController;
 use App\Http\Controllers\Admin\HomeworkFileController;
 use App\Http\Controllers\Admin\MarksheetDownloadController;
+use App\Http\Controllers\PublicHomeworkController;
 use App\Http\Middleware\EnsurePortalLicensed;
 use App\Http\Middleware\EnsureStudentPortalAuth;
 use Illuminate\Support\Facades\Route;
@@ -93,9 +94,28 @@ Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
         Route::get('marksheets/consolidated/download', [\App\Http\Controllers\Admin\ConsolidatedMarksheetDownloadController::class, 'download'])
             ->name('admin.marksheets.consolidated.download');
     });
+
+    Route::middleware('license.feature:certificates')->group(function () {
+        Route::get('certificates/{certificate}/preview', [\App\Http\Controllers\Admin\CertificateDownloadController::class, 'preview'])
+            ->name('admin.certificates.preview');
+        Route::get('certificates/{certificate}/download', [\App\Http\Controllers\Admin\CertificateDownloadController::class, 'download'])
+            ->name('admin.certificates.download');
+    });
 });
 
 Route::get('/verify/{enrollment}', IdCardVerifyController::class)->name('id-card.verify');
+
+Route::middleware(['license.feature:homework', 'throttle:60,1'])->group(function (): void {
+    Route::get('/h/{token}', [PublicHomeworkController::class, 'show'])
+        ->where('token', '[A-Za-z0-9]{24,64}')
+        ->name('homework.public.show');
+    Route::get('/h/{token}/view', [PublicHomeworkController::class, 'view'])
+        ->where('token', '[A-Za-z0-9]{24,64}')
+        ->name('homework.public.view');
+    Route::get('/h/{token}/download', [PublicHomeworkController::class, 'download'])
+        ->where('token', '[A-Za-z0-9]{24,64}')
+        ->name('homework.public.download');
+});
 
 Route::get('/display/attendance/photo/{document}', [AttendanceDisplayController::class, 'photo'])
     ->middleware('throttle:120,1')
@@ -112,8 +132,12 @@ Route::prefix('display/attendance')
             ->name('latest');
     });
 
-Route::get('/', HomeController::class)->name('home');
-Route::get('/courses', CourseController::class)->name('courses');
+Route::middleware(\App\Http\Middleware\EnsureWebsiteLicensed::class)->group(function (): void {
+    Route::get('/', HomeController::class)->name('home');
+    Route::get('/courses', CourseController::class)->name('courses');
+    Route::get('/contact', ContactController::class)->name('contact');
+});
+
 Route::get('/login', LoginController::class)->name('login');
 
 Route::prefix('staff')->name('staff.')->group(function () {
@@ -126,9 +150,8 @@ Route::prefix('staff')->name('staff.')->group(function () {
         ->name('otp-login.verify');
 });
 
-Route::get('/contact', ContactController::class)->name('contact');
 Route::post('/contact/enquiry', [ContactController::class, 'store'])
-    ->middleware(['throttle:10,1', 'license.feature:enquiries'])
+    ->middleware(['throttle:10,1', 'license.feature:enquiries', \App\Http\Middleware\EnsureWebsiteLicensed::class])
     ->name('contact.enquiry');
 
 Route::prefix('portal')->name('portal.')->middleware(EnsurePortalLicensed::class)->group(function () {
@@ -151,12 +174,15 @@ Route::prefix('portal')->name('portal.')->middleware(EnsurePortalLicensed::class
             ->name('password.change');
         Route::post('/admission', [DashboardController::class, 'submitAdmission'])->name('admission.submit');
         Route::get('/receipts/{payment}/download', [PortalReceiptDownloadController::class, 'download'])
+            ->middleware('license.feature:fees')
             ->name('receipts.download');
         Route::get('/id-card/download', [PortalIdCardDownloadController::class, 'download'])
             ->name('id-card.download');
-        Route::get('/homework', [HomeworkController::class, 'index'])->name('homework.index');
-        Route::get('/homework/{homeworkAssignment}', [HomeworkController::class, 'show'])->name('homework.show');
-        Route::get('/homework/{homeworkAssignment}/view', [HomeworkController::class, 'view'])->name('homework.view');
-        Route::get('/homework/{homeworkAssignment}/download', [HomeworkController::class, 'download'])->name('homework.download');
+        Route::middleware('license.feature:homework')->group(function (): void {
+            Route::get('/homework', [HomeworkController::class, 'index'])->name('homework.index');
+            Route::get('/homework/{homeworkAssignment}', [HomeworkController::class, 'show'])->name('homework.show');
+            Route::get('/homework/{homeworkAssignment}/view', [HomeworkController::class, 'view'])->name('homework.view');
+            Route::get('/homework/{homeworkAssignment}/download', [HomeworkController::class, 'download'])->name('homework.download');
+        });
     });
 });

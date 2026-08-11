@@ -4,12 +4,14 @@ namespace App\Filament\Pages;
 
 use App\Enums\CampusVisitPurpose;
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavBadges;
 use App\Support\CrmNavigation;
 use App\Support\CrmPagination;
+use App\Support\FeatureGate;
 use App\Services\StudentCaseService;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
@@ -50,6 +52,10 @@ class AllCasesPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Cases)) {
+            return false;
+        }
+
         $user = Auth::user();
 
         if (! $user || ! $user->is_active) {

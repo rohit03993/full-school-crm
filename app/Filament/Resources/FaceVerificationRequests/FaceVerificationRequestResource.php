@@ -2,11 +2,13 @@
 
 namespace App\Filament\Resources\FaceVerificationRequests;
 
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Filament\Resources\FaceVerificationRequests\Pages\ListFaceVerificationRequests;
 use App\Filament\Support\CrmTable;
 use App\Models\FaceVerificationRequest;
 use App\Support\CrmNavigation;
+use App\Support\FeatureGate;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -42,6 +44,10 @@ class FaceVerificationRequestResource extends Resource
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Attendance)) {
+            return false;
+        }
+
         return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
     }
 

@@ -57,6 +57,10 @@ class StudentSearchPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Enquiries)) {
+            return false;
+        }
+
         return CrmAccess::can(Auth::user(), CrmPermission::StudentsView);
     }
 

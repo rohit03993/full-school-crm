@@ -21,9 +21,9 @@
 
         $tabs = collect([
             ['id' => 'home', 'label' => 'Overview'],
-            ['id' => 'fees', 'label' => 'Fees'],
-            ['id' => 'marks', 'label' => 'Marks', 'hidden' => empty($examMarksSections)],
-            ['id' => 'admission', 'label' => 'Admission', 'hidden' => ! $admission],
+            ['id' => 'fees', 'label' => 'Fees', 'hidden' => ! ($showFees ?? true)],
+            ['id' => 'marks', 'label' => 'Marks', 'hidden' => ! ($showMarks ?? true) || empty($examMarksSections)],
+            ['id' => 'admission', 'label' => 'Admission', 'hidden' => ! ($showAdmissions ?? true) || ! $admission],
             ['id' => 'more', 'label' => 'More'],
         ])->filter(fn (array $tab): bool => empty($tab['hidden']))->values();
     @endphp

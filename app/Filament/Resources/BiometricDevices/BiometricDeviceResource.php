@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\BiometricDevices;
 
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Filament\Resources\BiometricDevices\Pages\CreateBiometricDevice;
 use App\Filament\Resources\BiometricDevices\Pages\EditBiometricDevice;
@@ -9,6 +10,7 @@ use App\Filament\Resources\BiometricDevices\Pages\ListBiometricDevices;
 use App\Filament\Support\CrmTable;
 use App\Models\BiometricDevice;
 use App\Support\CrmNavigation;
+use App\Support\FeatureGate;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -49,6 +51,10 @@ class BiometricDeviceResource extends Resource
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Attendance)) {
+            return false;
+        }
+
         return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
     }
 

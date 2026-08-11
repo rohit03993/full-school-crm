@@ -3,7 +3,9 @@
 namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Support\CrmAccess;
+use App\Support\FeatureGate;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 
@@ -15,6 +17,10 @@ class MyCasesPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Cases)) {
+            return false;
+        }
+
         $user = Auth::user();
 
         if (! $user || ! $user->is_active) {

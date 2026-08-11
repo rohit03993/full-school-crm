@@ -41,7 +41,8 @@ class FollowUpsPage extends Page
 
     public static function canAccess(): bool
     {
-        if (! FeatureGate::enabled(LicenseFeature::Enquiries)) {
+        if (! FeatureGate::enabled(LicenseFeature::Enquiries)
+            && ! FeatureGate::enabled(LicenseFeature::Calls)) {
             return false;
         }
 

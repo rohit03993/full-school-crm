@@ -2,11 +2,13 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Services\Punch\AttendanceDisplaySettingsService;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
+use App\Support\FeatureGate;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
@@ -43,6 +45,10 @@ class ManageAttendanceDisplayPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Attendance)) {
+            return false;
+        }
+
         return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
     }
 

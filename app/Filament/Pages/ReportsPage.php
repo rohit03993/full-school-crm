@@ -231,7 +231,15 @@ class ReportsPage extends Page
         $policy = app(ReportPolicy::class);
 
         return collect(ReportType::cases())
-            ->filter(fn (ReportType $type): bool => $policy->export($user, $type))
+            ->filter(function (ReportType $type) use ($user, $policy): bool {
+                $feature = $type->requiredLicenseFeature();
+
+                if ($feature !== null && ! FeatureGate::enabled($feature)) {
+                    return false;
+                }
+
+                return $policy->export($user, $type);
+            })
             ->mapWithKeys(fn (ReportType $type): array => [$type->value => $type->label()])
             ->all();
     }

@@ -63,6 +63,28 @@ enum ReportType: string
         };
     }
 
+    public function requiredLicenseFeature(): ?LicenseFeature
+    {
+        return match ($this) {
+            self::Enquiries, self::EnquirySources => LicenseFeature::Enquiries,
+            self::AdmissionsByCourse, self::AdmissionsByStaff => LicenseFeature::Admissions,
+            self::AttendanceByBatch,
+            self::AttendanceByStudent,
+            self::DailyAbsentSheet,
+            self::MonthlyStudentAttendance,
+            self::LowAttendanceAlert => LicenseFeature::Attendance,
+            self::Activities, self::TestMarks => LicenseFeature::Marks,
+            self::FeeCollection,
+            self::PendingFees,
+            self::OverdueInstallments,
+            self::Discounts,
+            self::PaymentModes,
+            self::FinancialSummary => LicenseFeature::Fees,
+            self::HomeworkCheckSummary => LicenseFeature::Homework,
+            self::AuditLogs => null,
+        };
+    }
+
     public function staffCanExport(): bool
     {
         return ! $this->isFinancial();

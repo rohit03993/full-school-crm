@@ -164,6 +164,15 @@ class CallReportService
      * @param  array<string, mixed>  $filters
      * @return Builder<StudentCall>
      */
+    public function filteredQueryForExport(array $filters, User $viewer): Builder
+    {
+        return $this->filteredQuery($filters, $viewer);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return Builder<StudentCall>
+     */
     protected function filteredQuery(array $filters, User $viewer): Builder
     {
         $from = Carbon::parse($filters['from'])->startOfDay();

@@ -33,7 +33,7 @@ return [
     | Homework WhatsApp (Meta live campaign name)
     |--------------------------------------------------------------------------
     |
-    | Template should accept: student name, roll number, homework title, portal link.
+    | Template should accept: student name, roll number, homework title, public homework link (no login).
     */
 
     'homework_template_name' => env('WHATSAPP_HOMEWORK_TEMPLATE', 'homework_api'),

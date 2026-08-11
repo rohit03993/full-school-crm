@@ -1,4 +1,4 @@
-@if ($enrollment && ($classAttendancePercentage !== null || $sessionAttendanceRecords->isNotEmpty()))
+@if (($showAttendance ?? true) && $enrollment && ($classAttendancePercentage !== null || $sessionAttendanceRecords->isNotEmpty()))
     <section class="portal-card overflow-hidden">
         <div class="border-b border-navy-100 px-4 py-3.5 sm:px-5">
             <h2 class="font-display text-lg font-bold text-navy-900">Attendance</h2>

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\LicenseFeature;
 use App\Enums\LicensePlan;
+use App\Filament\Pages\CertificatesPage;
 use App\Filament\Resources\Enquiries\EnquiryResource;
 use App\Models\Setting;
 use App\Services\LicenseService;
@@ -53,5 +54,17 @@ class FeatureGateModulesTest extends TestCase
         ]);
 
         $this->assertFalse(EnquiryResource::canAccess());
+    }
+
+    public function test_disabled_certificates_module_blocks_page_access(): void
+    {
+        $this->license->save([
+            'plan' => LicensePlan::Custom->value,
+            'features' => [LicenseFeature::Attendance->value],
+            'expires_at' => now()->addYear()->toDateString(),
+        ]);
+
+        $this->assertFalse(FeatureGate::enabled(LicenseFeature::Certificates));
+        $this->assertFalse(CertificatesPage::canAccess());
     }
 }

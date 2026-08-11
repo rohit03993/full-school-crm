@@ -127,6 +127,11 @@ class Student extends Model
         return $this->hasMany(StudentCase::class);
     }
 
+    public function certificates(): HasMany
+    {
+        return $this->hasMany(StudentCertificate::class);
+    }
+
     public function enquiry(): HasOne
     {
         return $this->hasOne(Enquiry::class);

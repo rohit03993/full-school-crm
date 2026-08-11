@@ -2,11 +2,13 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Services\Punch\AttendanceBiometricStatusService;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
+use App\Support\FeatureGate;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -38,6 +40,10 @@ class ManageAttendanceBiometricPage extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Attendance)) {
+            return false;
+        }
+
         return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
     }
 

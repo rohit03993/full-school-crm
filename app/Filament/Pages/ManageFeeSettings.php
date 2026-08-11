@@ -3,10 +3,12 @@
 namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
+use App\Support\FeatureGate;
 use App\Support\FeeSettings;
 use App\Services\OnlineAllowanceGstService;
 use Filament\Actions\Action;
@@ -60,6 +62,10 @@ class ManageFeeSettings extends Page
 
     public static function canAccess(): bool
     {
+        if (! FeatureGate::enabled(LicenseFeature::Fees)) {
+            return false;
+        }
+
         return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
     }
 

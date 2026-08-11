@@ -24,6 +24,9 @@ enum CrmPermission: string
     case StudentsEdit = 'crm.students.edit';
     case StudentsImport = 'crm.students.import';
 
+    case CertificatesView = 'crm.certificates.view';
+    case CertificatesIssue = 'crm.certificates.issue';
+
     case AdmissionsView = 'crm.admissions.view';
     case AdmissionsApprove = 'crm.admissions.approve';
 
@@ -66,6 +69,8 @@ enum CrmPermission: string
             self::StudentsView => 'View students',
             self::StudentsEdit => 'Edit student details',
             self::StudentsImport => 'Import students',
+            self::CertificatesView => 'View certificates',
+            self::CertificatesIssue => 'Issue certificates',
             self::AdmissionsView => 'View admissions',
             self::AdmissionsApprove => 'Approve admissions',
             self::FeesCollect => 'Collect fees',

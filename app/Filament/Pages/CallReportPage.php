@@ -20,6 +20,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Livewire\WithPagination;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
 class CallReportPage extends Page
@@ -156,6 +157,48 @@ class CallReportPage extends Page
         $this->applyDefaultDates();
         $this->resetPage();
         $this->loadReport(app(CallReportService::class));
+    }
+
+    public function exportCsv(CallReportService $report): StreamedResponse
+    {
+        $filters = $this->reportFilters($report);
+        $viewer = Auth::user();
+        $filename = 'call-report-'.$filters['from'].'-to-'.$filters['to'].'.csv';
+
+        return response()->streamDownload(function () use ($report, $filters, $viewer): void {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, [
+                'Called at',
+                'Student',
+                'Mobile',
+                'Staff',
+                'Status',
+                'Direction',
+                'Purpose / visit status',
+                'Notes',
+            ]);
+
+            $report->filteredQueryForExport($filters, $viewer)
+                ->with(['student', 'staff'])
+                ->orderByDesc('called_at')
+                ->chunk(200, function ($calls) use ($handle): void {
+                    foreach ($calls as $call) {
+                        fputcsv($handle, [
+                            $call->called_at?->format('Y-m-d H:i:s'),
+                            $call->student?->name,
+                            $call->student?->mobile,
+                            $call->staff?->name,
+                            $call->call_status?->label(),
+                            $call->call_direction?->label(),
+                            $call->call_purpose?->label()
+                                ?? $call->visit_status_changed_to?->label(),
+                            $call->call_notes,
+                        ]);
+                    }
+                });
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     protected function applyDefaultDates(): void

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\StudentPortal\Concerns\ResolvesPortalStudent;
+use App\Enums\LicenseFeature;
 use App\Enums\ResultDeclarationStatus;
 use App\Models\ActivityType;
 use App\Models\Admission;
@@ -12,6 +13,7 @@ use App\Models\StudentMarksheet;
 use App\Services\ActivityAttendanceService;
 use App\Services\AdmissionService;
 use App\Services\AttendanceService;
+use App\Support\FeatureGate;
 use App\Support\PublishedResultsGate;
 use App\Support\StudentExamMarksMatrix;
 use Illuminate\Http\RedirectResponse;
@@ -85,6 +87,31 @@ class DashboardController extends Controller
                 ->get();
         }
 
+        $showFees = FeatureGate::enabled(LicenseFeature::Fees);
+        $showAttendance = FeatureGate::enabled(LicenseFeature::Attendance);
+        $showMarks = FeatureGate::enabled(LicenseFeature::Marks) || FeatureGate::enabled(LicenseFeature::Results);
+        $showHomework = FeatureGate::enabled(LicenseFeature::Homework);
+        $showAdmissions = FeatureGate::enabled(LicenseFeature::Admissions);
+
+        if (! $showFees) {
+            $fees = null;
+            $payments = collect();
+        }
+
+        if (! $showAttendance) {
+            $sessionAttendanceRecords = collect();
+            $classAttendancePercentage = null;
+        }
+
+        if (! $showMarks) {
+            $examMarksSections = [];
+            $publishedResults = [];
+        }
+
+        if (! $showAdmissions) {
+            $admission = null;
+        }
+
         return view('portal.dashboard', [
             'student' => $student,
             'admission' => $admission,
@@ -98,6 +125,11 @@ class DashboardController extends Controller
             'publishedResults' => $publishedResults,
             'sessionAttendanceRecords' => $sessionAttendanceRecords,
             'classAttendancePercentage' => $classAttendancePercentage,
+            'showFees' => $showFees,
+            'showAttendance' => $showAttendance,
+            'showMarks' => $showMarks,
+            'showHomework' => $showHomework,
+            'showAdmissions' => $showAdmissions,
         ]);
     }
 

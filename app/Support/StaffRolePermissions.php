@@ -35,6 +35,8 @@ class StaffRolePermissions
                 CrmPermission::StudentsView,
                 CrmPermission::StudentsEdit,
                 CrmPermission::StudentsImport,
+                CrmPermission::CertificatesView,
+                CrmPermission::CertificatesIssue,
                 CrmPermission::AdmissionsView,
                 CrmPermission::AdmissionsApprove,
                 CrmPermission::CasesView,
@@ -46,6 +48,8 @@ class StaffRolePermissions
             StaffJobRole::Accountant->value => [
                 CrmPermission::DashboardFinanceStats,
                 CrmPermission::StudentsView,
+                CrmPermission::CertificatesView,
+                CrmPermission::CertificatesIssue,
                 CrmPermission::AdmissionsView,
                 CrmPermission::FeesCollect,
                 CrmPermission::ReportsView,
@@ -67,6 +71,8 @@ class StaffRolePermissions
             ],
             StaffJobRole::AcademicCoordinator->value => [
                 CrmPermission::StudentsView,
+                CrmPermission::CertificatesView,
+                CrmPermission::CertificatesIssue,
                 CrmPermission::AttendanceMark,
                 CrmPermission::AttendanceWorkshops,
                 CrmPermission::MarksImport,

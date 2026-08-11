@@ -31,7 +31,7 @@ class HomeworkWhatsAppService
             return ['sent' => 0, 'failed' => 0];
         }
 
-        $link = $assignment->portalUrl();
+        $link = $assignment->publicUrl();
         $students = $this->homework->batchStudentsWithMobile($assignment->batch_id);
 
         $sent = 0;
@@ -72,7 +72,7 @@ class HomeworkWhatsAppService
             return 'skipped';
         }
 
-        $link ??= $assignment->portalUrl();
+        $link ??= $assignment->publicUrl();
         $roll = (string) ($student->activeEnrollment?->enrollment_number ?? '');
 
         $params = [

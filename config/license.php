@@ -49,6 +49,7 @@ return [
             LicenseFeature::Enquiries->value,
             LicenseFeature::Calls->value,
             LicenseFeature::Admissions->value,
+            LicenseFeature::Cases->value,
             LicenseFeature::WhatsApp->value,
             LicenseFeature::Portal->value,
             LicenseFeature::Reports->value,
