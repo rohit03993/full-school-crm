@@ -131,6 +131,60 @@ class StudentProfileUpdateTest extends TestCase
         $this->assertSame('9811000011', $updated->alternate_mobile);
     }
 
+    public function test_super_admin_can_reuse_another_students_primary_mobile(): void
+    {
+        $admin = $this->createSuperAdminUser();
+
+        $other = Student::query()->create([
+            'name' => 'Other Student',
+            'mobile' => '9811000022',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        $student = Student::query()->create([
+            'name' => 'Current Student',
+            'mobile' => '9811000001',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        $updated = app(StudentUpdateService::class)->update($student, [
+            'name' => 'Current Student',
+            'mobile' => '9811000022',
+            'category' => 'general',
+        ], $admin);
+
+        $this->assertSame('9811000022', $updated->mobile);
+        $this->assertNull($other->fresh()->mobile);
+        $this->assertStringContainsString('reassigned', (string) $other->fresh()->mobile_import_note);
+    }
+
+    public function test_super_admin_can_reuse_soft_deleted_students_primary_mobile(): void
+    {
+        $admin = $this->createSuperAdminUser();
+
+        $other = Student::query()->create([
+            'name' => 'Deleted Student',
+            'mobile' => '9811000033',
+            'status' => StudentStatus::Enrolled,
+        ]);
+        $other->delete();
+
+        $student = Student::query()->create([
+            'name' => 'Current Student',
+            'mobile' => '9811000001',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        $updated = app(StudentUpdateService::class)->update($student, [
+            'name' => 'Current Student',
+            'mobile' => '9811000033',
+            'category' => 'general',
+        ], $admin);
+
+        $this->assertSame('9811000033', $updated->mobile);
+        $this->assertNull($other->fresh()->mobile);
+    }
+
     protected function createStaffUser(): User
     {
         Role::findOrCreate(RoleName::Staff->value);

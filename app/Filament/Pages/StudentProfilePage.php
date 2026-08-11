@@ -2883,6 +2883,20 @@ class StudentProfilePage extends Page
                             ->body(collect($exception->errors())->flatten()->first() ?? 'Please check the form.')
                             ->danger()
                             ->send();
+                    } catch (\Illuminate\Database\QueryException $exception) {
+                        report($exception);
+
+                        $duplicateMobile = str_contains(strtolower($exception->getMessage()), 'students_mobile_unique')
+                            || (str_contains(strtolower($exception->getMessage()), 'duplicate')
+                                && str_contains(strtolower($exception->getMessage()), 'mobile'));
+
+                        Notification::make()
+                            ->title('Could not save profile')
+                            ->body($duplicateMobile
+                                ? 'This mobile is already registered to another student.'
+                                : 'Something went wrong while saving. Please try again.')
+                            ->danger()
+                            ->send();
                     } catch (\Throwable $exception) {
                         report($exception);
 

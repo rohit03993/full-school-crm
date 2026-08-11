@@ -68,6 +68,29 @@ class StudentMobileService
         ];
     }
 
+    /**
+     * Free a primary mobile held by other students (including soft-deleted).
+     * Required for Super Admin reuse because students.mobile has a DB unique index.
+     */
+    public function releasePrimaryMobileFromOthers(string $mobile, int $exceptStudentId): void
+    {
+        $mobile = $this->normalize($mobile, 'mobile') ?? '';
+
+        if ($mobile === '') {
+            return;
+        }
+
+        Student::withTrashed()
+            ->where('id', '!=', $exceptStudentId)
+            ->where('mobile', $mobile)
+            ->each(function (Student $other) use ($mobile): void {
+                $other->forceFill([
+                    'mobile' => null,
+                    'mobile_import_note' => 'Mobile '.$mobile.' reassigned to another student by Super Admin.',
+                ])->save();
+            });
+    }
+
     public function findStudentByNumber(string $mobile, bool $restoreIfTrashed = false): ?Student
     {
         $mobile = $this->normalize($mobile, 'mobile') ?? '';

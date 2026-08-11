@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\RoleName;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,12 @@ class StudentUpdateService
                 $data['alternate_mobile'] ?? null,
                 $staff,
             );
+
+            // Super Admin may reuse a number in validation, but the DB unique index still blocks
+            // until the previous owner (including soft-deleted) is cleared.
+            if ($staff?->hasRole(RoleName::SuperAdmin->value) && filled($phones['mobile'])) {
+                $this->mobiles->releasePrimaryMobileFromOthers($phones['mobile'], $student->id);
+            }
 
             $oldValues = $student->only([
                 'name',
