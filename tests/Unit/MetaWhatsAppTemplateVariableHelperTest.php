@@ -2,12 +2,15 @@
 
 namespace Tests\Unit;
 
+use App\Support\FeeReminderWhatsAppTemplate;
+use App\Support\HomeworkNotDoneWhatsAppTemplate;
+use App\Support\HomeworkShareWhatsAppTemplate;
 use App\Support\MetaWhatsAppTemplateVariableHelper;
 use PHPUnit\Framework\TestCase;
 
 class MetaWhatsAppTemplateVariableHelperTest extends TestCase
 {
-    public function test_sync_rows_from_body_detects_four_variables(): void
+    public function test_sync_rows_from_body_uses_generic_labels_by_default(): void
     {
         $body = "Hello {{1}}, roll {{2}}, at {{3}} on {{4}}.";
 
@@ -15,10 +18,23 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
 
         $this->assertCount(4, $rows);
         $this->assertSame(1, $rows[0]['index']);
-        $this->assertSame('Student name', $rows[0]['label']);
-        $this->assertSame('Rohit Sharma', $rows[0]['example']);
-        $this->assertSame(4, $rows[3]['index']);
-        $this->assertSame('Date', $rows[3]['label']);
+        $this->assertSame('Variable 1', $rows[0]['label']);
+        $this->assertSame('Sample 1', $rows[0]['example']);
+        $this->assertSame(3, $rows[2]['index']);
+        $this->assertSame('Variable 3', $rows[2]['label']);
+        $this->assertSame('Sample 3', $rows[2]['example']);
+        $this->assertSame('Variable 4', $rows[3]['label']);
+    }
+
+    public function test_custom_homework_wording_without_preset_name_stays_generic(): void
+    {
+        $body = "Dear Parent,\nHomework for {{1}} (Roll: {{2}})\nTitle: {{3}}\nOpen homework:\n{{4}}";
+
+        $rows = MetaWhatsAppTemplateVariableHelper::syncRowsFromBody($body, [], 'parent_update');
+
+        $this->assertSame('Variable 3', $rows[2]['label']);
+        $this->assertSame('Variable 4', $rows[3]['label']);
+        $this->assertSame('Sample 3', $rows[2]['example']);
     }
 
     public function test_sync_preserves_existing_sample_values(): void
@@ -37,7 +53,7 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
     public function test_fee_reminder_body_uses_fee_sample_labels(): void
     {
         $rows = MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
-            \App\Support\FeeReminderWhatsAppTemplate::BODY,
+            FeeReminderWhatsAppTemplate::BODY,
             [],
             'fee_reminder',
         );
@@ -53,7 +69,7 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
     public function test_homework_not_done_body_uses_homework_sample_labels(): void
     {
         $rows = MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
-            \App\Support\HomeworkNotDoneWhatsAppTemplate::BODY,
+            HomeworkNotDoneWhatsAppTemplate::BODY,
             [],
             'homework_not_done',
         );
@@ -64,6 +80,21 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
         $this->assertSame('Subject', $rows[2]['label']);
         $this->assertSame('Homework topic', $rows[3]['label']);
         $this->assertSame('Institute name', $rows[4]['label']);
+    }
+
+    public function test_homework_share_preset_name_uses_share_labels(): void
+    {
+        $rows = MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
+            HomeworkShareWhatsAppTemplate::BODY,
+            [],
+            'homework_update',
+        );
+
+        $this->assertCount(4, $rows);
+        $this->assertSame('Student name', $rows[0]['label']);
+        $this->assertSame('Homework title', $rows[2]['label']);
+        $this->assertSame('Public homework link', $rows[3]['label']);
+        $this->assertStringContainsString('/h/', $rows[3]['example']);
     }
 
     public function test_rows_to_examples_csv_in_order(): void

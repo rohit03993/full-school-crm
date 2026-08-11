@@ -4,50 +4,14 @@ namespace App\Support;
 
 class MetaWhatsAppTemplateVariableHelper
 {
-    /** @var array<int, string> */
-    private const INDEX_LABELS = [
-        1 => 'Student name',
-        2 => 'Roll number',
-        3 => 'Time',
-        4 => 'Date',
-        5 => 'Batch / class',
-        6 => 'Institute name',
-    ];
-
-    /** @var array<int, string> */
-    private const HOMEWORK_SHARE_LABELS = [
-        1 => 'Student name',
-        2 => 'Roll number',
-        3 => 'Homework title',
-        4 => 'Public homework link',
-    ];
-
-    /** @var array<int, string> */
-    private const INDEX_SAMPLES = [
-        1 => 'Rohit Sharma',
-        2 => '12-A-042',
-        3 => '9:15 AM',
-        4 => '20 Jun 2026',
-        5 => 'Class 12-A',
-        6 => 'Your Institute',
-    ];
-
-    /** @var array<int, string> */
-    private const HOMEWORK_SHARE_SAMPLES = [
-        1 => 'Rohit Sharma',
-        2 => '12-A-042',
-        3 => 'Chapter 5 exercises',
-        4 => 'https://example.com/h/samplePublicHomeworkToken123456',
-    ];
-
     public static function labelForIndex(int $index): string
     {
-        return self::INDEX_LABELS[$index] ?? 'Variable {{'.$index.'}}';
+        return 'Variable '.$index;
     }
 
     public static function defaultSampleForIndex(int $index): string
     {
-        return self::INDEX_SAMPLES[$index] ?? 'Sample '.$index;
+        return 'Sample '.$index;
     }
 
     /**
@@ -62,52 +26,52 @@ class MetaWhatsAppTemplateVariableHelper
             ->filter(fn (mixed $row): bool => is_array($row))
             ->keyBy(fn (array $row): int => (int) ($row['index'] ?? 0));
 
-        $presetVariables = [];
-        $isHomeworkShare = self::looksLikeHomeworkShareTemplate((string) $templateName, $bodyText);
-
-        if (FeeReminderWhatsAppTemplate::looksLikeName((string) $templateName)
-            || str_contains(strtolower($bodyText), 'fee reminder')) {
-            $presetVariables = FeeReminderWhatsAppTemplate::variables();
-        } elseif (HomeworkNotDoneWhatsAppTemplate::looksLikeName((string) $templateName)
-            || str_contains(strtolower($bodyText), 'has not completed the homework')) {
-            $presetVariables = HomeworkNotDoneWhatsAppTemplate::variables();
-        }
+        $presetVariables = self::resolvePresetVariables((string) $templateName, $bodyText);
 
         $rows = [];
 
         foreach ($order as $index) {
             $previous = $existingByIndex->get($index);
             $preset = $presetVariables[$index] ?? null;
-            $defaultLabel = $isHomeworkShare
-                ? (self::HOMEWORK_SHARE_LABELS[$index] ?? self::labelForIndex($index))
-                : self::labelForIndex($index);
-            $defaultExample = $isHomeworkShare
-                ? (self::HOMEWORK_SHARE_SAMPLES[$index] ?? self::defaultSampleForIndex($index))
-                : self::defaultSampleForIndex($index);
 
             $rows[] = [
                 'index' => $index,
-                'label' => $preset['label'] ?? $defaultLabel,
+                'label' => $preset['label'] ?? self::labelForIndex($index),
                 'example' => filled($previous['example'] ?? null)
                     ? trim((string) $previous['example'])
-                    : ($preset['example'] ?? $defaultExample),
+                    : ($preset['example'] ?? self::defaultSampleForIndex($index)),
             ];
         }
 
         return $rows;
     }
 
-    public static function looksLikeHomeworkShareTemplate(string $templateName, string $bodyText): bool
+    /**
+     * Known CRM product templates only — custom / AiSensy-style bodies stay generic.
+     *
+     * @return array<int, array{label: string, example: string}>
+     */
+    public static function resolvePresetVariables(string $templateName, string $bodyText): array
     {
-        $name = strtolower(trim($templateName));
+        $name = MetaWhatsAppTemplateBuilder::normalizeName($templateName);
         $body = strtolower($bodyText);
 
-        if ($name !== '' && (str_starts_with($name, 'homework_') || str_contains($name, 'homework_update') || str_contains($name, 'homework_api'))) {
-            return ! str_contains($body, 'has not completed the homework');
+        if (FeeReminderWhatsAppTemplate::looksLikeName($name)
+            || str_contains($body, 'this is a fee reminder')) {
+            return FeeReminderWhatsAppTemplate::variables();
         }
 
-        return str_contains($body, 'open homework')
-            || (str_contains($body, 'homework for') && str_contains($body, 'title:'));
+        if (HomeworkNotDoneWhatsAppTemplate::looksLikeName($name)
+            || str_contains($body, 'has not completed the homework')) {
+            return HomeworkNotDoneWhatsAppTemplate::variables();
+        }
+
+        if (HomeworkShareWhatsAppTemplate::looksLikeName($name)) {
+            return HomeworkShareWhatsAppTemplate::variables();
+        }
+
+        // Do not infer homework-share from body text alone — too many false positives.
+        return [];
     }
 
     /**

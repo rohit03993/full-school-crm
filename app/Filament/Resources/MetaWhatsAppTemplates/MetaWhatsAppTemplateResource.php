@@ -16,6 +16,7 @@ use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeeReminderWhatsAppTemplate;
 use App\Support\HomeworkNotDoneWhatsAppTemplate;
+use App\Support\HomeworkShareWhatsAppTemplate;
 use App\Support\MetaWhatsAppTemplateBuilder;
 use App\Support\MetaWhatsAppTemplateVariableHelper;
 use Filament\Forms\Components\Placeholder;
@@ -93,15 +94,15 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->hiddenLabel()
                 ->content(new HtmlString(
                     '<div class="space-y-2">'
-                    .'<div class="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-sm dark:border-amber-500/20 dark:bg-amber-500/5">'
-                    .'<p class="font-bold text-gray-950 dark:text-white">Fee reminder template</p>'
+                    .'<div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-white/10 dark:bg-white/5">'
+                    .'<p class="font-bold text-gray-950 dark:text-white">Any template (generic)</p>'
                     .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
-                    .'Name <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>, Utility, leave body blank and blur name — auto-fills. Link under Automations → Fee reminders.'
+                    .'Use <code class="text-xs">{{1}}</code>, <code class="text-xs">{{2}}</code>, … in the body. Sample fields appear as Variable 1, Variable 2, … — edit the samples for Meta approval. Map CRM fields after approve on the Edit screen.'
                     .'</p></div>'
-                    .'<div class="rounded-xl border border-sky-200/70 bg-sky-50/50 px-4 py-3 text-sm dark:border-sky-500/20 dark:bg-sky-500/5">'
-                    .'<p class="font-bold text-gray-950 dark:text-white">Homework not done template</p>'
+                    .'<div class="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-sm dark:border-amber-500/20 dark:bg-amber-500/5">'
+                    .'<p class="font-bold text-gray-950 dark:text-white">Known CRM presets (optional)</p>'
                     .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
-                    .'Name <code class="text-xs">'.e(HomeworkNotDoneWhatsAppTemplate::NAME).'</code>, Utility, leave body blank and blur name — auto-fills. Link under Automations → Homework not done.'
+                    .'Name <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkNotDoneWhatsAppTemplate::NAME).'</code>, or <code class="text-xs">'.e(HomeworkShareWhatsAppTemplate::NAME).'</code> / <code class="text-xs">homework_update</code>, leave body blank and blur the name — body + samples auto-fill.'
                     .'</p></div></div>'
                 ))
                 ->columnSpanFull(),
@@ -109,13 +110,22 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->label('Template name')
                 ->required()
                 ->maxLength(64)
-                ->helperText('Examples: '.FeeReminderWhatsAppTemplate::NAME.', '.HomeworkNotDoneWhatsAppTemplate::NAME)
+                ->helperText('Custom names are fine. Presets: '.FeeReminderWhatsAppTemplate::NAME.', '.HomeworkNotDoneWhatsAppTemplate::NAME.', '.HomeworkShareWhatsAppTemplate::NAME)
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
                     $normalized = MetaWhatsAppTemplateBuilder::normalizeName((string) $state);
                     $set('name', $normalized);
 
                     if (filled(trim((string) $get('body_text')))) {
+                        $set(
+                            'body_variable_samples',
+                            MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
+                                (string) $get('body_text'),
+                                $get('body_variable_samples') ?? [],
+                                $normalized,
+                            ),
+                        );
+
                         return;
                     }
 
@@ -131,6 +141,14 @@ class MetaWhatsAppTemplateResource extends Resource
                         $set('category', HomeworkNotDoneWhatsAppTemplate::CATEGORY);
                         $set('body_text', HomeworkNotDoneWhatsAppTemplate::BODY);
                         $set('body_variable_samples', HomeworkNotDoneWhatsAppTemplate::sampleRows());
+
+                        return;
+                    }
+
+                    if (HomeworkShareWhatsAppTemplate::looksLikeName($normalized)) {
+                        $set('category', HomeworkShareWhatsAppTemplate::CATEGORY);
+                        $set('body_text', HomeworkShareWhatsAppTemplate::BODY);
+                        $set('body_variable_samples', HomeworkShareWhatsAppTemplate::sampleRows());
                     }
                 }),
             Select::make('language')
@@ -157,7 +175,7 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->label('Message body')
                 ->required()
                 ->rows(8)
-                ->helperText('Fee reminder: use the auto-filled body for `fee_reminder`. Other templates: {{1}}, {{2}}, … — samples appear below for Meta approval.')
+                ->helperText('Any Meta template: use {{1}}, {{2}}, … Samples below are for approval only. Optional presets auto-fill when you use a known CRM template name.')
                 ->live(debounce: 400)
                 ->afterStateUpdated(function (?string $state, Set $set, Get $get): void {
                     $set(
@@ -171,7 +189,7 @@ class MetaWhatsAppTemplateResource extends Resource
                 })
                 ->columnSpanFull(),
             Section::make('Template variables')
-                ->description('Meta requires one sample value per variable. These are only for approval — real sends use student data from the CRM.')
+                ->description('Meta needs one sample per {{n}}. Labels are hints only — edit samples freely. After approval, map params to CRM fields on Edit.')
                 ->schema([
                     Repeater::make('body_variable_samples')
                         ->label('')
