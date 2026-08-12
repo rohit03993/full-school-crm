@@ -176,13 +176,30 @@ class ManageMetaWhatsAppSettings extends Page
                         ->searchable()
                         ->native(false)
                         ->placeholder('Select approved template')
-                        ->helperText('Required for OTP login. Name login_otp in Templates (leave body blank and blur) or create AUTHENTICATION OTP in Meta and Sync.')
+                        ->helperText('Required for OTP login. Language is taken from the approved template after Sync (en vs en_US).')
                         ->live()
+                        ->afterStateUpdated(function ($state, callable $set): void {
+                            $name = trim((string) $state);
+
+                            if ($name === '') {
+                                return;
+                            }
+
+                            $language = MetaWhatsAppTemplate::query()
+                                ->where('name', $name)
+                                ->whereRaw('UPPER(status) = ?', ['APPROVED'])
+                                ->orderBy('language')
+                                ->value('language');
+
+                            if (filled($language)) {
+                                $set('otp_template_language', $language);
+                            }
+                        })
                         ->columnSpanFull(),
                     TextInput::make('otp_template_language')
                         ->label('OTP template language')
-                        ->placeholder('en')
-                        ->helperText('Leave blank to use the default template language above.'),
+                        ->placeholder('en_US')
+                        ->helperText('Must match the approved template exactly (often en_US, not en). Auto-filled when you pick the template.'),
                     Toggle::make('otp_include_button_param')
                         ->label('Include OTP in template button parameter')
                         ->helperText('Turn on for Meta copy-code / URL authentication templates that also need the code in the button.'),

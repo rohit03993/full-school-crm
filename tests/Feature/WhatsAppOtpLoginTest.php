@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\Gender;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
+use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
@@ -165,6 +166,21 @@ class WhatsAppOtpLoginTest extends TestCase
         ])->assertSessionHasErrors('mobile');
 
         $this->assertNull(session('student_portal_id'));
+    }
+
+    public function test_otp_language_follows_approved_template_not_en_default(): void
+    {
+        $this->enableOtpTemplate();
+
+        MetaWhatsAppTemplate::query()->create([
+            'name' => 'login_otp',
+            'language' => 'en_US',
+            'status' => 'APPROVED',
+            'param_count' => 1,
+            'is_active' => true,
+        ]);
+
+        $this->assertSame('en_US', app(WhatsAppOtpService::class)->otpTemplateLanguage());
     }
 
     public function test_otp_is_exactly_four_digits(): void

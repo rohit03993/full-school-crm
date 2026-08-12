@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
 use App\Support\IndianMobileNumber;
 use Illuminate\Support\Facades\Cache;
@@ -55,16 +56,46 @@ class WhatsAppOtpService
 
     public function otpTemplateLanguage(): string
     {
-        $language = trim((string) Setting::getValue(
+        $approved = $this->approvedOtpTemplate($this->otpTemplateName());
+        $synced = trim((string) ($approved?->language ?? ''));
+
+        if ($synced !== '') {
+            return $synced;
+        }
+
+        $configured = trim((string) Setting::getValue(
             'meta_whatsapp.otp_template_language',
             config('meta_whatsapp.otp_template_language', ''),
         ));
 
-        if ($language !== '') {
-            return $language;
+        if ($configured !== '') {
+            return $configured;
         }
 
         return $this->meta->defaultLanguage();
+    }
+
+    protected function approvedOtpTemplate(string $name): ?MetaWhatsAppTemplate
+    {
+        if ($name === '') {
+            return null;
+        }
+
+        $query = MetaWhatsAppTemplate::query()
+            ->where('name', $name)
+            ->whereRaw('UPPER(status) = ?', ['APPROVED']);
+
+        $configured = trim((string) Setting::getValue('meta_whatsapp.otp_template_language', ''));
+
+        if ($configured !== '') {
+            $match = (clone $query)->where('language', $configured)->first();
+
+            if ($match) {
+                return $match;
+            }
+        }
+
+        return $query->orderBy('language')->first();
     }
 
     /**
