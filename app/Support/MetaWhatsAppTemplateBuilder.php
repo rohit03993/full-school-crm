@@ -42,16 +42,12 @@ class MetaWhatsAppTemplateBuilder
             throw new InvalidArgumentException('Template name must use lowercase letters, numbers, and underscores only.');
         }
 
+        if (self::isAuthenticationOtp($name, $category)) {
+            return self::buildAuthenticationOtpPayload($name, $language);
+        }
+
         if ($bodyText === '') {
             throw new InvalidArgumentException('Message body is required.');
-        }
-
-        if ($headerText !== null && str_contains($headerText, '{{')) {
-            throw new InvalidArgumentException('Header cannot include variables. Use plain text only.');
-        }
-
-        if ($footerText !== null && str_contains($footerText, '{{')) {
-            throw new InvalidArgumentException('Footer cannot include variables.');
         }
 
         $components = [];
@@ -176,5 +172,58 @@ class MetaWhatsAppTemplateBuilder
         $name = preg_replace('/[^a-z0-9_]/', '', $name) ?? $name;
 
         return $name;
+    }
+
+    public static function isAuthenticationOtp(string $name, string $category = ''): bool
+    {
+        if (strtoupper(trim($category)) === 'AUTHENTICATION') {
+            return true;
+        }
+
+        return LoginOtpWhatsAppTemplate::looksLikeName($name);
+    }
+
+    /**
+     * Meta Authentication OTP (copy-code). Custom Utility bodies with "login code" are rejected.
+     *
+     * @return array{
+     *     name: string,
+     *     language: string,
+     *     category: string,
+     *     components: list<array<string, mixed>>,
+     *     allow_category_change: bool,
+     *     message_send_ttl_seconds: int
+     * }
+     */
+    protected static function buildAuthenticationOtpPayload(string $name, string $language): array
+    {
+        $ttl = max(60, LoginOtpWhatsAppTemplate::EXPIRY_MINUTES * 60);
+
+        return [
+            'name' => $name,
+            'language' => $language !== '' ? $language : 'en',
+            'category' => 'AUTHENTICATION',
+            'allow_category_change' => false,
+            'message_send_ttl_seconds' => $ttl,
+            'components' => [
+                [
+                    'type' => 'BODY',
+                    'add_security_recommendation' => true,
+                ],
+                [
+                    'type' => 'FOOTER',
+                    'code_expiration_minutes' => LoginOtpWhatsAppTemplate::EXPIRY_MINUTES,
+                ],
+                [
+                    'type' => 'BUTTONS',
+                    'buttons' => [
+                        [
+                            'type' => 'OTP',
+                            'otp_type' => 'COPY_CODE',
+                        ],
+                    ],
+                ],
+            ],
+        ];
     }
 }

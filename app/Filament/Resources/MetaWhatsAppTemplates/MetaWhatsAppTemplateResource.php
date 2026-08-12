@@ -103,7 +103,7 @@ class MetaWhatsAppTemplateResource extends Resource
                     .'<div class="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-sm dark:border-amber-500/20 dark:bg-amber-500/5">'
                     .'<p class="font-bold text-gray-950 dark:text-white">Known CRM presets (optional)</p>'
                     .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
-                    .'Name <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkNotDoneWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkShareWhatsAppTemplate::NAME).'</code> / <code class="text-xs">homework_update</code>, or <code class="text-xs">'.e(LoginOtpWhatsAppTemplate::NAME).'</code>, leave body blank and blur the name — body + samples auto-fill.'
+                    .'Name <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkNotDoneWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkShareWhatsAppTemplate::NAME).'</code> / <code class="text-xs">homework_update</code>, or <code class="text-xs">'.e(LoginOtpWhatsAppTemplate::NAME).'</code>, leave body blank and blur the name — body + samples auto-fill. <strong>login_otp</strong> is submitted as Authentication (Copy code), not Utility.'
                     .'</p></div></div>'
                 ))
                 ->columnSpanFull(),
@@ -116,19 +116,6 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
                     $normalized = MetaWhatsAppTemplateBuilder::normalizeName((string) $state);
                     $set('name', $normalized);
-
-                    if (filled(trim((string) $get('body_text')))) {
-                        $set(
-                            'body_variable_samples',
-                            MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
-                                (string) $get('body_text'),
-                                $get('body_variable_samples') ?? [],
-                                $normalized,
-                            ),
-                        );
-
-                        return;
-                    }
 
                     if (FeeReminderWhatsAppTemplate::looksLikeName($normalized)) {
                         $set('category', FeeReminderWhatsAppTemplate::CATEGORY);
@@ -158,6 +145,20 @@ class MetaWhatsAppTemplateResource extends Resource
                         $set('category', LoginOtpWhatsAppTemplate::CATEGORY);
                         $set('body_text', LoginOtpWhatsAppTemplate::BODY);
                         $set('body_variable_samples', LoginOtpWhatsAppTemplate::sampleRows());
+                        $set('allow_category_change', false);
+
+                        return;
+                    }
+
+                    if (filled(trim((string) $get('body_text')))) {
+                        $set(
+                            'body_variable_samples',
+                            MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
+                                (string) $get('body_text'),
+                                $get('body_variable_samples') ?? [],
+                                $normalized,
+                            ),
+                        );
                     }
                 }),
             Select::make('language')
@@ -175,16 +176,21 @@ class MetaWhatsAppTemplateResource extends Resource
                     'AUTHENTICATION' => 'Authentication (OTP)',
                 ])
                 ->default('UTILITY')
-                ->required(),
+                ->required()
+                ->live()
+                ->helperText('Authentication is required for login OTP. CRM submits Meta’s Copy code OTP template — not a custom Utility body.'),
             TextInput::make('header_text')
                 ->label('Header (optional)')
                 ->maxLength(60)
-                ->helperText('Plain text only — no variables.'),
+                ->helperText('Plain text only — no variables.')
+                ->visible(fn (Get $get): bool => ! MetaWhatsAppTemplateBuilder::isAuthenticationOtp((string) $get('name'), (string) $get('category'))),
             Textarea::make('body_text')
                 ->label('Message body')
-                ->required()
+                ->required(fn (Get $get): bool => ! MetaWhatsAppTemplateBuilder::isAuthenticationOtp((string) $get('name'), (string) $get('category')))
                 ->rows(8)
-                ->helperText('Any Meta template: use {{1}}, {{2}}, … Samples below are for approval only. Optional presets auto-fill when you use a known CRM template name.')
+                ->helperText(fn (Get $get): string => MetaWhatsAppTemplateBuilder::isAuthenticationOtp((string) $get('name'), (string) $get('category'))
+                    ? 'Preview only. Create submits an Authentication Copy-code OTP template to Meta (fixed OTP text + Copy code button).'
+                    : 'Any Meta template: use {{1}}, {{2}}, … Samples below are for approval only. Optional presets auto-fill when you use a known CRM template name.')
                 ->live(debounce: 400)
                 ->afterStateUpdated(function (?string $state, Set $set, Get $get): void {
                     $set(
@@ -239,10 +245,12 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->columnSpanFull(),
             TextInput::make('footer_text')
                 ->label('Footer (optional)')
-                ->maxLength(60),
+                ->maxLength(60)
+                ->visible(fn (Get $get): bool => ! MetaWhatsAppTemplateBuilder::isAuthenticationOtp((string) $get('name'), (string) $get('category'))),
             Toggle::make('allow_category_change')
                 ->label('Allow Meta to recategorize')
                 ->default(true)
+                ->visible(fn (Get $get): bool => ! MetaWhatsAppTemplateBuilder::isAuthenticationOtp((string) $get('name'), (string) $get('category')))
                 ->helperText('Recommended — Meta may adjust UTILITY vs MARKETING during review.'),
         ];
     }

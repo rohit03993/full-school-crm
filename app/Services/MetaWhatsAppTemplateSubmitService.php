@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\WhatsAppTemplate;
+use App\Support\LoginOtpWhatsAppTemplate;
 use App\Support\MetaWhatsAppTemplateBuilder;
 use App\Support\MetaWhatsAppTemplateParser;
 use App\Support\WhatsAppTemplateParamMappingInferrer;
@@ -54,6 +55,14 @@ class MetaWhatsAppTemplateSubmitService
         $paramCount = (int) $parsed['param_count'];
         $bodyVariables = $parsed['body_variables'];
         $name = (string) $payload['name'];
+
+        if (($payload['category'] ?? '') === 'AUTHENTICATION') {
+            $paramCount = max($paramCount, 1);
+            $bodyVariables = $bodyVariables !== [] ? $bodyVariables : ['1'];
+            if (blank($parsed['body'])) {
+                $parsed['body'] = LoginOtpWhatsAppTemplate::BODY;
+            }
+        }
         $inferredMappings = WhatsAppTemplateParamMappingInferrer::infer($bodyVariables, $paramCount, $name);
 
         $language = (string) $payload['language'];

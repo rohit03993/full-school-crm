@@ -58,4 +58,40 @@ class MetaWhatsAppTemplateBuilderTest extends TestCase
     {
         $this->assertSame('parent_check_in', MetaWhatsAppTemplateBuilder::normalizeName('Parent Check In'));
     }
+
+    public function test_login_otp_name_submits_authentication_copy_code_payload(): void
+    {
+        $payload = MetaWhatsAppTemplateBuilder::buildCreatePayload(
+            'login_otp',
+            'en',
+            'UTILITY',
+            'Your login code is {{1}}. Do not share this code with anyone. It expires in 5 minutes.',
+            null,
+            null,
+            '4821',
+        );
+
+        $this->assertSame('AUTHENTICATION', $payload['category']);
+        $this->assertFalse($payload['allow_category_change']);
+        $this->assertSame(300, $payload['message_send_ttl_seconds']);
+        $this->assertSame('BODY', $payload['components'][0]['type']);
+        $this->assertTrue($payload['components'][0]['add_security_recommendation']);
+        $this->assertSame(5, $payload['components'][1]['code_expiration_minutes']);
+        $this->assertSame('OTP', $payload['components'][2]['buttons'][0]['type']);
+        $this->assertSame('COPY_CODE', $payload['components'][2]['buttons'][0]['otp_type']);
+        $this->assertArrayNotHasKey('parameter_format', $payload);
+    }
+
+    public function test_authentication_category_does_not_require_custom_body(): void
+    {
+        $payload = MetaWhatsAppTemplateBuilder::buildCreatePayload(
+            'staff_login_otp',
+            'en_US',
+            'AUTHENTICATION',
+            '',
+        );
+
+        $this->assertSame('AUTHENTICATION', $payload['category']);
+        $this->assertSame('staff_login_otp', $payload['name']);
+    }
 }

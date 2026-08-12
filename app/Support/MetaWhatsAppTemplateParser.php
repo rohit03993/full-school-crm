@@ -14,11 +14,19 @@ class MetaWhatsAppTemplateParser
         $bodyVariables = [];
 
         foreach ($components as $component) {
-            if (! is_array($component) || ($component['type'] ?? '') !== 'BODY') {
+            if (! is_array($component) || strtoupper((string) ($component['type'] ?? '')) !== 'BODY') {
                 continue;
             }
 
             $body = isset($component['text']) ? (string) $component['text'] : null;
+
+            if (($body === null || $body === '') && ! empty($component['add_security_recommendation'])) {
+                return [
+                    'body' => LoginOtpWhatsAppTemplate::BODY,
+                    'param_count' => 1,
+                    'body_variables' => ['1'],
+                ];
+            }
 
             if ($body === null || $body === '') {
                 break;

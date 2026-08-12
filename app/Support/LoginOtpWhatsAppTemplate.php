@@ -3,8 +3,8 @@
 namespace App\Support;
 
 /**
- * WhatsApp template for staff and student account login OTP.
- * Prefer Meta AUTHENTICATION (copy-code) named login_otp; UTILITY with {{1}} also works.
+ * WhatsApp Authentication (copy-code) template for staff and student login OTP.
+ * Meta rejects OTP/login wording as Utility — submit as AUTHENTICATION from CRM.
  */
 final class LoginOtpWhatsAppTemplate
 {
@@ -18,10 +18,13 @@ final class LoginOtpWhatsAppTemplate
         'otp_login',
     ];
 
-    public const CATEGORY = 'UTILITY';
+    public const CATEGORY = 'AUTHENTICATION';
 
+    public const EXPIRY_MINUTES = 5;
+
+    /** Preview only — Meta uses its own Authentication body + Copy code button. */
     public const BODY = <<<'TXT'
-Your login code is {{1}}. Do not share this code with anyone. It expires in 5 minutes.
+{{1}} is your verification code. For your security, do not share this code. This code expires in 5 minutes.
 TXT;
 
     /**
