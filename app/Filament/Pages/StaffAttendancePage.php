@@ -56,7 +56,7 @@ class StaffAttendancePage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Mark IN/OUT manually here, or from Face/RFID (Staff ID = device PIN). Face sync: Admin → Staff → Sync to Face API, then enroll faces on the Android app under Staff.';
+        return 'Mark IN/OUT manually here, or from Face/RFID (Staff ID = device PIN). Open IN is auto-closed at the same cutoff as students (default 20:00) with no WhatsApp. Face sync: Admin → Staff → Sync to Face API.';
     }
 
     public function mount(): void

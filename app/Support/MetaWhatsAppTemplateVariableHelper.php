@@ -70,6 +70,12 @@ class MetaWhatsAppTemplateVariableHelper
             return HomeworkShareWhatsAppTemplate::variables();
         }
 
+        if (StaffPunchWhatsAppTemplate::looksLikeName($name)
+            || str_contains($body, 'you have checked in at')
+            || str_contains($body, 'you have checked out at')) {
+            return StaffPunchWhatsAppTemplate::variables();
+        }
+
         if (LoginOtpWhatsAppTemplate::looksLikeName($name)
             || str_contains($body, 'your login code is')) {
             return LoginOtpWhatsAppTemplate::variables();

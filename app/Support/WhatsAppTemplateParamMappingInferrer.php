@@ -47,9 +47,12 @@ class WhatsAppTemplateParamMappingInferrer
         'institute_phone' => 'institute.phone',
         'school_phone' => 'institute.phone',
         'caller_name' => 'caller.name',
-        'staff_name' => 'caller.name',
+        'staff_name' => 'staff.name',
+        'employee_code' => 'staff.employee_code',
+        'staff_id' => 'staff.employee_code',
+        'employee_id' => 'staff.employee_code',
         'caller_mobile' => 'caller.mobile',
-        'staff_mobile' => 'caller.mobile',
+        'staff_mobile' => 'staff.mobile',
         'date' => 'campaign.date',
         'announcement_date' => 'campaign.date',
         'check_out_date' => 'campaign.date',
@@ -125,6 +128,10 @@ class WhatsAppTemplateParamMappingInferrer
                 return self::homeworkNotDoneDefaults($paramCount);
             }
 
+            if ($templateName && StaffPunchWhatsAppTemplate::looksLikeName($templateName)) {
+                return self::staffPunchDefaults($paramCount);
+            }
+
             if ($templateName && self::looksLikeMarksTemplateName($templateName)) {
                 return self::marksDefaults($paramCount);
             }
@@ -174,6 +181,27 @@ class WhatsAppTemplateParamMappingInferrer
         }
 
         return false;
+    }
+
+    /**
+     * @return list<string|null>
+     */
+    public static function staffPunchDefaults(int $paramCount): array
+    {
+        $defaults = [
+            0 => 'staff.name',
+            1 => 'attendance.time',
+            2 => 'attendance.date',
+            3 => 'institute.name',
+        ];
+
+        $sources = [];
+
+        for ($i = 0; $i < $paramCount; $i++) {
+            $sources[] = $defaults[$i] ?? null;
+        }
+
+        return $sources;
     }
 
     public static function looksLikeHomeworkNotDoneTemplateName(string $name): bool

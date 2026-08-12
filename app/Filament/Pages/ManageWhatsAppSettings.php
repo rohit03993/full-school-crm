@@ -162,9 +162,13 @@ class ManageWhatsAppSettings extends Page
                 ])
                 ->columns(2),
             Section::make('Staff attendance punch — staff WhatsApp')
-                ->description('Separate templates from parent/student punch messages. Sent to the staff mobile when Staff ID punches IN/OUT on the same machines.')
+                ->description('Sent to the staff mobile on real IN/OUT punches only. Auto-out at night does not send a message.')
                 ->icon(Heroicon::OutlinedUserGroup)
                 ->schema([
+                    Placeholder::make('staff_punch_automation_guide')
+                        ->hiddenLabel()
+                        ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderStaffPunchAutomationGuide())
+                        ->columnSpanFull(),
                     Toggle::make('staff_punch_autosend_enabled')
                         ->label('Send staff WhatsApp on IN and OUT')
                         ->helperText('Uses staff templates only — not the parent punch campaigns above.')
@@ -175,13 +179,14 @@ class ManageWhatsAppSettings extends Page
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Map template vars to staff.name, staff.employee_code, attendance.time, institute.name.'),
+                        ->helperText('Map {{1}} staff.name, {{2}} attendance.time, {{3}} attendance.date, {{4}} institute.name.'),
                     Select::make('staff_punch_out_autosend_live_campaign_id')
                         ->label('Staff biometric check-out (OUT)')
                         ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
                         ->searchable()
                         ->nullable()
-                        ->native(false),
+                        ->native(false)
+                        ->helperText('Same mapping as IN. Leave blank if you only want IN messages.'),
                 ])
                 ->columns(2),
             Section::make('Post-call auto message')

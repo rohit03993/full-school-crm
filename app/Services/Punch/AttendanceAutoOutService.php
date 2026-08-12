@@ -4,12 +4,17 @@ namespace App\Services\Punch;
 
 use App\Enums\AttendanceStatus;
 use App\Models\Attendance;
+use App\Models\StaffAttendance;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 class AttendanceAutoOutService
 {
     /**
-     * Persist auto check-out on attendance rows that are still open past the cutoff.
+     * Persist auto check-out on student and staff attendance rows still open past the cutoff.
+     * Does not send WhatsApp — same as student auto-out.
      *
      * Rules:
      * - Checked in before cutoff → check out at cutoff (e.g. 20:00) once that time has passed
@@ -24,11 +29,25 @@ class AttendanceAutoOutService
             return 0;
         }
 
+        $updated = $this->closeOpenRows(Attendance::query());
+
+        if (Schema::hasTable('staff_attendances')) {
+            $updated += $this->closeOpenRows(StaffAttendance::query());
+        }
+
+        return $updated;
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function closeOpenRows(Builder $query): int
+    {
         $autoOutTime = $this->normalizedAutoOutTime();
         $graceMinutes = max(0, (int) config('attendance.auto_out_late_grace_minutes', 60));
         $updated = 0;
 
-        Attendance::query()
+        $query
             ->where('status', AttendanceStatus::Present)
             ->whereNotNull('checked_in_at')
             ->whereNull('checked_out_at')

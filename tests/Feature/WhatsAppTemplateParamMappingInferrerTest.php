@@ -93,6 +93,18 @@ class WhatsAppTemplateParamMappingInferrerTest extends TestCase
         ], $sources);
     }
 
+    public function test_positional_staff_punch_template_maps_staff_fields(): void
+    {
+        $sources = WhatsAppTemplateParamMappingInferrer::infer(['1', '2', '3', '4'], 4, 'staff_punch_in');
+
+        $this->assertSame([
+            'staff.name',
+            'attendance.time',
+            'attendance.date',
+            'institute.name',
+        ], $sources);
+    }
+
     public function test_template_with_positional_meta_variables_uses_attendance_defaults(): void
     {
         $template = WhatsAppTemplate::query()->create([

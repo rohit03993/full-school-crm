@@ -4,11 +4,13 @@ namespace App\Services;
 
 use App\Filament\Pages\AttendancePage;
 use App\Filament\Pages\ManageAttendanceBiometricPage;
+use App\Filament\Pages\StaffAttendancePage;
 use App\Models\Setting;
 use App\Models\WhatsAppTemplate;
 use App\Support\CrmNavigation;
 use App\Support\FeeReminderWhatsAppTemplate;
 use App\Support\HomeworkNotDoneWhatsAppTemplate;
+use App\Support\StaffPunchWhatsAppTemplate;
 use Illuminate\Support\HtmlString;
 
 class WhatsAppSettingsService
@@ -332,6 +334,50 @@ class WhatsAppSettingsService
             .'2) Live quick campaign with mapping below. '
             .'3) Teachers open <a href="'.$checkUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Academics → Homework check</a>, select students, Submit Not Done, then confirm WhatsApp count.</p></div>'
             .'<div class="px-4 py-3"><pre class="whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.$body.'</pre></div>'
+            .'<div class="overflow-x-auto border-t border-sky-200/60 dark:border-sky-500/20">'
+            .'<table class="w-full min-w-[36rem] text-left text-sm">'
+            .'<thead class="bg-white/60 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-black/20 dark:text-gray-400">'
+            .'<tr><th class="px-4 py-2">Var</th><th class="px-4 py-2">Meaning</th><th class="px-4 py-2">CRM map</th><th class="px-4 py-2">Meta sample</th></tr></thead>'
+            .'<tbody class="divide-y divide-sky-100 dark:divide-sky-500/10">'.$mappingRows.'</tbody></table></div></div>'
+        );
+    }
+
+    public function renderStaffPunchAutomationGuide(): HtmlString
+    {
+        $templatesUrl = e(\App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource::getUrl('create'));
+        $campaignsUrl = e(\App\Filament\Resources\WhatsAppLiveCampaigns\WhatsAppLiveCampaignResource::getUrl('create'));
+        $staffUrl = e(StaffAttendancePage::getUrl());
+        $inName = e(StaffPunchWhatsAppTemplate::IN_NAME);
+        $outName = e(StaffPunchWhatsAppTemplate::OUT_NAME);
+        $inBody = e(StaffPunchWhatsAppTemplate::IN_BODY);
+        $outBody = e(StaffPunchWhatsAppTemplate::OUT_BODY);
+
+        $mappingRows = '';
+        foreach (StaffPunchWhatsAppTemplate::variables() as $index => $variable) {
+            $mappingRows .= '<tr class="'.($index % 2 === 0 ? 'bg-white/40 dark:bg-transparent' : '').'">'
+                .'<td class="px-4 py-2 font-mono text-xs">{{'.$index.'}}</td>'
+                .'<td class="px-4 py-2">'.e($variable['label']).'</td>'
+                .'<td class="px-4 py-2 font-mono text-xs">'.e($variable['crm_source']).'</td>'
+                .'<td class="px-4 py-2 text-gray-500">'.e($variable['example']).'</td>'
+                .'</tr>';
+        }
+
+        return new HtmlString(
+            '<div class="overflow-hidden rounded-xl border border-sky-200/60 bg-sky-50/40 dark:border-sky-500/20 dark:bg-sky-500/5">'
+            .'<div class="border-b border-sky-200/60 px-4 py-3 dark:border-sky-500/20">'
+            .'<p class="text-sm font-bold text-gray-950 dark:text-white">Staff IN/OUT WhatsApp — not parent templates</p>'
+            .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
+            .'Goes to the staff mobile on file. Auto-out at night does <strong>not</strong> send. '
+            .'1) <a href="'.$templatesUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Templates → New</a> '
+            .'name <code class="text-xs">'.$inName.'</code> and <code class="text-xs">'.$outName.'</code> (Utility), submit, Sync after Meta approves. '
+            .'2) <a href="'.$campaignsUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Live campaigns</a> — one per template, map vars below, Go live. '
+            .'3) Pick those campaigns here and turn the switch on. Check names on <a href="'.$staffUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Staff attendance</a>.</p></div>'
+            .'<div class="grid gap-3 px-4 py-3 sm:grid-cols-2">'
+            .'<div><p class="mb-1 text-[11px] font-bold uppercase tracking-wide text-gray-500">'.$inName.'</p>'
+            .'<pre class="whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.$inBody.'</pre></div>'
+            .'<div><p class="mb-1 text-[11px] font-bold uppercase tracking-wide text-gray-500">'.$outName.'</p>'
+            .'<pre class="whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.$outBody.'</pre></div>'
+            .'</div>'
             .'<div class="overflow-x-auto border-t border-sky-200/60 dark:border-sky-500/20">'
             .'<table class="w-full min-w-[36rem] text-left text-sm">'
             .'<thead class="bg-white/60 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-black/20 dark:text-gray-400">'

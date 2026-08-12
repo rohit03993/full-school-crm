@@ -9,7 +9,7 @@ class AttendanceAutoOutCommand extends Command
 {
     protected $signature = 'attendance:auto-out';
 
-    protected $description = 'Auto check-out students still marked Inside after the configured daily cutoff (default 20:00).';
+    protected $description = 'Auto check-out students and staff still marked Inside after the configured daily cutoff (default 20:00). No WhatsApp is sent.';
 
     public function handle(AttendanceAutoOutService $autoOut): int
     {

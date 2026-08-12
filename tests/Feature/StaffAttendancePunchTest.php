@@ -82,6 +82,33 @@ class StaffAttendancePunchTest extends TestCase
         $this->assertNotNull($row->checked_in_at);
     }
 
+    public function test_staff_auto_out_closes_open_in_without_whatsapp(): void
+    {
+        config(['attendance.auto_out_enabled' => true, 'attendance.auto_out_time' => '20:00']);
+        Setting::setValue('whatsapp.staff_punch_autosend_enabled', '1', 'whatsapp');
+
+        $staff = $this->createStaffWithCode('STF500');
+
+        $this->travelTo('2026-08-12 13:27:56');
+        app(\App\Services\Punch\StaffPunchAttendanceSyncService::class)->syncFromPunch(
+            $staff,
+            '2026-08-12',
+            'IN',
+            '13:27:56',
+            'biometric',
+        );
+
+        $this->assertNull(StaffAttendance::query()->first()?->checked_out_at);
+
+        $this->travelTo('2026-08-12 20:05:00');
+        $closed = app(\App\Services\Punch\AttendanceAutoOutService::class)->applyDue();
+
+        $this->assertSame(1, $closed);
+        $this->assertSame('20:00:00', StaffAttendance::query()->first()?->checked_out_at?->format('H:i:s'));
+        $this->assertSame(0, \App\Models\StaffPunchWhatsappLog::query()->count());
+        $this->assertFalse(app(\App\Services\Punch\ManualStaffAttendanceService::class)->isInside($staff, '2026-08-12'));
+    }
+
     public function test_student_live_dashboard_hides_staff_punches(): void
     {
         $this->createStaffWithCode('STF005');
