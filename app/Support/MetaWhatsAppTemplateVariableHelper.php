@@ -71,6 +71,8 @@ class MetaWhatsAppTemplateVariableHelper
         }
 
         if (StaffPunchWhatsAppTemplate::looksLikeName($name)
+            || str_contains($body, 'your staff attendance check-in has been recorded')
+            || str_contains($body, 'your staff attendance check-out has been recorded')
             || str_contains($body, 'you have checked in at')
             || str_contains($body, 'you have checked out at')) {
             return StaffPunchWhatsAppTemplate::variables();

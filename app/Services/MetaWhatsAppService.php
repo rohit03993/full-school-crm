@@ -530,8 +530,12 @@ class MetaWhatsAppService
                 $subcode !== null ? '(subcode '.$subcode.')' : null,
             ]);
 
+            $hint = $this->templateSubmitErrorHint($subcode, is_array($error['error_data'] ?? null) ? $error['error_data'] : []);
+
             if ($parts !== []) {
-                return implode(' ', $parts);
+                $joined = implode(' ', $parts);
+
+                return $hint !== null ? $joined.' '.$hint : $joined;
             }
         }
 
@@ -540,6 +544,21 @@ class MetaWhatsAppService
         }
 
         return $fallbackBody !== '' ? $fallbackBody : 'Unknown Meta API error';
+    }
+
+    /**
+     * @param  array<string, mixed>  $errorData
+     */
+    private function templateSubmitErrorHint(mixed $subcode, array $errorData): ?string
+    {
+        $details = trim((string) ($errorData['details'] ?? ''));
+
+        return match ((int) $subcode) {
+            2388293 => 'Meta rejected this because the body is too short for that many {{variables}}. Add more fixed words, or use fewer variables. (Not a sample-value problem.)',
+            2388299 => 'Meta does not allow a {{variable}} at the very start or end of the body.',
+            2388042 => 'Meta rejected this Utility body for OTP. Use the login_otp Authentication preset instead.',
+            default => $details !== '' ? $details : null,
+        };
     }
 
     /**

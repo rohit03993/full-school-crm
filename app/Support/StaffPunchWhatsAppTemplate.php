@@ -15,11 +15,11 @@ final class StaffPunchWhatsAppTemplate
     public const CATEGORY = 'UTILITY';
 
     public const IN_BODY = <<<'TXT'
-Hello {{1}}, you have checked IN at {{2}} on {{3}}. — {{4}}
+Hello {{1}}, your staff attendance check-in has been recorded at {{2}} on {{3}}. This message is from {{4}}. Thank you.
 TXT;
 
     public const OUT_BODY = <<<'TXT'
-Hello {{1}}, you have checked OUT at {{2}} on {{3}}. — {{4}}
+Hello {{1}}, your staff attendance check-out has been recorded at {{2}} on {{3}}. This message is from {{4}}. Thank you.
 TXT;
 
     /**
