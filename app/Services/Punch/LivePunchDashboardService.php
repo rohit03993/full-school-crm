@@ -19,6 +19,7 @@ class LivePunchDashboardService
     public function __construct(
         protected PunchLogService $logs,
         protected PunchInOutCalculator $calculator,
+        protected PunchSubjectResolver $subjects,
     ) {}
 
     public function punchTableReady(): bool
@@ -28,7 +29,7 @@ class LivePunchDashboardService
 
     /**
      * @return array{
-     *     stats: array{total: int, inside: int, out: int},
+     *     stats: array{total: int, inside: int, out: int, staff_hidden: int},
      *     rows: list<array<string, mixed>>,
      * }
      */
@@ -41,7 +42,7 @@ class LivePunchDashboardService
     ): array {
         if (! $this->logs->punchTableExists()) {
             return [
-                'stats' => ['total' => 0, 'inside' => 0, 'out' => 0],
+                'stats' => ['total' => 0, 'inside' => 0, 'out' => 0, 'staff_hidden' => 0],
                 'rows' => [],
             ];
         }
@@ -54,10 +55,20 @@ class LivePunchDashboardService
         }
 
         $rows = [];
-        $stats = ['total' => 0, 'inside' => 0, 'out' => 0];
+        $stats = ['total' => 0, 'inside' => 0, 'out' => 0, 'staff_hidden' => 0];
 
         foreach ($rolls as $roll) {
-            $student = $this->logs->findStudentByRoll($roll);
+            $subject = $this->subjects->resolve($roll);
+
+            if ($subject !== null && $subject['type'] === PunchSubjectResolver::TYPE_STAFF) {
+                $stats['staff_hidden']++;
+
+                continue;
+            }
+
+            $student = $subject !== null
+                ? $subject['student']
+                : $this->logs->findStudentByRoll($roll);
 
             if ($nameFilter && $student && ! str_contains(strtolower($student->name), strtolower($nameFilter))) {
                 continue;

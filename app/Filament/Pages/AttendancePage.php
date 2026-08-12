@@ -85,7 +85,7 @@ class AttendancePage extends Page
 
     /** @var array<string, mixed> */
     public array $dashboard = [
-        'stats' => ['total' => 0, 'inside' => 0, 'out' => 0],
+        'stats' => ['total' => 0, 'inside' => 0, 'out' => 0, 'staff_hidden' => 0],
         'rows' => [],
     ];
 
@@ -760,6 +760,7 @@ class AttendancePage extends Page
                     'activeStateFilter' => filled($this->filters['state'] ?? null) ? (string) $this->filters['state'] : null,
                     'highlightRoll' => $this->highlightRoll,
                     'quickSearch' => $this->quickSearch,
+                    'staffAttendanceUrl' => StaffAttendancePage::canAccess() ? StaffAttendancePage::getUrl() : null,
                 ])
                 ->visible(fn (): bool => $this->viewMode === 'live'),
             Section::make('Batch & date')

@@ -82,6 +82,41 @@ class StaffAttendancePunchTest extends TestCase
         $this->assertNotNull($row->checked_in_at);
     }
 
+    public function test_student_live_dashboard_hides_staff_punches(): void
+    {
+        $this->createStaffWithCode('STF005');
+        $this->createEnrolledStudent('ROLL-1');
+
+        DB::table('punch_logs')->insert([
+            [
+                'employee_id' => 'STF005',
+                'punch_date' => '2026-08-12',
+                'punch_time' => '13:01:06',
+                'device_name' => 'Face Camera Kiosk',
+                'is_manual' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'employee_id' => 'ROLL-1',
+                'punch_date' => '2026-08-12',
+                'punch_time' => '13:05:00',
+                'device_name' => 'Face Camera Kiosk',
+                'is_manual' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $dashboard = app(\App\Services\Punch\LivePunchDashboardService::class)->dashboardForDate('2026-08-12');
+        $rolls = collect($dashboard['rows'])->pluck('roll')->all();
+
+        $this->assertContains('ROLL-1', $rolls);
+        $this->assertNotContains('STF005', $rolls);
+        $this->assertSame(1, $dashboard['stats']['staff_hidden']);
+        $this->assertNotSame('Unmapped punch', collect($dashboard['rows'])->first()['student_name'] ?? null);
+    }
+
     public function test_student_roll_still_takes_priority_over_staff_code(): void
     {
         $this->createStaffWithCode('ROLL99');

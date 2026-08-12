@@ -5,8 +5,9 @@
     /** @var string|null $lastRefreshedAt */
     /** @var string|null $activeStateFilter */
     /** @var string|null $highlightRoll */
-    $stats = $dashboard['stats'] ?? ['total' => 0, 'inside' => 0, 'out' => 0];
+    $stats = $dashboard['stats'] ?? ['total' => 0, 'inside' => 0, 'out' => 0, 'staff_hidden' => 0];
     $rows = $dashboard['rows'] ?? [];
+    $staffHidden = (int) ($stats['staff_hidden'] ?? 0);
 
     $statTiles = [
         [
@@ -131,6 +132,21 @@
         </div>
     </div>
 
+    @if ($staffHidden > 0)
+        <div class="rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-950 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-100 dark:ring-sky-500/30 sm:px-5">
+            <p>
+                <strong>{{ $staffHidden }}</strong> staff punch{{ $staffHidden === 1 ? '' : 'es' }}
+                {{ $staffHidden === 1 ? 'is' : 'are' }} hidden here — this page is student attendance only.
+                @if (filled($staffAttendanceUrl ?? null))
+                    <a href="{{ $staffAttendanceUrl }}" class="font-semibold underline decoration-sky-400 underline-offset-2 hover:text-sky-800 dark:hover:text-white">Open Staff attendance</a>
+                    to see names (Staff ID = kiosk PIN, e.g. STF005).
+                @else
+                    Open <strong>Academics → Staff attendance</strong> to see names.
+                @endif
+            </p>
+        </div>
+    @endif
+
     @include('filament.pages.partials.live-punch-batch-roster', [
         'batchRoster' => $batchRoster,
         'selectedDateLabel' => $selectedDateLabel,
@@ -141,8 +157,14 @@
             <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 dark:bg-white/10">
                 <svg class="h-7 w-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.21a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
             </div>
-            <p class="mt-4 text-base font-semibold text-gray-950 dark:text-white">No punches yet</p>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Change date or batch, or switch to Manual batch to mark attendance by hand.</p>
+            <p class="mt-4 text-base font-semibold text-gray-950 dark:text-white">{{ $staffHidden > 0 ? 'No student punches' : 'No punches yet' }}</p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                @if ($staffHidden > 0)
+                    Staff punches for this date are on Staff attendance, not this student list.
+                @else
+                    Change date or batch, or switch to Manual batch to mark attendance by hand.
+                @endif
+            </p>
         </div>
     @else
         <div class="space-y-3">
