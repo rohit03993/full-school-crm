@@ -295,6 +295,11 @@ final class CrmMenuLabels
         return 'Staff';
     }
 
+    public static function staffLoginLog(): string
+    {
+        return 'Staff login log';
+    }
+
     public static function auditLog(): string
     {
         return 'Audit log';

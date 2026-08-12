@@ -14,9 +14,11 @@ class CrmCleanupCommand extends Command
     public function handle(StorageCleanupService $cleanup): int
     {
         $results = $cleanup->run();
+        $prunedLogins = app(\App\Services\StaffLoginSessionService::class)->pruneOldSessions();
 
         $this->info("Removed {$results['livewire_temp']} stale temporary upload(s).");
         $this->info("Removed {$results['orphan_files']} orphan stored file(s).");
+        $this->info("Removed {$prunedLogins} staff login session(s) older than ".\App\Services\StaffLoginSessionService::RETAIN_DAYS.' days.');
 
         return self::SUCCESS;
     }

@@ -88,6 +88,7 @@ class CrmHint
         'whatsapp.templates.create' => 'Any Meta template: put {{1}}, {{2}}, … in the body. Presets: fee_reminder, homework_not_done, homework_api, login_otp. For login_otp the CRM submits an Authentication Copy-code OTP template (Meta rejects OTP text as Utility).',
         'whatsapp.campaigns.create' => 'Pick template, audience (batch or course), fill message fields, then send or save as draft.',
         'audit.logs' => 'Read-only history of important changes — fees, admissions, profile edits. For Super Admin oversight.',
+        'staff.login_log' => 'CRM sign-in and sign-out only (not biometric punch). One row per login. Kept 180 days. Super Admin / staff managers.',
     ];
 
     /** @var array<string, string> */

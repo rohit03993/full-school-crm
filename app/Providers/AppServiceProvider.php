@@ -10,8 +10,12 @@ use App\Support\CrmLivewireErrors;
 use App\Support\CrmPagination;
 use App\Support\FeatureGate;
 use App\Support\SiteContent;
+use App\Services\StaffLoginSessionService;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
 use Filament\Tables\Table;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -25,6 +29,13 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         CrmLivewireErrors::register();
+
+        Event::listen(Login::class, function (Login $event): void {
+            app(StaffLoginSessionService::class)->handleLoginEvent($event);
+        });
+        Event::listen(Logout::class, function (Logout $event): void {
+            app(StaffLoginSessionService::class)->handleLogoutEvent($event);
+        });
 
         try {
             app(\App\Services\FaceVerify\FaceVerifyPlatformService::class)->applyConfiguredOverrides();
