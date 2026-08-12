@@ -31,6 +31,20 @@ class WhatsAppOtpService
             && filled($this->otpTemplateName());
     }
 
+    public function otpOnlyEnabled(): bool
+    {
+        return (bool) Setting::getValue('meta_whatsapp.otp_only_login', false);
+    }
+
+    /**
+     * Password login is blocked only when OTP-only is on AND OTP can actually send.
+     * If WhatsApp is down, password remains as a fallback so the institute is not locked out.
+     */
+    public function passwordLoginAllowed(): bool
+    {
+        return ! ($this->otpOnlyEnabled() && $this->isAvailable());
+    }
+
     public function otpTemplateName(): string
     {
         return trim((string) Setting::getValue(

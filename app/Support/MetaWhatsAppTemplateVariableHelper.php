@@ -70,6 +70,11 @@ class MetaWhatsAppTemplateVariableHelper
             return HomeworkShareWhatsAppTemplate::variables();
         }
 
+        if (LoginOtpWhatsAppTemplate::looksLikeName($name)
+            || str_contains($body, 'your login code is')) {
+            return LoginOtpWhatsAppTemplate::variables();
+        }
+
         // Do not infer homework-share from body text alone — too many false positives.
         return [];
     }

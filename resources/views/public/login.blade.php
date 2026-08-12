@@ -30,12 +30,14 @@
                             CRM login for owners, counsellors, admission staff, accountants, and coordinators.
                         </p>
                         <p class="mt-4 text-sm font-semibold text-brand-700 group-hover:text-brand-800">
-                            Mobile + password →
+                            {{ ($otpOnly ?? false) ? 'WhatsApp OTP →' : 'Mobile + password →' }}
                         </p>
                     </a>
-                    <p class="mt-2 text-xs text-navy-500">
-                        Or <a href="{{ route('staff.otp-login') }}" class="font-semibold text-brand-700 hover:text-brand-800">WhatsApp OTP login</a>
-                    </p>
+                    @unless ($otpOnly ?? false)
+                        <p class="mt-2 text-xs text-navy-500">
+                            Or <a href="{{ route('staff.otp-login') }}" class="font-semibold text-brand-700 hover:text-brand-800">WhatsApp OTP login</a>
+                        </p>
+                    @endunless
                 </div>
 
                 <a
@@ -52,7 +54,7 @@
                         View fees, marks, admission status, receipts, and ID card.
                     </p>
                     <p class="mt-4 text-sm font-semibold text-brand-700 group-hover:text-brand-800">
-                        Student mobile + password (not roll number) →
+                        {{ ($otpOnly ?? false) ? 'Student mobile + WhatsApp OTP →' : 'Student mobile + password (not roll number) →' }}
                     </p>
                 </a>
             </div>

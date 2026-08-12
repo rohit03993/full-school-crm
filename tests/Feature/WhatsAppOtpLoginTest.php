@@ -133,6 +133,40 @@ class WhatsAppOtpLoginTest extends TestCase
         $this->assertAuthenticatedAs($admin);
     }
 
+    public function test_otp_only_blocks_student_password_login_when_otp_is_ready(): void
+    {
+        $this->enableOtpTemplate();
+        Setting::setValue('meta_whatsapp.otp_only_login', '1', 'meta_whatsapp');
+        Setting::flushValueCache();
+
+        $meta = Mockery::mock(MetaWhatsAppService::class);
+        $meta->shouldReceive('isConfigured')->andReturn(true);
+        $this->app->instance(MetaWhatsAppService::class, $meta);
+
+        Setting::setValue(
+            'portal.shared_password_hash',
+            app(StudentAuthService::class)->hashPortalPassword('Motion@2026'),
+            'portal',
+        );
+
+        Student::query()->create([
+            'name' => 'Portal Student',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2000-05-15',
+            'gender' => Gender::Male,
+            'mobile' => '9811000099',
+            'status' => StudentStatus::Enquiry,
+            'portal_password' => null,
+        ]);
+
+        $this->post(route('portal.login.submit'), [
+            'mobile' => '9811000099',
+            'password' => 'Motion@2026',
+        ])->assertSessionHasErrors('mobile');
+
+        $this->assertNull(session('student_portal_id'));
+    }
+
     public function test_otp_is_exactly_four_digits(): void
     {
         $service = app(WhatsAppOtpService::class);

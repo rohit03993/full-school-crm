@@ -40,6 +40,7 @@ class MetaWhatsAppSettingsService
                 Setting::getValue('meta_whatsapp.otp_include_button_param', config('meta_whatsapp.otp_include_button_param', true)),
                 FILTER_VALIDATE_BOOLEAN,
             ),
+            'otp_only_login' => (bool) Setting::getValue('meta_whatsapp.otp_only_login', false),
         ];
     }
 
@@ -73,6 +74,18 @@ class MetaWhatsAppSettingsService
             ! empty($data['otp_include_button_param']) ? '1' : '0',
             'meta_whatsapp',
         );
+
+        $otpOnly = ! empty($data['otp_only_login']);
+        $otpTemplate = trim((string) ($data['otp_template_name'] ?? ''));
+
+        if ($otpOnly && $otpTemplate === '') {
+            return [
+                'ok' => false,
+                'message' => 'Select an OTP template before turning on OTP-only login.',
+            ];
+        }
+
+        Setting::setValue('meta_whatsapp.otp_only_login', $otpOnly ? '1' : '0', 'meta_whatsapp');
 
         Setting::flushValueCache();
 

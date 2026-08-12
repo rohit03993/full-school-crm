@@ -17,6 +17,7 @@ use App\Support\CrmNavigation;
 use App\Support\FeeReminderWhatsAppTemplate;
 use App\Support\HomeworkNotDoneWhatsAppTemplate;
 use App\Support\HomeworkShareWhatsAppTemplate;
+use App\Support\LoginOtpWhatsAppTemplate;
 use App\Support\MetaWhatsAppTemplateBuilder;
 use App\Support\MetaWhatsAppTemplateVariableHelper;
 use Filament\Forms\Components\Placeholder;
@@ -102,7 +103,7 @@ class MetaWhatsAppTemplateResource extends Resource
                     .'<div class="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-sm dark:border-amber-500/20 dark:bg-amber-500/5">'
                     .'<p class="font-bold text-gray-950 dark:text-white">Known CRM presets (optional)</p>'
                     .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
-                    .'Name <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkNotDoneWhatsAppTemplate::NAME).'</code>, or <code class="text-xs">'.e(HomeworkShareWhatsAppTemplate::NAME).'</code> / <code class="text-xs">homework_update</code>, leave body blank and blur the name — body + samples auto-fill.'
+                    .'Name <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkNotDoneWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkShareWhatsAppTemplate::NAME).'</code> / <code class="text-xs">homework_update</code>, or <code class="text-xs">'.e(LoginOtpWhatsAppTemplate::NAME).'</code>, leave body blank and blur the name — body + samples auto-fill.'
                     .'</p></div></div>'
                 ))
                 ->columnSpanFull(),
@@ -110,7 +111,7 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->label('Template name')
                 ->required()
                 ->maxLength(64)
-                ->helperText('Custom names are fine. Presets: '.FeeReminderWhatsAppTemplate::NAME.', '.HomeworkNotDoneWhatsAppTemplate::NAME.', '.HomeworkShareWhatsAppTemplate::NAME)
+                ->helperText('Custom names are fine. Presets: '.FeeReminderWhatsAppTemplate::NAME.', '.HomeworkNotDoneWhatsAppTemplate::NAME.', '.HomeworkShareWhatsAppTemplate::NAME.', '.LoginOtpWhatsAppTemplate::NAME)
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
                     $normalized = MetaWhatsAppTemplateBuilder::normalizeName((string) $state);
@@ -149,6 +150,14 @@ class MetaWhatsAppTemplateResource extends Resource
                         $set('category', HomeworkShareWhatsAppTemplate::CATEGORY);
                         $set('body_text', HomeworkShareWhatsAppTemplate::BODY);
                         $set('body_variable_samples', HomeworkShareWhatsAppTemplate::sampleRows());
+
+                        return;
+                    }
+
+                    if (LoginOtpWhatsAppTemplate::looksLikeName($normalized)) {
+                        $set('category', LoginOtpWhatsAppTemplate::CATEGORY);
+                        $set('body_text', LoginOtpWhatsAppTemplate::BODY);
+                        $set('body_variable_samples', LoginOtpWhatsAppTemplate::sampleRows());
                     }
                 }),
             Select::make('language')

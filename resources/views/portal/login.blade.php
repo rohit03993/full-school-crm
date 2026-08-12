@@ -21,8 +21,11 @@
 </head>
 <body class="min-h-screen bg-navy-950 text-white antialiased">
     @php
+        $otpOnly = (bool) ($otpOnly ?? false);
         $activeTab = in_array($loginTab ?? 'password', ['password', 'otp'], true) ? ($loginTab ?? 'password') : 'password';
-        if (! ($otpAvailable ?? false)) {
+        if ($otpOnly && ($otpAvailable ?? false)) {
+            $activeTab = 'otp';
+        } elseif (! ($otpAvailable ?? false)) {
             $activeTab = 'password';
         }
     @endphp
@@ -39,11 +42,15 @@
                 @endif
                 <p class="text-xs font-bold uppercase tracking-widest text-brand-400">{{ $institute['name'] ?? config('app.name') }}</p>
                 <h1 class="mt-2 font-display text-3xl font-bold sm:text-4xl">Student Portal</h1>
-                <p class="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-navy-300">{{ $loginHint ?? 'Login with mobile and password' }}</p>
+                <p class="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-navy-300">
+                    {{ ($otpOnly ?? false) && ($otpAvailable ?? false)
+                        ? 'Sign in with a 4-digit code sent to your WhatsApp.'
+                        : ($loginHint ?? 'Login with mobile and password') }}
+                </p>
             </div>
 
             <div class="mt-8 rounded-3xl border border-white/10 bg-white p-5 text-navy-900 shadow-2xl sm:mt-10 sm:p-6">
-                @if ($otpAvailable ?? false)
+                @if (($otpAvailable ?? false) && ! ($otpOnly ?? false))
                     <div class="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-navy-50 p-1">
                         <a href="{{ route('portal.login', ['tab' => 'password']) }}"
                            class="rounded-lg px-3 py-2 text-center text-sm font-semibold {{ $activeTab === 'password' ? 'bg-white text-navy-900 shadow' : 'text-navy-500' }}">

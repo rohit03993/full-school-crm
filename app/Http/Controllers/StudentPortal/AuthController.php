@@ -24,14 +24,22 @@ class AuthController extends Controller
         return view('portal.login', [
             'loginHint' => $auth->portalLoginHint(),
             'otpAvailable' => $otp->isAvailable(),
+            'otpOnly' => ! $otp->passwordLoginAllowed(),
             'otpSent' => (bool) session('otp_sent'),
             'otpMobile' => session('otp_mobile', old('mobile')),
-            'loginTab' => session('login_tab', request('tab', 'password')),
+            'loginTab' => session('login_tab', request('tab', $otp->passwordLoginAllowed() ? 'password' : 'otp')),
         ]);
     }
 
-    public function login(Request $request, StudentAuthService $auth): RedirectResponse
+    public function login(Request $request, StudentAuthService $auth, WhatsAppOtpService $otp): RedirectResponse
     {
+        if (! $otp->passwordLoginAllowed()) {
+            return back()
+                ->withInput($request->only('mobile'))
+                ->with('login_tab', 'otp')
+                ->withErrors(['mobile' => 'Password login is disabled. Use WhatsApp OTP.']);
+        }
+
         $mobile = IndianMobileNumber::normalize($request->input('mobile'));
 
         if ($mobile === null) {

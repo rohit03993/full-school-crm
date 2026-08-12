@@ -31,7 +31,11 @@
                 <p class="text-xs font-bold uppercase tracking-widest text-brand-400">{{ $institute['name'] ?? config('app.name') }}</p>
                 <h1 class="mt-2 font-display text-3xl font-bold sm:text-4xl">Staff OTP Login</h1>
                 <p class="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-navy-300">
-                    Sign in with a 4-digit code sent to your WhatsApp. Password login still works as usual.
+                    @if ($otpOnly ?? false)
+                        Sign in with a 4-digit code sent to your WhatsApp. Password login is turned off.
+                    @else
+                        Sign in with a 4-digit code sent to your WhatsApp. Password login still works as usual.
+                    @endif
                 </p>
             </div>
 
@@ -92,7 +96,9 @@
             </div>
 
             <nav class="mt-8 flex flex-col items-center gap-3 text-sm text-navy-300 sm:flex-row sm:justify-center sm:gap-6">
-                <a href="{{ $passwordLoginUrl }}" class="font-medium transition hover:text-white">Password login</a>
+                @unless ($otpOnly ?? false)
+                    <a href="{{ $passwordLoginUrl }}" class="font-medium transition hover:text-white">Password login</a>
+                @endunless
                 <a href="{{ route('login') }}" class="font-medium transition hover:text-white">Other login options</a>
             </nav>
         </div>

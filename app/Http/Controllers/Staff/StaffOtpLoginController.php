@@ -22,6 +22,7 @@ class StaffOtpLoginController extends Controller
 
         return view('staff.otp-login', [
             'otpAvailable' => $otp->isAvailable(),
+            'otpOnly' => ! $otp->passwordLoginAllowed(),
             'otpSent' => (bool) session('otp_sent'),
             'otpMobile' => session('otp_mobile', old('mobile')),
             'passwordLoginUrl' => Filament::getPanel('admin')->getLoginUrl(),

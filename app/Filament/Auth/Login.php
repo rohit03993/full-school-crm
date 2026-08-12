@@ -2,6 +2,7 @@
 
 namespace App\Filament\Auth;
 
+use App\Services\WhatsAppOtpService;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
@@ -11,6 +12,17 @@ use Illuminate\Validation\ValidationException;
 
 class Login extends BaseLogin
 {
+    public function mount(): void
+    {
+        if (! app(WhatsAppOtpService::class)->passwordLoginAllowed() && ! Filament::auth()->check()) {
+            $this->redirect(route('staff.otp-login'));
+
+            return;
+        }
+
+        parent::mount();
+    }
+
     public function form(\Filament\Schemas\Schema $schema): \Filament\Schemas\Schema
     {
         return $schema
@@ -23,6 +35,19 @@ class Login extends BaseLogin
 
     protected function getLoginFormComponent(): Component
     {
+        $otp = app(WhatsAppOtpService::class);
+        $otpAvailable = $otp->isAvailable();
+        $otpOnly = ! $otp->passwordLoginAllowed();
+
+        $helper = 'Mobile with or without +91. Staff sign in with mobile and password.';
+
+        if ($otpOnly) {
+            $helper = 'Password login is off. Use WhatsApp OTP.';
+        } elseif ($otpAvailable) {
+            $helper = 'Mobile with or without +91. Staff sign in with mobile and password. '
+                .'<a href="'.e(route('staff.otp-login')).'" class="underline">Or use WhatsApp OTP</a>.';
+        }
+
         return TextInput::make('login')
             ->label('Mobile number')
             ->required()
@@ -31,10 +56,7 @@ class Login extends BaseLogin
             ->tel()
             ->maxLength(14)
             ->placeholder('10-digit mobile or +91…')
-            ->helperText(new HtmlString(
-                'Mobile with or without +91. Staff sign in with mobile and password. '
-                .'<a href="'.e(route('staff.otp-login')).'" class="underline">Or use WhatsApp OTP</a>.'
-            ));
+            ->helperText(new HtmlString($helper));
     }
 
     protected function throwFailureValidationException(): never
@@ -46,6 +68,12 @@ class Login extends BaseLogin
 
     public function authenticate(): ?\Filament\Auth\Http\Responses\Contracts\LoginResponse
     {
+        if (! app(WhatsAppOtpService::class)->passwordLoginAllowed()) {
+            throw ValidationException::withMessages([
+                'data.login' => 'Password login is disabled. Use WhatsApp OTP.',
+            ]);
+        }
+
         $response = parent::authenticate();
 
         $user = auth()->user();

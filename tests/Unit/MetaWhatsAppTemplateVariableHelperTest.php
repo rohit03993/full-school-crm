@@ -97,6 +97,19 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
         $this->assertStringContainsString('/h/', $rows[3]['example']);
     }
 
+    public function test_login_otp_preset_uses_otp_sample_label(): void
+    {
+        $rows = MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
+            \App\Support\LoginOtpWhatsAppTemplate::BODY,
+            [],
+            'login_otp',
+        );
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('4-digit OTP', $rows[0]['label']);
+        $this->assertSame('4821', $rows[0]['example']);
+    }
+
     public function test_rows_to_examples_csv_in_order(): void
     {
         $csv = MetaWhatsAppTemplateVariableHelper::rowsToExamplesCsv([

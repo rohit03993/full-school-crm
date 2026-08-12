@@ -161,7 +161,7 @@ class ManageMetaWhatsAppSettings extends Page
                 ])
                 ->columns(2),
             Section::make('Login OTP template')
-                ->description('Used for staff and student WhatsApp OTP login. Create an approved AUTHENTICATION (or UTILITY) template in Meta with one body variable for the 4-digit code.')
+                ->description('Used for staff and student WhatsApp OTP login. Create login_otp (or an AUTHENTICATION OTP template in Meta), Sync, then select it here.')
                 ->schema([
                     Select::make('otp_template_name')
                         ->label('OTP template')
@@ -176,7 +176,8 @@ class ManageMetaWhatsAppSettings extends Page
                         ->searchable()
                         ->native(false)
                         ->placeholder('Select approved template')
-                        ->helperText('Required for OTP login. Leave empty to keep password-only login.')
+                        ->helperText('Required for OTP login. Name login_otp in Templates (leave body blank and blur) or create AUTHENTICATION OTP in Meta and Sync.')
+                        ->live()
                         ->columnSpanFull(),
                     TextInput::make('otp_template_language')
                         ->label('OTP template language')
@@ -185,6 +186,11 @@ class ManageMetaWhatsAppSettings extends Page
                     Toggle::make('otp_include_button_param')
                         ->label('Include OTP in template button parameter')
                         ->helperText('Turn on for Meta copy-code / URL authentication templates that also need the code in the button.'),
+                    Toggle::make('otp_only_login')
+                        ->label('OTP-only login (disable passwords)')
+                        ->helperText('Staff CRM and student portal will sign in with WhatsApp OTP only. Password login is hidden. Requires an OTP template above. If WhatsApp is down, password is kept as a fallback so you are not locked out.')
+                        ->disabled(fn (callable $get): bool => blank($get('otp_template_name')))
+                        ->columnSpanFull(),
                 ])
                 ->columns(2),
             Section::make('Recent Meta messages')
