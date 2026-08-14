@@ -31,6 +31,75 @@
             </p>
         @endif
 
+        @if ($lastCombinedSendResult)
+            @php
+                $sendResult = $lastCombinedSendResult;
+                $currency = $sendResult['currency'] ?? 'INR';
+                $unitCost = (float) ($sendResult['unit_cost'] ?? 0);
+                $totalCost = (float) ($sendResult['estimated_total_cost'] ?? 0);
+            @endphp
+            <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/5">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Last combined send</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            {{ $sendResult['sent'] ?? 0 }} sent · {{ $sendResult['failed'] ?? 0 }} failed · {{ $sendResult['skipped'] ?? 0 }} skipped
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-bold text-gray-900 dark:text-gray-100">
+                            Estimated total: {{ $currency }} {{ number_format($totalCost, 2) }}
+                        </p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            {{ $currency }} {{ number_format($unitCost, 4) }} per successfully accepted message
+                        </p>
+                    </div>
+                </div>
+
+                <div class="max-h-72 overflow-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="sticky top-0 bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                            <tr>
+                                <th class="px-4 py-2">Student</th>
+                                <th class="px-4 py-2">Mobile number</th>
+                                <th class="px-4 py-2">Result</th>
+                                <th class="px-4 py-2 text-right">Estimated cost</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-white/5">
+                            @forelse (($sendResult['recipients'] ?? []) as $recipient)
+                                <tr>
+                                    <td class="px-4 py-2.5 font-medium text-gray-900 dark:text-gray-100">{{ $recipient['name'] }}</td>
+                                    <td class="px-4 py-2.5 font-mono text-gray-600 dark:text-gray-300">{{ $recipient['phone'] ?: '—' }}</td>
+                                    <td class="px-4 py-2.5">
+                                        <span @class([
+                                            'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                                            'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200' => $recipient['status'] === 'sent',
+                                            'bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200' => $recipient['status'] === 'failed',
+                                            'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300' => $recipient['status'] === 'skipped',
+                                        ])>{{ ucfirst($recipient['status']) }}</span>
+                                        @if ($recipient['error'])
+                                            <p class="mt-1 max-w-md text-xs text-rose-600 dark:text-rose-300">{{ $recipient['error'] }}</p>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-2.5 text-right text-gray-600 dark:text-gray-300">
+                                        {{ $currency }} {{ number_format((float) $recipient['estimated_cost'], 4) }}
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="px-4 py-5 text-center text-gray-500">No recipient details available.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                <p class="border-t border-gray-100 px-4 py-2 text-xs text-gray-500 dark:border-white/5 dark:text-gray-400">
+                    Costs are estimates from your configured Meta WhatsApp rates; final billing may differ.
+                </p>
+            </div>
+        @endif
+
         <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
             <table class="w-full text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">

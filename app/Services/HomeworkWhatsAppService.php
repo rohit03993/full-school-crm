@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\WhatsAppMessageSource;
 use App\Models\Batch;
 use App\Models\HomeworkAssignment;
 use App\Models\MetaWhatsAppTemplate;
@@ -17,6 +18,7 @@ class HomeworkWhatsAppService
     public function __construct(
         protected WhatsAppDispatchService $whatsapp,
         protected HomeworkAssignmentService $homework,
+        protected MetaWhatsAppCostEstimator $costEstimator,
     ) {}
 
     /**
@@ -89,7 +91,17 @@ class HomeworkWhatsAppService
      * without homework are simply not included.
      *
      * @param  Collection<int, HomeworkAssignment>  $assignments
-     * @return array{sent: int, failed: int, skipped: int, error: ?string, template: ?string}
+     * @return array{
+     *     sent: int,
+     *     failed: int,
+     *     skipped: int,
+     *     error: ?string,
+     *     template: ?string,
+     *     currency: string,
+     *     unit_cost: float,
+     *     estimated_total_cost: float,
+     *     recipients: list<array{name: string, phone: string, status: string, error: ?string, estimated_cost: float}>
+     * }
      */
     public function notifyCombined(
         Batch $batch,
@@ -97,7 +109,17 @@ class HomeworkWhatsAppService
         Collection $assignments,
         ?string $templateName = null,
     ): array {
-        $empty = ['sent' => 0, 'failed' => 0, 'skipped' => 0, 'error' => null, 'template' => null];
+        $empty = [
+            'sent' => 0,
+            'failed' => 0,
+            'skipped' => 0,
+            'error' => null,
+            'template' => null,
+            'currency' => $this->costEstimator->currency(),
+            'unit_cost' => 0.0,
+            'estimated_total_cost' => 0.0,
+            'recipients' => [],
+        ];
 
         if (! $this->whatsapp->isConfigured()) {
             return [...$empty, 'error' => 'WhatsApp is not configured. Open WhatsApp → WhatsApp setup.'];
@@ -124,6 +146,8 @@ class HomeworkWhatsAppService
             ];
         }
 
+        $estimate = $this->costEstimator->estimateForTemplate($resolved);
+        $unitCost = (float) $estimate['cost_inr'];
         $linksBlock = $this->buildSubjectLinksBlock($assignments);
 
         if ($linksBlock === '') {
@@ -140,10 +164,21 @@ class HomeworkWhatsAppService
         $failed = 0;
         $skipped = 0;
         $lastError = null;
+        $recipients = [];
 
         foreach ($students as $student) {
+            $name = (string) ($student->name ?? 'Student');
+            $phone = (string) ($student->mobile ?? '');
+
             if (blank($student->mobile)) {
                 $skipped++;
+                $recipients[] = [
+                    'name' => $name,
+                    'phone' => $phone,
+                    'status' => 'skipped',
+                    'error' => 'No mobile number',
+                    'estimated_cost' => 0.0,
+                ];
 
                 continue;
             }
@@ -160,24 +195,49 @@ class HomeworkWhatsAppService
             // One student's failure must not stop the rest of the class.
             try {
                 $result = $this->whatsapp->send(
-                    (string) $student->mobile,
+                    $phone,
                     $params,
                     $resolved,
-                    (string) ($student->name ?? 'Student'),
+                    $name,
                     4,
+                    logContext: [
+                        'student_id' => $student->id,
+                        'message_source' => WhatsAppMessageSource::Homework->value,
+                    ],
                 );
             } catch (Throwable $exception) {
                 $failed++;
                 $lastError = $exception->getMessage();
+                $recipients[] = [
+                    'name' => $name,
+                    'phone' => $phone,
+                    'status' => 'failed',
+                    'error' => $lastError,
+                    'estimated_cost' => 0.0,
+                ];
 
                 continue;
             }
 
             if (($result['status'] ?? '') === 'success') {
                 $sent++;
+                $recipients[] = [
+                    'name' => $name,
+                    'phone' => $phone,
+                    'status' => 'sent',
+                    'error' => null,
+                    'estimated_cost' => $unitCost,
+                ];
             } else {
                 $failed++;
                 $lastError = (string) ($result['error'] ?? $lastError);
+                $recipients[] = [
+                    'name' => $name,
+                    'phone' => $phone,
+                    'status' => 'failed',
+                    'error' => $lastError,
+                    'estimated_cost' => 0.0,
+                ];
             }
         }
 
@@ -189,6 +249,10 @@ class HomeworkWhatsAppService
                 ? ($lastError ?? 'No WhatsApp messages were sent.')
                 : ($failed > 0 ? $lastError : null),
             'template' => $resolved,
+            'currency' => (string) $estimate['currency'],
+            'unit_cost' => $unitCost,
+            'estimated_total_cost' => round($unitCost * $sent, 4),
+            'recipients' => $recipients,
         ];
     }
 

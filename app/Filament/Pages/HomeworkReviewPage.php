@@ -54,6 +54,9 @@ class HomeworkReviewPage extends Page
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
+    /** @var array<string, mixed>|null */
+    public ?array $lastCombinedSendResult = null;
+
     public static function getNavigationLabel(): string
     {
         return CrmMenuLabels::homeworkReview();
@@ -98,6 +101,7 @@ class HomeworkReviewPage extends Page
                         ->live()
                         ->afterStateUpdated(function (): void {
                             $this->data['course_subject_id'] = null;
+                            $this->lastCombinedSendResult = null;
                         }),
                     DatePicker::make('homework_date')
                         ->label('Date')
@@ -105,6 +109,9 @@ class HomeworkReviewPage extends Page
                         ->required()
                         ->maxDate(now())
                         ->live()
+                        ->afterStateUpdated(function (): void {
+                            $this->lastCombinedSendResult = null;
+                        })
                         ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
                 ])
                 ->columns(2),
@@ -176,6 +183,7 @@ class HomeworkReviewPage extends Page
                         'ready' => (bool) $ready,
                         'board' => $board,
                         'dateLabel' => Carbon::parse($this->dateString())->format('d M Y'),
+                        'lastCombinedSendResult' => $this->lastCombinedSendResult,
                     ];
                 }),
         ]);
@@ -272,11 +280,14 @@ class HomeworkReviewPage extends Page
             $this->dateString(),
             filled($this->data['combined_template_name'] ?? null) ? (string) $this->data['combined_template_name'] : null,
         );
+        $this->lastCombinedSendResult = $result;
+        $cost = number_format((float) ($result['estimated_total_cost'] ?? 0), 2);
+        $currency = (string) ($result['currency'] ?? 'INR');
 
         if ($result['sent'] > 0 && ($result['failed'] ?? 0) === 0) {
             Notification::make()
                 ->title('Sent to parents')
-                ->body($result['sent'].' message(s) sent covering '.$result['subjects'].' subject(s).')
+                ->body($result['sent'].' message(s) sent covering '.$result['subjects'].' subject(s). Estimated cost: '.$currency.' '.$cost.'.')
                 ->success()
                 ->send();
 
@@ -286,7 +297,7 @@ class HomeworkReviewPage extends Page
         if ($result['sent'] > 0) {
             Notification::make()
                 ->title('Partially sent')
-                ->body($result['sent'].' sent, '.$result['failed'].' failed. Check WhatsApp → Message history.')
+                ->body($result['sent'].' sent, '.$result['failed'].' failed. Estimated cost: '.$currency.' '.$cost.'. See recipient details below.')
                 ->warning()
                 ->send();
 

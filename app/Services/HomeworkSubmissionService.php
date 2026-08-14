@@ -402,7 +402,18 @@ class HomeworkSubmissionService
     /**
      * Approve all still-submitted subjects, then send one combined message per student.
      *
-     * @return array{sent: int, failed: int, skipped: int, error: ?string, template: ?string, subjects: int}
+     * @return array{
+     *     sent: int,
+     *     failed: int,
+     *     skipped: int,
+     *     error: ?string,
+     *     template: ?string,
+     *     subjects: int,
+     *     currency?: string,
+     *     unit_cost?: float,
+     *     estimated_total_cost?: float,
+     *     recipients?: list<array{name: string, phone: string, status: string, error: ?string, estimated_cost: float}>
+     * }
      */
     public function combinedSend(User $admin, int $batchId, string $date, ?string $templateName = null): array
     {

@@ -8,6 +8,7 @@ use App\Enums\CourseStatus;
 use App\Enums\HomeworkAssignmentStatus;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
+use App\Enums\WhatsAppMessageSource;
 use App\Filament\Pages\HomeworkCheckPage;
 use App\Filament\Pages\HomeworkPage;
 use App\Filament\Pages\HomeworkReviewPage;
@@ -20,6 +21,7 @@ use App\Models\BatchStudent;
 use App\Models\Course;
 use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
+use App\Models\MetaWhatsAppMessage;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
 use App\Models\Student;
@@ -174,6 +176,19 @@ class HomeworkSubmissionServiceTest extends TestCase
 
         $this->assertSame(2, $result['sent'], (string) ($result['error'] ?? ''));
         $this->assertSame(1, $result['subjects']);
+        $this->assertEqualsCanonicalizing(
+            ['9876500001', '9876500002'],
+            collect($result['recipients'])->pluck('phone')->all(),
+        );
+        $this->assertSame(['sent', 'sent'], collect($result['recipients'])->pluck('status')->all());
+        $this->assertSame(
+            round((float) $result['unit_cost'] * 2, 4),
+            $result['estimated_total_cost'],
+        );
+        $this->assertSame(
+            WhatsAppMessageSource::Homework->value,
+            MetaWhatsAppMessage::query()->firstOrFail()->message_source,
+        );
 
         $this->assertSame(
             HomeworkAssignmentStatus::Sent,
