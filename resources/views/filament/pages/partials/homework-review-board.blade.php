@@ -32,12 +32,10 @@
         @endif
 
         @if (! empty($lastCombinedSendResult))
-            @php
-                $sendResult = $lastCombinedSendResult;
-                $currency = $sendResult['currency'] ?? 'INR';
-                $unitCost = (float) ($sendResult['unit_cost'] ?? 0);
-                $totalCost = (float) ($sendResult['estimated_total_cost'] ?? 0);
-            @endphp
+            @php($sendResult = $lastCombinedSendResult)
+            @php($currency = $sendResult['currency'] ?? 'INR')
+            @php($unitCost = (float) ($sendResult['unit_cost'] ?? 0))
+            @php($totalCost = (float) ($sendResult['estimated_total_cost'] ?? 0))
             <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
                 <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/5">
                     <div>

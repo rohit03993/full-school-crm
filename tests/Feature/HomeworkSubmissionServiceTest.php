@@ -28,10 +28,12 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\HomeworkSubmissionService;
 use App\Support\CombinedHomeworkWhatsAppTemplate;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -60,6 +62,32 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertFalse(HomeworkCheckPage::shouldRegisterNavigation());
         $this->assertFalse(HomeworkAssignmentResource::shouldRegisterNavigation());
         $this->assertFalse(HomeworkAssignmentResource::canCreate());
+    }
+
+    public function test_review_page_renders_with_and_without_send_summary(): void
+    {
+        $data = $this->seedClass();
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->assertSuccessful()
+            ->set('data.batch_id', $data['batch']->id)
+            ->assertSuccessful()
+            ->set('lastCombinedSendResult', [
+                'sent' => 1,
+                'failed' => 0,
+                'skipped' => 0,
+                'currency' => 'INR',
+                'unit_cost' => 0.35,
+                'estimated_total_cost' => 0.35,
+                'recipients' => [
+                    ['name' => 'Riya Sharma', 'phone' => '9876500001', 'status' => 'sent', 'error' => null, 'estimated_cost' => 0.35],
+                ],
+            ])
+            ->assertSuccessful()
+            ->assertSee('9876500001');
     }
 
     public function test_teacher_submit_creates_submitted_assignment(): void
