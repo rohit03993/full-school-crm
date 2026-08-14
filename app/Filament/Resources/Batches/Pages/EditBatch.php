@@ -6,9 +6,7 @@ use App\Filament\Pages\ClassSectionsPage;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Filament\Resources\Batches\Concerns\SyncsBatchStaffAssignments;
-use App\Filament\Resources\Courses\CourseResource;
 use App\Models\Batch;
-use App\Models\CourseSubject;
 use App\Models\Student;
 use App\Services\BatchService;
 use Filament\Actions\Action;
@@ -34,21 +32,6 @@ class EditBatch extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('manageSubjects')
-                ->label(fn (): string => CourseSubject::query()
-                    ->where('course_id', $this->record->course_id)
-                    ->active()
-                    ->exists()
-                    ? 'Manage subjects'
-                    : 'Add subjects')
-                ->icon('heroicon-o-book-open')
-                ->color(fn (): string => CourseSubject::query()
-                    ->where('course_id', $this->record->course_id)
-                    ->active()
-                    ->exists()
-                    ? 'gray'
-                    : 'warning')
-                ->url(fn (): string => CourseResource::getUrl('edit', ['record' => $this->record->course_id]).'?panel=subjects'),
             Action::make('assignStudents')
                 ->label('Assign Students')
                 ->icon(Heroicon::OutlinedUserPlus)

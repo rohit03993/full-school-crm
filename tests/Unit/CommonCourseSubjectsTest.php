@@ -60,4 +60,24 @@ class CommonCourseSubjectsTest extends TestCase
         $this->assertSame('P1', $rows[0]['code']);
         $this->assertSame(70, $rows[0]['default_max_marks']);
     }
+
+    public function test_section_merge_preserves_teacher_for_still_selected_subject(): void
+    {
+        $rows = CommonCourseSubjects::mergeIntoSectionRows(
+            ['maths', 'physics'],
+            [
+                [
+                    'course_subject_id' => 10,
+                    'name' => 'Maths',
+                    'code' => 'MATH',
+                    'default_max_marks' => 100,
+                    'user_id' => 25,
+                ],
+            ],
+        );
+
+        $this->assertSame(25, $rows[0]['user_id']);
+        $this->assertSame(10, $rows[0]['course_subject_id']);
+        $this->assertNull($rows[1]['user_id']);
+    }
 }

@@ -15,10 +15,12 @@ use App\Models\ActivityType;
 use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
 use App\Models\Course;
+use App\Models\CourseSubject;
 use App\Models\ExamWindow;
 use App\Models\User;
 use App\Services\ActivityAttendanceService;
 use App\Services\CourseSubjectService;
+use App\Services\BatchSubjectService;
 use App\Services\ExamWindowService;
 use App\Services\ResultDeclarationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,10 +40,18 @@ class ExamWindowServiceTest extends TestCase
         Role::findOrCreate(RoleName::Staff->value);
     }
 
-    public function test_create_provisions_subject_sessions_from_course(): void
+    public function test_create_provisions_only_subjects_selected_for_section(): void
     {
         [$admin, $batch] = $this->seedBatchWithSubjects();
         $examType = ActivityType::query()->where('slug', 'exam')->firstOrFail();
+        $unselected = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'History',
+            'code' => 'HIS',
+            'default_max_marks' => 100,
+            'sort_order' => 3,
+            'is_active' => true,
+        ]);
 
         $window = app(ExamWindowService::class)->create([
             'batch_id' => $batch->id,
@@ -54,6 +64,9 @@ class ExamWindowServiceTest extends TestCase
         $this->assertSame(ExamWindowStatus::Open, $window->status);
         $this->assertDatabaseCount('exam_window_subjects', 2);
         $this->assertDatabaseCount('activity_sessions', 2);
+        $this->assertDatabaseMissing('exam_window_subjects', [
+            'course_subject_id' => $unselected->id,
+        ]);
 
         $session = ActivitySession::query()->where('batch_id', $batch->id)->firstOrFail();
         $this->assertSame('Unit Test 1', $session->metadataValue('test_name'));
@@ -167,6 +180,15 @@ class ExamWindowServiceTest extends TestCase
             'academic_session_id' => $session->id,
             'status' => BatchStatus::Active,
         ]);
+
+        app(BatchSubjectService::class)->sync(
+            $batch,
+            $course->subjects()->ordered()->get()->map(fn ($subject): array => [
+                'course_subject_id' => $subject->id,
+                'name' => $subject->name,
+                'default_max_marks' => $subject->default_max_marks,
+            ])->all(),
+        );
 
         return [$admin, $batch];
     }

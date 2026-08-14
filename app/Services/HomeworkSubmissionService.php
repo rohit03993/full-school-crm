@@ -74,14 +74,11 @@ class HomeworkSubmissionService
     {
         $batch = Batch::query()->find($batchId);
 
-        if (! $batch?->course_id) {
+        if (! $batch) {
             return [];
         }
 
-        return CourseSubject::query()
-            ->where('course_id', $batch->course_id)
-            ->where('is_active', true)
-            ->ordered()
+        return $batch->activeSubjects()
             ->get()
             ->mapWithKeys(fn (CourseSubject $subject): array => [
                 $subject->id => $subject->displayLabel(),
@@ -149,9 +146,9 @@ class HomeworkSubmissionService
         $batch = Batch::query()->with('course')->findOrFail($batchId);
         $subject = CourseSubject::query()->findOrFail($subjectId);
 
-        if ((int) $subject->course_id !== (int) $batch->course_id) {
+        if (! $batch->subjects()->where('course_subjects.id', $subject->id)->exists()) {
             throw ValidationException::withMessages([
-                'course_subject_id' => 'Subject does not belong to this class programme.',
+                'course_subject_id' => 'Subject is not selected for this section.',
             ]);
         }
 

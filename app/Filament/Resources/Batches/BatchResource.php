@@ -7,26 +7,25 @@ use App\Enums\BatchShift;
 use App\Enums\BatchStatus;
 use App\Enums\CrmPermission;
 use App\Filament\Concerns\RequiresCrmPermission;
+use App\Filament\Forms\BatchSubjectsFormSchema;
 use App\Filament\Resources\Batches\Pages\CreateBatch;
 use App\Filament\Resources\Batches\Pages\EditBatch;
 use App\Filament\Resources\Batches\Pages\ListBatches;
 use App\Filament\Support\CrmTable;
 use App\Models\AcademicSession;
 use App\Models\Batch;
-use App\Models\CourseSubject;
+use App\Services\BatchSubjectService;
 use App\Support\ClassSectionLabel;
+use App\Support\CommonCourseSubjects;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
 use App\Support\InstituteProfile;
 use App\Support\InstituteTerminology;
 use App\Support\StaffOptions;
-use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -99,22 +98,9 @@ class BatchResource extends Resource
                             ->native(false)
                             ->live()
                             ->afterStateUpdated(function (Set $set, ?int $state): void {
-                                $rows = $state
-                                    ? CourseSubject::query()
-                                        ->where('course_id', $state)
-                                        ->active()
-                                        ->ordered()
-                                        ->get()
-                                        ->map(fn (CourseSubject $subject): array => [
-                                            'course_subject_id' => $subject->id,
-                                            'subject_name' => $subject->displayLabel(),
-                                            'user_id' => null,
-                                        ])
-                                        ->values()
-                                        ->all()
-                                    : [];
-
-                                $set('subject_teacher_assignments', $rows);
+                                $rows = app(BatchSubjectService::class)->suggestedRowsForCourse($state);
+                                $set('section_subjects', $rows);
+                                $set('common_subject_presets', CommonCourseSubjects::keysMatchingRows($rows));
                             })
                             ->columnSpanFull(),
                         Select::make('status')
@@ -126,8 +112,8 @@ class BatchResource extends Resource
                             ->native(false),
                     ])
                     ->columns(2),
-                Section::make('Staff assignments')
-                    ->description('Optional. Assign a class/batch lead and subject teachers when you use structured academics and mark entry.')
+                Section::make('Subjects & teachers')
+                    ->description('Choose subjects for this section only, then assign a staff teacher beside each selected subject.')
                     ->schema([
                         Select::make('lead_teacher_user_id')
                             ->label('Class / batch lead teacher')
@@ -135,37 +121,9 @@ class BatchResource extends Resource
                             ->searchable()
                             ->native(false)
                             ->placeholder('Not assigned'),
-                        Repeater::make('subject_teacher_assignments')
-                            ->label('Subject teachers')
-                            ->schema([
-                                Hidden::make('course_subject_id'),
-                                TextInput::make('subject_name')
-                                    ->label('Subject')
-                                    ->disabled()
-                                    ->dehydrated(false),
-                                Select::make('user_id')
-                                    ->label('Teacher')
-                                    ->options(fn (): array => StaffOptions::facultyOptions())
-                                    ->searchable()
-                                    ->native(false)
-                                    ->placeholder('Not assigned'),
-                            ])
-                            ->columns(2)
-                            ->columnSpanFull()
-                            ->defaultItems(0)
-                            ->addable(false)
-                            ->deletable(false)
-                            ->reorderable(false)
-                            ->visible(fn (Get $get): bool => filled($get('course_id')))
-                            ->helperText(fn (Get $get): string => CourseSubject::query()
-                                ->where('course_id', $get('course_id'))
-                                ->active()
-                                ->exists()
-                                ? 'Assign a teacher per subject for this section. Leave blank to assign later.'
-                                : 'No subjects on this class yet — open Manage subjects in the page header (or Classes & sections → Subjects).'),
+                        ...BatchSubjectsFormSchema::components(),
                     ])
-                    ->collapsed()
-                    ->columns(2),
+                    ->columns(1),
             ]);
     }
 

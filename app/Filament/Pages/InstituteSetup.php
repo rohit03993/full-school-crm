@@ -97,7 +97,7 @@ class InstituteSetup extends Page
             ],
             [
                 'label' => CrmMenuLabels::createExam(),
-                'description' => 'Create unit tests and term exams from programme subjects.',
+                'description' => 'Create unit tests and term exams from each section’s selected subjects.',
                 'url' => ExamWindowsPage::getUrl(),
                 'icon' => 'heroicon-o-clipboard-document-check',
             ],

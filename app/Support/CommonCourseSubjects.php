@@ -132,6 +132,50 @@ final class CommonCourseSubjects
         return array_values([...$presetRows, ...$customRows]);
     }
 
+    /**
+     * Section form variant: preserve the selected teacher and catalogue id while the common
+     * checklist rebuilds the visible subject rows.
+     *
+     * @param  list<string>|null  $selectedKeys
+     * @param  array<int, array<string, mixed>>  $existingRows
+     * @return list<array<string, mixed>>
+     */
+    public static function mergeIntoSectionRows(?array $selectedKeys, array $existingRows): array
+    {
+        $stateByName = [];
+
+        foreach ($existingRows as $row) {
+            $name = mb_strtolower(trim((string) ($row['name'] ?? '')));
+
+            if ($name === '') {
+                continue;
+            }
+
+            $key = self::keyForName($name);
+            $stateByName[$key !== null ? 'preset:'.$key : 'name:'.$name] = [
+                'course_subject_id' => $row['course_subject_id'] ?? null,
+                'user_id' => $row['user_id'] ?? null,
+            ];
+        }
+
+        return collect(self::mergeIntoRows($selectedKeys, $existingRows))
+            ->map(function (array $row) use ($stateByName): array {
+                $key = self::keyForName($row['name']);
+                $stateKey = $key !== null
+                    ? 'preset:'.$key
+                    : 'name:'.mb_strtolower(trim($row['name']));
+                $state = $stateByName[$stateKey] ?? [];
+
+                return [
+                    ...$row,
+                    'course_subject_id' => $state['course_subject_id'] ?? null,
+                    'user_id' => $state['user_id'] ?? null,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     public static function keyForName(string $name): ?string
     {
         $normalized = mb_strtolower(trim($name));

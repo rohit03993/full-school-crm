@@ -54,7 +54,7 @@ class BatchStaffAssignmentService
     public function formStateForBatch(Batch $batch): array
     {
         $batch->loadMissing([
-            'course.subjects' => fn ($query) => $query->ordered(),
+            'activeSubjects',
             'staffAssignments.user',
             'staffAssignments.courseSubject',
         ]);
@@ -65,7 +65,7 @@ class BatchStaffAssignmentService
             ->filter(fn (BatchStaffAssignment $row): bool => $row->isSubjectTeacher())
             ->keyBy('course_subject_id');
 
-        $subjectRows = $batch->course?->subjects
+        $subjectRows = $batch->activeSubjects
             ->map(function (CourseSubject $subject) use ($assignedBySubject): array {
                 $assignment = $assignedBySubject->get($subject->id);
 
@@ -76,7 +76,7 @@ class BatchStaffAssignmentService
                 ];
             })
             ->values()
-            ->all() ?? [];
+            ->all();
 
         return [
             'lead_teacher_user_id' => $lead?->user_id,
@@ -121,10 +121,8 @@ class BatchStaffAssignmentService
             return [];
         }
 
-        $validSubjectIds = CourseSubject::query()
-            ->where('course_id', $batch->course_id)
-            ->where('is_active', true)
-            ->pluck('id')
+        $validSubjectIds = $batch->activeSubjects()
+            ->pluck('course_subjects.id')
             ->all();
 
         $normalized = [];
@@ -140,7 +138,7 @@ class BatchStaffAssignmentService
 
             if (! in_array($subjectId, $validSubjectIds, true)) {
                 throw ValidationException::withMessages([
-                    'subject_teacher_assignments' => 'One or more subjects do not belong to this programme.',
+                    'subject_teacher_assignments' => 'One or more subjects are not selected for this section.',
                 ]);
             }
 

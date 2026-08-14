@@ -109,17 +109,13 @@ class HomeworkCheckService
      */
     public function subjectOptionsForBatch(User $user, int $batchId): array
     {
-        $batch = Batch::query()->with('course.subjects')->find($batchId);
+        $batch = Batch::query()->find($batchId);
 
-        if (! $batch?->course_id) {
+        if (! $batch) {
             return [];
         }
 
-        $subjects = CourseSubject::query()
-            ->where('course_id', $batch->course_id)
-            ->where('is_active', true)
-            ->ordered()
-            ->get();
+        $subjects = $batch->activeSubjects()->get();
 
         if (! $user->hasRole(RoleName::SuperAdmin->value)) {
             $assignedSubjectIds = BatchStaffAssignment::query()
@@ -217,9 +213,9 @@ class HomeworkCheckService
             }
         }
 
-        if ((int) $subject->course_id !== (int) $batch->course_id) {
+        if (! $batch->subjects()->where('course_subjects.id', $subject->id)->exists()) {
             throw ValidationException::withMessages([
-                'course_subject_id' => 'Subject does not belong to this class programme.',
+                'course_subject_id' => 'Subject is not selected for this section.',
             ]);
         }
 

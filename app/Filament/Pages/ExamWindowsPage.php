@@ -69,7 +69,7 @@ class ExamWindowsPage extends Page
 
     public static function getNavigationTooltip(): ?string
     {
-        return 'Create exams from programme subjects — teachers enter marks, class lead submits, admin approves.';
+        return 'Create exams from the selected section subjects — teachers enter marks, class lead submits, admin approves.';
     }
 
     public function getSubheading(): ?string

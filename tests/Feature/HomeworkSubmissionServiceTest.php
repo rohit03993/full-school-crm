@@ -274,6 +274,11 @@ class HomeworkSubmissionServiceTest extends TestCase
             'status' => BatchStatus::Active,
         ]);
 
+        $batch->subjects()->attach([
+            $maths->id => ['sort_order' => 1],
+            $physics->id => ['sort_order' => 2],
+        ]);
+
         BatchStaffAssignment::query()->create([
             'batch_id' => $batch->id,
             'user_id' => $mathTeacher->id,

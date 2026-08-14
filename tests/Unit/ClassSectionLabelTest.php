@@ -172,7 +172,7 @@ class ClassSectionLabelTest extends TestCase
             'duration' => 1,
             'duration_type' => DurationType::Years->value,
             'fee' => 120000,
-            'course_subjects' => [
+            'section_subjects' => [
                 ['name' => 'Physics'],
                 ['name' => 'Chemistry'],
             ],
@@ -182,6 +182,7 @@ class ClassSectionLabelTest extends TestCase
 
         $this->assertDatabaseHas('courses', ['name' => 'IIT JEE Class 12', 'code' => 'IIT-JEE-CLASS-12']);
         $this->assertDatabaseCount('course_subjects', 2);
+        $this->assertDatabaseCount('batch_subjects', 2);
         $this->assertSame('IIT JEE Class 12', $result['batch']->course->name);
         $this->assertSame('A', $result['batch']->section);
     }

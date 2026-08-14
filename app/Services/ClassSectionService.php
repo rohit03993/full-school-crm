@@ -17,8 +17,7 @@ use Illuminate\Validation\ValidationException;
 class ClassSectionService
 {
     public function __construct(
-        protected CourseSubjectService $courseSubjects,
-        protected BatchStaffAssignmentService $staffAssignments,
+        protected BatchSubjectService $batchSubjects,
     ) {}
 
     /**
@@ -31,19 +30,15 @@ class ClassSectionService
             $course = $this->resolveCourse($data);
             $batch = $this->createBatch($course, $data);
 
-            if (($data['programme_mode'] ?? 'existing') === 'new' && ! empty($data['course_subjects'])) {
-                $this->courseSubjects->sync($course, $data['course_subjects']);
-            }
-
-            $this->staffAssignments->sync(
+            $this->batchSubjects->sync(
                 $batch,
+                $data['section_subjects'] ?? [],
                 filled($data['lead_teacher_user_id'] ?? null) ? (int) $data['lead_teacher_user_id'] : null,
-                $data['subject_teacher_assignments'] ?? [],
             );
 
             return [
                 'course' => $course->fresh(['subjects']),
-                'batch' => $batch->fresh(['course', 'academicSession', 'staffAssignments.user']),
+                'batch' => $batch->fresh(['course', 'academicSession', 'subjects', 'staffAssignments.user']),
             ];
         });
     }

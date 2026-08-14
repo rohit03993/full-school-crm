@@ -9,7 +9,6 @@ use App\Support\CrmHint;
 use App\Support\InstituteTerminology;
 use App\Support\CrmNavigation;
 use App\Enums\DurationType;
-use App\Filament\Forms\CourseSubjectsFormSchema;
 use App\Filament\Resources\Courses\Pages\CreateCourse;
 use App\Filament\Resources\Courses\Pages\EditCourse;
 use App\Filament\Resources\Courses\Pages\ListCourses;
@@ -87,7 +86,6 @@ class CourseResource extends Resource
             ->components([
                 Section::make('Programme Details')
                     ->description(fn (): string => 'Create and manage '.strtolower(InstituteTerminology::label('course')).' entries for your institute.')
-                    ->collapsed(fn (): bool => request()->query('panel') === 'subjects')
                     ->schema([
                         TextInput::make('name')
                             ->label('Programme Name')
@@ -141,11 +139,6 @@ class CourseResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->columns(2),
-                Section::make('Subjects')
-                    ->id('subjects')
-                    ->description('Tick common subjects (Maths, Physics, …), then Save. Shared by every section — needed for homework, exams, and subject teachers.')
-                    ->schema(CourseSubjectsFormSchema::components())
-                    ->columnSpanFull(),
                 Section::make('Default installment plan')
                     ->description('Optional. When staff convert a student to this course, these rows auto-fill the admission installment schedule (percentages should total 100%).')
                     ->schema([

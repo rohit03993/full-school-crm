@@ -29,9 +29,9 @@
     </div>
 
     <div class="rounded-xl border border-sky-200/80 bg-sky-50/60 px-4 py-3 text-sm text-sky-900 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100">
-        <p class="font-semibold">Subjects live on the class (programme), not on each section.</p>
+        <p class="font-semibold">Subjects and teachers are set separately for each section.</p>
         <p class="mt-1 text-sky-800 dark:text-sky-200">
-            Click <strong>Subjects</strong> on a class to add English, Maths, etc. Then use <strong>Edit section</strong> to assign subject teachers.
+            Open <strong>Edit section</strong>, tick its subjects, and choose the staff teacher beside each subject.
         </p>
     </div>
 
@@ -67,8 +67,6 @@
             @foreach ($groupedSections as $courseId => $batches)
                 @php
                     $course = $batches->first()?->course;
-                    $subjectCount = $course?->subjects?->where('is_active', true)->count() ?? 0;
-                    $subjectNames = $course?->subjects?->where('is_active', true)->pluck('name')->take(5)->implode(', ') ?? '';
                 @endphp
                 <div class="overflow-hidden rounded-xl border border-gray-200/80 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
                     @if ($course)
@@ -78,29 +76,9 @@
                                 <p class="mt-0.5 text-lg font-bold text-gray-950 dark:text-white">{{ $course->name }}</p>
                                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                                     Fee ₹{{ number_format((float) $course->fee, 0) }}
-                                    <span class="text-gray-300 dark:text-gray-600"> · </span>
-                                    @if ($subjectCount > 0)
-                                        <span class="font-semibold text-emerald-700 dark:text-emerald-300">{{ $subjectCount }} subject{{ $subjectCount === 1 ? '' : 's' }}</span>
-                                        @if ($subjectNames !== '')
-                                            <span class="text-gray-400">({{ $subjectNames }}{{ $subjectCount > 5 ? '…' : '' }})</span>
-                                        @endif
-                                    @else
-                                        <span class="font-semibold text-amber-700 dark:text-amber-300">No subjects yet — add before exams</span>
-                                    @endif
                                 </p>
                             </div>
                             <div class="flex flex-wrap gap-2">
-                                <a
-                                    href="{{ $courseSubjectsUrl($course->id) }}"
-                                    @class([
-                                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide',
-                                        'bg-amber-500 text-white hover:bg-amber-600' => $subjectCount === 0,
-                                        'bg-primary-600 text-white hover:bg-primary-500' => $subjectCount > 0,
-                                    ])
-                                >
-                                    <x-filament::icon icon="heroicon-m-book-open" class="h-4 w-4" />
-                                    Subjects
-                                </a>
                                 <a
                                     href="{{ $courseEditUrl($course->id) }}"
                                     class="inline-flex items-center rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-200 dark:hover:bg-white/15"
@@ -123,6 +101,8 @@
                         @foreach ($batches as $batch)
                             @php
                                 $lead = $batch->staffAssignments->first(fn ($row) => $row->role === BatchStaffRole::LeadTeacher);
+                                $subjectCount = $batch->subjects->where('is_active', true)->count();
+                                $subjectNames = $batch->subjects->where('is_active', true)->pluck('name')->take(5)->implode(', ');
                             @endphp
                             <div class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                                 <div class="min-w-0">
@@ -136,6 +116,17 @@
                                             <span class="text-gray-300 dark:text-gray-600"> · </span>
                                         @endif
                                         {{ $batch->active_students_count }} student{{ $batch->active_students_count === 1 ? '' : 's' }}
+                                        <span class="text-gray-300 dark:text-gray-600"> · </span>
+                                        @if ($subjectCount > 0)
+                                            <span class="font-medium text-emerald-700 dark:text-emerald-300">
+                                                {{ $subjectCount }} subject{{ $subjectCount === 1 ? '' : 's' }}
+                                                @if ($subjectNames !== '')
+                                                    ({{ $subjectNames }}{{ $subjectCount > 5 ? '…' : '' }})
+                                                @endif
+                                            </span>
+                                        @else
+                                            <span class="font-medium text-amber-700 dark:text-amber-300">No subjects selected</span>
+                                        @endif
                                         @if ($lead?->user)
                                             <span class="text-gray-300 dark:text-gray-600"> · </span>
                                             Lead: {{ $lead->user->name }}

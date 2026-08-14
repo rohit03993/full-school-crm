@@ -20,7 +20,8 @@ class ClassSectionListService
     ): LengthAwarePaginator {
         $query = Batch::query()
             ->with([
-                'course.subjects',
+                'course',
+                'subjects',
                 'academicSession',
                 'trainer',
                 'staffAssignments.user',

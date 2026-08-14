@@ -99,7 +99,7 @@ class ListActivitySessions extends ListRecords
                 ->icon(Heroicon::OutlinedClipboardDocumentCheck)
                 ->color('success')
                 ->url(ExamWindowsPage::getUrl())
-                ->tooltip('Create exams from programme subjects — teacher entry, approval, then publish.');
+                ->tooltip('Create exams from section subjects — teacher entry, approval, then publish.');
         }
 
         if (ConsolidatedReportCardsPage::canAccess()) {

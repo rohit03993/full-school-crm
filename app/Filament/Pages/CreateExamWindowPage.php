@@ -142,7 +142,7 @@ class CreateExamWindowPage extends Page
                         ->rows(2)
                         ->columnSpanFull(),
                     Placeholder::make('subjects_preview')
-                        ->label('Subjects from programme')
+                        ->label('Subjects for this section')
                         ->content(function (Get $get): string {
                             $batchId = (int) ($get('batch_id') ?? 0);
 
@@ -150,11 +150,11 @@ class CreateExamWindowPage extends Page
                                 return 'Select a section to preview subjects.';
                             }
 
-                            $batch = Batch::query()->with('course.subjects')->find($batchId);
-                            $subjects = $batch?->course?->subjects?->filter(fn (CourseSubject $s): bool => $s->is_active) ?? collect();
+                            $batch = Batch::query()->with('subjects')->find($batchId);
+                            $subjects = $batch?->subjects?->filter(fn (CourseSubject $s): bool => $s->is_active) ?? collect();
 
                             if ($subjects->isEmpty()) {
-                                return 'No subjects on this programme — add subjects under Programme & fee first.';
+                                return 'No subjects selected — open Edit section and choose its subjects first.';
                             }
 
                             return $subjects

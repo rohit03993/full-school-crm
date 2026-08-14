@@ -4,13 +4,14 @@ namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
 use App\Enums\DurationType;
-use App\Filament\Forms\CourseSubjectsFormSchema;
+use App\Filament\Forms\BatchSubjectsFormSchema;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Models\AcademicSession;
 use App\Models\Course;
-use App\Models\CourseSubject;
+use App\Services\BatchSubjectService;
 use App\Services\ClassSectionService;
 use App\Support\ClassSectionLabel;
+use App\Support\CommonCourseSubjects;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
 use App\Support\CrmNavigation;
@@ -18,9 +19,7 @@ use App\Support\InstituteProfile;
 use App\Support\InstituteTerminology;
 use App\Support\StaffOptions;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -92,8 +91,8 @@ class AddClassSectionPage extends Page
             'duration_type' => DurationType::Years->value,
             'fee' => 0,
             'show_on_website' => true,
-            'course_subjects' => [],
-            'subject_teacher_assignments' => [],
+            'common_subject_presets' => [],
+            'section_subjects' => [],
         ]);
     }
 
@@ -127,7 +126,7 @@ class AddClassSectionPage extends Page
                 ))
                 ->columnSpanFull(),
             Section::make('Programme / class')
-                ->description("The programme students enroll in (fee and subjects). All sections share this {$courseLabel}.")
+                ->description("The programme students enroll in. Subjects are selected separately for this {$batchLabel}.")
                 ->schema([
                     Select::make('programme_mode')
                         ->label('Programme')
@@ -138,7 +137,12 @@ class AddClassSectionPage extends Page
                         ->default('existing')
                         ->required()
                         ->native(false)
-                        ->live(),
+                        ->live()
+                        ->afterStateUpdated(function (Set $set): void {
+                            $set('course_id', null);
+                            $set('common_subject_presets', []);
+                            $set('section_subjects', []);
+                        }),
                     Select::make('course_id')
                         ->label($courseLabel)
                         ->options(fn (): array => InstituteProfile::activeCourseAdmissionOptions())
@@ -147,7 +151,7 @@ class AddClassSectionPage extends Page
                         ->visible(fn (Get $get): bool => $get('programme_mode') === 'existing')
                         ->required(fn (Get $get): bool => $get('programme_mode') === 'existing')
                         ->live()
-                        ->afterStateUpdated(fn (Set $set, ?int $state) => $this->applySubjectTeacherRows($set, $state)),
+                        ->afterStateUpdated(fn (Set $set, ?int $state) => $this->applySectionSubjectRows($set, $state)),
                     TextInput::make('programme_name')
                         ->label($courseLabel.' name')
                         ->placeholder('e.g. Class 12 Science, IIT JEE Class 12')
@@ -186,12 +190,6 @@ class AddClassSectionPage extends Page
                         ->visible(fn (Get $get): bool => $get('programme_mode') === 'new'),
                 ])
                 ->columns(2),
-            Section::make('Subjects')
-                ->description('Optional. Tick common subjects — shared by every section under this programme.')
-                ->schema(CourseSubjectsFormSchema::components())
-                ->collapsed()
-                ->visible(fn (Get $get): bool => $get('programme_mode') === 'new')
-                ->columnSpanFull(),
             Section::make('Section / batch')
                 ->description("Where students attend — e.g. Section A, Batch Morning.")
                 ->schema([
@@ -229,8 +227,8 @@ class AddClassSectionPage extends Page
                         ->columnSpanFull(),
                 ])
                 ->columns(2),
-            Section::make('Staff assignments')
-                ->description('Optional. Class/batch lead and subject teachers.')
+            Section::make('Subjects & teachers for this section')
+                ->description('Choose subjects for this section only. Then select the staff teacher beside each subject.')
                 ->schema([
                     Select::make('lead_teacher_user_id')
                         ->label('Class / batch lead teacher')
@@ -238,31 +236,10 @@ class AddClassSectionPage extends Page
                         ->searchable()
                         ->native(false)
                         ->placeholder('Not assigned'),
-                    Repeater::make('subject_teacher_assignments')
-                        ->label('Subject teachers')
-                        ->schema([
-                            Hidden::make('course_subject_id'),
-                            TextInput::make('subject_name')
-                                ->label('Subject')
-                                ->disabled()
-                                ->dehydrated(false),
-                            Select::make('user_id')
-                                ->label('Teacher')
-                                ->options(fn (): array => StaffOptions::facultyOptions())
-                                ->searchable()
-                                ->native(false)
-                                ->placeholder('Not assigned'),
-                        ])
-                        ->columns(2)
-                        ->columnSpanFull()
-                        ->defaultItems(0)
-                        ->addable(false)
-                        ->deletable(false)
-                        ->reorderable(false)
-                        ->visible(fn (Get $get): bool => $get('programme_mode') === 'existing' && filled($get('course_id'))),
+                    ...BatchSubjectsFormSchema::components(),
                 ])
-                ->collapsed()
-                ->columns(2),
+                ->visible(fn (Get $get): bool => $get('programme_mode') === 'new' || filled($get('course_id')))
+                ->columns(1),
         ]);
     }
 
@@ -321,28 +298,11 @@ class AddClassSectionPage extends Page
             ]);
     }
 
-    protected function applySubjectTeacherRows(Set $set, ?int $courseId): void
+    protected function applySectionSubjectRows(Set $set, ?int $courseId): void
     {
-        if (! $courseId) {
-            $set('subject_teacher_assignments', []);
-
-            return;
-        }
-
-        $rows = CourseSubject::query()
-            ->where('course_id', $courseId)
-            ->active()
-            ->ordered()
-            ->get()
-            ->map(fn (CourseSubject $subject): array => [
-                'course_subject_id' => $subject->id,
-                'subject_name' => $subject->displayLabel(),
-                'user_id' => null,
-            ])
-            ->values()
-            ->all();
-
-        $set('subject_teacher_assignments', $rows);
+        $rows = app(BatchSubjectService::class)->suggestedRowsForCourse($courseId);
+        $set('section_subjects', $rows);
+        $set('common_subject_presets', CommonCourseSubjects::keysMatchingRows($rows));
     }
 
     protected function previewProgrammeName(Get $get): string

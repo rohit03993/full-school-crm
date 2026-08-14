@@ -331,6 +331,10 @@ class HomeworkCheckServiceTest extends TestCase
             'sort_order' => 3,
             'is_active' => true,
         ]);
+        $batch->subjects()->attach([
+            $physics->id => ['sort_order' => 2],
+            $chemistry->id => ['sort_order' => 3],
+        ]);
 
         $service = app(HomeworkCheckService::class);
 
@@ -526,6 +530,8 @@ class HomeworkCheckServiceTest extends TestCase
             'end_date' => '2027-03-31',
             'status' => BatchStatus::Active,
         ]);
+
+        $batch->subjects()->attach($subject->id, ['sort_order' => 1]);
 
         BatchStaffAssignment::query()->create([
             'batch_id' => $batch->id,

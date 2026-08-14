@@ -111,6 +111,8 @@ class StudentProfileHomeworkTabTest extends TestCase
             'status' => BatchStatus::Active,
         ]);
 
+        $batch->subjects()->attach($subject->id, ['sort_order' => 1]);
+
         $student = Student::query()->create([
             'name' => 'Homework Student',
             'father_name' => 'Parent',

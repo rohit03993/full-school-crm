@@ -5,7 +5,6 @@ namespace App\Filament\Resources\Courses\Pages;
 use App\Enums\CourseStatus;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Courses\Concerns\SyncsCourseInstallmentTemplates;
-use App\Filament\Resources\Courses\Concerns\SyncsCourseSubjects;
 use App\Filament\Pages\ClassSectionsPage;
 use App\Filament\Resources\Courses\CourseResource;
 use App\Models\Course;
@@ -20,31 +19,12 @@ class EditCourse extends EditRecord
 {
     use ShowsCrmPageHint;
     use SyncsCourseInstallmentTemplates;
-    use SyncsCourseSubjects;
 
     protected static string $resource = CourseResource::class;
 
     protected static function crmHintKey(): ?string
     {
-        return request()->query('panel') === 'subjects' ? 'courses.subjects' : 'courses.edit';
-    }
-
-    public function getTitle(): string
-    {
-        if (request()->query('panel') === 'subjects' && $this->record instanceof Course) {
-            return 'Subjects — '.$this->record->name;
-        }
-
-        return parent::getTitle();
-    }
-
-    public function getSubheading(): ?string
-    {
-        if (request()->query('panel') === 'subjects') {
-            return 'Shared by every section under this class. Add subjects before creating exam windows.';
-        }
-
-        return parent::getSubheading();
+        return 'courses.edit';
     }
 
     protected function getHeaderActions(): array
@@ -104,16 +84,11 @@ class EditCourse extends EditRecord
      */
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        $data = $this->mutateFormDataBeforeFillForInstallmentTemplates($data, $this->record);
-
-        return $this->mutateFormDataBeforeFillForCourseSubjects($data, $this->record);
+        return $this->mutateFormDataBeforeFillForInstallmentTemplates($data, $this->record);
     }
 
     protected function afterSave(): void
     {
-        $state = $this->form->getState();
-
-        $this->syncCourseInstallmentTemplates($this->record, $state);
-        $this->syncCourseSubjects($this->record, $state);
+        $this->syncCourseInstallmentTemplates($this->record, $this->form->getState());
     }
 }

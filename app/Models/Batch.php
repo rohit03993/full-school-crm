@@ -8,6 +8,7 @@ use App\Enums\ResultDeclarationStatus;
 use App\Support\ClassSectionLabel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Schema;
 
@@ -68,6 +69,26 @@ class Batch extends Model
     public function staffAssignments(): HasMany
     {
         return $this->hasMany(BatchStaffAssignment::class);
+    }
+
+    /**
+     * Subjects enabled for this specific section.
+     *
+     * CourseSubject remains the shared catalogue so existing homework/exam foreign keys stay
+     * stable; batch_subjects decides which catalogue entries this section actually uses.
+     */
+    public function subjects(): BelongsToMany
+    {
+        return $this->belongsToMany(CourseSubject::class, 'batch_subjects')
+            ->withPivot('sort_order')
+            ->withTimestamps()
+            ->orderByPivot('sort_order')
+            ->orderBy('course_subjects.name');
+    }
+
+    public function activeSubjects(): BelongsToMany
+    {
+        return $this->subjects()->where('course_subjects.is_active', true);
     }
 
     public function isActive(): bool

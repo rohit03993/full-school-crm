@@ -30,7 +30,7 @@ class ExamWindowService
      */
     public function create(array $data, User $admin): ExamWindow
     {
-        $batch = Batch::query()->with(['course.subjects' => fn ($q) => $q->active()->ordered()])->findOrFail((int) $data['batch_id']);
+        $batch = Batch::query()->with(['course', 'subjects'])->findOrFail((int) $data['batch_id']);
         $activityType = ActivityType::query()->findOrFail((int) $data['activity_type_id']);
 
         if (! $activityType->supportsScoring()) {
@@ -39,11 +39,11 @@ class ExamWindowService
             ]);
         }
 
-        $subjects = $batch->course?->subjects?->filter(fn (CourseSubject $s): bool => $s->is_active) ?? collect();
+        $subjects = $batch->subjects->filter(fn (CourseSubject $s): bool => $s->is_active);
 
         if ($subjects->isEmpty()) {
             throw ValidationException::withMessages([
-                'batch_id' => 'Add subjects on the programme first — then create an exam window.',
+                'batch_id' => 'Select subjects on this section first — then create an exam window.',
             ]);
         }
 
