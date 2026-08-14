@@ -74,15 +74,33 @@
             Showing CRM estimates from Meta India rate card below.
         </p>
     @elseif ($metaOk)
-        <p class="rounded-xl border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
-            Official spend from Meta <code class="text-xs">pricing_analytics</code> (India, per-message pricing).
-            Per-campaign rows use CRM estimates until linked to Meta delivery data.
-        </p>
+        @php($gap = $data['gap'] ?? [])
+        <div class="rounded-xl border border-sky-200/80 bg-sky-50/80 px-4 py-3 text-sm text-sky-950 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100">
+            <p class="font-semibold">Meta vs CRM coverage</p>
+            <p class="mt-1">
+                Meta delivered <strong>{{ number_format((int) ($gap['meta_volume'] ?? 0)) }}</strong>
+                (billed {{ $this->formatMoney((float) ($gap['meta_cost'] ?? 0), (string) ($gap['currency'] ?? 'INR')) }}).
+                CRM logged <strong>{{ number_format((int) ($gap['crm_volume'] ?? 0)) }}</strong>
+                (est. {{ $this->formatMoney((float) ($gap['crm_estimated_cost'] ?? 0)) }}).
+                Coverage: <strong>{{ number_format((float) ($gap['coverage_percent'] ?? 0), 1) }}%</strong>.
+            </p>
+            @if (((int) ($gap['missing_from_crm'] ?? 0)) > 0)
+                <p class="mt-1 text-xs opacity-90">
+                    {{ number_format((int) $gap['missing_from_crm']) }} Meta deliveries are not in the CRM message log
+                    (older sends, external tools, or sends before logging was complete).
+                    Trust <strong>Meta billed cost</strong> for real spend. Use CRM source/campaign tables for feature breakdown of logged messages only.
+                </p>
+            @else
+                <p class="mt-1 text-xs opacity-90">
+                    CRM log matches Meta volume for this range. Official spend still comes from Meta; CRM costs remain estimates.
+                </p>
+            @endif
+        </div>
     @endif
 
     <div class="grid gap-6 lg:grid-cols-2">
         <section class="crm-wa-analytics__panel">
-            <h3 class="crm-wa-analytics__panel-title">Cost by category</h3>
+            <h3 class="crm-wa-analytics__panel-title">{{ $metaOk ? 'Cost by category (Meta official)' : 'Cost by category (CRM estimate)' }}</h3>
             @php
                 $categoryRows = $metaOk ? ($meta['by_category'] ?? []) : ($local['by_category'] ?? []);
             @endphp
@@ -113,7 +131,7 @@
         </section>
 
         <section class="crm-wa-analytics__panel">
-            <h3 class="crm-wa-analytics__panel-title">Cost by source</h3>
+            <h3 class="crm-wa-analytics__panel-title">Cost by source (CRM log only)</h3>
             @php $sourceRows = $data['by_source'] ?? []; @endphp
             @if ($sourceRows === [])
                 <p class="text-sm text-gray-500">No source breakdown yet.</p>
@@ -144,7 +162,7 @@
 
     <section class="crm-wa-analytics__panel">
         <div class="mb-4 flex items-center justify-between gap-3">
-            <h3 class="crm-wa-analytics__panel-title">Campaigns in range</h3>
+            <h3 class="crm-wa-analytics__panel-title">Campaigns in range (CRM estimates)</h3>
             <span class="text-xs text-gray-500">{{ $data['from'] ?? '' }} → {{ $data['to'] ?? '' }}</span>
         </div>
 

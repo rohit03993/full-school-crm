@@ -31,9 +31,48 @@ class WhatsAppAnalyticsService
             'to' => $to->toDateString(),
             'meta' => $meta,
             'local' => $local,
+            'gap' => $this->coverageGap($meta, $local),
             'campaigns' => $this->campaignBreakdown($from, $to),
             'by_source' => $this->breakdownBySource($from, $to),
             'by_category' => $this->breakdownByCategory($from, $to),
+        ];
+    }
+
+    /**
+     * Compare Meta official delivery volume with CRM outbound log coverage.
+     *
+     * @param  array<string, mixed>  $meta
+     * @param  array{total_messages: int, total_cost_inr: float}  $local
+     * @return array{
+     *     meta_available: bool,
+     *     meta_volume: int,
+     *     crm_volume: int,
+     *     missing_from_crm: int,
+     *     coverage_percent: float,
+     *     meta_cost: float,
+     *     crm_estimated_cost: float,
+     *     currency: string
+     * }
+     */
+    public function coverageGap(array $meta, array $local): array
+    {
+        $metaOk = ($meta['status'] ?? '') === 'success';
+        $metaVolume = $metaOk ? (int) ($meta['total_volume'] ?? 0) : 0;
+        $crmVolume = (int) ($local['total_messages'] ?? 0);
+        $missing = max(0, $metaVolume - $crmVolume);
+        $coverage = $metaVolume > 0
+            ? round(($crmVolume / $metaVolume) * 100, 1)
+            : ($crmVolume > 0 ? 100.0 : 0.0);
+
+        return [
+            'meta_available' => $metaOk,
+            'meta_volume' => $metaVolume,
+            'crm_volume' => $crmVolume,
+            'missing_from_crm' => $missing,
+            'coverage_percent' => $coverage,
+            'meta_cost' => $metaOk ? round((float) ($meta['total_cost'] ?? 0), 4) : 0.0,
+            'crm_estimated_cost' => round((float) ($local['total_cost_inr'] ?? 0), 4),
+            'currency' => $metaOk ? (string) ($meta['currency'] ?? 'INR') : 'INR',
         ];
     }
 

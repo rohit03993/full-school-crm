@@ -387,6 +387,10 @@ class HomeworkWhatsAppService
             $resolved,
             (string) ($student->name ?? 'Student'),
             4,
+            logContext: [
+                'student_id' => $student->id,
+                'message_source' => WhatsAppMessageSource::Homework->value,
+            ],
         );
 
         if (($result['status'] ?? '') === 'success') {

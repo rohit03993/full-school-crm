@@ -52,7 +52,7 @@ class MetaWhatsAppMessageLogger
             'body_preview' => mb_substr($preview, 0, 500),
             'message_type' => 'text',
             'conversation_category' => $context['conversation_category'] ?? $estimate['category'],
-            'message_source' => $context['message_source'] ?? WhatsAppMessageSource::Automation->value,
+            'message_source' => $this->resolveMessageSource($context, WhatsAppMessageSource::Automation),
             'estimated_cost_inr' => $context['estimated_cost_inr'] ?? $estimate['cost_inr'],
             'whatsapp_campaign_recipient_id' => $context['whatsapp_campaign_recipient_id'] ?? null,
             'status' => $status->value,
@@ -92,7 +92,7 @@ class MetaWhatsAppMessageLogger
             'body_preview' => mb_substr((string) ($mediaAttributes['body_preview'] ?? 'Media message'), 0, 500),
             'message_type' => (string) ($mediaAttributes['message_type'] ?? 'document'),
             'conversation_category' => $context['conversation_category'] ?? $estimate['category'],
-            'message_source' => $context['message_source'] ?? WhatsAppMessageSource::Profile->value,
+            'message_source' => $this->resolveMessageSource($context, WhatsAppMessageSource::Profile),
             'estimated_cost_inr' => $context['estimated_cost_inr'] ?? $estimate['cost_inr'],
             'whatsapp_campaign_recipient_id' => $context['whatsapp_campaign_recipient_id'] ?? null,
             'media_id' => $mediaAttributes['media_id'] ?? null,
@@ -134,7 +134,7 @@ class MetaWhatsAppMessageLogger
             'body_preview' => mb_substr($bodyPreview, 0, 500),
             'message_type' => 'text',
             'conversation_category' => $estimate['category'],
-            'message_source' => $context['message_source'] ?? WhatsAppMessageSource::Inbox->value,
+            'message_source' => $this->resolveMessageSource($context, WhatsAppMessageSource::Inbox),
             'estimated_cost_inr' => $estimate['cost_inr'],
             'whatsapp_campaign_recipient_id' => $context['whatsapp_campaign_recipient_id'] ?? null,
             'status' => $status->value,
@@ -259,6 +259,31 @@ class MetaWhatsAppMessageLogger
         }
 
         return $digits;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    protected function resolveMessageSource(array $context, WhatsAppMessageSource $default): string
+    {
+        $explicit = trim((string) ($context['message_source'] ?? ''));
+
+        if ($explicit !== '' && WhatsAppMessageSource::tryFrom($explicit) !== null) {
+            return $explicit;
+        }
+
+        $legacy = trim((string) ($context['source'] ?? ''));
+
+        return match ($legacy) {
+            'staff_punch', 'punch', 'attendance_punch' => WhatsAppMessageSource::Punch->value,
+            'homework' => WhatsAppMessageSource::Homework->value,
+            'campaign', 'bulk' => WhatsAppMessageSource::Campaign->value,
+            'inbox' => WhatsAppMessageSource::Inbox->value,
+            'profile' => WhatsAppMessageSource::Profile->value,
+            'post_call' => WhatsAppMessageSource::PostCall->value,
+            'test' => WhatsAppMessageSource::Test->value,
+            default => $default->value,
+        };
     }
 
     protected function guessStudentId(string $phone): ?int

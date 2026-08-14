@@ -148,5 +148,33 @@ class WhatsAppAnalyticsTest extends TestCase
         $this->assertSame(0.7846, $summary['local']['total_cost_inr']);
         $this->assertCount(1, $summary['campaigns']);
         $this->assertSame(0.7846, $summary['campaigns'][0]['estimated_total_cost_inr']);
+        $this->assertArrayHasKey('gap', $summary);
+        $this->assertSame(1, $summary['gap']['crm_volume']);
+    }
+
+    public function test_coverage_gap_compares_meta_and_crm_volumes(): void
+    {
+        $service = app(WhatsAppAnalyticsService::class);
+
+        $gap = $service->coverageGap(
+            [
+                'status' => 'success',
+                'total_volume' => 100,
+                'total_cost' => 11.5,
+                'currency' => 'INR',
+            ],
+            [
+                'total_messages' => 20,
+                'total_cost_inr' => 2.3,
+            ],
+        );
+
+        $this->assertTrue($gap['meta_available']);
+        $this->assertSame(100, $gap['meta_volume']);
+        $this->assertSame(20, $gap['crm_volume']);
+        $this->assertSame(80, $gap['missing_from_crm']);
+        $this->assertSame(20.0, $gap['coverage_percent']);
+        $this->assertSame(11.5, $gap['meta_cost']);
+        $this->assertSame(2.3, $gap['crm_estimated_cost']);
     }
 }

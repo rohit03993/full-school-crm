@@ -130,6 +130,20 @@ class MetaWhatsAppService
         } catch (\Throwable $e) {
             Log::error('Meta WhatsApp exception', ['error' => $e->getMessage()]);
 
+            $this->logger->recordOutbound(
+                $phone,
+                null,
+                $templateName,
+                $languageCode,
+                $bodyParams,
+                MetaWhatsAppMessageStatus::Failed,
+                $e->getMessage(),
+                null,
+                $logContext['student_id'] ?? null,
+                null,
+                $logContext,
+            );
+
             return ['status' => 'failed', 'error' => $e->getMessage()];
         }
     }
