@@ -85,7 +85,7 @@ class CrmHint
         'activity.attendance' => 'Mark Present or Absent, then enter marks for each student who appeared.',
         'activity.marks.import' => 'Enter test name and date, pick exam type, upload Excel. Roll numbers match students automatically.',
         'whatsapp.templates' => 'Create templates here and submit to Meta for approval. Sync refreshes APPROVED / PENDING / REJECTED status. Map {{1}} to student name before bulk campaigns.',
-        'whatsapp.templates.create' => 'Any Meta template: put {{1}}, {{2}}, … in the body. Presets: fee_reminder, homework_not_done, homework_api, staff_punch_in, staff_punch_out, login_otp. For login_otp the CRM submits an Authentication Copy-code OTP template (Meta rejects OTP text as Utility).',
+        'whatsapp.templates.create' => 'Any Meta template: put {{1}}, {{2}}, … in the body. Presets: fee_reminder, homework_not_done, homework_api, homework_combined, staff_punch_in, staff_punch_out, login_otp. For login_otp the CRM submits an Authentication Copy-code OTP template (Meta rejects OTP text as Utility).',
         'whatsapp.campaigns.create' => 'Pick template, audience (batch or course), fill message fields, then send or save as draft.',
         'audit.logs' => 'Read-only history of important changes — fees, admissions, profile edits. For Super Admin oversight.',
         'staff.login_log' => 'CRM sign-in and sign-out only (not biometric punch). One row per login. Kept 180 days. Super Admin / staff managers.',

@@ -66,6 +66,10 @@ class MetaWhatsAppTemplateVariableHelper
             return HomeworkNotDoneWhatsAppTemplate::variables();
         }
 
+        if (CombinedHomeworkWhatsAppTemplate::looksLikeName($name)) {
+            return CombinedHomeworkWhatsAppTemplate::variables();
+        }
+
         if (HomeworkShareWhatsAppTemplate::looksLikeName($name)) {
             return HomeworkShareWhatsAppTemplate::variables();
         }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\HomeworkAssignmentStatus;
 use App\Enums\HomeworkContentType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,13 +15,21 @@ class HomeworkAssignment extends Model
 {
     protected $fillable = [
         'batch_id',
+        'course_subject_id',
         'created_by_user_id',
+        'submitted_by_user_id',
+        'approved_by_user_id',
         'title',
         'description',
+        'status',
+        'homework_date',
         'content_type',
         'file_path',
         'public_token',
         'published_at',
+        'submitted_at',
+        'approved_at',
+        'combined_sent_at',
         'whatsapp_sent_count',
         'whatsapp_failed_count',
     ];
@@ -58,7 +67,12 @@ class HomeworkAssignment extends Model
     {
         return [
             'content_type' => HomeworkContentType::class,
+            'status' => HomeworkAssignmentStatus::class,
+            'homework_date' => 'date',
             'published_at' => 'datetime',
+            'submitted_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'combined_sent_at' => 'datetime',
             'whatsapp_sent_count' => 'integer',
             'whatsapp_failed_count' => 'integer',
         ];
@@ -69,9 +83,24 @@ class HomeworkAssignment extends Model
         return $this->belongsTo(Batch::class);
     }
 
+    public function courseSubject(): BelongsTo
+    {
+        return $this->belongsTo(CourseSubject::class);
+    }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function submittedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by_user_id');
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by_user_id');
     }
 
     public function views(): HasMany

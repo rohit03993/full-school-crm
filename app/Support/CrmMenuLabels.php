@@ -217,6 +217,16 @@ final class CrmMenuLabels
         return 'Homework';
     }
 
+    public static function submitHomework(): string
+    {
+        return 'Submit homework';
+    }
+
+    public static function homeworkReview(): string
+    {
+        return 'Homework review';
+    }
+
     public static function examTypes(): string
     {
         return 'Exam types';
