@@ -31,7 +31,7 @@
             </p>
         @endif
 
-        @if ($lastCombinedSendResult)
+        @if (! empty($lastCombinedSendResult))
             @php
                 $sendResult = $lastCombinedSendResult;
                 $currency = $sendResult['currency'] ?? 'INR';
