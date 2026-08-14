@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\MetaWhatsAppMessageDirection;
+use App\Enums\RoleName;
 use App\Enums\WhatsAppMessageSource;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\MetaWhatsAppTemplate;
@@ -10,8 +11,10 @@ use App\Models\Setting;
 use App\Models\Student;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
+use App\Models\User;
 use App\Models\WhatsAppTemplate;
 use App\Enums\StudentStatus;
+use App\Filament\Pages\WhatsAppAnalyticsPage;
 use App\Services\MetaWhatsAppCostEstimator;
 use App\Services\MetaWhatsAppPricingAnalyticsService;
 use App\Services\WhatsAppAnalyticsService;
@@ -19,6 +22,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class WhatsAppAnalyticsTest extends TestCase
@@ -150,6 +155,23 @@ class WhatsAppAnalyticsTest extends TestCase
         $this->assertSame(0.7846, $summary['campaigns'][0]['estimated_total_cost_inr']);
         $this->assertArrayHasKey('gap', $summary);
         $this->assertSame(1, $summary['gap']['crm_volume']);
+    }
+
+    public function test_usage_and_cost_page_renders(): void
+    {
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response(['pricing_analytics' => ['data' => []]], 200),
+        ]);
+
+        Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+
+        $this->actingAs($admin);
+
+        Livewire::test(WhatsAppAnalyticsPage::class)
+            ->assertSuccessful()
+            ->assertSee('Cost by source');
     }
 
     public function test_coverage_gap_compares_meta_and_crm_volumes(): void

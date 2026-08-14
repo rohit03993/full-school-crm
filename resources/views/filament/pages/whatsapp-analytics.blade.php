@@ -74,7 +74,9 @@
             Showing CRM estimates from Meta India rate card below.
         </p>
     @elseif ($metaOk)
-        @php($gap = $data['gap'] ?? [])
+        @php
+            $gap = $data['gap'] ?? [];
+        @endphp
         <div class="rounded-xl border border-sky-200/80 bg-sky-50/80 px-4 py-3 text-sm text-sky-950 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100">
             <p class="font-semibold">Meta vs CRM coverage</p>
             <p class="mt-1">
