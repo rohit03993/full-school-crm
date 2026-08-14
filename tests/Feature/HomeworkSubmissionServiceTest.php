@@ -8,6 +8,11 @@ use App\Enums\CourseStatus;
 use App\Enums\HomeworkAssignmentStatus;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
+use App\Filament\Pages\HomeworkCheckPage;
+use App\Filament\Pages\HomeworkPage;
+use App\Filament\Pages\HomeworkReviewPage;
+use App\Filament\Pages\SubmitHomeworkPage;
+use App\Filament\Resources\HomeworkAssignments\HomeworkAssignmentResource;
 use App\Models\AcademicSession;
 use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
@@ -43,6 +48,16 @@ class HomeworkSubmissionServiceTest extends TestCase
         Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
         Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-test-token'), 'meta_whatsapp');
         Setting::flushValueCache();
+    }
+
+    public function test_sidebar_registers_only_one_homework_entry(): void
+    {
+        $this->assertTrue(HomeworkPage::shouldRegisterNavigation());
+        $this->assertFalse(SubmitHomeworkPage::shouldRegisterNavigation());
+        $this->assertFalse(HomeworkReviewPage::shouldRegisterNavigation());
+        $this->assertFalse(HomeworkCheckPage::shouldRegisterNavigation());
+        $this->assertFalse(HomeworkAssignmentResource::shouldRegisterNavigation());
+        $this->assertFalse(HomeworkAssignmentResource::canCreate());
     }
 
     public function test_teacher_submit_creates_submitted_assignment(): void

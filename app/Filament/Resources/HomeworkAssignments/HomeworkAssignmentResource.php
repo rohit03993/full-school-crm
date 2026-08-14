@@ -13,7 +13,6 @@ use App\Models\Batch;
 use App\Models\HomeworkAssignment;
 use App\Services\HomeworkAssignmentService;
 use App\Services\HomeworkWhatsAppService;
-use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Filament\Forms\Components\FileUpload;
@@ -30,12 +29,13 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 class HomeworkAssignmentResource extends Resource
 {
     use RequiresAnyCrmPermission;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     /**
      * @return list<CrmPermission>
@@ -71,7 +71,7 @@ class HomeworkAssignmentResource extends Resource
 
     public static function canCreate(): bool
     {
-        return CrmAccess::can(Auth::user(), CrmPermission::HomeworkManage);
+        return false;
     }
 
     public static function form(Schema $schema): Schema

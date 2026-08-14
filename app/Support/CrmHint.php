@@ -51,7 +51,7 @@ class CrmHint
         'attendance.batch' => 'Use Academics → Attendance → Manual batch. Tap IN on arrival and OUT on departure. Parent WhatsApp sends on each action when enabled.',
         'attendance.punch' => 'Use Academics → Attendance → Live punches. First punch = IN (Present + IN WhatsApp); next valid punch = OUT (OUT WhatsApp).',
         'homework.create' => 'Attachment optional. Turn on WhatsApp and pick an APPROVED 4-param Meta template (homework_api / homework_update). Parents get a public link — no portal login. Automations → Homework not done is a separate 5-param flow.',
-        'homework.list' => 'Upload homework for one batch. Optional WhatsApp uses a public /h/ link (no login). Portal “Viewed” counts only logged-in opens.',
+        'homework.list' => 'Published homework history. Use Academics → Homework → Review & send for the daily combined workflow. Portal “Viewed” counts only logged-in opens.',
         'attendance.session' => 'Legacy — workshop attendance is no longer used. Use Academics → Attendance for daily class roll call.',
         'activity.types' => 'Exam category used when entering marks (default: Exam).',
         'followups' => 'Students due for a follow-up call today. Open the profile to log the call and schedule the next date.',
