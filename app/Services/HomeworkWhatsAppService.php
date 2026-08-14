@@ -193,6 +193,9 @@ class HomeworkWhatsAppService
     }
 
     /**
+     * Meta rejects newlines/tabs inside template parameters (#132018), so subjects are joined
+     * on one line with " | " instead of line breaks.
+     *
      * @param  Collection<int, HomeworkAssignment>  $assignments
      */
     protected function buildSubjectLinksBlock(Collection $assignments): string
@@ -209,10 +212,12 @@ class HomeworkWhatsAppService
                     return null;
                 }
 
-                return trim($label).': '.$link;
+                $safeLabel = preg_replace('/\s+/u', ' ', trim((string) $label)) ?? trim((string) $label);
+
+                return $safeLabel.': '.$link;
             })
             ->filter()
-            ->implode("\n");
+            ->implode(' | ');
     }
 
     /**

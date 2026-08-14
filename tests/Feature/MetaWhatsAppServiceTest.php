@@ -36,6 +36,19 @@ class MetaWhatsAppServiceTest extends TestCase
         $this->assertArrayNotHasKey('parameter_name', $service->buildBodyComponents(['Aarav'], ['1'])[0]['parameters'][0]);
     }
 
+    public function test_sanitize_template_param_strips_newlines_and_long_spaces(): void
+    {
+        $this->assertSame(
+            'Maths: https://a.test | Physics: https://b.test',
+            MetaWhatsAppService::sanitizeTemplateParamText("Maths: https://a.test\nPhysics: https://b.test"),
+        );
+
+        $this->assertSame(
+            'a    b',
+            MetaWhatsAppService::sanitizeTemplateParamText('a      b'),
+        );
+    }
+
     public function test_send_named_template_includes_parameter_name_in_payload(): void
     {
         config([

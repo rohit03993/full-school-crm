@@ -150,7 +150,8 @@ class MetaWhatsAppService
         foreach (array_values($bodyParams) as $index => $value) {
             $entry = [
                 'type' => 'text',
-                'text' => $value,
+                // Meta #132018: no newlines/tabs; no more than 4 consecutive spaces.
+                'text' => self::sanitizeTemplateParamText((string) $value),
             ];
 
             $name = trim((string) ($parameterNames[$index] ?? ''));
@@ -168,6 +169,17 @@ class MetaWhatsAppService
                 'parameters' => $parameters,
             ],
         ];
+    }
+
+    /**
+     * Meta template body params reject newlines/tabs and runs of 5+ spaces (#132018).
+     */
+    public static function sanitizeTemplateParamText(string $value): string
+    {
+        $value = str_replace(["\r\n", "\r", "\n", "\t"], ' ', $value);
+        $value = preg_replace('/ {5,}/', '    ', $value) ?? $value;
+
+        return trim($value);
     }
 
     /**
@@ -228,7 +240,11 @@ class MetaWhatsAppService
         }
 
         return array_map(
-            fn (string $value): string => $value === '' ? '—' : $value,
+            function (string $value): string {
+                $sanitized = self::sanitizeTemplateParamText($value);
+
+                return $sanitized === '' ? '—' : $sanitized;
+            },
             $params,
         );
     }
