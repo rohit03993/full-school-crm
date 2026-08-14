@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Courses\Concerns;
 use App\Models\Course;
 use App\Models\CourseSubject;
 use App\Services\CourseSubjectService;
+use App\Support\CommonCourseSubjects;
 
 trait SyncsCourseSubjects
 {
@@ -22,6 +23,8 @@ trait SyncsCourseSubjects
             'default_max_marks' => $subject->default_max_marks,
             'is_active' => $subject->is_active,
         ])->values()->all();
+
+        $data['common_subject_presets'] = CommonCourseSubjects::keysMatchingRows($data['course_subjects']);
 
         return $data;
     }

@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
 use App\Enums\DurationType;
+use App\Filament\Forms\CourseSubjectsFormSchema;
 use App\Filament\Resources\Batches\BatchResource;
 use App\Models\AcademicSession;
 use App\Models\Course;
@@ -186,33 +187,8 @@ class AddClassSectionPage extends Page
                 ])
                 ->columns(2),
             Section::make('Subjects')
-                ->description('Optional. Shared by every section under this programme.')
-                ->schema([
-                    Repeater::make('course_subjects')
-                        ->label('Subjects')
-                        ->schema([
-                            TextInput::make('name')
-                                ->label('Subject name')
-                                ->required()
-                                ->maxLength(100),
-                            TextInput::make('code')
-                                ->label('Short code')
-                                ->maxLength(30),
-                            TextInput::make('default_max_marks')
-                                ->label('Default max marks')
-                                ->numeric()
-                                ->minValue(1)
-                                ->maxValue(1000),
-                            Toggle::make('is_active')
-                                ->label('Active')
-                                ->default(true),
-                        ])
-                        ->columns(2)
-                        ->columnSpanFull()
-                        ->defaultItems(0)
-                        ->addActionLabel('Add subject')
-                        ->reorderable(),
-                ])
+                ->description('Optional. Tick common subjects — shared by every section under this programme.')
+                ->schema(CourseSubjectsFormSchema::components())
                 ->collapsed()
                 ->visible(fn (Get $get): bool => $get('programme_mode') === 'new')
                 ->columnSpanFull(),

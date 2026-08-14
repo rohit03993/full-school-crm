@@ -9,6 +9,7 @@ use App\Support\CrmHint;
 use App\Support\InstituteTerminology;
 use App\Support\CrmNavigation;
 use App\Enums\DurationType;
+use App\Filament\Forms\CourseSubjectsFormSchema;
 use App\Filament\Resources\Courses\Pages\CreateCourse;
 use App\Filament\Resources\Courses\Pages\EditCourse;
 use App\Filament\Resources\Courses\Pages\ListCourses;
@@ -142,36 +143,8 @@ class CourseResource extends Resource
                     ->columns(2),
                 Section::make('Subjects')
                     ->id('subjects')
-                    ->description('Add every subject for this class here (e.g. English, Mathematics, Science). All sections share this list — required before exam windows and subject teachers.')
-                    ->schema([
-                        Repeater::make('course_subjects')
-                            ->label('Subject list')
-                            ->schema([
-                                TextInput::make('name')
-                                    ->label('Subject name')
-                                    ->placeholder('e.g. English, Physics, Accountancy')
-                                    ->required()
-                                    ->maxLength(100),
-                                TextInput::make('code')
-                                    ->label('Short code')
-                                    ->placeholder('e.g. ENG')
-                                    ->maxLength(30),
-                                TextInput::make('default_max_marks')
-                                    ->label('Default max marks')
-                                    ->numeric()
-                                    ->minValue(1)
-                                    ->maxValue(1000)
-                                    ->placeholder('e.g. 100'),
-                                Toggle::make('is_active')
-                                    ->label('Active')
-                                    ->default(true),
-                            ])
-                            ->columns(2)
-                            ->columnSpanFull()
-                            ->defaultItems(0)
-                            ->addActionLabel('Add subject')
-                            ->reorderable(),
-                    ])
+                    ->description('Tick common subjects (Maths, Physics, …), then Save. Shared by every section — needed for homework, exams, and subject teachers.')
+                    ->schema(CourseSubjectsFormSchema::components())
                     ->columnSpanFull(),
                 Section::make('Default installment plan')
                     ->description('Optional. When staff convert a student to this course, these rows auto-fill the admission installment schedule (percentages should total 100%).')
