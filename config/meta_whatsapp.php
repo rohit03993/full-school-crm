@@ -58,16 +58,20 @@ return [
     | official totals from Meta pricing_analytics when WABA ID is configured.
     | Override per institute via settings (meta_whatsapp.pricing_rates).
     |
+    | Defaults approximate Meta India INR rate card (Aug 2026 research):
+    | Marketing ~₹0.8631, Utility/Auth ~₹0.1150. Utility can be free inside an
+    | open 24h customer-service window — estimates here assume billable sends.
+    |
     */
     'pricing_currency' => env('META_WHATSAPP_PRICING_CURRENCY', 'INR'),
 
     'pricing_rates_inr' => [
-        'MARKETING' => (float) env('META_WHATSAPP_RATE_MARKETING_INR', 0.7846),
-        'UTILITY' => (float) env('META_WHATSAPP_RATE_UTILITY_INR', 0.3500),
-        'AUTHENTICATION' => (float) env('META_WHATSAPP_RATE_AUTH_INR', 0.3500),
+        'MARKETING' => (float) env('META_WHATSAPP_RATE_MARKETING_INR', 0.8631),
+        'UTILITY' => (float) env('META_WHATSAPP_RATE_UTILITY_INR', 0.1150),
+        'AUTHENTICATION' => (float) env('META_WHATSAPP_RATE_AUTH_INR', 0.1150),
         'AUTHENTICATION_INTERNATIONAL' => (float) env('META_WHATSAPP_RATE_AUTH_INTL_INR', 2.3000),
         'SERVICE' => (float) env('META_WHATSAPP_RATE_SERVICE_INR', 0.0000),
-        'UNKNOWN' => (float) env('META_WHATSAPP_RATE_UNKNOWN_INR', 0.3500),
+        'UNKNOWN' => (float) env('META_WHATSAPP_RATE_UNKNOWN_INR', 0.1150),
     ],
 
 ];

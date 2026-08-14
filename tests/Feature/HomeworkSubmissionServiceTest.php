@@ -27,6 +27,7 @@ use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\HomeworkSubmissionService;
+use App\Services\MetaWhatsAppCostEstimator;
 use App\Support\CombinedHomeworkWhatsAppTemplate;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -80,14 +81,34 @@ class HomeworkSubmissionServiceTest extends TestCase
                 'failed' => 0,
                 'skipped' => 0,
                 'currency' => 'INR',
-                'unit_cost' => 0.35,
-                'estimated_total_cost' => 0.35,
+                'unit_cost' => 0.115,
+                'estimated_total_cost' => 0.115,
                 'recipients' => [
-                    ['name' => 'Riya Sharma', 'phone' => '9876500001', 'status' => 'sent', 'error' => null, 'estimated_cost' => 0.35],
+                    ['name' => 'Riya Sharma', 'phone' => '9876500001', 'status' => 'sent', 'error' => null, 'estimated_cost' => 0.115],
                 ],
             ])
             ->assertSuccessful()
             ->assertSee('9876500001');
+    }
+
+    public function test_combined_send_uses_current_india_utility_rate(): void
+    {
+        MetaWhatsAppTemplate::query()->create([
+            'name' => CombinedHomeworkWhatsAppTemplate::NAME,
+            'language' => 'en',
+            'status' => 'APPROVED',
+            'param_count' => 4,
+            'body' => CombinedHomeworkWhatsAppTemplate::BODY,
+            'is_active' => true,
+            'provider_meta' => ['category' => 'UTILITY'],
+            'synced_at' => now(),
+        ]);
+
+        $estimate = app(MetaWhatsAppCostEstimator::class)
+            ->estimateForTemplate(CombinedHomeworkWhatsAppTemplate::NAME, 'en');
+
+        $this->assertSame('UTILITY', $estimate['category']);
+        $this->assertSame(0.115, $estimate['cost_inr']);
     }
 
     public function test_teacher_submit_creates_submitted_assignment(): void

@@ -113,12 +113,12 @@ class MetaWhatsAppCostEstimator
 
         if (! is_array($rates) || $rates === []) {
             return [
-                'MARKETING' => 0.7846,
-                'UTILITY' => 0.35,
-                'AUTHENTICATION' => 0.35,
+                'MARKETING' => 0.8631,
+                'UTILITY' => 0.115,
+                'AUTHENTICATION' => 0.115,
                 'AUTHENTICATION_INTERNATIONAL' => 2.3,
                 'SERVICE' => 0.0,
-                'UNKNOWN' => 0.35,
+                'UNKNOWN' => 0.115,
             ];
         }
 
