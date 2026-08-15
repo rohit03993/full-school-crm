@@ -115,6 +115,25 @@ class CampusVisitsPage extends Page
         $this->resetPage();
     }
 
+    /**
+     * Which preset the current range matches, so the segmented control can show it.
+     */
+    public function periodPreset(): string
+    {
+        $today = now()->toDateString();
+
+        if ($this->dateTo !== $today) {
+            return 'custom';
+        }
+
+        return match ($this->dateFrom) {
+            $today => 'today',
+            now()->startOfWeek()->toDateString() => 'week',
+            now()->startOfMonth()->toDateString() => 'month',
+            default => 'custom',
+        };
+    }
+
     public function content(Schema $schema): Schema
     {
         $service = app(InstituteVisitsService::class);
@@ -136,6 +155,7 @@ class CampusVisitsPage extends Page
                     'enrollmentFilter' => $this->enrollmentFilter,
                     'search' => $this->search,
                     'periodLabel' => $this->periodLabel($from, $to),
+                    'periodPreset' => $this->periodPreset(),
                 ]),
         ]);
     }

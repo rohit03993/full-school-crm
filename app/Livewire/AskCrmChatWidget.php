@@ -48,6 +48,7 @@ class AskCrmChatWidget extends Component
         $this->open = true;
     }
 
+    #[On('ask-crm-toggle')]
     public function toggle(): void
     {
         if ($this->open) {

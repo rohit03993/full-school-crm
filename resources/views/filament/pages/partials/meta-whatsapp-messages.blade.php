@@ -82,7 +82,7 @@
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-gray-700 dark:text-gray-200" data-label="Template">{{ $message->template_name ?? '—' }}</td>
-                            <td class="px-4 py-3 max-w-xs text-xs leading-relaxed text-gray-600 dark:text-gray-300" data-label="Preview">
+                            <td class="crm-responsive-table__wide px-4 py-3 max-w-xs text-xs leading-relaxed text-gray-600 dark:text-gray-300" data-label="Preview">
                                 {{ \Illuminate\Support\Str::limit($message->body_preview, 120) }}
                             </td>
                         </tr>

@@ -169,7 +169,7 @@
                                         <span class="text-gray-400">0</span>
                                     @endif
                                 </td>
-                                <td class="px-4 py-2 text-xs text-gray-500" data-label="{{ $checkDateLabel }}">
+                                <td class="crm-responsive-table__wide px-4 py-2 text-xs text-gray-500" data-label="{{ $checkDateLabel }}">
                                     @if ($student['last_status'])
                                         {{ $student['last_status'] }}
                                         @if ($student['last_notify'])
@@ -245,7 +245,7 @@
                             <tr wire:key="hw-check-{{ $row->id }}">
                                 <td class="px-4 py-2 font-medium crm-responsive-table__title" data-label="Student">{{ $row->student?->name }}</td>
                                 <td class="px-4 py-2" data-label="Subject">{{ $row->subject_name }}</td>
-                                <td class="px-4 py-2 text-gray-600 dark:text-gray-300" data-label="Topic">{{ \Illuminate\Support\Str::limit($row->topic, 40) }}</td>
+                                <td class="crm-responsive-table__wide px-4 py-2 text-gray-600 dark:text-gray-300" data-label="Topic">{{ \Illuminate\Support\Str::limit($row->topic, 40) }}</td>
                                 <td class="px-4 py-2" data-label="Status">{{ $row->status?->label() }}</td>
                                 <td class="px-4 py-2 text-gray-500" data-label="WhatsApp">{{ $row->notify_status?->label() }}</td>
                                 <td class="px-4 py-2 text-xs text-gray-500" data-label="Time">{{ $row->created_at?->format('d M H:i') }}</td>

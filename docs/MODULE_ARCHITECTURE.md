@@ -31,6 +31,22 @@ Dense areas expose **one sidebar entry**; leaf screens stay reachable by URL and
 
 Turning a license module OFF hides that hub and its leaves only. Shared layout: `resources/views/filament/pages/partials/crm-hub.blade.php`. Role packs (`CrmNavigation::navRolePack`) collapse unused sidebar groups and tune dashboard quick actions.
 
+### Mobile list cards
+
+Below `lg` (1024px) every `<x-crm.responsive-table>` renders as a stack of cards instead of a scrolling table — no horizontal scroll anywhere in the admin panel. Per `<td>`:
+
+| Marker | Effect in the card |
+|--------|--------------------|
+| `data-label="Course"` | small label above the value |
+| `data-label=""` | value only, no label |
+| `crm-responsive-table__title` | card header, hoisted to the top |
+| `crm-responsive-table__actions` | footer, buttons stretched to 44px tap targets |
+| `crm-responsive-table__wide` | full width instead of half (prose, long values) |
+
+Facts fill a two-column grid, so keep cells short or mark them wide; cells holding inputs, selects, textareas or nested tables go full width automatically. Card order is independent of desktop column order.
+
+Shared mobile chrome (defined in `resources/css/filament/admin/theme.css`, used through components in `resources/views/components/crm/`): `x-crm.stat-tiles` (`.crm-stat*`), `x-crm.badge` (`.crm-badge--gray|success|info|warning|danger`), `x-crm.avatar`, plus `.crm-seg*` segmented controls and `.crm-chip*` filter chips. `resources/views/filament/pages/partials/campus-visits.blade.php` is the reference implementation. Enum tones (e.g. `VisitStatus::tone()`) feed `x-crm.badge` so statuses read the same everywhere.
+
 ---
 
 ## How to read each module

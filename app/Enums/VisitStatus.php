@@ -20,4 +20,17 @@ enum VisitStatus: string
             self::Joined => 'Joined',
         };
     }
+
+    /**
+     * Tone for x-crm.badge.
+     */
+    public function tone(): string
+    {
+        return match ($this) {
+            self::Joined => 'success',
+            self::AdmissionReady, self::Interested => 'info',
+            self::FollowUpRequired => 'warning',
+            self::NotInterested => 'danger',
+        };
+    }
 }

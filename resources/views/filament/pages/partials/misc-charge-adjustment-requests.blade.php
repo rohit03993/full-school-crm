@@ -156,7 +156,7 @@
                                     ])>{{ $entry->statusLabel }}</span>
                                 </td>
                                 <td class="px-4 py-3 text-gray-600 dark:text-gray-400" data-label="By">{{ $entry->actorName }}</td>
-                                <td class="px-4 py-3 text-gray-600 dark:text-gray-400" data-label="Reason">{{ $entry->reason ?: '—' }}</td>
+                                <td class="crm-responsive-table__wide px-4 py-3 text-gray-600 dark:text-gray-400" data-label="Reason">{{ $entry->reason ?: '—' }}</td>
                             </tr>
                         @endforeach
                     </tbody>

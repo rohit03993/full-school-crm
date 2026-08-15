@@ -1,11 +1,6 @@
-<div
-    style="position:fixed;right:1.25rem;bottom:1.5rem;z-index:9999;display:flex;flex-direction:column;align-items:flex-end;gap:0.75rem;pointer-events:none;"
->
+<div class="crm-ask">
     @if ($open)
-        <div
-            wire:key="ask-crm-panel"
-            style="pointer-events:auto;display:flex;flex-direction:column;width:min(22rem,calc(100vw - 2rem));height:min(32rem,70vh);overflow:hidden;border-radius:1rem;border:1px solid #e5e7eb;background:#fff;box-shadow:0 25px 50px rgba(0,0,0,.25);"
-        >
+        <div wire:key="ask-crm-panel" class="crm-ask__panel">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.65rem 0.85rem;background:#f59e0b;color:#fff;">
                 <div style="min-width:0;">
                     <p style="margin:0;font-size:0.875rem;font-weight:700;">Ask CRM</p>
@@ -134,10 +129,11 @@
         </div>
     @endif
 
+    {{-- Hidden on phones and tablets: there the launcher is a tab in the bottom nav --}}
     <button
         type="button"
         wire:click="toggle"
-        style="pointer-events:auto;display:inline-flex;align-items:center;gap:0.5rem;border:0;border-radius:999px;background:#f59e0b;color:#fff;padding:0.75rem 1.1rem;font-size:0.875rem;font-weight:800;box-shadow:0 10px 25px rgba(245,158,11,.45);cursor:pointer;"
+        class="crm-ask__launcher"
         aria-label="{{ $open ? 'End Ask CRM session' : ($hasActiveSession ? 'Resume Ask CRM chat' : 'Open Ask CRM') }}"
     >
         <span aria-hidden="true">💬</span>

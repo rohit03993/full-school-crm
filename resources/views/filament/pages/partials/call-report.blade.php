@@ -162,7 +162,7 @@
                                         {{ $isNew ? 'New' : 'Follow-up' }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300" data-label="Notes">
+                                <td class="crm-responsive-table__wide px-4 py-3 text-sm text-gray-600 dark:text-gray-300" data-label="Notes">
                                     {{ $call->call_notes ? \Illuminate\Support\Str::limit($call->call_notes, 80) : '—' }}
                                 </td>
                                 <td class="crm-responsive-table__actions whitespace-nowrap px-4 py-3 text-right" data-label="">

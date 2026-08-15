@@ -43,7 +43,7 @@
                                     <td class="hidden px-4 py-2 font-medium text-gray-950 dark:text-white md:table-cell" data-label="Subject">
                                         {{ $check->subject_name }}
                                     </td>
-                                    <td class="px-4 py-2 text-gray-600 dark:text-gray-300" data-label="Topic">
+                                    <td class="crm-responsive-table__wide px-4 py-2 text-gray-600 dark:text-gray-300" data-label="Topic">
                                         {{ \Illuminate\Support\Str::limit($check->topic, 48) }}
                                         @if ($check->homeworkAssignment)
                                             <span class="mt-0.5 block text-[11px] text-primary-600 dark:text-primary-400">

@@ -9,37 +9,40 @@
 @endphp
 
 <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+    {{-- Chips sit under the title, never beside the toggle: on a phone they collided with it --}}
     <button
         type="button"
         wire:click="toggleCase({{ $case->id }})"
-        class="flex w-full items-start justify-between gap-3 px-4 py-4 text-left sm:px-6"
+        class="flex w-full touch-manipulation items-start gap-3 px-4 py-4 text-left sm:px-6"
     >
-        <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="font-mono text-xs font-bold text-primary-600 dark:text-primary-400">{{ $case->case_number }}</span>
-                <span @class([
-                    'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase',
-                    'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' => $case->isOpen(),
-                    'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300' => ! $case->isOpen(),
-                ])>
-                    {{ $case->status->label() }}
-                </span>
-                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-white/10 dark:text-gray-300">
-                    {{ $case->case_type->label() }}
-                </span>
+        <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span class="break-all font-mono text-[11px] font-bold text-primary-600 dark:text-primary-400">{{ $case->case_number }}</span>
+                <x-crm.badge :tone="$case->isOpen() ? 'success' : 'gray'">{{ $case->status->label() }}</x-crm.badge>
+            </div>
+
+            <p class="mt-1.5 text-sm font-semibold text-gray-950 dark:text-white">{{ $case->title }}</p>
+
+            <div class="mt-2 flex flex-wrap gap-1.5">
+                <x-crm.badge tone="gray">{{ $case->case_type->label() }}</x-crm.badge>
                 @if ($case->isOpen() && $case->currentAssignee)
-                    <span class="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-800 dark:bg-violet-500/15 dark:text-violet-300">
+                    <span class="crm-badge bg-violet-100 text-violet-800 ring-violet-500/20 dark:bg-violet-500/15 dark:text-violet-300">
                         With {{ $case->currentAssignee->name }}
                     </span>
                 @endif
             </div>
-            <p class="mt-1 text-sm font-semibold text-gray-950 dark:text-white">{{ $case->title }}</p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 Opened {{ $case->opened_at?->format('d M Y, h:i A') }} by {{ $case->openedBy?->name ?? 'Staff' }}
             </p>
         </div>
-        <span class="shrink-0 text-xs font-semibold text-primary-600 dark:text-primary-400">
-            {{ $expanded ? 'Hide' : 'Details' }}
+
+        <span class="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-600 dark:text-primary-400">
+            <span class="hidden sm:inline">{{ $expanded ? 'Hide' : 'Details' }}</span>
+            <span class="sr-only sm:hidden">{{ $expanded ? 'Hide case details' : 'Show case details' }}</span>
+            <svg @class(['h-5 w-5 transition', 'rotate-180' => $expanded]) fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+            </svg>
         </span>
     </button>
 

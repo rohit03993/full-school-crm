@@ -1,5 +1,9 @@
 @php
     $tabs = \App\Support\CrmMobileBottomNav::tabs(auth()->user(), trim(request()->path(), '/'));
+    $showAskCrm = \App\Livewire\AskCrmChatWidget::canView();
+
+    // Six slots leave ~56px each on a small phone, so labels drop a point to avoid truncating
+    $labelSize = (count($tabs) + ($showAskCrm ? 1 : 0)) > 5 ? 'text-[9px]' : 'text-[10px]';
 @endphp
 
 @if ($tabs !== [])
@@ -27,7 +31,7 @@
                         ])>
                             <x-filament::icon :icon="$tab['icon']" class="h-5 w-5" />
                         </span>
-                        <span class="w-full truncate text-center text-[10px] font-semibold leading-tight">{{ $tab['label'] }}</span>
+                        <span class="w-full truncate text-center font-semibold leading-tight {{ $labelSize }}">{{ $tab['label'] }}</span>
                         @if (($tab['badge'] ?? null) > 0)
                             <span class="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warning-500 px-1 text-[9px] font-bold text-white">
                                 {{ $tab['badge'] > 9 ? '9+' : $tab['badge'] }}
@@ -35,6 +39,20 @@
                         @endif
                     </a>
                 @endforeach
+
+                @if ($showAskCrm)
+                    {{-- Toggles the Ask CRM widget rendered at the end of the body --}}
+                    <button
+                        type="button"
+                        onclick="window.Livewire && window.Livewire.dispatch('ask-crm-toggle')"
+                        class="relative flex min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 text-amber-600 transition active:scale-95 dark:text-amber-400"
+                    >
+                        <span class="rounded-xl bg-amber-500/10 p-1.5 ring-1 ring-amber-500/20">
+                            <x-filament::icon icon="heroicon-o-sparkles" class="h-5 w-5" />
+                        </span>
+                        <span class="w-full truncate text-center font-semibold leading-tight {{ $labelSize }}">Ask CRM</span>
+                    </button>
+                @endif
             </div>
         </nav>
     </div>
