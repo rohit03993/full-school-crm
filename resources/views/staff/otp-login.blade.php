@@ -26,7 +26,11 @@
         <div class="relative mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-10 sm:py-14">
             <div class="text-center">
                 @if (! empty($institute['logo_url']))
-                    <img src="{{ $institute['logo_url'] }}" alt="" class="mx-auto mb-4 h-14 w-auto object-contain">
+                    <img
+                        src="{{ $institute['logo_url'] }}"
+                        alt=""
+                        class="mx-auto mb-4 object-contain {{ \App\Support\SiteLogo::isSquare($institute['logo_shape'] ?? null) ? 'h-20 w-20' : 'h-14 w-auto' }}"
+                    >
                 @endif
                 <p class="text-xs font-bold uppercase tracking-widest text-brand-400">{{ $institute['name'] ?? config('app.name') }}</p>
                 <h1 class="mt-2 font-display text-3xl font-bold sm:text-4xl">Staff OTP Login</h1>

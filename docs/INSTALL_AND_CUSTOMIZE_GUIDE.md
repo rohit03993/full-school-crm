@@ -127,7 +127,7 @@ Click **Finish setup** — you can change all of this later under **Setup → Te
 
 | Tab | What to set |
 |-----|-------------|
-| **Branding** | Logo, favicon, institute name, tagline, ID prefix |
+| **Branding** | Logo + logo shape, favicon, institute name, tagline, ID prefix |
 | **Contact** | Phone, WhatsApp, email, address, office hours |
 | **Hero** | Main banner title & subtitle, hero images |
 | **About** | About paragraph + about image |
@@ -137,6 +137,13 @@ Click **Finish setup** — you can change all of this later under **Setup → Te
 | **Social** | Facebook, Instagram, YouTube links |
 
 **Tip:** Upload logo first — it appears on the website, admin panel, and receipts.
+
+**Logo shape matters.** On the Branding tab pick the option that matches your file:
+
+- **Wide banner** — the logo image already includes the institute name (a wordmark). It fills the header strip.
+- **Square / circular** — a round crest, emblem, or seal. The site shows the crest next to your institute name in text, instead of shrinking it into a thin strip.
+
+Picking the wrong shape is the usual reason a round college crest looks tiny or squashed in the header and on the login screen.
 
 ---
 

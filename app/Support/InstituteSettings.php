@@ -46,6 +46,19 @@ class InstituteSettings
         return SiteImageService::url($path);
     }
 
+    public static function logoShape(): string
+    {
+        return SiteLogo::normalizeShape(Setting::getValue('site.logo_shape'));
+    }
+
+    /**
+     * Height for the Filament brand logo on the login screen and top bar.
+     */
+    public static function panelLogoHeight(): string
+    {
+        return SiteLogo::panelLogoHeight(self::logoShape());
+    }
+
     /**
      * Branding used on receipts, ID cards, and CRM PDF exports.
      *

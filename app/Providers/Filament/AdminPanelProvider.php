@@ -47,6 +47,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->brandName(fn (): string => InstituteSettings::brandName())
             ->brandLogo(fn (): ?string => InstituteSettings::panelLogoUrl())
+            ->brandLogoHeight(fn (): string => InstituteSettings::panelLogoHeight())
             ->colors([
                 'primary' => Color::Amber,
             ])

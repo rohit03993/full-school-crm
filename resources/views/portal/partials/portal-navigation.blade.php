@@ -48,7 +48,11 @@
 >
     <div class="border-b border-navy-100 px-5 py-5">
         @if (! empty($institute['logo_url']))
-            <img src="{{ $institute['logo_url'] }}" alt="" class="mb-3 h-9 w-auto object-contain">
+            <img
+                src="{{ $institute['logo_url'] }}"
+                alt=""
+                class="mb-3 object-contain {{ \App\Support\SiteLogo::isSquare($institute['logo_shape'] ?? null) ? 'h-11 w-11' : 'h-9 w-auto' }}"
+            >
         @endif
         <p class="text-[11px] font-bold uppercase tracking-wider text-brand-600">{{ $institute['name'] ?? config('app.name') }}</p>
         <p class="mt-0.5 font-display text-lg font-bold text-navy-900">Student Portal</p>

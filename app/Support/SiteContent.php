@@ -82,6 +82,7 @@ class SiteContent
                 'youtube' => $g('site.social_youtube', config('institute.social.youtube')),
             ],
             'logo_url' => SiteImageService::url($g('site.logo')),
+            'logo_shape' => SiteLogo::normalizeShape($g('site.logo_shape')),
             'favicon_url' => SiteImageService::url($g('site.favicon')),
             'images' => [
                 'hero' => [

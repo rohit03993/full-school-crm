@@ -30,6 +30,7 @@ use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
@@ -98,11 +99,21 @@ class ManageSiteContent extends Page
                         ->icon(Heroicon::OutlinedPhoto)
                         ->schema([
                             Section::make('Logo & Favicon')
-                                ->description('Logo uses a fixed website header frame — drag and zoom to position your image inside it. Favicon stays square.')
+                                ->description('Pick the shape that matches your logo, then drag and zoom to position it inside the crop frame. Favicon stays square.')
                                 ->schema([
+                                    Select::make('logo_shape')
+                                        ->label('Logo shape')
+                                        ->options(SiteLogo::shapeOptions())
+                                        ->default(SiteLogo::DEFAULT_SHAPE)
+                                        ->selectablePlaceholder(false)
+                                        ->live()
+                                        ->helperText('Choose "Square / circular" for a round crest or emblem — the site then shows your institute name beside it instead of squeezing the crest into a wide strip.')
+                                        ->columnSpanFull(),
                                     Placeholder::make('logo_frame_hint')
                                         ->label('Header logo frame')
-                                        ->content('Fixed size '.SiteLogo::ASPECT_RATIO.' ('.SiteLogo::DISPLAY_MAX_WIDTH.'×'.SiteLogo::DISPLAY_HEIGHT.' px on site). Upload, then use the crop editor: zoom out so the full logo is visible, drag to position, and save.')
+                                        ->content(fn (Get $get): string => SiteLogo::isSquare($get('logo_shape'))
+                                            ? 'Square crop ('.SiteLogo::SQUARE_ASPECT_RATIO.', '.SiteLogo::SQUARE_EXPORT_SIZE.'×'.SiteLogo::SQUARE_EXPORT_SIZE.' px). Upload, then use the crop editor: zoom out so the full crest is visible, centre it, and save.'
+                                            : 'Wide crop ('.SiteLogo::ASPECT_RATIO.', '.SiteLogo::DISPLAY_MAX_WIDTH.'×'.SiteLogo::DISPLAY_HEIGHT.' px on site). Upload, then use the crop editor: zoom out so the full logo is visible, drag to position, and save.')
                                         ->columnSpanFull(),
                                     $this->logoUpload(),
                                     $this->imageUpload('favicon', 'Favicon', 'site/favicon')
@@ -278,19 +289,22 @@ class ManageSiteContent extends Page
             ->maxSize(SiteImageService::MAX_KILOBYTES)
             ->imageEditor()
             ->imageEditorMode(2)
-            ->imageEditorViewportWidth(SiteLogo::EXPORT_WIDTH)
-            ->imageEditorViewportHeight(SiteLogo::EXPORT_HEIGHT)
+            ->imageEditorViewportWidth(fn (Get $get): int => SiteLogo::isSquare($get('logo_shape'))
+                ? SiteLogo::SQUARE_EXPORT_SIZE
+                : SiteLogo::EXPORT_WIDTH)
+            ->imageEditorViewportHeight(fn (Get $get): int => SiteLogo::isSquare($get('logo_shape'))
+                ? SiteLogo::SQUARE_EXPORT_SIZE
+                : SiteLogo::EXPORT_HEIGHT)
             ->imageEditorAspectRatioOptions([
-                SiteLogo::ASPECT_RATIO => 'Website header ('.SiteLogo::ASPECT_RATIO.')',
+                SiteLogo::ASPECT_RATIO => 'Wide banner ('.SiteLogo::ASPECT_RATIO.')',
+                SiteLogo::SQUARE_ASPECT_RATIO => 'Square / circular ('.SiteLogo::SQUARE_ASPECT_RATIO.')',
             ])
             ->imageEditorEmptyFillColor('#ffffff')
-            ->imageAspectRatio(SiteLogo::ASPECT_RATIO)
-            ->automaticallyOpenImageEditorForAspectRatio()
             ->disk(SiteImageService::DISK)
             ->directory('site/logo')
             ->visibility('public')
             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-            ->helperText('Only for the website header. After upload, open the editor: pinch/zoom out, then drag the image inside the frame. The saved file is always the same size.')
+            ->helperText('Only for the website header. After upload, open the editor: pinch/zoom out, then drag the image inside the frame. Pick the crop ratio that matches the shape you selected above.')
             ->columnSpanFull();
     }
 

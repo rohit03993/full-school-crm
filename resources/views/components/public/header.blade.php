@@ -4,6 +4,7 @@
         ->take(2)
         ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
         ->implode('') ?: 'SC';
+    $logoIsSquare = \App\Support\SiteLogo::isSquare($institute['logo_shape'] ?? null);
     $navLinks = [
         ['label' => 'Home', 'url' => route('home'), 'active' => request()->routeIs('home')],
         ['label' => 'Courses', 'url' => route('courses'), 'active' => request()->routeIs('courses')],
@@ -34,8 +35,18 @@
     {{-- Main nav --}}
     <div class="border-b border-navy-100/80 bg-white/95 shadow-sm shadow-navy-900/5 backdrop-blur-md">
         <div class="relative mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8 lg:py-4">
-            <a href="{{ route('home') }}" class="group flex min-w-0 flex-1 items-center lg:flex-none">
-                @if (! empty($institute['logo_url']))
+            <a href="{{ route('home') }}" class="group flex min-w-0 flex-1 items-center gap-3 lg:flex-none">
+                @if (! empty($institute['logo_url']) && $logoIsSquare)
+                    <img
+                        src="{{ $institute['logo_url'] }}"
+                        alt="{{ $institute['name'] }}"
+                        class="h-11 w-11 shrink-0 object-contain sm:h-14 sm:w-14"
+                    >
+                    <div class="min-w-0 leading-tight">
+                        <div class="truncate font-display text-base font-bold text-navy-900 sm:text-xl">{{ $institute['name'] }}</div>
+                        <div class="hidden truncate text-xs font-medium text-navy-500 sm:block">{{ $institute['tagline'] }}</div>
+                    </div>
+                @elseif (! empty($institute['logo_url']))
                     <div
                         class="flex h-12 shrink-0 items-center justify-start sm:h-14"
                         style="width: min(100%, {{ \App\Support\SiteLogo::DISPLAY_MAX_WIDTH }}px); aspect-ratio: {{ \App\Support\SiteLogo::ASPECT_WIDTH }} / {{ \App\Support\SiteLogo::ASPECT_HEIGHT }};"

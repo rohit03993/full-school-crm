@@ -6,6 +6,7 @@ use App\Models\Setting;
 use App\Models\SiteGalleryItem;
 use App\Support\InstituteSettings;
 use App\Support\SiteContent;
+use App\Support\SiteLogo;
 
 class SiteContentService
 {
@@ -108,6 +109,7 @@ class SiteContentService
             if ($repaired !== $path) {
                 Setting::setValue($settingKey, $repaired, 'images');
                 $fixed++;
+
                 continue;
             }
 
@@ -126,6 +128,7 @@ class SiteContentService
             if ($repaired !== $path) {
                 $item->update(['image_path' => $repaired]);
                 $fixed++;
+
                 continue;
             }
 
@@ -182,6 +185,7 @@ class SiteContentService
             'social_instagram' => $g('site.social_instagram', ''),
             'social_youtube' => $g('site.social_youtube', ''),
             'logo' => $g('site.logo'),
+            'logo_shape' => SiteLogo::normalizeShape($g('site.logo_shape')),
             'favicon' => $g('site.favicon'),
             'hero_main_image' => $g('site.hero_main_image'),
             'hero_accent_one' => $g('site.hero_accent_one'),
@@ -235,6 +239,12 @@ class SiteContentService
         $this->persistImage('site.hero_accent_one', $data['hero_accent_one'] ?? null);
         $this->persistImage('site.hero_accent_two', $data['hero_accent_two'] ?? null);
         $this->persistImage('site.about_image', $data['about_image'] ?? null);
+
+        Setting::setValue(
+            'site.logo_shape',
+            SiteLogo::normalizeShape($data['logo_shape'] ?? null),
+            'general',
+        );
 
         Setting::setValue('site.name', $data['name'] ?? '', 'general');
         Setting::setValue('site.tagline', $data['tagline'] ?? '', 'general');
