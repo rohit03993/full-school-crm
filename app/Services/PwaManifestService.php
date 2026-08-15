@@ -89,26 +89,27 @@ class PwaManifestService
         );
     }
 
-    public static function iconSourcePath(int $size): ?string
+    /**
+     * Source image for the installed-app / home-screen icon.
+     *
+     * Favicon wins for every size — it is the dedicated square mark. The wide
+     * website logo is only a fallback (it shrinks awkwardly inside a square
+     * when used as an app icon). With neither file, the controller draws initials.
+     */
+    public static function iconSourcePath(int $size = 512): ?string
     {
-        if ($size <= 192) {
-            $favicon = (string) Setting::getValue('site.favicon', '');
+        unset($size); // same source for 192 and 512 — GD resizes it.
 
-            if (filled($favicon) && Storage::disk('public')->exists($favicon)) {
-                return $favicon;
-            }
+        $favicon = (string) Setting::getValue('site.favicon', '');
+
+        if (filled($favicon) && Storage::disk('public')->exists($favicon)) {
+            return $favicon;
         }
 
         $logo = (string) Setting::getValue('site.logo', '');
 
         if (filled($logo) && Storage::disk('public')->exists($logo)) {
             return $logo;
-        }
-
-        $favicon = (string) Setting::getValue('site.favicon', '');
-
-        if (filled($favicon) && Storage::disk('public')->exists($favicon)) {
-            return $favicon;
         }
 
         return null;

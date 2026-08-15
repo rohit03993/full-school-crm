@@ -46,6 +46,13 @@ class InstituteSettings
         return SiteImageService::url($path);
     }
 
+    public static function panelFaviconUrl(): ?string
+    {
+        $path = Setting::getValue('site.favicon');
+
+        return SiteImageService::url($path);
+    }
+
     public static function logoShape(): string
     {
         return SiteLogo::normalizeShape(Setting::getValue('site.logo_shape'));

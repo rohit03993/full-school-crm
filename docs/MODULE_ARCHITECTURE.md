@@ -57,7 +57,7 @@ Each school gets its own home-screen apps (not a shared “School CRM” brand):
 | `/portal` | `{Institute} Portal` | e.g. `MA Portal` | Student portal |
 | `/` | `{Institute}` | e.g. `Motion` | Public site |
 
-Icon = institute logo/favicon (else initials). Theme colour = ID-card primary colour. Service worker (`public/sw.js`) + `public/offline.html` give a clean offline screen. Staff can install from Admin (banner + topbar). Manifest: `PwaManifestService`.
+Icon = institute **favicon** first (the dedicated square mark), then website logo, else initials. Theme colour = ID-card primary colour. Service worker (`public/sw.js`) + `public/offline.html` give a clean offline screen. Staff can install from Admin (banner + topbar). Manifest: `PwaManifestService`.
 
 ---
 

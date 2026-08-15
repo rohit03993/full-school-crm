@@ -6,6 +6,7 @@ use App\Models\Setting;
 use App\Services\PwaManifestService;
 use App\Support\InstituteSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PwaManifestTest extends TestCase
@@ -70,6 +71,41 @@ class PwaManifestTest extends TestCase
         $this->get(route('pwa.icon', ['size' => 512]))
             ->assertOk()
             ->assertHeader('content-type', 'image/png');
+    }
+
+    public function test_favicon_is_preferred_over_logo_for_every_app_icon_size(): void
+    {
+        $disk = Storage::disk('public');
+        $disk->put('site/favicon/mark.png', $this->tinyPng());
+        $disk->put('site/logo/wide.png', $this->tinyPng());
+
+        Setting::setValue('site.favicon', 'site/favicon/mark.png', 'general');
+        Setting::setValue('site.logo', 'site/logo/wide.png', 'general');
+
+        $this->assertSame('site/favicon/mark.png', PwaManifestService::iconSourcePath(192));
+        $this->assertSame('site/favicon/mark.png', PwaManifestService::iconSourcePath(512));
+    }
+
+    public function test_logo_is_used_for_app_icons_when_favicon_is_missing(): void
+    {
+        $disk = Storage::disk('public');
+        $disk->put('site/logo/wide.png', $this->tinyPng());
+
+        Setting::setValue('site.logo', 'site/logo/wide.png', 'general');
+        Setting::setValue('site.favicon', '', 'general');
+
+        $this->assertSame('site/logo/wide.png', PwaManifestService::iconSourcePath(512));
+    }
+
+    /**
+     * Minimal valid 1×1 PNG so GD / Storage tests do not need a real image fixture.
+     */
+    protected function tinyPng(): string
+    {
+        return base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+            true,
+        ) ?: '';
     }
 
     public function test_homepage_links_to_manifest(): void

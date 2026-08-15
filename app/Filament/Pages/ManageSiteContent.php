@@ -99,7 +99,7 @@ class ManageSiteContent extends Page
                         ->icon(Heroicon::OutlinedPhoto)
                         ->schema([
                             Section::make('Logo & Favicon')
-                                ->description('Pick the shape that matches your logo, then drag and zoom to position it inside the crop frame. Favicon stays square.')
+                                ->description('Pick the logo shape for the website header. The favicon is the square mark used in the browser tab and as the installed-app icon.')
                                 ->schema([
                                     Select::make('logo_shape')
                                         ->label('Logo shape')
@@ -123,8 +123,9 @@ class ManageSiteContent extends Page
                                             : 'Wide crop ('.SiteLogo::ASPECT_RATIO.', '.SiteLogo::DISPLAY_MAX_WIDTH.'×'.SiteLogo::DISPLAY_HEIGHT.' px on site). Upload, then use the crop editor: zoom out so the full logo is visible, drag to position, and save.')
                                         ->columnSpanFull(),
                                     $this->logoUpload(),
-                                    $this->imageUpload('favicon', 'Favicon', 'site/favicon')
-                                        ->imageEditorAspectRatioOptions(['1:1' => 'Square']),
+                                    $this->imageUpload('favicon', 'Favicon / App icon', 'site/favicon')
+                                        ->imageEditorAspectRatioOptions(['1:1' => 'Square'])
+                                        ->helperText('Square PNG (ideally 512×512). Used for the browser tab icon and the home-screen icon when someone installs the website, Admin, or Portal as an app. If empty, the website logo is used instead.'),
                                 ])
                                 ->columns(2),
                             Section::make('Institute Name')
