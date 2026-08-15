@@ -93,6 +93,10 @@ class AdminPanelProvider extends PanelProvider
                 \App\Http\Middleware\EnsureInstituteOnboardingComplete::class,
             ])
             ->renderHook(
+                PanelsRenderHook::PAGE_START,
+                fn (array $scopes = []): string => view('filament.partials.page-back-link', ['scopes' => $scopes])->render(),
+            )
+            ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): string => Blade::render('<x-crm.media-preview-dialog />')
                     .view('filament.partials.mobile-bottom-nav')->render()
