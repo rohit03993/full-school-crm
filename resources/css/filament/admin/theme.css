@@ -11,8 +11,13 @@
 
 @layer components {
     /* ── Back to previous page (render hook on every panel page) ── */
+    /* The chip takes over the page's top padding, so the heading below tightens up */
     .fi-crm-back {
-        @apply mb-3 flex sm:mb-4;
+        @apply flex pt-6 sm:pt-8;
+    }
+
+    .fi-page:has(> .fi-crm-back) .fi-page-header-main-ctn {
+        @apply pt-3 sm:pt-4;
     }
 
     .fi-crm-back__link {
