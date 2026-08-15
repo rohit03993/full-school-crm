@@ -34,6 +34,7 @@ trait HandlesLogCallModal
         'visit_status' => null,
         'call_purpose' => null,
         'duration_minutes' => null,
+        'duration_seconds' => null,
         'call_notes' => null,
         'tags' => [],
         'next_followup_at' => null,
@@ -44,7 +45,7 @@ trait HandlesLogCallModal
     abstract protected function logCallTargetStudent(): ?Student;
 
     #[On('open-pending-call-log')]
-    public function openPendingCallLog(int $studentId): void
+    public function openPendingCallLog(int $studentId, ?int $durationMinutes = null, ?int $durationSeconds = null): void
     {
         if (! $this->pendingCallMatchesStudent($studentId)) {
             return;
@@ -52,6 +53,12 @@ trait HandlesLogCallModal
 
         $this->js('window.CrmPendingCall.clearPending()');
         $this->openLogCallModal();
+
+        // Elapsed time since Dial was tapped (tel:). Staff can still edit the fields.
+        if ($durationMinutes !== null || $durationSeconds !== null) {
+            $this->logCallForm['duration_minutes'] = max(0, min(600, (int) ($durationMinutes ?? 0)));
+            $this->logCallForm['duration_seconds'] = max(0, min(59, (int) ($durationSeconds ?? 0)));
+        }
     }
 
     public function openLogCallModal(): void
@@ -127,6 +134,7 @@ trait HandlesLogCallModal
             'visit_status' => null,
             'call_purpose' => null,
             'duration_minutes' => null,
+            'duration_seconds' => null,
             'call_notes' => null,
             'tags' => [],
             'next_followup_at' => null,

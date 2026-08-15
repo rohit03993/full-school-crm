@@ -90,6 +90,7 @@ class CallLogService
             'call_connected' => 'required|boolean',
             'call_direction' => 'nullable|in:outgoing,incoming',
             'duration_minutes' => 'nullable|integer|min:0|max:600',
+            'duration_seconds' => 'nullable|integer|min:0|max:59',
         ];
 
         if ($connected) {
@@ -135,6 +136,7 @@ class CallLogService
                 'call_direction' => $direction,
                 'who_answered' => $connected ? WhoAnswered::from($validated['who_answered']) : null,
                 'duration_minutes' => (int) ($validated['duration_minutes'] ?? 0),
+                'duration_seconds' => (int) ($validated['duration_seconds'] ?? 0),
                 'call_notes' => $validated['call_notes'] ?? null,
                 'tags' => $tags,
                 'call_purpose' => $purpose?->value,
@@ -180,6 +182,7 @@ class CallLogService
             'call_connected' => 'required|boolean',
             'call_direction' => 'nullable|in:outgoing,incoming',
             'duration_minutes' => 'nullable|integer|min:0|max:600',
+            'duration_seconds' => 'nullable|integer|min:0|max:59',
             'tags' => 'nullable|array',
             'tags.*' => 'string|max:50',
             'next_followup_at' => 'nullable|date',
@@ -237,6 +240,7 @@ class CallLogService
                 'call_direction' => $direction,
                 'who_answered' => $connected ? WhoAnswered::from($validated['who_answered']) : null,
                 'duration_minutes' => (int) ($validated['duration_minutes'] ?? 0),
+                'duration_seconds' => (int) ($validated['duration_seconds'] ?? 0),
                 'call_notes' => $validated['call_notes'] ?? null,
                 'tags' => $validated['tags'] ?? [],
                 'visit_status_changed_to' => $visitStatus,
@@ -298,6 +302,7 @@ class CallLogService
             'call_connected' => 'required|boolean',
             'call_direction' => 'nullable|in:outgoing,incoming',
             'duration_minutes' => 'nullable|integer|min:0|max:600',
+            'duration_seconds' => 'nullable|integer|min:0|max:59',
             'tags' => 'nullable|array',
             'tags.*' => 'string|max:50',
         ];
@@ -338,6 +343,7 @@ class CallLogService
                 'call_direction' => $direction,
                 'who_answered' => $connected ? WhoAnswered::from($validated['who_answered']) : null,
                 'duration_minutes' => (int) ($validated['duration_minutes'] ?? 0),
+                'duration_seconds' => (int) ($validated['duration_seconds'] ?? 0),
                 'call_notes' => $validated['call_notes'] ?? null,
                 'tags' => $validated['tags'] ?? [],
                 'called_at' => now(),

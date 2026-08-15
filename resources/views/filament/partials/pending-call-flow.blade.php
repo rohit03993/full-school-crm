@@ -68,8 +68,18 @@
                 return;
             }
 
+            const elapsedMs = Math.max(0, Date.now() - data.setAt);
+            // Cap at 10 hours. Exact phone-network talk time is not available via tel:.
+            const totalSeconds = Math.min(36000, Math.floor(elapsedMs / 1000));
+            const durationMinutes = Math.floor(totalSeconds / 60);
+            const durationSeconds = totalSeconds % 60;
+
             if (typeof Livewire !== 'undefined' && typeof Livewire.dispatch === 'function') {
-                Livewire.dispatch('open-pending-call-log', { studentId: data.studentId });
+                Livewire.dispatch('open-pending-call-log', {
+                    studentId: data.studentId,
+                    durationMinutes: durationMinutes,
+                    durationSeconds: durationSeconds,
+                });
             }
         },
         clearPending() {

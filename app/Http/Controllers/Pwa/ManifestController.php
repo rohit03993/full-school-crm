@@ -8,14 +8,20 @@ use Illuminate\Http\JsonResponse;
 
 class ManifestController extends Controller
 {
-    public function __invoke(string $context): JsonResponse
+    /**
+     * Serve the single institute manifest.
+     *
+     * Legacy /pwa/manifest/{admin|portal|public} URLs still work and return
+     * the same payload so already-linked pages do not break.
+     */
+    public function __invoke(?string $context = null): JsonResponse
     {
-        if (! in_array($context, ['public', 'portal', 'admin'], true)) {
+        if ($context !== null && ! in_array($context, ['public', 'portal', 'admin', 'app'], true)) {
             abort(404);
         }
 
         return response()->json(
-            PwaManifestService::manifest($context),
+            PwaManifestService::manifest(),
             200,
             [
                 'Content-Type' => 'application/manifest+json',

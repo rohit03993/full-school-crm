@@ -1,33 +1,38 @@
 <?php
 
-use App\Http\Controllers\Webhooks\MetaWhatsAppWebhookController;
-use App\Http\Controllers\Api\AisensyCampaignTriggerController;
 use App\Http\Controllers\Admin\BackupDownloadController;
-use App\Http\Controllers\Admin\GoogleDriveOAuthController;
+use App\Http\Controllers\Admin\CertificateDownloadController;
+use App\Http\Controllers\Admin\ConsolidatedMarksheetDownloadController;
 use App\Http\Controllers\Admin\DocumentDownloadController;
-use App\Http\Controllers\Admin\MetaWhatsAppMediaController;
+use App\Http\Controllers\Admin\GoogleDriveOAuthController;
+use App\Http\Controllers\Admin\HomeworkFileController;
 use App\Http\Controllers\Admin\IdCardDownloadController;
+use App\Http\Controllers\Admin\MarksheetDownloadController;
+use App\Http\Controllers\Admin\MetaWhatsAppMediaController;
 use App\Http\Controllers\Admin\PaymentProofDownloadController;
 use App\Http\Controllers\Admin\ReceiptDownloadController;
-use App\Http\Controllers\Pwa\ManifestController;
-use App\Http\Controllers\Pwa\PwaIconController;
+use App\Http\Controllers\Api\AisensyCampaignTriggerController;
 use App\Http\Controllers\Display\AttendanceDisplayController;
+use App\Http\Controllers\PublicHomeworkController;
 use App\Http\Controllers\PublicSite\ContactController;
-use App\Http\Controllers\PublicSite\IdCardVerifyController;
 use App\Http\Controllers\PublicSite\CourseController;
 use App\Http\Controllers\PublicSite\HomeController;
+use App\Http\Controllers\PublicSite\IdCardVerifyController;
 use App\Http\Controllers\PublicSite\LoginController;
+use App\Http\Controllers\Pwa\AppLaunchController;
+use App\Http\Controllers\Pwa\ManifestController;
+use App\Http\Controllers\Pwa\PushSubscriptionController;
+use App\Http\Controllers\Pwa\PwaIconController;
 use App\Http\Controllers\Staff\StaffOtpLoginController;
 use App\Http\Controllers\StudentPortal\AuthController;
 use App\Http\Controllers\StudentPortal\DashboardController;
 use App\Http\Controllers\StudentPortal\HomeworkController;
 use App\Http\Controllers\StudentPortal\IdCardDownloadController as PortalIdCardDownloadController;
 use App\Http\Controllers\StudentPortal\ReceiptDownloadController as PortalReceiptDownloadController;
-use App\Http\Controllers\Admin\HomeworkFileController;
-use App\Http\Controllers\Admin\MarksheetDownloadController;
-use App\Http\Controllers\PublicHomeworkController;
+use App\Http\Controllers\Webhooks\MetaWhatsAppWebhookController;
 use App\Http\Middleware\EnsurePortalLicensed;
 use App\Http\Middleware\EnsureStudentPortalAuth;
+use App\Http\Middleware\EnsureWebsiteLicensed;
 use Illuminate\Support\Facades\Route;
 
 Route::match(['get', 'post'], '/webhooks/meta/whatsapp', MetaWhatsAppWebhookController::class)
@@ -37,13 +42,23 @@ Route::post('/campaign/t1/api/v2', AisensyCampaignTriggerController::class)
     ->name('api.aisensy.campaign.trigger.legacy');
 
 Route::prefix('pwa')->name('pwa.')->group(function (): void {
-    Route::get('/manifest/{context}', ManifestController::class)
-        ->where('context', 'public|portal|admin')
+    Route::get('/manifest/{context?}', ManifestController::class)
+        ->where('context', 'public|portal|admin|app')
         ->name('manifest');
     Route::get('/icon/{size}', PwaIconController::class)
         ->where('size', '192|512')
         ->name('icon');
+    Route::get('/push/public-key', [PushSubscriptionController::class, 'publicKey'])
+        ->name('push.public-key');
+    Route::post('/push/subscribe', [PushSubscriptionController::class, 'store'])
+        ->middleware('web')
+        ->name('push.subscribe');
+    Route::post('/push/unsubscribe', [PushSubscriptionController::class, 'destroy'])
+        ->middleware('web')
+        ->name('push.unsubscribe');
 });
+
+Route::get('/app', AppLaunchController::class)->name('pwa.app');
 
 Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
     Route::get('backups/{filename}/download', BackupDownloadController::class)
@@ -91,14 +106,14 @@ Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
             ->name('admin.marksheets.preview');
         Route::get('marksheets/{marksheet}/download', [MarksheetDownloadController::class, 'download'])
             ->name('admin.marksheets.download');
-        Route::get('marksheets/consolidated/download', [\App\Http\Controllers\Admin\ConsolidatedMarksheetDownloadController::class, 'download'])
+        Route::get('marksheets/consolidated/download', [ConsolidatedMarksheetDownloadController::class, 'download'])
             ->name('admin.marksheets.consolidated.download');
     });
 
     Route::middleware('license.feature:certificates')->group(function () {
-        Route::get('certificates/{certificate}/preview', [\App\Http\Controllers\Admin\CertificateDownloadController::class, 'preview'])
+        Route::get('certificates/{certificate}/preview', [CertificateDownloadController::class, 'preview'])
             ->name('admin.certificates.preview');
-        Route::get('certificates/{certificate}/download', [\App\Http\Controllers\Admin\CertificateDownloadController::class, 'download'])
+        Route::get('certificates/{certificate}/download', [CertificateDownloadController::class, 'download'])
             ->name('admin.certificates.download');
     });
 });
@@ -132,7 +147,7 @@ Route::prefix('display/attendance')
             ->name('latest');
     });
 
-Route::middleware(\App\Http\Middleware\EnsureWebsiteLicensed::class)->group(function (): void {
+Route::middleware(EnsureWebsiteLicensed::class)->group(function (): void {
     Route::get('/', HomeController::class)->name('home');
     Route::get('/courses', CourseController::class)->name('courses');
     Route::get('/contact', ContactController::class)->name('contact');
@@ -151,7 +166,7 @@ Route::prefix('staff')->name('staff.')->group(function () {
 });
 
 Route::post('/contact/enquiry', [ContactController::class, 'store'])
-    ->middleware(['throttle:10,1', 'license.feature:enquiries', \App\Http\Middleware\EnsureWebsiteLicensed::class])
+    ->middleware(['throttle:10,1', 'license.feature:enquiries', EnsureWebsiteLicensed::class])
     ->name('contact.enquiry');
 
 Route::prefix('portal')->name('portal.')->middleware(EnsurePortalLicensed::class)->group(function () {

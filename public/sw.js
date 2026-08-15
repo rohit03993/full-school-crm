@@ -1,4 +1,4 @@
-const CACHE_NAME = 'school-crm-pwa-v3';
+const CACHE_NAME = 'school-crm-pwa-v4';
 const OFFLINE_URL = '/offline.html';
 
 // Institute icons are deliberately absent: they are served from /pwa/icon/{size}
@@ -25,6 +25,57 @@ self.addEventListener('activate', (event) => {
                     .map((key) => caches.delete(key)),
             ))
             .then(() => self.clients.claim()),
+    );
+});
+
+self.addEventListener('push', (event) => {
+    let data = {
+        title: 'School CRM',
+        body: 'You have an update.',
+        url: '/app',
+        tag: 'crm',
+    };
+
+    try {
+        if (event.data) {
+            data = { ...data, ...event.data.json() };
+        }
+    } catch (error) {
+        // Keep defaults.
+    }
+
+    event.waitUntil(
+        self.registration.showNotification(data.title || 'School CRM', {
+            body: data.body || '',
+            icon: '/pwa/icon/192',
+            badge: '/pwa/icon/192',
+            tag: data.tag || 'crm',
+            data: { url: data.url || '/app' },
+        }),
+    );
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    const target = (event.notification.data && event.notification.data.url) || '/app';
+
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+            for (const client of clients) {
+                if ('focus' in client && client.url.includes(self.location.origin)) {
+                    client.navigate(target);
+
+                    return client.focus();
+                }
+            }
+
+            if (self.clients.openWindow) {
+                return self.clients.openWindow(target);
+            }
+
+            return undefined;
+        }),
     );
 });
 

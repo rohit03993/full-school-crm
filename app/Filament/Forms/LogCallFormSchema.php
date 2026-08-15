@@ -78,10 +78,16 @@ class LogCallFormSchema
                 })
                 ->native(false),
             TextInput::make('duration_minutes')
-                ->label('Duration (minutes)')
+                ->label('Minutes')
                 ->numeric()
                 ->minValue(0)
                 ->maxValue(600),
+            TextInput::make('duration_seconds')
+                ->label('Seconds')
+                ->numeric()
+                ->minValue(0)
+                ->maxValue(59)
+                ->helperText('Auto-filled from Call tap until you return; not exact phone-network talk time.'),
             Textarea::make('call_notes')
                 ->label('Call notes')
                 ->rows(3)

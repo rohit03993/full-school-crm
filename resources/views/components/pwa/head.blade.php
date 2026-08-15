@@ -1,18 +1,19 @@
 @props([
-    'context' => 'public',
+    'context' => 'app',
     'appName' => null,
 ])
 
 @php
-    $appName ??= \App\Services\PwaManifestService::displayName($context);
-    $shortName = \App\Services\PwaManifestService::shortName($context);
+    // One institute app everywhere — context is kept only for legacy callers.
+    $appName ??= \App\Services\PwaManifestService::displayName();
+    $shortName = \App\Services\PwaManifestService::shortName();
     $themeColor = \App\Services\PwaManifestService::themeColor();
-    $manifestUrl = url('/pwa/manifest/'.$context);
+    $manifestUrl = url('/pwa/manifest');
     $icon192 = \App\Services\PwaManifestService::iconUrl(192);
     $icon512 = \App\Services\PwaManifestService::iconUrl(512);
 @endphp
 
-<meta name="crm-pwa-context" content="{{ $context }}">
+<meta name="crm-pwa-context" content="app">
 <meta name="crm-pwa-app-name" content="{{ $appName }}">
 <meta name="theme-color" content="{{ $themeColor }}">
 <meta name="mobile-web-app-capable" content="yes">

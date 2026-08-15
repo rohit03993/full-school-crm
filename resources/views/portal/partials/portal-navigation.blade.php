@@ -107,7 +107,7 @@
 
     <div class="border-t border-navy-100 p-4 space-y-2">
         <x-pwa.install-button class="portal-sidebar-footer-link w-full text-left">
-            Install portal app
+            Install app
         </x-pwa.install-button>
         <a href="{{ route('home') }}" class="portal-sidebar-footer-link">
             ← Back to website

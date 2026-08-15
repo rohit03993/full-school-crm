@@ -6,7 +6,7 @@
     <meta name="theme-color" content="{{ \App\Services\PwaManifestService::themeColor() }}">
     <title>Student Portal — {{ $institute['name'] ?? config('app.name') }}</title>
 
-    <x-pwa.head context="portal" />
+    <x-pwa.head />
 
     @if (! empty($institute['favicon_url']))
         <link rel="icon" href="{{ $institute['favicon_url'] }}"@if (! empty($institute['favicon_type'])) type="{{ $institute['favicon_type'] }}"@endif>
@@ -162,6 +162,6 @@
         });
     </script>
 
-    <x-pwa.install-prompt context="portal" />
+    <x-pwa.install-prompt />
 </body>
 </html>

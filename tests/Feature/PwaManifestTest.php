@@ -23,44 +23,44 @@ class PwaManifestTest extends TestCase
         InstituteSettings::clearCache();
     }
 
-    public function test_public_manifest_is_served(): void
+    public function test_unified_manifest_is_served(): void
     {
-        $this->get(route('pwa.manifest', ['context' => 'public']))
+        $this->get(route('pwa.manifest'))
             ->assertOk()
             ->assertHeader('content-type', 'application/manifest+json')
             ->assertJsonPath('display', 'standalone')
-            ->assertJsonPath('start_url', '/')
+            ->assertJsonPath('start_url', '/app')
+            ->assertJsonPath('scope', '/')
+            ->assertJsonPath('id', '/app')
             ->assertJsonPath('name', 'Motion Agra')
             ->assertJsonPath('short_name', 'Motion')
             ->assertJsonPath('theme_color', '#1E40AF')
             ->assertJsonPath('icons.0.sizes', '192x192');
     }
 
-    public function test_portal_and_admin_manifests_use_institute_names_and_short_labels(): void
+    public function test_legacy_context_manifest_urls_return_the_same_unified_app(): void
     {
-        $this->get(route('pwa.manifest', ['context' => 'portal']))
-            ->assertOk()
-            ->assertJsonPath('start_url', '/portal')
-            ->assertJsonPath('scope', '/portal/')
-            ->assertJsonPath('name', 'Motion Agra Portal')
-            ->assertJsonPath('short_name', 'MA Portal');
-
-        $this->get(route('pwa.manifest', ['context' => 'admin']))
-            ->assertOk()
-            ->assertJsonPath('start_url', '/admin')
-            ->assertJsonPath('scope', '/admin/')
-            ->assertJsonPath('name', 'Motion Agra Admin')
-            ->assertJsonPath('short_name', 'Motion Admin');
+        foreach (['public', 'portal', 'admin'] as $context) {
+            $this->get(route('pwa.manifest', ['context' => $context]))
+                ->assertOk()
+                ->assertJsonPath('start_url', '/app')
+                ->assertJsonPath('scope', '/')
+                ->assertJsonPath('name', 'Motion Agra')
+                ->assertJsonPath('short_name', 'Motion');
+        }
     }
 
-    public function test_long_brand_names_fall_back_to_initials_for_short_name(): void
+    public function test_long_brand_names_fit_the_short_home_screen_label(): void
     {
         Setting::setValue('site.name', 'International Coaching Academy', 'general');
         InstituteSettings::clearCache();
 
-        $this->assertSame('ICA Admin', PwaManifestService::shortName('admin'));
-        $this->assertSame('ICA Portal', PwaManifestService::shortName('portal'));
-        $this->assertLessThanOrEqual(12, strlen(PwaManifestService::shortName('admin')));
+        $short = PwaManifestService::shortName();
+        $this->assertSame('Internationa', $short);
+        $this->assertLessThanOrEqual(12, strlen($short));
+        // Context args are ignored — one app name for everyone.
+        $this->assertSame($short, PwaManifestService::shortName('admin'));
+        $this->assertSame(PwaManifestService::displayName(), PwaManifestService::displayName('portal'));
     }
 
     public function test_pwa_icons_are_available(): void
@@ -231,7 +231,8 @@ class PwaManifestTest extends TestCase
     {
         $this->get(route('home'))
             ->assertOk()
-            ->assertSee('/pwa/manifest/public', false)
+            ->assertSee('/pwa/manifest', false)
+            ->assertDontSee('/pwa/manifest/public', false)
             ->assertSee('apple-mobile-web-app-title', false);
     }
 
@@ -241,11 +242,10 @@ class PwaManifestTest extends TestCase
         $this->assertFileExists(public_path('offline.html'));
 
         $sw = (string) file_get_contents(public_path('sw.js'));
-        $this->assertStringContainsString('school-crm-pwa-v3', $sw);
+        $this->assertStringContainsString('school-crm-pwa-v4', $sw);
         $this->assertStringContainsString('/offline.html', $sw);
-
-        // A cached bare icon path would pin an old logo onto installed apps.
-        $this->assertStringNotContainsString("'/pwa/icon/192'", $sw);
+        $this->assertStringContainsString("addEventListener('push'", $sw);
+        $this->assertStringContainsString("addEventListener('notificationclick'", $sw);
         // The manifest must not be served cache-first.
         $this->assertStringNotContainsString("startsWith('/pwa/')", $sw);
 

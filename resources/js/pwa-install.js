@@ -12,7 +12,8 @@ function pwaContext() {
 }
 
 function dismissKey() {
-    return `crm_pwa_install_dismissed_until_${pwaContext()}`;
+    // One dismiss state for the whole institute app (not per admin/portal/public).
+    return 'crm_pwa_install_dismissed_until_app';
 }
 
 function appName() {
@@ -46,8 +47,8 @@ function dismissInstallPrompt() {
 function shouldOfferInstallByContext() {
     const context = pwaContext();
 
-    // Staff Admin, student Portal, and the public site are all installable apps
-    return context === 'public' || context === 'portal' || context === 'admin';
+    // Any surface of the institute app can offer install.
+    return context === 'app' || context === 'public' || context === 'portal' || context === 'admin';
 }
 
 function canOfferInstall() {

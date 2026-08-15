@@ -158,7 +158,8 @@
         @endif
     </div>
 
-    <div class="mb-4 space-y-2 md:hidden">
+    <div class="mb-4 space-y-2 lg:hidden">
+        <p class="text-xs text-gray-500 dark:text-gray-400">One card per student — subject scores below the name.</p>
         @foreach ($markSheet['rows'] as $row)
             <div class="rounded-xl bg-white p-3 ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-white/10">
                 <div class="flex items-start justify-between gap-2">
@@ -198,7 +199,7 @@
         @endforeach
     </div>
 
-    <div class="hidden overflow-x-auto rounded-xl ring-1 ring-gray-200 md:block dark:ring-white/10">
+    <div class="hidden overflow-x-auto rounded-xl ring-1 ring-gray-200 lg:block dark:ring-white/10">
         <table class="w-full min-w-[32rem] text-left text-sm">
             <thead class="bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
                 <tr>

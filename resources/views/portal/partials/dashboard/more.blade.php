@@ -49,6 +49,21 @@
 
 @include('portal.partials.change-password')
 
+<section class="portal-card p-4 sm:p-5">
+    <h2 class="font-display text-base font-bold text-navy-900">App notifications</h2>
+    <p class="mt-1 text-sm text-navy-500">
+        Allow notifications so fee reminders reach this phone even when the app is closed.
+    </p>
+    <button
+        type="button"
+        id="portal-enable-push"
+        class="touch-manipulation mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition active:bg-navy-800 sm:w-auto"
+    >
+        Enable notifications
+    </button>
+    <p id="portal-push-status" class="mt-2 hidden text-xs text-navy-500"></p>
+</section>
+
 <section class="portal-card p-4 sm:p-5 lg:hidden">
     <h2 class="font-display text-base font-bold text-navy-900">Session</h2>
     <p class="mt-1 text-sm text-navy-500">Sign out of the student portal on this device.</p>

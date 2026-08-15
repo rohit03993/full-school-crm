@@ -107,8 +107,20 @@
                 @endif
 
                 <div>
-                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Duration (minutes)</label>
-                    <input type="number" min="0" max="600" wire:model="logCallForm.duration_minutes" class="fi-crm-input mt-2">
+                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Duration</label>
+                    <div class="mt-2 grid grid-cols-2 gap-3">
+                        <div>
+                            <input type="number" min="0" max="600" wire:model="logCallForm.duration_minutes" class="fi-crm-input" aria-label="Minutes">
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Minutes</p>
+                        </div>
+                        <div>
+                            <input type="number" min="0" max="59" wire:model="logCallForm.duration_seconds" class="fi-crm-input" aria-label="Seconds">
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Seconds</p>
+                        </div>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Auto-filled from when you tapped Call until you returned to log. Edit if needed (not exact phone-network talk time).
+                    </p>
                 </div>
 
                 <div>

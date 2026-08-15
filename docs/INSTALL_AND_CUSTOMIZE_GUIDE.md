@@ -150,7 +150,9 @@ For a square/circular logo you also get **Show institute name beside the logo**:
 - **On** — for a plain crest or seal with no wording in it, so the header still shows who you are.
 - **Off** — when the logo image already contains your institute name, otherwise the name appears twice.
 
-**Favicon = installed app icon.** Upload a clear square mark (ideally 512×512 PNG). That file is used for the browser tab favicon **and** the home-screen icon when someone installs the CRM / website / portal as an app. If no favicon is uploaded, the system falls back to the website logo, then to institute initials.
+**Favicon = installed app icon.** Upload a clear square mark (ideally 512×512 PNG). That file is used for the browser tab favicon **and** the home-screen icon when someone installs **the institute app** (one app for staff, parents, and the website — not three separate installs). If no favicon is uploaded, the system falls back to the website logo, then to institute initials.
+
+**How the app opens:** Install from the website, Admin, or Portal — same icon. Opening it goes to `/app`, which sends signed-in staff to Admin, parents/students to the Portal, and guests to a Staff vs Parent/Student chooser.
 
 ---
 

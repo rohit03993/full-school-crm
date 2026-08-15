@@ -2,12 +2,15 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\Login;
 use App\Filament\Pages\BulkActivityMarksImportPage;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\FeesDashboardPage;
 use App\Filament\Pages\LicenseExpiredPage;
 use App\Filament\Pages\MyAccountPage;
 use App\Filament\Pages\TestMarksReviewPage;
+use App\Http\Middleware\EnsureInstituteOnboardingComplete;
+use App\Http\Middleware\EnsureLicenseActive;
 use App\Support\CrmNavigation;
 use App\Support\InstituteSettings;
 use Filament\Http\Middleware\Authenticate;
@@ -38,7 +41,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login(\App\Filament\Auth\Login::class)
+            ->login(Login::class)
             ->userMenuItems([
                 'profile' => MenuItem::make()
                     ->label('My account')
@@ -88,11 +91,11 @@ class AdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
-                \App\Http\Middleware\EnsureLicenseActive::class,
+                EnsureLicenseActive::class,
             ])
             ->authMiddleware([
                 Authenticate::class,
-                \App\Http\Middleware\EnsureInstituteOnboardingComplete::class,
+                EnsureInstituteOnboardingComplete::class,
             ])
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
@@ -109,7 +112,7 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): string => Blade::render('<x-crm.media-preview-dialog />')
-                    .Blade::render('<x-pwa.install-prompt context="admin" />')
+                    .Blade::render('<x-pwa.install-prompt />')
                     .view('filament.partials.mobile-bottom-nav')->render()
                     .view('filament.partials.pending-call-flow')->render()
                     .view('filament.partials.ask-crm-widget')->render(),

@@ -4,9 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="{{ \App\Services\PwaManifestService::themeColor() }}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Student Portal') — {{ $institute['name'] ?? config('app.name') }}</title>
 
-    <x-pwa.head context="portal" />
+    <x-pwa.head />
 
     @if (! empty($institute['favicon_url']))
         <link rel="icon" href="{{ $institute['favicon_url'] }}"@if (! empty($institute['favicon_type'])) type="{{ $institute['favicon_type'] }}"@endif>
@@ -140,7 +141,7 @@
     </script>
 
     @if (session()->has('student_portal_id'))
-        <x-pwa.install-prompt context="portal" />
+        <x-pwa.install-prompt />
     @endif
 </body>
 </html>

@@ -237,6 +237,8 @@ class AskCrmStudentDataService
                 'staff' => $call->staff?->name,
                 'notes' => $call->call_notes,
                 'duration_minutes' => $call->duration_minutes,
+                'duration_seconds' => $call->duration_seconds,
+                'duration_label' => $call->durationLabel(),
                 'next_followup_at' => $call->next_followup_at?->toDateString(),
                 'case_number' => $call->studentCase?->case_number,
                 'course' => $call->enquiry?->course?->name,

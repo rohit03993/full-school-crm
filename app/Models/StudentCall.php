@@ -23,6 +23,7 @@ class StudentCall extends Model
         'whatsapp_auto_status',
         'who_answered',
         'duration_minutes',
+        'duration_seconds',
         'call_notes',
         'tags',
         'call_purpose',
@@ -43,8 +44,29 @@ class StudentCall extends Model
             'next_followup_at' => 'datetime',
             'called_at' => 'datetime',
             'duration_minutes' => 'integer',
+            'duration_seconds' => 'integer',
             'tags' => 'array',
         ];
+    }
+
+    public function durationLabel(): string
+    {
+        $minutes = max(0, (int) ($this->duration_minutes ?? 0));
+        $seconds = max(0, min(59, (int) ($this->duration_seconds ?? 0)));
+
+        if ($minutes === 0 && $seconds === 0) {
+            return '0s';
+        }
+
+        if ($minutes === 0) {
+            return $seconds.'s';
+        }
+
+        if ($seconds === 0) {
+            return $minutes.'m';
+        }
+
+        return $minutes.'m '.$seconds.'s';
     }
 
     public function student(): BelongsTo

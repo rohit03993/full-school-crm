@@ -69,115 +69,117 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">No attendance rows in this month.</p>
         @else
             <div class="overflow-hidden rounded-xl ring-1 ring-gray-200 dark:ring-white/10">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
-                        <tr>
-                            <th class="px-4 py-2.5">Date</th>
-                            <th class="px-4 py-2.5">Status</th>
-                            <th class="px-4 py-2.5">Visits · source per punch</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-white/10">
-                        @foreach ($attendanceRecords as $record)
-                            @php
-                                $roll = $student?->activeEnrollment?->enrollment_number;
-                                $dayRow = filled($roll)
-                                    ? app(\App\Services\Punch\LivePunchDashboardService::class)->studentDayRow(
-                                        (string) $roll,
-                                        $record->attendance_date->toDateString(),
-                                        $student,
-                                    )
-                                    : null;
-                                $pairs = $dayRow['pairs'] ?? [];
-                                $lastPair = $pairs !== [] ? $pairs[array_key_last($pairs)] : null;
-                                $visit = $lastPair
-                                    ? (filled($lastPair['out'] ?? null) ? 'Checked out' : 'Inside')
-                                    : \App\Support\AttendanceSourceLabel::visitState($record->checked_in_at, $record->checked_out_at);
-                            @endphp
-                            <tr class="bg-white dark:bg-gray-900">
-                                <td class="px-4 py-2.5 font-medium text-gray-950 dark:text-white align-top">
-                                    {{ $record->attendance_date->format('d M Y') }}
-                                    @if (count($pairs) > 1)
-                                        <p class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                                            {{ count($pairs) }} visits
-                                        </p>
-                                    @endif
-                                </td>
-                                <td class="px-4 py-2.5 align-top">
-                                    <div class="flex flex-wrap items-center gap-1.5">
-                                        <span @class([
-                                            'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold',
-                                            'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' => $record->status === \App\Enums\AttendanceStatus::Present,
-                                            'bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300' => $record->status === \App\Enums\AttendanceStatus::Absent,
-                                            'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-300' => $record->status === \App\Enums\AttendanceStatus::Leave,
-                                        ])>
-                                            {{ $record->status->label() }}
-                                        </span>
-                                        @if ($visit && $record->status === \App\Enums\AttendanceStatus::Present)
-                                            <span @class([
-                                                'inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase',
-                                                'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' => $visit === 'Inside',
-                                                'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300' => $visit === 'Checked out',
-                                            ])>{{ $visit }}</span>
+                <x-crm.responsive-table>
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
+                            <tr>
+                                <th class="px-4 py-2.5">Date</th>
+                                <th class="px-4 py-2.5">Status</th>
+                                <th class="px-4 py-2.5">Visits · source per punch</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-white/10">
+                            @foreach ($attendanceRecords as $record)
+                                @php
+                                    $roll = $student?->activeEnrollment?->enrollment_number;
+                                    $dayRow = filled($roll)
+                                        ? app(\App\Services\Punch\LivePunchDashboardService::class)->studentDayRow(
+                                            (string) $roll,
+                                            $record->attendance_date->toDateString(),
+                                            $student,
+                                        )
+                                        : null;
+                                    $pairs = $dayRow['pairs'] ?? [];
+                                    $lastPair = $pairs !== [] ? $pairs[array_key_last($pairs)] : null;
+                                    $visit = $lastPair
+                                        ? (filled($lastPair['out'] ?? null) ? 'Checked out' : 'Inside')
+                                        : \App\Support\AttendanceSourceLabel::visitState($record->checked_in_at, $record->checked_out_at);
+                                @endphp
+                                <tr class="bg-white dark:bg-gray-900">
+                                    <td class="crm-responsive-table__title px-4 py-2.5 font-medium text-gray-950 dark:text-white align-top" data-label="Date">
+                                        {{ $record->attendance_date->format('d M Y') }}
+                                        @if (count($pairs) > 1)
+                                            <p class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                                                {{ count($pairs) }} visits
+                                            </p>
                                         @endif
-                                    </div>
-                                </td>
-                                <td class="px-4 py-2.5 align-top">
-                                    @if ($pairs !== [])
-                                        <div class="space-y-2.5">
-                                            @foreach ($pairs as $index => $pair)
-                                                <div class="rounded-lg bg-gray-50 px-2.5 py-2 ring-1 ring-gray-950/5 dark:bg-white/5 dark:ring-white/10">
-                                                    <div class="mb-1.5 flex items-center justify-between gap-2">
-                                                        <span class="text-[10px] font-bold uppercase tracking-wide text-gray-400">
-                                                            Visit {{ $index + 1 }}
-                                                        </span>
-                                                        @if (filled($pair['duration_label'] ?? null))
-                                                            <span class="text-[10px] text-gray-400">{{ $pair['duration_label'] }}</span>
-                                                        @endif
-                                                    </div>
-                                                    <div class="grid grid-cols-2 gap-3">
-                                                        <div class="min-w-0">
-                                                            <p class="text-[9px] font-semibold uppercase text-emerald-600 dark:text-emerald-400">In</p>
-                                                            <p class="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-300">{{ $pair['in'] ?? '—' }}</p>
-                                                            @include('filament.pages.partials.punch-source-chip', [
-                                                                'isManual' => ! empty($pair['is_manual_in']),
-                                                                'device' => $pair['device_in'] ?? null,
-                                                                'staffName' => $pair['marked_by_in'] ?? null,
-                                                            ])
-                                                        </div>
-                                                        <div class="min-w-0">
-                                                            <p class="text-[9px] font-semibold uppercase text-rose-600 dark:text-rose-400">Out</p>
-                                                            @if (filled($pair['out'] ?? null) || ! empty($pair['is_auto_out']))
-                                                                <p class="font-mono text-xs font-bold text-rose-700 dark:text-rose-300">{{ $pair['out'] ?? '—' }}</p>
-                                                                @include('filament.pages.partials.punch-source-chip', [
-                                                                    'isManual' => ! empty($pair['is_manual_out']),
-                                                                    'isAuto' => ! empty($pair['is_auto_out']),
-                                                                    'device' => $pair['device_out'] ?? null,
-                                                                    'staffName' => $pair['marked_by_out'] ?? null,
-                                                                ])
-                                                            @else
-                                                                <p class="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-300">Inside</p>
+                                    </td>
+                                    <td class="px-4 py-2.5 align-top" data-label="Status">
+                                        <div class="flex flex-wrap items-center gap-1.5">
+                                            <span @class([
+                                                'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold',
+                                                'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' => $record->status === \App\Enums\AttendanceStatus::Present,
+                                                'bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300' => $record->status === \App\Enums\AttendanceStatus::Absent,
+                                                'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-300' => $record->status === \App\Enums\AttendanceStatus::Leave,
+                                            ])>
+                                                {{ $record->status->label() }}
+                                            </span>
+                                            @if ($visit && $record->status === \App\Enums\AttendanceStatus::Present)
+                                                <span @class([
+                                                    'inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase',
+                                                    'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' => $visit === 'Inside',
+                                                    'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300' => $visit === 'Checked out',
+                                                ])>{{ $visit }}</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td class="crm-responsive-table__wide px-4 py-2.5 align-top" data-label="Visits">
+                                        @if ($pairs !== [])
+                                            <div class="space-y-2.5">
+                                                @foreach ($pairs as $index => $pair)
+                                                    <div class="rounded-lg bg-gray-50 px-2.5 py-2 ring-1 ring-gray-950/5 dark:bg-white/5 dark:ring-white/10">
+                                                        <div class="mb-1.5 flex items-center justify-between gap-2">
+                                                            <span class="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                                                                Visit {{ $index + 1 }}
+                                                            </span>
+                                                            @if (filled($pair['duration_label'] ?? null))
+                                                                <span class="text-[10px] text-gray-400">{{ $pair['duration_label'] }}</span>
                                                             @endif
                                                         </div>
+                                                        <div class="grid grid-cols-2 gap-3">
+                                                            <div class="min-w-0">
+                                                                <p class="text-[9px] font-semibold uppercase text-emerald-600 dark:text-emerald-400">In</p>
+                                                                <p class="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-300">{{ $pair['in'] ?? '—' }}</p>
+                                                                @include('filament.pages.partials.punch-source-chip', [
+                                                                    'isManual' => ! empty($pair['is_manual_in']),
+                                                                    'device' => $pair['device_in'] ?? null,
+                                                                    'staffName' => $pair['marked_by_in'] ?? null,
+                                                                ])
+                                                            </div>
+                                                            <div class="min-w-0">
+                                                                <p class="text-[9px] font-semibold uppercase text-rose-600 dark:text-rose-400">Out</p>
+                                                                @if (filled($pair['out'] ?? null) || ! empty($pair['is_auto_out']))
+                                                                    <p class="font-mono text-xs font-bold text-rose-700 dark:text-rose-300">{{ $pair['out'] ?? '—' }}</p>
+                                                                    @include('filament.pages.partials.punch-source-chip', [
+                                                                        'isManual' => ! empty($pair['is_manual_out']),
+                                                                        'isAuto' => ! empty($pair['is_auto_out']),
+                                                                        'device' => $pair['device_out'] ?? null,
+                                                                        'staffName' => $pair['marked_by_out'] ?? null,
+                                                                    ])
+                                                                @else
+                                                                    <p class="text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-300">Inside</p>
+                                                                @endif
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @else
-                                        <div class="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs">
-                                            <span class="text-emerald-700 dark:text-emerald-300">
-                                                IN {{ $record->checked_in_at?->format('H:i') ?? '—' }}
-                                            </span>
-                                            <span class="text-rose-700 dark:text-rose-300">
-                                                OUT {{ $record->checked_out_at?->format('H:i') ?? '—' }}
-                                            </span>
-                                        </div>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <div class="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs">
+                                                <span class="text-emerald-700 dark:text-emerald-300">
+                                                    IN {{ $record->checked_in_at?->format('H:i') ?? '—' }}
+                                                </span>
+                                                <span class="text-rose-700 dark:text-rose-300">
+                                                    OUT {{ $record->checked_out_at?->format('H:i') ?? '—' }}
+                                                </span>
+                                            </div>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </x-crm.responsive-table>
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">

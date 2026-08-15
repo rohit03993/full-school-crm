@@ -49,15 +49,38 @@ Shared mobile chrome (defined in `resources/css/filament/admin/theme.css`, used 
 
 ### Installable PWA (per institute)
 
-Each school gets its own home-screen apps (not a shared “School CRM” brand):
+**One home-screen app per school** — not separate Admin / Portal / Website apps.
 
-| Install from | Full name | Short label (≤12 chars) | Opens |
-|--------------|-----------|-------------------------|-------|
-| `/admin` | `{Institute} Admin` | e.g. `Motion Admin` | Staff CRM |
-| `/portal` | `{Institute} Portal` | e.g. `MA Portal` | Student portal |
-| `/` | `{Institute}` | e.g. `Motion` | Public site |
+| Piece | Behaviour |
+|-------|-----------|
+| Name | `{Institute}` (e.g. Motion Education) |
+| Short label | First brand word, ≤12 chars |
+| Icon | Favicon first, then logo, else initials |
+| Theme colour | ID-card primary colour |
+| Install from | Website, Admin, or Portal — all offer the **same** app |
+| Opens to | `/app` — smart entry |
 
-Icon = institute **favicon** first (the dedicated square mark), then website logo, else initials. Theme colour = ID-card primary colour. Service worker (`public/sw.js`) + `public/offline.html` give a clean offline screen. Staff can install from Admin (banner + topbar). Manifest: `PwaManifestService`.
+`/app` routes by login:
+
+1. Staff signed in (`auth`) → `/admin`
+2. Parent/student portal session → `/portal`
+3. Guest → chooser: Staff/Admin, Parent/Student (if Portal licensed), Visit website
+
+Manifest: `PwaManifestService` (`/pwa/manifest`). Legacy `/pwa/manifest/admin|portal|public` URLs still return the same unified payload. Service worker (`public/sw.js`) + `public/offline.html` give a clean offline screen.
+
+### Web Push (PWA notifications)
+
+Optional lock-screen alerts for the installed app (staff + portal):
+
+| Piece | Detail |
+|-------|--------|
+| Package | `minishlink/web-push` |
+| Keys | `php artisan crm:webpush-vapid` → `.env` `VAPID_*` |
+| Store | `push_subscriptions` (`user_id` staff / `student_id` portal) |
+| Subscribe | `/pwa/push/subscribe` after Allow notifications |
+| Fee reminders | `crm:send-fee-reminders` also sends portal push (even if WhatsApp is off) |
+| Staff follow-ups | `crm:send-push-followup-digest` daily 08:30 |
+| Toggle | Settings `push.enabled`, `push.fee_reminders_enabled`, `push.followup_digest_enabled` (default on) |
 
 ---
 

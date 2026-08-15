@@ -1,9 +1,16 @@
 <?php
 
+use App\Http\Middleware\EnsureAttendanceDisplayToken;
+use App\Http\Middleware\EnsureLicenseFeature;
+use App\Http\Middleware\EnsureStudentPortalAuth;
+use App\Support\CrmLivewireErrors;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -29,9 +36,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'student.portal' => \App\Http\Middleware\EnsureStudentPortalAuth::class,
-            'license.feature' => \App\Http\Middleware\EnsureLicenseFeature::class,
-            'attendance.display' => \App\Http\Middleware\EnsureAttendanceDisplayToken::class,
+            'student.portal' => EnsureStudentPortalAuth::class,
+            'license.feature' => EnsureLicenseFeature::class,
+            'attendance.display' => EnsureAttendanceDisplayToken::class,
         ]);
     })
     ->withSchedule(function (Schedule $schedule): void {
@@ -39,6 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('crm:backup')->dailyAt((string) config('crm-backup.schedule_at', '02:15'));
         $schedule->command('crm:process-late-fees')->dailyAt('00:30');
         $schedule->command('crm:send-fee-reminders')->dailyAt('09:00');
+        $schedule->command('crm:send-push-followup-digest')->dailyAt('08:30');
         $schedule->command('attendance:process-punches')->everyMinute();
         $schedule->command('attendance:auto-out')->everyMinute();
         $schedule->command('face-verify:sweep')->everyMinute()->withoutOverlapping();
@@ -46,20 +54,20 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('whatsapp:process-pending')->everyMinute()->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->render(function (\Throwable $exception, \Illuminate\Http\Request $request) {
+        $exceptions->render(function (Throwable $exception, Request $request) {
             if (! $request->header('X-Livewire') && ! $request->header('X-Livewire-Navigate')) {
                 return null;
             }
 
-            if ($exception instanceof \Illuminate\Auth\AuthenticationException) {
+            if ($exception instanceof AuthenticationException) {
                 return null;
             }
 
-            if ($exception instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+            if ($exception instanceof HttpExceptionInterface) {
                 return null;
             }
 
-            $message = \App\Support\CrmLivewireErrors::messageFor($exception);
+            $message = CrmLivewireErrors::messageFor($exception);
 
             if ($request->header('X-Livewire-Navigate')) {
                 return response($message, 500);

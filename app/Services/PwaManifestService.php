@@ -9,19 +9,31 @@ use Illuminate\Support\Str;
 
 class PwaManifestService
 {
+    public const START_URL = '/app';
+
+    public const SCOPE = '/';
+
     /**
+     * One institute app for staff, parents, and the public site.
+     *
+     * Legacy context arguments (admin/portal/public) are ignored so every
+     * install surface points at the same home-screen app. /app then routes
+     * by who is signed in.
+     *
      * @return array<string, mixed>
      */
-    public static function manifest(string $context = 'public'): array
+    public static function manifest(string $context = 'app'): array
     {
-        $profile = self::profile($context);
+        unset($context);
+
+        $brand = InstituteSettings::brandName();
 
         return [
-            'name' => self::displayName($context),
-            'short_name' => self::shortName($context),
-            'description' => $profile['description'],
-            'start_url' => $profile['start_url'],
-            'scope' => $profile['scope'],
+            'name' => self::displayName(),
+            'short_name' => self::shortName(),
+            'description' => "{$brand} — staff CRM, parent portal, and institute website in one app.",
+            'start_url' => self::START_URL,
+            'scope' => self::SCOPE,
             'display' => 'standalone',
             'orientation' => 'portrait-primary',
             'background_color' => '#FFFFFF',
@@ -46,7 +58,8 @@ class PwaManifestService
                     'purpose' => 'maskable',
                 ],
             ],
-            'id' => $profile['start_url'],
+            // Stable id so admin/portal/public pages do not create three apps.
+            'id' => self::START_URL,
             'lang' => 'en',
             'dir' => 'ltr',
             'categories' => ['education', 'business'],
@@ -54,31 +67,23 @@ class PwaManifestService
     }
 
     /**
-     * Full install title shown in the install dialog.
+     * Full install title — always the institute name (one app).
      */
-    public static function displayName(string $context = 'public'): string
+    public static function displayName(string $context = 'app'): string
     {
-        $brand = InstituteSettings::brandName();
+        unset($context);
 
-        return match ($context) {
-            'admin' => $brand.' Admin',
-            'portal' => $brand.' Portal',
-            default => $brand,
-        };
+        return InstituteSettings::brandName();
     }
 
     /**
      * Home-screen label — kept ≤12 characters so Android does not truncate oddly.
      */
-    public static function shortName(string $context = 'public'): string
+    public static function shortName(string $context = 'app'): string
     {
-        $token = self::shortBrandToken();
+        unset($context);
 
-        return match ($context) {
-            'admin' => self::fitShort($token, ' Admin'),
-            'portal' => self::fitShort($token, ' Portal'),
-            default => Str::limit($token, 12, ''),
-        };
+        return Str::limit(self::shortBrandToken(), 12, '');
     }
 
     public static function themeColor(): string
@@ -170,56 +175,5 @@ class PwaManifestService
         }
 
         return self::brandInitials();
-    }
-
-    /**
-     * Fit "{token}{suffix}" into 12 characters; fall back to initials when the brand word is long.
-     */
-    protected static function fitShort(string $token, string $suffix): string
-    {
-        $max = 12;
-        $room = $max - strlen($suffix);
-
-        if ($room < 2) {
-            return Str::limit($token.$suffix, $max, '');
-        }
-
-        if (strlen($token) <= $room) {
-            return $token.$suffix;
-        }
-
-        $initials = self::brandInitials();
-
-        if (strlen($initials) <= $room) {
-            return $initials.$suffix;
-        }
-
-        return Str::limit($token, $room, '').$suffix;
-    }
-
-    /**
-     * @return array{start_url: string, scope: string, description: string}
-     */
-    private static function profile(string $context): array
-    {
-        $brand = InstituteSettings::brandName();
-
-        return match ($context) {
-            'portal' => [
-                'start_url' => '/portal',
-                'scope' => '/portal/',
-                'description' => "Student portal for {$brand} — fees, marks, homework, and more.",
-            ],
-            'admin' => [
-                'start_url' => '/admin',
-                'scope' => '/admin/',
-                'description' => "Staff CRM for {$brand} — attendance, leads, fees, and messaging.",
-            ],
-            default => [
-                'start_url' => '/',
-                'scope' => '/',
-                'description' => "Official website for {$brand}.",
-            ],
-        };
     }
 }
