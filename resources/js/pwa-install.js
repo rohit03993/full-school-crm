@@ -46,7 +46,8 @@ function dismissInstallPrompt() {
 function shouldOfferInstallByContext() {
     const context = pwaContext();
 
-    return context === 'public' || context === 'portal';
+    // Staff Admin, student Portal, and the public site are all installable apps
+    return context === 'public' || context === 'portal' || context === 'admin';
 }
 
 function canOfferInstall() {
@@ -219,11 +220,14 @@ function registerServiceWorker() {
 }
 
 function initPwaInstall() {
+    // Always register the service worker so offline + install criteria work,
+    // even if the install banner is dismissed or already installed.
+    registerServiceWorker();
+
     if (! canOfferInstall()) {
         return;
     }
 
-    registerServiceWorker();
     bindInstallControls();
 
     window.addEventListener('beforeinstallprompt', (event) => {

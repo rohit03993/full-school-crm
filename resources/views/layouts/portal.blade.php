@@ -3,10 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#102a43">
+    <meta name="theme-color" content="{{ \App\Services\PwaManifestService::themeColor() }}">
     <title>@yield('title', 'Student Portal') — {{ $institute['name'] ?? config('app.name') }}</title>
 
-    <x-pwa.head context="portal" :app-name="($institute['name'] ?? config('app.name')).' Portal'" />
+    <x-pwa.head context="portal" />
 
     @if (! empty($institute['favicon_url']))
         <link rel="icon" href="{{ $institute['favicon_url'] }}" type="image/png">

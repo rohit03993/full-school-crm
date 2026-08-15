@@ -15,19 +15,17 @@ class PwaManifestService
     public static function manifest(string $context = 'public'): array
     {
         $profile = self::profile($context);
-        $brand = InstituteSettings::brandName();
-        $name = $brand.$profile['name_suffix'];
 
         return [
-            'name' => $name,
-            'short_name' => Str::limit($name, 12, ''),
+            'name' => self::displayName($context),
+            'short_name' => self::shortName($context),
             'description' => $profile['description'],
             'start_url' => $profile['start_url'],
             'scope' => $profile['scope'],
             'display' => 'standalone',
             'orientation' => 'portrait-primary',
             'background_color' => '#FFFFFF',
-            'theme_color' => '#102a43',
+            'theme_color' => self::themeColor(),
             'icons' => [
                 [
                     'src' => url('/pwa/icon/192'),
@@ -39,10 +37,56 @@ class PwaManifestService
                     'src' => url('/pwa/icon/512'),
                     'sizes' => '512x512',
                     'type' => 'image/png',
-                    'purpose' => 'any maskable',
+                    'purpose' => 'any',
+                ],
+                [
+                    'src' => url('/pwa/icon/512'),
+                    'sizes' => '512x512',
+                    'type' => 'image/png',
+                    'purpose' => 'maskable',
                 ],
             ],
+            'id' => $profile['start_url'],
+            'lang' => 'en',
+            'dir' => 'ltr',
+            'categories' => ['education', 'business'],
         ];
+    }
+
+    /**
+     * Full install title shown in the install dialog.
+     */
+    public static function displayName(string $context = 'public'): string
+    {
+        $brand = InstituteSettings::brandName();
+
+        return match ($context) {
+            'admin' => $brand.' Admin',
+            'portal' => $brand.' Portal',
+            default => $brand,
+        };
+    }
+
+    /**
+     * Home-screen label — kept ≤12 characters so Android does not truncate oddly.
+     */
+    public static function shortName(string $context = 'public'): string
+    {
+        $token = self::shortBrandToken();
+
+        return match ($context) {
+            'admin' => self::fitShort($token, ' Admin'),
+            'portal' => self::fitShort($token, ' Portal'),
+            default => Str::limit($token, 12, ''),
+        };
+    }
+
+    public static function themeColor(): string
+    {
+        return InstituteSettings::normalizeHexColor(
+            Setting::getValue('crm.id_card_primary_color'),
+            '#102a43',
+        );
     }
 
     public static function iconSourcePath(int $size): ?string
@@ -81,7 +125,7 @@ class PwaManifestService
 
         $initials = collect($words)
             ->filter()
-            ->take(2)
+            ->take(3)
             ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
             ->implode('');
 
@@ -89,7 +133,48 @@ class PwaManifestService
     }
 
     /**
-     * @return array{name_suffix: string, start_url: string, scope: string, description: string}
+     * First word of the brand, letters/digits only — used for the home-screen label.
+     */
+    protected static function shortBrandToken(): string
+    {
+        $brand = trim(InstituteSettings::brandName());
+        $first = strtok($brand, " \t") ?: $brand;
+        $clean = preg_replace('/[^A-Za-z0-9]/', '', (string) $first) ?? '';
+
+        if ($clean !== '') {
+            return $clean;
+        }
+
+        return self::brandInitials();
+    }
+
+    /**
+     * Fit "{token}{suffix}" into 12 characters; fall back to initials when the brand word is long.
+     */
+    protected static function fitShort(string $token, string $suffix): string
+    {
+        $max = 12;
+        $room = $max - strlen($suffix);
+
+        if ($room < 2) {
+            return Str::limit($token.$suffix, $max, '');
+        }
+
+        if (strlen($token) <= $room) {
+            return $token.$suffix;
+        }
+
+        $initials = self::brandInitials();
+
+        if (strlen($initials) <= $room) {
+            return $initials.$suffix;
+        }
+
+        return Str::limit($token, $room, '').$suffix;
+    }
+
+    /**
+     * @return array{start_url: string, scope: string, description: string}
      */
     private static function profile(string $context): array
     {
@@ -97,19 +182,16 @@ class PwaManifestService
 
         return match ($context) {
             'portal' => [
-                'name_suffix' => ' — Student Portal',
                 'start_url' => '/portal',
                 'scope' => '/portal/',
                 'description' => "Student portal for {$brand} — fees, marks, homework, and more.",
             ],
             'admin' => [
-                'name_suffix' => ' — Admin',
                 'start_url' => '/admin',
                 'scope' => '/admin/',
                 'description' => "Staff CRM for {$brand} — attendance, leads, fees, and messaging.",
             ],
             default => [
-                'name_suffix' => '',
                 'start_url' => '/',
                 'scope' => '/',
                 'description' => "Official website for {$brand}.",

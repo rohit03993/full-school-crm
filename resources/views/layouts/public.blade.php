@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="description" content="{{ $metaDescription ?? ($institute['tagline'] ?? '') }}">
-    <meta name="theme-color" content="#102a43">
+    <meta name="theme-color" content="{{ \App\Services\PwaManifestService::themeColor() }}">
     <meta name="mobile-web-app-capable" content="yes">
 
     <title>{{ isset($title) ? $title.' — ' : '' }}{{ $institute['name'] ?? config('institute.name') }}</title>
 
-    <x-pwa.head context="public" :app-name="$institute['name'] ?? null" />
+    <x-pwa.head context="public" />
 
     @if (! empty($institute['favicon_url']))
         <link rel="icon" href="{{ $institute['favicon_url'] }}" type="image/png">

@@ -7,10 +7,10 @@
         <div class="crm-pwa-install-banner-copy">
             <p class="crm-pwa-install-banner-title" data-crm-pwa-banner-title>Install app</p>
             <p class="crm-pwa-install-banner-text" data-crm-pwa-android-copy>
-                Add to your home screen or desktop for quick access.
+                Install this app on your phone — open it like any other app, with your institute name and logo.
             </p>
             <p class="crm-pwa-install-banner-text hidden" data-crm-pwa-ios-copy>
-                Tap Install for step-by-step Add to Home Screen instructions.
+                Tap Install for step-by-step Add to Home Screen instructions (Safari).
             </p>
         </div>
         <div class="crm-pwa-install-banner-actions">

@@ -1,7 +1,8 @@
 @php
+    use App\Services\PwaManifestService;
     use App\Support\ViteManifest;
 
-    $appName = \App\Support\InstituteSettings::brandName().' Admin';
+    $appName = PwaManifestService::displayName('admin');
 @endphp
 
 <x-pwa.head context="admin" :app-name="$appName" />

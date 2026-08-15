@@ -47,6 +47,18 @@ Facts fill a two-column grid, so keep cells short or mark them wide; cells holdi
 
 Shared mobile chrome (defined in `resources/css/filament/admin/theme.css`, used through components in `resources/views/components/crm/`): `x-crm.stat-tiles` (`.crm-stat*`), `x-crm.badge` (`.crm-badge--gray|success|info|warning|danger`), `x-crm.avatar`, plus `.crm-seg*` segmented controls and `.crm-chip*` filter chips. `resources/views/filament/pages/partials/campus-visits.blade.php` is the reference implementation. Enum tones (e.g. `VisitStatus::tone()`) feed `x-crm.badge` so statuses read the same everywhere.
 
+### Installable PWA (per institute)
+
+Each school gets its own home-screen apps (not a shared “School CRM” brand):
+
+| Install from | Full name | Short label (≤12 chars) | Opens |
+|--------------|-----------|-------------------------|-------|
+| `/admin` | `{Institute} Admin` | e.g. `Motion Admin` | Staff CRM |
+| `/portal` | `{Institute} Portal` | e.g. `MA Portal` | Student portal |
+| `/` | `{Institute}` | e.g. `Motion` | Public site |
+
+Icon = institute logo/favicon (else initials). Theme colour = ID-card primary colour. Service worker (`public/sw.js`) + `public/offline.html` give a clean offline screen. Staff can install from Admin (banner + topbar). Manifest: `PwaManifestService`.
+
 ---
 
 ## How to read each module

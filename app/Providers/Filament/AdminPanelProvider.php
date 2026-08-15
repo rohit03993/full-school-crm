@@ -93,12 +93,21 @@ class AdminPanelProvider extends PanelProvider
                 \App\Http\Middleware\EnsureInstituteOnboardingComplete::class,
             ])
             ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): string => view('filament.partials.pwa-head')->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::USER_MENU_BEFORE,
+                fn (): string => view('filament.partials.pwa-topbar-install')->render(),
+            )
+            ->renderHook(
                 PanelsRenderHook::PAGE_START,
                 fn (array $scopes = []): string => view('filament.partials.page-back-link', ['scopes' => $scopes])->render(),
             )
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): string => Blade::render('<x-crm.media-preview-dialog />')
+                    .Blade::render('<x-pwa.install-prompt context="admin" />')
                     .view('filament.partials.mobile-bottom-nav')->render()
                     .view('filament.partials.pending-call-flow')->render()
                     .view('filament.partials.ask-crm-widget')->render(),

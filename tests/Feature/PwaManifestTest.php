@@ -2,12 +2,24 @@
 
 namespace Tests\Feature;
 
+use App\Models\Setting;
+use App\Services\PwaManifestService;
+use App\Support\InstituteSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class PwaManifestTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Setting::setValue('site.name', 'Motion Agra', 'general');
+        Setting::setValue('crm.id_card_primary_color', '#1e40af', 'crm');
+        InstituteSettings::clearCache();
+    }
 
     public function test_public_manifest_is_served(): void
     {
@@ -16,20 +28,37 @@ class PwaManifestTest extends TestCase
             ->assertHeader('content-type', 'application/manifest+json')
             ->assertJsonPath('display', 'standalone')
             ->assertJsonPath('start_url', '/')
+            ->assertJsonPath('name', 'Motion Agra')
+            ->assertJsonPath('short_name', 'Motion')
+            ->assertJsonPath('theme_color', '#1E40AF')
             ->assertJsonPath('icons.0.sizes', '192x192');
     }
 
-    public function test_portal_and_admin_manifests_use_scoped_start_urls(): void
+    public function test_portal_and_admin_manifests_use_institute_names_and_short_labels(): void
     {
         $this->get(route('pwa.manifest', ['context' => 'portal']))
             ->assertOk()
             ->assertJsonPath('start_url', '/portal')
-            ->assertJsonPath('scope', '/portal/');
+            ->assertJsonPath('scope', '/portal/')
+            ->assertJsonPath('name', 'Motion Agra Portal')
+            ->assertJsonPath('short_name', 'MA Portal');
 
         $this->get(route('pwa.manifest', ['context' => 'admin']))
             ->assertOk()
             ->assertJsonPath('start_url', '/admin')
-            ->assertJsonPath('scope', '/admin/');
+            ->assertJsonPath('scope', '/admin/')
+            ->assertJsonPath('name', 'Motion Agra Admin')
+            ->assertJsonPath('short_name', 'Motion Admin');
+    }
+
+    public function test_long_brand_names_fall_back_to_initials_for_short_name(): void
+    {
+        Setting::setValue('site.name', 'International Coaching Academy', 'general');
+        InstituteSettings::clearCache();
+
+        $this->assertSame('ICA Admin', PwaManifestService::shortName('admin'));
+        $this->assertSame('ICA Portal', PwaManifestService::shortName('portal'));
+        $this->assertLessThanOrEqual(12, strlen(PwaManifestService::shortName('admin')));
     }
 
     public function test_pwa_icons_are_available(): void
@@ -47,12 +76,32 @@ class PwaManifestTest extends TestCase
     {
         $this->get(route('home'))
             ->assertOk()
-            ->assertSee('/pwa/manifest/public', false);
+            ->assertSee('/pwa/manifest/public', false)
+            ->assertSee('apple-mobile-web-app-title', false);
     }
 
-    public function test_service_worker_file_exists(): void
+    public function test_service_worker_and_offline_page_exist(): void
     {
         $this->assertFileExists(public_path('sw.js'));
-        $this->assertStringContainsString('school-crm-pwa-v1', (string) file_get_contents(public_path('sw.js')));
+        $this->assertFileExists(public_path('offline.html'));
+
+        $sw = (string) file_get_contents(public_path('sw.js'));
+        $this->assertStringContainsString('school-crm-pwa-v2', $sw);
+        $this->assertStringContainsString('/offline.html', $sw);
+
+        $offline = (string) file_get_contents(public_path('offline.html'));
+        $this->assertStringContainsString("You're offline", $offline);
+    }
+
+    public function test_admin_panel_wires_pwa_head_and_install_prompt(): void
+    {
+        $this->assertStringContainsString(
+            'pwa-head',
+            file_get_contents(app_path('Providers/Filament/AdminPanelProvider.php')),
+        );
+        $this->assertStringContainsString(
+            'install-prompt',
+            file_get_contents(app_path('Providers/Filament/AdminPanelProvider.php')),
+        );
     }
 }

@@ -2,7 +2,7 @@
     use App\Enums\StudentCaseStatus;
 @endphp
 
-<div class="space-y-4">
+  <div class="space-y-4 pb-6">
     @if ($canOpenCaseAsAdmin ?? false)
         @if ($showOpenCaseForm ?? false)
             <form wire:submit="submitOpenCase" class="space-y-3 rounded-2xl border border-primary-200 bg-primary-50/50 p-4 shadow-sm ring-1 ring-primary-200/60 dark:border-primary-500/20 dark:bg-primary-500/5 dark:ring-primary-500/20">

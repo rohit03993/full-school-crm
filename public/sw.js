@@ -1,11 +1,11 @@
-const CACHE_NAME = 'school-crm-pwa-v1';
+const CACHE_NAME = 'school-crm-pwa-v2';
+const OFFLINE_URL = '/offline.html';
 
 const PRECACHE_URLS = [
-    '/',
+    OFFLINE_URL,
     '/favicon.svg',
-    '/pwa/manifest/public',
-    '/pwa/manifest/portal',
-    '/pwa/manifest/admin',
+    '/pwa/icon/192',
+    '/pwa/icon/512',
 ];
 
 self.addEventListener('install', (event) => {
@@ -39,27 +39,69 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    event.respondWith(
-        caches.match(event.request).then((cached) => {
-            if (cached) {
-                return cached;
-            }
+    // Never intercept Livewire / auth / API / private file streams
+    if (
+        url.pathname.startsWith('/livewire')
+        || url.pathname.startsWith('/admin/livewire')
+        || url.pathname.startsWith('/api/')
+        || url.pathname.startsWith('/webhooks/')
+        || url.pathname.includes('/download')
+    ) {
+        return;
+    }
 
-            return fetch(event.request).then((response) => {
-                if (! response || response.status !== 200 || response.type !== 'basic') {
-                    return response;
-                }
+    const isNavigation = event.request.mode === 'navigate'
+        || (event.request.headers.get('accept') || '').includes('text/html');
 
-                if (
-                    url.pathname.startsWith('/build/')
-                    || url.pathname.startsWith('/pwa/icon/')
-                ) {
-                    const copy = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-                }
+    if (isNavigation) {
+        event.respondWith(networkFirstNavigation(event.request));
 
-                return response;
-            });
-        }),
-    );
+        return;
+    }
+
+    if (
+        url.pathname.startsWith('/build/')
+        || url.pathname.startsWith('/pwa/')
+        || url.pathname === '/favicon.svg'
+        || url.pathname === '/favicon.ico'
+        || url.pathname === OFFLINE_URL
+    ) {
+        event.respondWith(cacheFirstAsset(event.request));
+    }
 });
+
+async function networkFirstNavigation(request) {
+    try {
+        const response = await fetch(request);
+
+        return response;
+    } catch (error) {
+        const cached = await caches.match(OFFLINE_URL);
+
+        if (cached) {
+            return cached;
+        }
+
+        return new Response('You are offline.', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        });
+    }
+}
+
+async function cacheFirstAsset(request) {
+    const cached = await caches.match(request);
+
+    if (cached) {
+        return cached;
+    }
+
+    const response = await fetch(request);
+
+    if (response && response.status === 200 && response.type === 'basic') {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+    }
+
+    return response;
+}
