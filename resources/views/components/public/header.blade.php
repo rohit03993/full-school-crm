@@ -70,6 +70,17 @@
                         {{ $link['label'] }}
                     </a>
                 @endforeach
+                <button
+                    type="button"
+                    data-crm-pwa-install
+                    hidden
+                    class="ml-1 hidden min-h-[44px] items-center gap-2 rounded-xl border border-navy-200 bg-white px-4 py-2.5 text-sm font-semibold text-navy-800 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800"
+                >
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    Install App
+                </button>
                 <a
                     href="{{ route('contact') }}"
                     class="ml-3 inline-flex min-h-[44px] items-center rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-6 py-2.5 text-sm font-bold text-navy-950 shadow-md shadow-brand-500/25 transition hover:from-brand-400 hover:to-brand-500"
@@ -102,6 +113,17 @@
                                 {{ $link['label'] }}
                             </a>
                         @endforeach
+                        <button
+                            type="button"
+                            data-crm-pwa-install
+                            hidden
+                            class="mt-2 hidden min-h-[48px] items-center justify-center gap-2 rounded-xl border border-navy-200 bg-white px-4 text-base font-semibold text-navy-800 touch-manipulation active:bg-navy-50"
+                        >
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                            Install App
+                        </button>
                         <a
                             href="{{ route('contact') }}"
                             class="mt-2 flex min-h-[48px] items-center justify-center rounded-xl bg-brand-500 px-4 text-base font-bold text-navy-950 touch-manipulation active:bg-brand-600"
