@@ -5,6 +5,7 @@
         ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
         ->implode('') ?: 'SC';
     $logoIsSquare = \App\Support\SiteLogo::isSquare($institute['logo_shape'] ?? null);
+    $logoShowsName = $institute['logo_shows_name'] ?? true;
     $navLinks = [
         ['label' => 'Home', 'url' => route('home'), 'active' => request()->routeIs('home')],
         ['label' => 'Courses', 'url' => route('courses'), 'active' => request()->routeIs('courses')],
@@ -40,12 +41,18 @@
                     <img
                         src="{{ $institute['logo_url'] }}"
                         alt="{{ $institute['name'] }}"
-                        class="h-11 w-11 shrink-0 object-contain sm:h-14 sm:w-14"
+                        @class([
+                            'shrink-0 object-contain',
+                            'h-11 w-11 sm:h-14 sm:w-14' => $logoShowsName,
+                            'h-12 w-12 sm:h-16 sm:w-16' => ! $logoShowsName,
+                        ])
                     >
-                    <div class="min-w-0 leading-tight">
-                        <div class="truncate font-display text-base font-bold text-navy-900 sm:text-xl">{{ $institute['name'] }}</div>
-                        <div class="hidden truncate text-xs font-medium text-navy-500 sm:block">{{ $institute['tagline'] }}</div>
-                    </div>
+                    @if ($logoShowsName)
+                        <div class="min-w-0 leading-tight">
+                            <div class="truncate font-display text-base font-bold text-navy-900 sm:text-xl">{{ $institute['name'] }}</div>
+                            <div class="hidden truncate text-xs font-medium text-navy-500 sm:block">{{ $institute['tagline'] }}</div>
+                        </div>
+                    @endif
                 @elseif (! empty($institute['logo_url']))
                     <div
                         class="flex h-12 shrink-0 items-center justify-start sm:h-14"

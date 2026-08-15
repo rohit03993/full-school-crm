@@ -140,10 +140,15 @@ Click **Finish setup** — you can change all of this later under **Setup → Te
 
 **Logo shape matters.** On the Branding tab pick the option that matches your file:
 
-- **Wide banner** — the logo image already includes the institute name (a wordmark). It fills the header strip.
-- **Square / circular** — a round crest, emblem, or seal. The site shows the crest next to your institute name in text, instead of shrinking it into a thin strip.
+- **Wide banner** — a long logo that fills the header strip. Best when the image already includes your institute name.
+- **Square / circular** — a round crest, emblem, or seal, shown at full size instead of being shrunk into a thin strip.
 
 Picking the wrong shape is the usual reason a round college crest looks tiny or squashed in the header and on the login screen.
+
+For a square/circular logo you also get **Show institute name beside the logo**:
+
+- **On** — for a plain crest or seal with no wording in it, so the header still shows who you are.
+- **Off** — when the logo image already contains your institute name, otherwise the name appears twice.
 
 ---
 

@@ -48,8 +48,8 @@ class SiteLogo
     public static function shapeOptions(): array
     {
         return [
-            self::SHAPE_WIDE => 'Wide banner — logo already includes the institute name',
-            self::SHAPE_SQUARE => 'Square / circular — crest or emblem shown next to the name',
+            self::SHAPE_WIDE => 'Wide banner — fills the header strip',
+            self::SHAPE_SQUARE => 'Square / circular — crest, emblem, or seal',
         ];
     }
 
@@ -63,6 +63,22 @@ class SiteLogo
     public static function isSquare(mixed $value): bool
     {
         return self::normalizeShape($value) === self::SHAPE_SQUARE;
+    }
+
+    /**
+     * Whether the header prints the institute name next to the logo.
+     *
+     * Independent of shape on purpose: a crest usually carries no wording and
+     * needs the name, while a square-cropped wordmark already has it baked in
+     * and would read as a duplicate.
+     */
+    public static function showsName(mixed $shape, mixed $showName): bool
+    {
+        if (! self::isSquare($shape)) {
+            return false;
+        }
+
+        return $showName === null ? true : filter_var($showName, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**

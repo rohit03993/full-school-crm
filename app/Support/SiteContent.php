@@ -83,6 +83,7 @@ class SiteContent
             ],
             'logo_url' => SiteImageService::url($g('site.logo')),
             'logo_shape' => SiteLogo::normalizeShape($g('site.logo_shape')),
+            'logo_shows_name' => SiteLogo::showsName($g('site.logo_shape'), $g('site.logo_show_name')),
             'favicon_url' => SiteImageService::url($g('site.favicon')),
             'images' => [
                 'hero' => [

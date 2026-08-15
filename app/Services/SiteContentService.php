@@ -186,6 +186,8 @@ class SiteContentService
             'social_youtube' => $g('site.social_youtube', ''),
             'logo' => $g('site.logo'),
             'logo_shape' => SiteLogo::normalizeShape($g('site.logo_shape')),
+            // Raw preference, not shape-gated, so the choice survives switching shape.
+            'logo_show_name' => filter_var($g('site.logo_show_name', '1'), FILTER_VALIDATE_BOOLEAN),
             'favicon' => $g('site.favicon'),
             'hero_main_image' => $g('site.hero_main_image'),
             'hero_accent_one' => $g('site.hero_accent_one'),
@@ -243,6 +245,11 @@ class SiteContentService
         Setting::setValue(
             'site.logo_shape',
             SiteLogo::normalizeShape($data['logo_shape'] ?? null),
+            'general',
+        );
+        Setting::setValue(
+            'site.logo_show_name',
+            ($data['logo_show_name'] ?? false) ? '1' : '0',
             'general',
         );
 

@@ -107,7 +107,14 @@ class ManageSiteContent extends Page
                                         ->default(SiteLogo::DEFAULT_SHAPE)
                                         ->selectablePlaceholder(false)
                                         ->live()
-                                        ->helperText('Choose "Square / circular" for a round crest or emblem — the site then shows your institute name beside it instead of squeezing the crest into a wide strip.')
+                                        ->helperText('Choose "Square / circular" for a round crest or emblem so it is not squeezed into a wide strip.')
+                                        ->columnSpanFull(),
+                                    Toggle::make('logo_show_name')
+                                        ->label('Show institute name beside the logo')
+                                        ->default(true)
+                                        ->visible(fn (Get $get): bool => SiteLogo::isSquare($get('logo_shape')))
+                                        ->dehydrated()
+                                        ->helperText('Keep this on for a plain crest or seal with no wording in it. Turn it off if your logo already contains the institute name, otherwise the name appears twice.')
                                         ->columnSpanFull(),
                                     Placeholder::make('logo_frame_hint')
                                         ->label('Header logo frame')

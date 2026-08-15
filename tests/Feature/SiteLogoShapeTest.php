@@ -73,6 +73,35 @@ class SiteLogoShapeTest extends TestCase
         $this->assertStringNotContainsString('aspect-ratio: '.SiteLogo::ASPECT_WIDTH, $html);
     }
 
+    public function test_square_logo_can_hide_the_name_when_the_logo_already_has_one(): void
+    {
+        Setting::setValue('site.name', 'Motion Education', 'general');
+        Setting::setValue('site.tagline', 'School & Coaching Management', 'general');
+        Setting::setValue('site.logo', 'site/logo/wordmark.png', 'general');
+        Setting::setValue('site.logo_shape', SiteLogo::SHAPE_SQUARE, 'general');
+        Setting::setValue('site.logo_show_name', '0', 'general');
+        SiteContent::clearCache();
+        InstituteSettings::clearCache();
+
+        $this->assertFalse(SiteContent::institute()['logo_shows_name']);
+
+        $html = view('components.public.header', [
+            'institute' => SiteContent::institute(),
+        ])->render();
+
+        // The logo already reads "Motion Education", so no duplicate text beside it.
+        $this->assertStringNotContainsString('School &amp; Coaching Management', $html);
+    }
+
+    public function test_name_is_never_printed_beside_a_wide_logo(): void
+    {
+        // A wide banner already fills the strip, so the toggle must not apply.
+        $this->assertFalse(SiteLogo::showsName(SiteLogo::SHAPE_WIDE, true));
+        $this->assertTrue(SiteLogo::showsName(SiteLogo::SHAPE_SQUARE, null));
+        $this->assertTrue(SiteLogo::showsName(SiteLogo::SHAPE_SQUARE, '1'));
+        $this->assertFalse(SiteLogo::showsName(SiteLogo::SHAPE_SQUARE, '0'));
+    }
+
     public function test_public_header_keeps_the_wide_frame_for_a_wordmark_logo(): void
     {
         Setting::setValue('site.logo', 'site/logo/wordmark.png', 'general');
@@ -102,10 +131,16 @@ class SiteLogoShapeTest extends TestCase
         Livewire::test(ManageSiteContent::class)
             ->assertSuccessful()
             ->assertFormFieldExists('logo_shape')
-            ->fillForm(['logo_shape' => SiteLogo::SHAPE_SQUARE])
+            ->fillForm([
+                'logo_shape' => SiteLogo::SHAPE_SQUARE,
+                'logo_show_name' => false,
+            ])
             ->call('save')
             ->assertHasNoFormErrors();
 
         $this->assertSame(SiteLogo::SHAPE_SQUARE, InstituteSettings::logoShape());
+
+        SiteContent::clearCache();
+        $this->assertFalse(SiteContent::institute()['logo_shows_name']);
     }
 }
