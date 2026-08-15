@@ -1,11 +1,11 @@
-const CACHE_NAME = 'school-crm-pwa-v2';
+const CACHE_NAME = 'school-crm-pwa-v3';
 const OFFLINE_URL = '/offline.html';
 
+// Institute icons are deliberately absent: they are served from /pwa/icon/{size}
+// with a ?v= branding token, so precaching the bare path would pin a stale logo.
 const PRECACHE_URLS = [
     OFFLINE_URL,
     '/favicon.svg',
-    '/pwa/icon/192',
-    '/pwa/icon/512',
 ];
 
 self.addEventListener('install', (event) => {
@@ -59,9 +59,11 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Only versioned/immutable assets are cache-first. The manifest stays on the
+    // network so a renamed institute or new icon is picked up on next launch.
     if (
         url.pathname.startsWith('/build/')
-        || url.pathname.startsWith('/pwa/')
+        || url.pathname.startsWith('/pwa/icon/')
         || url.pathname === '/favicon.svg'
         || url.pathname === '/favicon.ico'
         || url.pathname === OFFLINE_URL

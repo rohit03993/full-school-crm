@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Setting;
 use App\Services\PwaManifestService;
 use App\Support\InstituteSettings;
+use App\Support\SiteContent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -86,6 +87,47 @@ class PwaManifestTest extends TestCase
         $this->assertSame('site/favicon/mark.png', PwaManifestService::iconSourcePath(512));
     }
 
+    public function test_icon_urls_change_when_the_favicon_changes(): void
+    {
+        $disk = Storage::disk('public');
+        $disk->put('site/favicon/first.png', $this->tinyPng());
+        Setting::setValue('site.favicon', 'site/favicon/first.png', 'general');
+
+        $before = PwaManifestService::iconUrl(512);
+        $this->assertStringContainsString('/pwa/icon/512?v=', $before);
+
+        $disk->put('site/favicon/second.png', $this->tinyPng());
+        touch($disk->path('site/favicon/second.png'), time() + 60);
+        Setting::setValue('site.favicon', 'site/favicon/second.png', 'general');
+
+        $this->assertNotSame($before, PwaManifestService::iconUrl(512));
+    }
+
+    public function test_manifest_is_not_cached_so_branding_changes_reach_installed_apps(): void
+    {
+        $response = $this->get(route('pwa.manifest', ['context' => 'admin']))->assertOk();
+
+        $this->assertStringContainsString('no-cache', $response->headers->get('cache-control'));
+        $response->assertJsonPath('icons.0.src', fn (string $src): bool => str_contains($src, '?v='));
+    }
+
+    public function test_favicon_link_uses_the_real_mime_type_and_a_cache_buster(): void
+    {
+        // A JPEG uploaded as the favicon must not be announced as image/png,
+        // or browsers ignore it and keep showing the default icon.
+        $disk = Storage::disk('public');
+        $disk->put('site/favicon/mark.jfif', $this->tinyPng());
+        Setting::setValue('site.favicon', 'site/favicon/mark.jfif', 'general');
+        SiteContent::clearCache();
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('type="image/jpeg"', false)
+            ->assertDontSee('mark.jfif" type="image/png"', false);
+
+        $this->assertStringContainsString('?v=', (string) SiteContent::institute()['favicon_url']);
+    }
+
     public function test_logo_is_used_for_app_icons_when_favicon_is_missing(): void
     {
         $disk = Storage::disk('public');
@@ -122,8 +164,13 @@ class PwaManifestTest extends TestCase
         $this->assertFileExists(public_path('offline.html'));
 
         $sw = (string) file_get_contents(public_path('sw.js'));
-        $this->assertStringContainsString('school-crm-pwa-v2', $sw);
+        $this->assertStringContainsString('school-crm-pwa-v3', $sw);
         $this->assertStringContainsString('/offline.html', $sw);
+
+        // A cached bare icon path would pin an old logo onto installed apps.
+        $this->assertStringNotContainsString("'/pwa/icon/192'", $sw);
+        // The manifest must not be served cache-first.
+        $this->assertStringNotContainsString("startsWith('/pwa/')", $sw);
 
         $offline = (string) file_get_contents(public_path('offline.html'));
         $this->assertStringContainsString("You're offline", $offline);

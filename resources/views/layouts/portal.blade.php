@@ -9,7 +9,7 @@
     <x-pwa.head context="portal" />
 
     @if (! empty($institute['favicon_url']))
-        <link rel="icon" href="{{ $institute['favicon_url'] }}" type="image/png">
+        <link rel="icon" href="{{ $institute['favicon_url'] }}"@if (! empty($institute['favicon_type'])) type="{{ $institute['favicon_type'] }}"@endif>
     @else
         <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
     @endif

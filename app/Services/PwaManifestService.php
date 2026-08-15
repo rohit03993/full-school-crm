@@ -28,19 +28,19 @@ class PwaManifestService
             'theme_color' => self::themeColor(),
             'icons' => [
                 [
-                    'src' => url('/pwa/icon/192'),
+                    'src' => self::iconUrl(192),
                     'sizes' => '192x192',
                     'type' => 'image/png',
                     'purpose' => 'any',
                 ],
                 [
-                    'src' => url('/pwa/icon/512'),
+                    'src' => self::iconUrl(512),
                     'sizes' => '512x512',
                     'type' => 'image/png',
                     'purpose' => 'any',
                 ],
                 [
-                    'src' => url('/pwa/icon/512'),
+                    'src' => self::iconUrl(512),
                     'sizes' => '512x512',
                     'type' => 'image/png',
                     'purpose' => 'maskable',
@@ -118,6 +118,29 @@ class PwaManifestService
     public static function fallbackIconPath(): string
     {
         return public_path('favicon.svg');
+    }
+
+    /**
+     * Icon URL carrying a token for the current branding.
+     *
+     * /pwa/icon/{size} is a fixed path that the service worker caches
+     * cache-first, so without this token a newly uploaded favicon would never
+     * reach an already-installed app or a browser that has the old icon.
+     */
+    public static function iconUrl(int $size): string
+    {
+        return url('/pwa/icon/'.$size).'?v='.self::iconVersion();
+    }
+
+    public static function iconVersion(): string
+    {
+        $source = self::iconSourcePath();
+
+        $token = $source !== null
+            ? (string) Storage::disk('public')->lastModified($source)
+            : 'initials';
+
+        return substr(md5($token.'|'.InstituteSettings::brandName()), 0, 8);
     }
 
     public static function brandInitials(): string

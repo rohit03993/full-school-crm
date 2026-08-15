@@ -8,8 +8,8 @@
     $shortName = \App\Services\PwaManifestService::shortName($context);
     $themeColor = \App\Services\PwaManifestService::themeColor();
     $manifestUrl = url('/pwa/manifest/'.$context);
-    $icon192 = url('/pwa/icon/192');
-    $icon512 = url('/pwa/icon/512');
+    $icon192 = \App\Services\PwaManifestService::iconUrl(192);
+    $icon512 = \App\Services\PwaManifestService::iconUrl(512);
 @endphp
 
 <meta name="crm-pwa-context" content="{{ $context }}">

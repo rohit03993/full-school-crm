@@ -17,7 +17,12 @@ class ManifestController extends Controller
         return response()->json(
             PwaManifestService::manifest($context),
             200,
-            ['Content-Type' => 'application/manifest+json'],
+            [
+                'Content-Type' => 'application/manifest+json',
+                // Branding can change at any time; never let a stale name or
+                // icon set stick to an installed app.
+                'Cache-Control' => 'no-cache, must-revalidate',
+            ],
             JSON_UNESCAPED_SLASHES,
         );
     }

@@ -37,6 +37,73 @@ class SiteImageService
         return Storage::disk(self::DISK)->url($path);
     }
 
+    /**
+     * URL with a cache-busting token so browsers pick up a replaced image.
+     *
+     * Favicons in particular are cached hard by browsers and by the service
+     * worker, so a stale tab icon survives long after the institute uploads
+     * a new one unless the URL itself changes.
+     */
+    public static function versionedUrl(?string $path): ?string
+    {
+        $url = self::url($path);
+
+        if (blank($url)) {
+            return null;
+        }
+
+        $version = self::version($path);
+
+        if ($version === null) {
+            return $url;
+        }
+
+        return $url.(str_contains($url, '?') ? '&' : '?').'v='.$version;
+    }
+
+    public static function version(?string $path): ?string
+    {
+        $path = self::resolveExistingPath($path);
+
+        if (blank($path) || str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return null;
+        }
+
+        $disk = Storage::disk(self::DISK);
+
+        if (! $disk->exists($path)) {
+            return null;
+        }
+
+        return substr(md5((string) $disk->lastModified($path)), 0, 8);
+    }
+
+    /**
+     * MIME type from the stored extension.
+     *
+     * The <link rel="icon"> type attribute must match the real file: declaring
+     * image/png for a JPEG upload makes browsers skip it and fall back to the
+     * default favicon.
+     */
+    public static function mimeType(?string $path): ?string
+    {
+        $path = self::resolveExistingPath($path);
+
+        if (blank($path)) {
+            return null;
+        }
+
+        return match (strtolower((string) pathinfo($path, PATHINFO_EXTENSION))) {
+            'png' => 'image/png',
+            'jpg', 'jpeg', 'jfif' => 'image/jpeg',
+            'webp' => 'image/webp',
+            'gif' => 'image/gif',
+            'svg' => 'image/svg+xml',
+            'ico' => 'image/x-icon',
+            default => null,
+        };
+    }
+
     public static function delete(?string $path): void
     {
         $path = self::normalizeStoragePath($path);

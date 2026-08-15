@@ -50,7 +50,7 @@ class InstituteSettings
     {
         $path = Setting::getValue('site.favicon');
 
-        return SiteImageService::url($path);
+        return SiteImageService::versionedUrl($path);
     }
 
     public static function logoShape(): string
