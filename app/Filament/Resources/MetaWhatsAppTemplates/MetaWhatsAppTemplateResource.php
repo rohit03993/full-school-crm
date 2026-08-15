@@ -55,6 +55,11 @@ class MetaWhatsAppTemplateResource extends Resource
         return LicenseFeature::WhatsApp;
     }
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static ?string $model = MetaWhatsAppTemplate::class;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;

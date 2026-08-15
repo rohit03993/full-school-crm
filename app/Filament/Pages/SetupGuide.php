@@ -15,6 +15,8 @@ use UnitEnum;
 
 class SetupGuide extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;
 
     protected static ?string $navigationLabel = null;

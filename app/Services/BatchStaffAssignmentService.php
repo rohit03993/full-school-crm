@@ -111,6 +111,13 @@ class BatchStaffAssignmentService
         ])->all();
     }
 
+    public function userHasTeachingAssignments(User $user): bool
+    {
+        return BatchStaffAssignment::query()
+            ->where('user_id', $user->id)
+            ->exists();
+    }
+
     /**
      * @param  array<int, array{course_subject_id?: mixed, user_id?: mixed}>  $rows
      * @return array<int, array{user_id: int, course_subject_id: int}>

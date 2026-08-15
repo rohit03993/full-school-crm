@@ -148,7 +148,7 @@ final class CrmMenuLabels
 
     public static function studentCalls(): string
     {
-        return 'Calls';
+        return 'Student call log';
     }
 
     public static function admissions(): string

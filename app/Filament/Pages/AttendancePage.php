@@ -43,6 +43,8 @@ class AttendancePage extends Page
 {
     use FinishesAttendanceSave;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
     protected static ?string $navigationLabel = null;

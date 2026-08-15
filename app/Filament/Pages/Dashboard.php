@@ -63,7 +63,8 @@ class Dashboard extends BaseDashboard
                 ->label('Search Student')
                 ->icon(Heroicon::OutlinedMagnifyingGlass)
                 ->url(StudentSearchPage::getUrl())
-                ->color('primary'),
+                ->color('primary')
+                ->visible(fn (): bool => StudentSearchPage::canAccess()),
         ];
     }
 

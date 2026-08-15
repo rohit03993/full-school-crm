@@ -51,6 +51,11 @@ class FaceVerificationRequestResource extends Resource
         return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
     }
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function canCreate(): bool
     {
         return false;

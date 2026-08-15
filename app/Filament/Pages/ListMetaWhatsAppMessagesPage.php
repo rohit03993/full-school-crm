@@ -22,6 +22,8 @@ class ListMetaWhatsAppMessagesPage extends Page
     use RequiresCrmPermission;
     use WithPagination;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static function requiredCrmPermission(): CrmPermission
     {
         return CrmPermission::MetaWhatsappSettings;

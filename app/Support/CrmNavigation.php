@@ -2,16 +2,24 @@
 
 namespace App\Support;
 
+use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
+use App\Models\User;
 use Filament\Navigation\NavigationGroup;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Sidebar group names and order — keep menu paths in hints/docs aligned with {@see CrmMenuLabels}.
  *
- * Ungrouped top (fixed): Dashboard → My meetings → My classes
+ * Ungrouped top (fixed): Dashboard → My work → My classes
  * Daily use: Leads → Students → Academics
  * Operations: Calls → Reports
  * Configuration (bottom): WhatsApp → Setup → Admin → Website
+ *
+ * Hub pattern: dense areas (Homework, Attendance, Fees, WhatsApp, Setup) expose one sidebar
+ * entry; leaf screens stay reachable by URL and hub cards. Turning a license module OFF only
+ * hides that module's hub/leaves.
  */
 class CrmNavigation
 {
@@ -80,9 +88,67 @@ class CrmNavigation
 
         return array_map(
             fn (string $group): NavigationGroup => NavigationGroup::make($group)
-                ->icon($icons[$group]),
+                ->icon($icons[$group])
+                ->collapsed(self::groupStartsCollapsed($group)),
             self::groupOrder(),
         );
+    }
+
+    /**
+     * Config-heavy groups always start collapsed. Role packs collapse unused daily groups.
+     */
+    public static function groupStartsCollapsed(string $group): bool
+    {
+        if (in_array($group, [self::GROUP_SETTINGS, self::GROUP_META_WHATSAPP, self::GROUP_ADMIN], true)) {
+            return true;
+        }
+
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        return match (self::navRolePack($user)) {
+            'calling' => in_array($group, [self::GROUP_ACADEMICS, self::GROUP_REPORTS, self::GROUP_WEBSITE], true),
+            'academic' => in_array($group, [self::GROUP_LEADS, self::GROUP_CALLS, self::GROUP_WEBSITE], true),
+            'finance' => in_array($group, [self::GROUP_LEADS, self::GROUP_CALLS, self::GROUP_ACADEMICS, self::GROUP_WEBSITE], true),
+            default => $group === self::GROUP_WEBSITE,
+        };
+    }
+
+    /**
+     * @return 'owner'|'calling'|'academic'|'finance'|'default'
+     */
+    public static function navRolePack(?User $user): string
+    {
+        if (! $user) {
+            return 'default';
+        }
+
+        if ($user->hasRole(RoleName::SuperAdmin->value)) {
+            return 'owner';
+        }
+
+        $jobs = CrmAccess::jobRoleNamesFor($user);
+        $counsellor = in_array(StaffJobRole::Counsellor->value, $jobs, true);
+        $academic = in_array(StaffJobRole::AcademicCoordinator->value, $jobs, true);
+        $finance = in_array(StaffJobRole::Accountant->value, $jobs, true)
+            || in_array(StaffJobRole::FeeAdjuster->value, $jobs, true);
+
+        if ($finance && ! $counsellor && ! $academic) {
+            return 'finance';
+        }
+
+        if ($counsellor && ! $academic) {
+            return 'calling';
+        }
+
+        if ($academic && ! $counsellor) {
+            return 'academic';
+        }
+
+        return 'default';
     }
 
     /**

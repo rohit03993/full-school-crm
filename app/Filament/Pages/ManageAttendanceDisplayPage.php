@@ -19,6 +19,8 @@ use UnitEnum;
 
 class ManageAttendanceDisplayPage extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedTv;
 
     protected static ?string $navigationLabel = null;

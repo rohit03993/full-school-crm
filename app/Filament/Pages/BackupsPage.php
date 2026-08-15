@@ -27,6 +27,8 @@ class BackupsPage extends Page
 {
     use WithFileUploads;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCircleStack;
 
     protected static ?string $navigationLabel = null;

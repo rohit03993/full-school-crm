@@ -23,6 +23,8 @@ use UnitEnum;
 
 class MiscChargeAdjustmentRequestsPage extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedReceiptPercent;
 
     protected static ?string $navigationLabel = 'Charge adjustments';

@@ -30,6 +30,9 @@ class ManageCustomFields extends Page
 {
     use CanUseDatabaseTransactions;
 
+    
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedAdjustmentsHorizontal;
 
     protected static ?string $navigationLabel = null;

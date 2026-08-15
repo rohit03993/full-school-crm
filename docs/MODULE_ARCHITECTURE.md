@@ -17,6 +17,20 @@ Foundation in code:
 
 **Defaults:** Cases is a sellable module; Ask CRM stays Core; one install per school (V1); parent reach = harden Portal then PWA.
 
+### Navigation hubs
+
+Dense areas expose **one sidebar entry**; leaf screens stay reachable by URL and hub cards:
+
+| Hub | Sidebar group | Leaves (examples) |
+|-----|---------------|-------------------|
+| Homework | Academics | Submit / Review / Check / History |
+| Attendance | Academics | Live punches / Manual batch / Staff |
+| Fees | Students | Dashboard / Bulk charges / Adjustments |
+| WhatsApp | WhatsApp | Inbox / Campaigns / Templates / Automations / Usage / Setup |
+| Setup | Setup | Guide / Institute / Terminology / Devices / Backups |
+
+Turning a license module OFF hides that hub and its leaves only. Shared layout: `resources/views/filament/pages/partials/crm-hub.blade.php`. Role packs (`CrmNavigation::navRolePack`) collapse unused sidebar groups and tune dashboard quick actions.
+
 ---
 
 ## How to read each module
@@ -383,6 +397,7 @@ PLANNED
 
 | Date | Change |
 |------|--------|
+| 2026-08-15 | Nav hubs: Attendance / Fees / WhatsApp / Setup = one sidebar entry each; leaf pages stay URL-reachable and module-gated. Homework hub pattern is the reference. |
 | 2026-08-10 | Initial short architecture |
 | 2026-08-10 | Restructured already-built vs planned |
 | 2026-08-10 | Full catalog: formal MS names, omit/edit/add, Phase 0–1 |

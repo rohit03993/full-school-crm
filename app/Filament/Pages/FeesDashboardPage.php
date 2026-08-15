@@ -19,6 +19,8 @@ use UnitEnum;
 
 class FeesDashboardPage extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 
     protected static ?string $navigationLabel = null;
@@ -32,7 +34,7 @@ class FeesDashboardPage extends Page
 
     public function getTitle(): string
     {
-        return CrmMenuLabels::fees();
+        return 'Fees dashboard';
     }
 
     protected static ?int $navigationSort = 25;

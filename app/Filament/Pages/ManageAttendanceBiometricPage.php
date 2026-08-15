@@ -18,6 +18,8 @@ use UnitEnum;
 
 class ManageAttendanceBiometricPage extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedFingerPrint;
 
     protected static ?string $navigationLabel = null;

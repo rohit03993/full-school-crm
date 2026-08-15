@@ -26,6 +26,9 @@ class ManageTerminology extends Page
 {
     use CanUseDatabaseTransactions;
 
+    
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedLanguage;
 
     protected static ?string $navigationLabel = null;

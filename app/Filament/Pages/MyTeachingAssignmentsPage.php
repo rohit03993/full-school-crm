@@ -40,7 +40,13 @@ class MyTeachingAssignmentsPage extends Page
 
     public static function canAccess(): bool
     {
-        return CrmAccess::hasPanelAccess(Auth::user());
+        $user = Auth::user();
+
+        if (! $user || ! CrmAccess::hasPanelAccess($user)) {
+            return false;
+        }
+
+        return app(BatchStaffAssignmentService::class)->userHasTeachingAssignments($user);
     }
 
     public static function shouldRegisterNavigation(): bool

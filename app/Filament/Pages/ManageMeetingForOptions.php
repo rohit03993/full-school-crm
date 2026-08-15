@@ -28,6 +28,9 @@ class ManageMeetingForOptions extends Page
 {
     use CanUseDatabaseTransactions;
 
+    
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedListBullet;
 
     protected static ?string $navigationLabel = null;

@@ -58,6 +58,11 @@ class BiometricDeviceResource extends Resource
         return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
     }
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->components([

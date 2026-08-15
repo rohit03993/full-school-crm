@@ -22,6 +22,8 @@ use UnitEnum;
 
 class InstituteSetup extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
     protected static ?string $navigationLabel = null;

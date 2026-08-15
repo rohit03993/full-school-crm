@@ -43,6 +43,11 @@ class WhatsAppLiveCampaignResource extends Resource
         return LicenseFeature::WhatsApp;
     }
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static ?string $model = WhatsAppLiveCampaign::class;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBolt;

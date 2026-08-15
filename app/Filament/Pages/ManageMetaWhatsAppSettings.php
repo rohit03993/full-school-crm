@@ -36,6 +36,8 @@ class ManageMetaWhatsAppSettings extends Page
     use CanUseDatabaseTransactions;
     use RequiresCrmPermission;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static function requiredCrmPermission(): CrmPermission
     {
         return CrmPermission::MetaWhatsappSettings;
