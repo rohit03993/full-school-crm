@@ -87,6 +87,83 @@ class PwaManifestTest extends TestCase
         $this->assertSame('site/favicon/mark.png', PwaManifestService::iconSourcePath(512));
     }
 
+    public function test_rendered_app_icon_actually_contains_the_uploaded_favicon(): void
+    {
+        // A red square favicon: if the endpoint still draws the navy/amber
+        // initials placeholder, or the old logo, the centre pixel will not be red.
+        Storage::disk('public')->put('site/favicon/red.png', $this->solidPng(220, 38, 38));
+        Setting::setValue('site.favicon', 'site/favicon/red.png', 'general');
+
+        $png = $this->get(route('pwa.icon', ['size' => 512]))->assertOk()->getContent();
+
+        $image = imagecreatefromstring($png);
+        $this->assertNotFalse($image, 'Icon endpoint did not return a readable image.');
+
+        $rgb = imagecolorat($image, 256, 256);
+        $this->assertSame(220, ($rgb >> 16) & 0xFF);
+        $this->assertSame(38, ($rgb >> 8) & 0xFF);
+        $this->assertSame(38, $rgb & 0xFF);
+        imagedestroy($image);
+    }
+
+    public function test_rendered_app_icon_reads_a_jpeg_favicon_saved_as_jfif(): void
+    {
+        Storage::disk('public')->put('site/favicon/mark.jfif', $this->solidJpeg(12, 140, 233));
+        Setting::setValue('site.favicon', 'site/favicon/mark.jfif', 'general');
+
+        $png = $this->get(route('pwa.icon', ['size' => 192]))->assertOk()->getContent();
+
+        $image = imagecreatefromstring($png);
+        $this->assertNotFalse($image, 'A .jfif favicon must still render as an app icon.');
+
+        $rgb = imagecolorat($image, 96, 96);
+        // JPEG is lossy, so allow a small tolerance per channel.
+        $this->assertEqualsWithDelta(12, ($rgb >> 16) & 0xFF, 8);
+        $this->assertEqualsWithDelta(140, ($rgb >> 8) & 0xFF, 8);
+        $this->assertEqualsWithDelta(233, $rgb & 0xFF, 8);
+        imagedestroy($image);
+    }
+
+    protected function solidPng(int $r, int $g, int $b, int $size = 512): string
+    {
+        $canvas = imagecreatetruecolor($size, $size);
+        imagefilledrectangle($canvas, 0, 0, $size, $size, imagecolorallocate($canvas, $r, $g, $b));
+
+        ob_start();
+        imagepng($canvas);
+        $bytes = (string) ob_get_clean();
+        imagedestroy($canvas);
+
+        return $bytes;
+    }
+
+    protected function solidJpeg(int $r, int $g, int $b, int $size = 512): string
+    {
+        $canvas = imagecreatetruecolor($size, $size);
+        imagefilledrectangle($canvas, 0, 0, $size, $size, imagecolorallocate($canvas, $r, $g, $b));
+
+        ob_start();
+        imagejpeg($canvas, null, 95);
+        $bytes = (string) ob_get_clean();
+        imagedestroy($canvas);
+
+        return $bytes;
+    }
+
+    public function test_unversioned_icon_requests_must_revalidate(): void
+    {
+        Storage::disk('public')->put('site/favicon/mark.png', $this->solidPng(10, 20, 30));
+        Setting::setValue('site.favicon', 'site/favicon/mark.png', 'general');
+
+        // Bare path: a device holding the old icon has to check back.
+        $bare = $this->get(route('pwa.icon', ['size' => 512]));
+        $this->assertStringContainsString('must-revalidate', (string) $bare->headers->get('cache-control'));
+
+        // Versioned path: safe to cache forever, since new branding changes the URL.
+        $versioned = $this->get(route('pwa.icon', ['size' => 512]).'?v='.PwaManifestService::iconVersion());
+        $this->assertStringContainsString('immutable', (string) $versioned->headers->get('cache-control'));
+    }
+
     public function test_icon_urls_change_when_the_favicon_changes(): void
     {
         $disk = Storage::disk('public');

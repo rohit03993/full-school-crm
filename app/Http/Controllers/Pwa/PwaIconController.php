@@ -4,20 +4,31 @@ namespace App\Http\Controllers\Pwa;
 
 use App\Http\Controllers\Controller;
 use App\Services\PwaManifestService;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 
 class PwaIconController extends Controller
 {
-    public function __invoke(int $size): Response
+    public function __invoke(Request $request, int $size): Response
     {
         if (! in_array($size, [192, 512], true)) {
             abort(404);
         }
 
+        $version = PwaManifestService::iconVersion();
+
+        // A ?v= request is safe to cache hard: new branding produces a new URL.
+        // A bare request must revalidate, otherwise a device that cached the old
+        // icon keeps showing it long after the institute uploads a new favicon.
+        $cacheControl = $request->query('v') === $version
+            ? 'public, max-age=31536000, immutable'
+            : 'public, max-age=0, must-revalidate';
+
         return response($this->renderIcon($size), 200, [
             'Content-Type' => 'image/png',
-            'Cache-Control' => 'public, max-age=86400',
+            'Cache-Control' => $cacheControl,
+            'ETag' => '"'.$version.'-'.$size.'"',
         ]);
     }
 
