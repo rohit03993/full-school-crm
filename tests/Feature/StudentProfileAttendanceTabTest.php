@@ -33,6 +33,9 @@ class StudentProfileAttendanceTabTest extends TestCase
 
     public function test_attendance_tab_renders_with_records(): void
     {
+        // The tab defaults to the current month, so pin "today" inside the fixture month.
+        $this->travelTo('2026-06-20 10:00:00');
+
         $admin = $this->createSuperAdmin();
         [$student, $batch] = $this->createEnrolledStudent('ROLL-ATT-01');
 

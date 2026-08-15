@@ -173,6 +173,11 @@
                                                     OUT {{ $record->checked_out_at?->format('H:i') ?? '—' }}
                                                 </span>
                                             </div>
+                                            @include('filament.pages.partials.punch-source-chip', [
+                                                'isManual' => \App\Support\AttendanceSourceLabel::isManual($record->punch_source),
+                                                'device' => null,
+                                                'staffName' => $record->markedBy?->name,
+                                            ])
                                         @endif
                                     </td>
                                 </tr>

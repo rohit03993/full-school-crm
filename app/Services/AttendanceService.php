@@ -390,31 +390,4 @@ class AttendanceService
 
         return $snapshot;
     }
-
-    /**
-     * @return list<array{date: string, label: string, checked_in: int, checked_out: int, total: int}>
-     */
-    public function markedDateSummariesForBatch(Batch $batch, int $limit = 30): array
-    {
-        $rows = Attendance::query()
-            ->where('batch_id', $batch->id)
-            ->orderByDesc('attendance_date')
-            ->get()
-            ->groupBy(fn (Attendance $row): string => $row->attendance_date->toDateString());
-
-        return $rows
-            ->map(function ($group, string $date): array {
-                return [
-                    'date' => $date,
-                    'label' => Carbon::parse($date)->format('d M Y'),
-                    'checked_in' => $group->where('status', AttendanceStatus::Present)->count(),
-                    'checked_out' => $group->whereNotNull('checked_out_at')->count(),
-                    'total' => $group->count(),
-                ];
-            })
-            ->sortByDesc('date')
-            ->take($limit)
-            ->values()
-            ->all();
-    }
 }

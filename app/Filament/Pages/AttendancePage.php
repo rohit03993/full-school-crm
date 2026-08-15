@@ -542,32 +542,6 @@ class AttendancePage extends Page
         $notification->warning()->send();
     }
 
-    /**
-     * @return list<array{date: string, label: string, checked_in: int, checked_out: int, total: int}>
-     */
-    public function markedDateSummaries(): array
-    {
-        $batchId = $this->filters['batch_id'] ?? null;
-
-        if (! $batchId) {
-            return [];
-        }
-
-        $batch = Batch::query()->find($batchId);
-
-        if (! $batch) {
-            return [];
-        }
-
-        return app(AttendanceService::class)->markedDateSummariesForBatch($batch);
-    }
-
-    public function openMarkedDate(string $date): void
-    {
-        $this->filters['date'] = $date;
-        $this->loadRoster();
-    }
-
     public function markManualPunch(
         PunchAttendanceProcessor $processor,
         LivePunchDashboardService $dashboard,
@@ -772,12 +746,6 @@ class AttendancePage extends Page
                 ])
                 ->compact()
                 ->visible(fn (): bool => $this->viewMode === 'manual'),
-            View::make('filament.pages.partials.batch-attendance-history')
-                ->viewData(fn (): array => [
-                    'summaries' => $this->markedDateSummaries(),
-                    'selectedDate' => $this->filters['date'] ?? null,
-                ])
-                ->visible(fn (): bool => $this->viewMode === 'manual' && filled($this->filters['batch_id'])),
             View::make('filament.pages.partials.batch-attendance-roster')
                 ->viewData(fn (): array => [
                     'rosterLoaded' => $this->rosterLoaded,

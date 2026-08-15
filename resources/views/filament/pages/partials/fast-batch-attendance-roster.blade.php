@@ -75,7 +75,7 @@
     }"
     class="space-y-3"
 >
-    <div class="fi-section sticky top-0 z-10 space-y-3 rounded-2xl bg-white/95 px-3 py-3 shadow-sm ring-1 ring-gray-950/5 backdrop-blur dark:bg-gray-900/95 dark:ring-white/10 sm:px-4">
+    <div class="fi-section space-y-3 rounded-2xl bg-white/95 px-3 py-3 shadow-sm ring-1 ring-gray-950/5 backdrop-blur dark:bg-gray-900/95 dark:ring-white/10 sm:px-4 lg:sticky lg:top-0 lg:z-10">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <p class="text-sm font-bold text-gray-950 dark:text-white">
