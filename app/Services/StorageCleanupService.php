@@ -2,9 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Document;
-use App\Models\Enrollment;
-use App\Models\Payment;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Finder\Finder;
 
@@ -78,84 +75,10 @@ class StorageCleanupService
 
     public function pruneOrphanStoredFiles(): int
     {
-        $validPaths = $this->referencedStoragePaths();
-        $disk = Storage::disk(self::DISK);
-        $deleted = 0;
-
-        // Never auto-delete under documents/ — student photos/ID proofs are critical.
-        // A path-mismatch bug here would wipe files while DB rows remain ("File missing on server").
-        foreach (['receipts', 'id_cards', 'payments'] as $root) {
-            if (! $disk->exists($root)) {
-                continue;
-            }
-
-            $absoluteRoot = $disk->path($root);
-
-            if (! is_dir($absoluteRoot)) {
-                continue;
-            }
-
-            $finder = Finder::create()
-                ->files()
-                ->in($absoluteRoot);
-
-            foreach ($finder as $file) {
-                $realPath = $file->getRealPath();
-
-                if ($realPath === false) {
-                    continue;
-                }
-
-                $relativePath = $this->toRelativeStoragePath($realPath);
-
-                if ($relativePath === null || isset($validPaths[$relativePath])) {
-                    continue;
-                }
-
-                if (@unlink($realPath)) {
-                    $deleted++;
-                    logger()->info('crm:cleanup removed orphan stored file', [
-                        'path' => $relativePath,
-                    ]);
-                }
-            }
-
-            $this->pruneEmptyDirectories($absoluteRoot);
-        }
-
-        return $deleted;
-    }
-
-    /**
-     * @return array<string, true>
-     */
-    protected function referencedStoragePaths(): array
-    {
-        $paths = [];
-
-        Document::query()
-            ->pluck('file_path')
-            ->filter()
-            ->each(fn (string $path) => $paths[$this->normalizePath($path)] = true);
-
-        Payment::query()
-            ->get(['proof_image_path', 'receipt_path'])
-            ->each(function (Payment $payment) use (&$paths): void {
-                if (filled($payment->proof_image_path)) {
-                    $paths[$this->normalizePath($payment->proof_image_path)] = true;
-                }
-
-                if (filled($payment->receipt_path)) {
-                    $paths[$this->normalizePath($payment->receipt_path)] = true;
-                }
-            });
-
-        Enrollment::query()
-            ->whereNotNull('id_card_path')
-            ->pluck('id_card_path')
-            ->each(fn (string $path) => $paths[$this->normalizePath($path)] = true);
-
-        return $paths;
+        // Never auto-delete under documents/, receipts/, id_cards/, or payments/.
+        // A path-mismatch bug here would wipe files while DB rows remain (broken previews).
+        // Livewire temp cleanup above still runs; only orphan sweeps of critical folders are skipped.
+        return 0;
     }
 
     /**
@@ -168,25 +91,6 @@ class StorageCleanupService
             storage_path('app/private/livewire-tmp'),
             storage_path('framework/livewire-tmp'),
         ]);
-    }
-
-    protected function toRelativeStoragePath(string $absolutePath): ?string
-    {
-        $configuredRoot = rtrim(Storage::disk(self::DISK)->path(''), DIRECTORY_SEPARATOR);
-        $root = realpath($configuredRoot) ?: $configuredRoot;
-        $root = rtrim(str_replace('\\', '/', $root), '/').'/';
-        $absolute = str_replace('\\', '/', $absolutePath);
-
-        if (! str_starts_with($absolute, $root)) {
-            return null;
-        }
-
-        return $this->normalizePath(substr($absolute, strlen($root)));
-    }
-
-    protected function normalizePath(string $path): string
-    {
-        return str_replace('\\', '/', $path);
     }
 
     protected function pruneEmptyDirectories(string $root): void

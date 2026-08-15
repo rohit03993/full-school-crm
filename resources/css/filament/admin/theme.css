@@ -1537,8 +1537,8 @@
         @apply text-sm font-semibold text-gray-950 dark:text-white;
     }
 
-    /* Responsive data tables — card rows on mobile (use with x-crm.responsive-table) */
-    @media (max-width: 767px) {
+    /* Responsive data tables — card rows on phone + tablet (align with Filament stacked) */
+    @media (max-width: 1023px) {
         .crm-responsive-table {
             @apply max-w-full overflow-x-hidden;
         }

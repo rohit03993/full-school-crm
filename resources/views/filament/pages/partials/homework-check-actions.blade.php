@@ -132,8 +132,8 @@
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[44rem] text-left text-sm">
+            <x-crm.responsive-table class="border-t border-gray-100 dark:border-gray-800">
+                <table class="w-full text-left text-sm">
                     <thead class="bg-gray-50 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                         <tr>
                             <th class="px-4 py-2 w-10"></th>
@@ -147,17 +147,20 @@
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         @forelse ($students as $student)
                             <tr wire:key="hw-roster-{{ $student['id'] }}">
-                                <td class="px-4 py-2">
-                                    <input
-                                        type="checkbox"
-                                        value="{{ $student['id'] }}"
-                                        wire:model.live="selectedStudentIds"
-                                        class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800"
-                                    />
+                                <td class="px-4 py-2 crm-responsive-table__title" data-label="">
+                                    <label class="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            value="{{ $student['id'] }}"
+                                            wire:model.live="selectedStudentIds"
+                                            class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800"
+                                        />
+                                        <span class="font-medium text-gray-950 md:hidden dark:text-white">{{ $student['name'] }}</span>
+                                    </label>
                                 </td>
-                                <td class="px-4 py-2 font-medium">{{ $student['name'] }}</td>
-                                <td class="px-4 py-2 text-gray-500">{{ $student['mobile'] ?: '—' }}</td>
-                                <td class="px-4 py-2 text-xs">
+                                <td class="hidden px-4 py-2 font-medium md:table-cell" data-label="Student">{{ $student['name'] }}</td>
+                                <td class="px-4 py-2 text-gray-500" data-label="Mobile">{{ $student['mobile'] ?: '—' }}</td>
+                                <td class="px-4 py-2 text-xs" data-label="Week ND">
                                     @if (($student['not_done_week'] ?? 0) > 0)
                                         <span class="rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
                                             {{ $student['not_done_week'] }}
@@ -166,7 +169,7 @@
                                         <span class="text-gray-400">0</span>
                                     @endif
                                 </td>
-                                <td class="px-4 py-2 text-xs text-gray-500">
+                                <td class="px-4 py-2 text-xs text-gray-500" data-label="{{ $checkDateLabel }}">
                                     @if ($student['last_status'])
                                         {{ $student['last_status'] }}
                                         @if ($student['last_notify'])
@@ -187,13 +190,13 @@
                                         —
                                     @endif
                                 </td>
-                                <td class="px-4 py-2 text-right">
+                                <td class="px-4 py-2 text-right crm-responsive-table__actions" data-label="">
                                     <button
                                         type="button"
                                         wire:click="markStudentDone({{ $student['id'] }})"
                                         wire:loading.attr="disabled"
                                         wire:target="markStudentDone({{ $student['id'] }})"
-                                        class="rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-extrabold uppercase text-white disabled:opacity-50"
+                                        class="rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-extrabold uppercase text-white disabled:opacity-50 touch-manipulation min-h-10"
                                     >
                                         Done
                                     </button>
@@ -208,7 +211,7 @@
                         @endforelse
                     </tbody>
                 </table>
-            </div>
+            </x-crm.responsive-table>
         </div>
     @endif
 
@@ -217,8 +220,8 @@
             <div class="border-b border-gray-100 px-4 py-3 text-sm font-semibold dark:border-gray-800">
                 Marks for {{ $checkDateLabel }}
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[44rem] text-left text-sm">
+            <x-crm.responsive-table class="border-t border-gray-100 dark:border-gray-800">
+                <table class="w-full text-left text-sm">
                     <thead class="bg-gray-50 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                         <tr>
                             <th class="px-4 py-2">Student</th>
@@ -240,20 +243,20 @@
                                     ], true);
                             @endphp
                             <tr wire:key="hw-check-{{ $row->id }}">
-                                <td class="px-4 py-2 font-medium">{{ $row->student?->name }}</td>
-                                <td class="px-4 py-2">{{ $row->subject_name }}</td>
-                                <td class="px-4 py-2 text-gray-600 dark:text-gray-300">{{ \Illuminate\Support\Str::limit($row->topic, 40) }}</td>
-                                <td class="px-4 py-2">{{ $row->status?->label() }}</td>
-                                <td class="px-4 py-2 text-gray-500">{{ $row->notify_status?->label() }}</td>
-                                <td class="px-4 py-2 text-xs text-gray-500">{{ $row->created_at?->format('d M H:i') }}</td>
-                                <td class="px-4 py-2 text-right">
+                                <td class="px-4 py-2 font-medium crm-responsive-table__title" data-label="Student">{{ $row->student?->name }}</td>
+                                <td class="px-4 py-2" data-label="Subject">{{ $row->subject_name }}</td>
+                                <td class="px-4 py-2 text-gray-600 dark:text-gray-300" data-label="Topic">{{ \Illuminate\Support\Str::limit($row->topic, 40) }}</td>
+                                <td class="px-4 py-2" data-label="Status">{{ $row->status?->label() }}</td>
+                                <td class="px-4 py-2 text-gray-500" data-label="WhatsApp">{{ $row->notify_status?->label() }}</td>
+                                <td class="px-4 py-2 text-xs text-gray-500" data-label="Time">{{ $row->created_at?->format('d M H:i') }}</td>
+                                <td class="px-4 py-2 text-right crm-responsive-table__actions" data-label="">
                                     @if ($canResend)
                                         <button
                                             type="button"
                                             wire:click="resendWhatsApp({{ $row->id }})"
                                             wire:loading.attr="disabled"
                                             wire:target="resendWhatsApp({{ $row->id }})"
-                                            class="text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
+                                            class="min-h-10 text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400 touch-manipulation"
                                         >
                                             Resend
                                         </button>
@@ -263,7 +266,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-crm.responsive-table>
         </div>
     @endif
 </div>
