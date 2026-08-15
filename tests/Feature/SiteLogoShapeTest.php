@@ -91,6 +91,10 @@ class SiteLogoShapeTest extends TestCase
 
         // The logo already reads "Motion Education", so no duplicate text beside it.
         $this->assertStringNotContainsString('School &amp; Coaching Management', $html);
+        // Logo-only mode gets the full header width while object-contain prevents
+        // a circular or unusually shaped logo from being cropped.
+        $this->assertStringContainsString('width: min(100%, '.SiteLogo::DISPLAY_MAX_WIDTH.'px)', $html);
+        $this->assertStringContainsString('max-w-full object-contain', $html);
     }
 
     public function test_name_is_never_printed_beside_a_wide_logo(): void
