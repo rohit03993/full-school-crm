@@ -11,6 +11,7 @@ use App\Support\SiteContent;
 use App\Support\SiteLogo;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -70,7 +71,55 @@ class SiteLogoShapeTest extends TestCase
         // A crest carries no wordmark, so the name has to appear as text.
         $this->assertStringContainsString('B.D.M. Kanya Degree College', $html);
         // The wide banner frame must not squeeze the crest.
-        $this->assertStringNotContainsString('aspect-ratio: '.SiteLogo::ASPECT_WIDTH, $html);
+        $this->assertStringNotContainsString('aspect-ratio: '.SiteLogo::frameRatio(null), $html);
+    }
+
+    public function test_header_frame_follows_the_uploaded_file_shape(): void
+    {
+        // A genuinely square crest must get a square slot, not a wide strip
+        // that leaves the mark looking small and stranded.
+        $this->putLogo('site/logo/crest.png', 300, 300);
+        Setting::setValue('site.logo', 'site/logo/crest.png', 'general');
+        Setting::setValue('site.logo_shape', SiteLogo::SHAPE_SQUARE, 'general');
+        Setting::setValue('site.logo_show_name', '0', 'general');
+        SiteContent::clearCache();
+
+        $this->assertSame(1.0, SiteContent::institute()['logo_ratio']);
+        $this->assertStringContainsString(
+            'aspect-ratio: 1',
+            view('components.public.header', ['institute' => SiteContent::institute()])->render(),
+        );
+
+        // A wide wordmark keeps the long strip.
+        $this->putLogo('site/logo/wide.png', 520, 160);
+        Setting::setValue('site.logo', 'site/logo/wide.png', 'general');
+        SiteContent::clearCache();
+
+        $this->assertSame(3.25, SiteContent::institute()['logo_ratio']);
+    }
+
+    public function test_frame_ratio_falls_back_and_clamps(): void
+    {
+        $wide = round(SiteLogo::ASPECT_WIDTH / SiteLogo::ASPECT_HEIGHT, 4);
+
+        // Unmeasurable file: assume the wide banner.
+        $this->assertSame($wide, SiteLogo::frameRatio(null));
+        // Absurdly long banners are capped so the header stays usable.
+        $this->assertSame($wide, SiteLogo::frameRatio(20.0));
+        // Very tall logos are clamped instead of towering over the nav.
+        $this->assertSame(0.6, SiteLogo::frameRatio(0.1));
+    }
+
+    protected function putLogo(string $path, int $width, int $height): void
+    {
+        $canvas = imagecreatetruecolor($width, $height);
+
+        ob_start();
+        imagepng($canvas);
+        $bytes = (string) ob_get_clean();
+        imagedestroy($canvas);
+
+        Storage::disk('public')->put($path, $bytes);
     }
 
     public function test_square_logo_can_hide_the_name_when_the_logo_already_has_one(): void
@@ -91,10 +140,10 @@ class SiteLogoShapeTest extends TestCase
 
         // The logo already reads "Motion Education", so no duplicate text beside it.
         $this->assertStringNotContainsString('School &amp; Coaching Management', $html);
-        // Logo-only mode gets the full header width while object-contain prevents
+        // Logo-only mode is capped to the header width, and object-contain stops
         // a circular or unusually shaped logo from being cropped.
-        $this->assertStringContainsString('width: min(100%, '.SiteLogo::DISPLAY_MAX_WIDTH.'px)', $html);
-        $this->assertStringContainsString('max-w-full object-contain', $html);
+        $this->assertStringContainsString('max-width: min(100%, '.SiteLogo::DISPLAY_MAX_WIDTH.'px)', $html);
+        $this->assertStringContainsString('object-contain', $html);
     }
 
     public function test_name_is_never_printed_beside_a_wide_logo(): void
@@ -108,6 +157,7 @@ class SiteLogoShapeTest extends TestCase
 
     public function test_public_header_keeps_the_wide_frame_for_a_wordmark_logo(): void
     {
+        $this->putLogo('site/logo/wordmark.png', 520, 160);
         Setting::setValue('site.logo', 'site/logo/wordmark.png', 'general');
         Setting::setValue('site.logo_shape', SiteLogo::SHAPE_WIDE, 'general');
         SiteContent::clearCache();
@@ -117,7 +167,7 @@ class SiteLogoShapeTest extends TestCase
             'institute' => SiteContent::institute(),
         ])->render();
 
-        $this->assertStringContainsString('aspect-ratio: '.SiteLogo::ASPECT_WIDTH, $html);
+        $this->assertStringContainsString('aspect-ratio: 3.25', $html);
     }
 
     public function test_admin_can_pick_and_save_the_logo_shape(): void

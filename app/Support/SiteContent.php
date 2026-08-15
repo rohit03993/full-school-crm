@@ -84,6 +84,7 @@ class SiteContent
             'logo_url' => SiteImageService::url($g('site.logo')),
             'logo_shape' => SiteLogo::normalizeShape($g('site.logo_shape')),
             'logo_shows_name' => SiteLogo::showsName($g('site.logo_shape'), $g('site.logo_show_name')),
+            'logo_ratio' => SiteLogo::frameRatio(SiteImageService::aspectRatio($g('site.logo'))),
             'favicon_url' => SiteImageService::versionedUrl($g('site.favicon')),
             'favicon_type' => SiteImageService::mimeType($g('site.favicon')),
             'images' => [

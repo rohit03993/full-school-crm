@@ -82,6 +82,23 @@ class SiteLogo
     }
 
     /**
+     * Header frame ratio to use for a logo file.
+     *
+     * Falls back to the wide banner when the file cannot be measured, and
+     * clamps extremes so a very tall or very long image still fits the header.
+     */
+    public static function frameRatio(?float $intrinsic): float
+    {
+        $default = self::ASPECT_WIDTH / self::ASPECT_HEIGHT;
+
+        if ($intrinsic === null || $intrinsic <= 0) {
+            return round($default, 4);
+        }
+
+        return round(max(0.6, min($intrinsic, $default)), 4);
+    }
+
+    /**
      * Filament brand logo height — a crest needs more room than a wordmark
      * because its height carries the whole mark.
      */

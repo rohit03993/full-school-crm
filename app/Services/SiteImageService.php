@@ -79,6 +79,38 @@ class SiteImageService
     }
 
     /**
+     * Intrinsic aspect ratio (width / height) of a stored image.
+     *
+     * The header used to assume every logo was a wide banner, which left a
+     * square crest floating in a strip of empty space. Reading the real shape
+     * means the frame fits whatever the institute actually uploaded.
+     *
+     * @return float|null null when the file is missing or unreadable
+     */
+    public static function aspectRatio(?string $path): ?float
+    {
+        $path = self::resolveExistingPath($path);
+
+        if (blank($path) || str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return null;
+        }
+
+        $disk = Storage::disk(self::DISK);
+
+        if (! $disk->exists($path)) {
+            return null;
+        }
+
+        $size = @getimagesize($disk->path($path));
+
+        if ($size === false || empty($size[0]) || empty($size[1])) {
+            return null;
+        }
+
+        return round($size[0] / $size[1], 4);
+    }
+
+    /**
      * MIME type from the stored extension.
      *
      * The <link rel="icon"> type attribute must match the real file: declaring

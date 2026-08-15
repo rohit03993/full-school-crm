@@ -6,6 +6,7 @@
         ->implode('') ?: 'SC';
     $logoIsSquare = \App\Support\SiteLogo::isSquare($institute['logo_shape'] ?? null);
     $logoShowsName = $institute['logo_shows_name'] ?? true;
+    $logoRatio = $institute['logo_ratio'] ?? \App\Support\SiteLogo::frameRatio(null);
     $navLinks = [
         ['label' => 'Home', 'url' => route('home'), 'active' => request()->routeIs('home')],
         ['label' => 'Courses', 'url' => route('courses'), 'active' => request()->routeIs('courses')],
@@ -47,23 +48,12 @@
                         <div class="truncate font-display text-base font-bold text-navy-900 sm:text-xl">{{ $institute['name'] }}</div>
                         <div class="hidden truncate text-xs font-medium text-navy-500 sm:block">{{ $institute['tagline'] }}</div>
                     </div>
-                @elseif (! empty($institute['logo_url']) && $logoIsSquare)
-                    {{-- Logo alone gets the full header width; object-contain keeps a
-                         circular mark whole instead of cropping it to a strip. --}}
-                    <div
-                        class="flex h-12 shrink-0 items-center justify-start sm:h-14"
-                        style="width: min(100%, {{ \App\Support\SiteLogo::DISPLAY_MAX_WIDTH }}px);"
-                    >
-                        <img
-                            src="{{ $institute['logo_url'] }}"
-                            alt="{{ $institute['name'] }}"
-                            class="h-full max-w-full object-contain object-left"
-                        >
-                    </div>
                 @elseif (! empty($institute['logo_url']))
+                    {{-- Frame follows the file's own proportions, so a round crest
+                         gets a square slot instead of floating in a wide strip. --}}
                     <div
                         class="flex h-12 shrink-0 items-center justify-start sm:h-14"
-                        style="width: min(100%, {{ \App\Support\SiteLogo::DISPLAY_MAX_WIDTH }}px); aspect-ratio: {{ \App\Support\SiteLogo::ASPECT_WIDTH }} / {{ \App\Support\SiteLogo::ASPECT_HEIGHT }};"
+                        style="aspect-ratio: {{ $logoRatio }}; max-width: min(100%, {{ \App\Support\SiteLogo::DISPLAY_MAX_WIDTH }}px);"
                     >
                         <img
                             src="{{ $institute['logo_url'] }}"
