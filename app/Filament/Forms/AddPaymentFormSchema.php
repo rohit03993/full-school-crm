@@ -28,7 +28,11 @@ class AddPaymentFormSchema
     /**
      * @return array<int, \Filament\Forms\Components\Component|\Filament\Schemas\Components\Component>
      */
-    public static function fields(FeeStructure $feeStructure, ?int $prefillMiscChargeId = null): array
+    public static function fields(
+        FeeStructure $feeStructure,
+        ?int $prefillMiscChargeId = null,
+        ?int $prefillInstallmentId = null,
+    ): array
     {
         $feeStructure->loadMissing(['installments', 'miscCharges']);
         $tuitionPending = round((float) $feeStructure->pending_amount, 2);
@@ -37,10 +41,11 @@ class AddPaymentFormSchema
         $payableMisc = $feeStructure->separateMiscCharges()
             ->filter(fn (FeeMiscCharge $charge): bool => $charge->isPayableSeparately())
             ->values();
-        $payableInstallments = $feeStructure->installments
-            ->filter(fn (FeeInstallment $row): bool => (float) $row->pending_amount > 0)
-            ->values();
-        $defaultInstallment = $payableInstallments->first();
+        $payableInstallments = app(\App\Services\FeeInstallmentService::class)
+            ->payableInstallmentsForCollection($feeStructure);
+        $defaultInstallment = $prefillInstallmentId
+            ? ($payableInstallments->firstWhere('id', $prefillInstallmentId) ?? $payableInstallments->first())
+            : $payableInstallments->first();
         $defaultMisc = $prefillMiscChargeId
             ? $payableMisc->firstWhere('id', $prefillMiscChargeId)
             : $payableMisc->first();
@@ -50,6 +55,7 @@ class AddPaymentFormSchema
 
         $defaultTarget = match (true) {
             $prefillMiscChargeId && $defaultMisc => 'misc',
+            $prefillInstallmentId && $defaultInstallment => 'tuition',
             $tuitionPending > 0 => 'tuition',
             $miscPending > 0 => 'misc',
             default => 'tuition',

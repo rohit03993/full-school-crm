@@ -393,11 +393,27 @@ class FeeInstallmentService
 
     public function firstPayableInstallment(FeeStructure $feeStructure): ?FeeInstallment
     {
-        return $feeStructure->installments()
-            ->where('pending_amount', '>', 0)
-            ->orderBy('sort_order')
-            ->orderBy('due_date')
-            ->first();
+        return $this->payableInstallmentsForCollection($feeStructure)->first();
+    }
+
+    /**
+     * Unpaid installments ordered for collection: overdue first, then soonest due.
+     *
+     * @return Collection<int, FeeInstallment>
+     */
+    public function payableInstallmentsForCollection(FeeStructure $feeStructure): Collection
+    {
+        $feeStructure->loadMissing('installments');
+
+        return $feeStructure->installments
+            ->filter(fn (FeeInstallment $row): bool => (float) $row->pending_amount > 0)
+            ->sortBy(fn (FeeInstallment $row): array => [
+                $row->isOverdue() ? 0 : 1,
+                $row->due_date?->timestamp ?? PHP_INT_MAX,
+                $row->sort_order,
+                $row->id,
+            ])
+            ->values();
     }
 
     public function syncAfterFeeStructureChange(FeeStructure $feeStructure): void

@@ -13,6 +13,7 @@ use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\CrmPagination;
+use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -26,6 +27,7 @@ use UnitEnum;
 class CallReportPage extends Page
 {
     use WithPagination;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedChartBar;
 
     protected static ?string $navigationLabel = null;
@@ -58,6 +60,24 @@ class CallReportPage extends Page
     public function getSubheading(): ?string
     {
         return CrmHint::text('call.report');
+    }
+
+    /**
+     * @return array<Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('exportCsv')
+                ->label(fn (): string => 'Export CSV'.(
+                    ($this->summary['total'] ?? 0) > 0
+                        ? ' ('.$this->summary['total'].')'
+                        : ''
+                ))
+                ->icon(Heroicon::OutlinedArrowDownTray)
+                ->color('primary')
+                ->action(fn (CallReportService $report): StreamedResponse => $this->exportCsv($report)),
+        ];
     }
 
     public string $dateFrom = '';
@@ -167,6 +187,8 @@ class CallReportPage extends Page
 
         return response()->streamDownload(function () use ($report, $filters, $viewer): void {
             $handle = fopen('php://output', 'w');
+            // Excel-friendly UTF-8
+            fwrite($handle, "\xEF\xBB\xBF");
             fputcsv($handle, [
                 'Called at',
                 'Student',
@@ -198,7 +220,9 @@ class CallReportPage extends Page
                 });
 
             fclose($handle);
-        }, $filename, ['Content-Type' => 'text/csv']);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 
     protected function applyDefaultDates(): void

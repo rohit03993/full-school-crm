@@ -172,12 +172,12 @@ Every management system below lists:
 |--|--|
 | **Formal name** | Calling Management System |
 | **Key** | `calls` |
-| **Status** | Incomplete (feature-rich; polish left) |
+| **Status** | Complete enough (CSV export + dual-mode Setup Guide live; VoIP omitted) |
 | **Includes** | Call Queue, Call Report, Students → Calls, profile Calls, dual-mode Log call (lead / enrolled / case), 3-strike block, calling widgets |
-| **Works today** | `tel:` dial + log; lead VisitStatus sync; enrolled purpose-as-tag; enrolled out of lead queue; Students Calls filters |
+| **Works today** | `tel:` dial + log; lead VisitStatus sync; enrolled purpose-as-tag; enrolled out of lead queue; Students Calls filters; Call Report CSV (filtered + Excel UTF-8) |
 | **Omit** | VoIP, recording, predictive dialer, bus |
 | **Edit** | Document `LeadsCall` vs `StudentsView`; Follow-ups call rows respect `calls` |
-| **Add** | Call Report CSV; Setup Guide lead vs enrolled vs cases; optional purpose deep-link |
+| **Add** | Optional purpose deep-link later |
 
 **Key files:** `CallQueuePage`, `CallReportPage`, `StudentCallsPage`, `CallLogService`, `HandlesLogCallModal`
 
@@ -204,12 +204,12 @@ Every management system below lists:
 |--|--|
 | **Formal name** | Fees Management System |
 | **Key** | `fees` |
-| **Status** | Incomplete |
+| **Status** | Complete enough for packaging (collect UX: next-due strip + row Collect + overdue-first default) |
 | **Includes** | Fees dashboard, profile Fees/Receipts, installments, misc charges, adjustments, fee settings, WA reminder hooks |
-| **Works today** | Office collect, receipts PDF, discounts/penalties, GST coaching settings, defaulters |
+| **Works today** | Office collect, receipts PDF, discounts/penalties, GST coaching settings, defaulters with Collect deep-link |
 | **Omit** | Full Tally inside Fees (expense accounting = separate module) |
 | **Edit** | Gate `ManageFeeSettings` with `fees`; portal Fees only if `fees` ON |
-| **Add** | Online pay later; installment UX polish |
+| **Add** | Online pay later |
 
 ---
 

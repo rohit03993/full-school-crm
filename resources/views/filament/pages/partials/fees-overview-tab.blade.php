@@ -45,6 +45,7 @@
                             <th class="px-4 py-3 font-semibold">Due</th>
                             <th class="px-4 py-3 font-semibold">Days late</th>
                             <th class="px-4 py-3 font-semibold text-right">Overdue</th>
+                            <th class="crm-responsive-table__actions px-4 py-3 font-semibold text-right">Collect</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-white/10">
@@ -72,6 +73,14 @@
                                 </td>
                                 <td class="px-4 py-3 text-right font-semibold text-red-700 dark:text-red-300" data-label="Overdue">
                                     ₹{{ number_format((float) $row['pending_amount'], 2) }}
+                                </td>
+                                <td class="crm-responsive-table__actions px-4 py-3 text-right" data-label="">
+                                    <a
+                                        href="{{ $row['profile_url'] }}"
+                                        class="inline-flex rounded-lg bg-primary-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-primary-500"
+                                    >
+                                        Collect
+                                    </a>
                                 </td>
                             </tr>
                         @endforeach

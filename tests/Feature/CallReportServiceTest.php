@@ -6,11 +6,14 @@ use App\Enums\CallStatus;
 use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\VisitStatus;
+use App\Filament\Pages\CallReportPage;
 use App\Models\User;
 use App\Services\CallLogService;
 use App\Services\CallReportService;
 use App\Services\EnquiryService;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -102,6 +105,32 @@ class CallReportServiceTest extends TestCase
 
         $this->assertSame(1, $report->summary($newFilters, $staff)['total']);
         $this->assertSame(1, $report->summary($followupFilters, $staff)['total']);
+    }
+
+    public function test_call_report_page_exports_filtered_csv(): void
+    {
+        Role::findOrCreate(RoleName::SuperAdmin->value);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+
+        $student = $this->createLeadStudent($admin);
+        app(CallLogService::class)->log($student, $admin, [
+            'call_connected' => true,
+            'who_answered' => 'father',
+            'visit_status' => VisitStatus::Interested->value,
+            'call_notes' => 'Export me please',
+            'next_followup_at' => now()->addDay()->format('Y-m-d H:i:s'),
+        ]);
+
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(CallReportPage::class)
+            ->assertSuccessful()
+            ->assertSee('Export CSV')
+            ->call('exportCsv')
+            ->assertFileDownloaded();
     }
 
     protected function createStaffUser(string $name = 'Staff User'): User

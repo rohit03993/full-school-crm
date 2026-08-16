@@ -125,6 +125,32 @@ class FeeInstallmentTest extends TestCase
         $this->assertSame(30000.0, (float) $feeStructure->pending_amount);
     }
 
+    public function test_first_payable_prefers_overdue_over_later_sorted_installment(): void
+    {
+        $staff = $this->createStaffUser();
+        $student = $this->createStudent();
+        $course = $this->createCourse();
+        $enquiry = $this->createEnquiry($student, $course, $staff);
+
+        $admissionService = app(AdmissionService::class);
+        $admission = $admissionService->convert($student, $enquiry, $staff, [
+            'course_id' => $course->id,
+            'use_installment_plan' => true,
+            'installment_plan' => [
+                ['label' => 'Future first in plan', 'amount' => 30000, 'due_date' => now()->addDays(30)->toDateString()],
+                ['label' => 'Already overdue', 'amount' => 30000, 'due_date' => now()->subDays(10)->toDateString()],
+            ],
+        ]);
+
+        $enrollment = $admissionService->approve($this->submitAdmissionForm($admission, $staff), $staff);
+        $feeStructure = $enrollment->feeStructure->load('installments');
+
+        $next = app(\App\Services\FeeInstallmentService::class)->firstPayableInstallment($feeStructure);
+
+        $this->assertNotNull($next);
+        $this->assertSame('Already overdue', $next->label);
+    }
+
     public function test_late_fee_is_generated_for_overdue_installment(): void
     {
         $staff = $this->createStaffUser();

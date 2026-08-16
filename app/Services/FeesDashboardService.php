@@ -106,7 +106,11 @@ class FeesDashboardService
                     'days_overdue' => $daysOverdue,
                     'overdue_installments' => $rows->count(),
                     'profile_url' => $student
-                        ? \App\Filament\Pages\StudentProfilePage::getUrl(['record' => $student->id, 'tab' => 'fees'])
+                        ? \App\Filament\Pages\StudentProfilePage::getUrl([
+                            'record' => $student->id,
+                            'tab' => 'fees',
+                            'collect' => 1,
+                        ])
                         : '#',
                 ];
             })

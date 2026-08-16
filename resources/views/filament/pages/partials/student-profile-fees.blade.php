@@ -309,6 +309,60 @@
             </details>
         @endif
 
+        @php $nextInstallment = $nextInstallment ?? null; @endphp
+        @if ($nextInstallment && ($canCollectFees ?? false))
+            @php
+                $nextPending = (float) $nextInstallment->pending_amount;
+                $nextOverdue = $nextInstallment->isOverdue();
+                $days = $nextInstallment->due_date
+                    ? (int) now()->startOfDay()->diffInDays($nextInstallment->due_date->copy()->startOfDay(), false)
+                    : null;
+            @endphp
+            <div @class([
+                'flex flex-col gap-3 rounded-2xl border px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between',
+                'border-red-200 bg-red-50 dark:border-red-500/30 dark:bg-red-500/10' => $nextOverdue,
+                'border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10' => ! $nextOverdue,
+            ])>
+                <div class="min-w-0">
+                    <p @class([
+                        'text-[11px] font-bold uppercase tracking-wide',
+                        'text-red-700 dark:text-red-300' => $nextOverdue,
+                        'text-amber-800 dark:text-amber-300' => ! $nextOverdue,
+                    ])>
+                        {{ $nextOverdue ? 'Overdue installment' : 'Next due' }}
+                    </p>
+                    <p class="mt-0.5 text-sm font-semibold text-gray-950 dark:text-white">
+                        {{ $nextInstallment->label }}
+                        · ₹{{ number_format($nextPending, 0) }}
+                    </p>
+                    <p class="text-xs text-gray-600 dark:text-gray-300">
+                        Due {{ $nextInstallment->due_date?->format('d M Y') ?? '—' }}
+                        @if ($days !== null)
+                            ·
+                            @if ($days < 0)
+                                {{ abs($days) }} day(s) late
+                            @elseif ($days === 0)
+                                due today
+                            @else
+                                due in {{ $days }} day(s)
+                            @endif
+                        @endif
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    wire:click="openPayInstallment({{ $nextInstallment->id }})"
+                    @class([
+                        'inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl px-4 text-sm font-bold text-white shadow-sm',
+                        'bg-red-600 hover:bg-red-500' => $nextOverdue,
+                        'bg-primary-600 hover:bg-primary-500' => ! $nextOverdue,
+                    ])
+                >
+                    Collect ₹{{ number_format($nextPending, 0) }}
+                </button>
+            </div>
+        @endif
+
         @if ($installments->isNotEmpty())
             <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
                 <div class="flex items-center gap-3 border-b border-gray-100 px-5 py-3.5 dark:border-white/10">
@@ -317,7 +371,7 @@
                     </span>
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Payment schedule</h3>
-                        <p class="text-xs text-gray-500">{{ $installments->count() }} installments · sorted by due date</p>
+                        <p class="text-xs text-gray-500">{{ $installments->count() }} installments · overdue first when collecting</p>
                     </div>
                 </div>
                 <x-crm.responsive-table>
@@ -329,6 +383,9 @@
                                 <th class="px-4 py-2.5 font-semibold text-right">Paid</th>
                                 <th class="px-4 py-2.5 font-semibold text-right">Balance</th>
                                 <th class="px-4 py-2.5 font-semibold">Status</th>
+                                @if ($canCollectFees ?? false)
+                                    <th class="crm-responsive-table__actions px-4 py-2.5 font-semibold text-right">Collect</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-white/5">
@@ -342,6 +399,7 @@
                                         default => 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400',
                                     };
                                     $isPaid = $status === 'Paid';
+                                    $canCollectRow = ! $isPaid && (float) $installment->pending_amount > 0;
                                 @endphp
                                 <tr @class([
                                     'transition-colors hover:bg-gray-50/80 dark:hover:bg-white/[0.02]',
@@ -354,6 +412,21 @@
                                     <td class="px-4 py-3" data-label="Status">
                                         <span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $statusClass }}">{{ $status }}</span>
                                     </td>
+                                    @if ($canCollectFees ?? false)
+                                        <td class="crm-responsive-table__actions px-4 py-3 text-right" data-label="">
+                                            @if ($canCollectRow)
+                                                <button
+                                                    type="button"
+                                                    wire:click="openPayInstallment({{ $installment->id }})"
+                                                    class="rounded-lg bg-primary-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-primary-500"
+                                                >
+                                                    Collect
+                                                </button>
+                                            @else
+                                                <span class="text-xs text-gray-400">—</span>
+                                            @endif
+                                        </td>
+                                    @endif
                                 </tr>
                             @endforeach
                         </tbody>

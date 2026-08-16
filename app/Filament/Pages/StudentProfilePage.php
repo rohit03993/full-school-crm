@@ -430,6 +430,26 @@ class StudentProfilePage extends Page
         }
 
         $this->syncCatalogCourseFeeIfNeeded();
+
+        if (
+            request()->boolean('collect')
+            && $this->profileTab === 'fees'
+            && $this->userCan(CrmPermission::FeesCollect)
+        ) {
+            $this->loadFeesTab();
+            $feeStructure = $this->record->activeEnrollment?->feeStructure;
+
+            if ($feeStructure) {
+                $feeStructure->loadMissing('installments');
+                $next = app(\App\Services\FeeInstallmentService::class)
+                    ->firstPayableInstallment($feeStructure);
+
+                $this->mountAction('addPayment', [
+                    'miscChargeId' => null,
+                    'installmentId' => $next?->id,
+                ]);
+            }
+        }
     }
 
     public static function getRoutePath(Panel $panel): string
@@ -1586,6 +1606,16 @@ class StudentProfilePage extends Page
         $this->mountAction('addPayment', ['miscChargeId' => $chargeId]);
     }
 
+    public function openPayInstallment(int $installmentId): void
+    {
+        abort_unless($this->userCan(CrmPermission::FeesCollect), 403);
+
+        $this->mountAction('addPayment', [
+            'miscChargeId' => null,
+            'installmentId' => $installmentId,
+        ]);
+    }
+
     public function submitMiscChargeAdjustmentRequest(
         int $chargeId,
         string $type,
@@ -2620,7 +2650,7 @@ class StudentProfilePage extends Page
                 ->button()
                 ->modalHeading('Add payment')
                 ->modalWidth('lg')
-                ->arguments(['miscChargeId' => null])
+                ->arguments(['miscChargeId' => null, 'installmentId' => null])
                 ->form(function (array $arguments): array {
                     $feeStructure = $this->record->activeEnrollment?->feeStructure;
 
@@ -2631,8 +2661,11 @@ class StudentProfilePage extends Page
                     $miscChargeId = filled($arguments['miscChargeId'] ?? null)
                         ? (int) $arguments['miscChargeId']
                         : null;
+                    $installmentId = filled($arguments['installmentId'] ?? null)
+                        ? (int) $arguments['installmentId']
+                        : null;
 
-                    return AddPaymentFormSchema::fields($feeStructure, $miscChargeId);
+                    return AddPaymentFormSchema::fields($feeStructure, $miscChargeId, $installmentId);
                 })
                 ->action(function (array $data, array $arguments, PaymentService $payments): void {
                     abort_unless($this->userCan(CrmPermission::FeesCollect), 403);
@@ -3248,6 +3281,10 @@ class StudentProfilePage extends Page
                                     'paymentsLastPage' => $this->paymentsLastPage,
                                     'paymentsPerPage' => CrmPagination::PER_PAGE,
                                     'installments' => $this->installments,
+                                    'nextInstallment' => $this->record->activeEnrollment?->feeStructure
+                                        ? app(\App\Services\FeeInstallmentService::class)
+                                            ->firstPayableInstallment($this->record->activeEnrollment->feeStructure)
+                                        : null,
                                     'penalties' => $this->penalties,
                                     'feeStructureHistory' => $this->feeStructureHistory,
                                     'canCollectFees' => $this->userCan(CrmPermission::FeesCollect),
