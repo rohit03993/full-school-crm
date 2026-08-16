@@ -11,9 +11,23 @@
             <li>Complete the <strong>Setup Wizard</strong> — choose institute type, enter your name, phone, and address.</li>
             <li>Open <strong>Institute Setup</strong> and work through the checklist (sessions, courses, site content, staff).</li>
             <li>Add your first <strong>Academic Session</strong>, then <strong>Courses</strong> and <strong>Batches</strong> before enrolling students.</li>
-            <li>Create <strong>Staff</strong> logins so counsellors and accountants can use the CRM.</li>
+            <li>Create <strong>Staff</strong> logins and assign job roles (Counsellor, Admission, Accountant, Fee adjuster, Academic, Teacher, Messaging) so day-to-day work does not wait on Super Admin.</li>
         </ol>
-        <p class="mt-3 text-xs text-gray-500">Each screen in the sidebar also shows a short hint under the title — read it when you are unsure what to enter.</p>
+        <p class="mt-3 text-xs text-gray-500">Super Admin keeps the vault: staff accounts, Setup/settings, fee waive/discount <strong>approval</strong>, All cases, audit, backups, WhatsApp API credentials. Each screen also shows a short hint under the title.</p>
+    </div>
+
+    <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-gray-900">
+        <h2 class="text-lg font-semibold text-gray-950 dark:text-white">Admin vault vs staff roles</h2>
+        <p class="mt-2">Tick one or more roles on each staff user — permissions combine. Deactivate with <strong>Active</strong> off (do not delete).</p>
+        <ul class="mt-3 list-disc space-y-1 pl-5">
+            <li><strong>Counsellor</strong> — calls, assigned leads, follow-ups</li>
+            <li><strong>Admission officer</strong> — enquiries, admissions, student edit/import</li>
+            <li><strong>Accountant</strong> — collect fees, receipts, report download</li>
+            <li><strong>Fee adjuster</strong> — fee plan/discounts; request waive (admin approves)</li>
+            <li><strong>Academic coordinator</strong> — courses, exams, attendance, marks publish</li>
+            <li><strong>Teacher</strong> — own classes only (attendance, homework, marks entry)</li>
+            <li><strong>Messaging</strong> — WhatsApp campaigns &amp; inbox (not API settings)</li>
+        </ul>
     </div>
 
     <div class="grid gap-4 lg:grid-cols-3">

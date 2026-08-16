@@ -10,6 +10,9 @@ class StaffRolePermissions
     /**
      * Permissions granted by each job role. Multiple roles on one user = union of all lists.
      *
+     * Super Admin vault (never granted here): StaffManage, SettingsManage, CasesViewAll,
+     * WhatsappSettings, MetaWhatsappSettings, waive-approval UI (role check), audit/backups/setup.
+     *
      * @return array<string, list<CrmPermission>>
      */
     public static function matrix(): array
@@ -52,6 +55,7 @@ class StaffRolePermissions
                 CrmPermission::AdmissionsView,
                 CrmPermission::FeesCollect,
                 CrmPermission::ReportsView,
+                CrmPermission::ReportsExport,
                 CrmPermission::CasesView,
                 CrmPermission::CasesAssign,
                 CrmPermission::CasesClose,
@@ -63,6 +67,7 @@ class StaffRolePermissions
                 CrmPermission::FeesAdjustStructure,
                 CrmPermission::FeesWaivePenalty,
                 CrmPermission::ReportsView,
+                CrmPermission::ReportsExport,
                 CrmPermission::CasesView,
                 CrmPermission::CasesOpen,
                 CrmPermission::CasesAssign,
@@ -75,7 +80,18 @@ class StaffRolePermissions
                 CrmPermission::AttendanceMark,
                 CrmPermission::AttendanceWorkshops,
                 CrmPermission::MarksImport,
+                CrmPermission::MarksPublish,
                 CrmPermission::HomeworkManage,
+                CrmPermission::AcademicsManage,
+                CrmPermission::CasesView,
+                CrmPermission::CasesOpen,
+                CrmPermission::CasesAssign,
+                CrmPermission::CasesClose,
+            ],
+            StaffJobRole::Teacher->value => [
+                CrmPermission::StudentsView,
+                CrmPermission::AttendanceMark,
+                CrmPermission::MarksImport,
                 CrmPermission::CasesView,
                 CrmPermission::CasesOpen,
                 CrmPermission::CasesAssign,
@@ -84,7 +100,7 @@ class StaffRolePermissions
             StaffJobRole::MessagingCoordinator->value => [
                 CrmPermission::StudentsView,
                 CrmPermission::WhatsappCampaigns,
-                CrmPermission::HomeworkManage,
+                CrmPermission::WhatsappOps,
                 CrmPermission::CasesView,
                 CrmPermission::CasesOpen,
                 CrmPermission::CasesAssign,
@@ -109,16 +125,19 @@ class StaffRolePermissions
                 CrmPermission::WhatsappSettings,
                 CrmPermission::MetaWhatsappSettings,
                 CrmPermission::WhatsappCampaigns,
+                CrmPermission::WhatsappOps,
                 CrmPermission::StaffManage,
                 CrmPermission::SettingsManage,
                 CrmPermission::AcademicsManage,
                 CrmPermission::AttendanceMark,
                 CrmPermission::AttendanceWorkshops,
                 CrmPermission::MarksImport,
+                CrmPermission::MarksPublish,
                 CrmPermission::FeesCollect,
                 CrmPermission::FeesAdjustStructure,
                 CrmPermission::FeesWaivePenalty,
                 CrmPermission::LeadsReassign,
+                CrmPermission::ReportsExport,
             ], true),
         ));
     }

@@ -27,7 +27,7 @@
                 <li class="rounded-xl bg-white/80 px-3 py-3 ring-1 ring-gray-200 dark:bg-gray-900/80 dark:ring-white/10">
                     <p class="text-[10px] font-bold uppercase tracking-wide text-primary-600 dark:text-primary-400">Step 4 · Declare</p>
                     <p class="mt-1 text-gray-700 dark:text-gray-300">
-                        <strong>View sheet</strong> → <strong>Publish results online</strong> for the student portal · Super Admin can <strong>issue PDF marksheets</strong>.
+                        <strong>View sheet</strong> → <strong>Publish results online</strong> for the student portal · Academic coordinator can <strong>issue PDF marksheets</strong>.
                     </p>
                 </li>
             </ol>

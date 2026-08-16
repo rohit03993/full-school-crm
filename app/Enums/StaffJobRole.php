@@ -13,6 +13,7 @@ enum StaffJobRole: string
     case Accountant = 'accountant';
     case FeeAdjuster = 'fee_adjuster';
     case AcademicCoordinator = 'academic_coordinator';
+    case Teacher = 'teacher';
     case MessagingCoordinator = 'messaging_coordinator';
 
     public function label(): string
@@ -23,6 +24,7 @@ enum StaffJobRole: string
             self::Accountant => 'Accountant (fees)',
             self::FeeAdjuster => 'Fee adjuster (discounts & structure)',
             self::AcademicCoordinator => 'Academic coordinator',
+            self::Teacher => 'Teacher / Faculty',
             self::MessagingCoordinator => 'Messaging (WhatsApp)',
         };
     }
@@ -32,10 +34,11 @@ enum StaffJobRole: string
         return match ($this) {
             self::Counsellor => 'Assigned to Call, call queue, log calls, follow-ups',
             self::AdmissionOfficer => 'Enquiries, admissions, student edits, imports',
-            self::Accountant => 'Collect fees, receipts, fee reports',
-            self::FeeAdjuster => 'Adjust fee plan, discounts, installments; request waive/discount',
-            self::AcademicCoordinator => 'Batch attendance, workshops, tests & marks upload',
-            self::MessagingCoordinator => 'WhatsApp campaigns and bulk messaging',
+            self::Accountant => 'Collect fees, receipts, fee reports (including download)',
+            self::FeeAdjuster => 'Adjust fee plan, discounts, installments; request waive/discount (admin approves)',
+            self::AcademicCoordinator => 'Courses, batches, exams, attendance, marks upload & publish, homework',
+            self::Teacher => 'Own classes only: attendance, homework submit, marks entry (no publish or setup)',
+            self::MessagingCoordinator => 'WhatsApp campaigns, inbox, templates & live sends (not API settings)',
         };
     }
 

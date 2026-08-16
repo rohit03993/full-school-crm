@@ -5,7 +5,6 @@ namespace App\Filament\Pages;
 use App\Filament\Pages\BulkActivityMarksImportPage;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
-use App\Enums\RoleName;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Models\StudentMarksheet;
@@ -105,7 +104,7 @@ class TestMarksReviewPage extends Page
     public function publishResults(ResultDeclarationService $declarations): void
     {
         abort_unless(FeatureGate::enabled(LicenseFeature::Results), 403);
-        abort_unless(CrmAccess::can(Auth::user(), CrmPermission::MarksImport), 403);
+        abort_unless(CrmAccess::can(Auth::user(), CrmPermission::MarksPublish), 403);
 
         $this->validate([
             'declarationDate' => 'required|date',
@@ -141,7 +140,7 @@ class TestMarksReviewPage extends Page
     public function issueMarksheets(ResultDeclarationService $declarations): void
     {
         abort_unless(FeatureGate::enabled(LicenseFeature::Marksheets), 403);
-        abort_unless(Auth::user()?->hasRole(RoleName::SuperAdmin->value), 403);
+        abort_unless(CrmAccess::can(Auth::user(), CrmPermission::MarksPublish), 403);
 
         $this->validate([
             'marksheetIssueDate' => 'required|date',
@@ -187,7 +186,7 @@ class TestMarksReviewPage extends Page
     public function regenerateMarksheets(ResultDeclarationService $declarations): void
     {
         abort_unless(FeatureGate::enabled(LicenseFeature::Marksheets), 403);
-        abort_unless(Auth::user()?->hasRole(RoleName::SuperAdmin->value), 403);
+        abort_unless(CrmAccess::can(Auth::user(), CrmPermission::MarksPublish), 403);
 
         $this->validate([
             'marksheetIssueDate' => 'required|date',
@@ -246,7 +245,7 @@ class TestMarksReviewPage extends Page
 
     public function unpublishResults(ResultDeclarationService $declarations): void
     {
-        abort_unless(Auth::user()?->hasRole(RoleName::SuperAdmin->value), 403);
+        abort_unless(CrmAccess::can(Auth::user(), CrmPermission::MarksPublish), 403);
 
         if (blank($this->groupKey)) {
             Notification::make()->title('Test not found')->warning()->send();
@@ -273,7 +272,7 @@ class TestMarksReviewPage extends Page
 
     public function lockMarks(ResultDeclarationService $declarations): void
     {
-        abort_unless(Auth::user()?->hasRole(RoleName::SuperAdmin->value), 403);
+        abort_unless(CrmAccess::can(Auth::user(), CrmPermission::MarksPublish), 403);
 
         if (blank($this->groupKey)) {
             return;
@@ -294,7 +293,7 @@ class TestMarksReviewPage extends Page
 
     public function unlockMarks(ResultDeclarationService $declarations): void
     {
-        abort_unless(Auth::user()?->hasRole(RoleName::SuperAdmin->value), 403);
+        abort_unless(CrmAccess::can(Auth::user(), CrmPermission::MarksPublish), 403);
 
         if (blank($this->groupKey)) {
             return;
@@ -457,12 +456,12 @@ class TestMarksReviewPage extends Page
                         && CrmAccess::can(Auth::user(), CrmPermission::WhatsappCampaigns),
                     'resultStatus' => $this->resultStatus(),
                     'canPublish' => FeatureGate::enabled(LicenseFeature::Results)
-                        && CrmAccess::can(Auth::user(), CrmPermission::MarksImport)
+                        && CrmAccess::can(Auth::user(), CrmPermission::MarksPublish)
                         && $this->examWindowAllowsPublish(),
                     'examWindowStatus' => $this->examWindowStatus(),
                     'canIssueMarksheet' => FeatureGate::enabled(LicenseFeature::Marksheets)
-                        && (Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false),
-                    'canManagePublish' => Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false,
+                        && CrmAccess::can(Auth::user(), CrmPermission::MarksPublish),
+                    'canManagePublish' => CrmAccess::can(Auth::user(), CrmPermission::MarksPublish),
                     'marksAreLocked' => $this->marksAreLocked(),
                     'auditTrailEntries' => $this->auditTrailEntries(),
                     'studentMarksheets' => $this->studentMarksheetsByStudentId(),

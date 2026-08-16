@@ -132,7 +132,8 @@ class CrmNavigation
 
         $jobs = CrmAccess::jobRoleNamesFor($user);
         $counsellor = in_array(StaffJobRole::Counsellor->value, $jobs, true);
-        $academic = in_array(StaffJobRole::AcademicCoordinator->value, $jobs, true);
+        $academic = in_array(StaffJobRole::AcademicCoordinator->value, $jobs, true)
+            || in_array(StaffJobRole::Teacher->value, $jobs, true);
         $finance = in_array(StaffJobRole::Accountant->value, $jobs, true)
             || in_array(StaffJobRole::FeeAdjuster->value, $jobs, true);
 

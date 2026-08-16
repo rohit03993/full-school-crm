@@ -262,12 +262,22 @@ Full API notes: `docs/PAL_DIGITAL_WASERVICE_INTEGRATION.md`
 
 ### G. Staff & roles
 
-| Role | Typical user |
-|------|--------------|
-| **Super Admin** | Owner, principal — full access + Setup menus |
-| **Staff** | Counsellors, accountants — day-to-day CRM |
+| Role | What they do |
+|------|----------------|
+| **Super Admin** | Owner vault only for serious controls: create/deactivate staff, Setup & settings, **approve** fee waive/discount requests, All cases, audit, backups, WhatsApp API credentials. Still has full access as override. |
+| **Counsellor** | Assigned leads, call queue, log calls, follow-ups, own cases |
+| **Admission officer** | Enquiries, admissions approve, student edit/import, campus visits |
+| **Accountant** | Collect fees, receipts, fee reports (view + download) |
+| **Fee adjuster** | Adjust fee plan/discounts; **request** waive (admin approves) |
+| **Academic coordinator** | Courses/batches, create exams, attendance, marks upload & publish, homework |
+| **Teacher / Faculty** | Own assigned classes: attendance, homework submit, marks entry (no publish/setup) |
+| **Messaging** | WhatsApp campaigns, inbox, templates, live sends (not API/settings) |
 
-**Setup → Staff** (or Staff resource in admin) — create users and assign roles.
+Assign **one or more** job roles on a staff user; permissions combine (union). Deactivate with **Active → off** (do not delete).
+
+**Admin → Staff** — Super Admin creates users and assigns roles.
+
+After deploy or role changes, run `php artisan crm:sync-permissions` (or your install’s permission sync command) so new roles/permissions exist in the database.
 
 ---
 

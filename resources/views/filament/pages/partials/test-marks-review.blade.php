@@ -29,11 +29,11 @@
                 <div class="rounded-xl border border-sky-200 bg-sky-50/50 p-4 dark:border-sky-500/20 dark:bg-sky-500/5 sm:col-span-2">
                     <p class="text-sm font-semibold text-sky-900 dark:text-sky-200">Marks locked</p>
                     <p class="mt-1 text-xs text-sky-800 dark:text-sky-300">
-                        Marks were frozen when results were published. Teachers cannot re-import or edit until Super Admin unlocks.
+                        Marks were frozen when results were published. Teachers cannot re-import or edit until someone with publish rights unlocks.
                     </p>
                     @if ($canManagePublish ?? false)
                         <button type="button" wire:click="unlockMarks" wire:confirm="Unlock marks so teachers can edit? Re-publish after corrections." class="mt-3 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500">
-                            Unlock marks (Super Admin)
+                            Unlock marks
                         </button>
                     @endif
                 </div>
@@ -135,7 +135,7 @@
             @if (($canIssueMarksheet ?? false) && ($status['status'] ?? '') === 'published')
                 <div class="rounded-xl border border-gray-200 p-4 dark:border-white/10">
                     <p class="text-sm font-semibold text-gray-950 dark:text-white">2. Issue marksheets (PDF)</p>
-                    <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Super Admin only — generates printable marksheets with rank, attendance, and remarks per Institute Settings.</p>
+                    <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Generates printable marksheets with rank, attendance, and remarks per Institute Settings (Academic coordinator or Super Admin).</p>
                     <div class="mt-3">
                         <x-crm.field label="Issue date" for="issue-date">
                             <input id="issue-date" type="date" wire:model="marksheetIssueDate" class="fi-input block w-full rounded-lg border-gray-300 text-sm dark:border-white/10 dark:bg-white/5" />

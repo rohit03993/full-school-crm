@@ -107,9 +107,9 @@ Every management system below lists:
 |--|--|
 | **Key** | none (always on) |
 | **Status** | Complete enough for production |
-| **Includes** | Login, Super Admin, staff (`StaffResource`), `CrmPermission`, Setup wizard, Terminology, Custom fields, Institute settings, Audit, Backups, license expiry page; vendor license UI on Platform panel |
+| **Includes** | Login, Super Admin vault (staff accounts, Setup, waive approval, All cases, audit, backups), staff job roles (`StaffResource`, `CrmPermission`, `StaffRolePermissions`), Setup wizard, Terminology, Custom fields, Institute settings; vendor license UI on Platform panel |
 | **Omit** | Multi-tenant shared DB (V1) |
-| **Edit** | Document Super Admin–only Setup screens |
+| **Edit** | Document Super Admin–only vault vs staff job roles (Teacher, Academic publish, Messaging ops, ReportsExport) |
 | **Add** | Optional school-facing “Modules enabled” read-only summary |
 
 ## 2. Students Management System

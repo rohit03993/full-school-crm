@@ -43,8 +43,16 @@ class CrmStaffRolesTest extends TestCase
         $this->assertTrue($user->canCrm(CrmPermission::FeesCollect));
         $this->assertTrue($user->canCrm(CrmPermission::FeesAdjustStructure));
         $this->assertTrue($user->canCrm(CrmPermission::AttendanceMark));
+        $this->assertTrue($user->canCrm(CrmPermission::AcademicsManage));
+        $this->assertTrue($user->canCrm(CrmPermission::MarksPublish));
         $this->assertTrue($user->canCrm(CrmPermission::WhatsappCampaigns));
+        $this->assertTrue($user->canCrm(CrmPermission::WhatsappOps));
+        $this->assertTrue($user->canCrm(CrmPermission::ReportsExport));
         $this->assertFalse($user->canCrm(CrmPermission::SettingsManage));
+        $this->assertFalse($user->canCrm(CrmPermission::StaffManage));
+        $this->assertFalse($user->canCrm(CrmPermission::WhatsappSettings));
+        $this->assertFalse($user->canCrm(CrmPermission::MetaWhatsappSettings));
+        $this->assertFalse($user->canCrm(CrmPermission::CasesViewAll));
     }
 
     public function test_super_admin_bypasses_all_permission_checks(): void
@@ -79,6 +87,7 @@ class CrmStaffRolesTest extends TestCase
         $user->assignRole(StaffJobRole::Accountant->value);
 
         $this->assertTrue($user->canCrm(CrmPermission::FeesCollect));
+        $this->assertTrue($user->canCrm(CrmPermission::ReportsExport));
         $this->assertTrue($user->can('create', \App\Models\Payment::class));
         $this->assertFalse($user->canCrm(CrmPermission::FeesAdjustStructure));
     }
@@ -90,10 +99,13 @@ class CrmStaffRolesTest extends TestCase
 
         $this->assertTrue($user->canCrm(CrmPermission::FeesAdjustStructure));
         $this->assertTrue($user->canCrm(CrmPermission::FeesWaivePenalty));
+        $this->assertTrue($user->canCrm(CrmPermission::ReportsExport));
         $this->assertTrue(\App\Support\CrmAccess::canViewFees($user));
         $this->assertTrue($user->can('update', new \App\Models\Payment));
         $this->assertFalse($user->canCrm(CrmPermission::FeesCollect));
         $this->assertFalse($user->can('create', \App\Models\Payment::class));
+        $this->actingAs($user);
+        $this->assertFalse(\App\Filament\Pages\MiscChargeAdjustmentRequestsPage::canAccess());
     }
 
     public function test_accountant_plus_fee_adjuster_can_collect_and_adjust(): void
@@ -170,9 +182,29 @@ class CrmStaffRolesTest extends TestCase
         $this->actingAs($user);
 
         $this->assertTrue($user->canCrm(CrmPermission::MarksImport));
+        $this->assertTrue($user->canCrm(CrmPermission::MarksPublish));
+        $this->assertTrue($user->canCrm(CrmPermission::AcademicsManage));
         $this->assertFalse($user->canCrm(CrmPermission::WhatsappCampaigns));
         $this->assertTrue(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::canAccess());
+        $this->assertTrue(\App\Filament\Pages\CreateExamWindowPage::canAccess());
         $this->assertFalse(\App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource::canAccess());
+    }
+
+    public function test_teacher_can_enter_marks_but_not_publish_or_manage_academics(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole(StaffJobRole::Teacher->value);
+
+        $this->actingAs($user);
+
+        $this->assertTrue($user->canCrm(CrmPermission::StudentsView));
+        $this->assertTrue($user->canCrm(CrmPermission::AttendanceMark));
+        $this->assertTrue($user->canCrm(CrmPermission::MarksImport));
+        $this->assertFalse($user->canCrm(CrmPermission::MarksPublish));
+        $this->assertFalse($user->canCrm(CrmPermission::AcademicsManage));
+        $this->assertFalse($user->canCrm(CrmPermission::HomeworkManage));
+        $this->assertFalse(\App\Filament\Pages\CreateExamWindowPage::canAccess());
+        $this->assertTrue(\App\Filament\Pages\AttendancePage::canAccess());
     }
 
     public function test_messaging_coordinator_can_send_whatsapp_not_enter_marks(): void
@@ -183,9 +215,38 @@ class CrmStaffRolesTest extends TestCase
         $this->actingAs($user);
 
         $this->assertTrue($user->canCrm(CrmPermission::WhatsappCampaigns));
+        $this->assertTrue($user->canCrm(CrmPermission::WhatsappOps));
+        $this->assertFalse($user->canCrm(CrmPermission::HomeworkManage));
         $this->assertFalse($user->canCrm(CrmPermission::MarksImport));
+        $this->assertFalse($user->canCrm(CrmPermission::MetaWhatsappSettings));
+        $this->assertFalse($user->canCrm(CrmPermission::WhatsappSettings));
         $this->assertFalse(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::canAccess());
         $this->assertTrue(\App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource::canAccess());
+        $this->assertTrue(\App\Filament\Pages\WhatsAppInboxPage::canAccess());
+        $this->assertTrue(\App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource::canAccess());
+        $this->assertFalse(\App\Filament\Pages\ManageMetaWhatsAppSettings::canAccess());
+        $this->assertFalse(\App\Filament\Pages\ManageWhatsAppSettings::canAccess());
+    }
+
+    public function test_super_admin_keeps_vault_pages_staff_cannot(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $this->actingAs($admin);
+
+        $this->assertTrue(\App\Filament\Pages\MiscChargeAdjustmentRequestsPage::canAccess());
+        $this->assertTrue(\App\Filament\Pages\SetupHubPage::canAccess());
+        $this->assertTrue(\App\Filament\Pages\AllCasesPage::canAccess());
+        $this->assertTrue(\App\Filament\Resources\Staff\StaffResource::canAccess());
+
+        $staff = User::factory()->create(['is_active' => true]);
+        $staff->syncRoles(StaffJobRole::values());
+        $this->actingAs($staff);
+
+        $this->assertFalse(\App\Filament\Pages\MiscChargeAdjustmentRequestsPage::canAccess());
+        $this->assertFalse(\App\Filament\Pages\SetupHubPage::canAccess());
+        $this->assertFalse(\App\Filament\Pages\AllCasesPage::canAccess());
+        $this->assertFalse(\App\Filament\Resources\Staff\StaffResource::canAccess());
     }
 
     public function test_every_job_role_can_access_my_work_and_own_cases(): void

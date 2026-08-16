@@ -37,10 +37,12 @@ enum CrmPermission: string
     case AttendanceMark = 'crm.attendance.mark';
     case AttendanceWorkshops = 'crm.attendance.workshops';
     case MarksImport = 'crm.marks.import';
+    case MarksPublish = 'crm.marks.publish';
     case HomeworkManage = 'crm.homework.manage';
     case AcademicsManage = 'crm.academics.manage';
 
     case WhatsappCampaigns = 'crm.whatsapp.campaigns';
+    case WhatsappOps = 'crm.whatsapp.ops';
     case WhatsappSettings = 'crm.whatsapp.settings';
     case MetaWhatsappSettings = 'crm.meta_whatsapp.settings';
 
@@ -79,9 +81,11 @@ enum CrmPermission: string
             self::AttendanceMark => 'Mark batch attendance',
             self::AttendanceWorkshops => 'Workshop / event attendance',
             self::MarksImport => 'Import marks',
+            self::MarksPublish => 'Publish marks to parents',
             self::HomeworkManage => 'Assign homework & view tracking',
             self::AcademicsManage => 'Manage courses, batches, exam types',
             self::WhatsappCampaigns => 'WhatsApp campaigns',
+            self::WhatsappOps => 'WhatsApp inbox, templates & live campaigns',
             self::WhatsappSettings => 'WhatsApp settings',
             self::MetaWhatsappSettings => 'Meta WhatsApp settings',
             self::ReportsView => 'View reports',

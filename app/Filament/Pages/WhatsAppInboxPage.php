@@ -29,7 +29,7 @@ class WhatsAppInboxPage extends Page
 
     protected static function requiredCrmPermission(): CrmPermission
     {
-        return CrmPermission::MetaWhatsappSettings;
+        return CrmPermission::WhatsappOps;
     }
 
     protected static function requiredLicenseFeature(): ?LicenseFeature
