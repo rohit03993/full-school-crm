@@ -26,6 +26,8 @@ class PublicEnquiryTest extends TestCase
             'status' => CourseStatus::Active,
         ]);
 
+        $this->createBatchForCourse($course);
+
         $response = $this->post(route('contact.enquiry'), [
             'name' => 'Rahul Sharma',
             'father_name' => 'Mr Sharma',
@@ -64,6 +66,8 @@ class PublicEnquiryTest extends TestCase
             'fee' => 0,
             'status' => CourseStatus::Active,
         ]);
+
+        $this->createBatchForCourse($course);
 
         $payload = [
             'name' => 'Priya Singh',
@@ -121,6 +125,8 @@ class PublicEnquiryTest extends TestCase
             'status' => CourseStatus::Active,
             'show_on_website' => true,
         ]);
+
+        $this->createBatchForCourse($course);
 
         $existing = Student::query()->create([
             'name' => 'Existing Student',

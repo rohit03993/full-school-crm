@@ -6,6 +6,7 @@ use App\Filament\Pages\StudentProfilePage;
 use App\Filament\Resources\Enquiries\EnquiryResource;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
+use App\Filament\Widgets\Concerns\UsesDashboardFilters;
 use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
 use App\Services\CrmDashboardService;
 use App\Support\CrmAccess;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Auth;
 
 class RecentEnquiriesWidget extends Widget
 {
+    use UsesDashboardFilters;
     use VisibleToSuperAdminOnly;
 
     public static function canView(): bool
@@ -37,7 +39,7 @@ class RecentEnquiriesWidget extends Widget
      */
     protected function getViewData(): array
     {
-        $enquiries = app(CrmDashboardService::class)->recentEnquiries();
+        $enquiries = app(CrmDashboardService::class)->recentEnquiries(5, $this->dashboardFilters());
 
         return [
             'enquiries' => $enquiries,

@@ -10,6 +10,7 @@ use App\Models\Enrollment;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\AttendanceService;
+use App\Support\CrmCacheInvalidator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -176,6 +177,10 @@ class ManualBatchAttendanceService
                 $stats['saved']++;
             }
         });
+
+        if ($stats['saved'] > 0) {
+            CrmCacheInvalidator::afterAttendanceChange();
+        }
 
         return $stats;
     }

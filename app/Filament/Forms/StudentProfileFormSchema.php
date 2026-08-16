@@ -8,6 +8,7 @@ use App\Enums\Gender;
 use App\Enums\RoleName;
 use App\Enums\StudentCategory;
 use App\Models\Admission;
+use App\Models\Course;
 use App\Models\Enrollment;
 use App\Support\BatchSelectOptions;
 use App\Services\CustomFieldService;
@@ -88,7 +89,7 @@ class StudentProfileFormSchema
                 ->schema([
                     Select::make('course_id')
                         ->label('Course')
-                        ->options(InstituteProfile::activeCourseOptions())
+                        ->options(self::courseOptionsIncludingCurrent($enrollment->course_id))
                         ->default($enrollment->course_id)
                         ->required()
                         ->searchable()
@@ -182,6 +183,30 @@ class StudentProfileFormSchema
     protected static function batchOptions(int $courseId, ?int $sessionId): array
     {
         return BatchSelectOptions::forCourse($courseId, $sessionId);
+    }
+
+    /**
+     * The catalog only offers courses that still have sections. A student already
+     * enrolled on a course whose sections were cleared must still be editable,
+     * so their current course stays in the list.
+     *
+     * @return array<int, string>
+     */
+    protected static function courseOptionsIncludingCurrent(?int $currentCourseId): array
+    {
+        $options = InstituteProfile::activeCourseOptions();
+
+        if ($currentCourseId === null || array_key_exists($currentCourseId, $options)) {
+            return $options;
+        }
+
+        $current = Course::query()->find($currentCourseId);
+
+        if ($current === null) {
+            return $options;
+        }
+
+        return [$currentCourseId => $current->name] + $options;
     }
 
     protected static function documentUpload(string $name, string $label, bool $imageOnly = false): FileUpload

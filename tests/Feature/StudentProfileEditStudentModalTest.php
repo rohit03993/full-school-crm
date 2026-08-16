@@ -76,6 +76,8 @@ class StudentProfileEditStudentModalTest extends TestCase
             'status' => CourseStatus::Active,
         ]);
 
+        $this->createBatchForCourse($course);
+
         $student = Student::query()->create([
             'name' => 'Aman sharma',
             'father_name' => 'varun',

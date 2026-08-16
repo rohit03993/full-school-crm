@@ -5,21 +5,30 @@ namespace App\Filament\Widgets;
 use App\Filament\Pages\AttendanceHubPage;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
-use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
+use App\Filament\Widgets\Concerns\UsesDashboardFilters;
 use App\Services\CrmDashboardService;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
+use App\Support\InstituteTerminology;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Facades\Auth;
 
 class BatchOverviewWidget extends Widget
 {
-    use VisibleToSuperAdminOnly;
+    use UsesDashboardFilters;
 
+    /**
+     * Academic staff run attendance day to day, so they get this board too —
+     * money columns stay behind the fee permission.
+     */
     public static function canView(): bool
     {
         return FeatureGate::anyEnabled(LicenseFeature::Attendance, LicenseFeature::Fees)
-            && CrmAccess::can(Auth::user(), CrmPermission::DashboardOwnerStats);
+            && CrmAccess::canAny(
+                Auth::user(),
+                CrmPermission::DashboardOwnerStats,
+                CrmPermission::AttendanceMark,
+            );
     }
 
     protected static ?int $sort = -8;
@@ -33,13 +42,16 @@ class BatchOverviewWidget extends Widget
      */
     protected function getViewData(): array
     {
-        $overview = app(CrmDashboardService::class)->batchOverview();
+        $filters = $this->dashboardFilters();
+        $user = Auth::user();
 
         return [
-            'overview' => $overview,
-            'attendanceUrl' => AttendanceHubPage::getUrl(),
+            'overview' => app(CrmDashboardService::class)->batchOverview($filters),
+            'attendanceUrl' => AttendanceHubPage::canAccess() ? AttendanceHubPage::getUrl() : null,
             'showAttendance' => FeatureGate::enabled(LicenseFeature::Attendance),
-            'showFees' => FeatureGate::enabled(LicenseFeature::Fees),
+            'showFees' => FeatureGate::enabled(LicenseFeature::Fees) && CrmAccess::canViewFees($user),
+            'batchLabel' => InstituteTerminology::label('batch'),
+            'isToday' => $filters->isToday(),
         ];
     }
 }

@@ -15,6 +15,8 @@ use App\Models\Enquiry;
 use App\Models\Enrollment;
 use App\Models\FeeStructure;
 use App\Models\Payment;
+use App\Support\DashboardFilters;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -24,29 +26,53 @@ class CrmDashboardService
     protected const STATS_CACHE_SECONDS = 60;
 
     protected const CHART_CACHE_SECONDS = 120;
+
+    /**
+     * Bumped instead of forgetting individual keys, because filtered dashboards
+     * produce one cache entry per filter combination and the database cache
+     * store does not support tags.
+     */
+    protected const VERSION_CACHE_KEY = 'crm.dashboard.version';
+
     /**
      * @return array{
      *     total_enquiries: int,
      *     today_enquiries: int,
      *     website_today: int,
      *     walk_in_today: int,
+     *     range_enquiries: int,
+     *     range_website: int,
+     *     range_walk_in: int,
      *     admissions_this_month: int,
+     *     range_admissions: int,
      *     pending_admissions: int,
      *     active_students: int,
      *     fee_collection_today: float,
+     *     range_fee_collection: float,
      *     pending_fees_total: float,
      *     active_batches: int,
      *     attendance_present_today: int,
      *     attendance_marked_today: int,
-     *     attendance_students_in_batches: int
+     *     attendance_students_in_batches: int,
+     *     range_label: string,
+     *     as_of_label: string
      * }
      */
-    public function stats(): array
+    public function stats(?DashboardFilters $filters = null): array
     {
-        return Cache::remember('crm.dashboard.stats', self::STATS_CACHE_SECONDS, function (): array {
+        $filters ??= DashboardFilters::default();
+
+        return $this->remember($filters->cacheKey('stats'), self::STATS_CACHE_SECONDS, function () use ($filters): array {
             $today = today();
             $monthStart = now()->startOfMonth();
-            $attendance = $this->todayAttendanceTotals($today);
+            $from = $filters->from->toDateString();
+            $to = $filters->to->toDateString();
+            $attendance = $this->attendanceTotals($filters);
+
+            $enquiriesInRange = fn (): Builder => Enquiry::query()
+                ->whereDate('created_at', '>=', $from)
+                ->whereDate('created_at', '<=', $to)
+                ->when($filters->courseId, fn (Builder $query, int $courseId) => $query->where('course_id', $courseId));
 
             return [
                 'total_enquiries' => Enquiry::query()->count(),
@@ -59,9 +85,17 @@ class CrmDashboardService
                     ->whereDate('created_at', $today)
                     ->where('lead_source', LeadSource::WalkIn)
                     ->count(),
+                'range_enquiries' => $enquiriesInRange()->count(),
+                'range_website' => $enquiriesInRange()->where('lead_source', LeadSource::Website)->count(),
+                'range_walk_in' => $enquiriesInRange()->where('lead_source', LeadSource::WalkIn)->count(),
                 'admissions_this_month' => Admission::query()
                     ->where('status', AdmissionStatus::Approved)
                     ->where('approved_at', '>=', $monthStart)
+                    ->count(),
+                'range_admissions' => Admission::query()
+                    ->where('status', AdmissionStatus::Approved)
+                    ->whereDate('approved_at', '>=', $from)
+                    ->whereDate('approved_at', '<=', $to)
                     ->count(),
                 'pending_admissions' => Admission::query()
                     ->whereIn('status', [
@@ -69,21 +103,42 @@ class CrmDashboardService
                         AdmissionStatus::VerificationPending,
                     ])
                     ->count(),
-                'active_students' => Enrollment::query()
-                    ->where('is_active', true)
-                    ->where('status', EnrollmentStatus::Enrolled)
-                    ->count(),
+                'active_students' => $this->activeEnrollmentsQuery($filters)->count(),
                 'fee_collection_today' => (float) Payment::query()
                     ->whereDate('payment_date', $today)
                     ->sum('amount'),
-                'pending_fees_total' => (float) FeeStructure::query()->forActiveEnrollments()->sum('pending_amount'),
-                'active_batches' => Batch::query()
-                    ->where('status', BatchStatus::Active)
-                    ->count(),
+                'range_fee_collection' => (float) Payment::query()
+                    ->whereDate('payment_date', '>=', $from)
+                    ->whereDate('payment_date', '<=', $to)
+                    ->sum('amount'),
+                'pending_fees_total' => $this->pendingFeesTotal($filters),
+                'active_batches' => $this->batchQuery($filters)->count(),
                 'attendance_present_today' => $attendance['present'],
                 'attendance_marked_today' => $attendance['marked'],
                 'attendance_students_in_batches' => $attendance['students_in_batches'],
+                'range_label' => $filters->rangeLabel(),
+                'as_of_label' => $filters->asOfLabel(),
             ];
+        });
+    }
+
+    /**
+     * @return array{
+     *     collection_today: float,
+     *     collection_month: float,
+     *     pending_fees_total: float,
+     *     pending_penalties_total: float,
+     *     overdue_installment_count: int,
+     *     overdue_students_count: int,
+     *     overdue_amount: float
+     * }
+     */
+    public function feeSummary(?DashboardFilters $filters = null): array
+    {
+        $filters ??= DashboardFilters::default();
+
+        return $this->remember($filters->cacheKey('fee_summary'), self::STATS_CACHE_SECONDS, function () use ($filters): array {
+            return app(FeesDashboardService::class)->summary($filters->asOf());
         });
     }
 
@@ -112,68 +167,19 @@ class CrmDashboardService
      *     }
      * }
      */
-    public function batchOverview(): array
+    public function batchOverview(?DashboardFilters $filters = null): array
     {
-        return Cache::remember('crm.dashboard.batch_overview', self::STATS_CACHE_SECONDS, function (): array {
-            $today = today();
+        $filters ??= DashboardFilters::default();
 
-            $batches = Batch::query()
-                ->where('status', BatchStatus::Active)
+        return $this->remember($filters->cacheKey('batch_overview'), self::STATS_CACHE_SECONDS, function () use ($filters): array {
+            $asOf = $filters->asOf();
+
+            $batches = $this->batchQuery($filters)
                 ->with('course')
                 ->orderBy('name')
                 ->get();
 
-            if ($batches->isEmpty()) {
-                return [
-                    'date_label' => $today->format('d M Y'),
-                    'rows' => [],
-                    'totals' => [
-                        'students' => 0,
-                        'present_today' => 0,
-                        'absent_today' => 0,
-                        'leave_today' => 0,
-                        'marked_today' => 0,
-                        'not_marked_today' => 0,
-                        'pending_fees' => 0.0,
-                    ],
-                ];
-            }
-
-            $batchIds = $batches->pluck('id');
-
-            $studentCounts = BatchStudent::query()
-                ->whereIn('batch_id', $batchIds)
-                ->where('is_active', true)
-                ->selectRaw('batch_id, COUNT(*) as total')
-                ->groupBy('batch_id')
-                ->pluck('total', 'batch_id');
-
-            $attendanceByBatch = Attendance::query()
-                ->whereIn('batch_id', $batchIds)
-                ->whereDate('attendance_date', $today)
-                ->get()
-                ->groupBy('batch_id');
-
-            $studentsByBatch = BatchStudent::query()
-                ->whereIn('batch_id', $batchIds)
-                ->where('is_active', true)
-                ->get(['batch_id', 'student_id'])
-                ->groupBy('batch_id');
-
-            $studentIds = $studentsByBatch->flatten(1)->pluck('student_id')->unique()->values();
-
-            $pendingByStudent = $studentIds->isEmpty()
-                ? collect()
-                : FeeStructure::query()
-                    ->forActiveEnrollments()
-                    ->whereHas('enrollment', fn ($query) => $query->whereIn('student_id', $studentIds))
-                    ->with('enrollment:id,student_id')
-                    ->get(['id', 'enrollment_id', 'pending_amount'])
-                    ->groupBy(fn (FeeStructure $row): int => (int) $row->enrollment->student_id)
-                    ->map(fn ($group): float => round((float) $group->sum('pending_amount'), 2));
-
-            $rows = [];
-            $totals = [
+            $emptyTotals = [
                 'students' => 0,
                 'present_today' => 0,
                 'absent_today' => 0,
@@ -183,8 +189,38 @@ class CrmDashboardService
                 'pending_fees' => 0.0,
             ];
 
+            if ($batches->isEmpty()) {
+                return [
+                    'date_label' => $asOf->format('d M Y'),
+                    'rows' => [],
+                    'totals' => $emptyTotals,
+                ];
+            }
+
+            $batchIds = $batches->pluck('id');
+
+            $attendanceByBatch = Attendance::query()
+                ->whereIn('batch_id', $batchIds)
+                ->whereDate('attendance_date', $asOf)
+                ->get(['batch_id', 'status'])
+                ->groupBy('batch_id');
+
+            $studentsByBatch = BatchStudent::query()
+                ->whereIn('batch_id', $batchIds)
+                ->where('is_active', true)
+                ->get(['batch_id', 'student_id'])
+                ->groupBy('batch_id');
+
+            $studentIds = $studentsByBatch->flatten(1)->pluck('student_id')->unique()->values();
+            $pendingByStudent = $this->pendingFeesByStudent($studentIds);
+
+            $rows = [];
+            $totals = $emptyTotals;
+            $countedStudents = [];
+
             foreach ($batches as $batch) {
-                $students = (int) ($studentCounts[$batch->id] ?? 0);
+                $batchStudentIds = $studentsByBatch->get($batch->id, collect())->pluck('student_id');
+                $students = $batchStudentIds->count();
                 $markedRows = $attendanceByBatch->get($batch->id, collect());
                 $present = $markedRows->where('status', AttendanceStatus::Present)->count();
                 $absent = $markedRows->where('status', AttendanceStatus::Absent)->count();
@@ -192,7 +228,6 @@ class CrmDashboardService
                 $marked = $markedRows->count();
                 $notMarked = max(0, $students - $marked);
 
-                $batchStudentIds = $studentsByBatch->get($batch->id, collect())->pluck('student_id');
                 $pendingFees = round((float) $batchStudentIds->sum(
                     fn (int $studentId): float => (float) ($pendingByStudent[$studentId] ?? 0),
                 ), 2);
@@ -215,11 +250,22 @@ class CrmDashboardService
                 $totals['leave_today'] += $leave;
                 $totals['marked_today'] += $marked;
                 $totals['not_marked_today'] += $notMarked;
-                $totals['pending_fees'] = round($totals['pending_fees'] + $pendingFees, 2);
+
+                // A student can sit in more than one batch; count their pending fee once.
+                foreach ($batchStudentIds as $studentId) {
+                    if (isset($countedStudents[$studentId])) {
+                        continue;
+                    }
+
+                    $countedStudents[$studentId] = true;
+                    $totals['pending_fees'] += (float) ($pendingByStudent[$studentId] ?? 0);
+                }
             }
 
+            $totals['pending_fees'] = round($totals['pending_fees'], 2);
+
             return [
-                'date_label' => $today->format('d M Y'),
+                'date_label' => $asOf->format('d M Y'),
                 'rows' => $rows,
                 'totals' => $totals,
             ];
@@ -227,13 +273,75 @@ class CrmDashboardService
     }
 
     /**
+     * @return Builder<Batch>
+     */
+    protected function batchQuery(DashboardFilters $filters): Builder
+    {
+        return Batch::query()
+            ->where('status', BatchStatus::Active)
+            ->when($filters->sessionId, fn (Builder $query, int $sessionId) => $query->where(
+                fn (Builder $scoped) => $scoped
+                    ->where('academic_session_id', $sessionId)
+                    ->orWhereNull('academic_session_id'),
+            ))
+            ->when($filters->courseId, fn (Builder $query, int $courseId) => $query->where('course_id', $courseId))
+            ->when($filters->batchId, fn (Builder $query, int $batchId) => $query->whereKey($batchId));
+    }
+
+    /**
+     * @return Builder<Enrollment>
+     */
+    protected function activeEnrollmentsQuery(DashboardFilters $filters): Builder
+    {
+        return Enrollment::query()
+            ->where('is_active', true)
+            ->where('status', EnrollmentStatus::Enrolled)
+            ->when($filters->sessionId, fn (Builder $query, int $sessionId) => $query->where(
+                fn (Builder $scoped) => $scoped
+                    ->where('academic_session_id', $sessionId)
+                    ->orWhereNull('academic_session_id'),
+            ))
+            ->when($filters->courseId, fn (Builder $query, int $courseId) => $query->where('course_id', $courseId));
+    }
+
+    protected function pendingFeesTotal(DashboardFilters $filters): float
+    {
+        $enrollmentIds = $this->activeEnrollmentsQuery($filters)->pluck('id');
+
+        if ($enrollmentIds->isEmpty()) {
+            return 0.0;
+        }
+
+        return round((float) FeeStructure::query()
+            ->whereIn('enrollment_id', $enrollmentIds)
+            ->sum('pending_amount'), 2);
+    }
+
+    /**
+     * @param  Collection<int, int>  $studentIds
+     * @return Collection<int, float>
+     */
+    protected function pendingFeesByStudent(Collection $studentIds): Collection
+    {
+        if ($studentIds->isEmpty()) {
+            return collect();
+        }
+
+        return FeeStructure::query()
+            ->forActiveEnrollments()
+            ->whereHas('enrollment', fn ($query) => $query->whereIn('student_id', $studentIds))
+            ->with('enrollment:id,student_id')
+            ->get(['id', 'enrollment_id', 'pending_amount'])
+            ->groupBy(fn (FeeStructure $row): int => (int) $row->enrollment->student_id)
+            ->map(fn ($group): float => round((float) $group->sum('pending_amount'), 2));
+    }
+
+    /**
      * @return array{present: int, marked: int, students_in_batches: int}
      */
-    protected function todayAttendanceTotals(Carbon $today): array
+    protected function attendanceTotals(DashboardFilters $filters): array
     {
-        $batchIds = Batch::query()
-            ->where('status', BatchStatus::Active)
-            ->pluck('id');
+        $batchIds = $this->batchQuery($filters)->pluck('id');
 
         if ($batchIds->isEmpty()) {
             return ['present' => 0, 'marked' => 0, 'students_in_batches' => 0];
@@ -246,8 +354,8 @@ class CrmDashboardService
 
         $markedRows = Attendance::query()
             ->whereIn('batch_id', $batchIds)
-            ->whereDate('attendance_date', $today)
-            ->get();
+            ->whereDate('attendance_date', $filters->asOf())
+            ->get(['status']);
 
         return [
             'present' => $markedRows->where('status', AttendanceStatus::Present)->count(),
@@ -256,41 +364,42 @@ class CrmDashboardService
         ];
     }
 
-    public static function flushStatsCache(): void
+    protected static function cacheVersion(): int
     {
-        Cache::forget('crm.dashboard.stats');
+        return (int) Cache::get(self::VERSION_CACHE_KEY, 1);
     }
 
+    protected function remember(string $key, int $seconds, callable $callback): mixed
+    {
+        return Cache::remember($key.'.v'.self::cacheVersion(), $seconds, $callback);
+    }
+
+    public static function flushStatsCache(): void
+    {
+        self::flushAllCaches();
+    }
+
+    /**
+     * Every dashboard read is namespaced by a version counter, so bumping the
+     * counter retires all filtered variants at once.
+     */
     public static function flushAllCaches(): void
     {
-        self::flushStatsCache();
-
-        foreach ([5, 6, 7, 8, 9, 10, 11, 12] as $months) {
-            Cache::forget("crm.dashboard.monthly_admissions.{$months}");
-            Cache::forget("crm.dashboard.monthly_fees.{$months}");
-        }
-
-        Cache::forget('crm.dashboard.lead_sources');
-        Cache::forget('crm.dashboard.course_admissions');
-        Cache::forget('crm.dashboard.batch_overview');
-
-        foreach ([5, 10, 15, 20] as $limit) {
-            Cache::forget("crm.dashboard.recent_enquiries.{$limit}");
-            Cache::forget("crm.dashboard.pending_admissions.{$limit}");
-        }
+        Cache::forever(self::VERSION_CACHE_KEY, self::cacheVersion() + 1);
     }
 
     /**
      * @return array{labels: array<int, string>, data: array<int, int>}
      */
-    public function monthlyAdmissions(int $months = 6): array
+    public function monthlyAdmissions(?DashboardFilters $filters = null): array
     {
-        return Cache::remember("crm.dashboard.monthly_admissions.{$months}", self::CHART_CACHE_SECONDS, function () use ($months): array {
+        $filters ??= DashboardFilters::default();
+
+        return $this->remember($filters->cacheKey('monthly_admissions'), self::CHART_CACHE_SECONDS, function () use ($filters): array {
             $labels = [];
             $data = [];
 
-            for ($i = $months - 1; $i >= 0; $i--) {
-                $month = now()->subMonths($i);
+            foreach ($this->monthsForChart($filters) as $month) {
                 $labels[] = $month->format('M Y');
                 $data[] = Admission::query()
                     ->where('status', AdmissionStatus::Approved)
@@ -306,14 +415,15 @@ class CrmDashboardService
     /**
      * @return array{labels: array<int, string>, data: array<int, float>}
      */
-    public function monthlyFeeCollection(int $months = 6): array
+    public function monthlyFeeCollection(?DashboardFilters $filters = null): array
     {
-        return Cache::remember("crm.dashboard.monthly_fees.{$months}", self::CHART_CACHE_SECONDS, function () use ($months): array {
+        $filters ??= DashboardFilters::default();
+
+        return $this->remember($filters->cacheKey('monthly_fees'), self::CHART_CACHE_SECONDS, function () use ($filters): array {
             $labels = [];
             $data = [];
 
-            for ($i = $months - 1; $i >= 0; $i--) {
-                $month = now()->subMonths($i);
+            foreach ($this->monthsForChart($filters) as $month) {
                 $labels[] = $month->format('M Y');
                 $data[] = (float) Payment::query()
                     ->whereYear('payment_date', $month->year)
@@ -326,12 +436,36 @@ class CrmDashboardService
     }
 
     /**
+     * Charts always show at least six months of context so a one-day filter
+     * still produces a readable trend.
+     *
+     * @return list<Carbon>
+     */
+    protected function monthsForChart(DashboardFilters $filters): array
+    {
+        $months = max(6, $filters->monthsInRange());
+        $end = $filters->to->copy()->startOfMonth();
+        $series = [];
+
+        for ($i = $months - 1; $i >= 0; $i--) {
+            $series[] = $end->copy()->subMonths($i);
+        }
+
+        return $series;
+    }
+
+    /**
      * @return array{labels: array<int, string>, data: array<int, int>}
      */
-    public function leadSourceBreakdown(): array
+    public function leadSourceBreakdown(?DashboardFilters $filters = null): array
     {
-        return Cache::remember('crm.dashboard.lead_sources', self::CHART_CACHE_SECONDS, function (): array {
+        $filters ??= DashboardFilters::default();
+
+        return $this->remember($filters->cacheKey('lead_sources'), self::CHART_CACHE_SECONDS, function () use ($filters): array {
             $counts = Enquiry::query()
+                ->whereDate('created_at', '>=', $filters->from->toDateString())
+                ->whereDate('created_at', '<=', $filters->to->toDateString())
+                ->when($filters->courseId, fn (Builder $query, int $courseId) => $query->where('course_id', $courseId))
                 ->selectRaw('lead_source, COUNT(*) as total')
                 ->groupBy('lead_source')
                 ->pluck('total', 'lead_source');
@@ -357,13 +491,18 @@ class CrmDashboardService
     /**
      * @return array{labels: array<int, string>, data: array<int, int>}
      */
-    public function courseWiseAdmissions(): array
+    public function courseWiseAdmissions(?DashboardFilters $filters = null): array
     {
-        return Cache::remember('crm.dashboard.course_admissions', self::CHART_CACHE_SECONDS, function (): array {
+        $filters ??= DashboardFilters::default();
+
+        return $this->remember($filters->cacheKey('course_admissions'), self::CHART_CACHE_SECONDS, function () use ($filters): array {
             $rows = Admission::query()
                 ->where('admissions.status', AdmissionStatus::Approved)
+                ->whereDate('admissions.approved_at', '>=', $filters->from->toDateString())
+                ->whereDate('admissions.approved_at', '<=', $filters->to->toDateString())
                 ->join('enquiries', 'admissions.enquiry_id', '=', 'enquiries.id')
                 ->join('courses', 'enquiries.course_id', '=', 'courses.id')
+                ->when($filters->courseId, fn ($query, int $courseId) => $query->where('courses.id', $courseId))
                 ->selectRaw('courses.name as course_name, COUNT(*) as total')
                 ->groupBy('courses.name')
                 ->orderByDesc('total')
@@ -380,11 +519,14 @@ class CrmDashboardService
     /**
      * @return Collection<int, Enquiry>
      */
-    public function recentEnquiries(int $limit = 5): Collection
+    public function recentEnquiries(int $limit = 5, ?DashboardFilters $filters = null): Collection
     {
-        return Cache::remember("crm.dashboard.recent_enquiries.{$limit}", self::STATS_CACHE_SECONDS, function () use ($limit): Collection {
+        $filters ??= DashboardFilters::default();
+
+        return $this->remember($filters->cacheKey("recent_enquiries.{$limit}"), self::STATS_CACHE_SECONDS, function () use ($limit, $filters): Collection {
             return Enquiry::query()
                 ->with(['student', 'course'])
+                ->when($filters->courseId, fn (Builder $query, int $courseId) => $query->where('course_id', $courseId))
                 ->latest()
                 ->limit($limit)
                 ->get();
@@ -394,9 +536,11 @@ class CrmDashboardService
     /**
      * @return Collection<int, Admission>
      */
-    public function pendingAdmissions(int $limit = 5): Collection
+    public function pendingAdmissions(int $limit = 5, ?DashboardFilters $filters = null): Collection
     {
-        return Cache::remember("crm.dashboard.pending_admissions.{$limit}", self::STATS_CACHE_SECONDS, function () use ($limit): Collection {
+        $filters ??= DashboardFilters::default();
+
+        return $this->remember($filters->cacheKey("pending_admissions.{$limit}"), self::STATS_CACHE_SECONDS, function () use ($limit): Collection {
             return Admission::query()
                 ->whereIn('status', [
                     AdmissionStatus::Submitted,

@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Widgets\Concerns\InteractsWithDashboardCharts;
+use App\Filament\Widgets\Concerns\UsesDashboardFilters;
 use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Auth;
 class LeadSourceChartWidget extends ChartWidget
 {
     use InteractsWithDashboardCharts;
+    use UsesDashboardFilters;
     use VisibleToSuperAdminOnly;
 
     public static function canView(): bool
@@ -27,18 +29,21 @@ class LeadSourceChartWidget extends ChartWidget
 
     protected static ?int $sort = 7;
 
-    protected ?string $heading = 'Lead Sources';
-
-    protected ?string $description = 'All-time breakdown';
+    protected ?string $heading = 'Where leads came from';
 
     protected int | string | array $columnSpan = [
         'default' => 'full',
         'lg' => 1,
     ];
 
+    public function getDescription(): ?string
+    {
+        return $this->dashboardFilters()->rangeLabel();
+    }
+
     protected function getData(): array
     {
-        $chart = app(CrmDashboardService::class)->leadSourceBreakdown();
+        $chart = app(CrmDashboardService::class)->leadSourceBreakdown($this->dashboardFilters());
 
         return [
             'datasets' => [

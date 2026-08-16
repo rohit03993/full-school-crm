@@ -35,6 +35,11 @@ class CrmCacheInvalidator
         CrmDashboardService::flushAllCaches();
     }
 
+    public static function afterAttendanceChange(): void
+    {
+        CrmDashboardService::flushAllCaches();
+    }
+
     public static function afterVisitOrFollowUpChange(?int $assignedStaffUserId = null): void
     {
         CrmDashboardService::flushAllCaches();

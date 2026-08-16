@@ -11,6 +11,7 @@ use App\Enums\LeadSource;
 use App\Enums\PaymentMode;
 use App\Enums\PaymentShortfallAction;
 use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Enums\StudentCategory;
 use App\Enums\StudentStatus;
 use App\Models\AcademicSession;
@@ -692,9 +693,16 @@ class DemoDataSeeder extends Seeder
             ],
         );
 
-        if (! $user->hasRole(RoleName::Staff->value)) {
-            $user->assignRole(RoleName::Staff->value);
-        }
+        // This one login stands in for the whole front office while seeding, so it
+        // needs the job roles that cover admissions, fees, and academics.
+        $user->syncRoles([
+            RoleName::Staff->value,
+            StaffJobRole::Counsellor->value,
+            StaffJobRole::AdmissionOfficer->value,
+            StaffJobRole::Accountant->value,
+            StaffJobRole::FeeAdjuster->value,
+            StaffJobRole::AcademicCoordinator->value,
+        ]);
 
         return $user;
     }

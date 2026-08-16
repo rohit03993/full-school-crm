@@ -10,7 +10,7 @@ class CrmHint
 {
     /** @var array<string, string> */
     private const HINTS = [
-        'dashboard' => 'Owner overview — students, today’s attendance, fees by batch, leads, and admissions. Staff see Assigned to Call and calling stats here.',
+        'dashboard' => 'Set the session and period once — every number, chart, and batch row below follows those filters. Each role sees its own figures and shortcuts.',
         'setup.wizard' => 'Complete this once when you first log in. Enter your institute name, contact details, and preferred labels — everything saves automatically.',
         'setup.institute' => 'Pick school, coaching, or college. This controls programme types on the website and enquiry forms. Use the checklist below for remaining steps.',
         'setup.guide' => 'Step-by-step reference for Super Admin. Use the table below to find where to change each setting. Every screen also shows hints under the title.',

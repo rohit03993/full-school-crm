@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Widgets\Concerns\InteractsWithDashboardCharts;
+use App\Filament\Widgets\Concerns\UsesDashboardFilters;
 use App\Filament\Widgets\Concerns\VisibleToSuperAdminOnly;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Auth;
 class MonthlyAdmissionsChartWidget extends ChartWidget
 {
     use InteractsWithDashboardCharts;
+    use UsesDashboardFilters;
     use VisibleToSuperAdminOnly;
 
     public static function canView(): bool
@@ -27,18 +29,21 @@ class MonthlyAdmissionsChartWidget extends ChartWidget
 
     protected static ?int $sort = 5;
 
-    protected ?string $heading = 'Monthly Admissions';
-
-    protected ?string $description = 'Last 6 months';
+    protected ?string $heading = 'Admissions trend';
 
     protected int | string | array $columnSpan = [
         'default' => 'full',
         'lg' => 1,
     ];
 
+    public function getDescription(): ?string
+    {
+        return 'Month by month, ending '.$this->dashboardFilters()->to->format('M Y');
+    }
+
     protected function getData(): array
     {
-        $chart = app(CrmDashboardService::class)->monthlyAdmissions();
+        $chart = app(CrmDashboardService::class)->monthlyAdmissions($this->dashboardFilters());
 
         return [
             'datasets' => [

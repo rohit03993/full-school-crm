@@ -190,10 +190,14 @@ class MetaWhatsAppService
      */
     public static function sanitizeTemplateParamText(string $value): string
     {
-        $value = str_replace(["\r\n", "\r", "\n", "\t"], ' ', $value);
+        $value = str_replace(["\r\n", "\r"], "\n", $value);
+        $value = str_replace("\t", ' ', $value);
+
+        // A pipe keeps a multi-line list readable once it is folded onto one line.
+        $value = preg_replace('/ *\n+ */', ' | ', $value) ?? $value;
         $value = preg_replace('/ {5,}/', '    ', $value) ?? $value;
 
-        return trim($value);
+        return trim(trim($value), '| ');
     }
 
     /**

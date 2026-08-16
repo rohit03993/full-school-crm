@@ -6,6 +6,7 @@ use App\Models\AttendanceManualPunch;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\CrmCacheInvalidator;
 use Illuminate\Support\Facades\DB;
 
 class PunchAttendanceProcessor
@@ -227,6 +228,10 @@ class PunchAttendanceProcessor
         }
 
         $whatsapp = $this->whatsapp->outcomeForPunch($student, $roll, $date, $time, $state, $staff);
+
+        if ($synced) {
+            CrmCacheInvalidator::afterAttendanceChange();
+        }
 
         if ($synced && in_array($state, ['IN', 'OUT'], true)) {
             try {

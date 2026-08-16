@@ -8,6 +8,7 @@ use App\Models\Batch;
 use App\Models\BatchStudent;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\CrmCacheInvalidator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -98,6 +99,10 @@ class AttendanceService
                 );
             }
         });
+
+        if ($saved > 0) {
+            CrmCacheInvalidator::afterAttendanceChange();
+        }
 
         return $saved;
     }

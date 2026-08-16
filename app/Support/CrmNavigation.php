@@ -113,12 +113,13 @@ class CrmNavigation
             'calling' => in_array($group, [self::GROUP_ACADEMICS, self::GROUP_REPORTS, self::GROUP_WEBSITE], true),
             'academic' => in_array($group, [self::GROUP_LEADS, self::GROUP_CALLS, self::GROUP_WEBSITE], true),
             'finance' => in_array($group, [self::GROUP_LEADS, self::GROUP_CALLS, self::GROUP_ACADEMICS, self::GROUP_WEBSITE], true),
+            'messaging' => in_array($group, [self::GROUP_CALLS, self::GROUP_ACADEMICS, self::GROUP_REPORTS, self::GROUP_WEBSITE], true),
             default => $group === self::GROUP_WEBSITE,
         };
     }
 
     /**
-     * @return 'owner'|'calling'|'academic'|'finance'|'default'
+     * @return 'owner'|'calling'|'academic'|'finance'|'messaging'|'default'
      */
     public static function navRolePack(?User $user): string
     {
@@ -136,6 +137,7 @@ class CrmNavigation
             || in_array(StaffJobRole::Teacher->value, $jobs, true);
         $finance = in_array(StaffJobRole::Accountant->value, $jobs, true)
             || in_array(StaffJobRole::FeeAdjuster->value, $jobs, true);
+        $messaging = in_array(StaffJobRole::MessagingCoordinator->value, $jobs, true);
 
         if ($finance && ! $counsellor && ! $academic) {
             return 'finance';
@@ -147,6 +149,10 @@ class CrmNavigation
 
         if ($academic && ! $counsellor) {
             return 'academic';
+        }
+
+        if ($messaging && ! $counsellor && ! $academic && ! $finance) {
+            return 'messaging';
         }
 
         return 'default';

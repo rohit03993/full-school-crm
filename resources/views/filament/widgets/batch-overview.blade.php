@@ -1,8 +1,17 @@
+@php
+    $totals = $overview['totals'];
+    $coverage = $totals['students'] > 0
+        ? (int) round(($totals['marked_today'] / $totals['students']) * 100)
+        : 0;
+@endphp
+
 <x-filament-widgets::widget>
     <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
-            <div>
-                <h3 class="text-base font-bold text-gray-950 dark:text-white">Today by batch</h3>
+            <div class="min-w-0">
+                <h3 class="text-base font-bold text-gray-950 dark:text-white">
+                    {{ $isToday ? 'Today' : $overview['date_label'] }} by {{ strtolower($batchLabel) }}
+                </h3>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     @if ($showAttendance && $showFees)
                         Students, attendance, and pending fees — {{ $overview['date_label'] }}
@@ -13,7 +22,7 @@
                     @endif
                 </p>
             </div>
-            @if ($showAttendance)
+            @if ($showAttendance && $attendanceUrl)
                 <a
                     href="{{ $attendanceUrl }}"
                     wire:navigate
@@ -25,8 +34,25 @@
         </div>
 
         @if (($overview['rows'] ?? []) === [])
-            <p class="px-4 py-8 text-center text-sm text-gray-500 sm:px-6 dark:text-gray-400">No active batches. Create batches under Academics.</p>
+            <p class="px-4 py-8 text-center text-sm text-gray-500 sm:px-6 dark:text-gray-400">
+                No active {{ strtolower($batchLabel) }} matches these filters. Widen the session or clear the filters above.
+            </p>
         @else
+            @if ($showAttendance)
+                <div class="border-b border-gray-100 px-4 py-3 dark:border-white/10 sm:px-6">
+                    <div class="flex items-center justify-between text-xs font-semibold text-gray-600 dark:text-gray-400">
+                        <span>Attendance marked</span>
+                        <span>{{ $totals['marked_today'] }} of {{ $totals['students'] }} · {{ $coverage }}%</span>
+                    </div>
+                    <div class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
+                        <div
+                            class="h-full rounded-full {{ $coverage >= 90 ? 'bg-emerald-500' : ($coverage > 0 ? 'bg-amber-500' : 'bg-gray-300') }}"
+                            style="width: {{ max(2, min(100, $coverage)) }}%"
+                        ></div>
+                    </div>
+                </div>
+            @endif
+
             {{-- Mobile: one card per batch — no sideways scroll --}}
             <div class="space-y-2 p-3 lg:hidden">
                 @foreach ($overview['rows'] as $row)
@@ -72,18 +98,23 @@
                 @endforeach
 
                 <div class="rounded-xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-gray-900">
-                    <p class="text-xs font-bold uppercase tracking-wide text-gray-500">All batches</p>
+                    <p class="text-xs font-bold uppercase tracking-wide text-gray-500">All {{ strtolower($batchLabel) }}</p>
                     <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold text-gray-950 dark:text-white">
-                        <span>{{ $overview['totals']['students'] }} students</span>
+                        <span>{{ $totals['students'] }} students</span>
                         @if ($showAttendance)
-                            <span class="text-emerald-700 dark:text-emerald-400">{{ $overview['totals']['present_today'] }} present</span>
-                            <span class="text-red-700 dark:text-red-400">{{ $overview['totals']['absent_today'] }} absent</span>
-                            <span>{{ $overview['totals']['not_marked_today'] }} open</span>
+                            <span class="text-emerald-700 dark:text-emerald-400">{{ $totals['present_today'] }} present</span>
+                            <span class="text-red-700 dark:text-red-400">{{ $totals['absent_today'] }} absent</span>
+                            <span>{{ $totals['not_marked_today'] }} open</span>
                         @endif
                         @if ($showFees)
-                            <span class="text-amber-700 dark:text-amber-400">₹{{ number_format((float) $overview['totals']['pending_fees'], 0) }} pending</span>
+                            <span class="text-amber-700 dark:text-amber-400">₹{{ number_format((float) $totals['pending_fees'], 0) }} pending</span>
                         @endif
                     </div>
+                    @if ($showFees)
+                        <p class="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                            Pending total counts each student once, even if they sit in more than one {{ strtolower($batchLabel) }}.
+                        </p>
+                    @endif
                 </div>
             </div>
 
@@ -92,7 +123,7 @@
                 <table class="w-full text-left text-sm">
                     <thead class="sticky top-0 z-10 bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
                         <tr>
-                            <th class="px-4 py-2.5">Batch</th>
+                            <th class="px-4 py-2.5">{{ $batchLabel }}</th>
                             <th class="px-4 py-2.5 text-center">Students</th>
                             @if ($showAttendance)
                                 <th class="px-4 py-2.5 text-center">Present</th>
@@ -134,15 +165,17 @@
                     </tbody>
                     <tfoot class="bg-gray-50 font-semibold text-gray-950 dark:bg-white/5 dark:text-white">
                         <tr>
-                            <td class="px-4 py-2.5">All batches</td>
-                            <td class="px-4 py-2.5 text-center">{{ $overview['totals']['students'] }}</td>
+                            <td class="px-4 py-2.5">All {{ strtolower($batchLabel) }}</td>
+                            <td class="px-4 py-2.5 text-center">{{ $totals['students'] }}</td>
                             @if ($showAttendance)
-                                <td class="px-4 py-2.5 text-center text-emerald-700 dark:text-emerald-400">{{ $overview['totals']['present_today'] }}</td>
-                                <td class="px-4 py-2.5 text-center text-red-700 dark:text-red-400">{{ $overview['totals']['absent_today'] }}</td>
-                                <td class="px-4 py-2.5 text-center">{{ $overview['totals']['not_marked_today'] }}</td>
+                                <td class="px-4 py-2.5 text-center text-emerald-700 dark:text-emerald-400">{{ $totals['present_today'] }}</td>
+                                <td class="px-4 py-2.5 text-center text-red-700 dark:text-red-400">{{ $totals['absent_today'] }}</td>
+                                <td class="px-4 py-2.5 text-center">{{ $totals['not_marked_today'] }}</td>
                             @endif
                             @if ($showFees)
-                                <td class="px-4 py-2.5 text-right text-amber-700 dark:text-amber-400">₹{{ number_format((float) $overview['totals']['pending_fees'], 0) }}</td>
+                                <td class="px-4 py-2.5 text-right text-amber-700 dark:text-amber-400" title="Each student counted once across batches">
+                                    ₹{{ number_format((float) $totals['pending_fees'], 0) }}
+                                </td>
                             @endif
                         </tr>
                     </tfoot>
