@@ -113,7 +113,7 @@ class DashboardAnalyticsWidget extends Widget
                 'show' => $canFees,
             ],
             [
-                'label' => 'Present today',
+                'label' => 'Students present',
                 'value' => (string) ($pulse['present_today'] ?? 0),
                 'sub' => ($pulse['active_students'] ?? 0).' active students',
                 'tone' => 'primary',
@@ -219,10 +219,19 @@ class DashboardAnalyticsWidget extends Widget
             $active = max(0, (int) ($pulse['active_students'] ?? 0));
             $present = max(0, (int) ($pulse['present_today'] ?? 0));
             $rows[] = [
-                'label' => 'Present vs active',
+                'label' => 'Students present',
                 'value' => $present.' / '.$active,
                 'pct' => $active > 0 ? (int) min(100, round(($present / $active) * 100)) : 0,
                 'tone' => 'primary',
+            ];
+
+            $staffTotal = max(0, (int) ($pulse['staff_total'] ?? 0));
+            $staffPresent = max(0, (int) ($pulse['staff_present_today'] ?? 0));
+            $rows[] = [
+                'label' => 'Staff present',
+                'value' => $staffPresent.' / '.$staffTotal,
+                'pct' => $staffTotal > 0 ? (int) min(100, round(($staffPresent / $staffTotal) * 100)) : 0,
+                'tone' => 'sky',
             ];
         }
 

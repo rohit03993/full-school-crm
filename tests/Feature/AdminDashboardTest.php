@@ -184,7 +184,8 @@ class AdminDashboardTest extends TestCase
         Livewire::test(DashboardTodayPulseWidget::class)
             ->assertSuccessful()
             ->assertSee('Today')
-            ->assertSee('New leads');
+            ->assertSee('New leads')
+            ->assertSee('Staff present');
     }
 
     public function test_owner_sees_hideable_analytics_panel(): void

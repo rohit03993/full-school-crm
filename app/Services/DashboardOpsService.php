@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AttendanceStatus;
 use App\Enums\CallStatus;
 use App\Enums\CrmPermission;
 use App\Enums\HomeworkAssignmentStatus;
@@ -10,6 +11,7 @@ use App\Enums\RoleName;
 use App\Models\Enquiry;
 use App\Models\HomeworkAssignment;
 use App\Models\Payment;
+use App\Models\StaffAttendance;
 use App\Models\StudentCall;
 use App\Models\User;
 use App\Support\CrmAccess;
@@ -124,6 +126,13 @@ class DashboardOpsService
      *     whatsapp_cost_today: float,
      *     fees_amount_today: float,
      *     fees_payments_today: int,
+     *     fees_amount_week: float,
+     *     range_admissions: int,
+     *     pending_admissions: int,
+     *     active_students: int,
+     *     present_today: int,
+     *     staff_present_today: int,
+     *     staff_total: int,
      *     as_of_label: string
      * }
      */
@@ -183,6 +192,19 @@ class DashboardOpsService
                     $feesAmount = 0.0;
                 }
 
+                $staffPresent = 0;
+                $staffTotal = 0;
+                if (FeatureGate::enabled(LicenseFeature::Attendance)) {
+                    $staffTotal = (int) User::query()
+                        ->where('is_active', true)
+                        ->whereHas('staffProfile', fn ($query) => $query->whereNotNull('employee_code'))
+                        ->count();
+                    $staffPresent = (int) StaffAttendance::query()
+                        ->whereDate('attendance_date', $today)
+                        ->where('status', AttendanceStatus::Present)
+                        ->count();
+                }
+
                 return [
                     'leads_today' => FeatureGate::enabled(LicenseFeature::Enquiries)
                         ? (int) ($stats['today_enquiries'] ?? 0)
@@ -205,6 +227,8 @@ class DashboardOpsService
                     'pending_admissions' => (int) ($stats['pending_admissions'] ?? 0),
                     'active_students' => (int) ($stats['active_students'] ?? 0),
                     'present_today' => (int) ($stats['attendance_present_today'] ?? 0),
+                    'staff_present_today' => $staffPresent,
+                    'staff_total' => $staffTotal,
                     'as_of_label' => $today->format('d M Y'),
                 ];
             },

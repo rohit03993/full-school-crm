@@ -146,7 +146,7 @@ class DashboardAttentionWidget extends Widget
                 'show' => FeatureGate::enabled(LicenseFeature::Cases),
             ],
             [
-                'label' => 'Attendance',
+                'label' => 'Student attendance',
                 'value' => (string) $data['attendance_unmarked'],
                 'meta' => $data['attendance_coverage_pct'].'% marked',
                 'tone' => $data['attendance_unmarked'] > 0 ? 'warning' : 'success',

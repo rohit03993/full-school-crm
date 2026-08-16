@@ -8,6 +8,7 @@ use App\Filament\Pages\CallReportPage;
 use App\Filament\Pages\CampusVisitsPage;
 use App\Filament\Pages\FeesDashboardPage;
 use App\Filament\Pages\HomeworkPage;
+use App\Filament\Pages\StaffAttendancePage;
 use App\Filament\Pages\WhatsAppAnalyticsPage;
 use App\Filament\Pages\WhatsAppInboxPage;
 use App\Filament\Resources\Enquiries\EnquiryResource;
@@ -166,6 +167,15 @@ class DashboardTodayPulseWidget extends Widget
                 'url' => $waUrl,
                 'show' => FeatureGate::enabled(LicenseFeature::WhatsApp)
                     && (WhatsAppAnalyticsPage::canAccess() || WhatsAppInboxPage::canAccess() || CrmAccess::can($user, CrmPermission::WhatsappOps)),
+            ],
+            [
+                'key' => 'staff',
+                'label' => 'Staff present',
+                'value' => (string) $data['staff_present_today'],
+                'meta' => 'of '.$data['staff_total'].' staff',
+                'tone' => 'success',
+                'url' => StaffAttendancePage::canAccess() ? StaffAttendancePage::getUrl() : null,
+                'show' => FeatureGate::enabled(LicenseFeature::Attendance) && StaffAttendancePage::canAccess(),
             ],
             [
                 'key' => 'fees',
