@@ -303,32 +303,70 @@ class AccountingLedgerService
     }
 
     /**
+     * @param  list<AccountingReferenceType>|null  $referenceTypes
      * @return Collection<int, AccountingJournalEntry>
      */
-    public function recentEntries(int $limit = 50, ?Carbon $from = null, ?Carbon $to = null, int $page = 1): Collection
-    {
+    public function recentEntries(
+        int $limit = 50,
+        ?Carbon $from = null,
+        ?Carbon $to = null,
+        int $page = 1,
+        ?array $referenceTypes = null,
+    ): Collection {
         $query = AccountingJournalEntry::query()
             ->with(['lines.account', 'postedBy'])
             ->orderByDesc('entry_date')
             ->orderByDesc('id');
 
-        if ($from) {
-            $query->whereDate('entry_date', '>=', $from->toDateString());
-        }
-
-        if ($to) {
-            $query->whereDate('entry_date', '<=', $to->toDateString());
-        }
+        $this->applyEntryFilters($query, $from, $to, $referenceTypes);
 
         return $query
             ->forPage(max(1, $page), max(1, $limit))
             ->get();
     }
 
-    public function countEntries(?Carbon $from = null, ?Carbon $to = null): int
+    /**
+     * @param  list<AccountingReferenceType>|null  $referenceTypes
+     */
+    public function countEntries(?Carbon $from = null, ?Carbon $to = null, ?array $referenceTypes = null): int
     {
         $query = AccountingJournalEntry::query();
+        $this->applyEntryFilters($query, $from, $to, $referenceTypes);
 
+        return (int) $query->count();
+    }
+
+    /**
+     * @return list<AccountingReferenceType>
+     */
+    public function referenceTypesForLedgerFilter(string $filter): array
+    {
+        return match ($filter) {
+            'collections' => [
+                AccountingReferenceType::Payment,
+                AccountingReferenceType::PaymentCancellation,
+            ],
+            'late_fees' => [
+                AccountingReferenceType::FeePenalty,
+                AccountingReferenceType::FeeMiscCharge,
+            ],
+            'cancels' => [
+                AccountingReferenceType::PaymentCancellation,
+            ],
+            default => [],
+        };
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<AccountingJournalEntry>  $query
+     * @param  list<AccountingReferenceType>|null  $referenceTypes
+     */
+    protected function applyEntryFilters(
+        \Illuminate\Database\Eloquent\Builder $query,
+        ?Carbon $from,
+        ?Carbon $to,
+        ?array $referenceTypes,
+    ): void {
         if ($from) {
             $query->whereDate('entry_date', '>=', $from->toDateString());
         }
@@ -337,7 +375,9 @@ class AccountingLedgerService
             $query->whereDate('entry_date', '<=', $to->toDateString());
         }
 
-        return (int) $query->count();
+        if ($referenceTypes !== null && $referenceTypes !== []) {
+            $query->whereIn('reference_type', $referenceTypes);
+        }
     }
 
     /**
@@ -386,8 +426,8 @@ class AccountingLedgerService
                 ['label' => 'Bank / UPI', 'amount' => $bankCollected],
             ])->filter(fn (array $row): bool => $row['amount'] > 0)->values(),
             'income_rows' => collect([
-                ['label' => 'Tuition fees', 'amount' => $tuitionIncome],
-                ['label' => 'Late fees', 'amount' => $lateFeeIncome],
+                ['label' => 'Tuition fees (collected)', 'amount' => $tuitionIncome],
+                ['label' => 'Late fees accrued (not cash)', 'amount' => $lateFeeIncome],
             ])->filter(fn (array $row): bool => $row['amount'] > 0)->values(),
         ];
     }

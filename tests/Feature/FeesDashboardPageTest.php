@@ -88,7 +88,11 @@ class FeesDashboardPageTest extends TestCase
             ->assertSet('activeTab', 'overview')
             ->call('setActiveTab', 'ledger')
             ->assertSet('activeTab', 'ledger')
-            ->assertSet('ledgerSummary.total_collected', 0.0);
+            ->assertSet('ledgerEntryFilter', 'collections')
+            ->assertSet('ledgerSummary.total_collected', 0.0)
+            ->call('setLedgerEntryFilter', 'late_fees')
+            ->assertSet('ledgerEntryFilter', 'late_fees')
+            ->assertSet('ledgerEntriesPage', 1);
     }
 
     public function test_fees_page_opens_ledger_tab_from_query_string(): void

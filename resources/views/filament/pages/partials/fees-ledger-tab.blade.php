@@ -99,13 +99,25 @@
                         <tbody class="divide-y divide-gray-100 dark:divide-white/10">
                             @foreach ($ledgerSummary['income_rows'] as $row)
                                 <tr>
-                                    <td class="crm-responsive-table__title px-4 py-3 font-medium text-gray-950 dark:text-white sm:px-6" data-label="">{{ $row['label'] }}</td>
-                                    <td class="px-4 py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400" data-label="Amount">₹{{ number_format((float) $row['amount'], 2) }}</td>
+                                    <td class="crm-responsive-table__title px-4 py-3 font-medium text-gray-950 dark:text-white sm:px-6" data-label="">
+                                        {{ $row['label'] }}
+                                        @if (str_contains(strtolower($row['label']), 'late fee'))
+                                            <span class="mt-0.5 block text-[11px] font-normal text-amber-700 dark:text-amber-300">Booked as receivable — not money received yet</span>
+                                        @endif
+                                    </td>
+                                    <td @class([
+                                        'px-4 py-3 text-right font-semibold',
+                                        'text-amber-600 dark:text-amber-400' => str_contains(strtolower($row['label']), 'late fee'),
+                                        'text-emerald-600 dark:text-emerald-400' => ! str_contains(strtolower($row['label']), 'late fee'),
+                                    ]) data-label="Amount">₹{{ number_format((float) $row['amount'], 2) }}</td>
                                 </tr>
                             @endforeach
                             @if ((float) ($ledgerSummary['fees_receivable'] ?? 0) > 0)
                                 <tr>
-                                    <td class="crm-responsive-table__title px-4 py-3 font-medium text-gray-950 dark:text-white sm:px-6" data-label="">Fees receivable (outstanding)</td>
+                                    <td class="crm-responsive-table__title px-4 py-3 font-medium text-gray-950 dark:text-white sm:px-6" data-label="">
+                                        Fees receivable (outstanding)
+                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">Still to collect — includes tuition + accrued late fees</span>
+                                    </td>
                                     <td class="px-4 py-3 text-right font-semibold text-amber-600 dark:text-amber-400" data-label="Amount">₹{{ number_format((float) $ledgerSummary['fees_receivable'], 2) }}</td>
                                 </tr>
                             @endif
@@ -118,25 +130,69 @@
 
     <div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
         <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
-            <h2 class="text-base font-semibold text-gray-950 dark:text-white">Recent journal entries</h2>
-            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                Fee receipts show as credit (money received). Late-fee accruals show debit and credit.
-                @if (($ledgerEntriesTotal ?? 0) > 0)
-                    · {{ (int) $ledgerEntriesTotal }} entr{{ (int) $ledgerEntriesTotal === 1 ? 'y' : 'ies' }}
-                @endif
-            </p>
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-950 dark:text-white">Journal entries</h2>
+                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                        @if ($ledgerEntryFilter === 'collections')
+                            Money received and cancelled receipts. Late-fee accruals are hidden by default.
+                        @elseif ($ledgerEntryFilter === 'late_fees')
+                            Late fees booked as receivable — not cash collected.
+                        @elseif ($ledgerEntryFilter === 'cancels')
+                            Soft-cancelled receipts only.
+                        @else
+                            Full journal: collections, cancels, and late-fee accruals.
+                        @endif
+                        @if (($ledgerEntriesTotal ?? 0) > 0)
+                            · {{ (int) $ledgerEntriesTotal }} entr{{ (int) $ledgerEntriesTotal === 1 ? 'y' : 'ies' }}
+                        @endif
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    @foreach ($this->ledgerEntryFilterOptions() as $option)
+                        <button
+                            type="button"
+                            wire:click="setLedgerEntryFilter('{{ $option['key'] }}')"
+                            @class([
+                                'rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+                                'bg-primary-600 text-white shadow-sm' => $ledgerEntryFilter === $option['key'],
+                                'bg-white text-gray-700 ring-1 ring-gray-950/10 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/5' => $ledgerEntryFilter !== $option['key'],
+                            ])
+                            title="{{ $option['hint'] }}"
+                        >
+                            {{ $option['label'] }}
+                        </button>
+                    @endforeach
+                </div>
+            </div>
         </div>
         <div class="divide-y divide-gray-100 dark:divide-white/10">
             @forelse ($this->getPresentedEntries() as $presented)
-                @php($entry = $presented['entry'])
+                @php
+                    $entry = $presented['entry'];
+                    $isLateFee = in_array($entry->reference_type?->value, ['fee_penalty', 'fee_misc_charge'], true);
+                    $isCancel = $entry->reference_type?->value === 'payment_cancellation';
+                @endphp
                 <div class="px-4 py-4 sm:px-6">
                     <div class="flex flex-wrap items-start justify-between gap-2">
                         <div>
-                            <p class="font-semibold text-gray-950 dark:text-white">{{ $entry->description }}</p>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-semibold text-gray-950 dark:text-white">{{ $entry->description }}</p>
+                                @if ($isLateFee)
+                                    <span class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">Accrual</span>
+                                @elseif ($isCancel)
+                                    <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-800 dark:bg-red-500/15 dark:text-red-300">Cancelled</span>
+                                @else
+                                    <span class="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Collection</span>
+                                @endif
+                            </div>
                             <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                                 {{ $entry->entry_date?->format('d M Y') }}
                                 @if ($entry->postedBy)
                                     · {{ $entry->postedBy->name }}
+                                @endif
+                                @if ($isLateFee)
+                                    · Not cash — penalty booked as receivable
                                 @endif
                             </p>
                         </div>
@@ -182,7 +238,17 @@
                     </x-crm.responsive-table>
                 </div>
             @empty
-                <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">No entries in this period.</p>
+                <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">
+                    @if ($ledgerEntryFilter === 'collections')
+                        No fee collections or cancels in this period. Switch to Late fees to see accruals.
+                    @elseif ($ledgerEntryFilter === 'late_fees')
+                        No late-fee accruals in this period.
+                    @elseif ($ledgerEntryFilter === 'cancels')
+                        No cancelled receipts in this period.
+                    @else
+                        No entries in this period.
+                    @endif
+                </p>
             @endforelse
         </div>
         @if (($ledgerEntriesLastPage ?? 1) > 1)

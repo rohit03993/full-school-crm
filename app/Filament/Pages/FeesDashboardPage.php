@@ -70,6 +70,9 @@ class FeesDashboardPage extends Page
 
     public int $ledgerEntriesLastPage = 1;
 
+    /** @var 'all'|'collections'|'late_fees'|'cancels' */
+    public string $ledgerEntryFilter = 'collections';
+
     public ?string $fromDate = null;
 
     public ?string $toDate = null;
@@ -96,7 +99,7 @@ class FeesDashboardPage extends Page
     public function getSubheading(): ?string
     {
         return match ($this->activeTab) {
-            'ledger' => 'Collections journal for '.$this->periodLabel().'. Receipts show as credits (money received).',
+            'ledger' => 'Money received for '.$this->periodLabel().'. Late-fee accruals are bookkeeping only — use the filter below to show them.',
             default => 'Track collections, discounts, and overdue balances for '.$this->periodLabel().'.',
         };
     }
@@ -182,6 +185,17 @@ class FeesDashboardPage extends Page
         $this->ledgerEntriesPage = min($this->ledgerEntriesLastPage, $this->ledgerEntriesPage + 1);
     }
 
+    public function setLedgerEntryFilter(string $filter): void
+    {
+        if (! in_array($filter, ['all', 'collections', 'late_fees', 'cancels'], true)) {
+            return;
+        }
+
+        $this->ledgerEntryFilter = $filter;
+        $this->ledgerEntriesPage = 1;
+        $this->refreshLedger(app(AccountingLedgerService::class));
+    }
+
     protected function refreshData(FeesDashboardService $fees): void
     {
         $this->normalizeDates();
@@ -212,7 +226,12 @@ class FeesDashboardPage extends Page
         $summary['income_rows'] = collect($summary['income_rows'])->values()->all();
 
         $this->ledgerSummary = $summary;
-        $this->ledgerEntriesTotal = $ledger->countEntries($from->copy()->startOfDay(), $to->copy()->endOfDay());
+        $types = $this->ledgerReferenceTypes($ledger);
+        $this->ledgerEntriesTotal = $ledger->countEntries(
+            $from->copy()->startOfDay(),
+            $to->copy()->endOfDay(),
+            $types,
+        );
         $this->ledgerEntriesLastPage = max(1, (int) ceil($this->ledgerEntriesTotal / CrmPagination::PER_PAGE));
         $this->ledgerEntriesPage = min(max(1, $this->ledgerEntriesPage), $this->ledgerEntriesLastPage);
     }
@@ -232,7 +251,33 @@ class FeesDashboardPage extends Page
             $from->copy()->startOfDay(),
             $to->copy()->endOfDay(),
             $this->ledgerEntriesPage,
+            $this->ledgerReferenceTypes($ledger),
         ));
+    }
+
+    /**
+     * @return list<\App\Enums\AccountingReferenceType>|null
+     */
+    protected function ledgerReferenceTypes(AccountingLedgerService $ledger): ?array
+    {
+        if ($this->ledgerEntryFilter === 'all') {
+            return null;
+        }
+
+        return $ledger->referenceTypesForLedgerFilter($this->ledgerEntryFilter);
+    }
+
+    /**
+     * @return list<array{key: string, label: string, hint: string}>
+     */
+    public function ledgerEntryFilterOptions(): array
+    {
+        return [
+            ['key' => 'collections', 'label' => 'Collections', 'hint' => 'Receipts & cancels'],
+            ['key' => 'late_fees', 'label' => 'Late fees', 'hint' => 'Accruals only'],
+            ['key' => 'cancels', 'label' => 'Cancels', 'hint' => 'Voided receipts'],
+            ['key' => 'all', 'label' => 'All', 'hint' => 'Full journal'],
+        ];
     }
 
     public function applyLedgerFilters(FeesDashboardService $fees, AccountingLedgerService $ledger): void
