@@ -27,12 +27,10 @@ use App\Filament\Forms\AdmissionFeePlanFormSchema;
 use App\Filament\Forms\AddPaymentFormSchema;
 use App\Filament\Forms\ConvertToAdmissionFormSchema;
 use App\Filament\Forms\EnquiryFormSchema;
-use App\Filament\Forms\PayMiscChargeFormSchema;
 use App\Filament\Forms\StudentProfileFormSchema;
 use App\Models\Admission;
 use App\Models\Document;
 use App\Models\Enquiry;
-use App\Models\FeeMiscCharge;
 use App\Models\FeeMiscChargeAdjustmentRequest;
 use App\Models\FeePenalty;
 use App\Models\Payment;
@@ -1638,6 +1636,53 @@ class StudentProfilePage extends Page
         ]);
     }
 
+    public function openRequestPaymentCancel(int $paymentId): void
+    {
+        abort_unless($this->userCanRequestPaymentCancellation(), 403);
+
+        $this->mountAction('requestPaymentCancel', ['paymentId' => $paymentId]);
+    }
+
+    /**
+     * Mount-only action opened from the payment history row on the fees tab.
+     * Filament v5 treats hidden actions as disabled and refuses to mount them,
+     * so this must be resolved by method name instead of living in getHeaderActions().
+     */
+    public function requestPaymentCancelAction(): Action
+    {
+        return Action::make('requestPaymentCancel')
+            ->label('Request cancel')
+            ->icon('heroicon-o-x-circle')
+            ->color('danger')
+            ->modalHeading('Request payment cancellation')
+            ->modalDescription(function (array $arguments): string {
+                $payment = Payment::query()->find((int) ($arguments['paymentId'] ?? 0));
+
+                return $payment
+                    ? 'Super Admin will review cancellation of '.$payment->receipt_number.' · ₹'.number_format((float) $payment->amount, 0).'. The payment stays on record as cancelled.'
+                    : 'Super Admin will review this cancellation.';
+            })
+            ->modalSubmitActionLabel('Send to admin')
+            ->modalWidth('lg')
+            ->arguments(['paymentId' => null])
+            ->form([
+                Textarea::make('reason')
+                    ->label('Why cancel this payment?')
+                    ->placeholder('e.g. Wrong amount entered by mistake')
+                    ->rows(3)
+                    ->required()
+                    ->minLength(3)
+                    ->maxLength(500),
+            ])
+            ->action(function (array $data, array $arguments, PaymentCancellationService $cancellations): void {
+                $this->submitPaymentCancellationRequest(
+                    (int) ($arguments['paymentId'] ?? 0),
+                    (string) ($data['reason'] ?? ''),
+                    $cancellations,
+                );
+            });
+    }
+
     public function submitMiscChargeAdjustmentRequest(
         int $chargeId,
         string $type,
@@ -2691,63 +2736,6 @@ class StudentProfilePage extends Page
                 })
                 ->visible(fn (): bool => $this->userCan(CrmPermission::AttendanceMark)
                     && $this->record->activeEnrollment !== null),
-            Action::make('payMiscCharge')
-                ->label('Pay misc')
-                ->icon('heroicon-o-banknotes')
-                ->modalHeading('Pay miscellaneous charge')
-                ->modalWidth('lg')
-                ->arguments(['chargeId' => 0])
-                ->fillForm(fn (array $arguments): array => ['fee_misc_charge_id' => (int) ($arguments['chargeId'] ?? 0)])
-                ->form(function (array $arguments): array {
-                    $charge = FeeMiscCharge::query()->find((int) ($arguments['chargeId'] ?? 0));
-
-                    if (! $charge) {
-                        return [];
-                    }
-
-                    return PayMiscChargeFormSchema::fields($charge);
-                })
-                ->action(function (array $data, array $arguments, PaymentService $payments): void {
-                    abort_unless($this->userCan(CrmPermission::FeesCollect), 403);
-
-                    $feeStructure = $this->record->activeEnrollment?->feeStructure;
-                    $charge = app(FeeMiscChargeService::class)->resolveForStudent(
-                        $this->record,
-                        (int) ($arguments['chargeId'] ?? $data['fee_misc_charge_id'] ?? 0),
-                    );
-
-                    if (! $feeStructure) {
-                        return;
-                    }
-
-                    $proof = $data['proof_image'] ?? null;
-
-                    if (is_array($proof)) {
-                        $proof = $proof[0] ?? null;
-                    }
-
-                    $payment = $payments->addMisc(
-                        $feeStructure,
-                        $this->record,
-                        $charge,
-                        $data,
-                        (string) $proof,
-                        Auth::user(),
-                    );
-
-                    app(StorageCleanupService::class)->pruneLivewireTempFiles(0);
-                    $this->feesTabLoaded = false;
-                    $this->receiptsTabLoaded = false;
-                    $this->loadFeesTab();
-                    $this->refreshRecord();
-
-                    Notification::make()
-                        ->title('Misc charge paid')
-                        ->body("Receipt {$payment->receipt_number} · ₹".number_format((float) $payment->amount, 0))
-                        ->success()
-                        ->send();
-                })
-                ->visible(false),
             Action::make('addPayment')
                 ->label('Add Payment')
                 ->icon('heroicon-o-banknotes')

@@ -696,25 +696,15 @@
                                     && ! $paymentRow->isCancelled()
                                     && ! $paymentRow->pendingCancellationRequest
                                     && ($latestActivePaymentId ?? null) === $paymentRow->id)
-                                    <div x-data="{ open: false, reason: '' }" class="relative">
-                                        <button type="button" @click="open = !open" class="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 dark:text-red-300 dark:ring-red-500/30 dark:hover:bg-red-500/10">
-                                            Request cancel
-                                        </button>
-                                        <div x-show="open" x-cloak @click.outside="open = false" class="absolute right-0 z-20 mt-2 w-72 rounded-xl bg-white p-3 shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10">
-                                            <p class="text-xs font-semibold text-gray-800 dark:text-gray-200">Why cancel this payment?</p>
-                                            <textarea x-model="reason" rows="3" class="mt-2 w-full rounded-lg border-gray-200 text-sm dark:border-white/10 dark:bg-white/5" placeholder="e.g. Wrong amount entered by mistake"></textarea>
-                                            <div class="mt-2 flex justify-end gap-2">
-                                                <button type="button" @click="open = false" class="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-600">Close</button>
-                                                <button
-                                                    type="button"
-                                                    class="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-500"
-                                                    @click="if (!reason.trim()) { return } $wire.submitPaymentCancellationRequest({{ $paymentRow->id }}, reason); open = false; reason = ''"
-                                                >
-                                                    Send to admin
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <button
+                                        type="button"
+                                        wire:click="openRequestPaymentCancel({{ $paymentRow->id }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="openRequestPaymentCancel({{ $paymentRow->id }})"
+                                        class="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 disabled:opacity-50 dark:text-red-300 dark:ring-red-500/30 dark:hover:bg-red-500/10"
+                                    >
+                                        Request cancel
+                                    </button>
                                 @elseif (($canReviewPaymentCancellations ?? false) && $paymentRow->pendingCancellationRequest)
                                     <a href="{{ $paymentCancellationsUrl ?? '#' }}" class="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200 hover:bg-amber-50 dark:text-amber-300 dark:ring-amber-500/30">
                                         Review

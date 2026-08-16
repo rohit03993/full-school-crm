@@ -6,6 +6,8 @@ use App\Enums\CourseStatus;
 use App\Enums\FeeMiscChargeKind;
 use App\Enums\FeeMiscChargeStatus;
 use App\Enums\Gender;
+use App\Enums\PaymentCancellationRequestStatus;
+use App\Enums\PaymentMode;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Filament\Pages\StudentProfilePage;
@@ -16,9 +18,11 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\AdmissionService;
 use App\Services\EnquiryService;
+use App\Services\PaymentService;
 use App\Enums\LeadSource;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -93,6 +97,47 @@ class StudentProfileFeesTabTest extends TestCase
             ->set('profileTab', 'fees')
             ->assertStatus(200)
             ->assertSee('Waive off pending');
+    }
+
+    public function test_request_cancel_button_opens_modal_and_submits_request(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->createSuperAdmin();
+        $student = $this->createEnrolledStudentWithFees($admin);
+
+        $payment = app(PaymentService::class)->add(
+            $student->activeEnrollment->feeStructure,
+            $student,
+            [
+                'payment_date' => now()->toDateString(),
+                'amount' => 30000,
+                'payment_mode' => PaymentMode::Cash->value,
+                'voucher_number' => 'VCH-FEES-TAB',
+            ],
+            UploadedFile::fake()->image('voucher.jpg'),
+            $admin,
+        );
+
+        $this->actingAs($admin);
+
+        Livewire::test(StudentProfilePage::class, ['record' => $student->fresh()])
+            ->set('profileTab', 'fees')
+            ->assertSee('Request cancel')
+            ->assertSee('openRequestPaymentCancel('.$payment->id.')', escape: false)
+            ->call('openRequestPaymentCancel', $payment->id)
+            ->assertHasNoErrors()
+            ->assertActionMounted('requestPaymentCancel')
+            ->setActionData(['reason' => 'Wrong amount entered by mistake'])
+            ->callMountedAction()
+            ->assertNotified()
+            ->assertActionNotMounted();
+
+        $this->assertDatabaseHas('payment_cancellation_requests', [
+            'payment_id' => $payment->id,
+            'requested_by_user_id' => $admin->id,
+            'status' => PaymentCancellationRequestStatus::Pending->value,
+        ]);
     }
 
     protected function createSuperAdmin(): User
