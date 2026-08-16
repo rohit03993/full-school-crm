@@ -85,6 +85,16 @@ class StaffResource extends Resource
             });
     }
 
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
@@ -110,7 +120,8 @@ class StaffResource extends Resource
                         ->helperText('Staff sign in at /admin with this mobile and password.'),
                     Toggle::make('is_active')
                         ->label('Active')
-                        ->default(true),
+                        ->default(true)
+                        ->helperText('Turn off to deactivate. The account and history stay; they cannot log in. Staff are not deleted from this screen.'),
                 ]),
             Section::make('Access & roles')
                 ->description('Tick every function this person should have. Permissions from all selected roles are combined — e.g. Accountant + Fee adjuster can collect and change fee plans.')

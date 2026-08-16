@@ -7,7 +7,6 @@ use App\Enums\StaffJobRole;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Staff\StaffResource;
 use App\Support\CrmAccess;
-use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditStaff extends EditRecord
@@ -64,13 +63,6 @@ class EditStaff extends EditRecord
         }
 
         return $jobRoles;
-    }
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            DeleteAction::make(),
-        ];
     }
 
     protected function getRedirectUrl(): string
