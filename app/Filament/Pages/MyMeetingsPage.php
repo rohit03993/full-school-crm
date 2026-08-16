@@ -285,7 +285,7 @@ class MyMeetingsPage extends Page
             return null;
         }
 
-        if ($user->hasRole(RoleName::SuperAdmin->value)) {
+        if ($staff->hasRole(RoleName::SuperAdmin->value)) {
             $openCases = CrmNavBadges::allCasesOpen();
 
             return $openCases > 0 ? (string) $openCases : null;
