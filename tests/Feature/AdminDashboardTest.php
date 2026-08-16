@@ -179,13 +179,19 @@ class AdminDashboardTest extends TestCase
         Livewire::test(DashboardAttentionWidget::class)
             ->assertSuccessful()
             ->assertSee('Needs attention')
-            ->assertSee('Admissions');
+            ->assertSee('Admissions')
+            ->assertSee('Students attendance');
 
         Livewire::test(DashboardTodayPulseWidget::class)
             ->assertSuccessful()
             ->assertSee('Today')
             ->assertSee('New leads')
-            ->assertSee('Staff present');
+            ->assertSee('Staff attendance');
+
+        Livewire::test(DashboardHeroWidget::class)
+            ->assertSuccessful()
+            ->assertSee('Students attendance')
+            ->assertSee('Staff attendance');
     }
 
     public function test_owner_sees_hideable_analytics_panel(): void
@@ -196,6 +202,8 @@ class AdminDashboardTest extends TestCase
         Livewire::test(DashboardAnalyticsWidget::class)
             ->assertSuccessful()
             ->assertSee('Hide analytics')
+            ->assertSee('Students attendance')
+            ->assertSee('Staff attendance')
             ->assertSee('Last 7 days')
             ->assertSee('Today’s mix')
             ->call('toggleAnalytics')

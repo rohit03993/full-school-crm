@@ -170,7 +170,7 @@ class DashboardTodayPulseWidget extends Widget
             ],
             [
                 'key' => 'staff',
-                'label' => 'Staff present',
+                'label' => 'Staff attendance',
                 'value' => (string) ($data['staff_present_today'] ?? 0),
                 'meta' => 'of '.($data['staff_total'] ?? 0).' staff',
                 'tone' => 'success',

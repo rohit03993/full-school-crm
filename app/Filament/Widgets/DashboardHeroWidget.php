@@ -14,6 +14,7 @@ use App\Filament\Pages\MyLeadsPage;
 use App\Filament\Pages\MyMeetingsPage;
 use App\Filament\Pages\MyTeachingAssignmentsPage;
 use App\Filament\Pages\ReportsPage;
+use App\Filament\Pages\StaffAttendancePage;
 use App\Filament\Pages\StudentSearchPage;
 use App\Filament\Pages\WhatsAppInboxPage;
 use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
@@ -22,6 +23,7 @@ use App\Filament\Resources\Enquiries\EnquiryResource;
 use App\Filament\Widgets\Concerns\UsesDashboardFilters;
 use App\Models\AcademicSession;
 use App\Services\CrmDashboardService;
+use App\Services\DashboardOpsService;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavBadges;
@@ -171,6 +173,11 @@ class DashboardHeroWidget extends Widget
 
         if (FeatureGate::enabled(LicenseFeature::Attendance)) {
             $metrics[] = $this->attendanceMetric($stats);
+
+            if (StaffAttendancePage::canAccess()) {
+                $pulse = app(DashboardOpsService::class)->todayPulse($filters, Auth::user());
+                $metrics[] = $this->staffAttendanceMetric($pulse);
+            }
         }
 
         if (FeatureGate::enabled(LicenseFeature::Enquiries)) {
@@ -198,7 +205,7 @@ class DashboardHeroWidget extends Widget
         $rate = $expected > 0 ? (int) round(($present / $expected) * 100) : 0;
 
         return $this->metric(
-            label: 'Present '.$stats['as_of_label'],
+            label: 'Students attendance',
             value: (string) $present,
             icon: 'heroicon-m-check-circle',
             meta: $expected > 0
@@ -211,6 +218,31 @@ class DashboardHeroWidget extends Widget
                 default => 'danger',
             },
             url: $this->urlIf(AttendanceHubPage::canAccess(), AttendanceHubPage::getUrl()),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $pulse
+     * @return array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}
+     */
+    protected function staffAttendanceMetric(array $pulse): array
+    {
+        $total = (int) ($pulse['staff_total'] ?? 0);
+        $present = (int) ($pulse['staff_present_today'] ?? 0);
+        $rate = $total > 0 ? (int) round(($present / $total) * 100) : 0;
+
+        return $this->metric(
+            label: 'Staff attendance',
+            value: (string) $present,
+            icon: 'heroicon-m-identification',
+            meta: $total > 0 ? $rate.'% of '.$total.' staff present' : 'No staff in scope',
+            tone: match (true) {
+                $total === 0 => 'neutral',
+                $rate >= 75 => 'success',
+                $rate > 0 => 'warning',
+                default => 'danger',
+            },
+            url: StaffAttendancePage::getUrl(),
         );
     }
 

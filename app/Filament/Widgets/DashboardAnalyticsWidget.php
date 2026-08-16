@@ -9,6 +9,7 @@ use App\Filament\Pages\FeesDashboardPage;
 use App\Filament\Pages\FollowUpsPage;
 use App\Filament\Pages\MyLeadsPage;
 use App\Filament\Pages\MyMeetingsPage;
+use App\Filament\Pages\StaffAttendancePage;
 use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Filament\Resources\Enquiries\EnquiryResource;
 use App\Filament\Widgets\Concerns\UsesDashboardFilters;
@@ -113,20 +114,20 @@ class DashboardAnalyticsWidget extends Widget
                 'show' => $canFees,
             ],
             [
-                'label' => 'Students present',
+                'label' => 'Students attendance',
                 'value' => (string) ($pulse['present_today'] ?? 0),
-                'sub' => ($pulse['active_students'] ?? 0).' active students',
+                'sub' => 'of '.($pulse['active_students'] ?? 0).' active students',
                 'tone' => 'primary',
                 'url' => AttendanceHubPage::canAccess() ? AttendanceHubPage::getUrl() : null,
                 'show' => FeatureGate::enabled(LicenseFeature::Attendance),
             ],
             [
-                'label' => 'Attendance',
-                'value' => ($attention['attendance_coverage_pct'] ?? 0).'%',
-                'sub' => ($attention['attendance_unmarked'] ?? 0).' still unmarked',
+                'label' => 'Staff attendance',
+                'value' => (string) ($pulse['staff_present_today'] ?? 0),
+                'sub' => 'of '.($pulse['staff_total'] ?? 0).' staff',
                 'tone' => 'primary',
-                'url' => AttendanceHubPage::canAccess() ? AttendanceHubPage::getUrl() : null,
-                'show' => FeatureGate::enabled(LicenseFeature::Attendance),
+                'url' => StaffAttendancePage::canAccess() ? StaffAttendancePage::getUrl() : null,
+                'show' => FeatureGate::enabled(LicenseFeature::Attendance) && StaffAttendancePage::canAccess(),
             ],
             [
                 'label' => 'New leads',
@@ -219,7 +220,7 @@ class DashboardAnalyticsWidget extends Widget
             $active = max(0, (int) ($pulse['active_students'] ?? 0));
             $present = max(0, (int) ($pulse['present_today'] ?? 0));
             $rows[] = [
-                'label' => 'Students present',
+                'label' => 'Students attendance',
                 'value' => $present.' / '.$active,
                 'pct' => $active > 0 ? (int) min(100, round(($present / $active) * 100)) : 0,
                 'tone' => 'primary',
@@ -228,7 +229,7 @@ class DashboardAnalyticsWidget extends Widget
             $staffTotal = max(0, (int) ($pulse['staff_total'] ?? 0));
             $staffPresent = max(0, (int) ($pulse['staff_present_today'] ?? 0));
             $rows[] = [
-                'label' => 'Staff present',
+                'label' => 'Staff attendance',
                 'value' => $staffPresent.' / '.$staffTotal,
                 'pct' => $staffTotal > 0 ? (int) min(100, round(($staffPresent / $staffTotal) * 100)) : 0,
                 'tone' => 'sky',
@@ -270,7 +271,7 @@ class DashboardAnalyticsWidget extends Widget
                 'show' => FeatureGate::enabled(LicenseFeature::Cases),
             ],
             [
-                'label' => 'Attendance unmarked',
+                'label' => 'Students attendance unmarked',
                 'value' => (int) ($attention['attendance_unmarked'] ?? 0),
                 'url' => AttendanceHubPage::canAccess() ? AttendanceHubPage::getUrl() : null,
                 'show' => FeatureGate::enabled(LicenseFeature::Attendance),
