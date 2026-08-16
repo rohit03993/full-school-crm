@@ -305,7 +305,7 @@ class AccountingLedgerService
     /**
      * @return Collection<int, AccountingJournalEntry>
      */
-    public function recentEntries(int $limit = 50, ?Carbon $from = null, ?Carbon $to = null): Collection
+    public function recentEntries(int $limit = 50, ?Carbon $from = null, ?Carbon $to = null, int $page = 1): Collection
     {
         $query = AccountingJournalEntry::query()
             ->with(['lines.account', 'postedBy'])
@@ -320,7 +320,24 @@ class AccountingLedgerService
             $query->whereDate('entry_date', '<=', $to->toDateString());
         }
 
-        return $query->limit($limit)->get();
+        return $query
+            ->forPage(max(1, $page), max(1, $limit))
+            ->get();
+    }
+
+    public function countEntries(?Carbon $from = null, ?Carbon $to = null): int
+    {
+        $query = AccountingJournalEntry::query();
+
+        if ($from) {
+            $query->whereDate('entry_date', '>=', $from->toDateString());
+        }
+
+        if ($to) {
+            $query->whereDate('entry_date', '<=', $to->toDateString());
+        }
+
+        return (int) $query->count();
     }
 
     /**

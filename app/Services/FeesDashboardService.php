@@ -140,7 +140,7 @@ class FeesDashboardService
      *     profile_url: string,
      * }>
      */
-    public function defaulters(?Carbon $asOf = null, int $limit = 100): Collection
+    public function defaulters(?Carbon $asOf = null, ?int $limit = null): Collection
     {
         $today = ($asOf ?? now())->copy()->startOfDay();
 
@@ -151,7 +151,7 @@ class FeesDashboardService
             ])
             ->get();
 
-        return $installments
+        $rows = $installments
             ->groupBy(fn (FeeInstallment $row): int => (int) $row->feeStructure?->enrollment?->student_id)
             ->filter(fn (Collection $rows, int $studentId): bool => $studentId > 0)
             ->map(function (Collection $rows) use ($today): array {
@@ -182,8 +182,39 @@ class FeesDashboardService
                 ];
             })
             ->sortByDesc('days_overdue')
-            ->values()
-            ->take($limit);
+            ->values();
+
+        if ($limit !== null) {
+            return $rows->take($limit)->values();
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return array{
+     *     rows: Collection<int, array<string, mixed>>,
+     *     total: int,
+     *     page: int,
+     *     last_page: int,
+     *     per_page: int,
+     * }
+     */
+    public function paginateDefaulters(?Carbon $asOf = null, int $page = 1, int $perPage = 15): array
+    {
+        $perPage = max(1, $perPage);
+        $all = $this->defaulters($asOf);
+        $total = $all->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min(max(1, $page), $lastPage);
+
+        return [
+            'rows' => $all->forPage($page, $perPage)->values(),
+            'total' => $total,
+            'page' => $page,
+            'last_page' => $lastPage,
+            'per_page' => $perPage,
+        ];
     }
 
     /**

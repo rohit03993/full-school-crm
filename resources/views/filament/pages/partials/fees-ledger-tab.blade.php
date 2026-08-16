@@ -119,7 +119,12 @@
     <div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
         <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
             <h2 class="text-base font-semibold text-gray-950 dark:text-white">Recent journal entries</h2>
-            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Fee receipts show as credit (money received). Late-fee accruals show debit and credit.</p>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                Fee receipts show as credit (money received). Late-fee accruals show debit and credit.
+                @if (($ledgerEntriesTotal ?? 0) > 0)
+                    · {{ (int) $ledgerEntriesTotal }} entr{{ (int) $ledgerEntriesTotal === 1 ? 'y' : 'ies' }}
+                @endif
+            </p>
         </div>
         <div class="divide-y divide-gray-100 dark:divide-white/10">
             @forelse ($this->getPresentedEntries() as $presented)
@@ -180,5 +185,18 @@
                 <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">No entries in this period.</p>
             @endforelse
         </div>
+        @if (($ledgerEntriesLastPage ?? 1) > 1)
+            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-4 py-3 text-xs text-gray-500 dark:border-white/10 sm:px-6">
+                <p>
+                    Page {{ $ledgerEntriesPage ?? 1 }} / {{ $ledgerEntriesLastPage }}
+                    · {{ \App\Support\CrmPagination::PER_PAGE }} per page
+                    · {{ (int) ($ledgerEntriesTotal ?? 0) }} total
+                </p>
+                <div class="flex gap-2">
+                    <button type="button" wire:click="previousLedgerEntriesPage" @disabled(($ledgerEntriesPage ?? 1) <= 1) class="rounded-lg px-3 py-1.5 font-semibold ring-1 ring-gray-200 disabled:opacity-40 dark:ring-white/10">Prev</button>
+                    <button type="button" wire:click="nextLedgerEntriesPage" @disabled(($ledgerEntriesPage ?? 1) >= ($ledgerEntriesLastPage ?? 1)) class="rounded-lg px-3 py-1.5 font-semibold ring-1 ring-gray-200 disabled:opacity-40 dark:ring-white/10">Next</button>
+                </div>
+            </div>
+        @endif
     </div>
 </div>

@@ -8,6 +8,7 @@ use App\Services\FeesDashboardService;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
+use App\Support\CrmPagination;
 use App\Support\DashboardFilters;
 use App\Support\FeatureGate;
 use Filament\Pages\Page;
@@ -56,6 +57,18 @@ class FeesDashboardPage extends Page
      * @var Collection<int, array<string, mixed>>
      */
     public Collection $defaulters;
+
+    public int $defaultersPage = 1;
+
+    public int $defaultersTotal = 0;
+
+    public int $defaultersLastPage = 1;
+
+    public int $ledgerEntriesPage = 1;
+
+    public int $ledgerEntriesTotal = 0;
+
+    public int $ledgerEntriesLastPage = 1;
 
     public ?string $fromDate = null;
 
@@ -125,6 +138,8 @@ class FeesDashboardPage extends Page
             $this->applyPresetDates($preset);
         }
 
+        $this->defaultersPage = 1;
+        $this->ledgerEntriesPage = 1;
         $this->refreshData($fees);
         $this->refreshLedger($ledger);
     }
@@ -133,6 +148,8 @@ class FeesDashboardPage extends Page
     {
         $this->rangePreset = DashboardFilters::RANGE_CUSTOM;
         $this->normalizeDates();
+        $this->defaultersPage = 1;
+        $this->ledgerEntriesPage = 1;
         $this->refreshData($fees);
         $this->refreshLedger($ledger);
     }
@@ -143,13 +160,46 @@ class FeesDashboardPage extends Page
         $this->refreshLedger($ledger);
     }
 
+    public function previousDefaultersPage(FeesDashboardService $fees): void
+    {
+        $this->defaultersPage = max(1, $this->defaultersPage - 1);
+        $this->refreshDefaulters($fees);
+    }
+
+    public function nextDefaultersPage(FeesDashboardService $fees): void
+    {
+        $this->defaultersPage = min($this->defaultersLastPage, $this->defaultersPage + 1);
+        $this->refreshDefaulters($fees);
+    }
+
+    public function previousLedgerEntriesPage(): void
+    {
+        $this->ledgerEntriesPage = max(1, $this->ledgerEntriesPage - 1);
+    }
+
+    public function nextLedgerEntriesPage(): void
+    {
+        $this->ledgerEntriesPage = min($this->ledgerEntriesLastPage, $this->ledgerEntriesPage + 1);
+    }
+
     protected function refreshData(FeesDashboardService $fees): void
     {
         $this->normalizeDates();
         [$from, $to] = $this->periodBounds();
 
         $this->summary = $fees->overview($from, $to);
-        $this->defaulters = $fees->defaulters($to)->values();
+        $this->refreshDefaulters($fees, $to);
+    }
+
+    protected function refreshDefaulters(FeesDashboardService $fees, ?Carbon $asOf = null): void
+    {
+        $asOf ??= $this->periodBounds()[1];
+        $page = $fees->paginateDefaulters($asOf, $this->defaultersPage, CrmPagination::PER_PAGE);
+
+        $this->defaulters = $page['rows'];
+        $this->defaultersTotal = $page['total'];
+        $this->defaultersPage = $page['page'];
+        $this->defaultersLastPage = $page['last_page'];
     }
 
     public function refreshLedger(AccountingLedgerService $ledger): void
@@ -162,6 +212,9 @@ class FeesDashboardPage extends Page
         $summary['income_rows'] = collect($summary['income_rows'])->values()->all();
 
         $this->ledgerSummary = $summary;
+        $this->ledgerEntriesTotal = $ledger->countEntries($from->copy()->startOfDay(), $to->copy()->endOfDay());
+        $this->ledgerEntriesLastPage = max(1, (int) ceil($this->ledgerEntriesTotal / CrmPagination::PER_PAGE));
+        $this->ledgerEntriesPage = min(max(1, $this->ledgerEntriesPage), $this->ledgerEntriesLastPage);
     }
 
     /**
@@ -174,7 +227,12 @@ class FeesDashboardPage extends Page
 
         $ledger = app(AccountingLedgerService::class);
 
-        return $ledger->presentEntries($ledger->recentEntries(50, $from->copy()->startOfDay(), $to->copy()->endOfDay()));
+        return $ledger->presentEntries($ledger->recentEntries(
+            CrmPagination::PER_PAGE,
+            $from->copy()->startOfDay(),
+            $to->copy()->endOfDay(),
+            $this->ledgerEntriesPage,
+        ));
     }
 
     public function applyLedgerFilters(FeesDashboardService $fees, AccountingLedgerService $ledger): void

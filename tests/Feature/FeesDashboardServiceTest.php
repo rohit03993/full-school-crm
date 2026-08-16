@@ -114,6 +114,11 @@ class FeesDashboardServiceTest extends TestCase
         $defaulters = app(FeesDashboardService::class)->defaulters();
 
         $this->assertTrue($defaulters->contains(fn (array $row): bool => $row['student_id'] === $student->id));
+
+        $page = app(FeesDashboardService::class)->paginateDefaulters(null, 1, 15);
+        $this->assertGreaterThanOrEqual(1, $page['total']);
+        $this->assertSame(1, $page['page']);
+        $this->assertTrue($page['rows']->contains(fn (array $row): bool => $row['student_id'] === $student->id));
     }
 
     protected function createSuperAdmin(): User

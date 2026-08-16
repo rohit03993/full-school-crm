@@ -232,7 +232,12 @@
         <div class="flex flex-col gap-2 border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
                 <h2 class="text-base font-semibold text-gray-950 dark:text-white">Defaulters</h2>
-                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Students with overdue installment balances (as of now)</p>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                    Students with overdue installment balances (as of now)
+                    @if (($defaultersTotal ?? 0) > 0)
+                        · {{ (int) $defaultersTotal }} student(s)
+                    @endif
+                </p>
             </div>
         </div>
 
@@ -290,6 +295,19 @@
                     </tbody>
                 </table>
             </x-crm.responsive-table>
+            @if (($defaultersLastPage ?? 1) > 1)
+                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-4 py-3 text-xs text-gray-500 dark:border-white/10 sm:px-6">
+                    <p>
+                        Page {{ $defaultersPage ?? 1 }} / {{ $defaultersLastPage }}
+                        · {{ \App\Support\CrmPagination::PER_PAGE }} per page
+                        · {{ (int) ($defaultersTotal ?? 0) }} total
+                    </p>
+                    <div class="flex gap-2">
+                        <button type="button" wire:click="previousDefaultersPage" @disabled(($defaultersPage ?? 1) <= 1) class="rounded-lg px-3 py-1.5 font-semibold ring-1 ring-gray-200 disabled:opacity-40 dark:ring-white/10">Prev</button>
+                        <button type="button" wire:click="nextDefaultersPage" @disabled(($defaultersPage ?? 1) >= ($defaultersLastPage ?? 1)) class="rounded-lg px-3 py-1.5 font-semibold ring-1 ring-gray-200 disabled:opacity-40 dark:ring-white/10">Next</button>
+                    </div>
+                </div>
+            @endif
         @endif
     </div>
 </div>

@@ -39,6 +39,7 @@ class FeesDashboardPageTest extends TestCase
             ->assertSet('rangePreset', 'today')
             ->assertSet('fromDate', now()->toDateString())
             ->assertSet('toDate', now()->toDateString())
+            ->assertSet('defaultersPage', 1)
             ->call('refreshDashboard')
             ->assertOk();
     }
