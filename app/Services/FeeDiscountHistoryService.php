@@ -21,6 +21,7 @@ class FeeDiscountHistoryService
      *     misc_discount_total: float,
      *     misc_waive_count: int,
      *     misc_waive_total: float,
+     *     misc_rejected_count: int,
      *     combined_count: int,
      *     combined_total: float,
      * }
@@ -33,6 +34,7 @@ class FeeDiscountHistoryService
         $miscDiscountTotal = 0.0;
         $miscWaiveCount = 0;
         $miscWaiveTotal = 0.0;
+        $miscRejectedCount = 0;
 
         $tuition = FeeDiscountEntry::query()
             ->where('amount', '<', 0)
@@ -60,6 +62,10 @@ class FeeDiscountHistoryService
 
             $miscWaiveCount = (int) ($miscWaive->entry_count ?? 0);
             $miscWaiveTotal = round((float) ($miscWaive->entry_total ?? 0), 2);
+
+            $miscRejectedCount = FeeMiscChargeAdjustmentRequest::query()
+                ->where('status', FeeMiscChargeAdjustmentRequestStatus::Rejected)
+                ->count();
         }
 
         $combinedCount = $tuitionCount + $miscDiscountCount + $miscWaiveCount;
@@ -72,6 +78,7 @@ class FeeDiscountHistoryService
             'misc_discount_total' => $miscDiscountTotal,
             'misc_waive_count' => $miscWaiveCount,
             'misc_waive_total' => $miscWaiveTotal,
+            'misc_rejected_count' => $miscRejectedCount,
             'combined_count' => $combinedCount,
             'combined_total' => $combinedTotal,
         ];
@@ -114,7 +121,10 @@ class FeeDiscountHistoryService
 
         if (FeeMiscChargeAdjustmentRequest::schemaReady()) {
             FeeMiscChargeAdjustmentRequest::query()
-                ->where('status', FeeMiscChargeAdjustmentRequestStatus::Approved)
+                ->whereIn('status', [
+                    FeeMiscChargeAdjustmentRequestStatus::Approved,
+                    FeeMiscChargeAdjustmentRequestStatus::Rejected,
+                ])
                 ->with([
                     'charge.feeStructure.enrollment.student',
                     'requestedBy',
@@ -127,18 +137,23 @@ class FeeDiscountHistoryService
                     $charge = $request->charge;
                     $student = $charge?->feeStructure?->enrollment?->student;
                     $isWaive = $request->type === FeeMiscChargeAdjustmentType::WaiveOff;
+                    $isRejected = $request->status === FeeMiscChargeAdjustmentRequestStatus::Rejected;
 
                     $items->push(new FeeDiscountHistoryItem(
                         kind: $isWaive ? 'misc_waive_off' : 'misc_discount',
                         kindLabel: $isWaive ? 'Additional charge waive-off' : 'Additional charge discount',
                         label: $charge?->label ?? 'Additional charge',
-                        amount: $this->resolvedAppliedAmount($request),
+                        amount: $isRejected
+                            ? $this->pendingRequestAmount($request)
+                            : $this->resolvedAppliedAmount($request),
                         studentName: $student?->name ?? '—',
                         studentId: $student?->id,
                         actorName: $request->reviewedBy?->name ?? $request->requestedBy?->name ?? '—',
                         reason: $request->reason,
                         occurredAt: $request->reviewed_at ?? $request->created_at,
                         source: 'misc_charge_adjustment',
+                        status: $isRejected ? 'rejected' : 'approved',
+                        statusLabel: $isRejected ? 'Rejected' : 'Approved',
                     ));
                 });
         }

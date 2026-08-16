@@ -96,6 +96,42 @@ class FeeDiscountHistoryServiceTest extends TestCase
         $this->assertSame($student->name, $history->first()->studentName);
     }
 
+    public function test_recent_history_includes_rejected_misc_adjustments(): void
+    {
+        $staff = $this->createStaff();
+        $admin = $this->createSuperAdmin();
+        $student = $this->createEnrolledStudent($staff);
+        $feeStructure = $student->activeEnrollment->feeStructure;
+
+        $charge = app(FeeMiscChargeService::class)->addSeparateCharge(
+            $feeStructure,
+            'Library fine',
+            800,
+            null,
+            $staff,
+        );
+
+        $adjustments = app(FeeMiscChargeAdjustmentService::class);
+        $request = $adjustments->submitRequest(
+            $charge,
+            $staff,
+            FeeMiscChargeAdjustmentType::Discount,
+            300,
+            'Not eligible for discount',
+        );
+        $adjustments->reject($request, $admin, 'Policy does not allow');
+
+        $summary = app(FeeDiscountHistoryService::class)->summary();
+        $history = app(FeeDiscountHistoryService::class)->recent();
+
+        $this->assertSame(1, $summary['misc_rejected_count']);
+        $this->assertTrue($history->contains(
+            fn ($item) => $item->status === 'rejected'
+                && $item->amount === 300.0
+                && $item->studentName === $student->name
+        ));
+    }
+
     public function test_student_timeline_includes_pending_misc_adjustment(): void
     {
         $staff = $this->createStaff();

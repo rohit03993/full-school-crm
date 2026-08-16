@@ -270,6 +270,81 @@ class PaymentCancellationService
             ->count();
     }
 
+    /**
+     * @return array{
+     *     pending_count: int,
+     *     approved_count: int,
+     *     approved_total: float,
+     *     rejected_count: int,
+     *     reviewed_count: int,
+     * }
+     */
+    public function summary(): array
+    {
+        if (! PaymentCancellationRequest::schemaReady()) {
+            return [
+                'pending_count' => 0,
+                'approved_count' => 0,
+                'approved_total' => 0.0,
+                'rejected_count' => 0,
+                'reviewed_count' => 0,
+            ];
+        }
+
+        $pendingCount = PaymentCancellationRequest::query()
+            ->where('status', PaymentCancellationRequestStatus::Pending)
+            ->count();
+
+        $approved = PaymentCancellationRequest::query()
+            ->where('payment_cancellation_requests.status', PaymentCancellationRequestStatus::Approved)
+            ->leftJoin('payments', 'payments.id', '=', 'payment_cancellation_requests.payment_id')
+            ->selectRaw('COUNT(payment_cancellation_requests.id) as entry_count, COALESCE(SUM(payments.amount), 0) as entry_total')
+            ->first();
+
+        $rejectedCount = PaymentCancellationRequest::query()
+            ->where('status', PaymentCancellationRequestStatus::Rejected)
+            ->count();
+
+        $approvedCount = (int) ($approved->entry_count ?? 0);
+        $approvedTotal = round((float) ($approved->entry_total ?? 0), 2);
+
+        return [
+            'pending_count' => $pendingCount,
+            'approved_count' => $approvedCount,
+            'approved_total' => $approvedTotal,
+            'rejected_count' => $rejectedCount,
+            'reviewed_count' => $approvedCount + $rejectedCount,
+        ];
+    }
+
+    /**
+     * @return Collection<int, PaymentCancellationRequest>
+     */
+    public function recentHistory(int $limit = 30): Collection
+    {
+        if (! PaymentCancellationRequest::schemaReady()) {
+            return collect();
+        }
+
+        return PaymentCancellationRequest::query()
+            ->whereIn('status', [
+                PaymentCancellationRequestStatus::Approved,
+                PaymentCancellationRequestStatus::Rejected,
+            ])
+            ->with([
+                'payment.student',
+                'payment.feeStructure.enrollment.course',
+                'payment.feeMiscCharge',
+                'payment.feeInstallment',
+                'requestedBy',
+                'reviewedBy',
+            ])
+            ->orderByDesc('reviewed_at')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+    }
+
     public function isLatestActivePayment(Payment $payment): bool
     {
         $latestId = Payment::query()

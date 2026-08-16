@@ -231,6 +231,69 @@ class PaymentCancellationServiceTest extends TestCase
         $this->assertSame(2000.0, $charge->fresh()->pendingAmount());
     }
 
+    public function test_summary_and_history_include_approved_and_rejected_cancels(): void
+    {
+        Storage::fake('local');
+
+        $staff = $this->createStaff();
+        $admin = $this->createSuperAdmin();
+        [$student, $feeStructure] = $this->createEnrolledStudent($staff);
+        $payments = app(PaymentService::class);
+        $cancellations = app(PaymentCancellationService::class);
+
+        $first = $payments->add(
+            $feeStructure,
+            $student,
+            [
+                'payment_date' => now()->toDateString(),
+                'amount' => 8000,
+                'payment_mode' => PaymentMode::Cash->value,
+                'voucher_number' => 'VCH-HIST-1',
+                'shortfall_action' => PaymentShortfallAction::CarryForward->value,
+            ],
+            UploadedFile::fake()->image('hist1.jpg'),
+            $staff,
+        );
+
+        $approvedRequest = $cancellations->submitRequest($first, $staff, 'Wrong receipt');
+        $cancellations->approve($approvedRequest->fresh(['payment']), $admin, 'Confirmed');
+
+        $second = $payments->add(
+            $feeStructure->fresh(),
+            $student,
+            [
+                'payment_date' => now()->toDateString(),
+                'amount' => 5000,
+                'payment_mode' => PaymentMode::Cash->value,
+                'voucher_number' => 'VCH-HIST-2',
+                'shortfall_action' => PaymentShortfallAction::CarryForward->value,
+            ],
+            UploadedFile::fake()->image('hist2.jpg'),
+            $staff,
+        );
+
+        $rejectedRequest = $cancellations->submitRequest($second, $staff, 'Changed mind');
+        $cancellations->reject($rejectedRequest, $admin, 'Keep payment');
+
+        $summary = $cancellations->summary();
+        $history = $cancellations->recentHistory();
+
+        $this->assertSame(0, $summary['pending_count']);
+        $this->assertSame(1, $summary['approved_count']);
+        $this->assertSame(8000.0, $summary['approved_total']);
+        $this->assertSame(1, $summary['rejected_count']);
+        $this->assertSame(2, $summary['reviewed_count']);
+        $this->assertCount(2, $history);
+        $this->assertTrue($history->contains(
+            fn ($row) => $row->status === PaymentCancellationRequestStatus::Approved
+                && $row->payment?->receipt_number === $first->receipt_number
+        ));
+        $this->assertTrue($history->contains(
+            fn ($row) => $row->status === PaymentCancellationRequestStatus::Rejected
+                && $row->payment?->receipt_number === $second->receipt_number
+        ));
+    }
+
     public function test_collection_kpis_ignore_cancelled_payments(): void
     {
         Storage::fake('local');

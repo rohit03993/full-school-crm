@@ -3,7 +3,7 @@
 @endphp
 
 <div class="space-y-6">
-    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div class="rounded-2xl bg-white px-4 py-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
             <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500">Main fee discounts</p>
             <p class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">{{ (int) ($summary['tuition_discount_count'] ?? 0) }}</p>
@@ -19,8 +19,13 @@
             <p class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">{{ (int) ($summary['misc_waive_count'] ?? 0) }}</p>
             <p class="mt-1 text-xs text-violet-700 dark:text-violet-300">₹{{ number_format((float) ($summary['misc_waive_total'] ?? 0), 0) }} waived</p>
         </div>
+        <div class="rounded-2xl bg-white px-4 py-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+            <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500">Rejected requests</p>
+            <p class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">{{ (int) ($summary['misc_rejected_count'] ?? 0) }}</p>
+            <p class="mt-1 text-xs text-red-700 dark:text-red-300">Charge adjustments declined</p>
+        </div>
         <div class="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 px-4 py-4 text-white shadow-sm ring-1 ring-white/10">
-            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Total record</p>
+            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Approved total</p>
             <p class="mt-1 text-2xl font-bold">{{ (int) ($summary['combined_count'] ?? 0) }}</p>
             <p class="mt-1 text-xs text-orange-300">₹{{ number_format((float) ($summary['combined_total'] ?? 0), 0) }} total reduction</p>
         </div>
@@ -103,7 +108,7 @@
 
     <div class="pt-2">
         <h2 class="text-sm font-semibold text-gray-900 dark:text-white">Discount & waive-off record</h2>
-        <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Includes main {{ strtolower($feesLabel ?? 'fees') }} discounts and approved additional charge adjustments.</p>
+        <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Includes main {{ strtolower($feesLabel ?? 'fees') }} discounts plus approved and rejected additional charge adjustments.</p>
     </div>
 
     @if (($history ?? collect())->isEmpty())
@@ -147,12 +152,13 @@
                                     ])>{{ $entry->kindLabel }}</span>
                                 </td>
                                 <td class="crm-responsive-table__title px-4 py-3 text-gray-800 dark:text-gray-200" data-label="">{{ $entry->label }}</td>
-                                <td class="px-4 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-300" data-label="Amount">− ₹{{ number_format($entry->amount, 2) }}</td>
+                                <td class="px-4 py-3 text-right font-semibold {{ $entry->status === 'rejected' ? 'text-gray-500 line-through' : 'text-emerald-700 dark:text-emerald-300' }}" data-label="Amount">− ₹{{ number_format($entry->amount, 2) }}</td>
                                 <td class="px-4 py-3" data-label="Status">
                                     <span @class([
                                         'inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold',
                                         'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' => $entry->status === 'approved',
                                         'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200' => $entry->status === 'pending',
+                                        'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300' => $entry->status === 'rejected',
                                     ])>{{ $entry->statusLabel }}</span>
                                 </td>
                                 <td class="px-4 py-3 text-gray-600 dark:text-gray-400" data-label="By">{{ $entry->actorName }}</td>

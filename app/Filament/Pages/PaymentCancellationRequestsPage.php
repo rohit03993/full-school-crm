@@ -90,15 +90,21 @@ class PaymentCancellationRequestsPage extends Page
     {
         return $schema->components([
             View::make('filament.pages.partials.payment-cancellation-requests')
-                ->viewData(fn (): array => [
-                    'requests' => $this->pendingRequests(app(PaymentCancellationService::class)),
-                    'feesLabel' => CrmMenuLabels::fees(),
-                ]),
+                ->viewData(function (): array {
+                    $cancellations = app(PaymentCancellationService::class);
+
+                    return [
+                        'requests' => $this->pendingRequests($cancellations),
+                        'summary' => $cancellations->summary(),
+                        'history' => $cancellations->recentHistory(),
+                        'feesLabel' => CrmMenuLabels::fees(),
+                    ];
+                }),
         ]);
     }
 
     public function getSubheading(): ?string
     {
-        return 'Staff request to cancel a mistaken payment. Only the latest active receipt can be cancelled; Super Admin must approve.';
+        return 'Staff request to cancel a mistaken payment. Only the latest active receipt can be cancelled; Super Admin must approve. Approved and rejected decisions stay in the history below.';
     }
 }
