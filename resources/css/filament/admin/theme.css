@@ -157,6 +157,19 @@
         @apply text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400;
     }
 
+    /* Select panels are absolutely positioned inside this card, and the hero and
+       widgets below are positioned too — without a stacking context of its own
+       the toolbar's open dropdown gets painted over by them. */
+    .crm-dash-filters {
+        @apply relative z-30;
+    }
+
+    .crm-dash-filters .fi-section,
+    .crm-dash-filters .fi-section-content-ctn,
+    .crm-dash-filters .fi-section-content {
+        @apply overflow-visible;
+    }
+
     /* The grouped period control is `w-max`, so let it scroll rather than overflow */
     .crm-dash-filters .fi-fo-toggle-buttons-wrp {
         @apply -mx-1 max-w-full overflow-x-auto px-1 pb-0.5;
