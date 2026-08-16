@@ -9,6 +9,7 @@ use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Enums\PaymentMode;
 use App\Models\Course;
+use App\Models\FeeDiscountEntry;
 use App\Models\FeeInstallment;
 use App\Models\Student;
 use App\Models\User;
@@ -60,6 +61,36 @@ class FeesDashboardServiceTest extends TestCase
         $summary = app(FeesDashboardService::class)->summary();
 
         $this->assertSame((float) $installment->pending_amount, $summary['collection_today']);
+
+        $overview = app(FeesDashboardService::class)->overview(now()->startOfMonth(), now());
+        $this->assertSame((float) $installment->pending_amount, $overview['collection_range']);
+        $this->assertSame(1, $overview['receipt_count']);
+        $this->assertNotEmpty($overview['payment_modes']);
+        $this->assertCount(7, $overview['last_seven_days']);
+        $this->assertCount(6, $overview['monthly']['data']);
+    }
+
+    public function test_overview_includes_discounts_in_selected_range(): void
+    {
+        $staff = $this->createSuperAdmin();
+        $student = $this->enrollStudentWithInstallments($staff, now()->addDays(30)->toDateString());
+        $feeStructure = $student->fresh()->activeEnrollment?->feeStructure;
+        $this->assertNotNull($feeStructure);
+
+        FeeDiscountEntry::query()->create([
+            'admission_id' => $student->activeEnrollment->admission_id,
+            'fee_structure_id' => $feeStructure->id,
+            'amount' => -2500,
+            'total_after' => 57500,
+            'reason' => 'Dashboard discount',
+            'granted_by_user_id' => $staff->id,
+        ]);
+
+        $overview = app(FeesDashboardService::class)->overview(now()->startOfMonth(), now());
+
+        $this->assertSame(1, $overview['discounts']['tuition_discount_count']);
+        $this->assertSame(2500.0, $overview['discounts']['tuition_discount_total']);
+        $this->assertSame(2500.0, $overview['discounts']['combined_total']);
     }
 
     public function test_fee_status_and_next_due_for_student_with_overdue_installment(): void

@@ -1,26 +1,34 @@
 <div class="space-y-6">
     <div class="fi-section rounded-xl px-4 py-4 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 sm:px-5">
-        <form wire:submit="applyLedgerFilters" class="flex flex-wrap items-end gap-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-                <label class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400" for="ledger-from">From</label>
-                <input
-                    id="ledger-from"
-                    type="date"
-                    wire:model="fromDate"
-                    class="mt-1 block rounded-lg border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-white/10 dark:bg-gray-900 dark:text-white"
-                />
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Period</p>
+                <p class="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                    Same dates as Overview · {{ $summary['range_label'] ?? $this->periodLabel() }}
+                </p>
             </div>
-            <div>
-                <label class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400" for="ledger-to">To</label>
-                <input
-                    id="ledger-to"
-                    type="date"
-                    wire:model="toDate"
-                    class="mt-1 block rounded-lg border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-white/10 dark:bg-gray-900 dark:text-white"
-                />
-            </div>
-            <x-filament::button type="submit" size="sm">Apply</x-filament::button>
-        </form>
+            <form wire:submit="applyLedgerFilters" class="flex flex-wrap items-end gap-4">
+                <div>
+                    <label class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400" for="ledger-from">From</label>
+                    <input
+                        id="ledger-from"
+                        type="date"
+                        wire:model="fromDate"
+                        class="mt-1 block rounded-lg border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-white/10 dark:bg-gray-900 dark:text-white"
+                    />
+                </div>
+                <div>
+                    <label class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400" for="ledger-to">To</label>
+                    <input
+                        id="ledger-to"
+                        type="date"
+                        wire:model="toDate"
+                        class="mt-1 block rounded-lg border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-white/10 dark:bg-gray-900 dark:text-white"
+                    />
+                </div>
+                <x-filament::button type="submit" size="sm">Apply</x-filament::button>
+            </form>
+        </div>
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

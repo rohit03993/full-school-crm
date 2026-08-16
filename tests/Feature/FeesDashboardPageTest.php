@@ -33,8 +33,41 @@ class FeesDashboardPageTest extends TestCase
         Livewire::test(FeesDashboardPage::class)
             ->assertOk()
             ->assertSet('summary.collection_today', 0.0)
+            ->assertSet('summary.collection_range', 0.0)
+            ->assertSet('rangePreset', 'month')
+            ->call('setRangePreset', 'today')
+            ->assertSet('rangePreset', 'today')
+            ->assertSet('fromDate', now()->toDateString())
+            ->assertSet('toDate', now()->toDateString())
             ->call('refreshDashboard')
             ->assertOk();
+    }
+
+    public function test_fees_page_custom_dates_drive_overview_and_ledger(): void
+    {
+        Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+
+        Setting::setValue('site.name', 'Test Institute', 'general');
+        Setting::setValue('crm.onboarding_completed', '1', 'crm');
+
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $from = now()->subDays(3)->toDateString();
+        $to = now()->toDateString();
+
+        Livewire::test(FeesDashboardPage::class)
+            ->set('fromDate', $from)
+            ->set('toDate', $to)
+            ->call('applyPeriodFilters')
+            ->assertSet('rangePreset', 'custom')
+            ->assertSet('fromDate', $from)
+            ->assertSet('toDate', $to)
+            ->assertSee('Collected in period')
+            ->assertSee('Discount breakdown');
     }
 
     public function test_fees_page_can_switch_to_ledger_tab(): void

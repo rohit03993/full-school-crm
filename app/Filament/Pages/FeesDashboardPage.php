@@ -6,9 +6,9 @@ use App\Enums\LicenseFeature;
 use App\Services\AccountingLedgerService;
 use App\Services\FeesDashboardService;
 use App\Support\CrmAccess;
-use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
+use App\Support\DashboardFilters;
 use App\Support\FeatureGate;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -45,8 +45,10 @@ class FeesDashboardPage extends Page
 
     public string $activeTab = 'overview';
 
+    public string $rangePreset = DashboardFilters::RANGE_MONTH;
+
     /**
-     * @var array<string, float|int>
+     * @var array<string, mixed>
      */
     public array $summary = [];
 
@@ -81,8 +83,8 @@ class FeesDashboardPage extends Page
     public function getSubheading(): ?string
     {
         return match ($this->activeTab) {
-            'ledger' => 'Collections journal for the selected period. Receipts show as credits (money received).',
-            default => CrmHint::text('fees.dashboard'),
+            'ledger' => 'Collections journal for '.$this->periodLabel().'. Receipts show as credits (money received).',
+            default => 'Track collections, discounts, and overdue balances for '.$this->periodLabel().'.',
         };
     }
 
@@ -92,9 +94,7 @@ class FeesDashboardPage extends Page
             $this->activeTab = 'ledger';
         }
 
-        $this->fromDate ??= now()->startOfMonth()->toDateString();
-        $this->toDate ??= now()->toDateString();
-
+        $this->applyPresetDates($this->rangePreset);
         $this->refreshData($fees);
         $this->refreshLedger($ledger);
     }
@@ -108,23 +108,56 @@ class FeesDashboardPage extends Page
         $this->activeTab = $tab;
     }
 
-    public function refreshDashboard(FeesDashboardService $fees): void
+    public function setRangePreset(string $preset, FeesDashboardService $fees, AccountingLedgerService $ledger): void
+    {
+        if (! in_array($preset, [
+            DashboardFilters::RANGE_TODAY,
+            DashboardFilters::RANGE_WEEK,
+            DashboardFilters::RANGE_MONTH,
+            DashboardFilters::RANGE_CUSTOM,
+        ], true)) {
+            return;
+        }
+
+        $this->rangePreset = $preset;
+
+        if ($preset !== DashboardFilters::RANGE_CUSTOM) {
+            $this->applyPresetDates($preset);
+        }
+
+        $this->refreshData($fees);
+        $this->refreshLedger($ledger);
+    }
+
+    public function applyPeriodFilters(FeesDashboardService $fees, AccountingLedgerService $ledger): void
+    {
+        $this->rangePreset = DashboardFilters::RANGE_CUSTOM;
+        $this->normalizeDates();
+        $this->refreshData($fees);
+        $this->refreshLedger($ledger);
+    }
+
+    public function refreshDashboard(FeesDashboardService $fees, AccountingLedgerService $ledger): void
     {
         $this->refreshData($fees);
+        $this->refreshLedger($ledger);
     }
 
     protected function refreshData(FeesDashboardService $fees): void
     {
-        $this->summary = $fees->summary();
-        $this->defaulters = $fees->defaulters()->values();
+        $this->normalizeDates();
+        [$from, $to] = $this->periodBounds();
+
+        $this->summary = $fees->overview($from, $to);
+        $this->defaulters = $fees->defaulters($to)->values();
     }
 
     public function refreshLedger(AccountingLedgerService $ledger): void
     {
-        $from = filled($this->fromDate) ? Carbon::parse($this->fromDate)->startOfDay() : null;
-        $to = filled($this->toDate) ? Carbon::parse($this->toDate)->endOfDay() : null;
+        $this->normalizeDates();
+        [$from, $to] = $this->periodBounds();
 
-        $summary = $ledger->feeLedgerSummary($from, $to);
+        $summary = $ledger->feeLedgerSummary($from->copy()->startOfDay(), $to->copy()->endOfDay());
         $summary['collection_rows'] = collect($summary['collection_rows'])->values()->all();
         $summary['income_rows'] = collect($summary['income_rows'])->values()->all();
 
@@ -136,15 +169,81 @@ class FeesDashboardPage extends Page
      */
     public function getPresentedEntries(): Collection
     {
-        $ledger = app(AccountingLedgerService::class);
-        $from = filled($this->fromDate) ? Carbon::parse($this->fromDate)->startOfDay() : null;
-        $to = filled($this->toDate) ? Carbon::parse($this->toDate)->endOfDay() : null;
+        $this->normalizeDates();
+        [$from, $to] = $this->periodBounds();
 
-        return $ledger->presentEntries($ledger->recentEntries(50, $from, $to));
+        $ledger = app(AccountingLedgerService::class);
+
+        return $ledger->presentEntries($ledger->recentEntries(50, $from->copy()->startOfDay(), $to->copy()->endOfDay()));
     }
 
-    public function applyLedgerFilters(AccountingLedgerService $ledger): void
+    public function applyLedgerFilters(FeesDashboardService $fees, AccountingLedgerService $ledger): void
     {
-        $this->refreshLedger($ledger);
+        $this->applyPeriodFilters($fees, $ledger);
+    }
+
+    public function periodLabel(): string
+    {
+        return match ($this->rangePreset) {
+            DashboardFilters::RANGE_TODAY => 'today',
+            DashboardFilters::RANGE_WEEK => 'the last 7 days',
+            DashboardFilters::RANGE_MONTH => 'this month',
+            default => filled($this->fromDate) && filled($this->toDate)
+                ? Carbon::parse($this->fromDate)->format('d M').' – '.Carbon::parse($this->toDate)->format('d M Y')
+                : 'the selected period',
+        };
+    }
+
+    /**
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    protected function periodBounds(): array
+    {
+        $from = Carbon::parse((string) $this->fromDate)->startOfDay();
+        $to = Carbon::parse((string) $this->toDate)->startOfDay();
+
+        return app(FeesDashboardService::class)->normalizeRange($from, $to);
+    }
+
+    protected function applyPresetDates(string $preset): void
+    {
+        $today = today();
+
+        [$from, $to] = match ($preset) {
+            DashboardFilters::RANGE_TODAY => [$today->copy(), $today->copy()],
+            DashboardFilters::RANGE_WEEK => [$today->copy()->subDays(6), $today->copy()],
+            default => [$today->copy()->startOfMonth(), $today->copy()],
+        };
+
+        $this->fromDate = $from->toDateString();
+        $this->toDate = $to->toDateString();
+    }
+
+    protected function normalizeDates(): void
+    {
+        if (! filled($this->fromDate)) {
+            $this->fromDate = now()->startOfMonth()->toDateString();
+        }
+
+        if (! filled($this->toDate)) {
+            $this->toDate = now()->toDateString();
+        }
+
+        if (Carbon::parse($this->toDate)->lt(Carbon::parse($this->fromDate))) {
+            [$this->fromDate, $this->toDate] = [$this->toDate, $this->fromDate];
+        }
+    }
+
+    /**
+     * @return list<array{key: string, label: string}>
+     */
+    public function rangePresetOptions(): array
+    {
+        return [
+            ['key' => DashboardFilters::RANGE_TODAY, 'label' => 'Today'],
+            ['key' => DashboardFilters::RANGE_WEEK, 'label' => 'Last 7 days'],
+            ['key' => DashboardFilters::RANGE_MONTH, 'label' => 'This month'],
+            ['key' => DashboardFilters::RANGE_CUSTOM, 'label' => 'Custom'],
+        ];
     }
 }

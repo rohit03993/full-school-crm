@@ -9,6 +9,7 @@ use App\Models\FeeMiscChargeAdjustmentRequest;
 use App\Models\Student;
 use App\Support\CrmPagination;
 use App\Support\FeeDiscountHistoryItem;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
 class FeeDiscountHistoryService
@@ -162,6 +163,82 @@ class FeeDiscountHistoryService
             ->sortByDesc(fn (FeeDiscountHistoryItem $item): int => $item->occurredAt->timestamp)
             ->take($limit)
             ->values();
+    }
+
+    /**
+     * @return array{
+     *     tuition_discount_count: int,
+     *     tuition_discount_total: float,
+     *     misc_discount_count: int,
+     *     misc_discount_total: float,
+     *     misc_waive_count: int,
+     *     misc_waive_total: float,
+     *     misc_rejected_count: int,
+     *     combined_count: int,
+     *     combined_total: float,
+     * }
+     */
+    public function summaryInRange(CarbonInterface $from, CarbonInterface $to): array
+    {
+        $fromDay = $from->copy()->startOfDay();
+        $toDay = $to->copy()->endOfDay();
+
+        $tuition = FeeDiscountEntry::query()
+            ->where('amount', '<', 0)
+            ->whereBetween('created_at', [$fromDay, $toDay])
+            ->selectRaw('COUNT(*) as entry_count, COALESCE(SUM(ABS(amount)), 0) as entry_total')
+            ->first();
+
+        $tuitionCount = (int) ($tuition->entry_count ?? 0);
+        $tuitionTotal = round((float) ($tuition->entry_total ?? 0), 2);
+
+        $miscDiscountCount = 0;
+        $miscDiscountTotal = 0.0;
+        $miscWaiveCount = 0;
+        $miscWaiveTotal = 0.0;
+        $miscRejectedCount = 0;
+
+        if (FeeMiscChargeAdjustmentRequest::schemaReady()) {
+            $miscDiscount = FeeMiscChargeAdjustmentRequest::query()
+                ->where('status', FeeMiscChargeAdjustmentRequestStatus::Approved)
+                ->where('type', FeeMiscChargeAdjustmentType::Discount)
+                ->whereBetween('reviewed_at', [$fromDay, $toDay])
+                ->selectRaw('COUNT(*) as entry_count, COALESCE(SUM(COALESCE(applied_amount, discount_amount)), 0) as entry_total')
+                ->first();
+
+            $miscDiscountCount = (int) ($miscDiscount->entry_count ?? 0);
+            $miscDiscountTotal = round((float) ($miscDiscount->entry_total ?? 0), 2);
+
+            $miscWaive = FeeMiscChargeAdjustmentRequest::query()
+                ->where('status', FeeMiscChargeAdjustmentRequestStatus::Approved)
+                ->where('type', FeeMiscChargeAdjustmentType::WaiveOff)
+                ->whereBetween('reviewed_at', [$fromDay, $toDay])
+                ->selectRaw('COUNT(*) as entry_count, COALESCE(SUM(applied_amount), 0) as entry_total')
+                ->first();
+
+            $miscWaiveCount = (int) ($miscWaive->entry_count ?? 0);
+            $miscWaiveTotal = round((float) ($miscWaive->entry_total ?? 0), 2);
+
+            $miscRejectedCount = FeeMiscChargeAdjustmentRequest::query()
+                ->where('status', FeeMiscChargeAdjustmentRequestStatus::Rejected)
+                ->whereBetween('reviewed_at', [$fromDay, $toDay])
+                ->count();
+        }
+
+        $combinedCount = $tuitionCount + $miscDiscountCount + $miscWaiveCount;
+        $combinedTotal = round($tuitionTotal + $miscDiscountTotal + $miscWaiveTotal, 2);
+
+        return [
+            'tuition_discount_count' => $tuitionCount,
+            'tuition_discount_total' => $tuitionTotal,
+            'misc_discount_count' => $miscDiscountCount,
+            'misc_discount_total' => $miscDiscountTotal,
+            'misc_waive_count' => $miscWaiveCount,
+            'misc_waive_total' => $miscWaiveTotal,
+            'misc_rejected_count' => $miscRejectedCount,
+            'combined_count' => $combinedCount,
+            'combined_total' => $combinedTotal,
+        ];
     }
 
     public function resolvedAppliedAmount(FeeMiscChargeAdjustmentRequest $request): float
