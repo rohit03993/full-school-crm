@@ -172,12 +172,15 @@
                     $entry = $presented['entry'];
                     $isLateFee = in_array($entry->reference_type?->value, ['fee_penalty', 'fee_misc_charge'], true);
                     $isCancel = $entry->reference_type?->value === 'payment_cancellation';
+                    $title = $isLateFee
+                        ? \Illuminate\Support\Str::after($entry->description, 'Late fee accrued — ')
+                        : $entry->description;
                 @endphp
                 <div class="px-4 py-4 sm:px-6">
                     <div class="flex flex-wrap items-start justify-between gap-2">
-                        <div>
+                        <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2">
-                                <p class="font-semibold text-gray-950 dark:text-white">{{ $entry->description }}</p>
+                                <p class="min-w-0 break-words text-sm font-semibold text-gray-950 dark:text-white">{{ $title }}</p>
                                 @if ($isLateFee)
                                     <span class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">Accrual</span>
                                 @elseif ($isCancel)
@@ -197,45 +200,32 @@
                             </p>
                         </div>
                     </div>
-                    <x-crm.responsive-table>
-                        <table class="w-full min-w-[480px] text-left text-xs">
-                            <thead class="text-gray-500 dark:text-gray-400">
-                                <tr>
-                                    <th class="py-1 pr-3 font-semibold">Entry</th>
-                                    <th class="py-1 pr-3 font-semibold">Side</th>
-                                    <th class="py-1 font-semibold text-right">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($presented['lines'] as $line)
-                                    <tr>
-                                        <td class="crm-responsive-table__title py-1 pr-3 text-gray-800 dark:text-gray-200" data-label="">
-                                            {{ $line->label }}
-                                            @if ($line->detail)
-                                                <span class="block text-[11px] text-gray-500 dark:text-gray-400">{{ $line->detail }}</span>
-                                            @endif
-                                        </td>
-                                        <td class="py-1 pr-3" data-label="Side">
-                                            <span @class([
-                                                'inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
-                                                'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $line->side === 'credit',
-                                                'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' => $line->side === 'debit',
-                                            ])>
-                                                {{ $line->sideLabel }}
-                                            </span>
-                                        </td>
-                                        <td @class([
-                                            'py-1 text-right font-semibold',
-                                            'text-emerald-600 dark:text-emerald-400' => $line->side === 'credit',
-                                            'text-amber-600 dark:text-amber-400' => $line->side === 'debit',
-                                        ]) data-label="Amount">
-                                            ₹{{ number_format($line->amount, 2) }}
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </x-crm.responsive-table>
+                    <div class="mt-3 space-y-2">
+                        @forelse ($presented['lines'] as $line)
+                            @php
+                                $isMoneyIn = $line->sideLabel === 'Money in';
+                                $isMoneyOut = $line->sideLabel === 'Money out';
+                            @endphp
+                            <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5">
+                                <div class="min-w-0 flex-1">
+                                    <p class="break-words text-xs font-medium text-gray-800 dark:text-gray-200">{{ $line->label }}</p>
+                                    @if ($line->detail)
+                                        <p class="break-words text-[11px] text-gray-500 dark:text-gray-400">{{ $line->detail }}</p>
+                                    @endif
+                                </div>
+                                <p @class([
+                                    'shrink-0 whitespace-nowrap text-xs font-semibold tabular-nums',
+                                    'text-emerald-600 dark:text-emerald-400' => $isMoneyIn,
+                                    'text-red-600 dark:text-red-400' => $isMoneyOut,
+                                    'text-amber-600 dark:text-amber-400' => ! $isMoneyIn && ! $isMoneyOut,
+                                ])>
+                                    {{ $isMoneyOut ? '−' : '' }}₹{{ number_format($line->amount, 2) }}
+                                </p>
+                            </div>
+                        @empty
+                            <p class="text-xs text-gray-500 dark:text-gray-400">No amount lines recorded for this entry.</p>
+                        @endforelse
+                    </div>
                 </div>
             @empty
                 <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">

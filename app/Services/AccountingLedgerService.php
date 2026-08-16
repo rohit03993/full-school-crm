@@ -450,18 +450,52 @@ class AccountingLedgerService
             );
 
             $presented = collect();
+            $modeName = $collectionLine?->account?->name ?? 'Cash / Bank';
 
             if ($collectionLine && (float) $collectionLine->debit > 0) {
                 $presented->push(new FeeLedgerPresentation(
                     side: 'credit',
-                    sideLabel: 'Credit',
-                    label: 'Fee collected via '.($collectionLine->account?->name ?? 'Cash / Bank'),
+                    sideLabel: 'Money in',
+                    label: 'Fee collected via '.$modeName,
                     amount: round((float) $collectionLine->debit, 2),
                     detail: $payment?->student?->name,
                 ));
             }
 
+            if ($collectionLine && (float) $collectionLine->credit > 0) {
+                $presented->push(new FeeLedgerPresentation(
+                    side: 'debit',
+                    sideLabel: 'Money out',
+                    label: 'Receipt cancelled — '.$modeName.' reversed',
+                    amount: round((float) $collectionLine->credit, 2),
+                    detail: $payment?->student?->name,
+                ));
+            }
+
             return $presented->values();
+        }
+
+        if ($entry->reference_type === AccountingReferenceType::FeePenalty
+            || $entry->reference_type === AccountingReferenceType::FeeMiscCharge) {
+            $lateFeeLine = $entry->lines->first(
+                fn (AccountingJournalLine $line): bool => $line->account?->code === self::CODE_LATE_FEE_INCOME,
+            );
+
+            $amount = round((float) ($lateFeeLine?->credit ?? 0), 2);
+
+            if ($amount <= 0) {
+                return collect();
+            }
+
+            return collect([
+                new FeeLedgerPresentation(
+                    side: 'debit',
+                    sideLabel: 'Charge added',
+                    label: 'Late fee added to student balance',
+                    amount: $amount,
+                    detail: null,
+                ),
+            ]);
         }
 
         $presented = collect();
@@ -470,7 +504,7 @@ class AccountingLedgerService
             if ((float) $line->debit > 0) {
                 $presented->push(new FeeLedgerPresentation(
                     side: 'debit',
-                    sideLabel: 'Debit',
+                    sideLabel: 'Charge added',
                     label: $line->account?->name ?? 'Account',
                     amount: round((float) $line->debit, 2),
                     detail: $line->memo,
@@ -480,7 +514,7 @@ class AccountingLedgerService
             if ((float) $line->credit > 0) {
                 $presented->push(new FeeLedgerPresentation(
                     side: 'credit',
-                    sideLabel: 'Credit',
+                    sideLabel: 'Money in',
                     label: $line->account?->name ?? 'Account',
                     amount: round((float) $line->credit, 2),
                     detail: $line->memo,

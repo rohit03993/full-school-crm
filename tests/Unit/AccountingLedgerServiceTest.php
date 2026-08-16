@@ -109,6 +109,12 @@ class AccountingLedgerServiceTest extends TestCase
         $lines = AccountingJournalLine::query()->where('journal_entry_id', $entry->id)->get();
         $this->assertSame(250.0, round((float) $lines->sum('debit'), 2));
         $this->assertSame(250.0, round((float) $lines->sum('credit'), 2));
+
+        $presented = app(AccountingLedgerService::class)->presentEntryLines($entry);
+
+        $this->assertCount(1, $presented);
+        $this->assertSame('Charge added', $presented->first()->sideLabel);
+        $this->assertSame(250.0, $presented->first()->amount);
     }
 
     public function test_fee_ledger_summary_shows_collections_as_credits(): void
@@ -176,10 +182,41 @@ class AccountingLedgerServiceTest extends TestCase
 
         $this->assertCount(1, $presented);
         $this->assertSame('credit', $presented->first()->side);
-        $this->assertSame('Credit', $presented->first()->sideLabel);
+        $this->assertSame('Money in', $presented->first()->sideLabel);
         $this->assertStringContainsString('Bank / UPI', $presented->first()->label);
         $this->assertSame(10000.0, $presented->first()->amount);
         $this->assertSame('Ledger Student', $presented->first()->detail);
+    }
+
+    public function test_cancellation_entry_is_presented_as_money_out(): void
+    {
+        $staff = User::factory()->create();
+        $student = $this->createStudent();
+        $feeStructure = $this->createFeeStructure($student);
+        $ledger = app(AccountingLedgerService::class);
+
+        $payment = Payment::query()->create([
+            'fee_structure_id' => $feeStructure->id,
+            'student_id' => $student->id,
+            'payment_date' => now()->toDateString(),
+            'amount' => 5000,
+            'payment_mode' => PaymentMode::Cash,
+            'receipt_number' => 'RCP-CANCEL-001',
+            'proof_image_path' => 'proofs/test.jpg',
+            'added_by_user_id' => $staff->id,
+        ]);
+
+        $ledger->postPayment($payment, 5000, 0, $staff);
+        $entry = $ledger->postPaymentCancellation($payment->fresh(), $staff);
+
+        $this->assertNotNull($entry);
+
+        $presented = $ledger->presentEntryLines($entry);
+
+        $this->assertCount(1, $presented);
+        $this->assertSame('Money out', $presented->first()->sideLabel);
+        $this->assertStringContainsString('Receipt cancelled', $presented->first()->label);
+        $this->assertSame(5000.0, $presented->first()->amount);
     }
 
     protected function createStudent(): Student
