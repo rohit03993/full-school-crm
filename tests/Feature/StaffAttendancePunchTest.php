@@ -10,6 +10,8 @@ use App\Enums\Gender;
 use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
+use App\Filament\Pages\AttendanceHubPage;
+use App\Filament\Pages\StaffAttendancePage;
 use App\Models\Admission;
 use App\Models\Course;
 use App\Models\Enquiry;
@@ -23,10 +25,12 @@ use App\Services\Punch\ManualStaffAttendanceService;
 use App\Services\Punch\PunchAttendanceProcessor;
 use App\Services\StaffBulkImportService;
 use App\Support\BiometricPinCollision;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -274,6 +278,32 @@ class StaffAttendancePunchTest extends TestCase
         $user->assignRole(RoleName::SuperAdmin->value);
 
         return $user;
+    }
+
+    public function test_staff_attendance_page_shows_day_summary_and_not_punched(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+
+        $this->createStaffWithCode('STF900');
+        User::factory()->create(['name' => 'No Code Yet', 'is_active' => true])
+            ->assignRole(RoleName::Staff->value);
+
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(StaffAttendancePage::class)
+            ->assertSuccessful()
+            ->assertSee('Not punched')
+            ->assertSee('Present')
+            ->assertSee('Assign missing Staff IDs')
+            ->assertSee('STF900');
+
+        Livewire::test(AttendanceHubPage::class)
+            ->assertSuccessful()
+            ->assertSee('Students — live punches')
+            ->assertSee('Staff attendance')
+            ->assertSee('Staff ID = device PIN');
     }
 
     protected function createStaffWithCode(string $code): User

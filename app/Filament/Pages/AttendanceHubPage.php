@@ -40,7 +40,7 @@ class AttendanceHubPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Mark student and staff attendance from one place.';
+        return 'Mark students and staff from one place. Same machine and Face app — Roll No. for students, Staff ID for staff.';
     }
 
     public function content(Schema $schema): Schema
@@ -49,24 +49,26 @@ class AttendanceHubPage extends Page
 
         if (AttendancePage::canAccess()) {
             $cards[] = [
-                'title' => 'Live punches',
-                'description' => 'Biometric and live IN/OUT for today\'s classes.',
+                'title' => 'Students — live punches',
+                'description' => 'Biometric / Face IN–OUT for today\'s classes. Student Roll No. = device PIN.',
                 'url' => AttendancePage::getUrl(['mode' => 'live']),
-                'badge' => 'Start here',
+                'badge' => 'Students',
                 'tone' => 'primary',
             ];
             $cards[] = [
-                'title' => 'Manual batch',
-                'description' => 'Tap IN/OUT for a class section when the device is not used.',
+                'title' => 'Students — manual batch',
+                'description' => 'Mark a class section by hand when the machine is not used.',
                 'url' => AttendancePage::getUrl(['mode' => 'manual']),
+                'badge' => 'Students',
             ];
         }
 
         if (StaffAttendancePage::canAccess()) {
             $cards[] = [
                 'title' => 'Staff attendance',
-                'description' => 'Record or review staff day attendance.',
+                'description' => 'IN/OUT for teachers and office staff. Staff ID = device PIN = Face ID.',
                 'url' => StaffAttendancePage::getUrl(),
+                'badge' => 'Staff',
             ];
         }
 
@@ -74,9 +76,9 @@ class AttendanceHubPage extends Page
             View::make('filament.pages.partials.crm-hub')
                 ->viewData([
                     'heading' => 'Attendance desk',
-                    'intro' => 'Choose live punches, manual class marking, or staff attendance.',
+                    'intro' => 'Students and staff share the same ADMS machine and Face app — the PIN decides who is who.',
                     'cards' => $cards,
-                    'footer' => '<strong class="text-gray-900 dark:text-white">Tip:</strong> Parent WhatsApp on punch still follows Automations under WhatsApp.',
+                    'footer' => '<strong class="text-gray-900 dark:text-white">Setup:</strong> Student Roll No. and Staff ID must be unique. Put the same code on the ADMS machine and Face app. Missing Staff IDs → Admin → Staff → Assign missing Staff IDs, then Sync to Face API. Parent WhatsApp on punch still follows WhatsApp → Automations.',
                 ]),
         ]);
     }

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\AttendanceStatus;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Filament\Resources\Staff\StaffResource;
@@ -58,7 +59,7 @@ class StaffAttendancePage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Mark IN/OUT manually here, or from Face/RFID (Staff ID = device PIN). Open IN is auto-closed at the same cutoff as students (default 20:00) with no WhatsApp. Face sync: Admin → Staff → Sync to Face API.';
+        return 'Manual IN/OUT here, or Face/RFID (Staff ID = device PIN). Open IN auto-closes at the same cutoff as students (default 20:00). Missing Staff ID? Admin → Staff → Assign missing Staff IDs, then Sync to Face API.';
     }
 
     public function mount(): void
@@ -119,11 +120,18 @@ class StaffAttendancePage extends Page
                     ])->alignment(Alignment::Start),
                 ]),
             View::make('filament.pages.partials.staff-attendance-table')
-                ->viewData(fn (): array => [
-                    'rows' => $this->rows(),
-                    'date' => $this->selectedDate(),
-                    'canMarkToday' => $this->selectedDate() === now()->toDateString(),
-                ]),
+                ->viewData(function (): array {
+                    $rows = $this->rows();
+
+                    return [
+                        'rows' => $rows,
+                        'summary' => $this->summarizeRows($rows),
+                        'missingStaffIdCount' => $this->missingStaffIdCount(),
+                        'staffListUrl' => StaffResource::getUrl('index'),
+                        'date' => $this->selectedDate(),
+                        'canMarkToday' => $this->selectedDate() === now()->toDateString(),
+                    ];
+                }),
         ]);
     }
 
@@ -202,6 +210,8 @@ class StaffAttendancePage extends Page
             /** @var StaffAttendance|null $attendance */
             $attendance = $user->staffAttendances->first();
             $inside = $manual->isInside($user, $date);
+            $status = $attendance?->status;
+            $statusKey = $this->dayStatusKey($status, $inside);
 
             return [
                 'id' => $user->id,
@@ -209,7 +219,9 @@ class StaffAttendancePage extends Page
                 'employee_code' => $user->staffProfile?->employee_code,
                 'designation' => $user->staffProfile?->designation,
                 'mobile' => $user->staffProfile?->mobile ?: $user->mobile,
-                'status' => $attendance?->status?->value ?? $attendance?->status,
+                'status' => $status?->value,
+                'status_key' => $statusKey,
+                'status_label' => $this->dayStatusLabel($statusKey),
                 'checked_in_at' => $attendance?->checked_in_at?->format('H:i:s'),
                 'checked_out_at' => $attendance?->checked_out_at?->format('H:i:s'),
                 'punch_source' => $attendance?->punch_source,
@@ -222,5 +234,64 @@ class StaffAttendancePage extends Page
                 'date' => $date,
             ];
         });
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return array{total: int, present: int, inside: int, left: int, not_punched: int, leave: int}
+     */
+    protected function summarizeRows(Collection $rows): array
+    {
+        return [
+            'total' => $rows->count(),
+            'present' => $rows->whereIn('status_key', ['inside', 'left'])->count(),
+            'inside' => $rows->where('status_key', 'inside')->count(),
+            'left' => $rows->where('status_key', 'left')->count(),
+            'not_punched' => $rows->where('status_key', 'not_punched')->count(),
+            'leave' => $rows->where('status_key', 'leave')->count(),
+        ];
+    }
+
+    protected function missingStaffIdCount(): int
+    {
+        return (int) User::query()
+            ->where('is_active', true)
+            ->where('is_platform_operator', false)
+            ->where(function ($query): void {
+                $query
+                    ->whereDoesntHave('staffProfile')
+                    ->orWhereHas('staffProfile', fn ($profile) => $profile
+                        ->whereNull('employee_code')
+                        ->orWhere('employee_code', ''));
+            })
+            ->whereHas('roles')
+            ->count();
+    }
+
+    protected function dayStatusKey(?AttendanceStatus $status, bool $inside): string
+    {
+        if ($status === AttendanceStatus::Leave) {
+            return 'leave';
+        }
+
+        if ($inside) {
+            return 'inside';
+        }
+
+        if ($status === AttendanceStatus::Present) {
+            return 'left';
+        }
+
+        return 'not_punched';
+    }
+
+    protected function dayStatusLabel(string $key): string
+    {
+        return match ($key) {
+            'inside' => 'Present · inside',
+            'left' => 'Present · left',
+            'leave' => 'Leave',
+            default => 'Not punched',
+        };
     }
 }
