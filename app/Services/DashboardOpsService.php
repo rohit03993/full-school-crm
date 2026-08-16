@@ -33,6 +33,7 @@ class DashboardOpsService
      *     approvals_total: int,
      *     admissions_pending: int,
      *     fee_adjustments_pending: int,
+     *     payment_cancellations_pending: int,
      *     homework_awaiting_approve: int,
      *     follow_ups_due: int,
      *     uncalled_leads: int,
@@ -59,6 +60,9 @@ class DashboardOpsService
                 $admissions = $isOwner ? CrmNavBadges::admissionsPendingAction() : 0;
                 $feeAdjustments = $isOwner && FeatureGate::enabled(LicenseFeature::Fees)
                     ? CrmNavBadges::miscChargeAdjustmentsPending()
+                    : 0;
+                $paymentCancellations = $isOwner && FeatureGate::enabled(LicenseFeature::Fees)
+                    ? CrmNavBadges::paymentCancellationsPending()
                     : 0;
                 $homeworkAwaiting = FeatureGate::enabled(LicenseFeature::Homework)
                     && ($isOwner || CrmAccess::can($user, CrmPermission::HomeworkManage))
@@ -90,13 +94,14 @@ class DashboardOpsService
                     $overdueStudents = (int) (app(CrmDashboardService::class)->feeSummary($filters)['overdue_students_count'] ?? 0);
                 }
 
-                $approvals = $admissions + $feeAdjustments + $homeworkAwaiting;
+                $approvals = $admissions + $feeAdjustments + $paymentCancellations + $homeworkAwaiting;
                 $staffWork = $followUps + $uncalled + $openCases + $openMeetings;
 
                 return [
                     'approvals_total' => $approvals,
                     'admissions_pending' => $admissions,
                     'fee_adjustments_pending' => $feeAdjustments,
+                    'payment_cancellations_pending' => $paymentCancellations,
                     'homework_awaiting_approve' => $homeworkAwaiting,
                     'follow_ups_due' => $followUps,
                     'uncalled_leads' => $uncalled,
@@ -188,7 +193,7 @@ class DashboardOpsService
                 $feesAmount = (float) ($stats['fee_collection_today'] ?? 0);
                 $feesCount = 0;
                 if (FeatureGate::enabled(LicenseFeature::Fees) && CrmAccess::canViewFees($user)) {
-                    $feesCount = (int) Payment::query()->whereDate('payment_date', $today)->count();
+                    $feesCount = (int) Payment::query()->active()->whereDate('payment_date', $today)->count();
                 } else {
                     $feesAmount = 0.0;
                 }
@@ -222,6 +227,7 @@ class DashboardOpsService
                     'fees_payments_today' => $feesCount,
                     'fees_amount_week' => FeatureGate::enabled(LicenseFeature::Fees) && CrmAccess::canViewFees($user)
                         ? (float) Payment::query()
+                            ->active()
                             ->whereDate('payment_date', '>=', $today->copy()->subDays(6)->toDateString())
                             ->whereDate('payment_date', '<=', $today->toDateString())
                             ->sum('amount')
@@ -261,7 +267,7 @@ class DashboardOpsService
                         ? (int) Enquiry::query()->whereDate('created_at', $date)->count()
                         : 0,
                     'fees' => FeatureGate::enabled(LicenseFeature::Fees)
-                        ? (float) Payment::query()->whereDate('payment_date', $date)->sum('amount')
+                        ? (float) Payment::query()->active()->whereDate('payment_date', $date)->sum('amount')
                         : 0.0,
                     'admissions' => FeatureGate::enabled(LicenseFeature::Admissions)
                         ? (int) \App\Models\Admission::query()

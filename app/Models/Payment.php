@@ -4,8 +4,12 @@ namespace App\Models;
 
 use App\Enums\PaymentMode;
 use App\Enums\PaymentShortfallAction;
+use App\Enums\PaymentStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Payment extends Model
 {
@@ -18,6 +22,7 @@ class Payment extends Model
         'amount',
         'tuition_amount',
         'shortfall_allocation',
+        'allocation_snapshot',
         'payment_mode',
         'voucher_number',
         'transaction_id',
@@ -25,6 +30,10 @@ class Payment extends Model
         'proof_image_path',
         'receipt_number',
         'receipt_path',
+        'status',
+        'cancelled_at',
+        'cancelled_by_user_id',
+        'cancel_reason',
         'added_by_user_id',
         'correction_reason',
         'corrected_by_user_id',
@@ -38,9 +47,21 @@ class Payment extends Model
             'amount' => 'decimal:2',
             'tuition_amount' => 'decimal:2',
             'shortfall_allocation' => 'array',
+            'allocation_snapshot' => 'array',
             'payment_mode' => PaymentMode::class,
+            'status' => PaymentStatus::class,
+            'cancelled_at' => 'datetime',
             'corrected_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Payment $payment): void {
+            if ($payment->status === null) {
+                $payment->status = PaymentStatus::Active;
+            }
+        });
     }
 
     public function feeStructure(): BelongsTo
@@ -87,6 +108,42 @@ class Payment extends Model
     public function correctedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'corrected_by_user_id');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by_user_id');
+    }
+
+    public function cancellationRequests(): HasMany
+    {
+        return $this->hasMany(PaymentCancellationRequest::class);
+    }
+
+    public function pendingCancellationRequest(): HasOne
+    {
+        return $this->hasOne(PaymentCancellationRequest::class)
+            ->where('status', \App\Enums\PaymentCancellationRequestStatus::Pending);
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', PaymentStatus::Active);
+    }
+
+    public function isActive(): bool
+    {
+        return ($this->status ?? PaymentStatus::Active) === PaymentStatus::Active;
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === PaymentStatus::Cancelled;
+    }
+
+    public function effectiveTuitionAmount(): float
+    {
+        return round((float) ($this->tuition_amount ?? $this->amount), 2);
     }
 
     public function hasReceiptPdf(): bool

@@ -11,6 +11,7 @@ use App\Filament\Pages\FollowUpsPage;
 use App\Filament\Pages\HomeworkPage;
 use App\Filament\Pages\HomeworkReviewPage;
 use App\Filament\Pages\MiscChargeAdjustmentRequestsPage;
+use App\Filament\Pages\PaymentCancellationRequestsPage;
 use App\Filament\Pages\MyLeadsPage;
 use App\Filament\Pages\MyMeetingsPage;
 use App\Filament\Resources\Admissions\AdmissionResource;
@@ -112,6 +113,14 @@ class DashboardAttentionWidget extends Widget
                 'tone' => $data['fee_adjustments_pending'] > 0 ? 'warning' : 'neutral',
                 'url' => MiscChargeAdjustmentRequestsPage::canAccess() ? MiscChargeAdjustmentRequestsPage::getUrl() : null,
                 'show' => FeatureGate::enabled(LicenseFeature::Fees) && MiscChargeAdjustmentRequestsPage::canAccess(),
+            ],
+            [
+                'label' => 'Payment cancels',
+                'value' => (string) ($data['payment_cancellations_pending'] ?? 0),
+                'meta' => 'Awaiting approve',
+                'tone' => ($data['payment_cancellations_pending'] ?? 0) > 0 ? 'danger' : 'neutral',
+                'url' => PaymentCancellationRequestsPage::canAccess() ? PaymentCancellationRequestsPage::getUrl() : null,
+                'show' => FeatureGate::enabled(LicenseFeature::Fees) && PaymentCancellationRequestsPage::canAccess(),
             ],
             [
                 'label' => 'Homework',
@@ -238,6 +247,14 @@ class DashboardAttentionWidget extends Widget
                 'tone' => $data['fee_adjustments_pending'] > 0 ? 'warning' : 'success',
                 'url' => MiscChargeAdjustmentRequestsPage::canAccess() ? MiscChargeAdjustmentRequestsPage::getUrl() : null,
                 'show' => FeatureGate::enabled(LicenseFeature::Fees) && MiscChargeAdjustmentRequestsPage::canAccess(),
+            ],
+            [
+                'label' => 'Payment cancels',
+                'value' => (string) ($data['payment_cancellations_pending'] ?? 0),
+                'meta' => 'Cancellation requests',
+                'tone' => ($data['payment_cancellations_pending'] ?? 0) > 0 ? 'danger' : 'success',
+                'url' => PaymentCancellationRequestsPage::canAccess() ? PaymentCancellationRequestsPage::getUrl() : null,
+                'show' => FeatureGate::enabled(LicenseFeature::Fees) && PaymentCancellationRequestsPage::canAccess(),
             ],
         ];
     }

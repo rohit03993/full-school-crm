@@ -590,6 +590,7 @@ class ReportService
     protected function feeCollectionReport(Carbon $from, Carbon $to): array
     {
         $rows = Payment::query()
+            ->active()
             ->with(['student', 'addedBy'])
             ->whereBetween('payment_date', [$from->toDateString(), $to->toDateString()])
             ->orderByDesc('payment_date')
@@ -737,6 +738,7 @@ class ReportService
     protected function paymentModesReport(Carbon $from, Carbon $to): array
     {
         $rows = Payment::query()
+            ->active()
             ->select('payment_mode', DB::raw('COUNT(*) as count'), DB::raw('SUM(amount) as total'))
             ->whereBetween('payment_date', [$from->toDateString(), $to->toDateString()])
             ->groupBy('payment_mode')
@@ -792,6 +794,7 @@ class ReportService
     protected function financialSummaryReport(Carbon $from, Carbon $to): array
     {
         $collected = (float) Payment::query()
+            ->active()
             ->whereBetween('payment_date', [$from->toDateString(), $to->toDateString()])
             ->sum('amount');
 
@@ -805,7 +808,7 @@ class ReportService
             ['Fee collected (period)', number_format($collected, 2)],
             ['Total pending (all students)', number_format($pending, 2)],
             ['Discounts given (period)', number_format($discounts, 2)],
-            ['Payments count (period)', (string) Payment::query()->whereBetween('payment_date', [$from->toDateString(), $to->toDateString()])->count()],
+            ['Payments count (period)', (string) Payment::query()->active()->whereBetween('payment_date', [$from->toDateString(), $to->toDateString()])->count()],
         ];
 
         return [

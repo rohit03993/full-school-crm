@@ -161,6 +161,7 @@ class OnlineAllowanceGstService
     public function onlineTuitionPaidTotal(FeeStructure $feeStructure, ?int $exceptPaymentId = null): float
     {
         $query = Payment::query()
+            ->active()
             ->where('fee_structure_id', $feeStructure->id)
             ->whereNull('fee_misc_charge_id')
             ->whereIn('payment_mode', [PaymentMode::Online->value, PaymentMode::Upi->value]);
@@ -174,6 +175,65 @@ class OnlineAllowanceGstService
         return round((float) $payments->sum(
             fn (Payment $payment): float => (float) ($payment->tuition_amount ?? $payment->amount),
         ), 2);
+    }
+
+    /**
+     * After cancelling a tuition payment, drop unpaid GST penalties that are no longer owed.
+     *
+     * @return list<int> Cancelled charge ids
+     */
+    public function syncUnpaidGstAfterPaymentCancellation(FeeStructure $feeStructure, ?User $staff = null): array
+    {
+        if (! $this->isEnabled() || ! $feeStructure->hasOnlineAllowancePlan()) {
+            return [];
+        }
+
+        $onlineAllowance = round((float) $feeStructure->planned_online_amount, 2);
+        $onlinePaid = $this->onlineTuitionPaidTotal($feeStructure);
+        $justifiedExcess = max(0, round($onlinePaid - $onlineAllowance, 2));
+        $gstRate = FeeSettings::gstPenaltyPercentage();
+        $justifiedGst = $justifiedExcess > 0
+            ? round($justifiedExcess * ($gstRate / 100), 2)
+            : 0.0;
+
+        $unpaidGstCharges = FeeMiscCharge::query()
+            ->where('fee_structure_id', $feeStructure->id)
+            ->where('kind', FeeMiscChargeKind::GstPenalty)
+            ->where('status', '!=', FeeMiscChargeStatus::Cancelled)
+            ->where('paid_amount', '<=', 0)
+            ->orderBy('id')
+            ->get();
+
+        $remainingJustified = $justifiedGst;
+        $cancelledIds = [];
+
+        foreach ($unpaidGstCharges as $charge) {
+            $amount = round((float) $charge->amount, 2);
+
+            if ($remainingJustified >= $amount - 0.01) {
+                $remainingJustified = round(max(0, $remainingJustified - $amount), 2);
+
+                continue;
+            }
+
+            $charge->update(['status' => FeeMiscChargeStatus::Cancelled]);
+            $cancelledIds[] = $charge->id;
+        }
+
+        if ($cancelledIds !== [] && $staff) {
+            $this->audit->log(
+                action: 'GST Penalties Cancelled After Payment Cancel',
+                auditable: $feeStructure,
+                newValues: [
+                    'cancelled_charge_ids' => $cancelledIds,
+                    'online_paid' => $onlinePaid,
+                    'justified_gst' => $justifiedGst,
+                ],
+                user: $staff,
+            );
+        }
+
+        return $cancelledIds;
     }
 
     public function assertAllowanceSplitValid(float $netFee, float $cash, float $online): void

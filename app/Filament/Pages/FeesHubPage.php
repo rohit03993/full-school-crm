@@ -37,12 +37,13 @@ class FeesHubPage extends Page
 
         return FeesDashboardPage::canAccess()
             || BulkMiscChargePage::canAccess()
-            || MiscChargeAdjustmentRequestsPage::canAccess();
+            || MiscChargeAdjustmentRequestsPage::canAccess()
+            || PaymentCancellationRequestsPage::canAccess();
     }
 
     public function getSubheading(): ?string
     {
-        return 'Dashboard, bulk charges, and adjustment requests.';
+        return 'Dashboard, bulk charges, adjustments, and payment cancellations.';
     }
 
     public function content(Schema $schema): Schema
@@ -72,6 +73,16 @@ class FeesHubPage extends Page
                 'title' => 'Charge adjustments',
                 'description' => 'Review discount and waive-off requests for misc charges.',
                 'url' => MiscChargeAdjustmentRequestsPage::getUrl(),
+            ];
+        }
+
+        if (PaymentCancellationRequestsPage::canAccess()) {
+            $cards[] = [
+                'title' => 'Payment cancellations',
+                'description' => 'Approve staff requests to cancel the latest mistaken payment.',
+                'url' => PaymentCancellationRequestsPage::getUrl(),
+                'badge' => ($count = \App\Support\CrmNavBadges::paymentCancellationsPending()) > 0 ? (string) $count : null,
+                'tone' => 'danger',
             ];
         }
 

@@ -204,10 +204,10 @@ Every management system below lists:
 |--|--|
 | **Formal name** | Fees Management System |
 | **Key** | `fees` |
-| **Status** | Complete enough for packaging (collect UX: next-due strip + row Collect + overdue-first default) |
-| **Includes** | Fees dashboard, profile Fees/Receipts, installments, misc charges, adjustments, fee settings, WA reminder hooks |
-| **Works today** | Office collect, receipts PDF, discounts/penalties, GST coaching settings, defaulters with Collect deep-link |
-| **Omit** | Full Tally inside Fees (expense accounting = separate module) |
+| **Status** | Complete enough for packaging (collect UX + payment cancel requests) |
+| **Includes** | Fees dashboard, profile Fees/Receipts, installments, misc charges, adjustments, **payment cancellation requests** (latest active only → Super Admin approve; soft cancel + void receipt + ledger reverse), fee settings, WA reminder hooks |
+| **Works today** | Office collect, receipts PDF, discounts/penalties, GST coaching settings, defaulters with Collect deep-link; staff request cancel mistaken payment (never hard-delete) |
+| **Omit** | Full Tally inside Fees (expense accounting = separate module); cancel of non-latest payments |
 | **Edit** | Gate `ManageFeeSettings` with `fees`; portal Fees only if `fees` ON |
 | **Add** | Online pay later |
 

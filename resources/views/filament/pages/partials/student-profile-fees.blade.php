@@ -660,25 +660,65 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span class="font-mono text-sm font-bold text-primary-600 dark:text-primary-400">{{ $paymentRow->receipt_number }}</span>
                                         <span class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $modeClass }}">{{ $modeLabel }}</span>
+                                        @if ($paymentRow->isCancelled())
+                                            <span class="inline-flex rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-800 dark:bg-red-500/15 dark:text-red-300">Cancelled</span>
+                                        @elseif ($paymentRow->pendingCancellationRequest)
+                                            <span class="inline-flex rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">Cancel pending</span>
+                                        @endif
                                     </div>
                                     <p class="mt-0.5 text-xs text-gray-500">
                                         {{ $paymentRow->payment_date->format('d M Y') }}
                                         @if ($description)
                                             · {{ $description }}
                                         @endif
+                                        @if ($paymentRow->isCancelled() && filled($paymentRow->cancel_reason))
+                                            · {{ $paymentRow->cancel_reason }}
+                                        @endif
                                     </p>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-3">
-                                <span class="text-base font-bold text-emerald-600 dark:text-emerald-400">₹{{ number_format((float) $paymentRow->amount, 0) }}</span>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <span @class([
+                                    'text-base font-bold',
+                                    'text-emerald-600 dark:text-emerald-400' => ! $paymentRow->isCancelled(),
+                                    'text-gray-400 line-through' => $paymentRow->isCancelled(),
+                                ])>₹{{ number_format((float) $paymentRow->amount, 0) }}</span>
                                 @if ($paymentRow->hasReceiptPdf())
                                     <x-crm.media-preview-button
                                         :url="$paymentRow->receiptPreviewUrl()"
                                         :download-url="$paymentRow->receiptDownloadUrl()"
-                                        :title="'Receipt · '.$paymentRow->receipt_number"
+                                        :title="($paymentRow->isCancelled() ? 'Cancelled receipt · ' : 'Receipt · ').$paymentRow->receipt_number"
                                         :is-pdf="true"
                                         label="PDF"
                                     />
+                                @endif
+                                @if (($canRequestPaymentCancellation ?? false)
+                                    && ! $paymentRow->isCancelled()
+                                    && ! $paymentRow->pendingCancellationRequest
+                                    && ($latestActivePaymentId ?? null) === $paymentRow->id)
+                                    <div x-data="{ open: false, reason: '' }" class="relative">
+                                        <button type="button" @click="open = !open" class="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-50 dark:text-red-300 dark:ring-red-500/30 dark:hover:bg-red-500/10">
+                                            Request cancel
+                                        </button>
+                                        <div x-show="open" x-cloak @click.outside="open = false" class="absolute right-0 z-20 mt-2 w-72 rounded-xl bg-white p-3 shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10">
+                                            <p class="text-xs font-semibold text-gray-800 dark:text-gray-200">Why cancel this payment?</p>
+                                            <textarea x-model="reason" rows="3" class="mt-2 w-full rounded-lg border-gray-200 text-sm dark:border-white/10 dark:bg-white/5" placeholder="e.g. Wrong amount entered by mistake"></textarea>
+                                            <div class="mt-2 flex justify-end gap-2">
+                                                <button type="button" @click="open = false" class="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-600">Close</button>
+                                                <button
+                                                    type="button"
+                                                    class="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-500"
+                                                    @click="if (!reason.trim()) { return } $wire.submitPaymentCancellationRequest({{ $paymentRow->id }}, reason); open = false; reason = ''"
+                                                >
+                                                    Send to admin
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @elseif (($canReviewPaymentCancellations ?? false) && $paymentRow->pendingCancellationRequest)
+                                    <a href="{{ $paymentCancellationsUrl ?? '#' }}" class="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200 hover:bg-amber-50 dark:text-amber-300 dark:ring-amber-500/30">
+                                        Review
+                                    </a>
                                 @endif
                             </div>
                         </div>

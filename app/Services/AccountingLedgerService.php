@@ -107,6 +107,44 @@ class AccountingLedgerService
         );
     }
 
+    public function postPaymentCancellation(Payment $payment, ?User $postedBy = null): ?AccountingJournalEntry
+    {
+        $this->ensureDefaultAccounts();
+
+        if (AccountingJournalEntry::query()
+            ->where('reference_type', AccountingReferenceType::PaymentCancellation)
+            ->where('reference_id', $payment->id)
+            ->exists()) {
+            return null;
+        }
+
+        $original = AccountingJournalEntry::query()
+            ->where('reference_type', AccountingReferenceType::Payment)
+            ->where('reference_id', $payment->id)
+            ->with('lines.account')
+            ->first();
+
+        if (! $original || $original->lines->isEmpty()) {
+            return null;
+        }
+
+        $lines = $original->lines->map(fn (AccountingJournalLine $line): array => [
+            'account' => $line->account,
+            'debit' => round((float) $line->credit, 2),
+            'credit' => round((float) $line->debit, 2),
+            'memo' => 'Cancel '.$payment->receipt_number.($line->memo ? ' · '.$line->memo : ''),
+        ])->all();
+
+        return $this->createEntry(
+            entryDate: now(),
+            description: 'Cancel fee receipt '.$payment->receipt_number,
+            referenceType: AccountingReferenceType::PaymentCancellation,
+            referenceId: $payment->id,
+            lines: $lines,
+            postedBy: $postedBy ?? $payment->cancelledBy ?? $payment->addedBy,
+        );
+    }
+
     public function postPenaltyAccrual(FeePenalty $penalty, ?User $postedBy = null): ?AccountingJournalEntry
     {
         $this->ensureDefaultAccounts();
@@ -344,7 +382,8 @@ class AccountingLedgerService
     {
         $entry->loadMissing(['lines.account']);
 
-        if ($entry->reference_type === AccountingReferenceType::Payment) {
+        if ($entry->reference_type === AccountingReferenceType::Payment
+            || $entry->reference_type === AccountingReferenceType::PaymentCancellation) {
             $payment = Payment::query()
                 ->with('student')
                 ->find($entry->reference_id);

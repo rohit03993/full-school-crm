@@ -11,7 +11,12 @@
             @foreach ($payments as $paymentRow)
                 <div class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <div class="min-w-0">
-                        <p class="font-mono text-sm font-bold text-primary-600 dark:text-primary-400">{{ $paymentRow->receipt_number }}</p>
+                        <p class="font-mono text-sm font-bold text-primary-600 dark:text-primary-400">
+                            {{ $paymentRow->receipt_number }}
+                            @if ($paymentRow->isCancelled())
+                                <span class="ml-2 inline-flex rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-800 dark:bg-red-500/15 dark:text-red-300">Cancelled</span>
+                            @endif
+                        </p>
                         <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
                             {{ $paymentRow->payment_date->format('d M Y') }} · ₹{{ number_format((float) $paymentRow->amount, 2) }} · {{ $paymentRow->payment_mode->label() }}
                         </p>

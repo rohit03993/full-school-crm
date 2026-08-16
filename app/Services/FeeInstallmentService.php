@@ -7,6 +7,7 @@ use App\Models\Admission;
 use App\Models\Enrollment;
 use App\Models\FeeInstallment;
 use App\Models\FeeStructure;
+use App\Models\Payment;
 use App\Support\FeePlanCalculator;
 use App\Support\PaymentShortfallHelper;
 use Illuminate\Support\Collection;
@@ -141,7 +142,11 @@ class FeeInstallmentService
      * FeesCRM-style allocation with staff-chosen shortfall handling on partial pay.
      *
      * @param  array{action?: string, due_date?: string|null, label?: string|null}|null  $shortfallHandling
-     * @return array{shortfall_allocation: ?array<string, mixed>}
+     * @return array{
+     *     shortfall_allocation: ?array<string, mixed>,
+     *     surplus_allocation: ?array<string, mixed>,
+     *     applications: list<array{installment_id: int, label: string, amount_applied: float, amount_before: float, paid_before: float, pending_before: float}>
+     * }
      */
     public function allocatePayment(
         FeeStructure $feeStructure,
@@ -154,9 +159,14 @@ class FeeInstallmentService
         $shortfallAllocation = null;
         $surplusAllocation = null;
         $surplusTargets = [];
+        $applications = [];
 
         if ($remaining <= 0) {
-            return ['shortfall_allocation' => null, 'surplus_allocation' => null];
+            return [
+                'shortfall_allocation' => null,
+                'surplus_allocation' => null,
+                'applications' => [],
+            ];
         }
 
         $installments = $feeStructure->installments()
@@ -167,7 +177,11 @@ class FeeInstallmentService
             ->get();
 
         if ($installments->isEmpty()) {
-            return ['shortfall_allocation' => null, 'surplus_allocation' => null];
+            return [
+                'shortfall_allocation' => null,
+                'surplus_allocation' => null,
+                'applications' => [],
+            ];
         }
 
         if ($startInstallment) {
@@ -186,24 +200,33 @@ class FeeInstallmentService
                 break;
             }
 
+            $amountBefore = round((float) $installment->amount, 2);
+            $paidBefore = round((float) $installment->paid_amount, 2);
             $pendingBefore = round((float) $installment->pending_amount, 2);
 
-            [$remaining, $allocation] = $this->processFlexibleInstallmentPayment(
+            [$remaining, $allocation, $amountApplied] = $this->processFlexibleInstallmentPayment(
                 $installment,
                 $remaining,
                 $isFirst ? $shortfallHandling : null,
             );
 
-            if (! $isFirst) {
-                $applied = round($pendingBefore - (float) $installment->fresh()->pending_amount, 2);
+            if ($amountApplied > 0.01) {
+                $applications[] = [
+                    'installment_id' => $installment->id,
+                    'label' => $installment->label,
+                    'amount_applied' => $amountApplied,
+                    'amount_before' => $amountBefore,
+                    'paid_before' => $paidBefore,
+                    'pending_before' => $pendingBefore,
+                ];
+            }
 
-                if ($applied > 0.01) {
-                    $surplusTargets[] = [
-                        'installment_id' => $installment->id,
-                        'label' => $installment->label,
-                        'amount' => $applied,
-                    ];
-                }
+            if (! $isFirst && $amountApplied > 0.01) {
+                $surplusTargets[] = [
+                    'installment_id' => $installment->id,
+                    'label' => $installment->label,
+                    'amount' => $amountApplied,
+                ];
             }
 
             if ($allocation !== null) {
@@ -234,12 +257,208 @@ class FeeInstallmentService
         return [
             'shortfall_allocation' => $shortfallAllocation,
             'surplus_allocation' => $surplusAllocation,
+            'applications' => $applications,
+        ];
+    }
+
+    /**
+     * Undo installment mutations from the latest cancelled payment.
+     */
+    public function reversePaymentAllocation(Payment $payment): void
+    {
+        $snapshot = $payment->allocation_snapshot;
+
+        if (! is_array($snapshot) || $snapshot === []) {
+            $snapshot = $this->legacyAllocationSnapshotFromShortfall($payment);
+        }
+
+        $applications = $snapshot['applications'] ?? [];
+        $shortfall = $snapshot['shortfall'] ?? null;
+
+        if (! is_array($shortfall) && is_array($payment->shortfall_allocation)) {
+            $action = $payment->shortfall_allocation['action'] ?? null;
+
+            if (in_array($action, [
+                PaymentShortfallAction::NewInstallment->value,
+                PaymentShortfallAction::CarryForward->value,
+            ], true)) {
+                $shortfall = $payment->shortfall_allocation;
+            }
+        }
+
+        if (is_array($shortfall)) {
+            $this->reverseShortfallAllocation($shortfall);
+        }
+
+        foreach (array_reverse($applications) as $application) {
+            if (! is_array($application)) {
+                continue;
+            }
+
+            $installmentId = (int) ($application['installment_id'] ?? 0);
+            $amountApplied = round((float) ($application['amount_applied'] ?? 0), 2);
+
+            if ($installmentId <= 0 || $amountApplied <= 0.01) {
+                continue;
+            }
+
+            $installment = FeeInstallment::query()->find($installmentId);
+
+            if (! $installment) {
+                continue;
+            }
+
+            $newPaid = round(max(0, (float) $installment->paid_amount - $amountApplied), 2);
+            $newPending = round((float) $installment->pending_amount + $amountApplied, 2);
+            $newAmount = round(max((float) $installment->amount, $newPaid + $newPending), 2);
+
+            if (array_key_exists('amount_before', $application)) {
+                $newAmount = round((float) $application['amount_before'], 2);
+            }
+
+            $installment->update([
+                'paid_amount' => $newPaid,
+                'pending_amount' => $newPending,
+                'amount' => $newAmount,
+            ]);
+        }
+
+        if ($payment->fee_structure_id) {
+            $this->syncInstallmentSortOrder($payment->feeStructure()->first() ?? FeeStructure::query()->findOrFail($payment->fee_structure_id));
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $shortfall
+     */
+    protected function reverseShortfallAllocation(array $shortfall): void
+    {
+        $action = PaymentShortfallAction::tryFrom((string) ($shortfall['action'] ?? ''));
+        $amount = round((float) ($shortfall['amount'] ?? 0), 2);
+        $sourceId = (int) ($shortfall['source_installment_id'] ?? 0);
+        $targetId = (int) ($shortfall['target_installment_id'] ?? 0);
+
+        if ($amount <= 0.01 || $sourceId <= 0) {
+            return;
+        }
+
+        $source = FeeInstallment::query()->find($sourceId);
+
+        if ($action === PaymentShortfallAction::NewInstallment && $targetId > 0) {
+            $target = FeeInstallment::query()->find($targetId);
+
+            if ($target) {
+                if ((float) $target->paid_amount > 0.01) {
+                    throw ValidationException::withMessages([
+                        'payment' => 'Cannot cancel: the balance installment created by this payment already has collections. Cancel those payments first.',
+                    ]);
+                }
+
+                $target->delete();
+            }
+
+            if ($source) {
+                $source->refresh();
+                $source->update([
+                    'amount' => round((float) $source->amount + $amount, 2),
+                    'pending_amount' => round((float) $source->pending_amount + $amount, 2),
+                ]);
+            }
+
+            return;
+        }
+
+        if ($action === PaymentShortfallAction::CarryForward && $targetId > 0) {
+            $target = FeeInstallment::query()->find($targetId);
+
+            if ($target) {
+                $target->update([
+                    'amount' => round(max(0, (float) $target->amount - $amount), 2),
+                    'pending_amount' => round(max(0, (float) $target->pending_amount - $amount), 2),
+                ]);
+            }
+
+            if ($source) {
+                $source->refresh();
+                $source->update([
+                    'amount' => round((float) $source->amount + $amount, 2),
+                    'pending_amount' => round((float) $source->pending_amount + $amount, 2),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @return array{applications: list<array<string, mixed>>, shortfall: ?array<string, mixed>}
+     */
+    protected function legacyAllocationSnapshotFromShortfall(Payment $payment): array
+    {
+        $note = $payment->shortfall_allocation;
+
+        if (! is_array($note)) {
+            return ['applications' => [], 'shortfall' => null];
+        }
+
+        $applications = [];
+        $shortfall = null;
+        $action = $note['action'] ?? null;
+
+        if ($action === PaymentShortfallAction::SurplusForward->value) {
+            $sourceId = (int) ($note['source_installment_id'] ?? 0);
+            $targets = $note['targets'] ?? [];
+            $sourceApplied = round((float) ($payment->effectiveTuitionAmount() - collect($targets)->sum('amount')), 2);
+
+            if ($sourceId > 0 && $sourceApplied > 0.01) {
+                $applications[] = [
+                    'installment_id' => $sourceId,
+                    'label' => (string) ($note['source_label'] ?? ''),
+                    'amount_applied' => $sourceApplied,
+                ];
+            }
+
+            foreach ($targets as $target) {
+                if (! is_array($target)) {
+                    continue;
+                }
+
+                $applications[] = [
+                    'installment_id' => (int) ($target['installment_id'] ?? 0),
+                    'label' => (string) ($target['label'] ?? ''),
+                    'amount_applied' => round((float) ($target['amount'] ?? 0), 2),
+                ];
+            }
+        } elseif (in_array($action, [
+            PaymentShortfallAction::NewInstallment->value,
+            PaymentShortfallAction::CarryForward->value,
+        ], true)) {
+            $shortfall = $note;
+            $sourceId = (int) ($note['source_installment_id'] ?? 0);
+            $applied = round((float) $payment->effectiveTuitionAmount(), 2);
+
+            if ($sourceId > 0 && $applied > 0.01) {
+                $applications[] = [
+                    'installment_id' => $sourceId,
+                    'label' => (string) ($note['source_label'] ?? ''),
+                    'amount_applied' => $applied,
+                ];
+            }
+        } elseif ($payment->fee_installment_id) {
+            $applications[] = [
+                'installment_id' => (int) $payment->fee_installment_id,
+                'label' => (string) ($payment->feeInstallment?->label ?? ''),
+                'amount_applied' => round((float) $payment->effectiveTuitionAmount(), 2),
+            ];
+        }
+
+        return [
+            'applications' => $applications,
+            'shortfall' => $shortfall,
         ];
     }
 
     /**
      * @param  array{action?: string, due_date?: string|null, label?: string|null}|null  $shortfallHandling
-     * @return array{0: float, 1: ?array<string, mixed>}
+     * @return array{0: float, 1: ?array<string, mixed>, 2: float}
      */
     protected function processFlexibleInstallmentPayment(
         FeeInstallment $installment,
@@ -250,7 +469,7 @@ class FeeInstallmentService
         $pending = round((float) $installment->pending_amount, 2);
 
         if ($pending <= 0.01) {
-            return [$remainingAmount, null];
+            return [$remainingAmount, null, 0.0];
         }
 
         $amountToApply = min($remainingAmount, $pending);
@@ -269,7 +488,7 @@ class FeeInstallmentService
             $allocation = $this->handleShortfall($installment, $newPending, $shortfallHandling);
         }
 
-        return [$remainingAmount, $allocation];
+        return [$remainingAmount, $allocation, round($amountToApply, 2)];
     }
 
     /**

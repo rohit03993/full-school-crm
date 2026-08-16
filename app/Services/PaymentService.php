@@ -170,12 +170,14 @@ class PaymentService
                 'amount' => $amount,
                 'tuition_amount' => $feePaymentAmount,
                 'shortfall_allocation' => null,
+                'allocation_snapshot' => null,
                 'payment_mode' => $mode,
                 'voucher_number' => $data['voucher_number'] ?? null,
                 'transaction_id' => $data['transaction_id'] ?? null,
                 'utr_number' => $data['utr_number'] ?? null,
                 'proof_image_path' => $this->storeProof($proof, $student->id, $receiptNumber),
                 'receipt_number' => $receiptNumber,
+                'status' => \App\Enums\PaymentStatus::Active,
                 'added_by_user_id' => $staff->id,
             ]);
 
@@ -199,11 +201,22 @@ class PaymentService
                     ?? $allocationResult['shortfall_allocation']
                     ?? null;
 
-                if ($allocationNote) {
-                    $payment->update([
-                        'shortfall_allocation' => $allocationNote,
-                    ]);
-                }
+                $payment->update([
+                    'shortfall_allocation' => $allocationNote,
+                    'allocation_snapshot' => [
+                        'applications' => $allocationResult['applications'] ?? [],
+                        'shortfall' => $allocationResult['shortfall_allocation'],
+                        'surplus' => $allocationResult['surplus_allocation'],
+                    ],
+                ]);
+            } else {
+                $payment->update([
+                    'allocation_snapshot' => [
+                        'applications' => [],
+                        'shortfall' => null,
+                        'surplus' => null,
+                    ],
+                ]);
             }
 
             $this->onlineAllowanceGst->applyAfterTuitionPayment($payment, $locked->fresh(), $feePaymentAmount);
@@ -306,6 +319,7 @@ class PaymentService
                 'utr_number' => $data['utr_number'] ?? null,
                 'proof_image_path' => $this->storeProof($proof, $student->id, $receiptNumber),
                 'receipt_number' => $receiptNumber,
+                'status' => \App\Enums\PaymentStatus::Active,
                 'added_by_user_id' => $staff->id,
             ]);
 

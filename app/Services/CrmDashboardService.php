@@ -105,9 +105,11 @@ class CrmDashboardService
                     ->count(),
                 'active_students' => $this->activeEnrollmentsQuery($filters)->count(),
                 'fee_collection_today' => (float) Payment::query()
+                    ->active()
                     ->whereDate('payment_date', $today)
                     ->sum('amount'),
                 'range_fee_collection' => (float) Payment::query()
+                    ->active()
                     ->whereDate('payment_date', '>=', $from)
                     ->whereDate('payment_date', '<=', $to)
                     ->sum('amount'),
@@ -377,6 +379,7 @@ class CrmDashboardService
             foreach ($this->monthsForChart($filters) as $month) {
                 $labels[] = $month->format('M Y');
                 $data[] = (float) Payment::query()
+                    ->active()
                     ->whereYear('payment_date', $month->year)
                     ->whereMonth('payment_date', $month->month)
                     ->sum('amount');

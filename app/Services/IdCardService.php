@@ -31,6 +31,7 @@ class IdCardService
     public function shouldGenerateForFirstPayment(Payment $payment): bool
     {
         return Payment::query()
+            ->active()
             ->where('fee_structure_id', $payment->fee_structure_id)
             ->count() === 1;
     }

@@ -235,6 +235,7 @@ class CrmStaffRolesTest extends TestCase
         $this->actingAs($admin);
 
         $this->assertTrue(\App\Filament\Pages\MiscChargeAdjustmentRequestsPage::canAccess());
+        $this->assertTrue(\App\Filament\Pages\PaymentCancellationRequestsPage::canAccess());
         $this->assertTrue(\App\Filament\Pages\SetupHubPage::canAccess());
         $this->assertTrue(\App\Filament\Pages\AllCasesPage::canAccess());
         $this->assertTrue(\App\Filament\Resources\Staff\StaffResource::canAccess());
@@ -244,6 +245,7 @@ class CrmStaffRolesTest extends TestCase
         $this->actingAs($staff);
 
         $this->assertFalse(\App\Filament\Pages\MiscChargeAdjustmentRequestsPage::canAccess());
+        $this->assertFalse(\App\Filament\Pages\PaymentCancellationRequestsPage::canAccess());
         $this->assertFalse(\App\Filament\Pages\SetupHubPage::canAccess());
         $this->assertFalse(\App\Filament\Pages\AllCasesPage::canAccess());
         $this->assertFalse(\App\Filament\Resources\Staff\StaffResource::canAccess());

@@ -36,6 +36,7 @@ use App\Models\FeeMiscCharge;
 use App\Models\FeeMiscChargeAdjustmentRequest;
 use App\Models\FeePenalty;
 use App\Models\Payment;
+use App\Models\PaymentCancellationRequest;
 use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\StudentCase;
@@ -67,6 +68,7 @@ use App\Services\HomeworkCheckService;
 use App\Services\IdCardService;
 use App\Services\LeadAssignmentService;
 use App\Services\PaymentService;
+use App\Services\PaymentCancellationService;
 use App\Services\PenaltyCalculationService;
 use App\Services\ReceiptService;
 use App\Services\StorageCleanupService;
@@ -1681,6 +1683,82 @@ class StudentProfilePage extends Page
         }
     }
 
+    public function submitPaymentCancellationRequest(
+        int $paymentId,
+        string $reason,
+        PaymentCancellationService $cancellations,
+    ): void {
+        abort_unless($this->userCanRequestPaymentCancellation(), 403);
+
+        $reason = trim($reason);
+
+        if ($reason === '') {
+            Notification::make()
+                ->title('Reason required')
+                ->body('Enter why this payment should be cancelled.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $payment = Payment::query()
+            ->whereKey($paymentId)
+            ->where('student_id', $this->record->id)
+            ->firstOrFail();
+
+        try {
+            $cancellations->submitRequest($payment, Auth::user(), $reason);
+
+            $this->feesTabLoaded = false;
+            $this->receiptsTabLoaded = false;
+            $this->loadFeesTab();
+
+            Notification::make()
+                ->title('Cancel request sent')
+                ->body('Super Admin will review cancellation of '.$payment->receipt_number.'.')
+                ->success()
+                ->send();
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not submit request')
+                ->body(collect($exception->errors())->flatten()->first())
+                ->danger()
+                ->send();
+        }
+    }
+
+    protected function userCanRequestPaymentCancellation(): bool
+    {
+        if (! PaymentCancellationRequest::schemaReady()) {
+            return false;
+        }
+
+        if ($this->userIsSuperAdmin()) {
+            return true;
+        }
+
+        return $this->userCan(CrmPermission::FeesCollect)
+            || $this->userCan(CrmPermission::FeesAdjustStructure);
+    }
+
+    protected function latestActivePaymentId(): ?int
+    {
+        $feeStructure = $this->record->activeEnrollment?->feeStructure;
+
+        if (! $feeStructure) {
+            return null;
+        }
+
+        $id = Payment::query()
+            ->active()
+            ->where('fee_structure_id', $feeStructure->id)
+            ->orderByDesc('id')
+            ->value('id');
+
+        return $id ? (int) $id : null;
+    }
+
     protected function userCanRequestMiscAdjustment(): bool
     {
         if (! FeeMiscChargeAdjustmentRequest::schemaReady()) {
@@ -1728,7 +1806,14 @@ class StudentProfilePage extends Page
     {
         $query = Payment::query()
             ->where('student_id', $this->record->id)
-            ->with(['addedBy.staffProfile', 'feeStructure.enrollment.course', 'feeInstallment', 'feeMiscCharge']);
+            ->with([
+                'addedBy.staffProfile',
+                'feeStructure.enrollment.course',
+                'feeInstallment',
+                'feeMiscCharge',
+                'cancelledBy',
+                'pendingCancellationRequest',
+            ]);
 
         if (filled($this->paymentsMonth) && preg_match('/^\d{4}-\d{2}$/', $this->paymentsMonth)) {
             $start = \Illuminate\Support\Carbon::createFromFormat('Y-m', $this->paymentsMonth)->startOfMonth();
@@ -2738,7 +2823,7 @@ class StudentProfilePage extends Page
                         $body .= ' · '.$payment->shortfallSummary();
                     }
 
-                    if (! $isMiscPayment && Payment::query()->where('fee_structure_id', $feeStructure->id)->whereNull('fee_misc_charge_id')->count() === 1) {
+                    if (! $isMiscPayment && Payment::query()->active()->where('fee_structure_id', $feeStructure->id)->whereNull('fee_misc_charge_id')->count() === 1) {
                         $body .= ' · ID card generated';
                     }
 
@@ -3309,8 +3394,12 @@ class StudentProfilePage extends Page
                                     'feeStructureHistory' => $this->feeStructureHistory,
                                     'canCollectFees' => $this->userCan(CrmPermission::FeesCollect),
                                     'canRequestMiscAdjustment' => $this->userCanRequestMiscAdjustment(),
+                                    'canRequestPaymentCancellation' => $this->userCanRequestPaymentCancellation(),
+                                    'latestActivePaymentId' => $this->latestActivePaymentId(),
+                                    'paymentCancellationsUrl' => PaymentCancellationRequestsPage::getUrl(),
                                     'adjustmentsUrl' => MiscChargeAdjustmentRequestsPage::getUrl(),
                                     'canReviewMiscAdjustments' => $this->userIsSuperAdmin(),
+                                    'canReviewPaymentCancellations' => $this->userIsSuperAdmin(),
                                     'discountSummary' => app(FeeDiscountHistoryService::class)->studentSummary($this->record),
                                     'discountTimeline' => app(FeeDiscountHistoryService::class)->studentTimeline($this->record),
                                 ]),

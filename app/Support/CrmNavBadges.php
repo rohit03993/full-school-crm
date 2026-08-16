@@ -120,6 +120,20 @@ class CrmNavBadges
         Cache::forget('crm.nav.misc_charge_adjustments_pending');
     }
 
+    public static function paymentCancellationsPending(): int
+    {
+        return (int) Cache::remember(
+            'crm.nav.payment_cancellations_pending',
+            self::CACHE_SECONDS,
+            fn (): int => app(\App\Services\PaymentCancellationService::class)->pendingCount(),
+        );
+    }
+
+    public static function flushPaymentCancellationBadgeCache(): void
+    {
+        Cache::forget('crm.nav.payment_cancellations_pending');
+    }
+
     public static function myCasesOpen(?User $staff = null): int
     {
         $staff ??= Auth::user();

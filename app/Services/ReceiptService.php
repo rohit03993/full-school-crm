@@ -29,6 +29,7 @@ class ReceiptService
             'student',
             'feeStructure.enrollment.course',
             'addedBy.staffProfile',
+            'cancelledBy',
         ]);
 
         $enrollment = $payment->feeStructure?->enrollment;
@@ -54,6 +55,8 @@ class ReceiptService
             'modeReference' => $this->modeReference($payment),
             'institute' => $institute,
             'footer' => $institute['footer'],
+            'isCancelled' => $payment->isCancelled(),
+            'cancelledBy' => $payment->cancelledBy,
         ])->setPaper('a4');
 
         Storage::disk(self::DISK)->put($relativePath, $pdf->output());

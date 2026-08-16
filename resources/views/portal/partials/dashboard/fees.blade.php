@@ -161,7 +161,12 @@
                     <li class="p-4 sm:p-5">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div class="min-w-0">
-                                <p class="font-mono text-sm font-bold text-brand-700">{{ $payment->receipt_number }}</p>
+                                <p class="font-mono text-sm font-bold text-brand-700">
+                                    {{ $payment->receipt_number }}
+                                    @if ($payment->isCancelled())
+                                        <span class="ml-2 rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-800">Cancelled</span>
+                                    @endif
+                                </p>
                                 <p class="mt-1 text-sm text-navy-600">
                                     {{ $payment->payment_date->format('d M Y') }} · {{ $payment->payment_mode->label() }}
                                     @if ($payment->feeMiscCharge)
@@ -170,7 +175,11 @@
                                         · {{ $payment->feeInstallment->label }}
                                     @endif
                                 </p>
-                                <p class="mt-1.5 text-xl font-bold text-emerald-700">₹{{ number_format((float) $payment->amount, 2) }}</p>
+                                <p @class([
+                                    'mt-1.5 text-xl font-bold',
+                                    'text-emerald-700' => ! $payment->isCancelled(),
+                                    'text-navy-400 line-through' => $payment->isCancelled(),
+                                ])>₹{{ number_format((float) $payment->amount, 2) }}</p>
                             </div>
                             @if ($payment->hasReceiptPdf())
                                 <a href="{{ $payment->portalReceiptDownloadUrl() }}"

@@ -42,6 +42,7 @@ use App\Filament\Pages\ManageMetaWhatsAppSettings;
 use App\Filament\Pages\ManageTerminology;
 use App\Filament\Pages\ManageWhatsAppSettings;
 use App\Filament\Pages\MiscChargeAdjustmentRequestsPage;
+use App\Filament\Pages\PaymentCancellationRequestsPage;
 use App\Filament\Pages\MyCasesPage;
 use App\Filament\Pages\MyMeetingsPage;
 use App\Filament\Pages\SessionAttendancePage;
@@ -103,6 +104,7 @@ class CrmBackLink
         FeesDashboardPage::class => FeesHubPage::class,
         BulkMiscChargePage::class => FeesHubPage::class,
         MiscChargeAdjustmentRequestsPage::class => FeesHubPage::class,
+        PaymentCancellationRequestsPage::class => FeesHubPage::class,
         AccountingLedgerPage::class => FeesHubPage::class,
 
         WhatsAppInboxPage::class => WhatsAppHubPage::class,

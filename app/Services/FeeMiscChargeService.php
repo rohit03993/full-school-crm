@@ -327,6 +327,32 @@ class FeeMiscChargeService
         return $charge->fresh();
     }
 
+    public function reversePayment(FeeMiscCharge $charge, float $amount): FeeMiscCharge
+    {
+        $amount = round($amount, 2);
+
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => 'Reversal amount must be greater than zero.',
+            ]);
+        }
+
+        $newPaid = round(max(0, (float) $charge->paid_amount - $amount), 2);
+        $total = round((float) $charge->amount, 2);
+
+        $status = $newPaid <= 0.01
+            ? FeeMiscChargeStatus::Pending
+            : ($newPaid >= $total - 0.01 ? FeeMiscChargeStatus::Paid : FeeMiscChargeStatus::Partial);
+
+        $charge->update([
+            'paid_amount' => $newPaid,
+            'status' => $status,
+            'paid_at' => $status === FeeMiscChargeStatus::Paid ? ($charge->paid_at ?? now()) : null,
+        ]);
+
+        return $charge->fresh();
+    }
+
     public function markPaid(FeeMiscCharge $charge): FeeMiscCharge
     {
         return $this->applyPayment($charge, $charge->pendingAmount());

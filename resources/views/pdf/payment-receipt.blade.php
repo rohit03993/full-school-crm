@@ -51,8 +51,24 @@
         </table>
     </div>
 
-    <div class="title">Fee Receipt</div>
+    <div class="title">{{ ! empty($isCancelled) ? 'Cancelled Fee Receipt' : 'Fee Receipt' }}</div>
     <div class="receipt-no">{{ $payment->receipt_number }}</div>
+    @if (! empty($isCancelled))
+        <div style="text-align:center;margin:0 0 16px;padding:10px;border:2px solid #b91c1c;background:#fef2f2;color:#991b1b;font-weight:bold;font-size:14px;letter-spacing:2px;">
+            CANCELLED
+            @if ($payment->cancelled_at)
+                · {{ $payment->cancelled_at->format('d M Y H:i') }}
+            @endif
+        </div>
+        @if (filled($payment->cancel_reason))
+            <div style="margin:0 0 14px;font-size:11px;color:#7f1d1d;">
+                Reason: {{ $payment->cancel_reason }}
+                @if ($cancelledBy ?? null)
+                    · by {{ $cancelledBy->name }}
+                @endif
+            </div>
+        @endif
+    @endif
 
     <table class="details">
         <tr>

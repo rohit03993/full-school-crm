@@ -39,8 +39,9 @@ class FeesDashboardService
             ->count();
 
         return [
-            'collection_today' => round((float) Payment::query()->whereDate('payment_date', $today)->sum('amount'), 2),
+            'collection_today' => round((float) Payment::query()->active()->whereDate('payment_date', $today)->sum('amount'), 2),
             'collection_month' => round((float) Payment::query()
+                ->active()
                 ->whereDate('payment_date', '>=', $monthStart)
                 ->whereDate('payment_date', '<=', $today)
                 ->sum('amount'), 2),
