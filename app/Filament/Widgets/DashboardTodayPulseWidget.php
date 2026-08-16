@@ -171,8 +171,8 @@ class DashboardTodayPulseWidget extends Widget
             [
                 'key' => 'staff',
                 'label' => 'Staff present',
-                'value' => (string) $data['staff_present_today'],
-                'meta' => 'of '.$data['staff_total'].' staff',
+                'value' => (string) ($data['staff_present_today'] ?? 0),
+                'meta' => 'of '.($data['staff_total'] ?? 0).' staff',
                 'tone' => 'success',
                 'url' => StaffAttendancePage::canAccess() ? StaffAttendancePage::getUrl() : null,
                 'show' => FeatureGate::enabled(LicenseFeature::Attendance) && StaffAttendancePage::canAccess(),

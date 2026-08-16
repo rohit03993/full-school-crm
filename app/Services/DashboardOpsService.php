@@ -19,6 +19,7 @@ use App\Support\CrmNavBadges;
 use App\Support\DashboardFilters;
 use App\Support\FeatureGate;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Action-first dashboard numbers: what needs attention, and today's pulse.
@@ -194,7 +195,7 @@ class DashboardOpsService
 
                 $staffPresent = 0;
                 $staffTotal = 0;
-                if (FeatureGate::enabled(LicenseFeature::Attendance)) {
+                if (FeatureGate::enabled(LicenseFeature::Attendance) && Schema::hasTable('staff_attendances')) {
                     $staffTotal = (int) User::query()
                         ->where('is_active', true)
                         ->whereHas('staffProfile', fn ($query) => $query->whereNotNull('employee_code'))
