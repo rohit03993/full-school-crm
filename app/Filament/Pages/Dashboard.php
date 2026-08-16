@@ -3,11 +3,12 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Widgets\BatchOverviewWidget;
-use App\Filament\Widgets\CallingStatsWidget;
 use App\Filament\Widgets\CrmFinanceStatsWidget;
 use App\Filament\Widgets\CrmLeadStatsWidget;
 use App\Filament\Widgets\CourseAdmissionsChartWidget;
+use App\Filament\Widgets\DashboardAttentionWidget;
 use App\Filament\Widgets\DashboardHeroWidget;
+use App\Filament\Widgets\DashboardTodayPulseWidget;
 use App\Filament\Widgets\LicenseStatusWidget;
 use App\Filament\Widgets\LeadSourceChartWidget;
 use App\Filament\Widgets\MonthlyAdmissionsChartWidget;
@@ -166,9 +167,10 @@ class Dashboard extends BaseDashboard
         return [
             LicenseStatusWidget::class,
             DashboardHeroWidget::class,
+            DashboardAttentionWidget::class,
+            DashboardTodayPulseWidget::class,
             CrmFinanceStatsWidget::class,
             CrmLeadStatsWidget::class,
-            CallingStatsWidget::class,
             BatchOverviewWidget::class,
             RecentEnquiriesWidget::class,
             PendingAdmissionsWidget::class,

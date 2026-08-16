@@ -21,7 +21,6 @@ use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Filament\Resources\Enquiries\EnquiryResource;
 use App\Filament\Widgets\Concerns\UsesDashboardFilters;
 use App\Models\AcademicSession;
-use App\Services\CallQueueService;
 use App\Services\CrmDashboardService;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
@@ -157,10 +156,7 @@ class DashboardHeroWidget extends Widget
     protected function ownerMetrics(): array
     {
         $filters = $this->dashboardFilters();
-        $service = app(CrmDashboardService::class);
-        $stats = $service->stats($filters);
-        $user = Auth::user();
-        $canViewFees = FeatureGate::enabled(LicenseFeature::Fees) && CrmAccess::canViewFees($user);
+        $stats = app(CrmDashboardService::class)->stats($filters);
 
         $metrics = [
             $this->metric(
@@ -177,27 +173,6 @@ class DashboardHeroWidget extends Widget
             $metrics[] = $this->attendanceMetric($stats);
         }
 
-        if ($canViewFees) {
-            $fees = $service->feeSummary($filters);
-
-            $metrics[] = $this->metric(
-                label: 'Collected',
-                value: $this->money((float) $stats['range_fee_collection']),
-                icon: 'heroicon-m-banknotes',
-                meta: $this->exactMoney((float) $stats['range_fee_collection']),
-                tone: 'success',
-                url: $this->urlIf(FeesHubPage::canAccess(), FeesHubPage::getUrl()),
-            );
-            $metrics[] = $this->metric(
-                label: 'Pending fees',
-                value: $this->money((float) $stats['pending_fees_total']),
-                icon: 'heroicon-m-exclamation-triangle',
-                meta: $fees['overdue_students_count'].' students overdue',
-                tone: $fees['overdue_students_count'] > 0 ? 'danger' : 'warning',
-                url: $this->urlIf(FeesHubPage::canAccess(), FeesHubPage::getUrl()),
-            );
-        }
-
         if (FeatureGate::enabled(LicenseFeature::Enquiries)) {
             $metrics[] = $this->metric(
                 label: 'New leads',
@@ -206,17 +181,6 @@ class DashboardHeroWidget extends Widget
                 meta: $filters->rangeName(),
                 tone: 'info',
                 url: $this->urlIf(EnquiryResource::canViewAny(), EnquiryResource::getUrl('index')),
-            );
-        }
-
-        if (FeatureGate::enabled(LicenseFeature::Admissions)) {
-            $metrics[] = $this->metric(
-                label: 'Admissions',
-                value: (string) $stats['range_admissions'],
-                icon: 'heroicon-m-clipboard-document-check',
-                meta: $stats['pending_admissions'].' awaiting review',
-                tone: $stats['pending_admissions'] > 0 ? 'warning' : 'success',
-                url: $this->urlIf(AdmissionResource::canViewAny(), AdmissionResource::getUrl('index')),
             );
         }
 
@@ -255,40 +219,8 @@ class DashboardHeroWidget extends Widget
      */
     protected function callingMetrics(): array
     {
-        $staff = Auth::user();
-
-        if (! $staff) {
-            return [];
-        }
-
-        $callStats = app(CallQueueService::class)->todayStats($staff);
-
-        return [
-            $this->metric(
-                label: 'Calls today',
-                value: (string) $callStats['calls_today'],
-                icon: 'heroicon-m-phone',
-                meta: $callStats['connected_today'].' connected',
-                tone: 'primary',
-                url: $this->urlIf(CallQueuePage::canAccess(), CallQueuePage::getUrl()),
-            ),
-            $this->metric(
-                label: 'In queue',
-                value: (string) $callStats['queue_count'],
-                icon: 'heroicon-m-bars-3-bottom-left',
-                meta: 'Waiting to be called',
-                tone: $callStats['queue_count'] > 0 ? 'info' : 'success',
-                url: $this->urlIf(CallQueuePage::canAccess(), CallQueuePage::getUrl()),
-            ),
-            $this->metric(
-                label: 'Follow-ups due',
-                value: (string) CrmNavBadges::followUpsDue(),
-                icon: 'heroicon-m-bell-alert',
-                meta: 'Today and overdue',
-                tone: CrmNavBadges::followUpsDue() > 0 ? 'warning' : 'success',
-                url: $this->urlIf(FollowUpsPage::canAccess(), FollowUpsPage::getUrl()),
-            ),
-        ];
+        // Calling pack uses Needs attention + Today pulse for live work numbers.
+        return [];
     }
 
     /**
@@ -301,14 +233,6 @@ class DashboardHeroWidget extends Widget
 
         if (FeatureGate::enabled(LicenseFeature::Attendance)) {
             $metrics[] = $this->attendanceMetric($stats);
-            $metrics[] = $this->metric(
-                label: 'Not marked',
-                value: (string) max(0, (int) $stats['attendance_students_in_batches'] - (int) $stats['attendance_marked_today']),
-                icon: 'heroicon-m-clipboard-document-list',
-                meta: $stats['attendance_marked_today'].' of '.$stats['attendance_students_in_batches'].' done',
-                tone: (int) $stats['attendance_marked_today'] >= (int) $stats['attendance_students_in_batches'] ? 'success' : 'warning',
-                url: $this->urlIf(AttendanceHubPage::canAccess(), AttendanceHubPage::getUrl()),
-            );
         }
 
         $metrics[] = $this->metric(
@@ -336,14 +260,6 @@ class DashboardHeroWidget extends Widget
 
         return [
             $this->metric(
-                label: 'Collected',
-                value: $this->money((float) $stats['range_fee_collection']),
-                icon: 'heroicon-m-banknotes',
-                meta: $this->exactMoney((float) $stats['range_fee_collection']),
-                tone: 'success',
-                url: $feesUrl,
-            ),
-            $this->metric(
                 label: 'Collected today',
                 value: $this->money((float) $stats['fee_collection_today']),
                 icon: 'heroicon-m-arrow-trending-up',
@@ -352,18 +268,10 @@ class DashboardHeroWidget extends Widget
                 url: $feesUrl,
             ),
             $this->metric(
-                label: 'Pending fees',
-                value: $this->money((float) $stats['pending_fees_total']),
-                icon: 'heroicon-m-exclamation-triangle',
-                meta: $this->exactMoney((float) $stats['pending_fees_total']),
-                tone: 'warning',
-                url: $feesUrl,
-            ),
-            $this->metric(
-                label: 'Overdue',
+                label: 'Overdue students',
                 value: (string) $fees['overdue_students_count'],
                 icon: 'heroicon-m-clock',
-                meta: $this->exactMoney((float) $fees['overdue_amount']).' past due',
+                meta: 'Open on Fees dashboard',
                 tone: $fees['overdue_students_count'] > 0 ? 'danger' : 'success',
                 url: $feesUrl,
             ),

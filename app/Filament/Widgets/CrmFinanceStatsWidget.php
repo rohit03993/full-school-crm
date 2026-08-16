@@ -78,10 +78,10 @@ class CrmFinanceStatsWidget extends StatsOverviewWidget
                 ->descriptionIcon(Heroicon::OutlinedBanknotes)
                 ->color('success')
                 ->url(FeesDashboardPage::canAccess() ? FeesDashboardPage::getUrl() : null),
-            Stat::make('Pending fees', '₹'.number_format($stats['pending_fees_total'], 0))
-                ->description($fees['overdue_students_count'].' students overdue · ₹'.number_format($fees['overdue_amount'], 0))
+            Stat::make('Overdue students', (string) $fees['overdue_students_count'])
+                ->description('See Fees dashboard for pending amounts')
                 ->descriptionIcon(Heroicon::OutlinedExclamationTriangle)
-                ->color($fees['overdue_amount'] > 0 ? 'danger' : 'warning')
+                ->color($fees['overdue_students_count'] > 0 ? 'danger' : 'gray')
                 ->url(FeesDashboardPage::canAccess() ? FeesDashboardPage::getUrl() : null),
         ];
     }

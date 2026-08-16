@@ -277,6 +277,75 @@
         @apply dark:bg-primary-500/15 dark:text-primary-400;
     }
 
+    /* ── Dashboard ops strips (Needs attention / Today) ── */
+    .crm-ops-strip {
+        @apply rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-950/[0.06] sm:p-5;
+        @apply dark:bg-gray-900 dark:ring-white/10;
+    }
+
+    .crm-ops-strip__head {
+        @apply mb-3 flex items-end justify-between gap-3;
+    }
+
+    .crm-ops-strip__heading {
+        @apply text-[11px] font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400;
+    }
+
+    .crm-ops-strip__sub {
+        @apply mt-0.5 text-xs text-gray-400 dark:text-gray-500;
+    }
+
+    .crm-ops-strip__grid {
+        @apply grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6;
+    }
+
+    .crm-ops-stat {
+        @apply relative flex flex-col overflow-hidden rounded-2xl bg-gray-50/90 py-2.5 pe-3 ps-3.5 transition duration-150;
+        @apply dark:bg-white/[0.04];
+    }
+
+    a.crm-ops-stat {
+        @apply touch-manipulation hover:bg-gray-100 active:scale-[0.99] dark:hover:bg-white/[0.08];
+    }
+
+    .crm-ops-stat::before {
+        content: '';
+        @apply absolute inset-y-2.5 start-0 w-[3px] rounded-full bg-gray-300 dark:bg-white/20;
+    }
+
+    .crm-ops-stat--primary::before {
+        @apply bg-primary-500;
+    }
+
+    .crm-ops-stat--success::before {
+        @apply bg-emerald-500;
+    }
+
+    .crm-ops-stat--warning::before {
+        @apply bg-amber-500;
+    }
+
+    .crm-ops-stat--danger::before {
+        @apply bg-danger-500;
+    }
+
+    .crm-ops-stat--info::before {
+        @apply bg-sky-500;
+    }
+
+    .crm-ops-stat__label {
+        @apply text-[10px] font-semibold uppercase leading-tight tracking-[0.06em] text-gray-500 dark:text-gray-400;
+    }
+
+    .crm-ops-stat__value {
+        @apply mt-1 text-xl font-semibold leading-none tracking-tight text-gray-950 dark:text-white sm:text-2xl;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .crm-ops-stat__meta {
+        @apply mt-1 truncate text-[11px] leading-tight text-gray-500 dark:text-gray-400;
+    }
+
     .fi-dashboard-panel {
         @apply h-full;
     }

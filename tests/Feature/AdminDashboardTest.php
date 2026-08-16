@@ -15,7 +15,9 @@ use App\Filament\Pages\Dashboard;
 use App\Filament\Widgets\BatchOverviewWidget;
 use App\Filament\Widgets\CrmFinanceStatsWidget;
 use App\Filament\Widgets\CrmLeadStatsWidget;
+use App\Filament\Widgets\DashboardAttentionWidget;
 use App\Filament\Widgets\DashboardHeroWidget;
+use App\Filament\Widgets\DashboardTodayPulseWidget;
 use App\Models\AcademicSession;
 use App\Models\BatchStudent;
 use App\Models\Course;
@@ -143,7 +145,61 @@ class AdminDashboardTest extends TestCase
         $overview = $service->batchOverview();
 
         $this->assertSame(1, $overview['totals']['present_today']);
-        $this->assertSame(0, $overview['totals']['not_marked_today']);
+        $this->assertSame(1, $overview['totals']['marked_today']);
+        $this->assertArrayNotHasKey('not_marked_today', $overview['totals']);
+        $this->assertArrayNotHasKey('pending_fees', $overview['totals']);
+    }
+
+    public function test_batch_overview_hides_not_marked_and_pending_fees(): void
+    {
+        $session = $this->createSession();
+        $course = $this->createCourse();
+        $this->createBatchForCourse($course, [
+            'name' => 'Attendance Only Batch',
+            'academic_session_id' => $session->id,
+        ]);
+
+        $this->actingAsSuperAdmin();
+
+        Livewire::test(BatchOverviewWidget::class, [
+            'pageFilters' => ['academic_session_id' => $session->id],
+        ])
+            ->assertSuccessful()
+            ->assertSee('Attendance Only Batch')
+            ->assertDontSee('Not marked')
+            ->assertDontSee('Pending fees');
+    }
+
+    public function test_owner_sees_needs_attention_and_today_pulse(): void
+    {
+        $this->createSession();
+        $this->actingAsSuperAdmin();
+
+        Livewire::test(DashboardAttentionWidget::class)
+            ->assertSuccessful()
+            ->assertSee('Needs attention')
+            ->assertSee('Approvals');
+
+        Livewire::test(DashboardTodayPulseWidget::class)
+            ->assertSuccessful()
+            ->assertSee('Today')
+            ->assertSee('New leads');
+    }
+
+    public function test_fee_adjuster_does_not_see_admin_approvals_tile_on_attention(): void
+    {
+        $this->createSession();
+
+        $adjuster = User::factory()->create(['is_active' => true]);
+        $adjuster->assignRole(StaffJobRole::FeeAdjuster->value);
+
+        $this->actingAs($adjuster);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(DashboardAttentionWidget::class)
+            ->assertSuccessful()
+            ->assertDontSee('Staff work open')
+            ->assertSee('Overdue students');
     }
 
     public function test_teacher_hero_shows_academic_chips_not_calling_copy(): void

@@ -152,18 +152,14 @@ class CrmDashboardService
      *         present_today: int,
      *         absent_today: int,
      *         leave_today: int,
-     *         marked_today: int,
-     *         not_marked_today: int,
-     *         pending_fees: float
+     *         marked_today: int
      *     }>,
      *     totals: array{
      *         students: int,
      *         present_today: int,
      *         absent_today: int,
      *         leave_today: int,
-     *         marked_today: int,
-     *         not_marked_today: int,
-     *         pending_fees: float
+     *         marked_today: int
      *     }
      * }
      */
@@ -171,7 +167,7 @@ class CrmDashboardService
     {
         $filters ??= DashboardFilters::default();
 
-        return $this->remember($filters->cacheKey('batch_overview'), self::STATS_CACHE_SECONDS, function () use ($filters): array {
+        return $this->remember($filters->cacheKey('batch_overview_attendance'), self::STATS_CACHE_SECONDS, function () use ($filters): array {
             $asOf = $filters->asOf();
 
             $batches = $this->batchQuery($filters)
@@ -185,8 +181,6 @@ class CrmDashboardService
                 'absent_today' => 0,
                 'leave_today' => 0,
                 'marked_today' => 0,
-                'not_marked_today' => 0,
-                'pending_fees' => 0.0,
             ];
 
             if ($batches->isEmpty()) {
@@ -211,12 +205,8 @@ class CrmDashboardService
                 ->get(['batch_id', 'student_id'])
                 ->groupBy('batch_id');
 
-            $studentIds = $studentsByBatch->flatten(1)->pluck('student_id')->unique()->values();
-            $pendingByStudent = $this->pendingFeesByStudent($studentIds);
-
             $rows = [];
             $totals = $emptyTotals;
-            $countedStudents = [];
 
             foreach ($batches as $batch) {
                 $batchStudentIds = $studentsByBatch->get($batch->id, collect())->pluck('student_id');
@@ -226,11 +216,6 @@ class CrmDashboardService
                 $absent = $markedRows->where('status', AttendanceStatus::Absent)->count();
                 $leave = $markedRows->where('status', AttendanceStatus::Leave)->count();
                 $marked = $markedRows->count();
-                $notMarked = max(0, $students - $marked);
-
-                $pendingFees = round((float) $batchStudentIds->sum(
-                    fn (int $studentId): float => (float) ($pendingByStudent[$studentId] ?? 0),
-                ), 2);
 
                 $rows[] = [
                     'id' => $batch->id,
@@ -240,8 +225,6 @@ class CrmDashboardService
                     'absent_today' => $absent,
                     'leave_today' => $leave,
                     'marked_today' => $marked,
-                    'not_marked_today' => $notMarked,
-                    'pending_fees' => $pendingFees,
                 ];
 
                 $totals['students'] += $students;
@@ -249,20 +232,7 @@ class CrmDashboardService
                 $totals['absent_today'] += $absent;
                 $totals['leave_today'] += $leave;
                 $totals['marked_today'] += $marked;
-                $totals['not_marked_today'] += $notMarked;
-
-                // A student can sit in more than one batch; count their pending fee once.
-                foreach ($batchStudentIds as $studentId) {
-                    if (isset($countedStudents[$studentId])) {
-                        continue;
-                    }
-
-                    $countedStudents[$studentId] = true;
-                    $totals['pending_fees'] += (float) ($pendingByStudent[$studentId] ?? 0);
-                }
             }
-
-            $totals['pending_fees'] = round($totals['pending_fees'], 2);
 
             return [
                 'date_label' => $asOf->format('d M Y'),
@@ -315,25 +285,6 @@ class CrmDashboardService
         return round((float) FeeStructure::query()
             ->whereIn('enrollment_id', $enrollmentIds)
             ->sum('pending_amount'), 2);
-    }
-
-    /**
-     * @param  Collection<int, int>  $studentIds
-     * @return Collection<int, float>
-     */
-    protected function pendingFeesByStudent(Collection $studentIds): Collection
-    {
-        if ($studentIds->isEmpty()) {
-            return collect();
-        }
-
-        return FeeStructure::query()
-            ->forActiveEnrollments()
-            ->whereHas('enrollment', fn ($query) => $query->whereIn('student_id', $studentIds))
-            ->with('enrollment:id,student_id')
-            ->get(['id', 'enrollment_id', 'pending_amount'])
-            ->groupBy(fn (FeeStructure $row): int => (int) $row->enrollment->student_id)
-            ->map(fn ($group): float => round((float) $group->sum('pending_amount'), 2));
     }
 
     /**
