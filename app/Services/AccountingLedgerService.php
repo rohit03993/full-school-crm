@@ -427,7 +427,7 @@ class AccountingLedgerService
             ])->filter(fn (array $row): bool => $row['amount'] > 0)->values(),
             'income_rows' => collect([
                 ['label' => 'Tuition fees (collected)', 'amount' => $tuitionIncome],
-                ['label' => 'Late fees accrued (not cash)', 'amount' => $lateFeeIncome],
+                ['label' => 'Late fees charged (not received)', 'amount' => $lateFeeIncome],
             ])->filter(fn (array $row): bool => $row['amount'] > 0)->values(),
         ];
     }
@@ -441,10 +441,6 @@ class AccountingLedgerService
 
         if ($entry->reference_type === AccountingReferenceType::Payment
             || $entry->reference_type === AccountingReferenceType::PaymentCancellation) {
-            $payment = Payment::query()
-                ->with('student')
-                ->find($entry->reference_id);
-
             $collectionLine = $entry->lines->first(
                 fn (AccountingJournalLine $line): bool => in_array($line->account?->code, [self::CODE_CASH, self::CODE_BANK], true),
             );
@@ -458,7 +454,6 @@ class AccountingLedgerService
                     sideLabel: 'Money in',
                     label: 'Fee collected via '.$modeName,
                     amount: round((float) $collectionLine->debit, 2),
-                    detail: $payment?->student?->name,
                 ));
             }
 
@@ -468,7 +463,6 @@ class AccountingLedgerService
                     sideLabel: 'Money out',
                     label: 'Receipt cancelled — '.$modeName.' reversed',
                     amount: round((float) $collectionLine->credit, 2),
-                    detail: $payment?->student?->name,
                 ));
             }
 
@@ -527,14 +521,62 @@ class AccountingLedgerService
 
     /**
      * @param  Collection<int, AccountingJournalEntry>  $entries
-     * @return Collection<int, array{entry: AccountingJournalEntry, lines: Collection<int, FeeLedgerPresentation>}>
+     * @return Collection<int, array{entry: AccountingJournalEntry, lines: Collection<int, FeeLedgerPresentation>, student: array{id: int, name: string}|null}>
      */
     public function presentEntries(Collection $entries): Collection
     {
+        $students = $this->resolveEntryStudents($entries);
+
         return $entries->map(fn (AccountingJournalEntry $entry): array => [
             'entry' => $entry,
             'lines' => $this->presentEntryLines($entry),
+            'student' => $students->get($entry->id),
         ]);
+    }
+
+    /**
+     * Maps each journal entry to the student it belongs to, so the ledger can link to profiles.
+     *
+     * @param  Collection<int, AccountingJournalEntry>  $entries
+     * @return Collection<int, array{id: int, name: string}>
+     */
+    protected function resolveEntryStudents(Collection $entries): Collection
+    {
+        $idsFor = fn (array $types): array => $entries
+            ->filter(fn (AccountingJournalEntry $entry): bool => in_array($entry->reference_type, $types, true))
+            ->pluck('reference_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $paymentIds = $idsFor([AccountingReferenceType::Payment, AccountingReferenceType::PaymentCancellation]);
+        $penaltyIds = $idsFor([AccountingReferenceType::FeePenalty]);
+        $miscIds = $idsFor([AccountingReferenceType::FeeMiscCharge]);
+
+        $payments = $paymentIds === []
+            ? collect()
+            : Payment::query()->with('student:id,name')->whereIn('id', $paymentIds)->get()->keyBy('id');
+
+        $penalties = $penaltyIds === []
+            ? collect()
+            : FeePenalty::query()->with('student:id,name')->whereIn('id', $penaltyIds)->get()->keyBy('id');
+
+        $miscCharges = $miscIds === []
+            ? collect()
+            : FeeMiscCharge::query()->with('feeStructure.enrollment.student:id,name')->whereIn('id', $miscIds)->get()->keyBy('id');
+
+        return $entries->mapWithKeys(function (AccountingJournalEntry $entry) use ($payments, $penalties, $miscCharges): array {
+            $student = match ($entry->reference_type) {
+                AccountingReferenceType::Payment,
+                AccountingReferenceType::PaymentCancellation => $payments->get($entry->reference_id)?->student,
+                AccountingReferenceType::FeePenalty => $penalties->get($entry->reference_id)?->student,
+                AccountingReferenceType::FeeMiscCharge => $miscCharges->get($entry->reference_id)?->feeStructure?->enrollment?->student,
+                default => null,
+            };
+
+            return [$entry->id => $student ? ['id' => $student->id, 'name' => $student->name] : null];
+        })->filter();
     }
 
     protected function createEntry(

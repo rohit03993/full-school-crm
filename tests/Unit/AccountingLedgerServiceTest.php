@@ -185,7 +185,11 @@ class AccountingLedgerServiceTest extends TestCase
         $this->assertSame('Money in', $presented->first()->sideLabel);
         $this->assertStringContainsString('Bank / UPI', $presented->first()->label);
         $this->assertSame(10000.0, $presented->first()->amount);
-        $this->assertSame('Ledger Student', $presented->first()->detail);
+
+        $entryStudent = $ledger->presentEntries(collect([$entry]))->first()['student'];
+
+        $this->assertSame($student->id, $entryStudent['id']);
+        $this->assertSame('Ledger Student', $entryStudent['name']);
     }
 
     public function test_cancellation_entry_is_presented_as_money_out(): void

@@ -102,7 +102,7 @@
                                     <td class="crm-responsive-table__title px-4 py-3 font-medium text-gray-950 dark:text-white sm:px-6" data-label="">
                                         {{ $row['label'] }}
                                         @if (str_contains(strtolower($row['label']), 'late fee'))
-                                            <span class="mt-0.5 block text-[11px] font-normal text-amber-700 dark:text-amber-300">Booked as receivable — not money received yet</span>
+                                            <span class="mt-0.5 block text-[11px] font-normal text-amber-700 dark:text-amber-300">Added to student dues — no money received yet</span>
                                         @endif
                                     </td>
                                     <td @class([
@@ -115,8 +115,8 @@
                             @if ((float) ($ledgerSummary['fees_receivable'] ?? 0) > 0)
                                 <tr>
                                     <td class="crm-responsive-table__title px-4 py-3 font-medium text-gray-950 dark:text-white sm:px-6" data-label="">
-                                        Fees receivable (outstanding)
-                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">Still to collect — includes tuition + accrued late fees</span>
+                                        Still to be collected
+                                        <span class="mt-0.5 block text-[11px] font-normal text-gray-500">Unpaid fees + unpaid late fees</span>
                                     </td>
                                     <td class="px-4 py-3 text-right font-semibold text-amber-600 dark:text-amber-400" data-label="Amount">₹{{ number_format((float) $ledgerSummary['fees_receivable'], 2) }}</td>
                                 </tr>
@@ -135,13 +135,13 @@
                     <h2 class="text-base font-semibold text-gray-950 dark:text-white">Journal entries</h2>
                     <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
                         @if ($ledgerEntryFilter === 'collections')
-                            Money received and cancelled receipts. Late-fee accruals are hidden by default.
+                            Money received and cancelled receipts. Late-fee charges are hidden by default.
                         @elseif ($ledgerEntryFilter === 'late_fees')
-                            Late fees booked as receivable — not cash collected.
+                            Late fees added to student dues — no money received.
                         @elseif ($ledgerEntryFilter === 'cancels')
-                            Soft-cancelled receipts only.
+                            Cancelled receipts only — the money was returned or never received.
                         @else
-                            Full journal: collections, cancels, and late-fee accruals.
+                            Everything: money received, cancelled receipts, and late fees charged.
                         @endif
                         @if (($ledgerEntriesTotal ?? 0) > 0)
                             · {{ (int) $ledgerEntriesTotal }} entr{{ (int) $ledgerEntriesTotal === 1 ? 'y' : 'ies' }}
@@ -175,6 +175,7 @@
                     $title = $isLateFee
                         ? \Illuminate\Support\Str::after($entry->description, 'Late fee accrued — ')
                         : $entry->description;
+                    $student = $presented['student'] ?? null;
                 @endphp
                 <div class="px-4 py-4 sm:px-6">
                     <div class="flex flex-wrap items-start justify-between gap-2">
@@ -182,11 +183,11 @@
                             <div class="flex flex-wrap items-center gap-2">
                                 <p class="min-w-0 break-words text-sm font-semibold text-gray-950 dark:text-white">{{ $title }}</p>
                                 @if ($isLateFee)
-                                    <span class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">Accrual</span>
+                                    <span class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">Charge added</span>
                                 @elseif ($isCancel)
                                     <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-800 dark:bg-red-500/15 dark:text-red-300">Cancelled</span>
                                 @else
-                                    <span class="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Collection</span>
+                                    <span class="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Money in</span>
                                 @endif
                             </div>
                             <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -194,8 +195,15 @@
                                 @if ($entry->postedBy)
                                     · {{ $entry->postedBy->name }}
                                 @endif
+                                @if ($student)
+                                    ·
+                                    <a
+                                        href="{{ \App\Filament\Pages\StudentProfilePage::getUrl(['record' => $student['id'], 'tab' => 'fees']) }}"
+                                        class="font-semibold text-primary-600 hover:underline dark:text-primary-400"
+                                    >{{ $student['name'] }}</a>
+                                @endif
                                 @if ($isLateFee)
-                                    · Not cash — penalty booked as receivable
+                                    · No money received — added to what the student owes
                                 @endif
                             </p>
                         </div>
@@ -230,9 +238,9 @@
             @empty
                 <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">
                     @if ($ledgerEntryFilter === 'collections')
-                        No fee collections or cancels in this period. Switch to Late fees to see accruals.
+                        No fee collections or cancels in this period. Switch to Late fees to see charges added.
                     @elseif ($ledgerEntryFilter === 'late_fees')
-                        No late-fee accruals in this period.
+                        No late fees were charged in this period.
                     @elseif ($ledgerEntryFilter === 'cancels')
                         No cancelled receipts in this period.
                     @else

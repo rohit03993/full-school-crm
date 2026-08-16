@@ -99,7 +99,7 @@ class FeesDashboardPage extends Page
     public function getSubheading(): ?string
     {
         return match ($this->activeTab) {
-            'ledger' => 'Money received for '.$this->periodLabel().'. Late-fee accruals are bookkeeping only — use the filter below to show them.',
+            'ledger' => 'Money received for '.$this->periodLabel().'. Late fees charged are hidden by default — use the filter below to show them.',
             default => 'Track collections, discounts, and overdue balances for '.$this->periodLabel().'.',
         };
     }
@@ -237,7 +237,7 @@ class FeesDashboardPage extends Page
     }
 
     /**
-     * @return Collection<int, array{entry: \App\Models\AccountingJournalEntry, lines: Collection<int, \App\Support\FeeLedgerPresentation>}>
+     * @return Collection<int, array{entry: \App\Models\AccountingJournalEntry, lines: Collection<int, \App\Support\FeeLedgerPresentation>, student: array{id: int, name: string}|null}>
      */
     public function getPresentedEntries(): Collection
     {
@@ -274,9 +274,9 @@ class FeesDashboardPage extends Page
     {
         return [
             ['key' => 'collections', 'label' => 'Collections', 'hint' => 'Receipts & cancels'],
-            ['key' => 'late_fees', 'label' => 'Late fees', 'hint' => 'Accruals only'],
-            ['key' => 'cancels', 'label' => 'Cancels', 'hint' => 'Voided receipts'],
-            ['key' => 'all', 'label' => 'All', 'hint' => 'Full journal'],
+            ['key' => 'late_fees', 'label' => 'Late fees', 'hint' => 'Charges added — no money received'],
+            ['key' => 'cancels', 'label' => 'Cancels', 'hint' => 'Cancelled receipts'],
+            ['key' => 'all', 'label' => 'All', 'hint' => 'Everything'],
         ];
     }
 
