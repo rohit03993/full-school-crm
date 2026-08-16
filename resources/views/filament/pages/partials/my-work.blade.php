@@ -31,7 +31,7 @@
         'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300 dark:hover:bg-white/15' => $workTab !== 'meetings',
       ])
     >
-      {{ $canAllCasesTab ? 'My meetings' : 'Meetings' }}
+      My meetings
       @if (($stats['open'] ?? 0) > 0)
         <span class="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">{{ $stats['open'] }}</span>
       @endif

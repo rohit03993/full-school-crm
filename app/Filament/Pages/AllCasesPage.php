@@ -3,9 +3,8 @@
 namespace App\Filament\Pages;
 
 use App\Enums\CampusVisitPurpose;
-use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
-use App\Support\CrmAccess;
+use App\Enums\RoleName;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavBadges;
@@ -62,7 +61,7 @@ class AllCasesPage extends Page
             return false;
         }
 
-        return CrmAccess::can($user, CrmPermission::CasesViewAll);
+        return $user->hasRole(RoleName::SuperAdmin->value);
     }
 
     public string $search = '';

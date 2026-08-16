@@ -261,9 +261,10 @@ class MyMeetingsPage extends Page
     {
         $user = Auth::user();
 
+        // Institute-wide case list is Super Admin only — staff use My meetings / My cases.
         return $user
             && FeatureGate::enabled(LicenseFeature::Cases)
-            && CrmAccess::can($user, CrmPermission::CasesViewAll);
+            && $user->hasRole(RoleName::SuperAdmin->value);
     }
 
     public function canMeetingsTab(): bool
@@ -284,7 +285,7 @@ class MyMeetingsPage extends Page
             return null;
         }
 
-        if (CrmAccess::can($staff, CrmPermission::CasesViewAll)) {
+        if ($user->hasRole(RoleName::SuperAdmin->value)) {
             $openCases = CrmNavBadges::allCasesOpen();
 
             return $openCases > 0 ? (string) $openCases : null;

@@ -93,6 +93,22 @@ class MyCasesPageTest extends TestCase
             ->assertDontSee('All cases');
     }
 
+    public function test_admission_officer_does_not_see_all_cases_tab_on_my_work(): void
+    {
+        $officer = User::factory()->create(['is_active' => true]);
+        $officer->assignRole(StaffJobRole::AdmissionOfficer->value);
+
+        $this->actingAs($officer);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->assertFalse(AllCasesPage::canAccess());
+
+        Livewire::test(MyMeetingsPage::class)
+            ->assertDontSee('All cases')
+            ->assertSee('My meetings')
+            ->assertSee('My cases');
+    }
+
     public function test_super_admin_lands_on_all_cases_tab_with_institute_view(): void
     {
         Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);

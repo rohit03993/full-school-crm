@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
+use App\Enums\RoleName;
 use App\Filament\Pages\AttendanceHubPage;
 use App\Filament\Pages\CallQueuePage;
 use App\Filament\Pages\FeesHubPage;
@@ -141,7 +142,7 @@ class DashboardHeroWidget extends Widget
         ];
 
         $user = Auth::user();
-        if ($user && CrmAccess::can($user, CrmPermission::CasesViewAll)) {
+        if ($user && $user->hasRole(RoleName::SuperAdmin->value)) {
             $actions[] = [
                 'label' => 'All cases',
                 'description' => 'Institute-wide support cases',

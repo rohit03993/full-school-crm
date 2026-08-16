@@ -43,7 +43,6 @@ class StaffRolePermissions
                 CrmPermission::CasesOpen,
                 CrmPermission::CasesAssign,
                 CrmPermission::CasesClose,
-                CrmPermission::CasesViewAll,
             ],
             StaffJobRole::Accountant->value => [
                 CrmPermission::DashboardFinanceStats,

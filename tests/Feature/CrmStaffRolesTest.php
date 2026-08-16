@@ -205,7 +205,10 @@ class CrmStaffRolesTest extends TestCase
             );
 
             if ($role === StaffJobRole::AdmissionOfficer) {
-                $this->assertTrue($user->canCrm(CrmPermission::CasesViewAll));
+                $this->assertFalse(
+                    $user->canCrm(CrmPermission::CasesViewAll),
+                    'Admission officer should not view all institute cases (Super Admin only)',
+                );
             } else {
                 $this->assertFalse(
                     $user->canCrm(CrmPermission::CasesViewAll),
