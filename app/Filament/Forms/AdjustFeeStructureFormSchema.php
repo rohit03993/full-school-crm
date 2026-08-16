@@ -222,6 +222,7 @@ class AdjustFeeStructureFormSchema
                                         $miscTotal,
                                     );
                                 },
+                                self::installmentStartNumber($feeStructure),
                             ),
                         ]),
         ];
@@ -460,6 +461,21 @@ class AdjustFeeStructureFormSchema
     }
 
     /**
+     * Pending rows continue the numbering after settled installments, so the
+     * schedule never shows two "Installment 1" rows.
+     */
+    public static function installmentStartNumber(FeeStructure $feeStructure): int
+    {
+        $feeStructure->loadMissing('installments');
+
+        $settled = $feeStructure->installments
+            ->filter(fn ($row): bool => (float) $row->pending_amount <= 0.01)
+            ->count();
+
+        return $settled + 1;
+    }
+
+    /**
      * Build installment rows that match the fee structure's current pending balance.
      *
      * @return list<array{label: string, amount: string, due_date: ?string}>
@@ -487,11 +503,14 @@ class AdjustFeeStructureFormSchema
             return FeePlanCalculator::singleFullFeeRow($pendingTotal);
         }
 
-        $rows = $unpaid->map(fn ($row): array => [
-            'label' => FeePlanCalculator::displayInstallmentLabel((string) $row->label, (int) $row->sort_order),
-            'amount' => FeePlanCalculator::normalizeRowAmount($row->pending_amount),
-            'due_date' => $row->due_date?->toDateString(),
-        ])->all();
+        $rows = FeePlanCalculator::renumberGeneratedLabels(
+            $unpaid->map(fn ($row): array => [
+                'label' => FeePlanCalculator::displayInstallmentLabel((string) $row->label, (int) $row->sort_order),
+                'amount' => FeePlanCalculator::normalizeRowAmount($row->pending_amount),
+                'due_date' => $row->due_date?->toDateString(),
+            ])->all(),
+            self::installmentStartNumber($feeStructure),
+        );
 
         $allocatedOnRows = round((float) $unpaid->sum('pending_amount'), 2);
 

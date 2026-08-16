@@ -167,13 +167,13 @@ class AdmissionFeePlanFormSchema
     /**
      * @return array<int, \Filament\Forms\Components\Field>
      */
-    public static function installmentRowSchema(): array
+    public static function installmentRowSchema(int $startNumber = 1): array
     {
         return [
             TextInput::make('label')
                 ->required()
                 ->maxLength(100)
-                ->placeholder('Installment 1'),
+                ->placeholder(FeePlanCalculator::installmentLabel(max(1, $startNumber))),
             TextInput::make('amount')
                 ->label('Amount (₹)')
                 ->numeric()
@@ -185,8 +185,8 @@ class AdmissionFeePlanFormSchema
                 ->label('Due date')
                 ->native(false)
                 ->live()
-                ->afterStateUpdated(function (DatePicker $component): void {
-                    self::resortInstallmentRepeater($component);
+                ->afterStateUpdated(function (DatePicker $component) use ($startNumber): void {
+                    self::resortInstallmentRepeater($component, $startNumber);
                 })
                 ->helperText('Rows reorder by due date. Custom labels are kept.'),
         ];
@@ -217,7 +217,7 @@ class AdmissionFeePlanFormSchema
         return array_values($repeater->getState() ?? []);
     }
 
-    public static function resortInstallmentRepeater(Field $component): void
+    public static function resortInstallmentRepeater(Field $component, int $startNumber = 1): void
     {
         $repeater = self::findParentRepeater($component);
 
@@ -231,35 +231,48 @@ class AdmissionFeePlanFormSchema
             return;
         }
 
-        $repeater->rawState(FeePlanCalculator::sortAndRenumberRepeaterItems($items));
+        $repeater->rawState(FeePlanCalculator::sortAndRenumberRepeaterItems($items, $startNumber));
         $repeater->callAfterStateUpdated();
+    }
+
+    /**
+     * Repeater item key (uuid) that the given field belongs to.
+     */
+    public static function repeaterItemKey(Field $component): ?string
+    {
+        $repeater = self::findParentRepeater($component);
+
+        if (! $repeater) {
+            return null;
+        }
+
+        $repeaterPath = (string) $repeater->getStatePath();
+        $fieldPath = (string) $component->getStatePath();
+
+        if ($repeaterPath === '' || ! str_starts_with($fieldPath, $repeaterPath.'.')) {
+            return null;
+        }
+
+        $key = explode('.', substr($fieldPath, strlen($repeaterPath) + 1))[0] ?? '';
+
+        return $key === '' ? null : $key;
     }
 
     public static function repeaterItemIndex(Field $component): int
     {
-        $container = $component->getContainer();
-        $itemPath = (string) $container->getStatePath();
-        $segments = explode('.', $itemPath);
-        array_pop($segments);
-        $itemKey = array_pop($segments);
+        $repeater = self::findParentRepeater($component);
+        $itemKey = self::repeaterItemKey($component);
 
-        $parent = $container->getParentComponent();
-
-        while ($parent && ! $parent instanceof Repeater) {
-            $parent = $parent->getParentComponent();
-        }
-
-        if (! $parent instanceof Repeater) {
+        if (! $repeater || $itemKey === null) {
             return 0;
         }
 
-        $keys = array_keys($parent->getState() ?? []);
-        $index = array_search($itemKey, $keys, true);
+        $index = array_search($itemKey, array_keys($repeater->getState() ?? []), true);
 
         return $index === false ? 0 : (int) $index;
     }
 
-    public static function autoFillEmptyRowInRepeater(Field $component, Closure $resolveTarget): void
+    public static function autoFillEmptyRowInRepeater(Field $component, Closure $resolveTarget, bool $skipOwnRow = false): void
     {
         $repeater = self::findParentRepeater($component);
 
@@ -273,29 +286,38 @@ class AdmissionFeePlanFormSchema
             return;
         }
 
-        $rows = array_values($repeater->getState() ?? []);
-        $filled = FeePlanCalculator::autoFillSingleEmptyRow($rows, $resolveTarget($repeater));
+        $rows = $repeater->getState() ?? [];
+        $filled = FeePlanCalculator::autoFillSingleEmptyRow(
+            $rows,
+            $resolveTarget($repeater),
+            $skipOwnRow ? self::repeaterItemKey($component) : null,
+        );
 
         if ($filled === $rows) {
             return;
         }
 
-        $keys = array_keys($items);
-        $newItems = [];
+        foreach ($filled as $key => $row) {
+            if (! is_array($items[$key] ?? null)) {
+                continue;
+            }
 
-        foreach ($filled as $index => $row) {
-            $newItems[$keys[$index] ?? $index] = $row;
+            if (($rows[$key]['amount'] ?? null) === ($row['amount'] ?? null)) {
+                continue;
+            }
+
+            $items[$key]['amount'] = $row['amount'] ?? null;
         }
 
-        $repeater->rawState($newItems);
+        $repeater->rawState($items);
     }
 
     /**
      * @return array<int, Field>
      */
-    public static function installmentRowSchemaForRepeater(Closure $resolveTarget, bool $wholeRupeesOnly = false): array
+    public static function installmentRowSchemaForRepeater(Closure $resolveTarget, bool $wholeRupeesOnly = false, int $startNumber = 1): array
     {
-        $schema = self::installmentRowSchema();
+        $schema = self::installmentRowSchema($startNumber);
 
         foreach ($schema as $field) {
             if ($field->getName() === 'amount') {
@@ -307,14 +329,14 @@ class AdmissionFeePlanFormSchema
                 }
 
                 $field->afterStateUpdated(function (mixed $state, Field $component) use ($resolveTarget): void {
-                    self::autoFillEmptyRowInRepeater($component, $resolveTarget);
+                    self::autoFillEmptyRowInRepeater($component, $resolveTarget, skipOwnRow: true);
                 });
 
                 continue;
             }
 
             if ($field->getName() === 'due_date') {
-                $field->helperText('First row defaults to today; each new row is +1 month from the previous due date.');
+                $field->helperText('Change a date and rows re-sort, then renumber 1, 2, 3. Custom labels are kept.');
             }
         }
 
@@ -324,21 +346,22 @@ class AdmissionFeePlanFormSchema
     /**
      * Adjust-fees modal: whole rupee amounts with allocation helpers.
      */
-    public static function configureAdjustFeeInstallmentRepeater(Repeater $repeater, Closure $resolveTarget): Repeater
+    public static function configureAdjustFeeInstallmentRepeater(Repeater $repeater, Closure $resolveTarget, int $startNumber = 1): Repeater
     {
-        return self::configureInstallmentRepeater($repeater, $resolveTarget)
-            ->schema(self::installmentRowSchemaForRepeater($resolveTarget, wholeRupeesOnly: true))
-            ->helperText('New rows default to the remaining balance and the next due date (+1 month). One empty row auto-fills the remaining balance.');
+        return self::configureInstallmentRepeater($repeater, $resolveTarget, $startNumber)
+            ->schema(self::installmentRowSchemaForRepeater($resolveTarget, wholeRupeesOnly: true, startNumber: $startNumber))
+            ->helperText('Rows stay ordered by due date and renumber automatically. New rows default to the remaining balance and the next due date (+1 month).');
     }
 
-    public static function configureInstallmentRepeater(Repeater $repeater, Closure $resolveTarget): Repeater
+    public static function configureInstallmentRepeater(Repeater $repeater, Closure $resolveTarget, int $startNumber = 1): Repeater
     {
         return $repeater
-            ->schema(self::installmentRowSchemaForRepeater($resolveTarget))
-            ->helperText('New rows default to the remaining balance and the next due date (+1 month). One empty row auto-fills the remaining balance.')
+            ->schema(self::installmentRowSchemaForRepeater($resolveTarget, startNumber: $startNumber))
+            ->helperText('Rows stay ordered by due date and renumber automatically. New rows default to the remaining balance and the next due date (+1 month).')
+            ->reorderable(false)
             ->addActionLabel('Add row')
-            ->addAction(function (Action $action) use ($resolveTarget): Action {
-                return $action->action(function (Repeater $component) use ($resolveTarget): void {
+            ->addAction(function (Action $action) use ($resolveTarget, $startNumber): Action {
+                return $action->action(function (Repeater $component) use ($resolveTarget, $startNumber): void {
                     $newUuid = $component->generateUuid();
                     $items = $component->getRawState();
                     $existing = array_values($component->getState() ?? []);
@@ -351,8 +374,18 @@ class AdmissionFeePlanFormSchema
                         $items[] = $newRow;
                     }
 
-                    $component->rawState($items);
+                    $component->rawState(FeePlanCalculator::sortAndRenumberRepeaterItems($items, $startNumber));
                     $component->collapsed(false, shouldMakeComponentCollapsible: false);
+                    $component->callAfterStateUpdated();
+                    $component->shouldPartiallyRenderAfterActionsCalled() ? $component->partiallyRender() : null;
+                });
+            })
+            ->deleteAction(function (Action $action) use ($startNumber): Action {
+                return $action->action(function (array $arguments, Repeater $component) use ($startNumber): void {
+                    $items = $component->getRawState();
+                    unset($items[$arguments['item']]);
+
+                    $component->rawState(FeePlanCalculator::sortAndRenumberRepeaterItems($items, $startNumber));
                     $component->callAfterStateUpdated();
                     $component->shouldPartiallyRenderAfterActionsCalled() ? $component->partiallyRender() : null;
                 });

@@ -104,9 +104,13 @@ class FeeInstallmentService
         ])->values();
 
         foreach ($sorted as $index => $installment) {
-            $installment->updateQuietly([
-                'sort_order' => $index + 1,
-            ]);
+            $attributes = ['sort_order' => $index + 1];
+
+            if (FeePlanCalculator::isGeneratedInstallmentLabel($installment->label)) {
+                $attributes['label'] = FeePlanCalculator::installmentLabel($index + 1);
+            }
+
+            $installment->updateQuietly($attributes);
         }
     }
 

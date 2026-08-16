@@ -196,7 +196,7 @@ class AdmissionFeePlanService
             return [];
         }
 
-        $sorted = FeePlanCalculator::sortInstallmentPlanByDueDate(array_map(
+        $sorted = FeePlanCalculator::renumberGeneratedLabels(array_map(
             fn (array $row): array => [
                 'label' => $row['label'],
                 'amount' => (string) $row['amount'],

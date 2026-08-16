@@ -1313,7 +1313,7 @@ class StudentProfilePage extends Page
     public function removeInstallmentRow(int $index): void
     {
         unset($this->installmentPlan[$index]);
-        $this->installmentPlan = FeePlanCalculator::sortAndRenumberInstallmentPlan(
+        $this->installmentPlan = FeePlanCalculator::renumberGeneratedLabels(
             array_values($this->installmentPlan),
         );
     }
@@ -1326,14 +1326,34 @@ class StudentProfilePage extends Page
         $netFee = max(0, $courseFee - $discount + $miscTotal);
 
         if (is_string($key) && str_ends_with($key, '.due_date')) {
-            $this->installmentPlan = FeePlanCalculator::sortAndRenumberInstallmentPlan($this->installmentPlan);
+            $this->installmentPlan = FeePlanCalculator::renumberGeneratedLabels($this->installmentPlan);
 
             return;
         }
 
         if (is_string($key) && str_ends_with($key, '.amount')) {
-            $this->installmentPlan = FeePlanCalculator::autoFillSingleEmptyRow($this->installmentPlan, $netFee);
+            $this->installmentPlan = FeePlanCalculator::autoFillSingleEmptyRow(
+                $this->installmentPlan,
+                $netFee,
+                self::rowKeyFromUpdatedKey($key),
+            );
         }
+    }
+
+    /**
+     * Row key from a Livewire update path such as "1.amount".
+     */
+    protected static function rowKeyFromUpdatedKey(string $key): int|string|null
+    {
+        $segments = explode('.', $key);
+        array_pop($segments);
+        $rowKey = array_pop($segments);
+
+        if ($rowKey === null || $rowKey === '') {
+            return null;
+        }
+
+        return ctype_digit($rowKey) ? (int) $rowKey : $rowKey;
     }
 
     public function suggestInstallmentPlan(): void

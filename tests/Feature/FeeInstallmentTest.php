@@ -151,6 +151,33 @@ class FeeInstallmentTest extends TestCase
         $this->assertSame('Already overdue', $next->label);
     }
 
+    public function test_installment_numbers_follow_due_date_order_and_keep_custom_labels(): void
+    {
+        $staff = $this->createStaffUser();
+        $student = $this->createStudent();
+        $course = $this->createCourse();
+        $enquiry = $this->createEnquiry($student, $course, $staff);
+
+        $admissionService = app(AdmissionService::class);
+        $admission = $admissionService->convert($student, $enquiry, $staff, [
+            'course_id' => $course->id,
+            'use_installment_plan' => true,
+            'installment_plan' => [
+                ['label' => 'Installment 1', 'amount' => 20000, 'due_date' => now()->addMonths(2)->toDateString()],
+                ['label' => 'Installment 3', 'amount' => 20000, 'due_date' => now()->addMonth()->toDateString()],
+                ['label' => 'Admission fee', 'amount' => 20000, 'due_date' => now()->toDateString()],
+            ],
+        ]);
+
+        $enrollment = $admissionService->approve($this->submitAdmissionForm($admission, $staff), $staff);
+        $installments = $enrollment->feeStructure->installments()->orderBy('sort_order')->get();
+
+        $this->assertSame(
+            ['Admission fee', 'Installment 2', 'Installment 3'],
+            $installments->pluck('label')->all(),
+        );
+    }
+
     public function test_late_fee_is_generated_for_overdue_installment(): void
     {
         $staff = $this->createStaffUser();

@@ -87,6 +87,20 @@ class FeePlanCalculator
         return 'Installment '.$number;
     }
 
+    /**
+     * True when the label is an auto-generated one that may safely be renumbered.
+     */
+    public static function isGeneratedInstallmentLabel(mixed $label): bool
+    {
+        $trimmed = trim((string) $label);
+
+        if ($trimmed === '') {
+            return true;
+        }
+
+        return (bool) preg_match('/^installment\s+\d+$/i', $trimmed);
+    }
+
     public static function displayInstallmentLabel(string $label, int $sortOrder): string
     {
         $trimmed = trim($label);
@@ -188,6 +202,28 @@ class FeePlanCalculator
         return $rows;
     }
 
+    /**
+     * Sort by due date and renumber only auto-generated labels, so a row added
+     * in between becomes Installment 2 instead of keeping a higher number.
+     *
+     * @param  array<int, array{label?: string, amount?: mixed, due_date?: ?string}>  $rows
+     * @return array<int, array{label?: string, amount?: mixed, due_date?: ?string}>
+     */
+    public static function renumberGeneratedLabels(array $rows, int $startNumber = 1): array
+    {
+        $rows = self::sortInstallmentPlanByDueDate($rows);
+        $startNumber = max(1, $startNumber);
+
+        foreach ($rows as $index => &$row) {
+            if (self::isGeneratedInstallmentLabel($row['label'] ?? '')) {
+                $row['label'] = self::installmentLabel($startNumber + $index);
+            }
+        }
+        unset($row);
+
+        return $rows;
+    }
+
     protected static function compareDueDates(mixed $dateA, mixed $dateB): int
     {
         if (! $dateA && ! $dateB) {
@@ -207,11 +243,13 @@ class FeePlanCalculator
 
     /**
      * When exactly one row has no amount, fill it with the remaining balance.
+     * `$skipKey` keeps the row the user is editing untouched, so clearing an
+     * amount does not immediately refill it.
      *
-     * @param  array<int, array{amount?: mixed}>  $rows
-     * @return array<int, array{amount?: mixed}>
+     * @param  array<array-key, array{amount?: mixed}>  $rows
+     * @return array<array-key, array{amount?: mixed}>
      */
-    public static function autoFillSingleEmptyRow(array $rows, float $targetTotal): array
+    public static function autoFillSingleEmptyRow(array $rows, float $targetTotal, int|string|null $skipKey = null): array
     {
         if ($targetTotal <= 0 || $rows === []) {
             return $rows;
@@ -226,6 +264,10 @@ class FeePlanCalculator
         }
 
         if (count($emptyIndices) !== 1) {
+            return $rows;
+        }
+
+        if ($skipKey !== null && (string) $emptyIndices[0] === (string) $skipKey) {
             return $rows;
         }
 
@@ -244,11 +286,13 @@ class FeePlanCalculator
      * @param  array<string, array<string, mixed>>  $items
      * @return array<string, array<string, mixed>>
      */
-    public static function sortAndRenumberRepeaterItems(array $items): array
+    public static function sortAndRenumberRepeaterItems(array $items, int $startNumber = 1): array
     {
         if ($items === []) {
             return [];
         }
+
+        $startNumber = max(1, $startNumber);
 
         $pairs = [];
 
@@ -282,10 +326,9 @@ class FeePlanCalculator
 
         foreach ($pairs as $index => $pair) {
             $row = $pair['row'];
-            $label = trim((string) ($row['label'] ?? ''));
 
-            if ($label === '') {
-                $row['label'] = self::installmentLabel($index + 1);
+            if (self::isGeneratedInstallmentLabel($row['label'] ?? '')) {
+                $row['label'] = self::installmentLabel($startNumber + $index);
             }
 
             $sorted[$pair['uuid']] = $row;

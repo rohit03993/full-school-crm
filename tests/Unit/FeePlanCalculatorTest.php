@@ -87,6 +87,47 @@ class FeePlanCalculatorTest extends TestCase
         $this->assertSame($rows, $filled);
     }
 
+    public function test_auto_fill_leaves_the_row_being_edited_empty(): void
+    {
+        $rows = [
+            'a1b2c3d4' => ['amount' => '5000'],
+            'e5f6g7h8' => ['amount' => ''],
+        ];
+
+        $filled = FeePlanCalculator::autoFillSingleEmptyRow($rows, 185000, 'e5f6g7h8');
+
+        $this->assertSame($rows, $filled);
+    }
+
+    public function test_renumber_generated_labels_sorts_and_keeps_custom_labels(): void
+    {
+        $rows = FeePlanCalculator::renumberGeneratedLabels([
+            ['label' => 'Installment 1', 'amount' => '5000', 'due_date' => '2026-08-01'],
+            ['label' => 'Installment 3', 'amount' => '5000', 'due_date' => '2026-09-01'],
+            ['label' => 'Admission fee', 'amount' => '5000', 'due_date' => '2026-07-01'],
+        ]);
+
+        $this->assertSame('Admission fee', $rows[0]['label']);
+        $this->assertSame('Installment 2', $rows[1]['label']);
+        $this->assertSame('2026-08-01', $rows[1]['due_date']);
+        $this->assertSame('Installment 3', $rows[2]['label']);
+    }
+
+    public function test_sort_and_renumber_repeater_items_fixes_out_of_order_numbers(): void
+    {
+        $items = FeePlanCalculator::sortAndRenumberRepeaterItems([
+            'a1' => ['label' => 'Installment 1', 'amount' => '5000', 'due_date' => '2026-08-01'],
+            'b2' => ['label' => 'Installment 3', 'amount' => '5000', 'due_date' => '2026-10-01'],
+            'c3' => ['label' => 'Installment 2', 'amount' => '5000', 'due_date' => '2026-09-01'],
+        ]);
+
+        $this->assertSame(['a1', 'c3', 'b2'], array_keys($items));
+        $this->assertSame(
+            ['Installment 1', 'Installment 2', 'Installment 3'],
+            array_column(array_values($items), 'label'),
+        );
+    }
+
     public function test_fill_balance_on_last_row_works_with_string_repeater_keys(): void
     {
         $rows = [

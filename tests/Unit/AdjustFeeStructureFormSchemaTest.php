@@ -45,6 +45,50 @@ class AdjustFeeStructureFormSchemaTest extends TestCase
         $this->assertSame('Installment 2', $plan[0]['label']);
     }
 
+    public function test_pending_installment_plan_resequences_numbers_after_settled_rows(): void
+    {
+        $feeStructure = new FeeStructure([
+            'course_fee' => 100000,
+            'discount_amount' => 0,
+            'net_fee' => 100000,
+            'paid_amount' => 20000,
+            'pending_amount' => 80000,
+        ]);
+
+        $feeStructure->setRelation('installments', new Collection([
+            new FeeInstallment([
+                'label' => 'Installment 1',
+                'amount' => 20000,
+                'paid_amount' => 20000,
+                'pending_amount' => 0,
+                'due_date' => '2026-08-01',
+                'sort_order' => 1,
+            ]),
+            new FeeInstallment([
+                'label' => 'Installment 3',
+                'amount' => 40000,
+                'paid_amount' => 0,
+                'pending_amount' => 40000,
+                'due_date' => '2026-09-01',
+                'sort_order' => 2,
+            ]),
+            new FeeInstallment([
+                'label' => 'Installment 2',
+                'amount' => 40000,
+                'paid_amount' => 0,
+                'pending_amount' => 40000,
+                'due_date' => '2026-10-01',
+                'sort_order' => 3,
+            ]),
+        ]));
+
+        $plan = AdjustFeeStructureFormSchema::pendingInstallmentPlan($feeStructure);
+
+        $this->assertSame(2, AdjustFeeStructureFormSchema::installmentStartNumber($feeStructure));
+        $this->assertSame(['Installment 2', 'Installment 3'], array_column($plan, 'label'));
+        $this->assertSame(['2026-09-01', '2026-10-01'], array_column($plan, 'due_date'));
+    }
+
     public function test_additional_discount_reduces_net_from_current_position_not_course_fee(): void
     {
         $feeStructure = new FeeStructure([
