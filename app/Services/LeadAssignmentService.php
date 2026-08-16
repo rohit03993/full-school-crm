@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\CrmAccess;
 use App\Support\CrmCacheInvalidator;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class LeadAssignmentService
@@ -198,6 +199,12 @@ class LeadAssignmentService
         }
 
         $notification->sendToDatabase($staff);
+
+        try {
+            app(WebPushService::class)->notifyLeadAssigned($staff, $studentName, $profileUrl);
+        } catch (\Throwable $exception) {
+            Log::warning('Lead assign web push failed: '.$exception->getMessage());
+        }
     }
 
     protected function flushCaches(?int ...$staffUserIds): void

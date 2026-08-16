@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\HomeworkAssignment;
 use App\Models\PushSubscription;
-use App\Models\Setting;
 use App\Models\Student;
+use App\Models\StudentCase;
 use App\Models\User;
+use App\Support\PushSettings;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Minishlink\WebPush\Subscription;
@@ -98,7 +100,7 @@ class WebPushService
             return ['sent' => 0, 'failed' => 0];
         }
 
-        if (! Setting::getValue('push.enabled', '1')) {
+        if (! PushSettings::enabled()) {
             return ['sent' => 0, 'failed' => 0];
         }
 
@@ -165,7 +167,7 @@ class WebPushService
      */
     public function notifyFeeReminders(Collection $rows): int
     {
-        if (! Setting::getValue('push.fee_reminders_enabled', '1')) {
+        if (! PushSettings::feeRemindersEnabled()) {
             return 0;
         }
 
@@ -201,7 +203,7 @@ class WebPushService
      */
     public function notifyStaffFollowUpDigest(User $user, int $dueCount): array
     {
-        if ($dueCount < 1 || ! Setting::getValue('push.followup_digest_enabled', '1')) {
+        if ($dueCount < 1 || ! PushSettings::followUpDigestEnabled()) {
             return ['sent' => 0, 'failed' => 0];
         }
 
@@ -212,6 +214,150 @@ class WebPushService
                 : "{$dueCount} follow-ups need attention.",
             'url' => url('/admin/follow-ups'),
             'tag' => 'followups-due',
+        ]);
+    }
+
+    public function notifyLeadAssigned(User $staff, string $studentName, ?string $profileUrl = null): array
+    {
+        if (! PushSettings::leadAssignedEnabled()) {
+            return ['sent' => 0, 'failed' => 0];
+        }
+
+        return $this->sendToUser($staff, [
+            'title' => 'Lead assigned for calling',
+            'body' => "{$studentName} was assigned to you for telecalling.",
+            'url' => $profileUrl ?: url('/admin'),
+            'tag' => 'lead-assigned',
+        ]);
+    }
+
+    public function notifyVisitAssigned(User $staff, string $studentName, ?string $profileUrl = null): array
+    {
+        if (! PushSettings::visitAssignedEnabled()) {
+            return ['sent' => 0, 'failed' => 0];
+        }
+
+        return $this->sendToUser($staff, [
+            'title' => 'Meeting assigned to you',
+            'body' => "{$studentName} was assigned for a campus meeting.",
+            'url' => $profileUrl ?: url('/admin'),
+            'tag' => 'visit-assigned',
+        ]);
+    }
+
+    public function notifyCaseAssigned(User $staff, StudentCase $case, string $studentName, ?string $url = null): array
+    {
+        if (! PushSettings::caseAssignedEnabled()) {
+            return ['sent' => 0, 'failed' => 0];
+        }
+
+        return $this->sendToUser($staff, [
+            'title' => 'Case assigned to you',
+            'body' => "{$case->case_number} ({$studentName}) was assigned to you.",
+            'url' => $url ?: url('/admin'),
+            'tag' => 'case-assigned',
+        ]);
+    }
+
+    public function notifyAttendancePunch(Student $student, string $state, string $time): array
+    {
+        if (! PushSettings::attendanceEnabled()) {
+            return ['sent' => 0, 'failed' => 0];
+        }
+
+        $label = strtoupper($state) === 'OUT' ? 'OUT' : 'IN';
+        $timeLabel = strlen($time) >= 5 ? substr($time, 0, 5) : $time;
+
+        return $this->sendToStudent($student, [
+            'title' => "Attendance {$label}",
+            'body' => "{$student->name}: checked {$label} at {$timeLabel}.",
+            'url' => url('/portal').'#attendance',
+            'tag' => 'attendance-'.$label,
+        ]);
+    }
+
+    public function notifyHomeworkPublished(HomeworkAssignment $assignment): int
+    {
+        if (! PushSettings::homeworkEnabled()) {
+            return 0;
+        }
+
+        $assignment->loadMissing('batch');
+        $title = $assignment->title ?: 'New homework';
+        $batchName = $assignment->batch?->name;
+
+        $students = \App\Models\BatchStudent::query()
+            ->where('batch_id', $assignment->batch_id)
+            ->where('is_active', true)
+            ->with('student')
+            ->get()
+            ->pluck('student')
+            ->filter();
+
+        $sent = 0;
+
+        foreach ($students as $student) {
+            if (! $student instanceof Student) {
+                continue;
+            }
+
+            $result = $this->sendToStudent($student, [
+                'title' => 'New homework',
+                'body' => $batchName
+                    ? "{$title} · {$batchName}"
+                    : $title,
+                'url' => url('/portal').'#homework',
+                'tag' => 'homework-'.$assignment->id,
+            ]);
+
+            $sent += $result['sent'];
+        }
+
+        return $sent;
+    }
+
+    /**
+     * @param  Collection<int, Student>|iterable<int, Student>  $students
+     */
+    public function notifyMarksPublished(iterable $students, string $examName): int
+    {
+        if (! PushSettings::marksPublishedEnabled()) {
+            return 0;
+        }
+
+        $sent = 0;
+
+        foreach ($students as $student) {
+            if (! $student instanceof Student) {
+                continue;
+            }
+
+            $result = $this->sendToStudent($student, [
+                'title' => 'Results published',
+                'body' => filled($examName)
+                    ? "{$examName} marks are now available in the app."
+                    : 'Exam results are now available in the app.',
+                'url' => url('/portal').'#marks',
+                'tag' => 'marks-published',
+            ]);
+
+            $sent += $result['sent'];
+        }
+
+        return $sent;
+    }
+
+    public function notifyCaseUpdate(Student $student, StudentCase $case): array
+    {
+        if (! PushSettings::caseUpdateEnabled()) {
+            return ['sent' => 0, 'failed' => 0];
+        }
+
+        return $this->sendToStudent($student, [
+            'title' => 'Case update',
+            'body' => "There is a new update on case {$case->case_number}.",
+            'url' => url('/portal'),
+            'tag' => 'case-update-'.$case->id,
         ]);
     }
 }

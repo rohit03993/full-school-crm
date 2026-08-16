@@ -15,6 +15,7 @@ use App\Support\CrmCacheInvalidator;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class VisitMeetingAssignmentService
@@ -342,6 +343,12 @@ class VisitMeetingAssignmentService
                     ->url($profileUrl),
             ])
             ->sendToDatabase($recipient);
+
+        try {
+            app(WebPushService::class)->notifyVisitAssigned($recipient, $studentName, $profileUrl);
+        } catch (\Throwable $exception) {
+            Log::warning('Visit assign web push failed: '.$exception->getMessage());
+        }
     }
 
     protected function flushCaches(int $staffUserId): void

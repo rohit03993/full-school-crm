@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class StudentCaseService
@@ -604,6 +605,17 @@ class StudentCaseService
         }
 
         $notification->sendToDatabase($assignee);
+
+        try {
+            app(WebPushService::class)->notifyCaseAssigned(
+                $assignee,
+                $case,
+                $studentName,
+                $profileUrl,
+            );
+        } catch (\Throwable $exception) {
+            Log::warning('Case assign web push failed: '.$exception->getMessage());
+        }
     }
 
     protected function applyCaseListFilters(

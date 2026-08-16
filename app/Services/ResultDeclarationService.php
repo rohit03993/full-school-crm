@@ -177,7 +177,22 @@ class ResultDeclarationService
             );
         });
 
-        return $declaration->fresh(['studentMarksheets.student']);
+        $fresh = $declaration->fresh(['studentMarksheets.student']);
+
+        try {
+            $students = $fresh->studentMarksheets
+                ->pluck('student')
+                ->filter();
+
+            app(WebPushService::class)->notifyMarksPublished(
+                $students,
+                (string) ($fresh->test_name ?? 'Exam'),
+            );
+        } catch (\Throwable $exception) {
+            \Illuminate\Support\Facades\Log::warning('Marks publish web push failed: '.$exception->getMessage());
+        }
+
+        return $fresh;
     }
 
     public function unpublish(string $groupKey, User $staff): ResultDeclaration

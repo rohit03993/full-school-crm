@@ -103,6 +103,14 @@ class SetupHubPage extends Page
             ];
         }
 
+        if (ManagePushNotificationsPage::canAccess()) {
+            $cards[] = [
+                'title' => CrmMenuLabels::pushNotifications(),
+                'description' => 'PWA lock-screen alerts for staff and parents.',
+                'url' => ManagePushNotificationsPage::getUrl(),
+            ];
+        }
+
         if (ManageAttendanceBiometricPage::canAccess()) {
             $cards[] = [
                 'title' => CrmMenuLabels::biometricSetup(),

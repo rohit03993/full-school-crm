@@ -228,6 +228,14 @@ class PunchAttendanceProcessor
 
         $whatsapp = $this->whatsapp->outcomeForPunch($student, $roll, $date, $time, $state, $staff);
 
+        if ($synced && in_array($state, ['IN', 'OUT'], true)) {
+            try {
+                app(\App\Services\WebPushService::class)->notifyAttendancePunch($student, $state, $time);
+            } catch (\Throwable $exception) {
+                \Illuminate\Support\Facades\Log::warning('Attendance web push failed: '.$exception->getMessage());
+            }
+        }
+
         return ['synced' => $synced, 'whatsapp' => $whatsapp];
     }
 

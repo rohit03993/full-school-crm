@@ -369,6 +369,14 @@ class CallLogService
             return $call->load(['staff', 'studentCase']);
         });
 
+        try {
+            if ($case->student) {
+                app(WebPushService::class)->notifyCaseUpdate($case->student, $case);
+            }
+        } catch (\Throwable $exception) {
+            \Illuminate\Support\Facades\Log::warning('Case update web push failed: '.$exception->getMessage());
+        }
+
         return $call;
     }
 

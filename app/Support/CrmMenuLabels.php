@@ -264,6 +264,11 @@ final class CrmMenuLabels
         return 'Fee rules';
     }
 
+    public static function pushNotifications(): string
+    {
+        return 'Push notifications';
+    }
+
     public static function customFields(): string
     {
         return 'Custom fields';

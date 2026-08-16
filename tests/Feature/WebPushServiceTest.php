@@ -92,6 +92,34 @@ class WebPushServiceTest extends TestCase
         $this->assertSame(0, $sent);
     }
 
+    public function test_staff_event_pushes_respect_toggles(): void
+    {
+        Setting::setValue('push.lead_assigned_enabled', '0', 'push');
+        Setting::setValue('push.visit_assigned_enabled', '0', 'push');
+        Setting::setValue('push.case_assigned_enabled', '0', 'push');
+        Setting::setValue('push.attendance_enabled', '0', 'push');
+        Setting::setValue('push.homework_enabled', '0', 'push');
+        Setting::setValue('push.marks_published_enabled', '0', 'push');
+        Setting::setValue('push.case_update_enabled', '0', 'push');
+
+        $user = User::factory()->create(['is_active' => true]);
+        $student = Student::query()->create([
+            'name' => 'Push Student',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2010-01-01',
+            'gender' => \App\Enums\Gender::Male,
+            'mobile' => '9999999999',
+            'status' => \App\Enums\StudentStatus::Enrolled,
+        ]);
+
+        $push = app(WebPushService::class);
+
+        $this->assertSame(0, $push->notifyLeadAssigned($user, 'Lead')['sent']);
+        $this->assertSame(0, $push->notifyVisitAssigned($user, 'Visitor')['sent']);
+        $this->assertSame(0, $push->notifyAttendancePunch($student, 'IN', '09:00:00')['sent']);
+        $this->assertSame(0, $push->notifyMarksPublished(collect([$student]), 'Unit Test'));
+    }
+
     public function test_unsubscribe_removes_endpoint(): void
     {
         PushSubscription::query()->create([

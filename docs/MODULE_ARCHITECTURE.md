@@ -80,7 +80,9 @@ Optional lock-screen alerts for the installed app (staff + portal):
 | Subscribe | `/pwa/push/subscribe` after Allow notifications |
 | Fee reminders | `crm:send-fee-reminders` also sends portal push (even if WhatsApp is off) |
 | Staff follow-ups | `crm:send-push-followup-digest` daily 08:30 |
-| Toggle | Settings `push.enabled`, `push.fee_reminders_enabled`, `push.followup_digest_enabled` (default on) |
+| Staff assign | Lead / visit / case assign → push to assignee |
+| Portal events | Attendance IN/OUT, homework published, marks published, case call update |
+| Toggle UI | Setup → **Push notifications** (`PushSettings`, default on) |
 
 ---
 

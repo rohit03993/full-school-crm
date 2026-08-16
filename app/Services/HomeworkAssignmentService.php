@@ -61,6 +61,12 @@ class HomeworkAssignmentService
             ]);
         }
 
+        try {
+            app(WebPushService::class)->notifyHomeworkPublished($assignment);
+        } catch (\Throwable $exception) {
+            \Illuminate\Support\Facades\Log::warning('Homework web push failed: '.$exception->getMessage());
+        }
+
         return $assignment->fresh(['batch']);
     }
 

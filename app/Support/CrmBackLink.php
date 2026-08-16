@@ -35,6 +35,7 @@ use App\Filament\Pages\ManageAttendanceDisplayPage;
 use App\Filament\Pages\ManageCustomFields;
 use App\Filament\Pages\ManageFacePlatformPage;
 use App\Filament\Pages\ManageFeeSettings;
+use App\Filament\Pages\ManagePushNotificationsPage;
 use App\Filament\Pages\ManageInstituteSettings;
 use App\Filament\Pages\ManageMeetingForOptions;
 use App\Filament\Pages\ManageMetaWhatsAppSettings;
@@ -117,6 +118,7 @@ class CrmBackLink
         ManageCustomFields::class => SetupHubPage::class,
         ManageMeetingForOptions::class => SetupHubPage::class,
         ManageFeeSettings::class => SetupHubPage::class,
+        ManagePushNotificationsPage::class => SetupHubPage::class,
         ManageAttendanceBiometricPage::class => SetupHubPage::class,
         ManageFacePlatformPage::class => SetupHubPage::class,
         ManageAttendanceDisplayPage::class => SetupHubPage::class,
