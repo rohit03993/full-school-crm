@@ -198,7 +198,9 @@ class DashboardOpsService
                 if (FeatureGate::enabled(LicenseFeature::Attendance) && Schema::hasTable('staff_attendances')) {
                     $staffTotal = (int) User::query()
                         ->where('is_active', true)
-                        ->whereHas('staffProfile', fn ($query) => $query->whereNotNull('employee_code'))
+                        ->whereHas('staffProfile', fn ($query) => $query
+                            ->whereNotNull('employee_code')
+                            ->where('employee_code', '!=', ''))
                         ->count();
                     $staffPresent = (int) StaffAttendance::query()
                         ->whereDate('attendance_date', $today)

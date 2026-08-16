@@ -88,7 +88,9 @@ class StaffAttendancePage extends Page
                         ->label('Staff')
                         ->options(fn (): array => User::query()
                             ->where('is_active', true)
-                            ->whereHas('staffProfile', fn ($q) => $q->whereNotNull('employee_code'))
+                            ->whereHas('staffProfile', fn ($q) => $q
+                                ->whereNotNull('employee_code')
+                                ->where('employee_code', '!=', ''))
                             ->orderBy('name')
                             ->pluck('name', 'id')
                             ->all())

@@ -13,6 +13,7 @@ use App\Filament\Resources\Staff\Pages\ListStaff;
 use App\Filament\Support\CrmTable;
 use App\Models\User;
 use App\Services\FaceVerify\FaceVerifyGateService;
+use App\Services\StaffEmployeeCodeService;
 use App\Support\BiometricPinCollision;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
@@ -149,7 +150,8 @@ class StaffResource extends Resource
                         ->maxLength(100),
                     TextInput::make('employee_code')
                         ->label('Staff ID')
-                        ->helperText('Device PIN / Face ID — must not match any student roll number.')
+                        ->helperText('Device PIN / Face ID. Leave blank to auto-assign 1001, 1002… Existing IDs (e.g. STF012) are kept. Must not match a student roll.')
+                        ->placeholder('Auto (1001…)')
                         ->maxLength(50)
                         ->unique(ignoreRecord: true)
                         ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? strtoupper(trim($state)) : null)
@@ -261,6 +263,23 @@ class StaffResource extends Resource
                     }),
             ])
             ->headerActions([
+                Action::make('assignMissingStaffIds')
+                    ->label('Assign missing Staff IDs')
+                    ->icon(Heroicon::OutlinedHashtag)
+                    ->color('gray')
+                    ->visible(fn (): bool => CrmAccess::can(Auth::user(), CrmPermission::StaffManage))
+                    ->requiresConfirmation()
+                    ->modalHeading('Assign missing Staff IDs')
+                    ->modalDescription('Staff without a Staff ID get the next free number from 1001 upward. Anyone who already has an ID (STF012, etc.) is left unchanged. They will then appear on Staff attendance and can sync to Face/RFID.')
+                    ->action(function (): void {
+                        $result = app(StaffEmployeeCodeService::class)->backfillMissing();
+
+                        Notification::make()
+                            ->title('Staff IDs updated')
+                            ->body($result['assigned'].' assigned · '.$result['skipped'].' already had an ID')
+                            ->success()
+                            ->send();
+                    }),
                 Action::make('importStaff')
                     ->label('Import staff')
                     ->icon(Heroicon::OutlinedArrowUpTray)

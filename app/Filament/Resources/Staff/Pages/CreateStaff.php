@@ -6,6 +6,7 @@ use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Staff\StaffResource;
+use App\Services\StaffEmployeeCodeService;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateStaff extends CreateRecord
@@ -40,6 +41,9 @@ class CreateStaff extends CreateRecord
         if (! $this->record->staffProfile()->exists()) {
             $this->record->staffProfile()->create([]);
         }
+
+        // Blank Staff ID → auto 1001, 1002… so Face/RFID and Staff attendance work.
+        app(StaffEmployeeCodeService::class)->ensureForUser($this->record->fresh(['staffProfile']));
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Staff\StaffResource;
+use App\Services\StaffEmployeeCodeService;
 use App\Support\CrmAccess;
 use Filament\Resources\Pages\EditRecord;
 
@@ -38,6 +39,11 @@ class EditStaff extends EditRecord
         unset($data['job_roles'], $data['is_super_admin']);
 
         return $data;
+    }
+
+    protected function afterSave(): void
+    {
+        app(StaffEmployeeCodeService::class)->ensureForUser($this->record->fresh(['staffProfile']));
     }
 
     /**
