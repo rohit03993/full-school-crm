@@ -6,6 +6,7 @@ use App\Filament\Widgets\BatchOverviewWidget;
 use App\Filament\Widgets\CrmFinanceStatsWidget;
 use App\Filament\Widgets\CrmLeadStatsWidget;
 use App\Filament\Widgets\CourseAdmissionsChartWidget;
+use App\Filament\Widgets\DashboardAnalyticsWidget;
 use App\Filament\Widgets\DashboardAttentionWidget;
 use App\Filament\Widgets\DashboardHeroWidget;
 use App\Filament\Widgets\DashboardTodayPulseWidget;
@@ -169,6 +170,7 @@ class Dashboard extends BaseDashboard
             DashboardHeroWidget::class,
             DashboardAttentionWidget::class,
             DashboardTodayPulseWidget::class,
+            DashboardAnalyticsWidget::class,
             CrmFinanceStatsWidget::class,
             CrmLeadStatsWidget::class,
             BatchOverviewWidget::class,

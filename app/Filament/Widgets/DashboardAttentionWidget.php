@@ -96,53 +96,60 @@ class DashboardAttentionWidget extends Widget
      */
     protected function ownerTiles(array $data): array
     {
-        $approvalsMeta = [];
-        if ($data['admissions_pending'] > 0) {
-            $approvalsMeta[] = $data['admissions_pending'].' admissions';
-        }
-        if ($data['fee_adjustments_pending'] > 0) {
-            $approvalsMeta[] = $data['fee_adjustments_pending'].' fee waives';
-        }
-        if ($data['homework_awaiting_approve'] > 0) {
-            $approvalsMeta[] = $data['homework_awaiting_approve'].' homework';
-        }
-
-        $approvalsUrl = null;
-        if ($data['fee_adjustments_pending'] > 0 && MiscChargeAdjustmentRequestsPage::canAccess()) {
-            $approvalsUrl = MiscChargeAdjustmentRequestsPage::getUrl();
-        } elseif ($data['homework_awaiting_approve'] > 0 && HomeworkReviewPage::canAccess()) {
-            $approvalsUrl = HomeworkReviewPage::getUrl();
-        } elseif (AdmissionResource::canViewAny()) {
-            $approvalsUrl = AdmissionResource::getUrl('index');
-        }
-
         return [
             [
-                'label' => 'Approvals',
-                'value' => (string) $data['approvals_total'],
-                'meta' => $approvalsMeta !== [] ? implode(' · ', $approvalsMeta) : 'Nothing waiting',
-                'tone' => $data['approvals_total'] > 0 ? 'warning' : 'success',
-                'url' => $approvalsUrl,
-                'show' => FeatureGate::anyEnabled(LicenseFeature::Admissions, LicenseFeature::Fees, LicenseFeature::Homework),
+                'label' => 'Admissions',
+                'value' => (string) $data['admissions_pending'],
+                'meta' => 'Awaiting review',
+                'tone' => $data['admissions_pending'] > 0 ? 'warning' : 'neutral',
+                'url' => AdmissionResource::canViewAny() ? AdmissionResource::getUrl('index') : null,
+                'show' => FeatureGate::enabled(LicenseFeature::Admissions) && AdmissionResource::canViewAny(),
             ],
             [
-                'label' => 'Staff work open',
-                'value' => (string) $data['staff_work_total'],
-                'meta' => $data['follow_ups_due'].' follow-ups · '.$data['uncalled_leads'].' uncalled · '.$data['open_cases'].' cases',
-                'tone' => $data['staff_work_total'] > 0 ? 'warning' : 'success',
+                'label' => 'Fee waives',
+                'value' => (string) $data['fee_adjustments_pending'],
+                'meta' => 'Discount / waive',
+                'tone' => $data['fee_adjustments_pending'] > 0 ? 'warning' : 'neutral',
+                'url' => MiscChargeAdjustmentRequestsPage::canAccess() ? MiscChargeAdjustmentRequestsPage::getUrl() : null,
+                'show' => FeatureGate::enabled(LicenseFeature::Fees) && MiscChargeAdjustmentRequestsPage::canAccess(),
+            ],
+            [
+                'label' => 'Homework',
+                'value' => (string) $data['homework_awaiting_approve'],
+                'meta' => 'Awaiting approve',
+                'tone' => $data['homework_awaiting_approve'] > 0 ? 'warning' : 'neutral',
+                'url' => HomeworkReviewPage::canAccess() ? HomeworkReviewPage::getUrl() : null,
+                'show' => FeatureGate::enabled(LicenseFeature::Homework) && HomeworkReviewPage::canAccess(),
+            ],
+            [
+                'label' => 'Follow-ups',
+                'value' => (string) $data['follow_ups_due'],
+                'meta' => 'Due / overdue',
+                'tone' => $data['follow_ups_due'] > 0 ? 'warning' : 'neutral',
                 'url' => FollowUpsPage::canAccess() ? FollowUpsPage::getUrl() : null,
-                'show' => true,
+                'show' => FeatureGate::enabled(LicenseFeature::Enquiries) && FollowUpsPage::canAccess(),
+            ],
+            [
+                'label' => 'Uncalled',
+                'value' => (string) $data['uncalled_leads'],
+                'meta' => 'Assigned leads',
+                'tone' => $data['uncalled_leads'] > 0 ? 'warning' : 'neutral',
+                'url' => MyLeadsPage::canAccess() ? MyLeadsPage::getUrl() : null,
+                'show' => FeatureGate::enabled(LicenseFeature::Enquiries),
+            ],
+            [
+                'label' => 'Open cases',
+                'value' => (string) $data['open_cases'],
+                'meta' => 'Institute-wide',
+                'tone' => $data['open_cases'] > 0 ? 'info' : 'neutral',
+                'url' => MyMeetingsPage::getUrl(['tab' => 'all_cases']),
+                'show' => FeatureGate::enabled(LicenseFeature::Cases),
             ],
             [
                 'label' => 'Attendance',
-                'value' => $data['attendance_coverage_pct'].'%',
-                'meta' => $data['attendance_marked'].' of '.$data['attendance_expected'].' marked',
-                'tone' => match (true) {
-                    $data['attendance_expected'] === 0 => 'neutral',
-                    $data['attendance_coverage_pct'] >= 75 => 'success',
-                    $data['attendance_unmarked'] > 0 => 'warning',
-                    default => 'neutral',
-                },
+                'value' => (string) $data['attendance_unmarked'],
+                'meta' => $data['attendance_coverage_pct'].'% marked',
+                'tone' => $data['attendance_unmarked'] > 0 ? 'warning' : 'success',
                 'url' => AttendanceHubPage::canAccess() ? AttendanceHubPage::getUrl() : null,
                 'show' => FeatureGate::enabled(LicenseFeature::Attendance),
             ],

@@ -22,8 +22,8 @@
                         @if (filled($tile['url'] ?? null)) href="{{ $tile['url'] }}" wire:navigate @endif
                         @if (filled($tile['meta'] ?? null)) title="{{ $tile['meta'] }}" @endif
                     >
-                        <span class="crm-ops-stat__label">{{ $tile['label'] }}</span>
                         <span class="crm-ops-stat__value">{{ $tile['value'] }}</span>
+                        <span class="crm-ops-stat__label">{{ $tile['label'] }}</span>
                         @if (filled($tile['meta'] ?? null))
                             <span class="crm-ops-stat__meta">{{ $tile['meta'] }}</span>
                         @endif

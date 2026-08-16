@@ -195,10 +195,61 @@ class DashboardOpsService
                     'whatsapp_cost_today' => $waCost,
                     'fees_amount_today' => $feesAmount,
                     'fees_payments_today' => $feesCount,
+                    'fees_amount_week' => FeatureGate::enabled(LicenseFeature::Fees) && CrmAccess::canViewFees($user)
+                        ? (float) Payment::query()
+                            ->whereDate('payment_date', '>=', $today->copy()->subDays(6)->toDateString())
+                            ->whereDate('payment_date', '<=', $today->toDateString())
+                            ->sum('amount')
+                        : 0.0,
+                    'range_admissions' => (int) ($stats['range_admissions'] ?? 0),
+                    'pending_admissions' => (int) ($stats['pending_admissions'] ?? 0),
+                    'active_students' => (int) ($stats['active_students'] ?? 0),
+                    'present_today' => (int) ($stats['attendance_present_today'] ?? 0),
                     'as_of_label' => $today->format('d M Y'),
                 ];
             },
         );
+    }
+
+    /**
+     * Last 7 calendar days for the lightweight CSS trend chart.
+     *
+     * @return list<array{date: string, day: string, is_today: bool, leads: int, fees: float, admissions: int, calls: int}>
+     */
+    public function lastSevenDaysSeries(): array
+    {
+        return $this->remember('ops_last7', function (): array {
+            $today = today();
+            $series = [];
+
+            for ($i = 6; $i >= 0; $i--) {
+                $day = $today->copy()->subDays($i);
+                $date = $day->toDateString();
+
+                $series[] = [
+                    'date' => $date,
+                    'day' => $day->format('D'),
+                    'is_today' => $i === 0,
+                    'leads' => FeatureGate::enabled(LicenseFeature::Enquiries)
+                        ? (int) Enquiry::query()->whereDate('created_at', $date)->count()
+                        : 0,
+                    'fees' => FeatureGate::enabled(LicenseFeature::Fees)
+                        ? (float) Payment::query()->whereDate('payment_date', $date)->sum('amount')
+                        : 0.0,
+                    'admissions' => FeatureGate::enabled(LicenseFeature::Admissions)
+                        ? (int) \App\Models\Admission::query()
+                            ->where('status', \App\Enums\AdmissionStatus::Approved)
+                            ->whereDate('approved_at', $date)
+                            ->count()
+                        : 0,
+                    'calls' => FeatureGate::enabled(LicenseFeature::Calls)
+                        ? (int) StudentCall::query()->whereDate('called_at', $date)->count()
+                        : 0,
+                ];
+            }
+
+            return $series;
+        });
     }
 
     protected function homeworkAwaitingApproveCount(): int

@@ -15,6 +15,7 @@ use App\Filament\Pages\Dashboard;
 use App\Filament\Widgets\BatchOverviewWidget;
 use App\Filament\Widgets\CrmFinanceStatsWidget;
 use App\Filament\Widgets\CrmLeadStatsWidget;
+use App\Filament\Widgets\DashboardAnalyticsWidget;
 use App\Filament\Widgets\DashboardAttentionWidget;
 use App\Filament\Widgets\DashboardHeroWidget;
 use App\Filament\Widgets\DashboardTodayPulseWidget;
@@ -178,12 +179,27 @@ class AdminDashboardTest extends TestCase
         Livewire::test(DashboardAttentionWidget::class)
             ->assertSuccessful()
             ->assertSee('Needs attention')
-            ->assertSee('Approvals');
+            ->assertSee('Admissions');
 
         Livewire::test(DashboardTodayPulseWidget::class)
             ->assertSuccessful()
             ->assertSee('Today')
             ->assertSee('New leads');
+    }
+
+    public function test_owner_sees_hideable_analytics_panel(): void
+    {
+        $this->createSession();
+        $this->actingAsSuperAdmin();
+
+        Livewire::test(DashboardAnalyticsWidget::class)
+            ->assertSuccessful()
+            ->assertSee('Hide analytics')
+            ->assertSee('Last 7 days')
+            ->assertSee('Today’s mix')
+            ->call('toggleAnalytics')
+            ->assertSee('Show analytics')
+            ->assertDontSee('Last 7 days');
     }
 
     public function test_fee_adjuster_does_not_see_admin_approvals_tile_on_attention(): void
@@ -200,6 +216,8 @@ class AdminDashboardTest extends TestCase
             ->assertSuccessful()
             ->assertDontSee('Staff work open')
             ->assertSee('Overdue students');
+
+        $this->assertFalse(DashboardAnalyticsWidget::canView());
     }
 
     public function test_teacher_hero_shows_academic_chips_not_calling_copy(): void
