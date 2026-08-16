@@ -24,8 +24,10 @@ use App\Support\InstituteTerminology;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -66,73 +68,77 @@ class Dashboard extends BaseDashboard
         ];
     }
 
+    /**
+     * Filament renders this form inside its own 2/3/4-column grid, so the toolbar
+     * claims the full width and lays its own controls out inside.
+     */
     public function filtersForm(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Filters')
-                ->description('Every number below follows these filters.')
-                ->icon(Heroicon::OutlinedFunnel)
-                ->collapsible()
-                ->collapsed(fn (): bool => false)
-                ->columns(['default' => 1, 'sm' => 2, 'xl' => 4])
+            Section::make()
+                ->extraAttributes(['class' => 'crm-dash-filters'])
+                ->columnSpanFull()
+                ->columns(1)
                 ->schema([
-                    Select::make('academic_session_id')
-                        ->label('Academic session')
-                        ->options(fn (): array => AcademicSession::query()
-                            ->orderByDesc('is_current')
-                            ->orderByDesc('starts_on')
-                            ->get()
-                            ->mapWithKeys(fn (AcademicSession $session): array => [
-                                $session->id => $session->selectLabel(),
-                            ])
-                            ->all())
-                        ->default(fn (): ?int => AcademicSession::current()?->id)
-                        ->placeholder('All sessions')
-                        ->native(false)
-                        ->helperText('Batches without a session always stay visible.'),
-                    Select::make('range')
-                        ->label('Period')
+                    ToggleButtons::make('range')
+                        ->hiddenLabel()
                         ->options([
                             DashboardFilters::RANGE_TODAY => 'Today',
-                            DashboardFilters::RANGE_WEEK => 'Last 7 days',
+                            DashboardFilters::RANGE_WEEK => '7 days',
                             DashboardFilters::RANGE_MONTH => 'This month',
-                            DashboardFilters::RANGE_QUARTER => 'Last 3 months',
-                            DashboardFilters::RANGE_SESSION => 'Full session',
-                            DashboardFilters::RANGE_CUSTOM => 'Custom dates',
+                            DashboardFilters::RANGE_QUARTER => '3 months',
+                            DashboardFilters::RANGE_SESSION => 'Session',
+                            DashboardFilters::RANGE_CUSTOM => 'Custom',
                         ])
                         ->default(DashboardFilters::RANGE_MONTH)
-                        ->selectablePlaceholder(false)
-                        ->native(false)
+                        ->inline()
+                        ->grouped()
                         ->live(),
-                    DatePicker::make('from')
-                        ->label('From')
-                        ->native(false)
-                        ->maxDate(now())
-                        ->default(now()->startOfMonth())
-                        ->visible(fn (Get $get): bool => $get('range') === DashboardFilters::RANGE_CUSTOM),
-                    DatePicker::make('to')
-                        ->label('To')
-                        ->native(false)
-                        ->maxDate(now())
-                        ->default(now())
-                        ->visible(fn (Get $get): bool => $get('range') === DashboardFilters::RANGE_CUSTOM),
-                    Select::make('course_id')
-                        ->label(InstituteTerminology::label('course'))
-                        ->options(fn (): array => InstituteProfile::activeCourseOptions())
-                        ->placeholder('All')
-                        ->searchable()
-                        ->native(false)
-                        ->live(),
-                    Select::make('batch_id')
-                        ->label(InstituteTerminology::label('batch'))
-                        ->options(fn (Get $get): array => Batch::query()
-                            ->when(filled($get('course_id')), fn ($query) => $query->where('course_id', (int) $get('course_id')))
-                            ->orderBy('name')
-                            ->pluck('name', 'id')
-                            ->all())
-                        ->placeholder('All')
-                        ->searchable()
-                        ->native(false),
+                    Grid::make(['default' => 1, 'sm' => 2, 'lg' => 4])
+                        ->schema([
+                            Select::make('academic_session_id')
+                                ->label('Session')
+                                ->options(fn (): array => AcademicSession::query()
+                                    ->orderByDesc('is_current')
+                                    ->orderByDesc('starts_on')
+                                    ->get()
+                                    ->mapWithKeys(fn (AcademicSession $session): array => [
+                                        $session->id => $session->selectLabel(),
+                                    ])
+                                    ->all())
+                                ->default(fn (): ?int => AcademicSession::current()?->id)
+                                ->placeholder('All sessions')
+                                ->native(false),
+                            Select::make('course_id')
+                                ->label(InstituteTerminology::label('course'))
+                                ->options(fn (): array => InstituteProfile::activeCourseOptions())
+                                ->placeholder('All')
+                                ->searchable()
+                                ->native(false)
+                                ->live(),
+                            Select::make('batch_id')
+                                ->label(InstituteTerminology::label('batch'))
+                                ->options(fn (Get $get): array => Batch::query()
+                                    ->when(filled($get('course_id')), fn ($query) => $query->where('course_id', (int) $get('course_id')))
+                                    ->orderBy('name')
+                                    ->pluck('name', 'id')
+                                    ->all())
+                                ->placeholder('All')
+                                ->searchable()
+                                ->native(false),
+                            DatePicker::make('from')
+                                ->label('From')
+                                ->native(false)
+                                ->maxDate(now())
+                                ->default(now()->startOfMonth())
+                                ->visible(fn (Get $get): bool => $get('range') === DashboardFilters::RANGE_CUSTOM),
+                            DatePicker::make('to')
+                                ->label('To')
+                                ->native(false)
+                                ->maxDate(now())
+                                ->default(now())
+                                ->visible(fn (Get $get): bool => $get('range') === DashboardFilters::RANGE_CUSTOM),
+                        ]),
                 ]),
         ]);
     }

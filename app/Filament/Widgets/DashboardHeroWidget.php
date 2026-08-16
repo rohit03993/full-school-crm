@@ -20,6 +20,7 @@ use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
 use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Filament\Resources\Enquiries\EnquiryResource;
 use App\Filament\Widgets\Concerns\UsesDashboardFilters;
+use App\Models\AcademicSession;
 use App\Services\CallQueueService;
 use App\Services\CrmDashboardService;
 use App\Support\CrmAccess;
@@ -51,91 +52,208 @@ class DashboardHeroWidget extends Widget
         $branding = InstituteSettings::forDocuments();
         $user = Auth::user();
         $pack = CrmNavigation::navRolePack($user);
+        $filters = $this->dashboardFilters();
 
         return [
             'userName' => $user?->name ?? 'there',
+            'initials' => $this->initials($user?->name),
             'instituteName' => $branding['name'],
             'tagline' => $branding['tagline'],
             'todayLabel' => now()->format('l, j F Y'),
-            'chips' => $this->chipsForPack($pack),
+            'scopeLabel' => $filters->rangeName(),
+            'scopeDates' => $filters->rangeLabel(),
+            'sessionLabel' => $this->sessionLabel($filters->sessionId),
+            'metrics' => $this->metricsForPack($pack),
             'quickActions' => $this->visibleActions($this->actionsForPack($pack)),
         ];
+    }
+
+    protected function initials(?string $name): string
+    {
+        $words = preg_split('/\s+/', trim((string) $name)) ?: [];
+        $letters = array_slice(array_filter(array_map(
+            fn (string $word): string => mb_substr($word, 0, 1),
+            $words,
+        )), 0, 2);
+
+        return $letters === [] ? '?' : mb_strtoupper(implode('', $letters));
+    }
+
+    protected function sessionLabel(?int $sessionId): ?string
+    {
+        if ($sessionId === null) {
+            return null;
+        }
+
+        return AcademicSession::query()->find($sessionId)?->code;
     }
 
     /**
      * Headline numbers for whoever is looking, so no role lands on a hero that
      * describes somebody else's job.
      *
-     * @return list<array{icon: string, label: string}>
+     * @return list<array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}>
      */
-    protected function chipsForPack(string $pack): array
+    protected function metricsForPack(string $pack): array
     {
         return match ($pack) {
-            'owner' => $this->ownerChips(),
-            'calling' => $this->callingChips(),
-            'academic' => $this->academicChips(),
-            'finance' => $this->financeChips(),
-            'messaging' => $this->messagingChips(),
-            default => $this->defaultChips(),
+            'owner' => $this->ownerMetrics(),
+            'calling' => $this->callingMetrics(),
+            'academic' => $this->academicMetrics(),
+            'finance' => $this->financeMetrics(),
+            'messaging' => $this->messagingMetrics(),
+            default => $this->defaultMetrics(),
         };
     }
 
     /**
-     * @return list<array{icon: string, label: string}>
+     * @return array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}
      */
-    protected function ownerChips(): array
-    {
-        $filters = $this->dashboardFilters();
-        $stats = app(CrmDashboardService::class)->stats($filters);
-        $user = Auth::user();
-        $canViewFees = FeatureGate::enabled(LicenseFeature::Fees) && CrmAccess::canViewFees($user);
-
-        $chips = [
-            [
-                'icon' => 'heroicon-m-user-group',
-                'label' => $stats['active_students'].' enrolled',
-            ],
-        ];
-
-        if (FeatureGate::enabled(LicenseFeature::Attendance)) {
-            $chips[] = [
-                'icon' => 'heroicon-m-check-circle',
-                'label' => $stats['attendance_present_today'].' present '.$stats['as_of_label'],
-            ];
-        }
-
-        if ($canViewFees) {
-            $chips[] = [
-                'icon' => 'heroicon-m-banknotes',
-                'label' => '₹'.number_format($stats['range_fee_collection'], 0).' collected · '.$stats['range_label'],
-            ];
-            $chips[] = [
-                'icon' => 'heroicon-m-exclamation-triangle',
-                'label' => '₹'.number_format($stats['pending_fees_total'], 0).' pending fees',
-            ];
-        }
-
-        if (FeatureGate::enabled(LicenseFeature::Admissions) && $stats['pending_admissions'] > 0) {
-            $chips[] = [
-                'icon' => 'heroicon-m-clipboard-document-check',
-                'label' => $stats['pending_admissions'].' pending admissions',
-            ];
-        }
-
-        if (FeatureGate::enabled(LicenseFeature::Enquiries)) {
-            $chips[] = [
-                'icon' => 'heroicon-m-inbox-arrow-down',
-                'label' => $stats['range_enquiries'].' leads · '.$stats['range_label'],
-            ];
-        }
-
-        return $chips;
+    protected function metric(
+        string $label,
+        string $value,
+        string $icon,
+        ?string $meta = null,
+        string $tone = 'neutral',
+        ?string $url = null,
+    ): array {
+        return compact('label', 'value', 'icon', 'meta', 'tone', 'url');
     }
 
     /**
-     * @return list<array{icon: string, label: string}>
+     * Lakh/crore short forms keep six- and seven-figure amounts readable in a tile;
+     * the tile's title attribute carries the exact rupee value.
      */
-    protected function callingChips(): array
+    protected function money(float $amount): string
+    {
+        $abs = abs($amount);
+
+        return match (true) {
+            $abs >= 10000000 => '₹'.$this->trim($amount / 10000000).'Cr',
+            $abs >= 100000 => '₹'.$this->trim($amount / 100000).'L',
+            $abs >= 1000 => '₹'.$this->trim($amount / 1000).'K',
+            default => '₹'.number_format($amount, 0),
+        };
+    }
+
+    protected function trim(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 1, '.', ''), '0'), '.');
+    }
+
+    protected function exactMoney(float $amount): string
+    {
+        return '₹'.number_format($amount, 0);
+    }
+
+    protected function urlIf(bool $condition, string $url): ?string
+    {
+        return $condition ? $url : null;
+    }
+
+    /**
+     * @return list<array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}>
+     */
+    protected function ownerMetrics(): array
+    {
+        $filters = $this->dashboardFilters();
+        $service = app(CrmDashboardService::class);
+        $stats = $service->stats($filters);
+        $user = Auth::user();
+        $canViewFees = FeatureGate::enabled(LicenseFeature::Fees) && CrmAccess::canViewFees($user);
+
+        $metrics = [
+            $this->metric(
+                label: 'Enrolled',
+                value: (string) $stats['active_students'],
+                icon: 'heroicon-m-user-group',
+                meta: $stats['active_batches'].' active classes',
+                tone: 'primary',
+                url: $this->urlIf(StudentSearchPage::canAccess(), StudentSearchPage::getUrl()),
+            ),
+        ];
+
+        if (FeatureGate::enabled(LicenseFeature::Attendance)) {
+            $metrics[] = $this->attendanceMetric($stats);
+        }
+
+        if ($canViewFees) {
+            $fees = $service->feeSummary($filters);
+
+            $metrics[] = $this->metric(
+                label: 'Collected',
+                value: $this->money((float) $stats['range_fee_collection']),
+                icon: 'heroicon-m-banknotes',
+                meta: $this->exactMoney((float) $stats['range_fee_collection']),
+                tone: 'success',
+                url: $this->urlIf(FeesHubPage::canAccess(), FeesHubPage::getUrl()),
+            );
+            $metrics[] = $this->metric(
+                label: 'Pending fees',
+                value: $this->money((float) $stats['pending_fees_total']),
+                icon: 'heroicon-m-exclamation-triangle',
+                meta: $fees['overdue_students_count'].' students overdue',
+                tone: $fees['overdue_students_count'] > 0 ? 'danger' : 'warning',
+                url: $this->urlIf(FeesHubPage::canAccess(), FeesHubPage::getUrl()),
+            );
+        }
+
+        if (FeatureGate::enabled(LicenseFeature::Enquiries)) {
+            $metrics[] = $this->metric(
+                label: 'New leads',
+                value: (string) $stats['range_enquiries'],
+                icon: 'heroicon-m-inbox-arrow-down',
+                meta: $filters->rangeName(),
+                tone: 'info',
+                url: $this->urlIf(EnquiryResource::canViewAny(), EnquiryResource::getUrl('index')),
+            );
+        }
+
+        if (FeatureGate::enabled(LicenseFeature::Admissions)) {
+            $metrics[] = $this->metric(
+                label: 'Admissions',
+                value: (string) $stats['range_admissions'],
+                icon: 'heroicon-m-clipboard-document-check',
+                meta: $stats['pending_admissions'].' awaiting review',
+                tone: $stats['pending_admissions'] > 0 ? 'warning' : 'success',
+                url: $this->urlIf(AdmissionResource::canViewAny(), AdmissionResource::getUrl('index')),
+            );
+        }
+
+        return $metrics;
+    }
+
+    /**
+     * @param  array<string, mixed>  $stats
+     * @return array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}
+     */
+    protected function attendanceMetric(array $stats): array
+    {
+        $expected = (int) $stats['attendance_students_in_batches'];
+        $present = (int) $stats['attendance_present_today'];
+        $rate = $expected > 0 ? (int) round(($present / $expected) * 100) : 0;
+
+        return $this->metric(
+            label: 'Present '.$stats['as_of_label'],
+            value: (string) $present,
+            icon: 'heroicon-m-check-circle',
+            meta: $expected > 0
+                ? $rate.'% of '.$expected.' · '.$stats['attendance_marked_today'].' marked'
+                : 'No students in scope',
+            tone: match (true) {
+                $expected === 0 => 'neutral',
+                $rate >= 75 => 'success',
+                $rate > 0 => 'warning',
+                default => 'danger',
+            },
+            url: $this->urlIf(AttendanceHubPage::canAccess(), AttendanceHubPage::getUrl()),
+        );
+    }
+
+    /**
+     * @return list<array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}>
+     */
+    protected function callingMetrics(): array
     {
         $staff = Auth::user();
 
@@ -146,119 +264,169 @@ class DashboardHeroWidget extends Widget
         $callStats = app(CallQueueService::class)->todayStats($staff);
 
         return [
-            [
-                'icon' => 'heroicon-m-phone',
-                'label' => $callStats['calls_today'].' calls today · '.$callStats['connected_today'].' connected',
-            ],
-            [
-                'icon' => 'heroicon-m-bars-3-bottom-left',
-                'label' => $callStats['queue_count'].' in queue',
-            ],
-            [
-                'icon' => 'heroicon-m-bell-alert',
-                'label' => CrmNavBadges::followUpsDue().' follow-ups due',
-            ],
+            $this->metric(
+                label: 'Calls today',
+                value: (string) $callStats['calls_today'],
+                icon: 'heroicon-m-phone',
+                meta: $callStats['connected_today'].' connected',
+                tone: 'primary',
+                url: $this->urlIf(CallQueuePage::canAccess(), CallQueuePage::getUrl()),
+            ),
+            $this->metric(
+                label: 'In queue',
+                value: (string) $callStats['queue_count'],
+                icon: 'heroicon-m-bars-3-bottom-left',
+                meta: 'Waiting to be called',
+                tone: $callStats['queue_count'] > 0 ? 'info' : 'success',
+                url: $this->urlIf(CallQueuePage::canAccess(), CallQueuePage::getUrl()),
+            ),
+            $this->metric(
+                label: 'Follow-ups due',
+                value: (string) CrmNavBadges::followUpsDue(),
+                icon: 'heroicon-m-bell-alert',
+                meta: 'Today and overdue',
+                tone: CrmNavBadges::followUpsDue() > 0 ? 'warning' : 'success',
+                url: $this->urlIf(FollowUpsPage::canAccess(), FollowUpsPage::getUrl()),
+            ),
         ];
     }
 
     /**
-     * @return list<array{icon: string, label: string}>
+     * @return list<array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}>
      */
-    protected function academicChips(): array
+    protected function academicMetrics(): array
     {
         $stats = app(CrmDashboardService::class)->stats($this->dashboardFilters());
-        $chips = [];
+        $metrics = [];
 
         if (FeatureGate::enabled(LicenseFeature::Attendance)) {
-            $chips[] = [
-                'icon' => 'heroicon-m-check-circle',
-                'label' => $stats['attendance_present_today'].' present '.$stats['as_of_label'],
-            ];
-            $chips[] = [
-                'icon' => 'heroicon-m-clipboard-document-list',
-                'label' => $stats['attendance_marked_today'].' of '.$stats['attendance_students_in_batches'].' marked',
-            ];
+            $metrics[] = $this->attendanceMetric($stats);
+            $metrics[] = $this->metric(
+                label: 'Not marked',
+                value: (string) max(0, (int) $stats['attendance_students_in_batches'] - (int) $stats['attendance_marked_today']),
+                icon: 'heroicon-m-clipboard-document-list',
+                meta: $stats['attendance_marked_today'].' of '.$stats['attendance_students_in_batches'].' done',
+                tone: (int) $stats['attendance_marked_today'] >= (int) $stats['attendance_students_in_batches'] ? 'success' : 'warning',
+                url: $this->urlIf(AttendanceHubPage::canAccess(), AttendanceHubPage::getUrl()),
+            );
         }
 
-        $chips[] = [
-            'icon' => 'heroicon-m-academic-cap',
-            'label' => $stats['active_batches'].' active classes',
-        ];
+        $metrics[] = $this->metric(
+            label: 'Active classes',
+            value: (string) $stats['active_batches'],
+            icon: 'heroicon-m-academic-cap',
+            meta: $stats['active_students'].' students enrolled',
+            tone: 'primary',
+            url: $this->urlIf(MyTeachingAssignmentsPage::canAccess(), MyTeachingAssignmentsPage::getUrl()),
+        );
 
-        return $chips;
+        return $metrics;
     }
 
     /**
-     * @return list<array{icon: string, label: string}>
+     * @return list<array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}>
      */
-    protected function financeChips(): array
+    protected function financeMetrics(): array
     {
         $filters = $this->dashboardFilters();
         $service = app(CrmDashboardService::class);
         $stats = $service->stats($filters);
         $fees = $service->feeSummary($filters);
+        $feesUrl = $this->urlIf(FeesHubPage::canAccess(), FeesHubPage::getUrl());
 
         return [
-            [
-                'icon' => 'heroicon-m-banknotes',
-                'label' => '₹'.number_format($stats['range_fee_collection'], 0).' collected · '.$stats['range_label'],
-            ],
-            [
-                'icon' => 'heroicon-m-exclamation-triangle',
-                'label' => '₹'.number_format($stats['pending_fees_total'], 0).' pending fees',
-            ],
-            [
-                'icon' => 'heroicon-m-clock',
-                'label' => $fees['overdue_students_count'].' students overdue',
-            ],
+            $this->metric(
+                label: 'Collected',
+                value: $this->money((float) $stats['range_fee_collection']),
+                icon: 'heroicon-m-banknotes',
+                meta: $this->exactMoney((float) $stats['range_fee_collection']),
+                tone: 'success',
+                url: $feesUrl,
+            ),
+            $this->metric(
+                label: 'Collected today',
+                value: $this->money((float) $stats['fee_collection_today']),
+                icon: 'heroicon-m-arrow-trending-up',
+                meta: $this->exactMoney((float) $stats['fee_collection_today']),
+                tone: 'primary',
+                url: $feesUrl,
+            ),
+            $this->metric(
+                label: 'Pending fees',
+                value: $this->money((float) $stats['pending_fees_total']),
+                icon: 'heroicon-m-exclamation-triangle',
+                meta: $this->exactMoney((float) $stats['pending_fees_total']),
+                tone: 'warning',
+                url: $feesUrl,
+            ),
+            $this->metric(
+                label: 'Overdue',
+                value: (string) $fees['overdue_students_count'],
+                icon: 'heroicon-m-clock',
+                meta: $this->exactMoney((float) $fees['overdue_amount']).' past due',
+                tone: $fees['overdue_students_count'] > 0 ? 'danger' : 'success',
+                url: $feesUrl,
+            ),
         ];
     }
 
     /**
-     * @return list<array{icon: string, label: string}>
+     * @return list<array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}>
      */
-    protected function messagingChips(): array
+    protected function messagingMetrics(): array
     {
         $stats = app(CrmDashboardService::class)->stats($this->dashboardFilters());
 
         return [
-            [
-                'icon' => 'heroicon-m-chat-bubble-left-right',
-                'label' => 'WhatsApp workspace',
-            ],
-            [
-                'icon' => 'heroicon-m-user-group',
-                'label' => $stats['active_students'].' students reachable',
-            ],
+            $this->metric(
+                label: 'Reachable students',
+                value: (string) $stats['active_students'],
+                icon: 'heroicon-m-user-group',
+                meta: 'Enrolled in this scope',
+                tone: 'primary',
+                url: $this->urlIf(WhatsAppInboxPage::canAccess(), WhatsAppInboxPage::getUrl()),
+            ),
+            $this->metric(
+                label: 'New leads',
+                value: (string) $stats['range_enquiries'],
+                icon: 'heroicon-m-inbox-arrow-down',
+                meta: $this->dashboardFilters()->rangeName(),
+                tone: 'info',
+            ),
         ];
     }
 
     /**
-     * @return list<array{icon: string, label: string}>
+     * @return list<array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}>
      */
-    protected function defaultChips(): array
+    protected function defaultMetrics(): array
     {
         $staff = Auth::user();
-        $chips = [];
+        $metrics = [];
 
         if ($staff && CrmAccess::can($staff, CrmPermission::CasesView)) {
-            $chips[] = [
-                'icon' => 'heroicon-m-briefcase',
-                'label' => CrmNavBadges::myCasesOpen($staff).' open cases assigned to you',
-            ];
+            $metrics[] = $this->metric(
+                label: 'Open cases',
+                value: (string) CrmNavBadges::myCasesOpen($staff),
+                icon: 'heroicon-m-briefcase',
+                meta: 'Assigned to you',
+                tone: 'primary',
+                url: MyMeetingsPage::getUrl(),
+            );
         }
 
         if ($staff && FeatureGate::enabled(LicenseFeature::Enquiries)) {
-            $chips[] = [
-                'icon' => 'heroicon-m-bell-alert',
-                'label' => CrmNavBadges::followUpsDue().' follow-ups due',
-            ];
+            $metrics[] = $this->metric(
+                label: 'Follow-ups due',
+                value: (string) CrmNavBadges::followUpsDue(),
+                icon: 'heroicon-m-bell-alert',
+                meta: 'Today and overdue',
+                tone: CrmNavBadges::followUpsDue() > 0 ? 'warning' : 'success',
+                url: $this->urlIf(FollowUpsPage::canAccess(), FollowUpsPage::getUrl()),
+            );
         }
 
-        return $chips !== [] ? $chips : [[
-            'icon' => 'heroicon-m-squares-2x2',
-            'label' => 'Your workspace',
-        ]];
+        return $metrics;
     }
 
     /**

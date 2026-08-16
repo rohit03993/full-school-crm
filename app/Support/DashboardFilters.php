@@ -131,6 +131,21 @@ final class DashboardFilters
         return $this->asOf()->isSameDay(today());
     }
 
+    /**
+     * Name of the chosen preset, for chips that already show the dates.
+     */
+    public function rangeName(): string
+    {
+        return match ($this->range) {
+            self::RANGE_TODAY => 'Today',
+            self::RANGE_WEEK => 'Last 7 days',
+            self::RANGE_QUARTER => 'Last 3 months',
+            self::RANGE_SESSION => 'Full session',
+            self::RANGE_CUSTOM => 'Custom dates',
+            default => 'This month',
+        };
+    }
+
     public function rangeLabel(): string
     {
         if ($this->from->isSameDay($this->to)) {

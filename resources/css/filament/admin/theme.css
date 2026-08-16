@@ -141,6 +141,142 @@
         @apply overflow-visible;
     }
 
+    /* ── Dashboard filter toolbar ──
+       Filament renders the dashboard filters inside its own multi-column grid, so
+       the toolbar spans every column and arranges its controls itself. */
+    .crm-dash-filters .fi-section {
+        @apply rounded-2xl border-0 bg-white/90 shadow-sm ring-1 ring-gray-950/[0.06] backdrop-blur;
+        @apply dark:bg-gray-900/70 dark:ring-white/10;
+    }
+
+    .crm-dash-filters .fi-section-content {
+        @apply gap-3 p-3 sm:p-4;
+    }
+
+    .crm-dash-filters .fi-fo-field-wrp-label span {
+        @apply text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400;
+    }
+
+    /* The grouped period control is `w-max`, so let it scroll rather than overflow */
+    .crm-dash-filters .fi-fo-toggle-buttons-wrp {
+        @apply -mx-1 max-w-full overflow-x-auto px-1 pb-0.5;
+        scrollbar-width: none;
+    }
+
+    .crm-dash-filters .fi-fo-toggle-buttons-wrp::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* ── Dashboard hero ── */
+    .crm-hero {
+        @apply relative overflow-hidden rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-950/[0.06] sm:p-6;
+        @apply dark:bg-gray-900 dark:ring-white/10;
+    }
+
+    .crm-hero::before {
+        content: '';
+        @apply pointer-events-none absolute -end-24 -top-28 h-72 w-72 rounded-full bg-primary-500/10 blur-3xl;
+    }
+
+    /* Brand line instead of a saturated banner */
+    .crm-hero::after {
+        content: '';
+        @apply pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-primary-500 via-primary-400/60 to-transparent;
+    }
+
+    .crm-hero__avatar {
+        @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-500/10 text-sm font-bold uppercase text-primary-700;
+        @apply ring-1 ring-primary-500/20 dark:bg-primary-500/15 dark:text-primary-300 dark:ring-primary-500/25;
+    }
+
+    .crm-hero__eyebrow {
+        @apply truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-primary-600 dark:text-primary-400;
+    }
+
+    .crm-hero__title {
+        @apply mt-0.5 truncate text-lg font-semibold tracking-tight text-gray-950 dark:text-white sm:text-2xl;
+    }
+
+    .crm-hero__meta {
+        @apply mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400 sm:text-sm;
+    }
+
+    .crm-hero__scope {
+        @apply inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600;
+        @apply dark:bg-white/[0.08] dark:text-gray-300;
+    }
+
+    .crm-hero__scope--active {
+        @apply bg-primary-500/10 text-primary-700 ring-1 ring-primary-500/20 dark:bg-primary-500/15 dark:text-primary-300;
+    }
+
+    .crm-hero__kpis {
+        @apply relative mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6;
+    }
+
+    .crm-hero__kpi {
+        @apply relative flex flex-col overflow-hidden rounded-2xl bg-gray-50/90 py-2.5 pe-3 ps-3.5 transition duration-150;
+        @apply dark:bg-white/[0.04];
+    }
+
+    a.crm-hero__kpi {
+        @apply touch-manipulation hover:bg-gray-100 active:scale-[0.99] dark:hover:bg-white/[0.08];
+    }
+
+    .crm-hero__kpi::before {
+        content: '';
+        @apply absolute inset-y-2.5 start-0 w-[3px] rounded-full bg-gray-300 dark:bg-white/20;
+    }
+
+    .crm-hero__kpi--primary::before {
+        @apply bg-primary-500;
+    }
+
+    .crm-hero__kpi--success::before {
+        @apply bg-emerald-500;
+    }
+
+    .crm-hero__kpi--warning::before {
+        @apply bg-amber-500;
+    }
+
+    .crm-hero__kpi--danger::before {
+        @apply bg-danger-500;
+    }
+
+    .crm-hero__kpi--info::before {
+        @apply bg-sky-500;
+    }
+
+    .crm-hero__kpi-label {
+        @apply flex items-center gap-1.5 text-[10px] font-semibold uppercase leading-tight tracking-[0.06em] text-gray-500;
+        @apply dark:text-gray-400;
+    }
+
+    .crm-hero__kpi-value {
+        @apply mt-1 text-xl font-semibold leading-none tracking-tight text-gray-950 dark:text-white sm:text-2xl;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .crm-hero__kpi-meta {
+        @apply mt-1 truncate text-[11px] leading-tight text-gray-500 dark:text-gray-400;
+    }
+
+    .crm-hero__actions {
+        @apply relative mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-4 dark:border-white/10;
+    }
+
+    .crm-hero__action {
+        @apply inline-flex min-h-10 touch-manipulation items-center gap-2 rounded-xl bg-white px-3 text-[13px] font-semibold text-gray-700 ring-1 ring-gray-950/[0.06] transition duration-150;
+        @apply hover:bg-gray-50 hover:text-gray-950 hover:ring-primary-500/30 active:scale-[0.98];
+        @apply dark:bg-white/[0.04] dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/[0.08] dark:hover:text-white;
+    }
+
+    .crm-hero__action-icon {
+        @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600;
+        @apply dark:bg-primary-500/15 dark:text-primary-400;
+    }
+
     .fi-dashboard-panel {
         @apply h-full;
     }
@@ -372,10 +508,6 @@
         .fi-input-wrp select,
         .fi-input-wrp textarea {
             @apply text-base;
-        }
-
-        .fi-dashboard-hero .grid {
-            @apply gap-2;
         }
 
         /* Modals — fit screen with top safe-area gap */

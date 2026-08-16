@@ -1,58 +1,75 @@
 <x-filament-widgets::widget class="fi-dashboard-hero-widget">
-    <div class="fi-dashboard-hero relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 via-amber-600 to-orange-700 p-5 shadow-lg ring-1 ring-black/5 sm:p-6 lg:p-8">
-        <div class="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl"></div>
-        <div class="pointer-events-none absolute -bottom-20 -left-10 h-48 w-48 rounded-full bg-orange-900/20 blur-2xl"></div>
-
-        <div class="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div class="min-w-0 flex-1">
-                <p class="text-xs font-bold uppercase tracking-[0.2em] text-amber-100/90">
-                    {{ $instituteName }}
-                </p>
-                <h2 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                    Welcome back, {{ $userName }}
-                </h2>
-                <p class="mt-1 text-sm text-amber-50/90 sm:text-base">
-                    {{ $todayLabel }}
-                </p>
-                @if ($tagline)
-                    <p class="mt-2 max-w-xl text-sm text-amber-100/80">
-                        {{ $tagline }}
+    <div class="crm-hero">
+        <div class="relative flex flex-wrap items-start justify-between gap-4">
+            <div class="flex min-w-0 items-center gap-3">
+                <span class="crm-hero__avatar">{{ $initials }}</span>
+                <div class="min-w-0">
+                    <p class="crm-hero__eyebrow">{{ $instituteName }}</p>
+                    <h2 class="crm-hero__title">Welcome back, {{ $userName }}</h2>
+                    <p class="crm-hero__meta">
+                        {{ $todayLabel }}
+                        @if ($tagline)
+                            <span class="hidden sm:inline">· {{ $tagline }}</span>
+                        @endif
                     </p>
-                @endif
-
-                @if (filled($chips))
-                    <div class="mt-5 flex flex-wrap gap-2">
-                        @foreach ($chips as $chip)
-                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm">
-                                <x-filament::icon :icon="$chip['icon']" class="h-3.5 w-3.5" />
-                                {{ $chip['label'] }}
-                            </span>
-                        @endforeach
-                    </div>
-                @endif
+                </div>
             </div>
 
-            @if (filled($quickActions))
-                <div class="grid w-full grid-cols-2 gap-2 sm:gap-3 lg:max-w-md lg:shrink-0">
-                    @foreach ($quickActions as $action)
-                        <a
-                            href="{{ $action['url'] }}"
-                            wire:navigate
-                            class="group flex touch-manipulation flex-col gap-2 rounded-xl bg-white/10 p-3 ring-1 ring-white/20 backdrop-blur-sm transition hover:bg-white/20 hover:shadow-md active:scale-[0.98] sm:p-4"
-                        >
-                            <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20 ring-1 ring-white/25 transition group-hover:bg-white/30">
-                                <x-filament::icon :icon="$action['icon']" class="h-5 w-5 text-white" />
-                            </span>
-                            <span>
-                                <span class="block text-sm font-bold text-white">{{ $action['label'] }}</span>
-                                <span class="mt-0.5 block text-[11px] leading-tight text-amber-50/80 sm:text-xs">
-                                    {{ $action['description'] }}
-                                </span>
-                            </span>
-                        </a>
-                    @endforeach
-                </div>
-            @endif
+            <div class="flex flex-wrap items-center gap-2">
+                @if ($sessionLabel)
+                    <span class="crm-hero__scope">
+                        <x-filament::icon icon="heroicon-m-academic-cap" class="h-3.5 w-3.5" />
+                        {{ $sessionLabel }}
+                    </span>
+                @endif
+                <span class="crm-hero__scope crm-hero__scope--active" title="{{ $scopeDates }}">
+                    <x-filament::icon icon="heroicon-m-calendar-days" class="h-3.5 w-3.5" />
+                    {{ $scopeLabel }}
+                </span>
+            </div>
         </div>
+
+        @if (filled($metrics))
+            <div class="crm-hero__kpis">
+                @foreach ($metrics as $metric)
+                    @php
+                        $tag = filled($metric['url']) ? 'a' : 'div';
+                    @endphp
+
+                    <{{ $tag }}
+                        class="crm-hero__kpi crm-hero__kpi--{{ $metric['tone'] }}"
+                        @if (filled($metric['url'])) href="{{ $metric['url'] }}" wire:navigate @endif
+                        @if (filled($metric['meta'])) title="{{ $metric['meta'] }}" @endif
+                    >
+                        <span class="crm-hero__kpi-label">
+                            <x-filament::icon :icon="$metric['icon']" class="h-3.5 w-3.5 shrink-0" />
+                            <span class="truncate">{{ $metric['label'] }}</span>
+                        </span>
+                        <span class="crm-hero__kpi-value">{{ $metric['value'] }}</span>
+                        @if (filled($metric['meta']))
+                            <span class="crm-hero__kpi-meta">{{ $metric['meta'] }}</span>
+                        @endif
+                    </{{ $tag }}>
+                @endforeach
+            </div>
+        @endif
+
+        @if (filled($quickActions))
+            <div class="crm-hero__actions">
+                @foreach ($quickActions as $action)
+                    <a
+                        href="{{ $action['url'] }}"
+                        wire:navigate
+                        class="crm-hero__action"
+                        title="{{ $action['description'] }}"
+                    >
+                        <span class="crm-hero__action-icon">
+                            <x-filament::icon :icon="$action['icon']" class="h-4 w-4" />
+                        </span>
+                        {{ $action['label'] }}
+                    </a>
+                @endforeach
+            </div>
+        @endif
     </div>
 </x-filament-widgets::widget>
