@@ -29,7 +29,7 @@ Dense areas expose **one sidebar entry**; leaf screens stay reachable by URL and
 | WhatsApp | WhatsApp | Inbox / Campaigns / Templates / Automations / Usage / Setup |
 | Setup | Setup | Guide / Institute / Terminology / Devices / Backups |
 
-Turning a license module OFF hides that hub and its leaves only. Shared layout: `resources/views/filament/pages/partials/crm-hub.blade.php`. Role packs (`CrmNavigation::navRolePack`) collapse unused sidebar groups and tune dashboard quick actions.
+Turning a license module OFF hides that hub and its leaves only. Shared layout: `resources/views/filament/pages/partials/crm-hub.blade.php`. Role packs (`CrmNavigation::navRolePacks`) collapse unused sidebar groups (union of roles) and merge dashboard hero / attention / pulse / quick actions from every assigned job role.
 
 ### Mobile list cards
 

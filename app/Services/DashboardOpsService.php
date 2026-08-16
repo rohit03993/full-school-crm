@@ -57,7 +57,10 @@ class DashboardOpsService
             $filters->cacheKey('ops_attention.'.$user->id.($isOwner ? '.owner' : '.staff')),
             function () use ($filters, $user, $isOwner): array {
                 $stats = app(CrmDashboardService::class)->stats($filters);
-                $admissions = $isOwner ? CrmNavBadges::admissionsPendingAction() : 0;
+                $canSeeAdmissions = $isOwner || CrmAccess::can($user, CrmPermission::AdmissionsApprove);
+                $admissions = $canSeeAdmissions && FeatureGate::enabled(LicenseFeature::Admissions)
+                    ? CrmNavBadges::admissionsPendingAction()
+                    : 0;
                 $feeAdjustments = $isOwner && FeatureGate::enabled(LicenseFeature::Fees)
                     ? CrmNavBadges::miscChargeAdjustmentsPending()
                     : 0;

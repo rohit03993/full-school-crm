@@ -96,6 +96,7 @@ class CrmNavigation
 
     /**
      * Config-heavy groups always start collapsed. Role packs collapse unused daily groups.
+     * With multiple packs, collapse only when every active pack would collapse the group.
      */
     public static function groupStartsCollapsed(string $group): bool
     {
@@ -109,8 +110,26 @@ class CrmNavigation
             return false;
         }
 
-        return match (self::navRolePack($user)) {
+        $packs = self::navRolePacks($user);
+
+        foreach ($packs as $pack) {
+            if (! self::packWouldCollapseGroup($pack, $group)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  'owner'|'calling'|'admissions'|'academic'|'finance'|'messaging'|'default'  $pack
+     */
+    protected static function packWouldCollapseGroup(string $pack, string $group): bool
+    {
+        return match ($pack) {
+            'owner' => $group === self::GROUP_WEBSITE,
             'calling' => in_array($group, [self::GROUP_ACADEMICS, self::GROUP_REPORTS, self::GROUP_WEBSITE], true),
+            'admissions' => in_array($group, [self::GROUP_ACADEMICS, self::GROUP_WEBSITE], true),
             'academic' => in_array($group, [self::GROUP_LEADS, self::GROUP_CALLS, self::GROUP_WEBSITE], true),
             'finance' => in_array($group, [self::GROUP_LEADS, self::GROUP_CALLS, self::GROUP_ACADEMICS, self::GROUP_WEBSITE], true),
             'messaging' => in_array($group, [self::GROUP_CALLS, self::GROUP_ACADEMICS, self::GROUP_REPORTS, self::GROUP_WEBSITE], true),
@@ -119,43 +138,57 @@ class CrmNavigation
     }
 
     /**
-     * @return 'owner'|'calling'|'academic'|'finance'|'messaging'|'default'
+     * All dashboard packs for this staff member (union of job roles).
+     * Super Admin is exclusively `owner`.
+     *
+     * @return list<'owner'|'calling'|'admissions'|'academic'|'finance'|'messaging'|'default'>
      */
-    public static function navRolePack(?User $user): string
+    public static function navRolePacks(?User $user): array
     {
         if (! $user) {
-            return 'default';
+            return ['default'];
         }
 
         if ($user->hasRole(RoleName::SuperAdmin->value)) {
-            return 'owner';
+            return ['owner'];
         }
 
         $jobs = CrmAccess::jobRoleNamesFor($user);
-        $counsellor = in_array(StaffJobRole::Counsellor->value, $jobs, true);
-        $academic = in_array(StaffJobRole::AcademicCoordinator->value, $jobs, true)
-            || in_array(StaffJobRole::Teacher->value, $jobs, true);
-        $finance = in_array(StaffJobRole::Accountant->value, $jobs, true)
-            || in_array(StaffJobRole::FeeAdjuster->value, $jobs, true);
-        $messaging = in_array(StaffJobRole::MessagingCoordinator->value, $jobs, true);
+        $has = fn (StaffJobRole $role): bool => in_array($role->value, $jobs, true);
+        $packs = [];
 
-        if ($finance && ! $counsellor && ! $academic) {
-            return 'finance';
+        if ($has(StaffJobRole::Accountant) || $has(StaffJobRole::FeeAdjuster)) {
+            $packs[] = 'finance';
         }
 
-        if ($counsellor && ! $academic) {
-            return 'calling';
+        if ($has(StaffJobRole::AdmissionOfficer)) {
+            $packs[] = 'admissions';
         }
 
-        if ($academic && ! $counsellor) {
-            return 'academic';
+        if ($has(StaffJobRole::Counsellor)) {
+            $packs[] = 'calling';
         }
 
-        if ($messaging && ! $counsellor && ! $academic && ! $finance) {
-            return 'messaging';
+        if ($has(StaffJobRole::AcademicCoordinator) || $has(StaffJobRole::Teacher)) {
+            $packs[] = 'academic';
         }
 
-        return 'default';
+        if ($has(StaffJobRole::MessagingCoordinator)) {
+            $packs[] = 'messaging';
+        }
+
+        return $packs === [] ? ['default'] : $packs;
+    }
+
+    /**
+     * Primary pack convenience for any leftover single-pack callers.
+     * Prefer {@see navRolePacks()} for combined dashboards.
+     *
+     * @return 'owner'|'calling'|'admissions'|'academic'|'finance'|'messaging'|'default'
+     */
+    public static function navRolePack(?User $user): string
+    {
+        return self::navRolePacks($user)[0] ?? 'default';
     }
 
     /**

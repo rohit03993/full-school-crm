@@ -275,6 +275,113 @@ class AdminDashboardTest extends TestCase
         $this->assertFalse($messaging->canCrm(CrmPermission::DashboardOwnerStats));
     }
 
+    public function test_admission_officer_sees_admissions_focused_home(): void
+    {
+        $this->createSession();
+
+        $officer = User::factory()->create(['is_active' => true]);
+        $officer->assignRole(StaffJobRole::AdmissionOfficer->value);
+
+        $this->actingAs($officer);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->assertSame(['admissions'], \App\Support\CrmNavigation::navRolePacks($officer));
+
+        Livewire::test(DashboardHeroWidget::class)
+            ->assertSuccessful()
+            ->assertSee('Pending admissions')
+            ->assertSee('Admissions');
+
+        Livewire::test(DashboardAttentionWidget::class)
+            ->assertSuccessful()
+            ->assertSee('Admissions')
+            ->assertSee('Follow-ups due');
+    }
+
+    public function test_counsellor_hero_shows_calling_metrics(): void
+    {
+        $this->createSession();
+
+        $counsellor = User::factory()->create(['is_active' => true]);
+        $counsellor->assignRole(StaffJobRole::Counsellor->value);
+
+        $this->actingAs($counsellor);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(DashboardHeroWidget::class)
+            ->assertSuccessful()
+            ->assertSee('Follow-ups due')
+            ->assertSee('Uncalled')
+            ->assertSee('Call Queue');
+    }
+
+    public function test_multi_role_counsellor_and_teacher_merge_calling_and_academic_tiles(): void
+    {
+        $this->createSession();
+
+        $hybrid = User::factory()->create(['is_active' => true]);
+        $hybrid->assignRole(StaffJobRole::Counsellor->value);
+        $hybrid->assignRole(StaffJobRole::Teacher->value);
+
+        $this->actingAs($hybrid);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $packs = \App\Support\CrmNavigation::navRolePacks($hybrid);
+        $this->assertContains('calling', $packs);
+        $this->assertContains('academic', $packs);
+
+        Livewire::test(DashboardAttentionWidget::class)
+            ->assertSuccessful()
+            ->assertSee('In queue')
+            ->assertSee('Students attendance');
+
+        Livewire::test(DashboardTodayPulseWidget::class)
+            ->assertSuccessful()
+            ->assertSee('New leads')
+            ->assertSee('Students attendance');
+    }
+
+    public function test_accountant_sees_finance_home_not_call_queue(): void
+    {
+        $this->createSession();
+
+        $accountant = User::factory()->create(['is_active' => true]);
+        $accountant->assignRole(StaffJobRole::Accountant->value);
+
+        $this->actingAs($accountant);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(DashboardAttentionWidget::class)
+            ->assertSuccessful()
+            ->assertSee('Overdue students')
+            ->assertSee('Collected today')
+            ->assertDontSee('Fee waives')
+            ->assertDontSee('Payment cancels');
+
+        Livewire::test(DashboardHeroWidget::class)
+            ->assertSuccessful()
+            ->assertDontSee('Call Queue');
+    }
+
+    public function test_messaging_coordinator_sees_whatsapp_attention_tiles(): void
+    {
+        $this->createSession();
+
+        $messaging = User::factory()->create(['is_active' => true]);
+        $messaging->assignRole(StaffJobRole::MessagingCoordinator->value);
+
+        $this->actingAs($messaging);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(DashboardAttentionWidget::class)
+            ->assertSuccessful()
+            ->assertSee('WhatsApp inbox');
+
+        Livewire::test(DashboardHeroWidget::class)
+            ->assertSuccessful()
+            ->assertSee('WhatsApp inbox');
+    }
+
     protected function actingAsSuperAdmin(): User
     {
         Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);

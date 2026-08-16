@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
+use App\Filament\Pages\AttendanceHubPage;
 use App\Filament\Pages\CallReportPage;
 use App\Filament\Pages\CampusVisitsPage;
 use App\Filament\Pages\FeesDashboardPage;
@@ -43,19 +44,20 @@ class DashboardTodayPulseWidget extends Widget
     protected function getViewData(): array
     {
         $user = Auth::user();
-        $pack = CrmNavigation::navRolePack($user);
+        $packs = CrmNavigation::navRolePacks($user);
         $data = app(DashboardOpsService::class)->todayPulse($this->dashboardFilters(), $user);
+        $attention = app(DashboardOpsService::class)->attentionSnapshot($this->dashboardFilters(), $user);
 
         return [
             'heading' => 'Today',
             'subheading' => $data['as_of_label'],
             'poll' => '15s',
-            'tiles' => $this->visibleTiles($this->tilesForPack($pack, $data, $user)),
+            'tiles' => $this->visibleTiles($this->mergedTiles($packs, $data, $attention, $user)),
         ];
     }
 
     /**
-     * @param  list<array{label: string, value: string, meta: ?string, tone: string, url: ?string, show: bool}>  $tiles
+     * @param  list<array{key: string, label: string, value: string, meta: ?string, tone: string, url: ?string, show: bool}>  $tiles
      * @return list<array{label: string, value: string, meta: ?string, tone: string, url: ?string}>
      */
     protected function visibleTiles(array $tiles): array
@@ -90,28 +92,60 @@ class DashboardTodayPulseWidget extends Widget
     }
 
     /**
+     * @param  list<string>  $packs
      * @param  array<string, mixed>  $data
-     * @return list<array{label: string, value: string, meta: ?string, tone: string, url: ?string, show: bool}>
+     * @param  array<string, mixed>  $attention
+     * @return list<array{key: string, label: string, value: string, meta: ?string, tone: string, url: ?string, show: bool}>
      */
-    protected function tilesForPack(string $pack, array $data, $user): array
+    protected function mergedTiles(array $packs, array $data, array $attention, $user): array
     {
-        $all = $this->allTiles($data, $user);
+        $all = $this->allTiles($data, $attention, $user);
+        $byKey = [];
+        foreach ($all as $tile) {
+            $byKey[$tile['key']] = $tile;
+        }
 
+        $keys = [];
+        foreach ($packs as $pack) {
+            foreach ($this->keysForPack($pack) as $key) {
+                if (! in_array($key, $keys, true)) {
+                    $keys[] = $key;
+                }
+            }
+        }
+
+        $merged = [];
+        foreach ($keys as $key) {
+            if (isset($byKey[$key])) {
+                $merged[] = $byKey[$key];
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function keysForPack(string $pack): array
+    {
         return match ($pack) {
-            'calling' => array_values(array_filter($all, fn (array $t): bool => in_array($t['key'], ['leads', 'calls', 'visits'], true))),
-            'academic' => array_values(array_filter($all, fn (array $t): bool => in_array($t['key'], ['homework', 'leads'], true))),
-            'finance' => array_values(array_filter($all, fn (array $t): bool => in_array($t['key'], ['fees'], true))),
-            'messaging' => array_values(array_filter($all, fn (array $t): bool => in_array($t['key'], ['whatsapp', 'leads'], true))),
-            'default' => array_values(array_filter($all, fn (array $t): bool => in_array($t['key'], ['leads', 'calls', 'visits'], true))),
-            default => $all,
+            'calling' => ['leads', 'calls', 'visits'],
+            'admissions' => ['leads', 'visits', 'calls'],
+            'academic' => ['attendance', 'homework'],
+            'finance' => ['fees'],
+            'messaging' => ['whatsapp', 'leads'],
+            'default' => ['leads', 'calls', 'visits'],
+            default => ['leads', 'calls', 'visits', 'homework', 'whatsapp', 'staff', 'fees', 'attendance'],
         };
     }
 
     /**
      * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $attention
      * @return list<array{key: string, label: string, value: string, meta: ?string, tone: string, url: ?string, show: bool}>
      */
-    protected function allTiles(array $data, $user): array
+    protected function allTiles(array $data, array $attention, $user): array
     {
         $waUrl = null;
         if (WhatsAppAnalyticsPage::canAccess()) {
@@ -148,6 +182,15 @@ class DashboardTodayPulseWidget extends Widget
                 'tone' => 'neutral',
                 'url' => CampusVisitsPage::canAccess() ? CampusVisitsPage::getUrl() : null,
                 'show' => FeatureGate::enabled(LicenseFeature::Enquiries) && CampusVisitsPage::canAccess(),
+            ],
+            [
+                'key' => 'attendance',
+                'label' => 'Students attendance',
+                'value' => $attention['attendance_coverage_pct'].'%',
+                'meta' => $attention['attendance_unmarked'].' unmarked · '.$data['present_today'].' present',
+                'tone' => $attention['attendance_unmarked'] > 0 ? 'warning' : 'success',
+                'url' => AttendanceHubPage::canAccess() ? AttendanceHubPage::getUrl() : null,
+                'show' => FeatureGate::enabled(LicenseFeature::Attendance) && AttendanceHubPage::canAccess(),
             ],
             [
                 'key' => 'homework',

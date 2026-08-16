@@ -7,6 +7,7 @@ use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Filament\Pages\AttendanceHubPage;
 use App\Filament\Pages\CallQueuePage;
+use App\Filament\Pages\CampusVisitsPage;
 use App\Filament\Pages\FeesHubPage;
 use App\Filament\Pages\FollowUpsPage;
 use App\Filament\Pages\HomeworkPage;
@@ -52,7 +53,7 @@ class DashboardHeroWidget extends Widget
     {
         $branding = InstituteSettings::forDocuments();
         $user = Auth::user();
-        $pack = CrmNavigation::navRolePack($user);
+        $packs = CrmNavigation::navRolePacks($user);
         $filters = $this->dashboardFilters();
 
         return [
@@ -64,8 +65,8 @@ class DashboardHeroWidget extends Widget
             'scopeLabel' => $filters->rangeName(),
             'scopeDates' => $filters->rangeLabel(),
             'sessionLabel' => $this->sessionLabel($filters->sessionId),
-            'metrics' => $this->metricsForPack($pack),
-            'quickActions' => $this->visibleActions($this->actionsForPack($pack)),
+            'metrics' => $this->mergedMetrics($packs),
+            'quickActions' => $this->visibleActions($this->mergedActions($packs)),
         ];
     }
 
@@ -93,6 +94,52 @@ class DashboardHeroWidget extends Widget
      * Headline numbers for whoever is looking, so no role lands on a hero that
      * describes somebody else's job.
      *
+     * @param  list<string>  $packs
+     * @return list<array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}>
+     */
+    protected function mergedMetrics(array $packs): array
+    {
+        $merged = [];
+        $seen = [];
+
+        foreach ($packs as $pack) {
+            foreach ($this->metricsForPack($pack) as $metric) {
+                $key = $metric['label'];
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $merged[] = $metric;
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * @param  list<string>  $packs
+     * @return list<array{label: string, description: string, icon: string, url: string, feature?: ?LicenseFeature, can?: callable}>
+     */
+    protected function mergedActions(array $packs): array
+    {
+        $merged = [];
+        $seen = [];
+
+        foreach ($packs as $pack) {
+            foreach ($this->actionsForPack($pack) as $action) {
+                $key = $action['url'].'|'.$action['label'];
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $merged[] = $action;
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
      * @return list<array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}>
      */
     protected function metricsForPack(string $pack): array
@@ -100,6 +147,7 @@ class DashboardHeroWidget extends Widget
         return match ($pack) {
             'owner' => $this->ownerMetrics(),
             'calling' => $this->callingMetrics(),
+            'admissions' => $this->admissionsMetrics(),
             'academic' => $this->academicMetrics(),
             'finance' => $this->financeMetrics(),
             'messaging' => $this->messagingMetrics(),
@@ -251,8 +299,103 @@ class DashboardHeroWidget extends Widget
      */
     protected function callingMetrics(): array
     {
-        // Calling pack uses Needs attention + Today pulse for live work numbers.
-        return [];
+        $user = Auth::user();
+        if (! $user) {
+            return [];
+        }
+
+        $attention = app(DashboardOpsService::class)->attentionSnapshot($this->dashboardFilters(), $user);
+        $metrics = [];
+
+        if (FeatureGate::enabled(LicenseFeature::Calls) && CallQueuePage::canAccess()) {
+            $metrics[] = $this->metric(
+                label: 'In queue',
+                value: (string) $attention['queue_count'],
+                icon: 'heroicon-m-bars-3-bottom-left',
+                meta: 'Ready to call now',
+                tone: $attention['queue_count'] > 0 ? 'warning' : 'success',
+                url: CallQueuePage::getUrl(),
+            );
+        }
+
+        if (FeatureGate::enabled(LicenseFeature::Enquiries) && FollowUpsPage::canAccess()) {
+            $metrics[] = $this->metric(
+                label: 'Follow-ups due',
+                value: (string) $attention['follow_ups_due'],
+                icon: 'heroicon-m-bell-alert',
+                meta: 'Today and overdue',
+                tone: $attention['follow_ups_due'] > 0 ? 'warning' : 'success',
+                url: FollowUpsPage::getUrl(),
+            );
+        }
+
+        if (FeatureGate::enabled(LicenseFeature::Enquiries) && MyLeadsPage::canAccess()) {
+            $metrics[] = $this->metric(
+                label: 'Uncalled',
+                value: (string) $attention['uncalled_leads'],
+                icon: 'heroicon-m-phone-x-mark',
+                meta: 'Assigned — not yet dialled',
+                tone: $attention['uncalled_leads'] > 0 ? 'info' : 'success',
+                url: MyLeadsPage::getUrl(),
+            );
+        }
+
+        return $metrics;
+    }
+
+    /**
+     * @return list<array{label: string, value: string, meta: ?string, icon: string, tone: string, url: ?string}>
+     */
+    protected function admissionsMetrics(): array
+    {
+        $user = Auth::user();
+        $filters = $this->dashboardFilters();
+        $stats = app(CrmDashboardService::class)->stats($filters);
+        $attention = $user
+            ? app(DashboardOpsService::class)->attentionSnapshot($filters, $user)
+            : ['admissions_pending' => 0];
+        $pulse = $user
+            ? app(DashboardOpsService::class)->todayPulse($filters, $user)
+            : ['visits_today' => 0];
+
+        $metrics = [];
+
+        if (FeatureGate::enabled(LicenseFeature::Admissions) && AdmissionResource::canViewAny()) {
+            $pending = (int) ($attention['admissions_pending'] ?? $stats['pending_admissions'] ?? 0);
+            $metrics[] = $this->metric(
+                label: 'Pending admissions',
+                value: (string) $pending,
+                icon: 'heroicon-m-clipboard-document-check',
+                meta: 'Awaiting review',
+                tone: $pending > 0 ? 'warning' : 'success',
+                url: AdmissionResource::getUrl('index'),
+            );
+        }
+
+        if (FeatureGate::enabled(LicenseFeature::Enquiries)) {
+            $metrics[] = $this->metric(
+                label: 'New leads',
+                value: (string) $stats['range_enquiries'],
+                icon: 'heroicon-m-inbox-arrow-down',
+                meta: $filters->rangeName(),
+                tone: 'info',
+                url: $this->urlIf(EnquiryResource::canViewAny(), EnquiryResource::getUrl('index')),
+            );
+        }
+
+        if (FeatureGate::enabled(LicenseFeature::Enquiries) && CampusVisitsPage::canAccess()) {
+            $visits = (int) ($pulse['visits_today'] ?? 0);
+            $metrics[] = $this->metric(
+                label: 'Campus visits',
+                value: (string) $visits,
+                icon: 'heroicon-m-building-office-2',
+                meta: 'Walk-ins today',
+                tone: 'neutral',
+                url: CampusVisitsPage::getUrl(),
+            );
+        }
+
+        return $metrics;
     }
 
     /**
@@ -403,6 +546,7 @@ class DashboardHeroWidget extends Widget
         return match ($pack) {
             'owner' => $this->ownerActions(),
             'calling' => $this->callingActions(),
+            'admissions' => $this->admissionsActions(),
             'academic' => $this->academicActions(),
             'finance' => $this->financeActions(),
             'messaging' => $this->messagingActions(),
@@ -500,6 +644,41 @@ class DashboardHeroWidget extends Widget
                 'feature' => LicenseFeature::Cases,
                 'can' => fn ($user): bool => $user && $user->hasRole(RoleName::SuperAdmin->value),
             ],
+        ];
+    }
+
+    /**
+     * @return list<array{label: string, description: string, icon: string, url: string, feature?: ?LicenseFeature, can?: callable}>
+     */
+    protected function admissionsActions(): array
+    {
+        return [
+            [
+                'label' => 'Admissions',
+                'description' => 'Review pending forms',
+                'icon' => 'heroicon-o-clipboard-document-check',
+                'url' => AdmissionResource::getUrl('index'),
+                'feature' => LicenseFeature::Admissions,
+                'can' => fn ($user): bool => AdmissionResource::canViewAny(),
+            ],
+            [
+                'label' => 'All Leads',
+                'description' => 'Full enquiry pipeline',
+                'icon' => 'heroicon-o-inbox-stack',
+                'url' => EnquiryResource::getUrl('index'),
+                'feature' => LicenseFeature::Enquiries,
+                'can' => fn ($user): bool => EnquiryResource::canViewAny(),
+            ],
+            [
+                'label' => 'Follow-ups',
+                'description' => 'Due today',
+                'icon' => 'heroicon-o-bell-alert',
+                'url' => FollowUpsPage::getUrl(),
+                'feature' => LicenseFeature::Enquiries,
+                'can' => fn ($user): bool => FollowUpsPage::canAccess(),
+            ],
+            $this->findStudentAction('Open any profile'),
+            $this->myWorkAction(),
         ];
     }
 
