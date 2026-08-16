@@ -71,6 +71,8 @@ class AppServiceProvider extends ServiceProvider
                 'showAttendance' => FeatureGate::enabled(LicenseFeature::Attendance),
                 'showAdmissions' => FeatureGate::enabled(LicenseFeature::Admissions),
                 'student' => null,
+                'linkedChildren' => [],
+                'activeStudentId' => null,
             ];
 
             if (session()->has('student_portal_id')) {
@@ -85,6 +87,7 @@ class AppServiceProvider extends ServiceProvider
                     $portalNav['homeworkBadge'] = $portalNav['showHomework']
                         ? app(HomeworkAssignmentService::class)->unviewedCountForStudent($student)
                         : 0;
+                    $portalNav['activeStudentId'] = $student->id;
                     $portalNav['student'] = [
                         'name' => $student->name,
                         'initials' => $student->initials(),
@@ -92,6 +95,22 @@ class AppServiceProvider extends ServiceProvider
                             ? \App\Support\StudentLabels::rollNumberLabel().' · '.$student->activeEnrollment->enrollment_number
                             : $student->mobile,
                     ];
+
+                    $loginMobile = (string) session('portal_login_mobile', '');
+                    if ($loginMobile !== '') {
+                        $portalNav['linkedChildren'] = app(\App\Services\StudentAuthService::class)
+                            ->findStudentsByLoginMobile($loginMobile)
+                            ->map(fn (Student $child): array => [
+                                'id' => $child->id,
+                                'name' => $child->name,
+                                'initials' => $child->initials(),
+                                'subtitle' => $child->activeEnrollment?->enrollment_number
+                                    ? \App\Support\StudentLabels::rollNumberLabel().' · '.$child->activeEnrollment->enrollment_number
+                                    : ($child->mobile ?? ''),
+                            ])
+                            ->values()
+                            ->all();
+                    }
                 }
             }
 

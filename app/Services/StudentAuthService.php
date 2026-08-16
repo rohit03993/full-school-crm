@@ -72,17 +72,37 @@ class StudentAuthService
 
     public function login(string $mobile, string $password): ?Student
     {
-        $student = $this->findStudentByMobile($mobile);
+        $students = $this->findStudentsByLoginMobile($mobile);
 
-        if (! $student || ! $this->verifyStudentPassword($student, $password)) {
+        if ($students->isEmpty()) {
             return null;
         }
 
-        if (blank($student->portal_password) || $this->hasLegacyDobPortalPassword($student)) {
-            $student->update(['portal_password' => $this->sharedPortalPasswordHash()]);
+        $matched = null;
+        foreach ($students as $student) {
+            if ($this->verifyStudentPassword($student, $password)) {
+                $matched = $student;
+                break;
+            }
         }
 
-        return $student;
+        if (! $matched) {
+            return null;
+        }
+
+        $preferred = $this->preferredStudentForLogin($students, $mobile) ?? $matched;
+
+        if ($preferred->is($matched) || $this->verifyStudentPassword($preferred, $password) || $this->usesInstituteDefaultPassword($preferred)) {
+            $active = $preferred;
+        } else {
+            $active = $matched;
+        }
+
+        if (blank($active->portal_password) || $this->hasLegacyDobPortalPassword($active)) {
+            $active->update(['portal_password' => $this->sharedPortalPasswordHash()]);
+        }
+
+        return $active;
     }
 
     public function changePassword(Student $student, string $currentPassword, string $newPassword): bool
@@ -98,15 +118,51 @@ class StudentAuthService
         return true;
     }
 
-    public function findStudentByMobile(string $mobile): ?Student
+    /**
+     * Students reachable by this phone: primary mobile or alternate (parent) mobile.
+     *
+     * @return \Illuminate\Support\Collection<int, Student>
+     */
+    public function findStudentsByLoginMobile(string $mobile): \Illuminate\Support\Collection
     {
         $digits = \App\Support\IndianMobileNumber::normalize($mobile);
 
         if ($digits === null) {
+            return collect();
+        }
+
+        return Student::query()
+            ->with('activeEnrollment')
+            ->where(function ($query) use ($digits): void {
+                $query->where('mobile', $digits)
+                    ->orWhere('alternate_mobile', $digits);
+            })
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function findStudentByMobile(string $mobile): ?Student
+    {
+        $students = $this->findStudentsByLoginMobile($mobile);
+
+        return $this->preferredStudentForLogin($students, $mobile);
+    }
+
+    /**
+     * Prefer the student whose primary mobile matches the login number.
+     *
+     * @param  \Illuminate\Support\Collection<int, Student>  $students
+     */
+    public function preferredStudentForLogin(\Illuminate\Support\Collection $students, string $mobile): ?Student
+    {
+        if ($students->isEmpty()) {
             return null;
         }
 
-        return Student::query()->where('mobile', $digits)->first();
+        $digits = \App\Support\IndianMobileNumber::normalize($mobile);
+
+        return $students->first(fn (Student $student): bool => $student->mobile === $digits)
+            ?? $students->first();
     }
 
     public function loginWithVerifiedOtp(string $mobile): ?Student
@@ -122,9 +178,23 @@ class StudentAuthService
         return $student;
     }
 
+    /**
+     * Switch active child after parent/student login. Student must belong to the login mobile.
+     */
+    public function studentAccessibleWithLoginMobile(Student $student, string $loginMobile): bool
+    {
+        $digits = \App\Support\IndianMobileNumber::normalize($loginMobile);
+
+        if ($digits === null) {
+            return false;
+        }
+
+        return $student->mobile === $digits || $student->alternate_mobile === $digits;
+    }
+
     public function portalLoginHint(): string
     {
-        return 'Login with your mobile number and portal password, or request a 4-digit WhatsApp OTP.';
+        return 'Parents and students: sign in with the mobile on the student record (or alternate/parent mobile). Use the institute portal password, or a WhatsApp OTP.';
     }
 
     /**

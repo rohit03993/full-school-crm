@@ -52,11 +52,22 @@ class DashboardController extends Controller
         $publishedResults = [];
         $sessionAttendanceRecords = collect();
         $classAttendancePercentage = null;
+        $classAttendanceSummary = null;
+        $attendanceMonth = now()->format('Y-m');
 
         if ($enrollment) {
             $attendance = app(ActivityAttendanceService::class);
             $sessionAttendanceRecords = $attendance->sessionAttendanceRecordsForStudent($student);
-            $classAttendancePercentage = app(AttendanceService::class)->percentageForStudent($student);
+
+            $requestedMonth = request()->query('attendance_month');
+            if (is_string($requestedMonth) && preg_match('/^\d{4}-\d{2}$/', $requestedMonth)) {
+                $attendanceMonth = $requestedMonth;
+                $classAttendanceSummary = app(AttendanceService::class)->summaryForStudentInMonth($student, $attendanceMonth);
+            } else {
+                $classAttendanceSummary = app(AttendanceService::class)->monthToDateSummaryForStudent($student);
+            }
+
+            $classAttendancePercentage = $classAttendanceSummary['percentage'] ?? null;
 
             foreach (ActivityType::query()->enabled()->ordered()->get() as $activityType) {
                 if (! $activityType->supportsScoring()) {
@@ -101,6 +112,7 @@ class DashboardController extends Controller
         if (! $showAttendance) {
             $sessionAttendanceRecords = collect();
             $classAttendancePercentage = null;
+            $classAttendanceSummary = null;
         }
 
         if (! $showMarks) {
@@ -111,6 +123,11 @@ class DashboardController extends Controller
         if (! $showAdmissions) {
             $admission = null;
         }
+
+        $loginMobile = (string) session('portal_login_mobile', '');
+        $linkedChildren = $loginMobile !== ''
+            ? app(\App\Services\StudentAuthService::class)->findStudentsByLoginMobile($loginMobile)
+            : collect([$student]);
 
         return view('portal.dashboard', [
             'student' => $student,
@@ -125,6 +142,9 @@ class DashboardController extends Controller
             'publishedResults' => $publishedResults,
             'sessionAttendanceRecords' => $sessionAttendanceRecords,
             'classAttendancePercentage' => $classAttendancePercentage,
+            'classAttendanceSummary' => $classAttendanceSummary,
+            'attendanceMonth' => $attendanceMonth,
+            'linkedChildren' => $linkedChildren,
             'showFees' => $showFees,
             'showAttendance' => $showAttendance,
             'showMarks' => $showMarks,

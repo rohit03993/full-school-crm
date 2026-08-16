@@ -4,6 +4,7 @@ namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\StudentPortal\Concerns\ResolvesPortalStudent;
+use App\Models\Student;
 use App\Services\StudentAuthService;
 use App\Services\WhatsAppOtpService;
 use App\Support\IndianMobileNumber;
@@ -67,7 +68,7 @@ class AuthController extends Controller
                 ->withErrors(['mobile' => 'Invalid mobile number or password.']);
         }
 
-        return $this->completePortalLogin($request, $student->id);
+        return $this->completePortalLogin($request, $student->id, $data['mobile']);
     }
 
     public function sendLoginOtp(
@@ -98,7 +99,7 @@ class AuthController extends Controller
             return back()
                 ->withInput($request->only('mobile'))
                 ->with('login_tab', 'otp')
-                ->withErrors(['mobile' => 'This mobile number is not registered on the student portal.']);
+                ->withErrors(['mobile' => 'This mobile is not registered as a student or parent number on the portal.']);
         }
 
         $result = $otp->send($mobile, WhatsAppOtpService::PURPOSE_STUDENT, $student->name);
@@ -158,7 +159,7 @@ class AuthController extends Controller
                 ->withErrors(['mobile' => 'This mobile number is not registered on the student portal.']);
         }
 
-        return $this->completePortalLogin($request, $student->id);
+        return $this->completePortalLogin($request, $student->id, $data['mobile']);
     }
 
     public function changePassword(Request $request, StudentAuthService $auth): RedirectResponse
@@ -185,14 +186,41 @@ class AuthController extends Controller
 
     public function logout(): RedirectResponse
     {
-        session()->forget('student_portal_id');
+        session()->forget(['student_portal_id', 'portal_login_mobile']);
 
         return redirect()->route('home');
     }
 
-    protected function completePortalLogin(Request $request, int $studentId): RedirectResponse
+    public function switchChild(Request $request, StudentAuthService $auth): RedirectResponse
     {
-        session(['student_portal_id' => $studentId]);
+        $loginMobile = (string) session('portal_login_mobile', '');
+        $data = $request->validate([
+            'student_id' => ['required', 'integer'],
+        ]);
+
+        $student = Student::query()->find($data['student_id']);
+
+        if (! $student || $loginMobile === '' || ! $auth->studentAccessibleWithLoginMobile($student, $loginMobile)) {
+            return back()->withErrors(['student_id' => 'That student is not linked to this login.']);
+        }
+
+        session(['student_portal_id' => $student->id]);
+
+        return redirect()
+            ->route('portal.dashboard')
+            ->with('portal_success', 'Switched to '.$student->name.'.');
+    }
+
+    protected function completePortalLogin(Request $request, int $studentId, ?string $loginMobile = null): RedirectResponse
+    {
+        $mobile = $loginMobile
+            ?? IndianMobileNumber::normalize((string) $request->input('mobile'))
+            ?? (string) session('otp_mobile', '');
+
+        session([
+            'student_portal_id' => $studentId,
+            'portal_login_mobile' => $mobile !== '' ? $mobile : null,
+        ]);
 
         $intended = session()->pull('portal_intended_url');
 

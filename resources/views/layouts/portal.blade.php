@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="{{ \App\Services\PwaManifestService::themeColor() }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Student Portal') — {{ $institute['name'] ?? config('app.name') }}</title>
+    <title>@yield('title', 'Parent & Student Portal') — {{ $institute['name'] ?? config('app.name') }}</title>
 
     <x-pwa.head />
 
@@ -36,7 +36,7 @@
 
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-[11px] font-bold uppercase tracking-wider text-brand-600">
-                        @yield('eyebrow', 'Student Portal')
+                        @yield('eyebrow', 'Parent & Student')
                     </p>
                     <h1 class="truncate font-display text-lg font-bold leading-tight text-navy-900">
                         @yield('heading')
@@ -55,7 +55,7 @@
         <header class="hidden border-b border-navy-100 bg-white px-8 py-6 lg:block">
             <div class="mx-auto max-w-5xl">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-brand-600">
-                    @yield('eyebrow', 'Student Portal')
+                    @yield('eyebrow', 'Parent & Student')
                 </p>
                 <h1 class="mt-1 font-display text-2xl font-bold text-navy-900">
                     @yield('heading')

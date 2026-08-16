@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="{{ \App\Services\PwaManifestService::themeColor() }}">
-    <title>Student Portal — {{ $institute['name'] ?? config('app.name') }}</title>
+    <title>Parent &amp; Student Portal — {{ $institute['name'] ?? config('app.name') }}</title>
 
     <x-pwa.head />
 
@@ -45,7 +45,7 @@
                     >
                 @endif
                 <p class="text-xs font-bold uppercase tracking-widest text-brand-400">{{ $institute['name'] ?? config('app.name') }}</p>
-                <h1 class="mt-2 font-display text-3xl font-bold sm:text-4xl">Student Portal</h1>
+                <h1 class="mt-2 font-display text-3xl font-bold sm:text-4xl">Parent &amp; Student</h1>
                 <p class="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-navy-300">
                     {{ ($otpOnly ?? false) && ($otpAvailable ?? false)
                         ? 'Sign in with a 4-digit code sent to your WhatsApp.'

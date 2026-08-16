@@ -180,10 +180,13 @@ Route::prefix('portal')->name('portal.')->middleware(EnsurePortalLicensed::class
     Route::post('/login/otp/verify', [AuthController::class, 'verifyLoginOtp'])
         ->middleware('throttle:10,1')
         ->name('login.otp.verify');
-    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::middleware(EnsureStudentPortalAuth::class)->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::post('/switch-child', [AuthController::class, 'switchChild'])
+            ->middleware('throttle:30,1')
+            ->name('switch-child');
         Route::post('/password', [AuthController::class, 'changePassword'])
             ->middleware('throttle:10,1')
             ->name('password.change');

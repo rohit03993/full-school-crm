@@ -4,7 +4,7 @@
     $collectiblePending = $enrollment && $fees ? (float) $fees->totalCollectiblePending() : 0;
     $paidPercent = $netFee > 0 ? min(100, (int) round(($paidAmount / $netFee) * 100)) : 0;
     $hasMarks = ! empty($examMarksSections);
-    $hasAttendance = $enrollment && ($classAttendancePercentage !== null || $sessionAttendanceRecords->isNotEmpty());
+    $hasAttendance = ($showAttendance ?? true) && $enrollment;
 @endphp
 
 <div class="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-5 lg:gap-6">
@@ -107,7 +107,7 @@
         @endif
 
         @if ($hasAttendance)
-            <button type="button" @click="setTab('more')" class="portal-quick-action text-left">
+            <button type="button" @click="setTab('attendance')" class="portal-quick-action text-left">
                 <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 </span>

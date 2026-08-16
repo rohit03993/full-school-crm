@@ -302,7 +302,7 @@ Every management system below lists:
 | **Formal name** | Student Portal Management System |
 | **Key** | `portal` |
 | **Status** | Incomplete |
-| **Works today** | Login (password/OTP), dashboard, homework, receipts/ID, published marks |
+| **Works today** | Parent & student login (password/OTP), multi-child switch via mobile/alternate mobile, dashboard, attendance tab, homework, receipts/ID, published marks, unified PWA `/app` |
 | **Omit** | Treating Portal as native parent app |
 | **Edit** | Each portal section checks its sibling module key |
 | **Add** | Notices/certificates when those modules exist; then Parent App |

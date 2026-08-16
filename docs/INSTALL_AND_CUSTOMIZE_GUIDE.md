@@ -281,11 +281,13 @@ After deploy or role changes, run `php artisan crm:sync-permissions` (or your in
 
 ---
 
-### H. Student portal
+### H. Student / parent portal
 
-Students log in at **`/portal/login`** with mobile + date of birth (default).
+Parents and students log in at **`/portal/login`** with mobile + password (default), or WhatsApp OTP.
 
-They see fees, attendance, and profile linked to their enrollment.
+Use the student’s primary mobile **or** the parent number stored as **alternate mobile**. If the same parent number is on more than one student, the portal shows a **Switch child** control (works with the installed PWA at `/app` → Parent / Student).
+
+They see fees, attendance, homework, marks, and profile linked to the selected student.
 
 ---
 

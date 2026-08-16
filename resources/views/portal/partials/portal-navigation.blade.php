@@ -6,6 +6,9 @@
     $showHomework = (bool) ($portalNav['showHomework'] ?? true);
     $showFees = (bool) ($portalNav['showFees'] ?? true);
     $showMarks = (bool) ($portalNav['showMarks'] ?? true);
+    $showAttendance = (bool) ($portalNav['showAttendance'] ?? false);
+    $linkedChildren = $portalNav['linkedChildren'] ?? [];
+    $activeStudentId = $portalNav['activeStudentId'] ?? null;
 
     $primaryNav = [
         ['key' => 'home', 'label' => 'Overview', 'href' => route('portal.dashboard'), 'route' => 'home', 'icon' => 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],
@@ -19,6 +22,10 @@
         $primaryNav[] = ['key' => 'fees', 'label' => 'Fees', 'href' => route('portal.dashboard').'#fees', 'route' => 'fees', 'icon' => 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z'];
     }
 
+    if ($showAttendance) {
+        $primaryNav[] = ['key' => 'attendance', 'label' => 'Attendance', 'href' => route('portal.dashboard').'#attendance', 'route' => 'attendance', 'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'];
+    }
+
     if ($showMarks) {
         $primaryNav[] = ['key' => 'marks', 'label' => 'Marks', 'href' => route('portal.dashboard').'#marks', 'route' => 'marks', 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'];
     }
@@ -29,7 +36,11 @@
 
     $primaryNav[] = ['key' => 'more', 'label' => 'Account', 'href' => route('portal.dashboard').'#more', 'route' => 'more', 'icon' => 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'];
 
+    // Bottom bar keeps 5 items max for thumbs; drop Marks to sidebar/tabs when crowded.
     $mobileNav = array_values(array_filter($primaryNav, fn (array $item): bool => empty($item['sidebarOnly'])));
+    if (count($mobileNav) > 5) {
+        $mobileNav = array_values(array_filter($mobileNav, fn (array $item): bool => $item['route'] !== 'marks'));
+    }
 
     $resolveActive = function (string $route) use ($onHomework, $onDashboard): bool {
         if ($onHomework) {
@@ -44,7 +55,7 @@
 <aside
     id="portal-sidebar-nav"
     class="portal-sidebar hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:flex lg:w-64 lg:flex-col lg:border-r lg:border-navy-100 lg:bg-white"
-    aria-label="Student portal navigation"
+    aria-label="Parent and student portal navigation"
 >
     <div class="border-b border-navy-100 px-5 py-5">
         @if (! empty($institute['logo_url']))
@@ -55,7 +66,7 @@
             >
         @endif
         <p class="text-[11px] font-bold uppercase tracking-wider text-brand-600">{{ $institute['name'] ?? config('app.name') }}</p>
-        <p class="mt-0.5 font-display text-lg font-bold text-navy-900">Student Portal</p>
+        <p class="mt-0.5 font-display text-lg font-bold text-navy-900">Parent &amp; Student</p>
     </div>
 
     @if (! empty($portalNav['student']))
@@ -70,6 +81,30 @@
                     <p class="truncate text-xs text-navy-500">{{ $navStudent['subtitle'] }}</p>
                 </div>
             </div>
+
+            @if (count($linkedChildren) > 1)
+                <div class="mt-3 space-y-1.5">
+                    <p class="px-1 text-[10px] font-bold uppercase tracking-wider text-navy-400">Switch child</p>
+                    @foreach ($linkedChildren as $child)
+                        @if ((int) $child['id'] === (int) $activeStudentId)
+                            <div class="rounded-xl bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-800 ring-1 ring-brand-200">
+                                {{ $child['name'] }} · viewing
+                            </div>
+                        @else
+                            <form method="POST" action="{{ route('portal.switch-child') }}">
+                                @csrf
+                                <input type="hidden" name="student_id" value="{{ $child['id'] }}">
+                                <button type="submit" class="w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-navy-700 transition hover:bg-navy-50">
+                                    {{ $child['name'] }}
+                                    @if (! empty($child['subtitle']))
+                                        <span class="mt-0.5 block font-normal text-navy-400">{{ $child['subtitle'] }}</span>
+                                    @endif
+                                </button>
+                            </form>
+                        @endif
+                    @endforeach
+                </div>
+            @endif
         </div>
     @endif
 
@@ -125,7 +160,7 @@
 <nav
     id="portal-bottom-nav"
     class="portal-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-navy-100/90 bg-white/95 shadow-[0_-4px_24px_rgba(16,42,67,0.08)] backdrop-blur-md supports-[backdrop-filter]:bg-white/90 lg:hidden"
-    aria-label="Student portal navigation"
+    aria-label="Parent and student portal navigation"
 >
     <div class="mx-auto flex max-w-lg items-stretch justify-around gap-0.5 px-1 pt-1.5">
         @foreach ($mobileNav as $item)

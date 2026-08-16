@@ -1,6 +1,6 @@
 @extends('layouts.portal')
 
-@section('title', 'My Portal')
+@section('title', 'Parent & Student Portal')
 @section('heading', $student->name)
 @section('subheading', $student->mobile.' · '.$student->status->label())
 
@@ -22,6 +22,7 @@
         $tabs = collect([
             ['id' => 'home', 'label' => 'Overview'],
             ['id' => 'fees', 'label' => 'Fees', 'hidden' => ! ($showFees ?? true)],
+            ['id' => 'attendance', 'label' => 'Attendance', 'hidden' => ! ($showAttendance ?? true)],
             ['id' => 'marks', 'label' => 'Marks', 'hidden' => ! ($showMarks ?? true) || empty($examMarksSections)],
             ['id' => 'admission', 'label' => 'Admission', 'hidden' => ! ($showAdmissions ?? true) || ! $admission],
             ['id' => 'more', 'label' => 'More'],
@@ -33,8 +34,13 @@
             tab: @js($initialTab),
             tabs: @js($tabs->pluck('id')->all()),
             init() {
+                const params = new URLSearchParams(window.location.search);
+                const queryTab = params.get('tab');
                 const hash = window.location.hash.replace('#', '');
-                if (this.tabs.includes(hash)) {
+                if (queryTab && this.tabs.includes(queryTab)) {
+                    this.tab = queryTab;
+                    history.replaceState(null, '', '#' + queryTab);
+                } else if (this.tabs.includes(hash)) {
                     this.tab = hash;
                 }
                 window.addEventListener('hashchange', () => {
@@ -80,6 +86,12 @@
             <div x-show="tab === 'fees'" x-cloak role="tabpanel" class="space-y-4">
                 @include('portal.partials.dashboard.fees')
             </div>
+
+            @if ($showAttendance ?? true)
+                <div x-show="tab === 'attendance'" x-cloak role="tabpanel" class="space-y-4">
+                    @include('portal.partials.dashboard.attendance')
+                </div>
+            @endif
 
             @if (! empty($examMarksSections))
                 <div x-show="tab === 'marks'" x-cloak role="tabpanel">
