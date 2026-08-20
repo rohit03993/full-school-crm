@@ -24,7 +24,6 @@ use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
-use App\Support\InstituteProfile;
 use App\Support\InstituteTerminology;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
@@ -34,6 +33,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -89,6 +89,13 @@ class StudentResource extends Resource
     public static function table(Table $table): Table
     {
         return CrmTable::configure($table)
+            ->deferFilters(false)
+            ->filtersLayout(FiltersLayout::AboveContent)
+            ->filtersFormColumns([
+                'default' => 1,
+                'md' => 2,
+                'xl' => 3,
+            ])
             ->recordClasses(fn (Student $record): ?string => blank($record->mobile)
                 ? 'bg-danger-50/60 dark:bg-danger-500/5'
                 : null)
@@ -202,16 +209,6 @@ class StudentResource extends Resource
                         StudentStatus::Dropped,
                     ])->mapWithKeys(
                         fn (StudentStatus $status) => [$status->value => $status->label()],
-                    )),
-                SelectFilter::make('course')
-                    ->label(InstituteTerminology::label('course'))
-                    ->options(fn (): array => InstituteProfile::directoryCourseOptions())
-                    ->query(fn (Builder $query, array $data): Builder => $query->when(
-                        filled($data['value'] ?? null),
-                        fn (Builder $query): Builder => $query->whereHas(
-                            'activeEnrollment',
-                            fn (Builder $query): Builder => $query->where('course_id', $data['value']),
-                        ),
                     )),
                 SelectFilter::make('section')
                     ->label('Class & section')
