@@ -5,6 +5,7 @@ namespace App\Services\FaceVerify;
 use App\Models\FaceVerificationRequest;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\ClassSectionLabel;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
@@ -186,12 +187,23 @@ class FaceVerifyClient
         return [
             'enrollment_number' => strtoupper(trim($enrollment->enrollment_number)),
             'name' => $student->name,
-            'batch' => $student->activeBatchStudent?->batch?->name
-                ?? $enrollment->course?->name
-                ?? $enrollment->academicSession?->name,
+            'batch' => $this->classSectionForFace($student),
             'crm_student_id' => (string) $student->id,
             'subject' => 'student',
         ];
+    }
+
+    protected function classSectionForFace(Student $student): ?string
+    {
+        $batch = $student->activeBatchStudent?->batch;
+
+        if ($batch) {
+            $batch->loadMissing('course');
+
+            return ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false);
+        }
+
+        return $student->activeEnrollment?->course?->name;
     }
 
     /**

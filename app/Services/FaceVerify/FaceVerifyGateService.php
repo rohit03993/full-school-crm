@@ -391,7 +391,7 @@ class FaceVerifyGateService
         $student->loadMissing([
             'activeEnrollment.course',
             'activeEnrollment.academicSession',
-            'activeBatchStudent.batch',
+            'activeBatchStudent.batch.course',
         ]);
 
         return $this->client->upsertStudent($student);
@@ -409,7 +409,7 @@ class FaceVerifyGateService
             $student->loadMissing([
                 'activeEnrollment.course',
                 'activeEnrollment.academicSession',
-                'activeBatchStudent.batch',
+                'activeBatchStudent.batch.course',
             ]);
             $ready[] = $student;
         }

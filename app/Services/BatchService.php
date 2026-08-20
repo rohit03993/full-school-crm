@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\BatchStatus;
 use App\Enums\ResultDeclarationStatus;
 use App\Models\Batch;
 use App\Models\BatchStudent;
@@ -105,6 +106,56 @@ class BatchService
         }
 
         return $assigned;
+    }
+
+    /**
+     * Assign students to a section, skipping records that do not match the class/session.
+     *
+     * @param  array<int, int>  $studentIds
+     * @return array{assigned: int, skipped: int}
+     */
+    public function bulkAssignSkippingMismatches(Batch $batch, array $studentIds, User $staff): array
+    {
+        $studentIds = array_values(array_unique(array_map('intval', $studentIds)));
+        $assigned = 0;
+        $skipped = 0;
+
+        foreach ($studentIds as $studentId) {
+            $student = Student::query()->find($studentId);
+
+            if (! $student) {
+                $skipped++;
+
+                continue;
+            }
+
+            try {
+                $this->assign($student, $batch, $staff);
+                $assigned++;
+            } catch (ValidationException) {
+                $skipped++;
+            }
+        }
+
+        return ['assigned' => $assigned, 'skipped' => $skipped];
+    }
+
+    /**
+     * When a class has exactly one active section in the session, that section can be assigned automatically.
+     */
+    public function soleActiveSectionForCourse(int $courseId, ?int $sessionId): ?Batch
+    {
+        $query = Batch::query()
+            ->where('course_id', $courseId)
+            ->where('status', BatchStatus::Active);
+
+        if ($sessionId !== null) {
+            $query->where('academic_session_id', $sessionId);
+        }
+
+        $batches = $query->limit(2)->get();
+
+        return $batches->count() === 1 ? $batches->first() : null;
     }
 
     public function deleteSection(Batch $batch): void

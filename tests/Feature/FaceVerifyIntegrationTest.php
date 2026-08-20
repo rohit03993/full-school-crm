@@ -427,7 +427,7 @@ class FaceVerifyIntegrationTest extends TestCase
                 && ($request['students'][0]['enrollment_number'] ?? null) === 'FI 0801'
                 && ($request['students'][0]['name'] ?? null) === $student->name
                 && ($request['students'][0]['crm_student_id'] ?? null) === (string) $student->id
-                && array_key_exists('batch', $request['students'][0]);
+                && ($request['students'][0]['batch'] ?? null) === 'Class 10 · Section A';
         });
     }
 
@@ -461,6 +461,7 @@ class FaceVerifyIntegrationTest extends TestCase
             'course_id' => $course->id,
             'academic_session_id' => $session->id,
             'name' => '10-A',
+            'section' => 'A',
             'trainer_user_id' => $staff->id,
             'start_date' => '2026-06-01',
             'end_date' => '2026-12-31',

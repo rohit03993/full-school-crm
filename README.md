@@ -43,7 +43,7 @@ Default admin: `ADMIN_MOBILE` / `ADMIN_PASSWORD` in `.env`.
 2. Open **Settings → Institute Setup** for the full checklist (courses, terminology, branding, WhatsApp).
 3. Sync branding from config if needed: `php artisan crm:sync-institute-branding`
 
-Detailed steps: [docs/INSTALL_AND_CUSTOMIZE_GUIDE.md](docs/INSTALL_AND_CUSTOMIZE_GUIDE.md)
+Detailed steps: [docs/install/README.md](docs/install/README.md) (server checklist + customize guide)
 
 ## WhatsApp fee reminders
 

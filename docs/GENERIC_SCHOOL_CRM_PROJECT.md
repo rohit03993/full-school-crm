@@ -178,7 +178,7 @@ Use this section to steer the agent when opening this project.
 
 - [ ] Single deployment per school (V1) vs multi-tenant (V2) — **decide with user**
 - [x] Environment-based branding only for V1
-- [x] Document install guide for new schools (`docs/INSTALL_AND_CUSTOMIZE_GUIDE.md`)
+- [x] Document install guide for new schools (`docs/install/` — server checklist + customize)
 
 ### Phase G3 — Product packaging
 

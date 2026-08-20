@@ -31,7 +31,10 @@ CloudPanel/nginx requires `public/vendor/livewire/` (run `php artisan crm:publis
 
 ## Client install guide
 
-Share **`docs/INSTALL_AND_CUSTOMIZE_GUIDE.md`** with each school/coaching/college — covers install, wizard, terminology, custom fields, and checklists by institute type. In admin: **Setup → Setup Guide**.
+Share **`docs/install/`** with each school — start at [`docs/install/README.md`](docs/install/README.md).  
+- Server: [`docs/install/server-checklist.md`](docs/install/server-checklist.md)  
+- Customize: [`docs/install/customize-for-school.md`](docs/install/customize-for-school.md)  
+In admin: **Setup → Setup Guide**.
 
 ## Module packaging
 

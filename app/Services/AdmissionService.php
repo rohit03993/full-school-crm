@@ -31,6 +31,7 @@ class AdmissionService
         protected FeeStructureService $feeStructures,
         protected AdmissionFeePlanService $feePlans,
         protected StudentAuthService $studentAuth,
+        protected BatchService $batches,
     ) {}
 
     /**
@@ -341,6 +342,15 @@ class AdmissionService
             $this->studentAuth->ensurePortalLoginForStudent($locked->student);
 
             $this->feeStructures->createFromAdmission($enrollment, $locked, $staff);
+
+            $section = $this->batches->soleActiveSectionForCourse(
+                (int) $locked->enquiry->course_id,
+                $enrollment->academic_session_id,
+            );
+
+            if ($section) {
+                $this->batches->assign($locked->student->fresh(['activeEnrollment']), $section, $staff);
+            }
 
             $this->audit->log(
                 action: 'Admission Approved, Enrollment Generated',

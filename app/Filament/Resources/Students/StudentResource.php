@@ -12,16 +12,24 @@ use App\Filament\Pages\StudentSearchPage;
 use App\Filament\Resources\Students\Pages\ListStudents;
 use App\Filament\Support\CrmTable;
 use App\Models\AcademicSession;
-use App\Models\Course;
+use App\Models\Batch;
 use App\Models\Student;
+use App\Services\BatchService;
 use App\Services\FaceVerify\FaceVerifyGateService;
 use App\Services\FeesDashboardService;
+use App\Services\StudentProfileDeleteService;
+use App\Support\BatchSelectOptions;
+use App\Support\ClassSectionLabel;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
 use App\Support\InstituteProfile;
+use App\Support\InstituteTerminology;
 use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
@@ -30,7 +38,9 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 use UnitEnum;
 
@@ -72,7 +82,7 @@ class StudentResource extends Resource
                 'activeEnrollment.course',
                 'activeEnrollment.academicSession',
                 'activeEnrollment.feeStructure.installments',
-                'activeBatchStudent.batch',
+                'activeBatchStudent.batch.course',
             ]);
     }
 
@@ -105,7 +115,7 @@ class StudentResource extends Resource
                     ->badge(fn (?string $state): bool => blank($state))
                     ->color(fn (?string $state): string => blank($state) ? 'danger' : 'gray'),
                 TextColumn::make('activeEnrollment.course.name')
-                    ->label('Course')
+                    ->label(InstituteTerminology::label('course'))
                     ->placeholder('—')
                     ->limit(30)
                     ->toggleable(),
@@ -146,8 +156,15 @@ class StudentResource extends Resource
                     ->toggleable()
                     ->hiddenFrom('md'),
                 TextColumn::make('activeBatchStudent.batch.name')
-                    ->label('Batch')
-                    ->placeholder('—')
+                    ->label(InstituteTerminology::label('batch'))
+                    ->state(function (Student $record): ?string {
+                        $batch = $record->activeBatchStudent?->batch;
+
+                        return $batch
+                            ? ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false)
+                            : null;
+                    })
+                    ->placeholder('No section')
                     ->toggleable()
                     ->hiddenFrom('md'),
                 TextColumn::make('status')
@@ -187,8 +204,8 @@ class StudentResource extends Resource
                         fn (StudentStatus $status) => [$status->value => $status->label()],
                     )),
                 SelectFilter::make('course')
-                    ->label('Course')
-                    ->options(fn (): array => InstituteProfile::activeCourseOptions())
+                    ->label(InstituteTerminology::label('course'))
+                    ->options(fn (): array => InstituteProfile::directoryCourseOptions())
                     ->query(fn (Builder $query, array $data): Builder => $query->when(
                         filled($data['value'] ?? null),
                         fn (Builder $query): Builder => $query->whereHas(
@@ -196,6 +213,27 @@ class StudentResource extends Resource
                             fn (Builder $query): Builder => $query->where('course_id', $data['value']),
                         ),
                     )),
+                SelectFilter::make('section')
+                    ->label('Class & section')
+                    ->options(fn (): array => BatchSelectOptions::activeOptions())
+                    ->searchable()
+                    ->query(fn (Builder $query, array $data): Builder => $query->when(
+                        filled($data['value'] ?? null),
+                        fn (Builder $query): Builder => $query->whereHas(
+                            'activeBatchStudent',
+                            fn (Builder $query): Builder => $query->where('batch_id', $data['value']),
+                        ),
+                    )),
+                TernaryFilter::make('section_assigned')
+                    ->label('Section assigned')
+                    ->placeholder('All students')
+                    ->trueLabel('Has class & section')
+                    ->falseLabel('No section assigned')
+                    ->queries(
+                        true: fn (Builder $query): Builder => $query->whereHas('activeBatchStudent'),
+                        false: fn (Builder $query): Builder => $query->whereDoesntHave('activeBatchStudent'),
+                        blank: fn (Builder $query): Builder => $query,
+                    ),
                 SelectFilter::make('academic_session')
                     ->label('Session')
                     ->options(fn (): array => AcademicSession::query()
@@ -210,6 +248,90 @@ class StudentResource extends Resource
                             fn (Builder $query): Builder => $query->where('academic_session_id', $data['value']),
                         ),
                     )),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('assignSection')
+                        ->label('Assign class & section')
+                        ->icon(Heroicon::OutlinedRectangleStack)
+                        ->visible(fn (): bool => CrmAccess::can(Auth::user(), CrmPermission::StudentsEdit))
+                        ->form([
+                            Select::make('batch_id')
+                                ->label('Class & section')
+                                ->options(fn (): array => BatchSelectOptions::activeOptions())
+                                ->searchable()
+                                ->required()
+                                ->native(false)
+                                ->helperText('Only students in the same class and session as this section are updated. Others are skipped.'),
+                        ])
+                        ->action(function (Collection $records, array $data, BatchService $batches): void {
+                            $batch = Batch::query()->findOrFail((int) $data['batch_id']);
+                            $result = $batches->bulkAssignSkippingMismatches(
+                                $batch,
+                                $records->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+                                Auth::user(),
+                            );
+
+                            $label = ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false);
+                            $body = $result['assigned'].' student(s) assigned to '.$label.'.';
+
+                            if ($result['skipped'] > 0) {
+                                $body .= ' '.$result['skipped'].' skipped (different class/session, or no enrollment).';
+                            }
+
+                            Notification::make()
+                                ->title('Section assignment')
+                                ->body($body)
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+                    BulkAction::make('deleteWithoutHistory')
+                        ->label('Delete (no fees or attendance)')
+                        ->icon(Heroicon::OutlinedTrash)
+                        ->color('danger')
+                        ->visible(fn (): bool => Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false)
+                        ->requiresConfirmation()
+                        ->modalHeading('Permanently delete selected students?')
+                        ->modalDescription('Students with fee payments, penalties, or attendance are skipped so that data is not lost. Only profiles with no such history are removed.')
+                        ->action(function (Collection $records, StudentProfileDeleteService $deletes): void {
+                            $deleted = 0;
+                            $skipped = 0;
+                            $actor = Auth::user();
+
+                            foreach ($records as $student) {
+                                if (! $student instanceof Student) {
+                                    continue;
+                                }
+
+                                if ($deletes->hasProtectedHistory($student)) {
+                                    $skipped++;
+
+                                    continue;
+                                }
+
+                                try {
+                                    $deletes->delete($student, $actor);
+                                    $deleted++;
+                                } catch (ValidationException) {
+                                    $skipped++;
+                                }
+                            }
+
+                            $notification = Notification::make()
+                                ->title('Bulk delete')
+                                ->body($deleted.' deleted. '.$skipped.' skipped to protect fee or attendance history.');
+
+                            if ($deleted === 0) {
+                                $notification->warning();
+                            } else {
+                                $notification->success();
+                            }
+
+                            $notification->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+                ]),
             ])
             ->recordActions([
                 Action::make('openProfile')

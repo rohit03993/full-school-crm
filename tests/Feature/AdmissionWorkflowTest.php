@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\AdmissionStatus;
+use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\EnrollmentStatus;
 use App\Enums\Gender;
@@ -10,6 +11,7 @@ use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Models\AcademicSession;
+use App\Models\Batch;
 use App\Models\Course;
 use App\Models\Enquiry;
 use App\Models\Student;
@@ -85,6 +87,106 @@ class AdmissionWorkflowTest extends TestCase
         $this->assertTrue($enrollment->is_active);
         $this->assertSame($session->id, $enrollment->academic_session_id);
         $this->assertSame(StudentStatus::Enrolled, $student->fresh()->status);
+    }
+
+    public function test_approve_assigns_section_when_class_has_exactly_one(): void
+    {
+        Storage::fake('local');
+
+        $staff = $this->createStaffUser();
+        $session = AcademicSession::query()->create([
+            'name' => '2026–27',
+            'code' => '2026-27-one-sec',
+            'starts_on' => '2026-04-01',
+            'ends_on' => '2027-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
+        $student = $this->createStudent();
+        $course = $this->createCourse();
+        $batch = Batch::query()->create([
+            'name' => 'Diploma Test-A',
+            'section' => 'A',
+            'course_id' => $course->id,
+            'academic_session_id' => $session->id,
+            'trainer_user_id' => $staff->id,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-12-31',
+            'status' => BatchStatus::Active,
+        ]);
+        $enquiry = $this->createEnquiry($student, $course, $staff);
+        $admissionService = app(AdmissionService::class);
+
+        $admission = $admissionService->convert($student, $enquiry, $staff, [
+            'course_id' => $course->id,
+            'discount_amount' => 0,
+        ]);
+        $admission = $admissionService->submitForm(
+            $admission,
+            ['tenth_board' => 'CBSE'],
+            [
+                'photo' => UploadedFile::fake()->image('photo.jpg'),
+                'aadhaar' => UploadedFile::fake()->create('aadhaar.pdf', 100, 'application/pdf'),
+                'marksheet' => UploadedFile::fake()->create('marksheet.pdf', 100, 'application/pdf'),
+                'signature' => UploadedFile::fake()->image('sign.jpg'),
+            ],
+            $staff,
+        );
+
+        $admissionService->approve($admission, $staff);
+
+        $this->assertSame($batch->id, $student->fresh()->activeBatchStudent?->batch_id);
+    }
+
+    public function test_approve_does_not_guess_section_when_class_has_two(): void
+    {
+        Storage::fake('local');
+
+        $staff = $this->createStaffUser();
+        $session = AcademicSession::query()->create([
+            'name' => '2026–27',
+            'code' => '2026-27-two-sec',
+            'starts_on' => '2026-04-01',
+            'ends_on' => '2027-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
+        $student = $this->createStudent();
+        $course = $this->createCourse();
+        foreach (['A', 'B'] as $section) {
+            Batch::query()->create([
+                'name' => 'Diploma Test-'.$section,
+                'section' => $section,
+                'course_id' => $course->id,
+                'academic_session_id' => $session->id,
+                'trainer_user_id' => $staff->id,
+                'start_date' => '2026-06-01',
+                'end_date' => '2026-12-31',
+                'status' => BatchStatus::Active,
+            ]);
+        }
+        $enquiry = $this->createEnquiry($student, $course, $staff);
+        $admissionService = app(AdmissionService::class);
+
+        $admission = $admissionService->convert($student, $enquiry, $staff, [
+            'course_id' => $course->id,
+            'discount_amount' => 0,
+        ]);
+        $admission = $admissionService->submitForm(
+            $admission,
+            ['tenth_board' => 'CBSE'],
+            [
+                'photo' => UploadedFile::fake()->image('photo.jpg'),
+                'aadhaar' => UploadedFile::fake()->create('aadhaar.pdf', 100, 'application/pdf'),
+                'marksheet' => UploadedFile::fake()->create('marksheet.pdf', 100, 'application/pdf'),
+                'signature' => UploadedFile::fake()->image('sign.jpg'),
+            ],
+            $staff,
+        );
+
+        $admissionService->approve($admission, $staff);
+
+        $this->assertNull($student->fresh()->activeBatchStudent);
     }
 
     public function test_enrollment_ensures_default_portal_password(): void

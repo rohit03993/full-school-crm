@@ -29,6 +29,17 @@ class StudentProfileDeleteService
         protected StorageCleanupService $storage,
     ) {}
 
+    /**
+     * Permanent delete wipes fee payments and attendance. Callers must skip these records.
+     */
+    public function hasProtectedHistory(Student $student): bool
+    {
+        return Payment::query()->where('student_id', $student->id)->exists()
+            || Attendance::query()->where('student_id', $student->id)->exists()
+            || ActivityAttendance::query()->where('student_id', $student->id)->exists()
+            || FeePenalty::query()->where('student_id', $student->id)->exists();
+    }
+
     public function delete(Student $student, User $actor): void
     {
         if (! $actor->hasRole(RoleName::SuperAdmin->value)) {

@@ -149,6 +149,18 @@ class InstituteProfile
     }
 
     /**
+     * Active programmes for the student directory filter (includes classes with no section yet).
+     *
+     * @return array<int, string>
+     */
+    public static function directoryCourseOptions(): array
+    {
+        return self::adminCoursesQuery(
+            Course::query()->active()->orderBy('name'),
+        )->pluck('name', 'id')->all();
+    }
+
+    /**
      * Active programmes for CRM dropdowns.
      *
      * @return array<int, string>

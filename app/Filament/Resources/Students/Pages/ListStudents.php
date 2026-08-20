@@ -130,7 +130,7 @@ class ListStudents extends ListRecords
                 ->color('gray')
                 ->requiresConfirmation()
                 ->modalHeading('Sync all active students to Face API')
-                ->modalDescription('Sends roll number, name and batch. Face enrollment is still required once per student.')
+                ->modalDescription('Sends roll number, name, and class with section. Face enrollment is still required once per student.')
                 ->action(function (FaceVerifyGateService $faceVerify): void {
                     $synced = 0;
                     $chunkSize = max(1, (int) config('face_verify.bulk_sync_chunk_size', 100));
@@ -141,7 +141,7 @@ class ListStudents extends ListRecords
                             ->with([
                                 'activeEnrollment.course',
                                 'activeEnrollment.academicSession',
-                                'activeBatchStudent.batch',
+                                'activeBatchStudent.batch.course',
                             ])
                             ->chunkById($chunkSize, function ($students) use ($faceVerify, &$synced): void {
                                 $response = $faceVerify->syncStudents($students);
