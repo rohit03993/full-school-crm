@@ -24,7 +24,6 @@ use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
-use App\Support\InstituteTerminology;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
@@ -121,11 +120,23 @@ class StudentResource extends Resource
                     ->description(fn (Student $record): ?string => blank($record->mobile) ? $record->mobile_import_note : null)
                     ->badge(fn (?string $state): bool => blank($state))
                     ->color(fn (?string $state): string => blank($state) ? 'danger' : 'gray'),
-                TextColumn::make('activeEnrollment.course.name')
-                    ->label(InstituteTerminology::label('course'))
-                    ->placeholder('—')
-                    ->limit(30)
-                    ->toggleable(),
+                TextColumn::make('class_section')
+                    ->label('Class & section')
+                    ->state(function (Student $record): string {
+                        $batch = $record->activeBatchStudent?->batch;
+
+                        if ($batch) {
+                            return ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false);
+                        }
+
+                        $courseName = $record->activeEnrollment?->course?->name;
+
+                        return filled($courseName)
+                            ? $courseName.' · No section'
+                            : '—';
+                    })
+                    ->wrap()
+                    ->toggleable(false),
                 TextColumn::make('activeEnrollment.feeStructure.pending_amount')
                     ->label('Fee pending')
                     ->money('INR')
@@ -160,18 +171,6 @@ class StudentResource extends Resource
                 TextColumn::make('activeEnrollment.academicSession.name')
                     ->label('Session')
                     ->placeholder('—')
-                    ->toggleable()
-                    ->hiddenFrom('md'),
-                TextColumn::make('activeBatchStudent.batch.name')
-                    ->label(InstituteTerminology::label('batch'))
-                    ->state(function (Student $record): ?string {
-                        $batch = $record->activeBatchStudent?->batch;
-
-                        return $batch
-                            ? ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false)
-                            : null;
-                    })
-                    ->placeholder('No section')
                     ->toggleable()
                     ->hiddenFrom('md'),
                 TextColumn::make('status')
