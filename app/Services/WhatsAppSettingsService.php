@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Filament\Pages\AttendancePage;
 use App\Filament\Pages\ManageAttendanceBiometricPage;
+use App\Filament\Pages\ManageWhatsAppSettings;
 use App\Filament\Pages\StaffAttendancePage;
 use App\Models\Setting;
 use App\Models\WhatsAppTemplate;
@@ -43,6 +44,91 @@ class WhatsAppSettingsService
                 config('whatsapp.next_batch_delay_seconds', 2),
             ),
         ];
+    }
+
+    /**
+     * Channels staff can turn on/off under Automations.
+     *
+     * @return list<array{key: string, label: string, hint: string, enabled: bool}>
+     */
+    public function sendingChannelStatuses(): array
+    {
+        return [
+            [
+                'key' => 'punch',
+                'label' => 'Attendance to parents',
+                'hint' => 'Gate / biometric / staff IN and OUT',
+                'enabled' => (bool) Setting::getValue('whatsapp.punch_autosend_enabled', true),
+            ],
+            [
+                'key' => 'attendance_legacy',
+                'label' => 'Old roll-call attendance',
+                'hint' => 'Legacy batch-save only — leave off unless you still use it',
+                'enabled' => (bool) Setting::getValue('whatsapp.attendance_autosend_enabled', false),
+            ],
+            [
+                'key' => 'staff_punch',
+                'label' => 'Attendance to staff',
+                'hint' => 'Staff phone on IN and OUT — not parents',
+                'enabled' => (bool) Setting::getValue('whatsapp.staff_punch_autosend_enabled', false),
+            ],
+            [
+                'key' => 'fees',
+                'label' => 'Fee reminders',
+                'hint' => 'Daily overdue installment messages',
+                'enabled' => (bool) Setting::getValue('whatsapp.fee_reminder_autosend_enabled', false),
+            ],
+            [
+                'key' => 'homework',
+                'label' => 'Homework not done',
+                'hint' => 'When staff submit Not Done on Homework check',
+                'enabled' => (bool) Setting::getValue('whatsapp.homework_not_done_autosend_enabled', false),
+            ],
+            [
+                'key' => 'postcall',
+                'label' => 'After a logged call',
+                'hint' => 'Leads / follow-up after an outgoing call',
+                'enabled' => (bool) Setting::getValue('whatsapp.postcall_autosend_enabled', false),
+            ],
+        ];
+    }
+
+    public function renderSendingChannelsSummary(): HtmlString
+    {
+        $automationsUrl = e(ManageWhatsAppSettings::getUrl());
+        $masterOn = app(WhatsAppProviderResolver::class)->isMetaActive();
+        $rows = '';
+
+        foreach ($this->sendingChannelStatuses() as $channel) {
+            $on = $channel['enabled'];
+            $badgeClass = $on
+                ? 'bg-success-100 text-success-800 dark:bg-success-500/20 dark:text-success-200'
+                : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300';
+            $badge = $on ? 'Sending' : 'Off';
+
+            $rows .= '<tr class="border-t border-gray-100 dark:border-white/10">'
+                .'<td class="px-3 py-2.5"><p class="font-medium text-gray-950 dark:text-white">'.e($channel['label']).'</p>'
+                .'<p class="text-xs text-gray-500 dark:text-gray-400">'.e($channel['hint']).'</p></td>'
+                .'<td class="px-3 py-2.5 text-right"><span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold '.$badgeClass.'">'.$badge.'</span></td>'
+                .'</tr>';
+        }
+
+        $masterNote = $masterOn
+            ? 'WhatsApp is <strong>on</strong> for this institute. The list below is what actually goes out. Change any row on Automations.'
+            : 'WhatsApp is <strong>off</strong> on this page — nothing below will send until you turn <strong>WhatsApp enabled</strong> on.';
+
+        return new HtmlString(
+            '<div class="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">'
+            .'<div class="flex flex-wrap items-start justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3 py-3 dark:border-white/10 dark:bg-white/5">'
+            .'<div><p class="text-sm font-semibold text-gray-950 dark:text-white">What is sending</p>'
+            .'<p class="mt-1 text-sm text-gray-600 dark:text-gray-300">'.$masterNote.'</p></div>'
+            .'<a href="'.$automationsUrl.'" class="shrink-0 text-sm font-semibold text-primary-600 hover:underline dark:text-primary-400">Open Automations</a>'
+            .'</div>'
+            .'<table class="w-full text-sm"><tbody>'.$rows.'</tbody></table>'
+            .'<p class="border-t border-gray-200 px-3 py-2 text-xs text-gray-500 dark:border-white/10 dark:text-gray-400">'
+            .'Share homework, exam marks, and bulk campaigns are sent only when staff click Send — they are not in this list.'
+            .'</p></div>'
+        );
     }
 
     public function renderActiveProviderNotice(): HtmlString

@@ -94,6 +94,15 @@ class ManageWhatsAppSettings extends Page
                 ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderActiveProviderNotice())
                 ->columnSpanFull()
                 ->visible(fn (): bool => app(WhatsAppProviderResolver::class)->isMetaActive()),
+            Placeholder::make('how_this_page_works')
+                ->label('')
+                ->content(new HtmlString(
+                    '<p class="text-sm text-gray-600 dark:text-gray-300">'
+                    .'<strong>WhatsApp setup</strong> is the master switch for the institute. This page is where you turn each message type on or off. '
+                    .'Example: keep Setup on, turn <strong>Attendance to parents</strong> off, and leave fees and homework on.'
+                    .'</p>'
+                ))
+                ->columnSpanFull(),
             Section::make('Live campaigns for automations')
                 ->description(fn (): string => 'Pick a **live** campaign from '.CrmNavigation::whatsAppMenu('Live campaigns').'. Each campaign links to an approved Meta template.')
                 ->schema([
@@ -102,8 +111,8 @@ class ManageWhatsAppSettings extends Page
                         ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderLiveCampaignsNotice())
                         ->columnSpanFull(),
                 ]),
-            Section::make('Attendance & punch — parent WhatsApp')
-                ->description('Match each real-world action to one approved Meta template.')
+            Section::make('Parents — attendance')
+                ->description('Turn this off if you want WhatsApp for fees or homework but not gate IN/OUT messages.')
                 ->icon(Heroicon::OutlinedChatBubbleLeftRight)
                 ->schema([
                     Placeholder::make('attendance_automation_guide')
@@ -111,8 +120,8 @@ class ManageWhatsAppSettings extends Page
                         ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderAttendanceAutomationGuide())
                         ->columnSpanFull(),
                     Toggle::make('punch_autosend_enabled')
-                        ->label('Send parent WhatsApp on IN and OUT')
-                        ->helperText('Master switch for all four templates below (machine + manual).')
+                        ->label('Send attendance messages to parents')
+                        ->helperText('IN and OUT from the biometric machine and from the Attendance screen. Turn off to stop all parent attendance WhatsApp.')
                         ->columnSpanFull(),
                     Placeholder::make('machine_templates_heading')
                         ->label('')
@@ -163,8 +172,8 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('Used when a specific IN/OUT campaign is left blank.'),
                 ])
                 ->columns(2),
-            Section::make('Staff attendance punch — staff WhatsApp')
-                ->description('Sent to the staff mobile on real IN/OUT punches only. Auto-out at night does not send a message.')
+            Section::make('Staff — attendance')
+                ->description('Messages to the staff member’s own phone. Independent of parent attendance.')
                 ->icon(Heroicon::OutlinedUserGroup)
                 ->schema([
                     Placeholder::make('staff_punch_automation_guide')
@@ -172,8 +181,8 @@ class ManageWhatsAppSettings extends Page
                         ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderStaffPunchAutomationGuide())
                         ->columnSpanFull(),
                     Toggle::make('staff_punch_autosend_enabled')
-                        ->label('Send staff WhatsApp on IN and OUT')
-                        ->helperText('Uses staff templates only — not the parent punch campaigns above.')
+                        ->label('Send attendance messages to staff')
+                        ->helperText('Does not send to parents. Auto-out at night does not send.')
                         ->columnSpanFull(),
                     Select::make('staff_punch_in_autosend_live_campaign_id')
                         ->label('Staff biometric check-in (IN)')
@@ -191,12 +200,12 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('Same mapping as IN. Leave blank if you only want IN messages.'),
                 ])
                 ->columns(2),
-            Section::make('Post-call auto message')
-                ->description('After a connected outgoing call is logged, queue a WhatsApp using the selected template.')
+            Section::make('Leads — after a call')
+                ->description('Optional message after a connected outgoing call is logged.')
                 ->collapsed()
                 ->schema([
                     Toggle::make('postcall_autosend_enabled')
-                        ->label('Enable post-call WhatsApp'),
+                        ->label('Send WhatsApp after a logged call'),
                     Select::make('postcall_autosend_live_campaign_id')
                         ->label('Live campaign')
                         ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
@@ -205,8 +214,8 @@ class ManageWhatsAppSettings extends Page
                         ->native(false),
                 ])
                 ->columns(2),
-            Section::make('Fee reminders')
-                ->description('Daily WhatsApp to parents with overdue installments. Create the Utility template below, approve it on Meta, then link a Live quick campaign here.')
+            Section::make('Parents — fee reminders')
+                ->description('Daily overdue installment messages. Turn on here even if attendance is off.')
                 ->icon(Heroicon::OutlinedBanknotes)
                 ->schema([
                     Placeholder::make('fee_reminder_template_guide')
@@ -226,8 +235,8 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('Map {{1}} institute.name, {{2}} student.name, {{3}} fee.pending_amount, {{4}} fee.due_date — then Go live.'),
                 ])
                 ->columns(2),
-            Section::make('Homework not done')
-                ->description('Sent when staff submit Not Done on Academics → Homework check (after confirmation). Separate from share-homework.')
+            Section::make('Parents — homework not done')
+                ->description('When staff submit Not Done on Homework check. Share-homework from class is a separate Send button, not this switch.')
                 ->icon(Heroicon::OutlinedBookOpen)
                 ->schema([
                     Placeholder::make('homework_not_done_template_guide')

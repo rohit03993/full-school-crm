@@ -101,7 +101,7 @@ class ManageMetaWhatsAppSettings extends Page
                         ->columnSpanFull(),
                 ]),
             Section::make('Status')
-                ->description('Enable when credentials are saved. Automations and campaigns use Meta while this is on.')
+                ->description('This is the master switch for the institute. Turn individual messages on or off under Automations.')
                 ->schema([
                     Placeholder::make('routing_banner')
                         ->label('')
@@ -109,7 +109,11 @@ class ManageMetaWhatsAppSettings extends Page
                         ->columnSpanFull(),
                     Toggle::make('enabled')
                         ->label('WhatsApp enabled')
-                        ->helperText('When on, all campaigns and automations (punch, post-call, homework, marks) send via Meta for this institute. Template names must exist under Synced Meta templates below.')
+                        ->helperText('When off, no WhatsApp leaves this CRM (campaigns, attendance, homework, fees, OTP). When on, only the Automations you turn on will send — plus messages staff send by hand.')
+                        ->columnSpanFull(),
+                    Placeholder::make('sending_channels')
+                        ->label('')
+                        ->content(fn (\App\Services\WhatsAppSettingsService $settings): \Illuminate\Support\HtmlString => $settings->renderSendingChannelsSummary())
                         ->columnSpanFull(),
                 ]),
             Section::make('Meta Cloud API credentials')

@@ -189,7 +189,7 @@ class MetaWhatsAppSettingsService
         }
 
         return new HtmlString(
-            '<p class="text-sm text-success-700 dark:text-success-400">WhatsApp routing is <strong>active</strong> for this institute via Meta Cloud API. Campaigns, punch, and automations send from this CRM.</p>'
+            '<p class="text-sm text-success-700 dark:text-success-400">WhatsApp routing is <strong>active</strong> for this institute. Use the list below to see which message types are on. Change them under Automations — this switch does not turn attendance, fees, or homework on by itself.</p>'
         );
     }
 
