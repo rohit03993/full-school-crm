@@ -83,6 +83,7 @@ use App\Support\StudentWhatsAppTemplateComposer;
 use App\Services\FaceVerify\FaceVerifyClient;
 use App\Services\VisitMeetingAssignmentService;
 use App\Services\WhatsAppCampaignService;
+use App\Services\FeeReminderWhatsAppService;
 use App\Services\WhatsAppTemplateCatalog;
 use App\Support\FeePlanCalculator;
 use App\Support\FeePlanSubmissionGuard;
@@ -93,6 +94,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
+use Illuminate\Validation\ValidationException;
 use Filament\Pages\Page;
 use Filament\Panel;
 use Filament\Schemas\Components\Tabs;
@@ -2429,6 +2431,53 @@ class StudentProfilePage extends Page
                 ->color('gray')
                 ->button()
                 ->outlined(),
+            Action::make('sendFeeReminder')
+                ->label('Send fee reminder')
+                ->icon('heroicon-o-chat-bubble-left-ellipsis')
+                ->button()
+                ->color('warning')
+                ->outlined()
+                ->modalHeading('Send fee reminder on WhatsApp?')
+                ->modalDescription(function (): string {
+                    $preview = app(FeeReminderWhatsAppService::class)->previewForStudent($this->record);
+
+                    if (! $preview) {
+                        return 'No pending installment with a due date. Nothing will be sent.';
+                    }
+
+                    $mobile = $preview['mobile'] ?: 'no mobile on file';
+                    $stage = \App\Enums\FeeReminderStage::tryFrom((string) $preview['stage'])?->label() ?? $preview['stage'];
+
+                    return "To: {$mobile}\nStudent installment: {$preview['installment_label']}\nAmount: ₹{$preview['pending_amount']}\nDue: {$preview['due_date']}\nTemplate stage: {$stage}\n\nThis sends immediately (does not wait for the daily job).";
+                })
+                ->modalSubmitActionLabel('Send now')
+                ->requiresConfirmation()
+                ->action(function (): void {
+                    try {
+                        $result = app(FeeReminderWhatsAppService::class)->sendManual(
+                            $this->record,
+                            Auth::user(),
+                        );
+                    } catch (ValidationException $exception) {
+                        Notification::make()
+                            ->title('Could not send fee reminder')
+                            ->body(collect($exception->errors())->flatten()->first() ?? 'Check WhatsApp automations and the parent mobile.')
+                            ->danger()
+                            ->send();
+
+                        return;
+                    }
+
+                    Notification::make()
+                        ->title('Fee reminder queued')
+                        ->body('WhatsApp will go to the parent mobile. Queued: '.$result['queued'])
+                        ->success()
+                        ->send();
+                })
+                ->visible(fn (): bool => $this->profileTab === 'fees'
+                    && $this->licensed(LicenseFeature::WhatsApp)
+                    && $this->userCan(CrmPermission::FeesCollect)
+                    && $this->record->activeEnrollment?->feeStructure !== null),
             Action::make('addVisit')
                 ->label('Add Visit')
                 ->icon('heroicon-o-plus-circle')

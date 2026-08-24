@@ -60,10 +60,27 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
 
         $this->assertCount(4, $rows);
         $this->assertSame('Institute name', $rows[0]['label']);
-        $this->assertSame('B.D.M. Kanya Degree College', $rows[0]['example']);
+        $this->assertSame('Springdale Public School', $rows[0]['example']);
         $this->assertSame('Student name', $rows[1]['label']);
         $this->assertSame('Pending amount', $rows[2]['label']);
         $this->assertSame('Due date', $rows[3]['label']);
+    }
+
+    public function test_upcoming_and_due_preset_names_fill_distinct_bodies(): void
+    {
+        $upcoming = FeeReminderWhatsAppTemplate::formPresetForName('fee_reminder_upcoming');
+        $due = FeeReminderWhatsAppTemplate::formPresetForName('fee_reminder_due');
+        $overdue = FeeReminderWhatsAppTemplate::formPresetForName('fee_reminder_overdue');
+
+        $this->assertNotNull($upcoming);
+        $this->assertNotNull($due);
+        $this->assertNotNull($overdue);
+        $this->assertSame(FeeReminderWhatsAppTemplate::BODY_UPCOMING, $upcoming['body_text']);
+        $this->assertSame(FeeReminderWhatsAppTemplate::BODY_DUE, $due['body_text']);
+        $this->assertSame(FeeReminderWhatsAppTemplate::BODY_OVERDUE, $overdue['body_text']);
+        $this->assertStringContainsString('Please pay on or before the due date', $upcoming['body_text']);
+        $this->assertStringContainsString('Please complete the payment today', $due['body_text']);
+        $this->assertStringContainsString('The due date has passed', $overdue['body_text']);
     }
 
     public function test_homework_not_done_body_uses_homework_sample_labels(): void

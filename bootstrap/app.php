@@ -45,7 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('crm:cleanup')->dailyAt('03:00');
         $schedule->command('crm:backup')->dailyAt((string) config('crm-backup.schedule_at', '02:15'));
         $schedule->command('crm:process-late-fees')->dailyAt('00:30');
-        $schedule->command('crm:send-fee-reminders')->dailyAt('09:00');
+        $schedule->command('crm:send-fee-reminders')->everyMinute()->withoutOverlapping();
         $schedule->command('crm:send-push-followup-digest')->dailyAt('08:30');
         $schedule->command('attendance:process-punches')->everyMinute();
         $schedule->command('attendance:auto-out')->everyMinute();

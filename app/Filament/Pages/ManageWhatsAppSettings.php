@@ -215,7 +215,7 @@ class ManageWhatsAppSettings extends Page
                 ])
                 ->columns(2),
             Section::make('Parents — fee reminders')
-                ->description('Daily overdue installment messages. Turn on here even if attendance is off.')
+                ->description('Automatic WhatsApp on the parent mobile. Upcoming = N days before due. Due today = on the due date. Overdue = after due date. Staff can also send from the student Fees tab.')
                 ->icon(Heroicon::OutlinedBanknotes)
                 ->schema([
                     Placeholder::make('fee_reminder_template_guide')
@@ -223,16 +223,49 @@ class ManageWhatsAppSettings extends Page
                         ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderFeeReminderTemplateGuide())
                         ->columnSpanFull(),
                     Toggle::make('fee_reminder_autosend_enabled')
-                        ->label('Send daily fee reminders')
-                        ->helperText('Runs at 09:00 via scheduler (`crm:send-fee-reminders`). Same student is not reminded again within the cooldown in config/fees.php.')
+                        ->label('Send automatic fee reminders')
+                        ->helperText('Master switch for the three stages below. Scheduler runs hourly and sends once per day at the time you set.')
                         ->columnSpanFull(),
-                    Select::make('fee_reminder_live_campaign_id')
-                        ->label('Fee reminder live campaign')
+                    TextInput::make('fee_reminder_days_before')
+                        ->label('Days before due date')
+                        ->numeric()
+                        ->minValue(1)
+                        ->maxValue(14)
+                        ->helperText('Example: 2 = 48 hours before. Due 27 Aug → send on 25 Aug.'),
+                    TextInput::make('fee_reminder_send_time')
+                        ->label('Send time')
+                        ->placeholder('10:00')
+                        ->helperText('24-hour clock, institute timezone (e.g. 10:00).'),
+                    Toggle::make('fee_reminder_upcoming_enabled')
+                        ->label('Upcoming (before due date)')
+                        ->columnSpanFull(),
+                    Select::make('fee_reminder_upcoming_live_campaign_id')
+                        ->label('Upcoming live campaign')
                         ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Map {{1}} institute.name, {{2}} student.name, {{3}} fee.pending_amount, {{4}} fee.due_date — then Go live.'),
+                        ->helperText('Template fee_reminder_upcoming. Map institute, student, amount, due date.'),
+                    Toggle::make('fee_reminder_due_enabled')
+                        ->label('Due today')
+                        ->columnSpanFull(),
+                    Select::make('fee_reminder_due_live_campaign_id')
+                        ->label('Due-today live campaign')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Template fee_reminder_due.'),
+                    Toggle::make('fee_reminder_overdue_enabled')
+                        ->label('Overdue')
+                        ->columnSpanFull(),
+                    Select::make('fee_reminder_overdue_live_campaign_id')
+                        ->label('Overdue live campaign')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Template fee_reminder_overdue (or fee_reminder). Same student is not reminded again within the cooldown in config/fees.php.'),
                 ])
                 ->columns(2),
             Section::make('Parents — homework not done')

@@ -11,6 +11,7 @@ class FeeReminderLog extends Model
         'student_id',
         'fee_installment_id',
         'whatsapp_campaign_id',
+        'stage',
         'sent_at',
     ];
 

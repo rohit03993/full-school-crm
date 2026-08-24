@@ -43,13 +43,15 @@ return [
     |--------------------------------------------------------------------------
     |
     | Requires an approved Meta template mapped in WhatsApp → Automations.
-    | Scheduled via `crm:send-fee-reminders` (daily).
+    | Scheduled via `crm:send-fee-reminders` (every minute; sends once per day at send_time).
     |
     */
 
     'reminder' => [
         'min_days_overdue' => (int) env('FEE_REMINDER_MIN_DAYS_OVERDUE', 1),
         'cooldown_days' => (int) env('FEE_REMINDER_COOLDOWN_DAYS', 7),
+        'days_before_due' => (int) env('FEE_REMINDER_DAYS_BEFORE', 2),
+        'send_time' => env('FEE_REMINDER_SEND_TIME', '10:00'),
     ],
 
     /*

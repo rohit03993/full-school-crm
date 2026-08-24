@@ -110,7 +110,7 @@ class MetaWhatsAppTemplateResource extends Resource
                     .'<div class="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-sm dark:border-amber-500/20 dark:bg-amber-500/5">'
                     .'<p class="font-bold text-gray-950 dark:text-white">Known CRM presets (optional)</p>'
                     .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
-                    .'Name <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkNotDoneWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkShareWhatsAppTemplate::NAME).'</code> / <code class="text-xs">homework_update</code>, <code class="text-xs">'.e(CombinedHomeworkWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(StaffPunchWhatsAppTemplate::IN_NAME).'</code> / <code class="text-xs">'.e(StaffPunchWhatsAppTemplate::OUT_NAME).'</code>, or <code class="text-xs">'.e(LoginOtpWhatsAppTemplate::NAME).'</code>, leave body blank and blur the name — body + samples auto-fill. <strong>login_otp</strong> is submitted as Authentication (Copy code), not Utility.'
+                    .'Name <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::UPCOMING_NAME).'</code>, <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::DUE_NAME).'</code>, <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::OVERDUE_NAME).'</code> (or <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>), <code class="text-xs">'.e(HomeworkNotDoneWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkShareWhatsAppTemplate::NAME).'</code> / <code class="text-xs">homework_update</code>, <code class="text-xs">'.e(CombinedHomeworkWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(StaffPunchWhatsAppTemplate::IN_NAME).'</code> / <code class="text-xs">'.e(StaffPunchWhatsAppTemplate::OUT_NAME).'</code>, or <code class="text-xs">'.e(LoginOtpWhatsAppTemplate::NAME).'</code>, leave body blank and blur the name — body + samples auto-fill. <strong>login_otp</strong> is submitted as Authentication (Copy code), not Utility.'
                     .'</p></div></div>'
                 ))
                 ->columnSpanFull(),
@@ -118,16 +118,16 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->label('Template name')
                 ->required()
                 ->maxLength(64)
-                ->helperText('Custom names are fine. Presets: '.FeeReminderWhatsAppTemplate::NAME.', '.HomeworkNotDoneWhatsAppTemplate::NAME.', '.HomeworkShareWhatsAppTemplate::NAME.', '.CombinedHomeworkWhatsAppTemplate::NAME.', '.StaffPunchWhatsAppTemplate::IN_NAME.', '.StaffPunchWhatsAppTemplate::OUT_NAME.', '.LoginOtpWhatsAppTemplate::NAME)
+                ->helperText('Custom names are fine. Fee reminder presets: '.FeeReminderWhatsAppTemplate::UPCOMING_NAME.', '.FeeReminderWhatsAppTemplate::DUE_NAME.', '.FeeReminderWhatsAppTemplate::OVERDUE_NAME.'. Also: '.HomeworkNotDoneWhatsAppTemplate::NAME.', '.HomeworkShareWhatsAppTemplate::NAME.', '.CombinedHomeworkWhatsAppTemplate::NAME.', '.StaffPunchWhatsAppTemplate::IN_NAME.', '.StaffPunchWhatsAppTemplate::OUT_NAME.', '.LoginOtpWhatsAppTemplate::NAME)
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
                     $normalized = MetaWhatsAppTemplateBuilder::normalizeName((string) $state);
                     $set('name', $normalized);
 
-                    if (FeeReminderWhatsAppTemplate::looksLikeName($normalized)) {
-                        $set('category', FeeReminderWhatsAppTemplate::CATEGORY);
-                        $set('body_text', FeeReminderWhatsAppTemplate::BODY);
-                        $set('body_variable_samples', FeeReminderWhatsAppTemplate::sampleRows());
+                    if ($preset = FeeReminderWhatsAppTemplate::formPresetForName($normalized)) {
+                        $set('category', $preset['category']);
+                        $set('body_text', $preset['body_text']);
+                        $set('body_variable_samples', $preset['body_variable_samples']);
 
                         return;
                     }

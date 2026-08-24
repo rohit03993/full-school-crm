@@ -11,7 +11,7 @@ class SendFeeRemindersCommand extends Command
 {
     protected $signature = 'crm:send-fee-reminders';
 
-    protected $description = 'Queue WhatsApp fee reminders and PWA fee push notifications for overdue installments';
+    protected $description = 'Queue WhatsApp fee reminders (upcoming, due today, overdue) and PWA fee push notifications';
 
     public function handle(FeeReminderWhatsAppService $reminders, WebPushService $push): int
     {

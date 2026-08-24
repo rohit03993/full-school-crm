@@ -258,13 +258,10 @@ class WhatsAppTemplateParamMappingInferrer
     public static function feeReminderDefaults(int $paramCount): array
     {
         $defaults = [
-            0 => 'student.name',
-            1 => 'fee.pending_amount',
-            2 => 'fee.due_date',
-            3 => 'institute.name',
-            4 => 'fee.installment_label',
-            5 => 'fee.days_overdue',
-            6 => 'fee.penalty_pending',
+            0 => 'institute.name',
+            1 => 'student.name',
+            2 => 'fee.pending_amount',
+            3 => 'fee.due_date',
         ];
 
         $sources = [];

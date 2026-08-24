@@ -25,7 +25,16 @@ class WhatsAppSettingsService
             'postcall_autosend_enabled' => (bool) Setting::getValue('whatsapp.postcall_autosend_enabled', false),
             'postcall_autosend_live_campaign_id' => Setting::getValue('whatsapp.postcall_autosend_live_campaign_id'),
             'fee_reminder_autosend_enabled' => (bool) Setting::getValue('whatsapp.fee_reminder_autosend_enabled', false),
+            'fee_reminder_upcoming_enabled' => Setting::getValue('whatsapp.fee_reminder_upcoming_enabled', '0') === '1',
+            'fee_reminder_due_enabled' => Setting::getValue('whatsapp.fee_reminder_due_enabled', '0') === '1',
+            'fee_reminder_overdue_enabled' => Setting::getValue('whatsapp.fee_reminder_overdue_enabled', '1') === '1',
+            'fee_reminder_days_before' => (int) Setting::getValue('whatsapp.fee_reminder_days_before', 2),
+            'fee_reminder_send_time' => (string) Setting::getValue('whatsapp.fee_reminder_send_time', '10:00'),
             'fee_reminder_live_campaign_id' => Setting::getValue('whatsapp.fee_reminder_live_campaign_id'),
+            'fee_reminder_upcoming_live_campaign_id' => Setting::getValue('whatsapp.fee_reminder_upcoming_live_campaign_id'),
+            'fee_reminder_due_live_campaign_id' => Setting::getValue('whatsapp.fee_reminder_due_live_campaign_id'),
+            'fee_reminder_overdue_live_campaign_id' => Setting::getValue('whatsapp.fee_reminder_overdue_live_campaign_id')
+                ?: Setting::getValue('whatsapp.fee_reminder_live_campaign_id'),
             'homework_not_done_autosend_enabled' => (bool) Setting::getValue('whatsapp.homework_not_done_autosend_enabled', false),
             'homework_not_done_live_campaign_id' => Setting::getValue('whatsapp.homework_not_done_live_campaign_id'),
             'attendance_autosend_enabled' => (bool) Setting::getValue('whatsapp.attendance_autosend_enabled', false),
@@ -75,7 +84,7 @@ class WhatsAppSettingsService
             [
                 'key' => 'fees',
                 'label' => 'Fee reminders',
-                'hint' => 'Daily overdue installment messages',
+                'hint' => 'Upcoming, due today, and overdue — set days-before and send time in Automations',
                 'enabled' => (bool) Setting::getValue('whatsapp.fee_reminder_autosend_enabled', false),
             ],
             [
@@ -167,8 +176,50 @@ class WhatsAppSettingsService
             'whatsapp',
         );
         Setting::setValue(
+            'whatsapp.fee_reminder_upcoming_enabled',
+            ! empty($data['fee_reminder_upcoming_enabled']) ? '1' : '0',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.fee_reminder_due_enabled',
+            ! empty($data['fee_reminder_due_enabled']) ? '1' : '0',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.fee_reminder_overdue_enabled',
+            ! empty($data['fee_reminder_overdue_enabled']) ? '1' : '0',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.fee_reminder_days_before',
+            (string) max(1, min(14, (int) ($data['fee_reminder_days_before'] ?? 2))),
+            'whatsapp',
+        );
+        $sendTime = trim((string) ($data['fee_reminder_send_time'] ?? '10:00'));
+        if (! preg_match('/^([01]?\d|2[0-3]):[0-5]\d$/', $sendTime)) {
+            $sendTime = '10:00';
+        }
+        Setting::setValue('whatsapp.fee_reminder_send_time', $sendTime, 'whatsapp');
+        Setting::setValue(
             'whatsapp.fee_reminder_live_campaign_id',
-            filled($data['fee_reminder_live_campaign_id'] ?? null) ? (string) $data['fee_reminder_live_campaign_id'] : '',
+            filled($data['fee_reminder_overdue_live_campaign_id'] ?? $data['fee_reminder_live_campaign_id'] ?? null)
+                ? (string) ($data['fee_reminder_overdue_live_campaign_id'] ?? $data['fee_reminder_live_campaign_id'])
+                : '',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.fee_reminder_upcoming_live_campaign_id',
+            filled($data['fee_reminder_upcoming_live_campaign_id'] ?? null) ? (string) $data['fee_reminder_upcoming_live_campaign_id'] : '',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.fee_reminder_due_live_campaign_id',
+            filled($data['fee_reminder_due_live_campaign_id'] ?? null) ? (string) $data['fee_reminder_due_live_campaign_id'] : '',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.fee_reminder_overdue_live_campaign_id',
+            filled($data['fee_reminder_overdue_live_campaign_id'] ?? null) ? (string) $data['fee_reminder_overdue_live_campaign_id'] : '',
             'whatsapp',
         );
         Setting::setValue(
@@ -360,8 +411,6 @@ class WhatsAppSettingsService
     {
         $templatesUrl = e(\App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource::getUrl('create'));
         $campaignsUrl = e(\App\Filament\Resources\WhatsAppLiveCampaigns\WhatsAppLiveCampaignResource::getUrl('create'));
-        $body = e(FeeReminderWhatsAppTemplate::BODY);
-        $name = e(FeeReminderWhatsAppTemplate::NAME);
 
         $mappingRows = '';
         foreach (FeeReminderWhatsAppTemplate::variables() as $index => $variable) {
@@ -373,16 +422,30 @@ class WhatsAppSettingsService
                 .'</tr>';
         }
 
+        $blocks = [
+            [FeeReminderWhatsAppTemplate::UPCOMING_NAME, 'Before due date', FeeReminderWhatsAppTemplate::BODY_UPCOMING],
+            [FeeReminderWhatsAppTemplate::DUE_NAME, 'On due date', FeeReminderWhatsAppTemplate::BODY_DUE],
+            [FeeReminderWhatsAppTemplate::OVERDUE_NAME, 'After due date ('.$FeeReminderWhatsAppTemplate::NAME.' also works)', FeeReminderWhatsAppTemplate::BODY_OVERDUE],
+        ];
+
+        $bodies = '';
+        foreach ($blocks as [$name, $when, $body]) {
+            $bodies .= '<div class="px-4 py-3 border-t border-primary-200/60 dark:border-primary-500/20">'
+                .'<p class="text-xs font-bold text-gray-950 dark:text-white"><code>'.e($name).'</code> — '.e($when).'</p>'
+                .'<pre class="mt-2 whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.e($body).'</pre>'
+                .'</div>';
+        }
+
         return new HtmlString(
             '<div class="overflow-hidden rounded-xl border border-primary-200/60 bg-primary-50/40 dark:border-primary-500/20 dark:bg-primary-500/5">'
-            .'<div class="border-b border-primary-200/60 px-4 py-3 dark:border-primary-500/20">'
-            .'<p class="text-sm font-bold text-gray-950 dark:text-white">Required Meta template (copy this)</p>'
+            .'<div class="px-4 py-3">'
+            .'<p class="text-sm font-bold text-gray-950 dark:text-white">Ready-made fee templates (do not rewrite them)</p>'
             .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
-            .'1) <a href="'.$templatesUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">WhatsApp → Templates → New</a> '
-            .'— name <code class="text-xs">'.$name.'</code>, category <strong>Utility</strong>. '
-            .'2) After Meta approves, <a href="'.$campaignsUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Quick campaigns → New</a> '
-            .'— map variables below, Go live. 3) Select that live campaign in the field below.</p></div>'
-            .'<div class="px-4 py-3"><pre class="whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.$body.'</pre></div>'
+            .'1) <a href="'.$templatesUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Templates → New</a> '
+            .'— type each name below, leave body blank, blur — copy auto-fills. Submit to Meta (Utility). '
+            .'2) After APPROVED, <a href="'.$campaignsUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Quick campaigns → New</a> '
+            .'— map the four variables, Go live. 3) Pick those live campaigns in the fields below.</p></div>'
+            .$bodies
             .'<div class="overflow-x-auto border-t border-primary-200/60 dark:border-primary-500/20">'
             .'<table class="w-full min-w-[36rem] text-left text-sm">'
             .'<thead class="bg-white/60 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-black/20 dark:text-gray-400">'

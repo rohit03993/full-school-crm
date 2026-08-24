@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Enums\LeadSource;
 use App\Enums\AdmissionStatus;
 use App\Enums\EnrollmentStatus;
+use App\Enums\FeeReminderStage;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
+use App\Support\FeeReminderWhatsAppTemplate;
 use App\Models\Admission;
 use App\Models\Course;
 use App\Models\Enquiry;
@@ -43,7 +45,7 @@ class FeeReminderWhatsAppTest extends TestCase
 
     public function test_queues_fee_reminders_for_overdue_students(): void
     {
-        $this->travelTo('2026-07-10 09:00:00');
+        $this->travelTo('2026-07-10 10:00:00');
 
         Http::fake([
             'https://graph.facebook.com/*' => Http::response([
@@ -68,6 +70,10 @@ class FeeReminderWhatsAppTest extends TestCase
         ]);
 
         Setting::setValue('whatsapp.fee_reminder_autosend_enabled', '1', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_send_time', '10:00', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_upcoming_enabled', '0', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_due_enabled', '0', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_overdue_enabled', '1', 'whatsapp');
         Setting::setValue('whatsapp.fee_reminder_template_id', (string) $template->id, 'whatsapp');
 
         $service = app(FeeReminderWhatsAppService::class);
@@ -84,6 +90,7 @@ class FeeReminderWhatsAppTest extends TestCase
         $this->assertDatabaseHas('fee_reminder_logs', [
             'student_id' => $student->id,
             'fee_installment_id' => $installment->id,
+            'stage' => 'overdue',
         ]);
 
         $params = app(WhatsAppTemplateParamResolver::class)->resolveAll(
@@ -101,7 +108,7 @@ class FeeReminderWhatsAppTest extends TestCase
 
     public function test_skips_students_within_cooldown(): void
     {
-        $this->travelTo('2026-07-10 09:00:00');
+        $this->travelTo('2026-07-10 10:00:00');
 
         $staff = $this->createStaffUser();
         [$student, $installment] = $this->createOverdueStudent('9876543211');
@@ -109,6 +116,7 @@ class FeeReminderWhatsAppTest extends TestCase
         FeeReminderLog::query()->create([
             'student_id' => $student->id,
             'fee_installment_id' => $installment->id,
+            'stage' => 'overdue',
             'sent_at' => now()->subDays(2),
         ]);
 
@@ -120,12 +128,142 @@ class FeeReminderWhatsAppTest extends TestCase
         ]);
 
         Setting::setValue('whatsapp.fee_reminder_autosend_enabled', '1', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_send_time', '10:00', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_upcoming_enabled', '0', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_due_enabled', '0', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_overdue_enabled', '1', 'whatsapp');
         Setting::setValue('whatsapp.fee_reminder_template_id', (string) $template->id, 'whatsapp');
 
         $result = app(FeeReminderWhatsAppService::class)->maybeQueueDailyReminders($staff);
 
         $this->assertSame(0, $result['queued']);
         $this->assertDatabaseCount('whatsapp_campaigns', 0);
+    }
+
+    public function test_queues_upcoming_reminder_two_days_before_due(): void
+    {
+        $this->travelTo('2026-07-25 10:00:00');
+
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response([
+                'messages' => [['id' => 'wamid.FEEUP']],
+            ], 200),
+        ]);
+
+        $staff = $this->createStaffUser();
+        [$student, $installment] = $this->createOverdueStudent('9876543299');
+        $installment->update(['due_date' => '2026-07-27']);
+
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'fee_reminder_upcoming',
+            'param_count' => 4,
+            'param_mappings' => [
+                'institute.name',
+                'student.name',
+                'fee.pending_amount',
+                'fee.due_date',
+            ],
+            'body' => FeeReminderWhatsAppTemplate::BODY_UPCOMING,
+            'is_active' => true,
+        ]);
+
+        Setting::setValue('whatsapp.fee_reminder_autosend_enabled', '1', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_send_time', '10:00', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_days_before', '2', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_upcoming_enabled', '1', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_due_enabled', '0', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_overdue_enabled', '0', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_template_id', (string) $template->id, 'whatsapp');
+
+        $service = app(FeeReminderWhatsAppService::class);
+        $this->assertCount(1, $service->eligibleStudentsForStage(FeeReminderStage::Upcoming));
+
+        $result = $service->maybeQueueDailyReminders($staff);
+
+        $this->assertSame(1, $result['queued'], $result['reason'] ?? 'unknown');
+        $this->assertDatabaseHas('fee_reminder_logs', [
+            'student_id' => $student->id,
+            'stage' => 'upcoming',
+        ]);
+    }
+
+    public function test_queues_due_today_reminder(): void
+    {
+        $this->travelTo('2026-07-27 10:00:00');
+
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response([
+                'messages' => [['id' => 'wamid.FEEDUE']],
+            ], 200),
+        ]);
+
+        $staff = $this->createStaffUser();
+        [$student, $installment] = $this->createOverdueStudent('9876543277');
+        $installment->update(['due_date' => '2026-07-27']);
+
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'fee_reminder_due',
+            'param_count' => 4,
+            'param_mappings' => [
+                'institute.name',
+                'student.name',
+                'fee.pending_amount',
+                'fee.due_date',
+            ],
+            'body' => FeeReminderWhatsAppTemplate::BODY_DUE,
+            'is_active' => true,
+        ]);
+
+        Setting::setValue('whatsapp.fee_reminder_autosend_enabled', '1', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_send_time', '10:00', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_upcoming_enabled', '0', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_due_enabled', '1', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_overdue_enabled', '0', 'whatsapp');
+        Setting::setValue('whatsapp.fee_reminder_template_id', (string) $template->id, 'whatsapp');
+
+        $result = app(FeeReminderWhatsAppService::class)->maybeQueueDailyReminders($staff);
+
+        $this->assertSame(1, $result['queued'], $result['reason'] ?? 'unknown');
+        $this->assertDatabaseHas('fee_reminder_logs', [
+            'student_id' => $student->id,
+            'stage' => 'due',
+        ]);
+    }
+
+    public function test_manual_send_queues_for_one_student(): void
+    {
+        $this->travelTo('2026-07-10 11:00:00');
+
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response([
+                'messages' => [['id' => 'wamid.FEEMAN']],
+            ], 200),
+        ]);
+
+        $staff = $this->createStaffUser();
+        [$student] = $this->createOverdueStudent('9876543288');
+
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'fee_reminder_overdue',
+            'param_count' => 4,
+            'param_mappings' => [
+                'institute.name',
+                'student.name',
+                'fee.pending_amount',
+                'fee.due_date',
+            ],
+            'is_active' => true,
+        ]);
+
+        Setting::setValue('whatsapp.fee_reminder_template_id', (string) $template->id, 'whatsapp');
+
+        $result = app(FeeReminderWhatsAppService::class)->sendManual($student, $staff);
+
+        $this->assertSame(1, $result['queued']);
+        $this->assertDatabaseHas('fee_reminder_logs', [
+            'student_id' => $student->id,
+            'stage' => 'manual',
+        ]);
     }
 
     /**
@@ -175,7 +313,7 @@ class FeeReminderWhatsAppTest extends TestCase
             'course_id' => $course->id,
             'status' => EnrollmentStatus::Enrolled,
             'is_active' => true,
-            'enrollment_number' => 'CRM-2026-000001',
+            'enrollment_number' => 'CRM-FEE-'.$student->id,
             'enrolled_at' => now(),
         ]);
 
