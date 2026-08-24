@@ -85,8 +85,14 @@ class PayMiscChargeFormSchema
                         ->required(fn (callable $get): bool => $get('payment_mode') === PaymentMode::Cheque->value),
                     TextInput::make('cheque_number')
                         ->label('Cheque number')
-                        ->numeric()
                         ->maxLength(6)
+                        ->extraInputAttributes([
+                            'maxlength' => '6',
+                            'inputmode' => 'numeric',
+                            'pattern' => '[0-9]{6}',
+                            'autocomplete' => 'off',
+                            'x-on:input' => "\$el.value = \$el.value.replace(/\\D/g, '').slice(0, 6)",
+                        ])
                         ->helperText('Exactly 6 digits.')
                         ->visible(fn (callable $get): bool => $get('payment_mode') === PaymentMode::Cheque->value)
                         ->required(fn (callable $get): bool => $get('payment_mode') === PaymentMode::Cheque->value)
