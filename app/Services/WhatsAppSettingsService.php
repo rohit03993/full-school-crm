@@ -16,6 +16,8 @@ use Illuminate\Support\HtmlString;
 
 class WhatsAppSettingsService
 {
+    public const AUTOMATION_TEMPLATE_PREFIX = 'template:';
+
     /**
      * @return array<string, mixed>
      */
@@ -23,30 +25,32 @@ class WhatsAppSettingsService
     {
         return [
             'postcall_autosend_enabled' => (bool) Setting::getValue('whatsapp.postcall_autosend_enabled', false),
-            'postcall_autosend_live_campaign_id' => Setting::getValue('whatsapp.postcall_autosend_live_campaign_id'),
+            'postcall_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.postcall_autosend_live_campaign_id')),
             'fee_reminder_autosend_enabled' => (bool) Setting::getValue('whatsapp.fee_reminder_autosend_enabled', false),
             'fee_reminder_upcoming_enabled' => Setting::getValue('whatsapp.fee_reminder_upcoming_enabled', '0') === '1',
             'fee_reminder_due_enabled' => Setting::getValue('whatsapp.fee_reminder_due_enabled', '0') === '1',
             'fee_reminder_overdue_enabled' => Setting::getValue('whatsapp.fee_reminder_overdue_enabled', '1') === '1',
             'fee_reminder_days_before' => (int) Setting::getValue('whatsapp.fee_reminder_days_before', 2),
             'fee_reminder_send_time' => (string) Setting::getValue('whatsapp.fee_reminder_send_time', '10:00'),
-            'fee_reminder_live_campaign_id' => Setting::getValue('whatsapp.fee_reminder_live_campaign_id'),
-            'fee_reminder_upcoming_live_campaign_id' => Setting::getValue('whatsapp.fee_reminder_upcoming_live_campaign_id'),
-            'fee_reminder_due_live_campaign_id' => Setting::getValue('whatsapp.fee_reminder_due_live_campaign_id'),
-            'fee_reminder_overdue_live_campaign_id' => Setting::getValue('whatsapp.fee_reminder_overdue_live_campaign_id')
-                ?: Setting::getValue('whatsapp.fee_reminder_live_campaign_id'),
+            'fee_reminder_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.fee_reminder_live_campaign_id')),
+            'fee_reminder_upcoming_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.fee_reminder_upcoming_live_campaign_id')),
+            'fee_reminder_due_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.fee_reminder_due_live_campaign_id')),
+            'fee_reminder_overdue_live_campaign_id' => $this->formTemplateIdFromStored(
+                Setting::getValue('whatsapp.fee_reminder_overdue_live_campaign_id')
+                    ?: Setting::getValue('whatsapp.fee_reminder_live_campaign_id'),
+            ),
             'homework_not_done_autosend_enabled' => (bool) Setting::getValue('whatsapp.homework_not_done_autosend_enabled', false),
-            'homework_not_done_live_campaign_id' => Setting::getValue('whatsapp.homework_not_done_live_campaign_id'),
+            'homework_not_done_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_not_done_live_campaign_id')),
             'attendance_autosend_enabled' => (bool) Setting::getValue('whatsapp.attendance_autosend_enabled', false),
-            'attendance_autosend_live_campaign_id' => Setting::getValue('whatsapp.attendance_autosend_live_campaign_id'),
+            'attendance_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.attendance_autosend_live_campaign_id')),
             'punch_autosend_enabled' => (bool) Setting::getValue('whatsapp.punch_autosend_enabled', true),
-            'punch_in_autosend_live_campaign_id' => Setting::getValue('whatsapp.punch_in_autosend_live_campaign_id'),
-            'punch_out_autosend_live_campaign_id' => Setting::getValue('whatsapp.punch_out_autosend_live_campaign_id'),
-            'punch_manual_in_autosend_live_campaign_id' => Setting::getValue('whatsapp.punch_manual_in_autosend_live_campaign_id'),
-            'punch_manual_out_autosend_live_campaign_id' => Setting::getValue('whatsapp.punch_manual_out_autosend_live_campaign_id'),
+            'punch_in_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.punch_in_autosend_live_campaign_id')),
+            'punch_out_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.punch_out_autosend_live_campaign_id')),
+            'punch_manual_in_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.punch_manual_in_autosend_live_campaign_id')),
+            'punch_manual_out_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.punch_manual_out_autosend_live_campaign_id')),
             'staff_punch_autosend_enabled' => (bool) Setting::getValue('whatsapp.staff_punch_autosend_enabled', false),
-            'staff_punch_in_autosend_live_campaign_id' => Setting::getValue('whatsapp.staff_punch_in_autosend_live_campaign_id'),
-            'staff_punch_out_autosend_live_campaign_id' => Setting::getValue('whatsapp.staff_punch_out_autosend_live_campaign_id'),
+            'staff_punch_in_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.staff_punch_in_autosend_live_campaign_id')),
+            'staff_punch_out_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.staff_punch_out_autosend_live_campaign_id')),
             'campaign_batch_size' => (int) Setting::getValue('whatsapp.campaign_batch_size', config('whatsapp.batch_size', 10)),
             'campaign_batch_delay_seconds' => (int) Setting::getValue(
                 'whatsapp.campaign_next_batch_delay_seconds',
@@ -167,7 +171,7 @@ class WhatsAppSettingsService
         );
         Setting::setValue(
             'whatsapp.postcall_autosend_live_campaign_id',
-            filled($data['postcall_autosend_live_campaign_id'] ?? null) ? (string) $data['postcall_autosend_live_campaign_id'] : '',
+            $this->encodeAutomationTemplateId($data['postcall_autosend_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
@@ -202,24 +206,22 @@ class WhatsAppSettingsService
         Setting::setValue('whatsapp.fee_reminder_send_time', $sendTime, 'whatsapp');
         Setting::setValue(
             'whatsapp.fee_reminder_live_campaign_id',
-            filled($data['fee_reminder_overdue_live_campaign_id'] ?? $data['fee_reminder_live_campaign_id'] ?? null)
-                ? (string) ($data['fee_reminder_overdue_live_campaign_id'] ?? $data['fee_reminder_live_campaign_id'])
-                : '',
+            $this->encodeAutomationTemplateId($data['fee_reminder_overdue_live_campaign_id'] ?? $data['fee_reminder_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
             'whatsapp.fee_reminder_upcoming_live_campaign_id',
-            filled($data['fee_reminder_upcoming_live_campaign_id'] ?? null) ? (string) $data['fee_reminder_upcoming_live_campaign_id'] : '',
+            $this->encodeAutomationTemplateId($data['fee_reminder_upcoming_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
             'whatsapp.fee_reminder_due_live_campaign_id',
-            filled($data['fee_reminder_due_live_campaign_id'] ?? null) ? (string) $data['fee_reminder_due_live_campaign_id'] : '',
+            $this->encodeAutomationTemplateId($data['fee_reminder_due_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
             'whatsapp.fee_reminder_overdue_live_campaign_id',
-            filled($data['fee_reminder_overdue_live_campaign_id'] ?? null) ? (string) $data['fee_reminder_overdue_live_campaign_id'] : '',
+            $this->encodeAutomationTemplateId($data['fee_reminder_overdue_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
@@ -229,7 +231,7 @@ class WhatsAppSettingsService
         );
         Setting::setValue(
             'whatsapp.homework_not_done_live_campaign_id',
-            filled($data['homework_not_done_live_campaign_id'] ?? null) ? (string) $data['homework_not_done_live_campaign_id'] : '',
+            $this->encodeAutomationTemplateId($data['homework_not_done_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
@@ -239,7 +241,7 @@ class WhatsAppSettingsService
         );
         Setting::setValue(
             'whatsapp.attendance_autosend_live_campaign_id',
-            filled($data['attendance_autosend_live_campaign_id'] ?? null) ? (string) $data['attendance_autosend_live_campaign_id'] : '',
+            $this->encodeAutomationTemplateId($data['attendance_autosend_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
@@ -249,22 +251,22 @@ class WhatsAppSettingsService
         );
         Setting::setValue(
             'whatsapp.punch_in_autosend_live_campaign_id',
-            filled($data['punch_in_autosend_live_campaign_id'] ?? null) ? (string) $data['punch_in_autosend_live_campaign_id'] : '',
+            $this->encodeAutomationTemplateId($data['punch_in_autosend_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
             'whatsapp.punch_out_autosend_live_campaign_id',
-            filled($data['punch_out_autosend_live_campaign_id'] ?? null) ? (string) $data['punch_out_autosend_live_campaign_id'] : '',
+            $this->encodeAutomationTemplateId($data['punch_out_autosend_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
             'whatsapp.punch_manual_in_autosend_live_campaign_id',
-            filled($data['punch_manual_in_autosend_live_campaign_id'] ?? null) ? (string) $data['punch_manual_in_autosend_live_campaign_id'] : '',
+            $this->encodeAutomationTemplateId($data['punch_manual_in_autosend_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
             'whatsapp.punch_manual_out_autosend_live_campaign_id',
-            filled($data['punch_manual_out_autosend_live_campaign_id'] ?? null) ? (string) $data['punch_manual_out_autosend_live_campaign_id'] : '',
+            $this->encodeAutomationTemplateId($data['punch_manual_out_autosend_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
@@ -274,12 +276,12 @@ class WhatsAppSettingsService
         );
         Setting::setValue(
             'whatsapp.staff_punch_in_autosend_live_campaign_id',
-            filled($data['staff_punch_in_autosend_live_campaign_id'] ?? null) ? (string) $data['staff_punch_in_autosend_live_campaign_id'] : '',
+            $this->encodeAutomationTemplateId($data['staff_punch_in_autosend_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
             'whatsapp.staff_punch_out_autosend_live_campaign_id',
-            filled($data['staff_punch_out_autosend_live_campaign_id'] ?? null) ? (string) $data['staff_punch_out_autosend_live_campaign_id'] : '',
+            $this->encodeAutomationTemplateId($data['staff_punch_out_autosend_live_campaign_id'] ?? null),
             'whatsapp',
         );
         Setting::setValue(
@@ -312,21 +314,70 @@ class WhatsAppSettingsService
             ->all();
     }
 
-    public function resolveAutomationTemplate(?string $liveCampaignId, ?string $legacyTemplateId = null): ?WhatsAppTemplate
+    public function resolveAutomationTemplate(?string $storedPointer, ?string $legacyTemplateId = null): ?WhatsAppTemplate
     {
-        $templateId = app(WhatsAppLiveCampaignService::class)->whatsAppTemplateIdForCampaign(
-            filled($liveCampaignId) ? (int) $liveCampaignId : null,
-        );
+        if (is_string($storedPointer) && str_starts_with($storedPointer, self::AUTOMATION_TEMPLATE_PREFIX)) {
+            return $this->activeTemplate((int) substr($storedPointer, strlen(self::AUTOMATION_TEMPLATE_PREFIX)));
+        }
 
-        if ($templateId) {
-            return WhatsAppTemplate::query()->whereKey($templateId)->where('is_active', true)->first();
+        if (filled($storedPointer) && ctype_digit((string) $storedPointer)) {
+            $fromLive = app(WhatsAppLiveCampaignService::class)->whatsAppTemplateIdForCampaign((int) $storedPointer);
+
+            if ($fromLive) {
+                $template = $this->activeTemplate($fromLive);
+
+                if ($template) {
+                    return $template;
+                }
+            }
+
+            $direct = $this->activeTemplate((int) $storedPointer);
+
+            if ($direct) {
+                return $direct;
+            }
         }
 
         if (filled($legacyTemplateId)) {
-            return WhatsAppTemplate::query()->whereKey($legacyTemplateId)->where('is_active', true)->first();
+            return $this->activeTemplate((int) $legacyTemplateId);
         }
 
         return null;
+    }
+
+    public function encodeAutomationTemplateId(mixed $templateId): string
+    {
+        if (! filled($templateId)) {
+            return '';
+        }
+
+        $raw = (string) $templateId;
+
+        if (str_starts_with($raw, self::AUTOMATION_TEMPLATE_PREFIX)) {
+            return $raw;
+        }
+
+        return self::AUTOMATION_TEMPLATE_PREFIX.(int) $raw;
+    }
+
+    public function formTemplateIdFromStored(mixed $stored): ?string
+    {
+        if (! filled($stored)) {
+            return null;
+        }
+
+        $template = $this->resolveAutomationTemplate((string) $stored, null);
+
+        return $template ? (string) $template->id : null;
+    }
+
+    protected function activeTemplate(int $id): ?WhatsAppTemplate
+    {
+        if ($id < 1) {
+            return null;
+        }
+
+        return WhatsAppTemplate::query()->whereKey($id)->where('is_active', true)->first();
     }
 
     /**
@@ -393,24 +444,24 @@ class WhatsAppSettingsService
 
         if ($liveCount === 0) {
             return new HtmlString(
-                '<p class="text-sm text-warning-600 dark:text-warning-400">No live campaigns yet. Create templates under '
+                '<p class="text-sm text-gray-600 dark:text-gray-300">Automations below use <strong>templates</strong> (create them under '
                 .e(CrmNavigation::whatsAppMenu('Templates'))
-                .', then create campaigns under '
+                .', submit to Meta, then pick them here). '
                 .e(CrmNavigation::whatsAppMenu('Live campaigns'))
-                .' and click <strong>Go live</strong>.</p>'
+                .' is only needed for the external API key / campaignName POST — not for attendance, fees, or homework automations.</p>'
             );
         }
 
         return new HtmlString(
             '<p class="text-sm text-gray-600 dark:text-gray-300">'
-            .$liveCount.' live campaign(s) available. Each automation below must pick one of these — the linked template and student name mapping are used when sending.</p>'
+            .'Pick a <strong>template</strong> for each automation below. '
+            .$liveCount.' live API campaign(s) still exist for external POST triggers (Generate API key) — they are not required for these switches.</p>'
         );
     }
 
     public function renderFeeReminderTemplateGuide(): HtmlString
     {
         $templatesUrl = e(\App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource::getUrl('create'));
-        $campaignsUrl = e(\App\Filament\Resources\WhatsAppLiveCampaigns\WhatsAppLiveCampaignResource::getUrl('create'));
 
         $mappingRows = '';
         foreach (FeeReminderWhatsAppTemplate::variables() as $index => $variable) {
@@ -443,8 +494,8 @@ class WhatsAppSettingsService
             .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
             .'1) <a href="'.$templatesUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Templates → New</a> '
             .'— type each name below, leave body blank, blur — copy auto-fills. Submit to Meta (Utility). '
-            .'2) After APPROVED, <a href="'.$campaignsUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Quick campaigns → New</a> '
-            .'— map the four variables, Go live. 3) Pick those live campaigns in the fields below.</p></div>'
+            .'2) After APPROVED, open the template and map the four variables. '
+            .'3) Pick those templates in the fields below.</p></div>'
             .$bodies
             .'<div class="overflow-x-auto border-t border-primary-200/60 dark:border-primary-500/20">'
             .'<table class="w-full min-w-[36rem] text-left text-sm">'
@@ -457,7 +508,6 @@ class WhatsAppSettingsService
     public function renderHomeworkNotDoneTemplateGuide(): HtmlString
     {
         $templatesUrl = e(\App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource::getUrl('create'));
-        $campaignsUrl = e(\App\Filament\Resources\WhatsAppLiveCampaigns\WhatsAppLiveCampaignResource::getUrl('create'));
         $checkUrl = e(\App\Filament\Pages\HomeworkCheckPage::getUrl());
         $body = e(HomeworkNotDoneWhatsAppTemplate::BODY);
         $name = e(HomeworkNotDoneWhatsAppTemplate::NAME);
@@ -480,7 +530,7 @@ class WhatsAppSettingsService
             .'Separate from share-homework and attendance templates. '
             .'1) <a href="'.$templatesUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Templates → New</a> '
             .'name <code class="text-xs">'.$name.'</code>, Utility. '
-            .'2) Live quick campaign with mapping below. '
+            .'2) After APPROVED, map variables on the template and pick it below. '
             .'3) Teachers open <a href="'.$checkUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Academics → Homework check</a>, select students, Submit Not Done, then confirm WhatsApp count.</p></div>'
             .'<div class="px-4 py-3"><pre class="whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.$body.'</pre></div>'
             .'<div class="overflow-x-auto border-t border-sky-200/60 dark:border-sky-500/20">'
@@ -494,7 +544,6 @@ class WhatsAppSettingsService
     public function renderStaffPunchAutomationGuide(): HtmlString
     {
         $templatesUrl = e(\App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource::getUrl('create'));
-        $campaignsUrl = e(\App\Filament\Resources\WhatsAppLiveCampaigns\WhatsAppLiveCampaignResource::getUrl('create'));
         $staffUrl = e(StaffAttendancePage::getUrl());
         $inName = e(StaffPunchWhatsAppTemplate::IN_NAME);
         $outName = e(StaffPunchWhatsAppTemplate::OUT_NAME);
@@ -519,8 +568,8 @@ class WhatsAppSettingsService
             .'Goes to the staff mobile on file. Auto-out at night does <strong>not</strong> send. '
             .'1) <a href="'.$templatesUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Templates → New</a> '
             .'name <code class="text-xs">'.$inName.'</code> and <code class="text-xs">'.$outName.'</code> (Utility), submit, Sync after Meta approves. '
-            .'2) <a href="'.$campaignsUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Live campaigns</a> — one per template, map vars below, Go live. '
-            .'3) Pick those campaigns here and turn the switch on. Check names on <a href="'.$staffUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Staff attendance</a>.</p></div>'
+            .'2) Map vars below on each template. '
+            .'3) Pick those templates here and turn the switch on. Check names on <a href="'.$staffUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Staff attendance</a>.</p></div>'
             .'<div class="grid gap-3 px-4 py-3 sm:grid-cols-2">'
             .'<div><p class="mb-1 text-[11px] font-bold uppercase tracking-wide text-gray-500">'.$inName.'</p>'
             .'<pre class="whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.$inBody.'</pre></div>'

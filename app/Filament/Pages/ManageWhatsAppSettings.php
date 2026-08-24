@@ -103,8 +103,8 @@ class ManageWhatsAppSettings extends Page
                     .'</p>'
                 ))
                 ->columnSpanFull(),
-            Section::make('Live campaigns for automations')
-                ->description(fn (): string => 'Pick a **live** campaign from '.CrmNavigation::whatsAppMenu('Live campaigns').'. Each campaign links to an approved Meta template.')
+            Section::make('Templates for automations')
+                ->description('Pick an approved, synced template for each message type below. Live API campaigns are only for external POST / API key triggers — not required here.')
                 ->schema([
                     Placeholder::make('live_campaigns_notice')
                         ->label('')
@@ -129,14 +129,14 @@ class ManageWhatsAppSettings extends Page
                         ->columnSpanFull(),
                     Select::make('punch_in_autosend_live_campaign_id')
                         ->label('Biometric check-in (IN)')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
                         ->helperText('When student punches IN at the gate/device.'),
                     Select::make('punch_out_autosend_live_campaign_id')
                         ->label('Biometric check-out (OUT)')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
@@ -147,29 +147,29 @@ class ManageWhatsAppSettings extends Page
                         ->columnSpanFull(),
                     Select::make('punch_manual_in_autosend_live_campaign_id')
                         ->label('Manual check-in (IN)')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Staff marks IN. Leave blank to reuse Biometric IN campaign.'),
+                        ->helperText('Staff marks IN. Leave blank to reuse the Biometric IN template.'),
                     Select::make('punch_manual_out_autosend_live_campaign_id')
                         ->label('Manual check-out (OUT)')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Staff marks OUT. Leave blank to reuse Biometric OUT campaign.'),
+                        ->helperText('Staff marks OUT. Leave blank to reuse the Biometric OUT template.'),
                     Toggle::make('attendance_autosend_enabled')
                         ->label('Legacy: batch-save template (optional)')
                         ->helperText('Old roll-call Present flow only. Manual IN/OUT on Attendance uses the four punch templates above.')
                         ->columnSpanFull(),
                     Select::make('attendance_autosend_live_campaign_id')
-                        ->label('Fallback attendance campaign')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->label('Fallback attendance template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Used when a specific IN/OUT campaign is left blank.'),
+                        ->helperText('Used when a specific IN/OUT template is left blank.'),
                 ])
                 ->columns(2),
             Section::make('Staff — attendance')
@@ -186,14 +186,14 @@ class ManageWhatsAppSettings extends Page
                         ->columnSpanFull(),
                     Select::make('staff_punch_in_autosend_live_campaign_id')
                         ->label('Staff biometric check-in (IN)')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
                         ->helperText('Map {{1}} staff.name, {{2}} attendance.time, {{3}} attendance.date, {{4}} institute.name.'),
                     Select::make('staff_punch_out_autosend_live_campaign_id')
                         ->label('Staff biometric check-out (OUT)')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
@@ -207,8 +207,8 @@ class ManageWhatsAppSettings extends Page
                     Toggle::make('postcall_autosend_enabled')
                         ->label('Send WhatsApp after a logged call'),
                     Select::make('postcall_autosend_live_campaign_id')
-                        ->label('Live campaign')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->label('Template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false),
@@ -240,8 +240,8 @@ class ManageWhatsAppSettings extends Page
                         ->label('Upcoming (before due date)')
                         ->columnSpanFull(),
                     Select::make('fee_reminder_upcoming_live_campaign_id')
-                        ->label('Upcoming live campaign')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->label('Upcoming template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
@@ -250,8 +250,8 @@ class ManageWhatsAppSettings extends Page
                         ->label('Due today')
                         ->columnSpanFull(),
                     Select::make('fee_reminder_due_live_campaign_id')
-                        ->label('Due-today live campaign')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->label('Due-today template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
@@ -260,8 +260,8 @@ class ManageWhatsAppSettings extends Page
                         ->label('Overdue')
                         ->columnSpanFull(),
                     Select::make('fee_reminder_overdue_live_campaign_id')
-                        ->label('Overdue live campaign')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->label('Overdue template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
@@ -281,8 +281,8 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('Never sends when status is Done.')
                         ->columnSpanFull(),
                     Select::make('homework_not_done_live_campaign_id')
-                        ->label('Homework not done live campaign')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->liveCampaignOptions())
+                        ->label('Homework not done template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
