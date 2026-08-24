@@ -476,7 +476,7 @@ class WhatsAppSettingsService
         $blocks = [
             [FeeReminderWhatsAppTemplate::UPCOMING_NAME, 'Before due date', FeeReminderWhatsAppTemplate::BODY_UPCOMING],
             [FeeReminderWhatsAppTemplate::DUE_NAME, 'On due date', FeeReminderWhatsAppTemplate::BODY_DUE],
-            [FeeReminderWhatsAppTemplate::OVERDUE_NAME, 'After due date ('.$FeeReminderWhatsAppTemplate::NAME.' also works)', FeeReminderWhatsAppTemplate::BODY_OVERDUE],
+            [FeeReminderWhatsAppTemplate::OVERDUE_NAME, 'After due date ('.FeeReminderWhatsAppTemplate::NAME.' also works)', FeeReminderWhatsAppTemplate::BODY_OVERDUE],
         ];
 
         $bodies = '';
