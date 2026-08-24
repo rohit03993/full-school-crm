@@ -101,7 +101,8 @@ class ManageWhatsAppSettings extends Page
                 ->content(new HtmlString(
                     '<p class="text-sm text-gray-600 dark:text-gray-300">'
                     .'<strong>WhatsApp setup</strong> is the master switch for the institute. Use the tabs below — only one message type is shown at a time. '
-                    .'Example: keep Setup on, turn <strong>Attendance to parents</strong> off, and leave fees and homework on. '
+                    .'<strong>Student attendance</strong> = student IN/OUT, WhatsApp to parents. '
+                    .'<strong>Staff attendance</strong> = staff punch, WhatsApp to the staff phone. '
                     .'Pick an approved template on each tab. Live API campaigns are only for external POST / API key, not these automations.'
                     .'</p>'
                 ))
@@ -114,19 +115,19 @@ class ManageWhatsAppSettings extends Page
                 ->persistTabInQueryString('automation')
                 ->columnSpanFull()
                 ->tabs([
-                    Tab::make('Parents attendance')
+                    Tab::make('Student attendance')
                         ->icon(Heroicon::OutlinedChatBubbleLeftRight)
                         ->schema([
-            Section::make('Parents — attendance')
-                ->description('Turn this off if you want WhatsApp for fees or homework but not gate IN/OUT messages.')
+            Section::make('Student attendance — WhatsApp to parents')
+                ->description('These messages go to the parent mobile when a student punches IN or OUT. This is not staff attendance — that is the next tab.')
                 ->schema([
                     Placeholder::make('attendance_automation_guide')
                         ->label('')
                         ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderAttendanceAutomationGuide())
                         ->columnSpanFull(),
                     Toggle::make('punch_autosend_enabled')
-                        ->label('Send attendance messages to parents')
-                        ->helperText('IN and OUT from the biometric machine and from the Attendance screen. Turn off to stop all parent attendance WhatsApp.')
+                        ->label('Send student IN/OUT WhatsApp to parents')
+                        ->helperText('Student biometric punch or teacher marking the student IN/OUT on Attendance. Turn off to stop parent attendance WhatsApp only.')
                         ->columnSpanFull(),
                     Placeholder::make('machine_templates_heading')
                         ->label('')
@@ -148,7 +149,7 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('When student punches OUT at the device.'),
                     Placeholder::make('manual_templates_heading')
                         ->label('')
-                        ->content(new HtmlString('<p class="mt-2 text-sm font-bold text-gray-950 dark:text-white">From staff on Attendance screen</p><p class="mt-0.5 text-xs text-gray-500">Manual IN, Manual OUT, or batch IN/OUT buttons.</p>'))
+                        ->content(new HtmlString('<p class="mt-2 text-sm font-bold text-gray-950 dark:text-white">Teacher marks the student on Attendance</p><p class="mt-0.5 text-xs text-gray-500">Manual IN, Manual OUT, or batch IN/OUT — still a student event; WhatsApp goes to the parent.</p>'))
                         ->columnSpanFull(),
                     Select::make('punch_manual_in_autosend_live_campaign_id')
                         ->label('Manual check-in (IN)')
@@ -156,14 +157,14 @@ class ManageWhatsAppSettings extends Page
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Staff marks IN. Leave blank to reuse the Biometric IN template.'),
+                        ->helperText('Teacher marks the student IN. Leave blank to reuse the Biometric IN template.'),
                     Select::make('punch_manual_out_autosend_live_campaign_id')
                         ->label('Manual check-out (OUT)')
                         ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Staff marks OUT. Leave blank to reuse the Biometric OUT template.'),
+                        ->helperText('Teacher marks the student OUT. Leave blank to reuse the Biometric OUT template.'),
                     Toggle::make('attendance_autosend_enabled')
                         ->label('Legacy: batch-save template (optional)')
                         ->helperText('Old roll-call Present flow only. Manual IN/OUT on Attendance uses the four punch templates above.')
@@ -181,8 +182,8 @@ class ManageWhatsAppSettings extends Page
                     Tab::make('Staff attendance')
                         ->icon(Heroicon::OutlinedUserGroup)
                         ->schema([
-            Section::make('Staff — attendance')
-                ->description('Messages to the staff member’s own phone. Independent of parent attendance.')
+            Section::make('Staff attendance — WhatsApp to the staff phone')
+                ->description('When a staff member punches IN or OUT, the message goes to that staff member’s own mobile. Parents and students are not messaged from this tab.')
                 ->schema([
                     Placeholder::make('staff_punch_automation_guide')
                         ->hiddenLabel()

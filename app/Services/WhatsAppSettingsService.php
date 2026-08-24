@@ -69,8 +69,8 @@ class WhatsAppSettingsService
         return [
             [
                 'key' => 'punch',
-                'label' => 'Attendance to parents',
-                'hint' => 'Gate / biometric / staff IN and OUT',
+                'label' => 'Student attendance (to parents)',
+                'hint' => 'Student gate / biometric / teacher IN and OUT — WhatsApp to parent mobile',
                 'enabled' => (bool) Setting::getValue('whatsapp.punch_autosend_enabled', true),
             ],
             [
@@ -81,8 +81,8 @@ class WhatsAppSettingsService
             ],
             [
                 'key' => 'staff_punch',
-                'label' => 'Attendance to staff',
-                'hint' => 'Staff phone on IN and OUT — not parents',
+                'label' => 'Staff attendance (to staff phone)',
+                'hint' => 'Staff punch IN and OUT — not parents',
                 'enabled' => (bool) Setting::getValue('whatsapp.staff_punch_autosend_enabled', false),
             ],
             [
@@ -409,28 +409,28 @@ class WhatsAppSettingsService
         return new HtmlString(
             '<div class="overflow-hidden rounded-xl border border-primary-200/60 bg-primary-50/40 dark:border-primary-500/20 dark:bg-primary-500/5">'
             .'<div class="border-b border-primary-200/60 px-4 py-3 dark:border-primary-500/20">'
-            .'<p class="text-sm font-bold text-gray-950 dark:text-white">Which action sends which message?</p>'
-            .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">Turn each option on below and pick a synced template. '
+            .'<p class="text-sm font-bold text-gray-950 dark:text-white">Student IN/OUT — WhatsApp goes to the parent</p>'
+            .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">This is student attendance, not staff attendance. Pick templates below. '
             .'<a href="'.$biometricUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Biometric setup</a> · '
             .'<a href="'.$attendanceUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Attendance screen</a>'
             .'</p></div>'
             .'<div class="overflow-x-auto"><table class="w-full min-w-[36rem] text-left text-sm">'
             .'<thead class="bg-white/60 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-black/20 dark:text-gray-400">'
-            .'<tr><th class="px-4 py-2">Action</th><th class="px-4 py-2">Trigger</th><th class="px-4 py-2">Template to pick below</th></tr></thead><tbody class="divide-y divide-primary-100 dark:divide-primary-500/10">'
-            .'<tr class="bg-white/40 dark:bg-transparent"><td class="px-4 py-3 font-semibold text-emerald-700 dark:text-emerald-300">Machine check-in (IN)</td>'
-            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">EasyTimePro → <code class="text-xs">punch_logs</code></td>'
+            .'<tr><th class="px-4 py-2">Student action</th><th class="px-4 py-2">How it happens</th><th class="px-4 py-2">Template to pick below</th></tr></thead><tbody class="divide-y divide-primary-100 dark:divide-primary-500/10">'
+            .'<tr class="bg-white/40 dark:bg-transparent"><td class="px-4 py-3 font-semibold text-emerald-700 dark:text-emerald-300">Student machine check-in (IN)</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Student punches on EasyTimePro → <code class="text-xs">punch_logs</code></td>'
             .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300"><strong>Biometric IN</strong></td></tr>'
-            .'<tr><td class="px-4 py-3 font-semibold text-rose-700 dark:text-rose-300">Machine check-out (OUT)</td>'
-            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Device punch OUT from punch_logs</td>'
+            .'<tr><td class="px-4 py-3 font-semibold text-rose-700 dark:text-rose-300">Student machine check-out (OUT)</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Student punches OUT on the device</td>'
             .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300"><strong>Biometric OUT</strong></td></tr>'
-            .'<tr class="bg-white/40 dark:bg-transparent"><td class="px-4 py-3 font-semibold text-emerald-700 dark:text-emerald-300">Manual check-in (IN)</td>'
-            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Staff IN on Attendance (live or batch save)</td>'
+            .'<tr class="bg-white/40 dark:bg-transparent"><td class="px-4 py-3 font-semibold text-emerald-700 dark:text-emerald-300">Student marked IN by teacher</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Teacher taps IN for that student on Attendance (live or batch)</td>'
             .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300"><strong>Manual IN</strong> (falls back to Biometric IN)</td></tr>'
-            .'<tr><td class="px-4 py-3 font-semibold text-rose-700 dark:text-rose-300">Manual check-out (OUT)</td>'
-            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Staff OUT button on Attendance</td>'
+            .'<tr><td class="px-4 py-3 font-semibold text-rose-700 dark:text-rose-300">Student marked OUT by teacher</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Teacher taps OUT for that student on Attendance</td>'
             .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300"><strong>Manual OUT</strong> (falls back to Biometric OUT)</td></tr>'
-            .'<tr><td class="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300">Absent / Leave</td>'
-            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Staff marks A or L</td>'
+            .'<tr><td class="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300">Student absent / leave</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Teacher marks A or L for the student</td>'
             .'<td class="px-4 py-3 text-gray-500 dark:text-gray-400">Not sent automatically</td></tr>'
             .'</tbody></table></div></div>'
         );
