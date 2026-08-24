@@ -19,6 +19,9 @@
                         </p>
                         <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
                             {{ $paymentRow->payment_date->format('d M Y') }} · ₹{{ number_format((float) $paymentRow->amount, 2) }} · {{ $paymentRow->payment_mode->label() }}
+                            @if ($paymentRow->chequeSummary())
+                                · {{ $paymentRow->chequeSummary() }}
+                            @endif
                         </p>
                         <p class="text-xs text-gray-400">Collected by {{ $paymentRow->addedBy?->staffCollectorLabel() ?? 'Staff' }}</p>
                     </div>

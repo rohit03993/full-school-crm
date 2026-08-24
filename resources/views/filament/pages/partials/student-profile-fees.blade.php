@@ -655,6 +655,7 @@
                             $modeLabel = $paymentRow->payment_mode->label();
                             $modeClass = match (true) {
                                 str_contains(strtolower($modeLabel), 'cash') => 'bg-lime-100 text-lime-800 dark:bg-lime-500/15 dark:text-lime-300',
+                                str_contains(strtolower($modeLabel), 'cheque') => 'bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300',
                                 str_contains(strtolower($modeLabel), 'online') || str_contains(strtolower($modeLabel), 'upi') => 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300',
                                 default => 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300',
                             };
@@ -677,6 +678,9 @@
                                     </div>
                                     <p class="mt-0.5 text-xs text-gray-500">
                                         {{ $paymentRow->payment_date->format('d M Y') }}
+                                        @if ($paymentRow->chequeSummary())
+                                            · {{ $paymentRow->chequeSummary() }}
+                                        @endif
                                         @if ($description)
                                             · {{ $description }}
                                         @endif

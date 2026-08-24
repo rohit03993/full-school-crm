@@ -27,6 +27,9 @@ class Payment extends Model
         'voucher_number',
         'transaction_id',
         'utr_number',
+        'cheque_number',
+        'cheque_date',
+        'cheque_bank_name',
         'proof_image_path',
         'receipt_number',
         'receipt_path',
@@ -44,6 +47,7 @@ class Payment extends Model
     {
         return [
             'payment_date' => 'date',
+            'cheque_date' => 'date',
             'amount' => 'decimal:2',
             'tuition_amount' => 'decimal:2',
             'shortfall_allocation' => 'array',
@@ -93,6 +97,21 @@ class Payment extends Model
     {
         return $this->isTuitionPayment()
             && in_array($this->payment_mode, [PaymentMode::Online, PaymentMode::Upi], true);
+    }
+
+    public function chequeSummary(): ?string
+    {
+        if ($this->payment_mode !== PaymentMode::Cheque) {
+            return null;
+        }
+
+        $parts = array_filter([
+            filled($this->cheque_number) ? $this->cheque_number : null,
+            $this->cheque_date?->format('d M Y'),
+            filled($this->cheque_bank_name) ? $this->cheque_bank_name : null,
+        ]);
+
+        return $parts === [] ? null : implode(' · ', $parts);
     }
 
     public function student(): BelongsTo

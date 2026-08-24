@@ -626,7 +626,7 @@ class AccountingLedgerService
     {
         return match ($mode) {
             PaymentMode::Cash => $this->account(self::CODE_CASH),
-            PaymentMode::Online, PaymentMode::Upi => $this->account(self::CODE_BANK),
+            PaymentMode::Online, PaymentMode::Upi, PaymentMode::Cheque => $this->account(self::CODE_BANK),
         };
     }
 }

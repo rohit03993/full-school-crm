@@ -162,7 +162,7 @@ class PaymentService
 
             $receiptNumber = $this->numberGenerator->generate(NumberSequenceType::Receipt);
 
-            $payment = Payment::query()->create([
+            $payment = Payment::query()->create(array_merge([
                 'fee_structure_id' => $locked->id,
                 'fee_installment_id' => $installment?->id,
                 'student_id' => $student->id,
@@ -179,7 +179,7 @@ class PaymentService
                 'receipt_number' => $receiptNumber,
                 'status' => \App\Enums\PaymentStatus::Active,
                 'added_by_user_id' => $staff->id,
-            ]);
+            ], $this->chequeAttributes($mode, $data)));
 
             $newPaid = round((float) $locked->paid_amount + $feePaymentAmount, 2);
             $newPending = round(max(0, (float) $locked->net_fee - $newPaid), 2);
@@ -306,7 +306,7 @@ class PaymentService
         return DB::transaction(function () use ($feeStructure, $student, $charge, $data, $proof, $staff, $amount, $mode): Payment {
             $receiptNumber = $this->numberGenerator->generate(NumberSequenceType::Receipt);
 
-            $payment = Payment::query()->create([
+            $payment = Payment::query()->create(array_merge([
                 'fee_structure_id' => $feeStructure->id,
                 'fee_misc_charge_id' => $charge->id,
                 'student_id' => $student->id,
@@ -321,7 +321,7 @@ class PaymentService
                 'receipt_number' => $receiptNumber,
                 'status' => \App\Enums\PaymentStatus::Active,
                 'added_by_user_id' => $staff->id,
-            ]);
+            ], $this->chequeAttributes($mode, $data)));
 
             $this->miscCharges->applyPayment($charge->fresh(), $amount);
 
@@ -429,7 +429,46 @@ class PaymentService
             PaymentMode::Cash => $this->requireField($data, 'voucher_number', 'Voucher number is required for cash payments.'),
             PaymentMode::Online => $this->requireField($data, 'transaction_id', 'Transaction ID is required for online payments.'),
             PaymentMode::Upi => $this->requireField($data, 'utr_number', 'UTR number is required for UPI payments.'),
+            PaymentMode::Cheque => $this->validateChequeFields($data),
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function validateChequeFields(array $data): void
+    {
+        $this->requireField($data, 'cheque_date', 'Cheque date is required.');
+        $this->requireField($data, 'cheque_bank_name', 'Bank name is required for cheque payments.');
+
+        $number = trim((string) ($data['cheque_number'] ?? ''));
+
+        if (! preg_match('/^\d{6}$/', $number)) {
+            throw ValidationException::withMessages([
+                'cheque_number' => 'Cheque number must be exactly 6 digits.',
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{cheque_number: string|null, cheque_date: mixed, cheque_bank_name: string|null}
+     */
+    protected function chequeAttributes(PaymentMode $mode, array $data): array
+    {
+        if ($mode !== PaymentMode::Cheque) {
+            return [
+                'cheque_number' => null,
+                'cheque_date' => null,
+                'cheque_bank_name' => null,
+            ];
+        }
+
+        return [
+            'cheque_number' => trim((string) ($data['cheque_number'] ?? '')) ?: null,
+            'cheque_date' => $data['cheque_date'] ?? null,
+            'cheque_bank_name' => trim((string) ($data['cheque_bank_name'] ?? '')) ?: null,
+        ];
     }
 
     /**

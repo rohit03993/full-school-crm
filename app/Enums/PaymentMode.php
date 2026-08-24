@@ -7,6 +7,7 @@ enum PaymentMode: string
     case Cash = 'cash';
     case Online = 'online';
     case Upi = 'upi';
+    case Cheque = 'cheque';
 
     public function label(): string
     {
@@ -14,6 +15,7 @@ enum PaymentMode: string
             self::Cash => 'Cash',
             self::Online => 'Online',
             self::Upi => 'UPI',
+            self::Cheque => 'Cheque',
         };
     }
 }

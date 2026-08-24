@@ -168,7 +168,10 @@
                                     @endif
                                 </p>
                                 <p class="mt-1 text-sm text-navy-600">
-                                    {{ $payment->payment_date->format('d M Y') }} · {{ $payment->payment_mode->label() }}
+        {{ $payment->payment_date->format('d M Y') }} · {{ $payment->payment_mode->label() }}
+                                    @if ($payment->chequeSummary())
+                                        · {{ $payment->chequeSummary() }}
+                                    @endif
                                     @if ($payment->feeMiscCharge)
                                         · {{ $payment->feeMiscCharge->label }}
                                     @elseif ($payment->feeInstallment)

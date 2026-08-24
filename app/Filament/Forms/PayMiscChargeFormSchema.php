@@ -78,6 +78,25 @@ class PayMiscChargeFormSchema
                         ->label('UTR number')
                         ->visible(fn (callable $get): bool => $get('payment_mode') === PaymentMode::Upi->value)
                         ->required(fn (callable $get): bool => $get('payment_mode') === PaymentMode::Upi->value),
+                    DatePicker::make('cheque_date')
+                        ->label('Cheque date')
+                        ->native(false)
+                        ->visible(fn (callable $get): bool => $get('payment_mode') === PaymentMode::Cheque->value)
+                        ->required(fn (callable $get): bool => $get('payment_mode') === PaymentMode::Cheque->value),
+                    TextInput::make('cheque_number')
+                        ->label('Cheque number')
+                        ->numeric()
+                        ->maxLength(6)
+                        ->helperText('Exactly 6 digits.')
+                        ->visible(fn (callable $get): bool => $get('payment_mode') === PaymentMode::Cheque->value)
+                        ->required(fn (callable $get): bool => $get('payment_mode') === PaymentMode::Cheque->value)
+                        ->rule('regex:/^\d{6}$/'),
+                    TextInput::make('cheque_bank_name')
+                        ->label('Submitted to bank')
+                        ->maxLength(100)
+                        ->helperText('Bank where the cheque was deposited.')
+                        ->visible(fn (callable $get): bool => $get('payment_mode') === PaymentMode::Cheque->value)
+                        ->required(fn (callable $get): bool => $get('payment_mode') === PaymentMode::Cheque->value),
                 ]),
             FileUpload::make('proof_image')
                 ->label('Payment proof')

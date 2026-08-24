@@ -82,6 +82,7 @@ class ReceiptService
             PaymentMode::Cash => $payment->voucher_number ? "Voucher: {$payment->voucher_number}" : null,
             PaymentMode::Online => $payment->transaction_id ? "Txn ID: {$payment->transaction_id}" : null,
             PaymentMode::Upi => $payment->utr_number ? "UTR: {$payment->utr_number}" : null,
+            PaymentMode::Cheque => $payment->chequeSummary(),
         };
     }
 }

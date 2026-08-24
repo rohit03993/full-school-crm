@@ -107,6 +107,123 @@ class PaymentWorkflowTest extends TestCase
         $this->assertGreaterThan(5000, strlen($pdfBytes));
     }
 
+    public function test_cheque_payment_saves_six_digit_number_and_reduces_pending(): void
+    {
+        Storage::fake('local');
+
+        $staff = $this->createStaffUser();
+        $student = $this->createStudent();
+        $course = $this->createCourse();
+        $enquiry = $this->createEnquiry($student, $course, $staff);
+
+        $admissionService = app(AdmissionService::class);
+        $paymentService = app(PaymentService::class);
+
+        $admission = $admissionService->convert($student, $enquiry, $staff, [
+            'course_id' => $course->id,
+            'discount_amount' => 5000,
+        ]);
+
+        $admission = $admissionService->submitForm(
+            $admission,
+            ['tenth_board' => 'CBSE', 'tenth_percentage' => 85],
+            [
+                'photo' => UploadedFile::fake()->image('photo.jpg'),
+                'aadhaar' => UploadedFile::fake()->create('aadhaar.pdf', 100, 'application/pdf'),
+                'marksheet' => UploadedFile::fake()->create('marksheet.pdf', 100, 'application/pdf'),
+                'signature' => UploadedFile::fake()->image('sign.jpg'),
+            ],
+            $staff,
+        );
+
+        $enrollment = $admissionService->approve($admission, $staff);
+        $feeStructure = $enrollment->feeStructure;
+
+        $payment = $paymentService->add(
+            $feeStructure,
+            $student,
+            [
+                'payment_date' => now()->toDateString(),
+                'amount' => 5000,
+                'payment_mode' => PaymentMode::Cheque->value,
+                'cheque_number' => '123456',
+                'cheque_date' => now()->toDateString(),
+                'cheque_bank_name' => 'SBI Civil Lines',
+                'shortfall_action' => PaymentShortfallAction::NewInstallment->value,
+                'shortfall_due_date' => now()->addMonth()->toDateString(),
+                'shortfall_label' => 'Installment 2',
+            ],
+            UploadedFile::fake()->image('cheque.jpg'),
+            $staff,
+        );
+
+        $feeStructure->refresh();
+
+        $this->assertSame(PaymentMode::Cheque, $payment->payment_mode);
+        $this->assertSame('123456', $payment->cheque_number);
+        $this->assertSame('SBI Civil Lines', $payment->cheque_bank_name);
+        $this->assertFalse($payment->countsAsOnlineTuition());
+        $this->assertSame(5000.0, (float) $feeStructure->paid_amount);
+        $this->assertSame(40000.0, (float) $feeStructure->pending_amount);
+        $this->assertStringContainsString('123456', (string) $payment->chequeSummary());
+        $this->assertStringContainsString('SBI Civil Lines', (string) $payment->chequeSummary());
+    }
+
+    public function test_cheque_number_must_be_exactly_six_digits(): void
+    {
+        Storage::fake('local');
+
+        $staff = $this->createStaffUser();
+        $student = $this->createStudent();
+        $course = $this->createCourse();
+        $enquiry = $this->createEnquiry($student, $course, $staff);
+
+        $admissionService = app(AdmissionService::class);
+        $paymentService = app(PaymentService::class);
+
+        $admission = $admissionService->convert($student, $enquiry, $staff, [
+            'course_id' => $course->id,
+            'discount_amount' => 5000,
+        ]);
+
+        $admission = $admissionService->submitForm(
+            $admission,
+            ['tenth_board' => 'CBSE', 'tenth_percentage' => 85],
+            [
+                'photo' => UploadedFile::fake()->image('photo.jpg'),
+                'aadhaar' => UploadedFile::fake()->create('aadhaar.pdf', 100, 'application/pdf'),
+                'marksheet' => UploadedFile::fake()->create('marksheet.pdf', 100, 'application/pdf'),
+                'signature' => UploadedFile::fake()->image('sign.jpg'),
+            ],
+            $staff,
+        );
+
+        $enrollment = $admissionService->approve($admission, $staff);
+        $feeStructure = $enrollment->feeStructure;
+
+        try {
+            $paymentService->add(
+                $feeStructure,
+                $student,
+                [
+                    'payment_date' => now()->toDateString(),
+                    'amount' => 1000,
+                    'payment_mode' => PaymentMode::Cheque->value,
+                    'cheque_number' => '12345',
+                    'cheque_date' => now()->toDateString(),
+                    'cheque_bank_name' => 'HDFC',
+                ],
+                UploadedFile::fake()->image('cheque.jpg'),
+                $staff,
+            );
+            $this->fail('Expected invalid cheque number to fail.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('cheque_number', $exception->errors());
+        }
+
+        $this->assertSame(45000.0, (float) $feeStructure->fresh()->pending_amount);
+    }
+
     public function test_payment_cannot_exceed_pending_amount(): void
     {
         Storage::fake('local');
