@@ -23,6 +23,8 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\HtmlString;
@@ -98,22 +100,25 @@ class ManageWhatsAppSettings extends Page
                 ->label('')
                 ->content(new HtmlString(
                     '<p class="text-sm text-gray-600 dark:text-gray-300">'
-                    .'<strong>WhatsApp setup</strong> is the master switch for the institute. This page is where you turn each message type on or off. '
-                    .'Example: keep Setup on, turn <strong>Attendance to parents</strong> off, and leave fees and homework on.'
+                    .'<strong>WhatsApp setup</strong> is the master switch for the institute. Use the tabs below — only one message type is shown at a time. '
+                    .'Example: keep Setup on, turn <strong>Attendance to parents</strong> off, and leave fees and homework on. '
+                    .'Pick an approved template on each tab. Live API campaigns are only for external POST / API key, not these automations.'
                     .'</p>'
                 ))
                 ->columnSpanFull(),
-            Section::make('Templates for automations')
-                ->description('Pick an approved, synced template for each message type below. Live API campaigns are only for external POST / API key triggers — not required here.')
-                ->schema([
-                    Placeholder::make('live_campaigns_notice')
-                        ->label('')
-                        ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderLiveCampaignsNotice())
-                        ->columnSpanFull(),
-                ]),
+            Placeholder::make('live_campaigns_notice')
+                ->label('')
+                ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderLiveCampaignsNotice())
+                ->columnSpanFull(),
+            Tabs::make('Automations')
+                ->persistTabInQueryString('automation')
+                ->columnSpanFull()
+                ->tabs([
+                    Tab::make('Parents attendance')
+                        ->icon(Heroicon::OutlinedChatBubbleLeftRight)
+                        ->schema([
             Section::make('Parents — attendance')
                 ->description('Turn this off if you want WhatsApp for fees or homework but not gate IN/OUT messages.')
-                ->icon(Heroicon::OutlinedChatBubbleLeftRight)
                 ->schema([
                     Placeholder::make('attendance_automation_guide')
                         ->label('')
@@ -172,9 +177,12 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('Used when a specific IN/OUT template is left blank.'),
                 ])
                 ->columns(2),
+                        ]),
+                    Tab::make('Staff attendance')
+                        ->icon(Heroicon::OutlinedUserGroup)
+                        ->schema([
             Section::make('Staff — attendance')
                 ->description('Messages to the staff member’s own phone. Independent of parent attendance.')
-                ->icon(Heroicon::OutlinedUserGroup)
                 ->schema([
                     Placeholder::make('staff_punch_automation_guide')
                         ->hiddenLabel()
@@ -200,9 +208,12 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('Same mapping as IN. Leave blank if you only want IN messages.'),
                 ])
                 ->columns(2),
+                        ]),
+                    Tab::make('After a call')
+                        ->icon(Heroicon::OutlinedPhone)
+                        ->schema([
             Section::make('Leads — after a call')
                 ->description('Optional message after a connected outgoing call is logged.')
-                ->collapsed()
                 ->schema([
                     Toggle::make('postcall_autosend_enabled')
                         ->label('Send WhatsApp after a logged call'),
@@ -214,9 +225,12 @@ class ManageWhatsAppSettings extends Page
                         ->native(false),
                 ])
                 ->columns(2),
+                        ]),
+                    Tab::make('Fee reminders')
+                        ->icon(Heroicon::OutlinedBanknotes)
+                        ->schema([
             Section::make('Parents — fee reminders')
                 ->description('Automatic WhatsApp on the parent mobile. Upcoming = N days before due. Due today = on the due date. Overdue = after due date. Staff can also send from the student Fees tab.')
-                ->icon(Heroicon::OutlinedBanknotes)
                 ->schema([
                     Placeholder::make('fee_reminder_template_guide')
                         ->hiddenLabel()
@@ -268,9 +282,12 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('Template fee_reminder_overdue (or fee_reminder). Same student is not reminded again within the cooldown in config/fees.php.'),
                 ])
                 ->columns(2),
+                        ]),
+                    Tab::make('Homework not done')
+                        ->icon(Heroicon::OutlinedBookOpen)
+                        ->schema([
             Section::make('Parents — homework not done')
                 ->description('When staff submit Not Done on Homework check. Share-homework from class is a separate Send button, not this switch.')
-                ->icon(Heroicon::OutlinedBookOpen)
                 ->schema([
                     Placeholder::make('homework_not_done_template_guide')
                         ->hiddenLabel()
@@ -289,6 +306,10 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('Map student.name, homework.class_section, homework.subject, homework.topic, institute.name.'),
                 ])
                 ->columns(2),
+                        ]),
+                    Tab::make('Sending batches')
+                        ->icon(Heroicon::OutlinedRectangleStack)
+                        ->schema([
             Section::make('Campaign processing')
                 ->description('For large campaigns (50+ students): batch size 10–20 and 2–5 second delay between batches is recommended.')
                 ->schema([
@@ -308,6 +329,8 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('Pause before the next batch — reduces rate-limit risk on large sends.'),
                 ])
                 ->columns(2),
+                        ]),
+                ]),
         ]);
     }
 
