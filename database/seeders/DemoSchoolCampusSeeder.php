@@ -31,7 +31,6 @@ use App\Models\StaffProfile;
 use App\Models\Student;
 use App\Models\StudentCase;
 use App\Models\User;
-use App\Models\Visit;
 use App\Services\ActivityAttendanceService;
 use App\Services\BatchService;
 use App\Services\BatchSubjectService;
@@ -105,6 +104,7 @@ class DemoSchoolCampusSeeder extends Seeder
             $this->seedCases($batchesWithStudents, $approver);
             $this->seedStaffAttendanceToday($approver);
             $this->printCampusSummary();
+            $this->call(DemoOperationalHistorySeeder::class);
 
             return;
         }
@@ -167,6 +167,7 @@ class DemoSchoolCampusSeeder extends Seeder
         $this->seedStaffAttendanceToday($approver);
 
         $this->printCampusSummary();
+        $this->call(DemoOperationalHistorySeeder::class);
     }
 
     /**
@@ -391,15 +392,8 @@ class DemoSchoolCampusSeeder extends Seeder
             'meeting_with_user_id' => null,
         ]);
 
-        Visit::query()->create([
-            'student_id' => $student->id,
-            'enquiry_id' => $enquiry->id,
-            'visit_date' => now()->subDays(($index % 10) + 1)->toDateString(),
-            'staff_user_id' => $staff->id,
-            'discussion_summary' => "Campus demo enroll — Class {$classNo}-{$section}.",
-            'remarks' => 'Seeded for sales demo (not a live lead).',
-            'status' => VisitStatus::Joined,
-        ]);
+        // No Visit row — Joined visits polluted Campus Visits / dashboard pulse.
+        // Enquiry.latest_visit_status = Joined still keeps them out of active leads.
 
         $courseFee = (float) $course->fee;
         $admission = Admission::query()->create([
@@ -625,5 +619,6 @@ class DemoSchoolCampusSeeder extends Seeder
         $this->command?->line('Office: counsellor01@example.com · admission01@example.com · accounts01@example.com · academic.coord@example.com');
         $this->command?->line('Homework: active + past per section · marks on Class 10–12');
         $this->command?->line('Open cases: 3 · Staff IN today: 8 teachers');
+        $this->command?->line('Then run DemoOperationalHistorySeeder for 3-month attendance, fees, mid-term publish, leads/calls.');
     }
 }

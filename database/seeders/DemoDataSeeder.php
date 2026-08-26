@@ -332,7 +332,7 @@ class DemoDataSeeder extends Seeder
                 'dob' => '2001-08-09',
                 'dob_password' => '09082001',
                 'gender' => Gender::Male,
-                'batch_name' => 'Class 12-A',
+                'batch_name' => 'Commerce Demo 12-A',
                 'section' => 'A',
                 'shift' => BatchShift::Morning,
                 'discount' => 10000,
