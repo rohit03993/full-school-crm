@@ -301,6 +301,9 @@ class StaffAttendancePunchTest extends TestCase
 
         Livewire::test(AttendanceHubPage::class)
             ->assertSuccessful()
+            ->assertSee('Students present')
+            ->assertSee('Staff present')
+            ->assertSee('Attendance log')
             ->assertSee('Students — live punches')
             ->assertSee('Staff attendance')
             ->assertSee('Staff ID = device PIN');

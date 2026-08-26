@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Enums\LicenseFeature;
+use App\Services\AttendanceHubOverviewService;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
@@ -10,10 +11,14 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Carbon;
+use Livewire\WithPagination;
 use UnitEnum;
 
 class AttendanceHubPage extends Page
 {
+    use WithPagination;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
     protected static ?string $title = 'Attendance';
@@ -23,6 +28,11 @@ class AttendanceHubPage extends Page
     protected static ?int $navigationSort = 39;
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_ACADEMICS;
+
+    public string $overviewDate = '';
+
+    /** @var 'all'|'student'|'staff' */
+    public string $feedType = 'all';
 
     public static function getNavigationLabel(): string
     {
@@ -38,13 +48,40 @@ class AttendanceHubPage extends Page
         return AttendancePage::canAccess() || StaffAttendancePage::canAccess();
     }
 
+    public function mount(): void
+    {
+        $this->overviewDate = now()->toDateString();
+    }
+
+    public function updatedOverviewDate(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFeedType(): void
+    {
+        $this->resetPage();
+    }
+
     public function getSubheading(): ?string
     {
-        return 'Mark students and staff from one place. Same machine and Face app — Roll No. for students, Staff ID for staff.';
+        return 'Today’s overview for students and staff, then mark from live punches, manual batch, or staff desk.';
     }
 
     public function content(Schema $schema): Schema
     {
+        $date = filled($this->overviewDate)
+            ? Carbon::parse($this->overviewDate)->toDateString()
+            : now()->toDateString();
+
+        $overview = app(AttendanceHubOverviewService::class)->overview($date);
+        $feed = app(AttendanceHubOverviewService::class)->feed(
+            $date,
+            $this->feedType,
+            $this->getPage(),
+            AttendanceHubOverviewService::FEED_PER_PAGE,
+        );
+
         $cards = [];
 
         if (AttendancePage::canAccess()) {
@@ -73,12 +110,12 @@ class AttendanceHubPage extends Page
         }
 
         return $schema->components([
-            View::make('filament.pages.partials.crm-hub')
+            View::make('filament.pages.partials.attendance-hub-overview')
                 ->viewData([
-                    'heading' => 'Attendance desk',
-                    'intro' => 'Students and staff share the same ADMS machine and Face app — the PIN decides who is who.',
+                    'overview' => $overview,
+                    'feed' => $feed,
+                    'feedType' => $this->feedType,
                     'cards' => $cards,
-                    'footer' => '<strong class="text-gray-900 dark:text-white">Setup:</strong> Student Roll No. and Staff ID must be unique. Put the same code on the ADMS machine and Face app. Missing Staff IDs → Admin → Staff → Assign missing Staff IDs, then Sync to Face API. Parent WhatsApp on punch still follows WhatsApp → Automations.',
                 ]),
         ]);
     }
