@@ -341,6 +341,16 @@ class AttendanceService
 
             $pairs = $dayRow['pairs'] ?? [];
             $currentState = $dayRow['current_state'] ?? null;
+
+            // Roll-call / seeded attendance has IN/OUT on the attendance row but no biometric
+            // punch pairs — synthesize a visit so Visits + Live Track stay consistent.
+            if ($pairs === [] && $attendance?->checked_in_at !== null) {
+                $pairs = [$this->syntheticPairFromAttendance($attendance)];
+                if ($currentState === null) {
+                    $currentState = $attendance->checked_out_at === null ? 'IN' : 'OUT';
+                }
+            }
+
             $isInside = $currentState === 'IN'
                 || ($currentState === null
                     && $attendance?->checked_in_at !== null
@@ -371,9 +381,16 @@ class AttendanceService
                     $staffName = $lastPair['marked_by_out']
                         ?? $lastPair['marked_by_in']
                         ?? $staffName;
+                } elseif (! empty($lastPair['is_auto_out']) && empty($lastPair['is_manual_in'])) {
+                    $punchSource = $punchSource ?: 'biometric';
                 } elseif (filled($lastPair['device_in'] ?? null) || filled($lastPair['device_out'] ?? null)) {
                     $punchSource = 'biometric';
                 }
+            }
+
+            $visitCount = count($pairs);
+            if ($visitCount === 0 && $attendance?->checked_in_at !== null) {
+                $visitCount = 1;
             }
 
             $snapshot[$student->id] = [
@@ -381,9 +398,10 @@ class AttendanceService
                 'checked_in_at' => $checkedIn,
                 'checked_out_at' => $checkedOut,
                 'is_inside' => $isInside,
+                // Next action: after checkout (incl. 20:00 auto-out), IN is allowed for a return visit.
                 'can_in' => ! $isInside,
                 'can_out' => $isInside,
-                'visit_count' => count($pairs),
+                'visit_count' => $visitCount,
                 'pairs' => $pairs,
                 'punch_source' => $punchSource,
                 'marked_by_name' => $staffName,
@@ -394,5 +412,42 @@ class AttendanceService
         }
 
         return $snapshot;
+    }
+
+    /**
+     * @return array{
+     *     in: string,
+     *     out: ?string,
+     *     is_manual_in: bool,
+     *     is_manual_out: bool,
+     *     is_auto_out: bool,
+     *     device_in: ?string,
+     *     device_out: ?string,
+     *     marked_by_in: ?string,
+     *     marked_by_out: ?string
+     * }
+     */
+    protected function syntheticPairFromAttendance(Attendance $attendance): array
+    {
+        $attendance->loadMissing('markedBy:id,name');
+        $manual = \App\Support\AttendanceSourceLabel::isManual($attendance->punch_source);
+        $staffName = $attendance->markedBy?->name;
+        $outAt = $attendance->checked_out_at;
+        $autoOutTime = substr((string) config('attendance.auto_out_time', '20:00'), 0, 5);
+        $isAutoOut = $outAt !== null
+            && ! $manual
+            && $outAt->format('H:i') >= $autoOutTime;
+
+        return [
+            'in' => $attendance->checked_in_at?->format('H:i') ?? '—',
+            'out' => $outAt?->format('H:i'),
+            'is_manual_in' => $manual,
+            'is_manual_out' => $manual && $outAt !== null && ! $isAutoOut,
+            'is_auto_out' => $isAutoOut,
+            'device_in' => $manual ? null : 'Biometric',
+            'device_out' => $isAutoOut ? 'Auto' : ($manual || $outAt === null ? null : 'Biometric'),
+            'marked_by_in' => $manual ? $staffName : null,
+            'marked_by_out' => ($manual && $outAt !== null && ! $isAutoOut) ? $staffName : null,
+        ];
     }
 }

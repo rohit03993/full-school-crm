@@ -82,7 +82,7 @@
                     Class attendance today
                 </p>
                 <p class="text-[11px] text-gray-500 dark:text-gray-400">
-                    Present = IN at least once today. Visits list every IN→OUT pair. Only the next action is enabled (IN or OUT).
+                    Present = IN at least once today. Visits list every IN→OUT pair (manual or machine). Highlighted button = current state; after checkout / 8:00 PM auto-out, OUT stays highlighted and IN is available for a return visit.
                 </p>
             </div>
             @if ($absent > 0)
@@ -299,6 +299,12 @@
 
                     <div class="flex justify-end">
                         <div class="inline-flex overflow-hidden rounded-lg bg-gray-100 p-0.5 ring-1 ring-gray-200/80 dark:bg-white/5 dark:ring-white/10">
+                            @php
+                                // Solid colour = current state (Inside → IN, Checked out → OUT).
+                                // Enabled = next allowed action (can still re-IN after checkout).
+                                $inIsCurrent = $row['is_inside'] || $row['track'] === 'pending';
+                                $outIsCurrent = ! $row['is_inside'] && $row['track'] === 'out';
+                            @endphp
                             <button
                                 type="button"
                                 wire:click="markManualInForStudent({{ $row['id'] }})"
@@ -307,10 +313,11 @@
                                 @disabled(! $row['can_in'])
                                 @class([
                                     'min-w-[3.25rem] rounded-md px-2.5 py-1.5 text-xs font-extrabold uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-35',
-                                    'bg-emerald-500 text-white shadow-sm' => $row['can_in'],
-                                    'text-gray-400' => ! $row['can_in'],
+                                    'bg-emerald-500 text-white shadow-sm' => $inIsCurrent,
+                                    'bg-white text-emerald-700 ring-1 ring-emerald-300 dark:bg-transparent dark:text-emerald-300 dark:ring-emerald-500/40' => ! $inIsCurrent && $row['can_in'],
+                                    'text-gray-400' => ! $inIsCurrent && ! $row['can_in'],
                                 ])
-                                title="{{ $row['can_in'] ? 'Manual check-in' : 'Already inside — mark OUT first' }}"
+                                title="{{ $row['is_inside'] ? 'Currently inside' : ($row['can_in'] ? 'Manual check-in' : 'Already inside — mark OUT first') }}"
                             >
                                 <span wire:loading.remove wire:target="markManualInForStudent({{ $row['id'] }})">IN</span>
                                 <span wire:loading wire:target="markManualInForStudent({{ $row['id'] }})">…</span>
@@ -323,10 +330,11 @@
                                 @disabled(! $row['can_out'])
                                 @class([
                                     'min-w-[3.25rem] rounded-md px-2.5 py-1.5 text-xs font-extrabold uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-35',
-                                    'bg-rose-500 text-white shadow-sm' => $row['can_out'],
-                                    'text-gray-400' => ! $row['can_out'],
+                                    'bg-rose-500 text-white shadow-sm' => $outIsCurrent,
+                                    'bg-white text-rose-700 ring-1 ring-rose-300 dark:bg-transparent dark:text-rose-300 dark:ring-rose-500/40' => ! $outIsCurrent && $row['can_out'],
+                                    'text-gray-400' => ! $outIsCurrent && ! $row['can_out'],
                                 ])
-                                title="{{ $row['can_out'] ? 'Manual check-out' : 'Not inside — mark IN first' }}"
+                                title="{{ $outIsCurrent ? 'Currently checked out (incl. auto-out after 8:00 PM)' : ($row['can_out'] ? 'Manual check-out' : 'Not inside — mark IN first') }}"
                             >
                                 <span wire:loading.remove wire:target="markManualOutForStudent({{ $row['id'] }})">OUT</span>
                                 <span wire:loading wire:target="markManualOutForStudent({{ $row['id'] }})">…</span>
