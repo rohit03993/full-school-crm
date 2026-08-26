@@ -490,33 +490,36 @@ class DemoSchoolCampusSeeder extends Seeder
             $batch->loadMissing('activeSubjects');
             foreach ($batch->activeSubjects->take(3) as $subject) {
                 $testKey = 'unit-'.$batch->id.'-'.$subject->id;
-                $existing = ActivitySession::query()
+                $session = ActivitySession::query()
                     ->where('batch_id', $batch->id)
                     ->where('activity_type_id', $examType->id)
                     ->where('title', "Unit Test — {$subject->name}")
                     ->first();
 
-                if ($existing) {
+                if (! $session) {
+                    $session = ActivitySession::query()->create([
+                        'activity_type_id' => $examType->id,
+                        'title' => "Unit Test — {$subject->name}",
+                        'session_date' => now()->subDays(5)->toDateString(),
+                        'batch_id' => $batch->id,
+                        'created_by_user_id' => $teacher->id,
+                        'metadata' => [
+                            'test_key' => $testKey,
+                            'test_name' => 'Unit Test 1',
+                            'subject' => $subject->name,
+                            'max_marks' => 40,
+                        ],
+                    ]);
+                }
+
+                if ($session->activityAttendances()->exists()) {
                     continue;
                 }
 
-                $session = ActivitySession::query()->create([
-                    'activity_type_id' => $examType->id,
-                    'title' => "Unit Test — {$subject->name}",
-                    'session_date' => now()->subDays(5)->toDateString(),
-                    'batch_id' => $batch->id,
-                    'created_by_user_id' => $teacher->id,
-                    'metadata' => [
-                        'test_key' => $testKey,
-                        'test_name' => 'Unit Test 1',
-                        'subject' => $subject->name,
-                        'max_marks' => 40,
-                    ],
-                ]);
-
                 $scores = [];
                 foreach ($students as $i => $student) {
-                    $scores[$student->id] = 28 + ($i * 3);
+                    // Keep within max_marks (40): spread ~24–38 across the section.
+                    $scores[$student->id] = 24 + ($i % 15);
                 }
                 $attendance->importStudentScores($session, $scores, $teacher);
             }
