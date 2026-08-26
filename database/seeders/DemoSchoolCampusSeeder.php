@@ -551,45 +551,51 @@ class DemoSchoolCampusSeeder extends Seeder
             return;
         }
 
-        $demoTitles = [
-            'Late fee waiver request',
-            'Extra class for Maths',
-            'TC / bonafide pending',
+        $defs = [
+            [
+                'title' => 'Late fee waiver request',
+                'type' => CampusVisitPurpose::Fees,
+                'summary' => 'Parent asked to waive late fee for Term 1.',
+                'assignee' => $this->accountant,
+                'opened_by' => $this->counsellor,
+                'handoff' => 'Please review and advise.',
+                'student' => $picked[0],
+            ],
+            [
+                'title' => 'Extra class for Maths',
+                'type' => CampusVisitPurpose::Academic,
+                'summary' => 'Student needs remedial Maths sessions.',
+                'assignee' => $this->academicCoordinator,
+                'opened_by' => $this->counsellor,
+                'handoff' => 'Assign a teacher for two weeks.',
+                'student' => $picked[1],
+            ],
+            [
+                'title' => 'TC / bonafide pending',
+                'type' => CampusVisitPurpose::Documents,
+                'summary' => 'Documents requested for scholarship.',
+                'assignee' => $this->academicCoordinator,
+                'opened_by' => $openedBy,
+                'handoff' => 'Please issue TC / bonafide and update the parent.',
+                'student' => $picked[2],
+            ],
         ];
 
-        if (StudentCase::query()->whereIn('title', $demoTitles)->exists()) {
-            return;
+        foreach ($defs as $def) {
+            if (StudentCase::query()->where('title', $def['title'])->exists()) {
+                continue;
+            }
+
+            $cases->open(
+                $def['student'],
+                $def['type'],
+                $def['title'],
+                $def['summary'],
+                $def['assignee'],
+                $def['opened_by'],
+                $def['handoff'],
+            );
         }
-
-        $cases->open(
-            $picked[0],
-            CampusVisitPurpose::Fees,
-            $demoTitles[0],
-            'Parent asked to waive late fee for Term 1.',
-            $this->accountant,
-            $this->counsellor,
-            'Please review and advise.',
-        );
-
-        $cases->open(
-            $picked[1],
-            CampusVisitPurpose::Academic,
-            $demoTitles[1],
-            'Student needs remedial Maths sessions.',
-            $this->academicCoordinator,
-            $this->counsellor,
-            'Assign a teacher for two weeks.',
-        );
-
-        $cases->open(
-            $picked[2],
-            CampusVisitPurpose::Documents,
-            $demoTitles[2],
-            'Documents requested for scholarship.',
-            $this->academicCoordinator,
-            $openedBy,
-            null,
-        );
     }
 
     protected function seedStaffAttendanceToday(User $actor): void
