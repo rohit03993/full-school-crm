@@ -489,7 +489,8 @@ class DemoOperationalHistorySeeder extends Seeder
     }
 
     /**
-     * Finish Term 2 for students who got DEMO-OPS part 1 only (failed when proof file was reused).
+     * Finish Term 2 for campus students with both terms past-due and remaining pending.
+     * (First run often applied Term 1 then failed Term 2 when the fake proof file was reused.)
      */
     protected function completeMissingSecondFeePayments(User $staff): void
     {
@@ -498,50 +499,36 @@ class DemoOperationalHistorySeeder extends Seeder
         $skipped = 0;
         $firstError = null;
 
-        $part1Markers = Payment::query()
-            ->where(function ($q): void {
-                $q->where('voucher_number', 'like', self::MARKER_VOUCHER_PREFIX.'%-1')
-                    ->orWhere('transaction_id', 'like', self::MARKER_VOUCHER_PREFIX.'%-1')
-                    ->orWhere('utr_number', 'like', self::MARKER_VOUCHER_PREFIX.'%-1');
-            })
-            ->with(['feeStructure.installments', 'feeStructure.enrollment.student'])
+        $codes = collect(range(5, 12))->map(fn (int $n): string => sprintf('SCH-%02d', $n));
+        $courseIds = Course::query()->whereIn('code', $codes)->pluck('id');
+
+        $structures = FeeStructure::query()
+            ->whereHas('enrollment', fn ($q) => $q->whereIn('course_id', $courseIds)->where('is_active', true))
+            ->with(['enrollment.student', 'installments'])
+            ->where('pending_amount', '>', 1)
             ->get();
 
-        foreach ($part1Markers as $index => $payment) {
-            $feeStructure = $payment->feeStructure;
-            $student = $feeStructure?->enrollment?->student;
-            if (! $feeStructure || ! $student) {
+        foreach ($structures as $feeStructure) {
+            $student = $feeStructure->enrollment?->student;
+            if (! $student) {
                 continue;
             }
 
-            $part2 = self::MARKER_VOUCHER_PREFIX.$feeStructure->id.'-2';
-            $hasPart2 = Payment::query()
-                ->where(function ($q) use ($part2): void {
-                    $q->where('voucher_number', $part2)
-                        ->orWhere('transaction_id', $part2)
-                        ->orWhere('utr_number', $part2);
-                })
-                ->exists();
-
-            if ($hasPart2) {
-                continue;
-            }
-
-            $pending = round((float) $feeStructure->fresh()->pending_amount, 2);
-            if ($pending <= 0) {
-                continue;
-            }
-
-            // Only backfill the "fully paid" persona (both terms past due).
-            // Partial personas keep Term 2 with a future due date.
             $rows = $feeStructure->installments;
             if ($rows->count() < 2) {
                 continue;
             }
+
+            // Fully-paid persona only: both installment due dates in the past.
             $bothPastDue = $rows->every(
-                fn ($row): bool => $row->due_date !== null && $row->due_date->isPast()
+                fn ($row): bool => $row->due_date !== null && $row->due_date->lt(now()->startOfDay())
             );
             if (! $bothPastDue) {
+                continue;
+            }
+
+            $pending = round((float) $feeStructure->pending_amount, 2);
+            if ($pending <= 0) {
                 continue;
             }
 
@@ -598,24 +585,50 @@ class DemoOperationalHistorySeeder extends Seeder
             }
 
             $testName = self::MIDTERM_TEST_NAME.' — '.$batch->name;
-            if (ExamWindow::query()->where('batch_id', $batch->id)->where('test_name', $testName)->exists()) {
-                $existing = ExamWindow::query()
-                    ->where('batch_id', $batch->id)
-                    ->where('test_name', $testName)
-                    ->first();
-                if ($existing && $approvedForPublish === null && $existing->status === ExamWindowStatus::Approved) {
-                    $approvedForPublish = $existing;
+
+            $unique = ExamWindow::query()
+                ->where('batch_id', $batch->id)
+                ->where('test_name', $testName)
+                ->first();
+
+            if ($unique) {
+                if ($approvedForPublish === null && $unique->status === ExamWindowStatus::Approved) {
+                    $approvedForPublish = $unique;
                 }
                 $skipped++;
 
                 continue;
             }
 
-            // Also skip legacy shared-name window on this batch.
-            if (ExamWindow::query()->where('batch_id', $batch->id)->where('test_name', self::MIDTERM_TEST_NAME)->exists()) {
-                $skipped++;
+            // First run created empty shared-name windows, then failed on locked marks.
+            // Remove incomplete legacy windows so we can recreate with unique test keys.
+            $legacy = ExamWindow::query()
+                ->where('batch_id', $batch->id)
+                ->where('test_name', self::MIDTERM_TEST_NAME)
+                ->first();
 
-                continue;
+            if ($legacy) {
+                $legacyPublished = ResultDeclaration::query()
+                    ->where('group_key', $legacy->test_key)
+                    ->whereNotNull('declared_at')
+                    ->exists();
+
+                $hasScores = ActivitySession::query()
+                    ->where('batch_id', $batch->id)
+                    ->where('metadata->test_key', $legacy->test_key)
+                    ->whereHas('activityAttendances')
+                    ->exists();
+
+                if ($legacyPublished && $hasScores) {
+                    if ($approvedForPublish === null) {
+                        $approvedForPublish = $legacy;
+                    }
+                    $skipped++;
+
+                    continue;
+                }
+
+                $this->deleteIncompleteExamWindow($legacy);
             }
 
             $students = Student::query()
@@ -626,7 +639,6 @@ class DemoOperationalHistorySeeder extends Seeder
                 continue;
             }
 
-            // Unique date per batch so test_key never collides across sections.
             $sessionDate = now()->subDays(40 + $batchIndex)->toDateString();
 
             try {
@@ -737,6 +749,24 @@ class DemoOperationalHistorySeeder extends Seeder
         }
 
         $this->command?->line("  Marks / publish: {$created} mid-terms created · {$skipped} already present.");
+    }
+
+    protected function deleteIncompleteExamWindow(ExamWindow $window): void
+    {
+        $testKey = $window->test_key;
+
+        $sessions = ActivitySession::query()
+            ->where('batch_id', $window->batch_id)
+            ->where('metadata->test_key', $testKey)
+            ->get();
+
+        foreach ($sessions as $session) {
+            $session->activityAttendances()->delete();
+            $session->delete();
+        }
+
+        $window->subjects()->delete();
+        $window->delete();
     }
 
     /**
