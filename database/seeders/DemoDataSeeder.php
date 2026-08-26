@@ -208,6 +208,10 @@ class DemoDataSeeder extends Seeder
 
         $this->seedDemoActivities($staff, $batch, array_slice($classStudents, 0, 3), $instituteType);
 
+        if ($instituteType === InstituteType::School) {
+            $this->call(DemoSchoolCampusSeeder::class);
+        }
+
         $this->printSummary($instituteType, $primaryCourse, $demo, $studentThree->fresh());
     }
 
