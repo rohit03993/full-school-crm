@@ -98,10 +98,6 @@ class AdminPanelProvider extends PanelProvider
                 EnsureInstituteOnboardingComplete::class,
             ])
             ->renderHook(
-                PanelsRenderHook::BODY_START,
-                fn (): string => view('filament.partials.demo-mode-banner')->render(),
-            )
-            ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): string => view('filament.partials.pwa-head')->render(),
             )

@@ -2,20 +2,15 @@
 
 namespace App\Support;
 
+/**
+ * Marks a sales-demo install (e.g. demo.taskbook.co.in).
+ * Does not change CRM behaviour — WhatsApp and features match a normal school install.
+ * Use with SEED_DEMO_DATA for dummy XYZ School rows only on that server.
+ */
 class DemoMode
 {
     public static function enabled(): bool
     {
         return filter_var(config('institute.demo_mode', false), FILTER_VALIDATE_BOOLEAN);
-    }
-
-    public static function sendBlockedMessage(): string
-    {
-        return 'Demo desk — WhatsApp is not sent to real phones. The inbox screen still works.';
-    }
-
-    public static function bannerMessage(): string
-    {
-        return 'Task Book demo — dummy XYZ School. Do not enter a paying campus here. WhatsApp is not sent to real phones.';
     }
 }

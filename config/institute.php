@@ -17,8 +17,9 @@ return [
     'seed_demo_data' => filter_var(env('SEED_DEMO_DATA', false), FILTER_VALIDATE_BOOLEAN),
 
     /*
-    | Sales demo desk only (e.g. demo.taskbook.co.in). Default false — paying schools unchanged.
-    | When true: outbound Meta WhatsApp is blocked; admin shows a demo banner.
+    | Sales demo desk flag (e.g. demo.taskbook.co.in). Default false.
+    | Does not block WhatsApp or hide features — same CRM as a paying school.
+    | Pair with SEED_DEMO_DATA=true only on the demo database.
     */
     'demo_mode' => filter_var(env('DEMO_MODE', false), FILTER_VALIDATE_BOOLEAN),
 
