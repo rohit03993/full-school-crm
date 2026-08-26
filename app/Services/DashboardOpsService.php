@@ -267,7 +267,7 @@ class DashboardOpsService
                     'day' => $day->format('D'),
                     'is_today' => $i === 0,
                     'leads' => FeatureGate::enabled(LicenseFeature::Enquiries)
-                        ? (int) Enquiry::query()->whereDate('created_at', $date)->count()
+                        ? (int) Enquiry::query()->activeLeads()->whereDate('created_at', $date)->count()
                         : 0,
                     'fees' => FeatureGate::enabled(LicenseFeature::Fees)
                         ? (float) Payment::query()->active()->whereDate('payment_date', $date)->sum('amount')

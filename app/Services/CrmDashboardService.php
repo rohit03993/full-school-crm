@@ -43,6 +43,7 @@ class CrmDashboardService
      *     range_enquiries: int,
      *     range_website: int,
      *     range_walk_in: int,
+     *     range_enquiry_intake: int,
      *     admissions_this_month: int,
      *     range_admissions: int,
      *     pending_admissions: int,
@@ -69,25 +70,27 @@ class CrmDashboardService
             $to = $filters->to->toDateString();
             $attendance = $this->attendanceTotals($filters);
 
-            $enquiriesInRange = fn (): Builder => Enquiry::query()
+            $enquiriesCreatedInRange = fn (): Builder => Enquiry::query()
                 ->whereDate('created_at', '>=', $from)
                 ->whereDate('created_at', '<=', $to)
                 ->when($filters->courseId, fn (Builder $query, int $courseId) => $query->where('course_id', $courseId));
 
+            // Open leads only — same rule as All leads (excludes enrolled / Joined).
+            $activeLeadsInRange = fn (): Builder => $enquiriesCreatedInRange()->activeLeads();
+            $activeLeadsToday = fn (): Builder => Enquiry::query()
+                ->activeLeads()
+                ->whereDate('created_at', $today);
+
             return [
-                'total_enquiries' => Enquiry::query()->count(),
-                'today_enquiries' => Enquiry::query()->whereDate('created_at', $today)->count(),
-                'website_today' => Enquiry::query()
-                    ->whereDate('created_at', $today)
-                    ->where('lead_source', LeadSource::Website)
-                    ->count(),
-                'walk_in_today' => Enquiry::query()
-                    ->whereDate('created_at', $today)
-                    ->where('lead_source', LeadSource::WalkIn)
-                    ->count(),
-                'range_enquiries' => $enquiriesInRange()->count(),
-                'range_website' => $enquiriesInRange()->where('lead_source', LeadSource::Website)->count(),
-                'range_walk_in' => $enquiriesInRange()->where('lead_source', LeadSource::WalkIn)->count(),
+                'total_enquiries' => Enquiry::query()->activeLeads()->count(),
+                'today_enquiries' => $activeLeadsToday()->count(),
+                'website_today' => $activeLeadsToday()->where('lead_source', LeadSource::Website)->count(),
+                'walk_in_today' => $activeLeadsToday()->where('lead_source', LeadSource::WalkIn)->count(),
+                'range_enquiries' => $activeLeadsInRange()->count(),
+                'range_website' => $activeLeadsInRange()->where('lead_source', LeadSource::Website)->count(),
+                'range_walk_in' => $activeLeadsInRange()->where('lead_source', LeadSource::WalkIn)->count(),
+                // All enquiry rows created in range (includes people who later enrolled) — conversion denominator.
+                'range_enquiry_intake' => $enquiriesCreatedInRange()->count(),
                 'admissions_this_month' => Admission::query()
                     ->where('status', AdmissionStatus::Approved)
                     ->where('approved_at', '>=', $monthStart)
@@ -417,6 +420,7 @@ class CrmDashboardService
 
         return $this->remember($filters->cacheKey('lead_sources'), self::CHART_CACHE_SECONDS, function () use ($filters): array {
             $counts = Enquiry::query()
+                ->activeLeads()
                 ->whereDate('created_at', '>=', $filters->from->toDateString())
                 ->whereDate('created_at', '<=', $filters->to->toDateString())
                 ->when($filters->courseId, fn (Builder $query, int $courseId) => $query->where('course_id', $courseId))
@@ -479,6 +483,7 @@ class CrmDashboardService
 
         return $this->remember($filters->cacheKey("recent_enquiries.{$limit}"), self::STATS_CACHE_SECONDS, function () use ($limit, $filters): Collection {
             return Enquiry::query()
+                ->activeLeads()
                 ->with(['student', 'course'])
                 ->when($filters->courseId, fn (Builder $query, int $courseId) => $query->where('course_id', $courseId))
                 ->latest()

@@ -159,7 +159,7 @@ class DashboardTodayPulseWidget extends Widget
                 'key' => 'leads',
                 'label' => 'New leads',
                 'value' => (string) $data['leads_today'],
-                'meta' => 'Enquiries today',
+                'meta' => 'Open leads today',
                 'tone' => 'info',
                 'url' => EnquiryResource::canViewAny() ? EnquiryResource::getUrl('index') : null,
                 'show' => FeatureGate::enabled(LicenseFeature::Enquiries) && EnquiryResource::canViewAny(),

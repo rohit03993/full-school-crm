@@ -50,13 +50,14 @@ class CrmLeadStatsWidget extends StatsOverviewWidget
     {
         $stats = app(CrmDashboardService::class)->stats($this->dashboardFilters());
 
-        $conversion = $stats['range_enquiries'] > 0
-            ? round(($stats['range_admissions'] / $stats['range_enquiries']) * 100)
+        $intake = (int) ($stats['range_enquiry_intake'] ?? $stats['range_enquiries'] ?? 0);
+        $conversion = $intake > 0
+            ? round(($stats['range_admissions'] / $intake) * 100)
             : 0;
 
         return [
             Stat::make('New leads', (string) $stats['range_enquiries'])
-                ->description($stats['range_website'].' website · '.$stats['range_walk_in'].' walk-in')
+                ->description($stats['range_website'].' website · '.$stats['range_walk_in'].' walk-in · open only')
                 ->descriptionIcon(Heroicon::OutlinedInboxArrowDown)
                 ->color('primary')
                 ->url(EnquiryResource::getUrl('index')),
@@ -66,7 +67,7 @@ class CrmLeadStatsWidget extends StatsOverviewWidget
                 ->color('success')
                 ->url(AdmissionResource::getUrl('index')),
             Stat::make('Lead to admission', $conversion.'%')
-                ->description('Approved against leads in period')
+                ->description('Approved against enquiry intake in period')
                 ->descriptionIcon(Heroicon::OutlinedArrowTrendingUp)
                 ->color($conversion >= 20 ? 'success' : 'gray'),
             Stat::make('Pending admissions', (string) $stats['pending_admissions'])
