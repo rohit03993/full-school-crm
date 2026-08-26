@@ -109,6 +109,184 @@ class ManualBatchAttendanceService
     }
 
     /**
+     * Mark student as Leave for the day (not Present). Requires a reason.
+     *
+     * @return array{ok: bool, message: string, whatsapp: null}
+     */
+    public function markLeave(Student $student, string $date, User $staff, string $reason, ?Batch $batch = null): array
+    {
+        if ($blocked = $this->manualDateBlockedResult($date)) {
+            return $blocked;
+        }
+
+        $reason = trim($reason);
+
+        if ($reason === '') {
+            return [
+                'ok' => false,
+                'message' => 'Enter a leave reason (pick a tag or type your own).',
+                'whatsapp' => null,
+            ];
+        }
+
+        $batch ??= $this->activeBatchForStudent($student);
+
+        if (! $batch) {
+            return [
+                'ok' => false,
+                'message' => 'Student is not in an active class section.',
+                'whatsapp' => null,
+            ];
+        }
+
+        $roll = $this->rollForStudent($student);
+        if ($roll !== null) {
+            $dayRow = app(LivePunchDashboardService::class)->studentDayRow($roll, $date, $student);
+            if (($dayRow['current_state'] ?? null) === 'IN') {
+                return [
+                    'ok' => false,
+                    'message' => 'Student is still inside. Mark OUT first, or clear today’s IN before Leave.',
+                    'whatsapp' => null,
+                ];
+            }
+            if (($dayRow['pairs'] ?? []) !== []) {
+                return [
+                    'ok' => false,
+                    'message' => 'Student already has an IN punch today. Leave is only for students who did not attend.',
+                    'whatsapp' => null,
+                ];
+            }
+        }
+
+        $existing = Attendance::query()
+            ->where('batch_id', $batch->id)
+            ->where('student_id', $student->id)
+            ->whereDate('attendance_date', $date)
+            ->first();
+
+        if ($existing?->checked_in_at !== null) {
+            return [
+                'ok' => false,
+                'message' => 'Student already has check-in today. Leave is only when they did not come.',
+                'whatsapp' => null,
+            ];
+        }
+
+        Attendance::query()->updateOrCreate(
+            [
+                'batch_id' => $batch->id,
+                'student_id' => $student->id,
+                'attendance_date' => $date,
+            ],
+            [
+                'status' => AttendanceStatus::Leave,
+                'checked_in_at' => null,
+                'checked_out_at' => null,
+                'punch_source' => 'roll_call',
+                'leave_reason' => mb_substr($reason, 0, 255),
+                'marked_by_user_id' => $staff->id,
+            ],
+        );
+
+        CrmCacheInvalidator::afterAttendanceChange();
+
+        return [
+            'ok' => true,
+            'message' => 'Marked on Leave.',
+            'whatsapp' => null,
+        ];
+    }
+
+    /**
+     * Mark student Absent for the day (not Leave / not Present).
+     *
+     * @return array{ok: bool, message: string, whatsapp: null}
+     */
+    public function markAbsent(Student $student, string $date, User $staff, ?Batch $batch = null): array
+    {
+        if ($blocked = $this->manualDateBlockedResult($date)) {
+            return $blocked;
+        }
+
+        $batch ??= $this->activeBatchForStudent($student);
+
+        if (! $batch) {
+            return [
+                'ok' => false,
+                'message' => 'Student is not in an active class section.',
+                'whatsapp' => null,
+            ];
+        }
+
+        $roll = $this->rollForStudent($student);
+        if ($roll !== null) {
+            $dayRow = app(LivePunchDashboardService::class)->studentDayRow($roll, $date, $student);
+            if (($dayRow['current_state'] ?? null) === 'IN') {
+                return [
+                    'ok' => false,
+                    'message' => 'Student is still inside. Mark OUT first before Absent.',
+                    'whatsapp' => null,
+                ];
+            }
+            if (($dayRow['pairs'] ?? []) !== []) {
+                return [
+                    'ok' => false,
+                    'message' => 'Student already has an IN punch today. Cannot mark Absent.',
+                    'whatsapp' => null,
+                ];
+            }
+        }
+
+        $existing = Attendance::query()
+            ->where('batch_id', $batch->id)
+            ->where('student_id', $student->id)
+            ->whereDate('attendance_date', $date)
+            ->first();
+
+        if ($existing?->checked_in_at !== null) {
+            return [
+                'ok' => false,
+                'message' => 'Student already has check-in today. Cannot mark Absent.',
+                'whatsapp' => null,
+            ];
+        }
+
+        Attendance::query()->updateOrCreate(
+            [
+                'batch_id' => $batch->id,
+                'student_id' => $student->id,
+                'attendance_date' => $date,
+            ],
+            [
+                'status' => AttendanceStatus::Absent,
+                'checked_in_at' => null,
+                'checked_out_at' => null,
+                'punch_source' => 'roll_call',
+                'leave_reason' => null,
+                'marked_by_user_id' => $staff->id,
+            ],
+        );
+
+        CrmCacheInvalidator::afterAttendanceChange();
+
+        return [
+            'ok' => true,
+            'message' => 'Marked Absent.',
+            'whatsapp' => null,
+        ];
+    }
+
+    private function activeBatchForStudent(Student $student): ?Batch
+    {
+        $batchId = BatchStudent::query()
+            ->where('student_id', $student->id)
+            ->where('is_active', true)
+            ->value('batch_id');
+
+        return $batchId ? Batch::query()->find($batchId) : null;
+    }
+
+    /**
      * @param  array<int, string>  $marks  student_id => attendance status value
      * @return array{saved: int, in_punches: int, no_roll: int, whatsapp_queued: int, whatsapp_skipped: int}
      */
@@ -223,8 +401,11 @@ class ManualBatchAttendanceService
             ],
             [
                 'status' => $status,
-                'marked_by_user_id' => $staff->id,
+                'checked_in_at' => null,
+                'checked_out_at' => null,
                 'punch_source' => 'roll_call',
+                'leave_reason' => null,
+                'marked_by_user_id' => $staff->id,
             ],
         );
     }

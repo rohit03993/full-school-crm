@@ -212,16 +212,22 @@ class AttendanceHubOverviewService
             );
             $channel = AttendanceSourceLabel::isManual($row->punch_source) ? 'Manual' : 'Auto / machine';
 
+            $detail = ClassSectionLabel::forBatch($row->batch, includeSession: false, includeShift: false)
+                .($row->student?->activeEnrollment?->enrollment_number
+                    ? ' · Roll '.$row->student->activeEnrollment->enrollment_number
+                    : '');
+            if ($status === AttendanceStatus::Leave && filled($row->leave_reason)) {
+                $detail .= ' · '.$row->leave_reason;
+            }
+
             return [
                 'kind' => 'student',
                 'kind_label' => 'Student',
                 'name' => $row->student?->name ?? '—',
-                'detail' => ClassSectionLabel::forBatch($row->batch, includeSession: false, includeShift: false)
-                    .($row->student?->activeEnrollment?->enrollment_number
-                        ? ' · Roll '.$row->student->activeEnrollment->enrollment_number
-                        : ''),
+                'detail' => $detail,
                 'status' => $status?->label() ?? '—',
                 'status_value' => $status?->value ?? '',
+                'leave_reason' => $status === AttendanceStatus::Leave ? ($row->leave_reason ?: null) : null,
                 'channel' => $channel,
                 'source' => $source,
                 'in_at' => $row->checked_in_at?->format('h:i A'),

@@ -19,6 +19,7 @@ use App\Services\Punch\PunchBatchRosterService;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
+use App\Support\AttendanceLeaveReasons;
 use App\Support\FeatureGate;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -119,6 +120,16 @@ class AttendancePage extends Page
     public array $attendanceSnapshot = [];
 
     public bool $rosterLoaded = false;
+
+    public bool $showLeaveModal = false;
+
+    public ?int $leaveStudentId = null;
+
+    public string $leaveStudentName = '';
+
+    public string $leaveTag = '';
+
+    public string $leaveCustomReason = '';
 
     /**
      * @var Collection<int, BatchStudent>
@@ -515,6 +526,159 @@ class AttendancePage extends Page
 
         $this->loadRoster();
         $this->notifyManualPunchResult('Check-out (OUT) saved', $student->name, $result);
+    }
+
+    public function openLeaveModal(int $studentId): void
+    {
+        $student = Student::query()->find($studentId);
+
+        if (! $student) {
+            Notification::make()->title('Student not found')->danger()->send();
+
+            return;
+        }
+
+        if (! ($this->attendanceSnapshot[$studentId]['can_leave'] ?? false)) {
+            Notification::make()
+                ->title('Cannot mark Leave')
+                ->body('Leave is only for students who did not attend today (no IN punch).')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->leaveStudentId = $studentId;
+        $this->leaveStudentName = $student->name;
+        $this->leaveTag = '';
+        $this->leaveCustomReason = '';
+
+        $existingReason = trim((string) ($this->attendanceSnapshot[$studentId]['leave_reason'] ?? ''));
+        if ($existingReason !== '') {
+            foreach (AttendanceLeaveReasons::tags() as $tag) {
+                if (strcasecmp($existingReason, $tag) === 0) {
+                    $this->leaveTag = $tag;
+                    break;
+                }
+                $prefix = $tag.' — ';
+                if (str_starts_with($existingReason, $prefix)) {
+                    $this->leaveTag = $tag;
+                    $this->leaveCustomReason = trim(substr($existingReason, strlen($prefix)));
+                    break;
+                }
+            }
+            if ($this->leaveTag === '') {
+                $this->leaveCustomReason = $existingReason;
+            }
+        }
+
+        $this->showLeaveModal = true;
+    }
+
+    public function closeLeaveModal(): void
+    {
+        $this->showLeaveModal = false;
+        $this->leaveStudentId = null;
+        $this->leaveStudentName = '';
+        $this->leaveTag = '';
+        $this->leaveCustomReason = '';
+    }
+
+    public function selectLeaveTag(string $tag): void
+    {
+        $this->leaveTag = $this->leaveTag === $tag ? '' : $tag;
+    }
+
+    public function confirmLeave(ManualBatchAttendanceService $manualBatch): void
+    {
+        if (! $this->leaveStudentId) {
+            $this->closeLeaveModal();
+
+            return;
+        }
+
+        $reason = AttendanceLeaveReasons::compose($this->leaveTag, $this->leaveCustomReason);
+
+        if ($reason === '') {
+            Notification::make()
+                ->title('Leave reason required')
+                ->body('Pick a tag or type a custom reason.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $date = $this->filters['date'] ?? now()->toDateString();
+        $student = Student::query()->find($this->leaveStudentId);
+        $batchId = filled($this->filters['batch_id'] ?? null) ? (int) $this->filters['batch_id'] : null;
+        $batch = $batchId ? Batch::query()->find($batchId) : null;
+
+        if (! $student) {
+            Notification::make()->title('Student not found')->danger()->send();
+            $this->closeLeaveModal();
+
+            return;
+        }
+
+        $result = $manualBatch->markLeave($student, $date, Auth::user(), $reason, $batch);
+
+        if (! $result['ok']) {
+            Notification::make()
+                ->title('Cannot mark Leave')
+                ->body($result['message'])
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->marks[$student->id] = AttendanceStatus::Leave->value;
+        $this->closeLeaveModal();
+        $this->loadRoster();
+
+        Notification::make()
+            ->title('Marked on Leave')
+            ->body("{$student->name}: {$reason}")
+            ->success()
+            ->send();
+    }
+
+    public function markAbsentForStudent(
+        ManualBatchAttendanceService $manualBatch,
+        int $studentId,
+    ): void {
+        $date = $this->filters['date'] ?? now()->toDateString();
+        $student = Student::query()->find($studentId);
+        $batchId = filled($this->filters['batch_id'] ?? null) ? (int) $this->filters['batch_id'] : null;
+        $batch = $batchId ? Batch::query()->find($batchId) : null;
+
+        if (! $student) {
+            Notification::make()->title('Student not found')->danger()->send();
+
+            return;
+        }
+
+        $result = $manualBatch->markAbsent($student, $date, Auth::user(), $batch);
+
+        if (! $result['ok']) {
+            Notification::make()
+                ->title('Cannot mark Absent')
+                ->body($result['message'])
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->marks[$studentId] = AttendanceStatus::Absent->value;
+        $this->loadRoster();
+
+        Notification::make()
+            ->title('Marked Absent')
+            ->body($student->name)
+            ->success()
+            ->send();
     }
 
     /**

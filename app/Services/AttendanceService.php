@@ -305,7 +305,10 @@ class AttendanceService
      *     pairs: list<array<string, mixed>>,
      *     punch_source: ?string,
      *     marked_by_name: ?string,
-     *     source_label: string
+     *     source_label: string,
+     *     leave_reason: ?string,
+     *     can_leave: bool,
+     *     can_absent: bool
      * }>
      */
     public function punchSnapshotForBatchDate(Batch $batch, string $date): array
@@ -393,6 +396,12 @@ class AttendanceService
                 $visitCount = 1;
             }
 
+            $neverAttended = ! $isInside
+                && $visitCount === 0
+                && $attendance?->checked_in_at === null;
+            $canLeaveOrAbsent = $neverAttended
+                || in_array($attendance?->status, [AttendanceStatus::Absent, AttendanceStatus::Leave], true);
+
             $snapshot[$student->id] = [
                 'status' => $attendance?->status->value,
                 'checked_in_at' => $checkedIn,
@@ -401,10 +410,13 @@ class AttendanceService
                 // Next action: after checkout (incl. 20:00 auto-out), IN is allowed for a return visit.
                 'can_in' => ! $isInside,
                 'can_out' => $isInside,
+                'can_leave' => $canLeaveOrAbsent && ! $isInside,
+                'can_absent' => $canLeaveOrAbsent && ! $isInside,
                 'visit_count' => $visitCount,
                 'pairs' => $pairs,
                 'punch_source' => $punchSource,
                 'marked_by_name' => $staffName,
+                'leave_reason' => $attendance?->leave_reason,
                 'source_label' => $sourceLabel !== '—'
                     ? $sourceLabel
                     : \App\Support\AttendanceSourceLabel::for($punchSource, $staffName),

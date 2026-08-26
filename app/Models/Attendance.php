@@ -16,6 +16,7 @@ class Attendance extends Model
         'checked_in_at',
         'checked_out_at',
         'punch_source',
+        'leave_reason',
         'marked_by_user_id',
     ];
 
