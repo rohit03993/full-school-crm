@@ -26,8 +26,10 @@ use App\Models\Batch;
 use App\Models\Course;
 use App\Models\Enquiry;
 use App\Models\Enrollment;
+use App\Models\HomeworkAssignment;
 use App\Models\StaffProfile;
 use App\Models\Student;
+use App\Models\StudentCase;
 use App\Models\User;
 use App\Models\Visit;
 use App\Services\ActivityAttendanceService;
@@ -49,7 +51,7 @@ use Spatie\Permission\Models\Role;
 /**
  * Rich school campus for sales demo: Classes 5–12 × sections A/B,
  * ~35 staff (teachers + office roles), subjects, homework, marks, cases.
- * Safe to re-run only after migrate:fresh — skips if SCH-05 already exists.
+ * Re-runnable: if SCH-05 exists, finishes homework / marks / cases / attendance only.
  */
 class DemoSchoolCampusSeeder extends Seeder
 {
@@ -77,12 +79,6 @@ class DemoSchoolCampusSeeder extends Seeder
             return;
         }
 
-        if (Course::query()->where('code', 'SCH-05')->exists()) {
-            $this->command?->warn('School campus already seeded (SCH-05 exists). Skip.');
-
-            return;
-        }
-
         $session = AcademicSession::current();
         $approver = User::query()
             ->whereHas('roles', fn ($q) => $q->where('name', RoleName::SuperAdmin->value))
@@ -96,13 +92,24 @@ class DemoSchoolCampusSeeder extends Seeder
 
         Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);
 
-        $this->command?->info('Seeding school campus (Classes 5–12)…');
-
         $office = $this->seedOfficeStaff();
         $this->teachers = $this->seedTeachers(26);
         $this->academicCoordinator = $office['academic'];
         $this->counsellor = $office['counsellor'];
         $this->accountant = $office['accountant'];
+
+        if (Course::query()->where('code', 'SCH-05')->exists()) {
+            $this->command?->warn('School campus classes already exist — finishing homework, marks, cases, attendance…');
+            $batchesWithStudents = $this->loadExistingCampusGroups($session);
+            $this->seedHomeworkAndMarks($batchesWithStudents);
+            $this->seedCases($batchesWithStudents, $approver);
+            $this->seedStaffAttendanceToday($approver);
+            $this->printCampusSummary();
+
+            return;
+        }
+
+        $this->command?->info('Seeding school campus (Classes 5–12)…');
 
         $staffActor = $office['admission'];
         $batchesWithStudents = [];
@@ -160,6 +167,45 @@ class DemoSchoolCampusSeeder extends Seeder
         $this->seedStaffAttendanceToday($approver);
 
         $this->printCampusSummary();
+    }
+
+    /**
+     * @return list<array{batch: Batch, students: list<Student>, class: int}>
+     */
+    protected function loadExistingCampusGroups(AcademicSession $session): array
+    {
+        $groups = [];
+
+        foreach (range(5, 12) as $classNo) {
+            $course = Course::query()->where('code', sprintf('SCH-%02d', $classNo))->first();
+            if (! $course) {
+                continue;
+            }
+
+            foreach (['A', 'B'] as $section) {
+                $batch = Batch::query()
+                    ->where('course_id', $course->id)
+                    ->where('academic_session_id', $session->id)
+                    ->where('name', "Class {$classNo}-{$section}")
+                    ->first();
+
+                if (! $batch) {
+                    continue;
+                }
+
+                $studentIds = $batch->activeStudents()->pluck('student_id');
+                $students = Student::query()
+                    ->whereIn('id', $studentIds)
+                    ->with('activeEnrollment')
+                    ->get()
+                    ->all();
+
+                $groups[] = ['batch' => $batch, 'students' => $students, 'class' => $classNo];
+                $this->command?->line("  Resume {$batch->name}: ".count($students).' students');
+            }
+        }
+
+        return $groups;
     }
 
     /**
@@ -409,26 +455,33 @@ class DemoSchoolCampusSeeder extends Seeder
                 continue;
             }
 
-            $active = $homework->create($teacher, [
-                'batch_id' => $batch->id,
-                'title' => 'This week — '.$batch->name.' practice',
-                'description' => 'Complete the worksheet and bring it tomorrow.',
-                'send_whatsapp' => false,
-            ]);
+            $activeTitle = 'This week — '.$batch->name.' practice';
+            $pastTitle = 'Last fortnight revision — '.$batch->name;
 
-            $past = $homework->create($teacher, [
-                'batch_id' => $batch->id,
-                'title' => 'Last fortnight revision — '.$batch->name,
-                'description' => 'Revision chapter already discussed in class.',
-                'send_whatsapp' => false,
-            ]);
-            $past->update([
-                'published_at' => now()->subDays(12),
-                'homework_date' => now()->subDays(12)->toDateString(),
-            ]);
-            $active->update([
-                'homework_date' => now()->toDateString(),
-            ]);
+            if (! HomeworkAssignment::query()->where('batch_id', $batch->id)->where('title', $activeTitle)->exists()) {
+                $active = $homework->create($teacher, [
+                    'batch_id' => $batch->id,
+                    'title' => $activeTitle,
+                    'description' => 'Complete the worksheet and bring it tomorrow.',
+                    'send_whatsapp' => false,
+                ]);
+                $active->update([
+                    'homework_date' => now()->toDateString(),
+                ]);
+            }
+
+            if (! HomeworkAssignment::query()->where('batch_id', $batch->id)->where('title', $pastTitle)->exists()) {
+                $past = $homework->create($teacher, [
+                    'batch_id' => $batch->id,
+                    'title' => $pastTitle,
+                    'description' => 'Revision chapter already discussed in class.',
+                    'send_whatsapp' => false,
+                ]);
+                $past->update([
+                    'published_at' => now()->subDays(12),
+                    'homework_date' => now()->subDays(12)->toDateString(),
+                ]);
+            }
 
             if (! $examType || $students === [] || $group['class'] < 10) {
                 continue;
@@ -436,13 +489,25 @@ class DemoSchoolCampusSeeder extends Seeder
 
             $batch->loadMissing('activeSubjects');
             foreach ($batch->activeSubjects->take(3) as $subject) {
+                $testKey = 'unit-'.$batch->id.'-'.$subject->id;
+                $existing = ActivitySession::query()
+                    ->where('batch_id', $batch->id)
+                    ->where('activity_type_id', $examType->id)
+                    ->where('title', "Unit Test — {$subject->name}")
+                    ->first();
+
+                if ($existing) {
+                    continue;
+                }
+
                 $session = ActivitySession::query()->create([
                     'activity_type_id' => $examType->id,
                     'title' => "Unit Test — {$subject->name}",
                     'session_date' => now()->subDays(5)->toDateString(),
                     'batch_id' => $batch->id,
+                    'created_by_user_id' => $teacher->id,
                     'metadata' => [
-                        'test_key' => 'unit-'.$batch->id.'-'.$subject->id,
+                        'test_key' => $testKey,
                         'test_name' => 'Unit Test 1',
                         'subject' => $subject->name,
                         'max_marks' => 40,
@@ -483,10 +548,20 @@ class DemoSchoolCampusSeeder extends Seeder
             return;
         }
 
+        $demoTitles = [
+            'Late fee waiver request',
+            'Extra class for Maths',
+            'TC / bonafide pending',
+        ];
+
+        if (StudentCase::query()->whereIn('title', $demoTitles)->exists()) {
+            return;
+        }
+
         $cases->open(
             $picked[0],
             CampusVisitPurpose::Fees,
-            'Late fee waiver request',
+            $demoTitles[0],
             'Parent asked to waive late fee for Term 1.',
             $this->accountant,
             $this->counsellor,
@@ -496,7 +571,7 @@ class DemoSchoolCampusSeeder extends Seeder
         $cases->open(
             $picked[1],
             CampusVisitPurpose::Academic,
-            'Extra class for Maths',
+            $demoTitles[1],
             'Student needs remedial Maths sessions.',
             $this->academicCoordinator,
             $this->counsellor,
@@ -506,7 +581,7 @@ class DemoSchoolCampusSeeder extends Seeder
         $cases->open(
             $picked[2],
             CampusVisitPurpose::Documents,
-            'TC / bonafide pending',
+            $demoTitles[2],
             'Documents requested for scholarship.',
             $this->academicCoordinator,
             $openedBy,
