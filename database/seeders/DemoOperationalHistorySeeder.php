@@ -6,6 +6,7 @@ use App\Enums\AttendanceStatus;
 use App\Enums\CallDirection;
 use App\Enums\CallStatus;
 use App\Enums\EnrolledCallPurpose;
+use App\Enums\ExamWindowStatus;
 use App\Enums\Gender;
 use App\Enums\HomeworkCheckNotifyStatus;
 use App\Enums\HomeworkCheckStatus;
@@ -26,6 +27,7 @@ use App\Models\FeeStructure;
 use App\Models\HomeworkAssignment;
 use App\Models\HomeworkCheck;
 use App\Models\Payment;
+use App\Models\ResultDeclaration;
 use App\Models\StaffAttendance;
 use App\Models\Student;
 use App\Models\StudentCall;
@@ -44,6 +46,7 @@ use App\Services\ResultDeclarationService;
 use App\Models\Setting;
 use App\Support\CrmCacheInvalidator;
 use App\Support\FeePaymentPolicy;
+use App\Support\FeePlanCalculator;
 use App\Support\InstituteProfile;
 use App\Support\PaymentShortfallHelper;
 use App\Services\CrmDashboardService;
@@ -318,7 +321,8 @@ class DemoOperationalHistorySeeder extends Seeder
             || Payment::query()->where('voucher_number', 'like', self::MARKER_VOUCHER_PREFIX.'%')->exists()
             || Payment::query()->where('transaction_id', 'like', self::MARKER_VOUCHER_PREFIX.'%')->exists()
             || Payment::query()->where('utr_number', 'like', self::MARKER_VOUCHER_PREFIX.'%')->exists()) {
-            $this->command?->line('  Campus fees: already present — skip.');
+            $this->command?->line('  Campus fees: base slice present — completing missing Term 2 payments…');
+            $this->completeMissingSecondFeePayments($staff);
 
             return;
         }
@@ -338,10 +342,11 @@ class DemoOperationalHistorySeeder extends Seeder
         $payments = app(PaymentService::class);
         $installments = app(FeeInstallmentService::class);
         $penalties = app(PenaltyCalculationService::class);
-        $proof = UploadedFile::fake()->image('demo-ops-proof.jpg');
 
         $paid = 0;
+        $scheduledOnly = 0;
         $skipped = 0;
+        $firstError = null;
 
         foreach ($structures as $index => $feeStructure) {
             $student = $feeStructure->enrollment?->student;
@@ -352,12 +357,12 @@ class DemoOperationalHistorySeeder extends Seeder
             }
 
             $bucket = $index % 10;
-            $net = round((float) $feeStructure->pending_amount, 2);
+            $net = (float) FeePlanCalculator::toWholeRupeeAmount((float) $feeStructure->pending_amount);
             if ($net <= 0) {
                 continue;
             }
 
-            $term1 = round($net * 0.4, 2);
+            $term1 = (float) FeePlanCalculator::toWholeRupeeAmount($net * 0.4);
             $term2 = round($net - $term1, 2);
 
             try {
@@ -368,8 +373,8 @@ class DemoOperationalHistorySeeder extends Seeder
                         ['label' => 'Term 2', 'amount' => $term2, 'due_date' => now()->subDays(20)->toDateString(), 'sort_order' => 2],
                     ]);
                     $fs = $feeStructure->fresh(['installments']);
-                    $this->payInstallment($payments, $fs, $student, $staff, $proof, $term1, now()->subMonths(2)->addDays(3), $index, 1);
-                    $this->payInstallment($payments, $fs->fresh(['installments']), $student, $staff, $proof, $term2, now()->subDays(15), $index, 2);
+                    $this->payInstallment($payments, $fs, $student, $staff, $term1, now()->subMonths(2)->addDays(3), $index, 1);
+                    $this->payInstallment($payments, $fs->fresh(['installments']), $student, $staff, $term2, now()->subDays(15), $index, 2);
                     $paid++;
                 } elseif ($bucket <= 6) {
                     // 30% — partial (first term only)
@@ -378,7 +383,7 @@ class DemoOperationalHistorySeeder extends Seeder
                         ['label' => 'Term 2', 'amount' => $term2, 'due_date' => now()->addMonth()->toDateString(), 'sort_order' => 2],
                     ]);
                     $fs = $feeStructure->fresh(['installments']);
-                    $this->payInstallment($payments, $fs, $student, $staff, $proof, $term1, now()->subDays(25), $index, 1);
+                    $this->payInstallment($payments, $fs, $student, $staff, $term1, now()->subDays(25), $index, 1);
                     $paid++;
                 } elseif ($bucket <= 8) {
                     // 20% — unpaid, future due
@@ -386,6 +391,7 @@ class DemoOperationalHistorySeeder extends Seeder
                         ['label' => 'Term 1', 'amount' => $term1, 'due_date' => now()->addDays(15)->toDateString(), 'sort_order' => 1],
                         ['label' => 'Term 2', 'amount' => $term2, 'due_date' => now()->addMonths(2)->toDateString(), 'sort_order' => 2],
                     ]);
+                    $scheduledOnly++;
                 } else {
                     // 10% — overdue + late fee
                     $installments->reschedulePendingInstallments($feeStructure, [
@@ -396,9 +402,11 @@ class DemoOperationalHistorySeeder extends Seeder
                     if ($first) {
                         $penalties->processInstallmentPenalty($first, now());
                     }
+                    $scheduledOnly++;
                 }
             } catch (\Throwable $e) {
                 $skipped++;
+                $firstError ??= $e->getMessage();
                 Log::warning('Demo ops fee seed skipped for fee_structure '.$feeStructure->id.': '.$e->getMessage());
             }
 
@@ -408,7 +416,10 @@ class DemoOperationalHistorySeeder extends Seeder
         }
 
         Setting::setValue('demo_ops_fees_v1', '1', 'demo');
-        $this->command?->line("  Campus fees: payment groups applied (~{$paid} with collections; {$skipped} skipped).");
+        $this->command?->line("  Campus fees: {$paid} with collections · {$scheduledOnly} scheduled/overdue · {$skipped} skipped.");
+        if ($firstError) {
+            $this->command?->warn('  First fee error: '.$firstError);
+        }
     }
 
     protected function payInstallment(
@@ -416,7 +427,6 @@ class DemoOperationalHistorySeeder extends Seeder
         FeeStructure $feeStructure,
         Student $student,
         User $staff,
-        UploadedFile $proof,
         float $amount,
         Carbon $paymentDate,
         int $index,
@@ -426,6 +436,9 @@ class DemoOperationalHistorySeeder extends Seeder
         if ($amount <= 0) {
             return;
         }
+
+        // Fresh proof each time — UploadedFile::fake() is consumed when stored.
+        $proof = UploadedFile::fake()->image('demo-ops-proof-'.$feeStructure->id.'-'.$part.'.jpg');
 
         $mode = match ($index % 4) {
             0 => PaymentMode::Cash,
@@ -446,7 +459,7 @@ class DemoOperationalHistorySeeder extends Seeder
             PaymentMode::Upi => ['utr_number' => $marker],
             PaymentMode::Online => ['transaction_id' => $marker],
             PaymentMode::Cheque => [
-                'cheque_number' => str_pad((string) (($index * 10 + $part) % 1000000), 6, '0', STR_PAD_LEFT),
+                'cheque_number' => str_pad((string) (($feeStructure->id * 10 + $part) % 1000000), 6, '0', STR_PAD_LEFT),
                 'cheque_date' => $paymentDate->toDateString(),
                 'cheque_bank_name' => 'Demo Bank',
                 'voucher_number' => $marker,
@@ -476,16 +489,92 @@ class DemoOperationalHistorySeeder extends Seeder
     }
 
     /**
+     * Finish Term 2 for students who got DEMO-OPS part 1 only (failed when proof file was reused).
+     */
+    protected function completeMissingSecondFeePayments(User $staff): void
+    {
+        $payments = app(PaymentService::class);
+        $completed = 0;
+        $skipped = 0;
+        $firstError = null;
+
+        $part1Markers = Payment::query()
+            ->where(function ($q): void {
+                $q->where('voucher_number', 'like', self::MARKER_VOUCHER_PREFIX.'%-1')
+                    ->orWhere('transaction_id', 'like', self::MARKER_VOUCHER_PREFIX.'%-1')
+                    ->orWhere('utr_number', 'like', self::MARKER_VOUCHER_PREFIX.'%-1');
+            })
+            ->with(['feeStructure.installments', 'feeStructure.enrollment.student'])
+            ->get();
+
+        foreach ($part1Markers as $index => $payment) {
+            $feeStructure = $payment->feeStructure;
+            $student = $feeStructure?->enrollment?->student;
+            if (! $feeStructure || ! $student) {
+                continue;
+            }
+
+            $part2 = self::MARKER_VOUCHER_PREFIX.$feeStructure->id.'-2';
+            $hasPart2 = Payment::query()
+                ->where(function ($q) use ($part2): void {
+                    $q->where('voucher_number', $part2)
+                        ->orWhere('transaction_id', $part2)
+                        ->orWhere('utr_number', $part2);
+                })
+                ->exists();
+
+            if ($hasPart2) {
+                continue;
+            }
+
+            $pending = round((float) $feeStructure->fresh()->pending_amount, 2);
+            if ($pending <= 0) {
+                continue;
+            }
+
+            // Only backfill the "fully paid" persona (both terms past due).
+            // Partial personas keep Term 2 with a future due date.
+            $rows = $feeStructure->installments;
+            if ($rows->count() < 2) {
+                continue;
+            }
+            $bothPastDue = $rows->every(
+                fn ($row): bool => $row->due_date !== null && $row->due_date->isPast()
+            );
+            if (! $bothPastDue) {
+                continue;
+            }
+
+            try {
+                $this->payInstallment(
+                    $payments,
+                    $feeStructure->fresh(['installments', 'enrollment']),
+                    $student,
+                    $staff,
+                    $pending,
+                    now()->subDays(15),
+                    $feeStructure->id,
+                    2,
+                );
+                $completed++;
+            } catch (\Throwable $e) {
+                $skipped++;
+                $firstError ??= $e->getMessage();
+                Log::warning('Demo ops Term 2 complete failed for fee_structure '.$feeStructure->id.': '.$e->getMessage());
+            }
+        }
+
+        $this->command?->line("  Term 2 backfill: {$completed} completed · {$skipped} skipped.");
+        if ($firstError) {
+            $this->command?->warn('  First Term 2 error: '.$firstError);
+        }
+    }
+
+    /**
      * @param  \Illuminate\Support\Collection<int, Batch>  $batches
      */
     protected function seedExtraMarksAndPublish($batches, User $admin): void
     {
-        if (ExamWindow::query()->where('test_name', self::MIDTERM_TEST_NAME)->exists()) {
-            $this->command?->line('  Demo Mid-Term exam windows: already present — skip.');
-
-            return;
-        }
-
         $examType = ActivityType::query()->where('slug', 'exam')->first();
         if (! $examType) {
             $this->command?->warn('  No exam activity type — skip marks publish.');
@@ -498,12 +587,34 @@ class DemoOperationalHistorySeeder extends Seeder
         $attendance = app(ActivityAttendanceService::class);
         $results = app(ResultDeclarationService::class);
 
-        $sessionDate = now()->subDays(40)->toDateString();
-        $publishedOne = false;
+        $approvedForPublish = null;
+        $created = 0;
+        $skipped = 0;
 
-        foreach ($batches as $batch) {
+        foreach ($batches as $batchIndex => $batch) {
             $classNo = $this->classNumberFromBatch($batch);
             if ($classNo === null || $classNo < 8) {
+                continue;
+            }
+
+            $testName = self::MIDTERM_TEST_NAME.' — '.$batch->name;
+            if (ExamWindow::query()->where('batch_id', $batch->id)->where('test_name', $testName)->exists()) {
+                $existing = ExamWindow::query()
+                    ->where('batch_id', $batch->id)
+                    ->where('test_name', $testName)
+                    ->first();
+                if ($existing && $approvedForPublish === null && $existing->status === ExamWindowStatus::Approved) {
+                    $approvedForPublish = $existing;
+                }
+                $skipped++;
+
+                continue;
+            }
+
+            // Also skip legacy shared-name window on this batch.
+            if (ExamWindow::query()->where('batch_id', $batch->id)->where('test_name', self::MIDTERM_TEST_NAME)->exists()) {
+                $skipped++;
+
                 continue;
             }
 
@@ -515,11 +626,14 @@ class DemoOperationalHistorySeeder extends Seeder
                 continue;
             }
 
+            // Unique date per batch so test_key never collides across sections.
+            $sessionDate = now()->subDays(40 + $batchIndex)->toDateString();
+
             try {
                 $window = $windows->create([
                     'batch_id' => $batch->id,
                     'activity_type_id' => $examType->id,
-                    'test_name' => self::MIDTERM_TEST_NAME,
+                    'test_name' => $testName,
                     'session_date' => $sessionDate,
                     'open_immediately' => true,
                     'remarks' => 'Demo operational history mid-term.',
@@ -542,19 +656,35 @@ class DemoOperationalHistorySeeder extends Seeder
                 }
 
                 $windows->submit($window->fresh(), $admin);
-                $windows->approve($window->fresh(), $admin);
-
-                if (! $publishedOne) {
-                    $results->publish($window->test_key, $admin, now()->subDays(35)->toDateString());
-                    $publishedOne = true;
-                    $this->command?->line("    Published results for {$batch->name}.");
-                }
+                $approved = $windows->approve($window->fresh(), $admin);
+                $approvedForPublish ??= $approved;
+                $created++;
+                $this->command?->line("    Mid-term ready for {$batch->name}.");
             } catch (ValidationException $e) {
                 Log::warning('Demo mid-term seed failed for batch '.$batch->id.': '.json_encode($e->errors()));
                 $this->command?->warn('    Mid-term skipped for '.$batch->name.': '.collect($e->errors())->flatten()->first());
             } catch (\Throwable $e) {
                 Log::warning('Demo mid-term seed failed for batch '.$batch->id.': '.$e->getMessage());
                 $this->command?->warn('    Mid-term skipped for '.$batch->name.': '.$e->getMessage());
+            }
+        }
+
+        if ($approvedForPublish) {
+            try {
+                $already = ResultDeclaration::query()
+                    ->where('group_key', $approvedForPublish->test_key)
+                    ->whereNotNull('declared_at')
+                    ->exists();
+                if (! $already) {
+                    $results->publish(
+                        $approvedForPublish->test_key,
+                        $admin,
+                        now()->subDays(35)->toDateString(),
+                    );
+                    $this->command?->line('    Published results for '.($approvedForPublish->batch?->name ?? 'batch'));
+                }
+            } catch (\Throwable $e) {
+                $this->command?->warn('    Publish skipped: '.$e->getMessage());
             }
         }
 
@@ -606,7 +736,7 @@ class DemoOperationalHistorySeeder extends Seeder
             }
         }
 
-        $this->command?->line('  Marks / publish: done.');
+        $this->command?->line("  Marks / publish: {$created} mid-terms created · {$skipped} already present.");
     }
 
     /**
