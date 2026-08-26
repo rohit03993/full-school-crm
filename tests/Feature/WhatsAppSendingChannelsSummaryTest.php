@@ -26,7 +26,7 @@ class WhatsAppSendingChannelsSummaryTest extends TestCase
 
         $html = (string) app(WhatsAppSettingsService::class)->renderSendingChannelsSummary();
 
-        $this->assertStringContainsString('Attendance to parents', $html);
+        $this->assertStringContainsString('Student attendance (to parents)', $html);
         $this->assertStringContainsString('Fee reminders', $html);
         $this->assertStringContainsString('Homework not done', $html);
         $this->assertStringContainsString('Open Automations', $html);

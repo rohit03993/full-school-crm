@@ -16,6 +16,12 @@ return [
 
     'seed_demo_data' => filter_var(env('SEED_DEMO_DATA', false), FILTER_VALIDATE_BOOLEAN),
 
+    /*
+    | Sales demo desk only (e.g. demo.taskbook.co.in). Default false — paying schools unchanged.
+    | When true: outbound Meta WhatsApp is blocked; admin shows a demo banner.
+    */
+    'demo_mode' => filter_var(env('DEMO_MODE', false), FILTER_VALIDATE_BOOLEAN),
+
     'hero' => [
         'title' => env('INSTITUTE_HERO_TITLE', 'Quality Education for Every Student'),
         'subtitle' => env('INSTITUTE_HERO_SUBTITLE', 'Manage admissions, fees, batches, and attendance — built for schools and coaching institutes. Start your learning journey with us.'),

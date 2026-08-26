@@ -6,6 +6,7 @@ use App\Models\Setting;
 use App\Models\MetaWhatsAppTemplate;
 use App\Enums\MetaWhatsAppMessageStatus;
 use App\Support\CrmNavigation;
+use App\Support\DemoMode;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -28,6 +29,10 @@ class MetaWhatsAppService
         int $expectedParamCount = 0,
         array $logContext = [],
     ): array {
+        if ($blocked = $this->demoSendBlock()) {
+            return $blocked;
+        }
+
         if (! $this->isConfigured()) {
             return ['status' => 'failed', 'error' => 'WhatsApp is not configured. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').' and save credentials.'];
         }
@@ -394,6 +399,18 @@ class MetaWhatsAppService
         return filled($this->phoneNumberId()) && filled($this->accessToken());
     }
 
+    /**
+     * @return array{status: string, error: string}|null
+     */
+    protected function demoSendBlock(): ?array
+    {
+        if (! DemoMode::enabled()) {
+            return null;
+        }
+
+        return ['status' => 'failed', 'error' => DemoMode::sendBlockedMessage()];
+    }
+
     public function hasStoredAccessToken(): bool
     {
         return filled(Setting::getValue('meta_whatsapp.access_token'));
@@ -608,6 +625,10 @@ class MetaWhatsAppService
         ?string $languageCode = null,
         ?string $contactName = null,
     ): array {
+        if ($blocked = $this->demoSendBlock()) {
+            return $blocked;
+        }
+
         if (! $this->isConfigured()) {
             return ['status' => 'failed', 'error' => 'WhatsApp is not configured. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').' and save credentials.'];
         }
@@ -745,6 +766,10 @@ class MetaWhatsAppService
      */
     public function sendText(string $phone, string $text): array
     {
+        if ($blocked = $this->demoSendBlock()) {
+            return $blocked;
+        }
+
         if (! $this->isConfigured()) {
             return ['status' => 'failed', 'error' => 'WhatsApp is not configured. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').' and save credentials.'];
         }
@@ -813,6 +838,10 @@ class MetaWhatsAppService
         ?string $caption = null,
         ?string $filename = null,
     ): array {
+        if ($blocked = $this->demoSendBlock()) {
+            return $blocked;
+        }
+
         if (! $this->isConfigured()) {
             return ['status' => 'failed', 'error' => 'WhatsApp is not configured. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').' and save credentials.'];
         }

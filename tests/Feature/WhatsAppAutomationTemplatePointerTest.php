@@ -75,4 +75,13 @@ class WhatsAppAutomationTemplatePointerTest extends TestCase
         $this->assertSame('template:'.$template->id, $stored);
         $this->assertSame($template->id, $settings->resolveAutomationTemplate($stored)?->id);
     }
+
+    public function test_fee_reminder_guide_renders_without_undefined_class_variable(): void
+    {
+        $html = (string) app(WhatsAppSettingsService::class)->renderFeeReminderTemplateGuide();
+
+        $this->assertStringContainsString('fee_reminder', $html);
+        $this->assertStringContainsString('also works', $html);
+        $this->assertStringNotContainsString('$FeeReminderWhatsAppTemplate', $html);
+    }
 }
