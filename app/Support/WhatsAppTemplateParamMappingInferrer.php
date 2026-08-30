@@ -128,6 +128,10 @@ class WhatsAppTemplateParamMappingInferrer
                 return self::homeworkNotDoneDefaults($paramCount);
             }
 
+            if ($templateName && StudentPunchWhatsAppTemplate::looksLikeName($templateName)) {
+                return self::attendancePunchDefaults($paramCount);
+            }
+
             if ($templateName && StaffPunchWhatsAppTemplate::looksLikeName($templateName)) {
                 return self::staffPunchDefaults($paramCount);
             }

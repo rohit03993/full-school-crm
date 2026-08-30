@@ -114,6 +114,31 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
         $this->assertStringContainsString('/h/', $rows[3]['example']);
     }
 
+    public function test_student_punch_in_preset_fills_body_and_samples(): void
+    {
+        $this->assertTrue(\App\Support\StudentPunchWhatsAppTemplate::looksLikeInName('punch_in'));
+        $this->assertTrue(\App\Support\StudentPunchWhatsAppTemplate::looksLikeInName('manual_in'));
+        $this->assertFalse(\App\Support\StudentPunchWhatsAppTemplate::looksLikeInName('staff_punch_in'));
+
+        $rows = MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
+            \App\Support\StudentPunchWhatsAppTemplate::IN_BODY,
+            [],
+            'punch_in',
+        );
+
+        $this->assertCount(5, $rows);
+        $this->assertSame('Student name', $rows[0]['label']);
+        $this->assertSame('Roll number', $rows[1]['label']);
+        $this->assertSame('Attendance status', $rows[4]['label']);
+    }
+
+    public function test_student_punch_out_preset_name_is_detected(): void
+    {
+        $this->assertTrue(\App\Support\StudentPunchWhatsAppTemplate::looksLikeOutName('punch_out'));
+        $this->assertTrue(\App\Support\StudentPunchWhatsAppTemplate::looksLikeOutName('manual_out'));
+        $this->assertFalse(\App\Support\StudentPunchWhatsAppTemplate::looksLikeOutName('staff_punch_out'));
+    }
+
     public function test_login_otp_preset_uses_otp_sample_label(): void
     {
         $rows = MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
