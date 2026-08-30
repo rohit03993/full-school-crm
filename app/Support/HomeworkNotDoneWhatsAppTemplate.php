@@ -14,6 +14,7 @@ final class HomeworkNotDoneWhatsAppTemplate
 
     public const BODY = <<<'TXT'
 Dear Parent, your child {{1}} of Class {{2}} has not completed the homework for {{3}}. Homework Topic: {{4}}. Please ensure the homework is completed. — {{5}}
+Thank you.
 TXT;
 
     /**

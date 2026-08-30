@@ -27,6 +27,8 @@ Title: {{3}}
 
 Open homework (view/download, no login):
 {{4}}
+
+Thank you.
 TXT;
 
     /**

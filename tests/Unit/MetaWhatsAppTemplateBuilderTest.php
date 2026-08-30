@@ -50,8 +50,52 @@ class MetaWhatsAppTemplateBuilderTest extends TestCase
             'missing_examples',
             'en',
             'UTILITY',
-            'Hello {{1}}',
+            'Hello {{1}}, welcome back.',
         );
+    }
+
+    public function test_rejects_variable_at_start_of_body(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('very start');
+
+        MetaWhatsAppTemplateBuilder::buildCreatePayload(
+            'bad_start',
+            'en',
+            'UTILITY',
+            '{{1}} checked in at school.',
+            null,
+            null,
+            'Riya Sharma',
+        );
+    }
+
+    public function test_rejects_variable_at_end_of_body(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('very end');
+
+        MetaWhatsAppTemplateBuilder::buildCreatePayload(
+            'bad_end',
+            'en',
+            'UTILITY',
+            'Hello parent, homework link: {{1}}',
+            null,
+            null,
+            'https://example.com/h/token',
+        );
+    }
+
+    public function test_preset_homework_bodies_pass_meta_edge_rule(): void
+    {
+        foreach ([
+            \App\Support\HomeworkNotDoneWhatsAppTemplate::BODY,
+            \App\Support\HomeworkShareWhatsAppTemplate::BODY,
+            \App\Support\CombinedHomeworkWhatsAppTemplate::BODY,
+        ] as $body) {
+            MetaWhatsAppTemplateBuilder::assertBodyVariablesNotAtEdges($body);
+            $this->addToAssertionCount(1);
+        }
     }
 
     public function test_normalizes_template_name(): void

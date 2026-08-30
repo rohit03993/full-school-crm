@@ -50,6 +50,8 @@ class MetaWhatsAppTemplateBuilder
             throw new InvalidArgumentException('Message body is required.');
         }
 
+        self::assertBodyVariablesNotAtEdges($bodyText);
+
         $components = [];
 
         if (filled($headerText)) {
@@ -172,6 +174,30 @@ class MetaWhatsAppTemplateBuilder
         $name = preg_replace('/[^a-z0-9_]/', '', $name) ?? $name;
 
         return $name;
+    }
+
+    /**
+     * Meta rejects Utility/Marketing bodies when a {{n}} placeholder is the first or last content.
+     */
+    public static function assertBodyVariablesNotAtEdges(string $bodyText): void
+    {
+        $bodyText = trim($bodyText);
+
+        if ($bodyText === '') {
+            return;
+        }
+
+        if (preg_match('/^\{\{\s*\d+\s*\}\}/', $bodyText)) {
+            throw new InvalidArgumentException(
+                'Meta does not allow a {{variable}} at the very start of the body. Add fixed text before the first {{n}}.'
+            );
+        }
+
+        if (preg_match('/\{\{\s*\d+\s*\}\}\s*$/', $bodyText)) {
+            throw new InvalidArgumentException(
+                'Meta does not allow a {{variable}} at the very end of the body. Add fixed text after the last {{n}} (for example "Thank you.").'
+            );
+        }
     }
 
     public static function isAuthenticationOtp(string $name, string $category = ''): bool
