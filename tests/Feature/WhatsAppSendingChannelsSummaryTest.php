@@ -28,6 +28,7 @@ class WhatsAppSendingChannelsSummaryTest extends TestCase
 
         $this->assertStringContainsString('Student attendance (to parents)', $html);
         $this->assertStringContainsString('Fee reminders', $html);
+        $this->assertStringContainsString('Share homework (combined / single)', $html);
         $this->assertStringContainsString('Homework not done', $html);
         $this->assertStringContainsString('Open Automations', $html);
     }

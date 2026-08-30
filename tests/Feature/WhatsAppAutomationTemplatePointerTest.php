@@ -76,6 +76,34 @@ class WhatsAppAutomationTemplatePointerTest extends TestCase
         $this->assertSame($template->id, $settings->resolveAutomationTemplate($stored)?->id);
     }
 
+    public function test_save_stores_homework_share_template_prefix(): void
+    {
+        $combined = WhatsAppTemplate::query()->create([
+            'name' => 'homework_combined',
+            'param_count' => 4,
+            'is_active' => true,
+        ]);
+
+        $share = WhatsAppTemplate::query()->create([
+            'name' => 'homework_api',
+            'param_count' => 4,
+            'is_active' => true,
+        ]);
+
+        $settings = app(WhatsAppSettingsService::class);
+        $settings->save([
+            'homework_combined_live_campaign_id' => $combined->id,
+            'homework_share_live_campaign_id' => $share->id,
+        ]);
+
+        Setting::flushValueCache();
+
+        $this->assertSame('template:'.$combined->id, Setting::getValue('whatsapp.homework_combined_live_campaign_id'));
+        $this->assertSame('template:'.$share->id, Setting::getValue('whatsapp.homework_share_live_campaign_id'));
+        $this->assertSame('homework_combined', Setting::getValue('whatsapp.homework_combined_template_name'));
+        $this->assertSame('homework_api', Setting::getValue('whatsapp.homework_template_name'));
+    }
+
     public function test_fee_reminder_guide_renders_without_undefined_class_variable(): void
     {
         $html = (string) app(WhatsAppSettingsService::class)->renderFeeReminderTemplateGuide();

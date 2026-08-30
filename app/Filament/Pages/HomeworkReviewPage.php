@@ -76,7 +76,6 @@ class HomeworkReviewPage extends Page
             'title' => '',
             'description' => '',
             'attachment' => null,
-            'combined_template_name' => app(HomeworkWhatsAppService::class)->defaultCombinedTemplateName(),
         ]);
     }
 
@@ -152,13 +151,31 @@ class HomeworkReviewPage extends Page
                 ->columns(2)
                 ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
             Section::make('Send to parents')
+                ->description(function (): string {
+                    $template = app(HomeworkWhatsAppService::class)->defaultCombinedTemplateName();
+
+                    if (filled($template)) {
+                        return 'Uses template "'.$template.'" from WhatsApp → Automations → Homework. Change it there if needed.';
+                    }
+
+                    return 'Pick a combined template on WhatsApp → Automations → Homework before sending.';
+                })
                 ->schema([
-                    Select::make('combined_template_name')
-                        ->label('Combined WhatsApp template')
-                        ->options(fn (): array => app(HomeworkWhatsAppService::class)->shareTemplateOptions())
-                        ->native(false)
-                        ->searchable()
-                        ->helperText('APPROVED Meta template with exactly 4 params (name, roll, class/date, subject links). Use homework_combined after Sync.'),
+                    \Filament\Forms\Components\Placeholder::make('combined_template_notice')
+                        ->hiddenLabel()
+                        ->content(function (): \Illuminate\Support\HtmlString {
+                            $template = app(HomeworkWhatsAppService::class)->defaultCombinedTemplateName();
+                            $automationsUrl = e(ManageWhatsAppSettings::getUrl(['automation' => 'homework']));
+                            $label = filled($template)
+                                ? '<strong>'.e($template).'</strong>'
+                                : '<span class="text-danger-600">No template selected</span>';
+
+                            return new \Illuminate\Support\HtmlString(
+                                '<p class="text-sm text-gray-600 dark:text-gray-300">Combined WhatsApp template: '.$label
+                                .' — <a href="'.$automationsUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Open Automations → Homework</a></p>'
+                            );
+                        })
+                        ->columnSpanFull(),
                 ])
                 ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
         ]);
@@ -278,7 +295,7 @@ class HomeworkReviewPage extends Page
             $user,
             (int) ($this->data['batch_id'] ?? 0),
             $this->dateString(),
-            filled($this->data['combined_template_name'] ?? null) ? (string) $this->data['combined_template_name'] : null,
+            app(HomeworkWhatsAppService::class)->defaultCombinedTemplateName(),
         );
         $this->lastCombinedSendResult = $result;
         $cost = number_format((float) ($result['estimated_total_cost'] ?? 0), 2);

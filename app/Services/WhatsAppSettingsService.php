@@ -9,8 +9,10 @@ use App\Filament\Pages\StaffAttendancePage;
 use App\Models\Setting;
 use App\Models\WhatsAppTemplate;
 use App\Support\CrmNavigation;
+use App\Support\CombinedHomeworkWhatsAppTemplate;
 use App\Support\FeeReminderWhatsAppTemplate;
 use App\Support\HomeworkNotDoneWhatsAppTemplate;
+use App\Support\HomeworkShareWhatsAppTemplate;
 use App\Support\StaffPunchWhatsAppTemplate;
 use Illuminate\Support\HtmlString;
 
@@ -39,6 +41,8 @@ class WhatsAppSettingsService
                 Setting::getValue('whatsapp.fee_reminder_overdue_live_campaign_id')
                     ?: Setting::getValue('whatsapp.fee_reminder_live_campaign_id'),
             ),
+            'homework_combined_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_combined_live_campaign_id')),
+            'homework_share_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_share_live_campaign_id')),
             'homework_not_done_autosend_enabled' => (bool) Setting::getValue('whatsapp.homework_not_done_autosend_enabled', false),
             'homework_not_done_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_not_done_live_campaign_id')),
             'attendance_autosend_enabled' => (bool) Setting::getValue('whatsapp.attendance_autosend_enabled', false),
@@ -92,6 +96,13 @@ class WhatsAppSettingsService
                 'enabled' => (bool) Setting::getValue('whatsapp.fee_reminder_autosend_enabled', false),
             ],
             [
+                'key' => 'homework_share',
+                'label' => 'Share homework (combined / single)',
+                'hint' => 'Template on Automations → Homework — staff click Send on Homework Review or when uploading',
+                'enabled' => filled($this->resolveConfiguredTemplateName(Setting::getValue('whatsapp.homework_combined_live_campaign_id')))
+                    || filled($this->resolveConfiguredTemplateName(Setting::getValue('whatsapp.homework_share_live_campaign_id'))),
+            ],
+            [
                 'key' => 'homework',
                 'label' => 'Homework not done',
                 'hint' => 'When staff submit Not Done on Homework check',
@@ -139,7 +150,7 @@ class WhatsAppSettingsService
             .'</div>'
             .'<table class="w-full text-sm"><tbody>'.$rows.'</tbody></table>'
             .'<p class="border-t border-gray-200 px-3 py-2 text-xs text-gray-500 dark:border-white/10 dark:text-gray-400">'
-            .'Share homework, exam marks, and bulk campaigns are sent only when staff click Send — they are not in this list.'
+            .'Share homework is configured on Automations → Homework; staff still click Send on Homework Review. Exam marks and bulk campaigns are manual only.'
             .'</p></div>'
         );
     }
@@ -224,6 +235,28 @@ class WhatsAppSettingsService
             $this->encodeAutomationTemplateId($data['fee_reminder_overdue_live_campaign_id'] ?? null),
             'whatsapp',
         );
+        Setting::setValue(
+            'whatsapp.homework_combined_live_campaign_id',
+            $this->encodeAutomationTemplateId($data['homework_combined_live_campaign_id'] ?? null),
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.homework_share_live_campaign_id',
+            $this->encodeAutomationTemplateId($data['homework_share_live_campaign_id'] ?? null),
+            'whatsapp',
+        );
+        $combinedName = $this->resolveConfiguredTemplateName(
+            $this->encodeAutomationTemplateId($data['homework_combined_live_campaign_id'] ?? null),
+        );
+        if (filled($combinedName)) {
+            Setting::setValue('whatsapp.homework_combined_template_name', $combinedName, 'whatsapp');
+        }
+        $shareName = $this->resolveConfiguredTemplateName(
+            $this->encodeAutomationTemplateId($data['homework_share_live_campaign_id'] ?? null),
+        );
+        if (filled($shareName)) {
+            Setting::setValue('whatsapp.homework_template_name', $shareName, 'whatsapp');
+        }
         Setting::setValue(
             'whatsapp.homework_not_done_autosend_enabled',
             ! empty($data['homework_not_done_autosend_enabled']) ? '1' : '0',
@@ -385,11 +418,25 @@ class WhatsAppSettingsService
      */
     public function templateOptions(): array
     {
+        return $this->templateOptionsForParamCount();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function templateOptionsForParamCount(?int $paramCount = null): array
+    {
         return WhatsAppTemplate::query()
             ->where('is_active', true)
+            ->when($paramCount !== null, fn ($query) => $query->where('param_count', $paramCount))
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();
+    }
+
+    public function resolveConfiguredTemplateName(?string $storedPointer): ?string
+    {
+        return $this->resolveAutomationTemplate($storedPointer)?->name;
     }
 
     public function templateName(?string $id): ?string
@@ -502,6 +549,54 @@ class WhatsAppSettingsService
             .'<thead class="bg-white/60 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-black/20 dark:text-gray-400">'
             .'<tr><th class="px-4 py-2">Var</th><th class="px-4 py-2">Meaning</th><th class="px-4 py-2">CRM map</th><th class="px-4 py-2">Meta sample</th></tr></thead>'
             .'<tbody class="divide-y divide-primary-100 dark:divide-primary-500/10">'.$mappingRows.'</tbody></table></div></div>'
+        );
+    }
+
+    public function renderHomeworkShareTemplateGuide(): HtmlString
+    {
+        $templatesUrl = e(\App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource::getUrl('create'));
+        $reviewUrl = e(\App\Filament\Pages\HomeworkReviewPage::getUrl());
+        $combinedName = e(CombinedHomeworkWhatsAppTemplate::NAME);
+        $shareName = e(HomeworkShareWhatsAppTemplate::NAME);
+        $combinedBody = e(CombinedHomeworkWhatsAppTemplate::BODY);
+        $shareBody = e(HomeworkShareWhatsAppTemplate::BODY);
+
+        $combinedRows = '';
+        foreach (CombinedHomeworkWhatsAppTemplate::variables() as $index => $variable) {
+            $combinedRows .= '<tr class="'.($index % 2 === 0 ? 'bg-white/40 dark:bg-transparent' : '').'">'
+                .'<td class="px-4 py-2 font-mono text-xs">{{'.$index.'}}</td>'
+                .'<td class="px-4 py-2">'.e($variable['label']).'</td>'
+                .'<td class="px-4 py-2 text-gray-500">'.e($variable['example']).'</td>'
+                .'</tr>';
+        }
+
+        $shareRows = '';
+        foreach (HomeworkShareWhatsAppTemplate::variables() as $index => $variable) {
+            $shareRows .= '<tr class="'.($index % 2 === 0 ? 'bg-white/40 dark:bg-transparent' : '').'">'
+                .'<td class="px-4 py-2 font-mono text-xs">{{'.$index.'}}</td>'
+                .'<td class="px-4 py-2">'.e($variable['label']).'</td>'
+                .'<td class="px-4 py-2 text-gray-500">'.e($variable['example']).'</td>'
+                .'</tr>';
+        }
+
+        return new HtmlString(
+            '<div class="overflow-hidden rounded-xl border border-emerald-200/60 bg-emerald-50/40 dark:border-emerald-500/20 dark:bg-emerald-500/5">'
+            .'<div class="border-b border-emerald-200/60 px-4 py-3 dark:border-emerald-500/20">'
+            .'<p class="text-sm font-bold text-gray-950 dark:text-white">Share homework — templates used when staff click Send</p>'
+            .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
+            .'Not automatic — admin reviews homework on <a href="'.$reviewUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Homework Review</a>, then clicks <strong>Send to parents</strong>. '
+            .'Single-subject upload uses the share template. Create templates under '
+            .'<a href="'.$templatesUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Templates → New</a>, Sync after Meta approves, then pick them below.</p></div>'
+            .'<div class="grid gap-0 lg:grid-cols-2">'
+            .'<div class="border-b border-emerald-200/60 px-4 py-3 dark:border-emerald-500/20 lg:border-b-0 lg:border-r">'
+            .'<p class="text-xs font-bold text-gray-950 dark:text-white"><code>'.$combinedName.'</code> — all subjects in one message (4 params)</p>'
+            .'<pre class="mt-2 whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.$combinedBody.'</pre>'
+            .'<table class="mt-3 w-full text-left text-sm"><tbody class="divide-y divide-emerald-100 dark:divide-emerald-500/10">'.$combinedRows.'</tbody></table></div>'
+            .'<div class="px-4 py-3">'
+            .'<p class="text-xs font-bold text-gray-950 dark:text-white"><code>'.$shareName.'</code> / homework_update — one subject + link (4 params)</p>'
+            .'<pre class="mt-2 whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.$shareBody.'</pre>'
+            .'<table class="mt-3 w-full text-left text-sm"><tbody class="divide-y divide-emerald-100 dark:divide-emerald-500/10">'.$shareRows.'</tbody></table></div>'
+            .'</div></div>'
         );
     }
 

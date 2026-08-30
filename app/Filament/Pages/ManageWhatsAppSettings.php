@@ -103,6 +103,7 @@ class ManageWhatsAppSettings extends Page
                     .'<strong>WhatsApp setup</strong> is the master switch for the institute. Use the tabs below — only one message type is shown at a time. '
                     .'<strong>Student attendance</strong> = student IN/OUT, WhatsApp to parents. '
                     .'<strong>Staff attendance</strong> = staff punch, WhatsApp to the staff phone. '
+                    .'<strong>Homework</strong> = share templates (staff click Send) and optional Not Done alerts. '
                     .'Pick an approved template on each tab. Live API campaigns are only for external POST / API key, not these automations.'
                     .'</p>'
                 ))
@@ -284,11 +285,34 @@ class ManageWhatsAppSettings extends Page
                 ])
                 ->columns(2),
                         ]),
-                    Tab::make('Homework not done')
+                    Tab::make('Homework')
                         ->icon(Heroicon::OutlinedBookOpen)
                         ->schema([
+            Section::make('Parents — share homework')
+                ->description('Pick templates here. Staff still click Send on Homework Review (combined) or when uploading one subject — messages do not go out until they confirm.')
+                ->schema([
+                    Placeholder::make('homework_share_template_guide')
+                        ->hiddenLabel()
+                        ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderHomeworkShareTemplateGuide())
+                        ->columnSpanFull(),
+                    Select::make('homework_combined_live_campaign_id')
+                        ->label('Combined daily homework (all subjects)')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(4))
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Used on Homework Review → Send to parents. Template homework_combined (4 params).'),
+                    Select::make('homework_share_live_campaign_id')
+                        ->label('Single-subject homework share')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(4))
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Used when uploading one homework with Send WhatsApp on. Template homework_api / homework_update (4 params).'),
+                ])
+                ->columns(2),
             Section::make('Parents — homework not done')
-                ->description('When staff submit Not Done on Homework check. Share-homework from class is a separate Send button, not this switch.')
+                ->description('Automatic when staff submit Not Done on Homework check. Separate from share homework above.')
                 ->schema([
                     Placeholder::make('homework_not_done_template_guide')
                         ->hiddenLabel()
@@ -300,11 +324,11 @@ class ManageWhatsAppSettings extends Page
                         ->columnSpanFull(),
                     Select::make('homework_not_done_live_campaign_id')
                         ->label('Homework not done template')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(5))
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Map student.name, homework.class_section, homework.subject, homework.topic, institute.name.'),
+                        ->helperText('Template homework_not_done (5 params). Map student.name, homework.class_section, homework.subject, homework.topic, institute.name.'),
                 ])
                 ->columns(2),
                         ]),

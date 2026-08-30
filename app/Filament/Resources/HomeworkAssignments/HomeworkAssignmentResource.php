@@ -106,7 +106,7 @@ class HomeworkAssignmentResource extends Resource
                         ->columnSpanFull(),
                     Toggle::make('send_whatsapp')
                         ->label('Send WhatsApp with homework link')
-                        ->helperText('Sends to each student’s Mobile: name, roll, title, and public link (no login). Separate from Automations → Homework not done.')
+                        ->helperText('Configured on WhatsApp → Automations → Homework. Sends name, roll, title, and public link (no login).')
                         ->default(true)
                         ->live(),
                     Select::make('whatsapp_template_name')
@@ -116,7 +116,7 @@ class HomeworkAssignmentResource extends Resource
                         ->searchable()
                         ->required(fn (callable $get): bool => (bool) $get('send_whatsapp'))
                         ->visible(fn (callable $get): bool => (bool) $get('send_whatsapp'))
-                        ->helperText('Pick an APPROVED Meta template with exactly 4 params (name, roll, title, link). Use homework_api / homework_update after Sync.'),
+                        ->helperText('Default from Automations → Homework (single-subject share). Override here if needed.')
                 ])
                 ->columns(2),
         ]);

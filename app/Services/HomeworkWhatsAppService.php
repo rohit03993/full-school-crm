@@ -19,6 +19,7 @@ class HomeworkWhatsAppService
         protected WhatsAppDispatchService $whatsapp,
         protected HomeworkAssignmentService $homework,
         protected MetaWhatsAppCostEstimator $costEstimator,
+        protected WhatsAppSettingsService $settings,
     ) {}
 
     /**
@@ -37,6 +38,14 @@ class HomeworkWhatsAppService
 
     public function defaultShareTemplateName(): ?string
     {
+        $fromAutomation = $this->settings->resolveConfiguredTemplateName(
+            (string) Setting::getValue('whatsapp.homework_share_live_campaign_id', ''),
+        );
+
+        if (filled($fromAutomation)) {
+            return $fromAutomation;
+        }
+
         $preferred = array_values(array_unique(array_filter([
             (string) Setting::getValue('whatsapp.homework_template_name', ''),
             (string) config('whatsapp.homework_template_name', ''),
@@ -64,6 +73,14 @@ class HomeworkWhatsAppService
      */
     public function defaultCombinedTemplateName(): ?string
     {
+        $fromAutomation = $this->settings->resolveConfiguredTemplateName(
+            (string) Setting::getValue('whatsapp.homework_combined_live_campaign_id', ''),
+        );
+
+        if (filled($fromAutomation)) {
+            return $fromAutomation;
+        }
+
         $preferred = array_values(array_unique(array_filter([
             (string) Setting::getValue('whatsapp.homework_combined_template_name', ''),
             ...CombinedHomeworkWhatsAppTemplate::ALIASES,
