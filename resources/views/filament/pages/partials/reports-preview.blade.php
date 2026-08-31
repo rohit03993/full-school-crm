@@ -3,11 +3,21 @@
         Loading report…
     </div>
 @else
+    @php
+        $totalRows = count($report['rows']);
+        $previewRows = $paginatedRows ?? collect();
+    @endphp
+
     <div class="space-y-4">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h3 class="text-base font-bold text-gray-950 dark:text-white">{{ $report['title'] }}</h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Generated {{ $report['generated_at'] }} · {{ count($report['rows']) }} row(s)</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                    Generated {{ $report['generated_at'] }} · {{ $totalRows }} row(s)
+                    @if ($totalRows > 0 && $previewRows->hasPages())
+                        · Showing {{ $previewRows->firstItem() }}–{{ $previewRows->lastItem() }}
+                    @endif
+                </p>
             </div>
             @if ($canExport)
                 <div class="flex flex-wrap gap-2">
@@ -27,7 +37,7 @@
         <p class="fi-crm-scroll-hint hidden md:block">Swipe horizontally to view all columns on desktop.</p>
 
         <div class="space-y-2 md:hidden">
-            @forelse ($report['rows'] as $rowIndex => $row)
+            @forelse ($previewRows as $row)
                 <div class="rounded-xl bg-white p-3 ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-white/10">
                     @foreach ($report['columns'] as $colIndex => $column)
                         <div @class([
@@ -56,7 +66,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-white/10">
-                    @forelse ($report['rows'] as $row)
+                    @forelse ($previewRows as $row)
                         <tr class="bg-white dark:bg-gray-900">
                             @foreach ($row as $cell)
                                 <td class="px-4 py-2.5 text-gray-700 dark:text-gray-300">{{ $cell }}</td>
@@ -72,5 +82,11 @@
                 </tbody>
             </table>
         </div>
+
+        @if ($previewRows->hasPages())
+            <div class="rounded-xl bg-white px-4 py-3 ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-white/10">
+                {{ $previewRows->links() }}
+            </div>
+        @endif
     </div>
 @endif

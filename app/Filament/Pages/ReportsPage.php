@@ -42,11 +42,18 @@ use Filament\Support\Enums\Alignment;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator as Paginator;
+use Livewire\WithPagination;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
 class ReportsPage extends Page
 {
+    use WithPagination;
+
+    public const PREVIEW_PER_PAGE = 20;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentChartBar;
 
     protected static ?string $navigationLabel = null;
@@ -113,6 +120,7 @@ class ReportsPage extends Page
         }
 
         $this->report = $reports->generate($type, $this->normalizedFilters());
+        $this->resetPage();
 
         if ($notify) {
             Notification::make()
@@ -197,6 +205,30 @@ class ReportsPage extends Page
         }
 
         return $filters;
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, array<int, string|int|float|null>>|null
+     */
+    protected function paginatedReportRows(): ?LengthAwarePaginator
+    {
+        if ($this->report === null) {
+            return null;
+        }
+
+        $rows = $this->report['rows'];
+        $total = count($rows);
+        $page = $this->getPage();
+        $perPage = self::PREVIEW_PER_PAGE;
+        $items = array_slice($rows, ($page - 1) * $perPage, $perPage);
+
+        return new Paginator(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'pageName' => 'page'],
+        );
     }
 
     /**
@@ -430,6 +462,7 @@ class ReportsPage extends Page
                         ->afterStateUpdated(function (): void {
                             $this->report = null;
                             $this->filters = $this->defaultFiltersForSelectedReport();
+                            $this->resetPage();
                             $this->runReport(app(ReportService::class), notify: false);
                         })
                         ->native(false)
@@ -455,6 +488,7 @@ class ReportsPage extends Page
                     View::make('filament.pages.partials.reports-preview')
                         ->viewData(fn (): array => [
                             'report' => $this->report,
+                            'paginatedRows' => $this->paginatedReportRows(),
                             'canExport' => filled($this->reportType) && app(ReportPolicy::class)->export(
                                 Auth::user(),
                                 ReportType::from((string) $this->reportType),
