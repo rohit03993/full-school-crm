@@ -74,6 +74,29 @@ class ReportServiceTest extends TestCase
         $this->assertContains('Done %', $report['columns']);
     }
 
+    public function test_lead_aging_report_lists_open_leads_with_age_columns(): void
+    {
+        $staff = $this->createSuperAdmin();
+        $course = $this->createCourse();
+
+        app(EnquiryService::class)->create([
+            'name' => 'Aging Lead',
+            'father_name' => 'Parent',
+            'mobile' => '9811000092',
+            'gender' => Gender::Male->value,
+            'course_id' => $course->id,
+        ], $staff, LeadSource::WalkIn);
+
+        $report = app(ReportService::class)->generate(ReportType::LeadAging, []);
+
+        $this->assertStringStartsWith('Open leads — aging', $report['title']);
+        $this->assertContains('Days open', $report['columns']);
+        $this->assertContains('Days since contact', $report['columns']);
+        $this->assertCount(1, $report['rows']);
+        $this->assertStringContainsString('Aging Lead', (string) $report['rows'][0][1]);
+        $this->assertSame(0, $report['rows'][0][7]);
+    }
+
     protected function createSuperAdmin(): User
     {
         Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);

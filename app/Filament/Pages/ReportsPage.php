@@ -175,8 +175,14 @@ class ReportsPage extends Page
         return $schema
             ->statePath('filters')
             ->components([
-                DatePicker::make('date_from')->label('From')->native(false),
-                DatePicker::make('date_to')->label('To')->native(false),
+                DatePicker::make('date_from')
+                    ->label('From')
+                    ->native(false)
+                    ->visible(fn (): bool => $this->selectedReportUsesDateRange()),
+                DatePicker::make('date_to')
+                    ->label('To')
+                    ->native(false)
+                    ->visible(fn (): bool => $this->selectedReportUsesDateRange()),
                 Select::make('course_id')
                     ->label('Course')
                     ->options(fn (): array => InstituteProfile::activeCourseOptions())
@@ -204,6 +210,18 @@ class ReportsPage extends Page
                         fn (LeadSource $source) => [$source->value => $source->label()],
                     ))
                     ->native(false),
+                TextInput::make('min_days_open')
+                    ->label('Minimum days open')
+                    ->numeric()
+                    ->minValue(0)
+                    ->helperText('Open leads — aging only. Example: 7 = leads at least one week old.')
+                    ->visible(fn (): bool => $this->reportType === ReportType::LeadAging->value),
+                TextInput::make('min_days_since_contact')
+                    ->label('Minimum days since last contact')
+                    ->numeric()
+                    ->minValue(0)
+                    ->helperText('Open leads — aging only. Example: 7 = no call or visit in 7+ days.')
+                    ->visible(fn (): bool => $this->reportType === ReportType::LeadAging->value),
                 Select::make('user_id')
                     ->label('Staff')
                     ->options(fn (): array => User::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id')->all())
@@ -220,6 +238,13 @@ class ReportsPage extends Page
                     ->maxValue(100)
                     ->helperText('Used by Low attendance alert (default 75).'),
             ]);
+    }
+
+    protected function selectedReportUsesDateRange(): bool
+    {
+        $type = ReportType::tryFrom((string) $this->reportType);
+
+        return $type?->usesDateRange() ?? true;
     }
 
     /**

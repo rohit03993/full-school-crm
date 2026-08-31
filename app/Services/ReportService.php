@@ -60,6 +60,17 @@ class ReportService
 
         $report = match ($type) {
             ReportType::Enquiries => $this->enquiriesReport($from, $to),
+            ReportType::LeadAging => $this->leadAgingReport(
+                $filters['course_id'] ?? null,
+                $filters['lead_source'] ?? null,
+                $filters['user_id'] ?? null,
+                isset($filters['min_days_open']) && $filters['min_days_open'] !== '' && $filters['min_days_open'] !== null
+                    ? (int) $filters['min_days_open']
+                    : null,
+                isset($filters['min_days_since_contact']) && $filters['min_days_since_contact'] !== '' && $filters['min_days_since_contact'] !== null
+                    ? (int) $filters['min_days_since_contact']
+                    : null,
+            ),
             ReportType::EnquirySources => $this->enquirySourcesReport($from, $to, $filters['lead_source'] ?? null),
             ReportType::AdmissionsByCourse => $this->admissionsByCourseReport($from, $to, $filters['course_id'] ?? null),
             ReportType::AdmissionsByStaff => $this->admissionsByStaffReport($from, $to, $filters['user_id'] ?? null),
@@ -152,6 +163,143 @@ class ReportService
             'title' => 'Enquiries · '.$from->format('d M Y').' – '.$to->format('d M Y'),
             'columns' => ['Date', 'Enquiry #', 'Student', 'Mobile', 'Course', 'Source'],
             'rows' => $rows,
+        ]);
+    }
+
+    /**
+     * Open pipeline leads with age since creation and since last call/visit.
+     *
+     * @return array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>}
+     */
+    protected function leadAgingReport(
+        ?int $courseId,
+        ?string $leadSource,
+        ?int $userId,
+        ?int $minDaysOpen,
+        ?int $minDaysSinceContact,
+    ): array {
+        $query = Enquiry::query()
+            ->activeLeads()
+            ->with([
+                'student' => fn ($studentQuery) => $studentQuery->withMax('visits as last_visit_date', 'visit_date'),
+                'course',
+                'meetingWith',
+                'visits' => fn ($visitQuery) => $visitQuery
+                    ->whereNotNull('next_follow_up_date')
+                    ->orderByDesc('next_follow_up_date')
+                    ->limit(1),
+            ]);
+
+        if ($courseId) {
+            $query->where('course_id', $courseId);
+        }
+
+        if (filled($leadSource)) {
+            $query->where('lead_source', $leadSource);
+        }
+
+        if ($userId) {
+            $query->where('meeting_with_user_id', $userId);
+        }
+
+        $today = today();
+        $rows = [];
+
+        foreach ($query->limit(self::MAX_DETAIL_ROWS)->get() as $enquiry) {
+            $student = $enquiry->student;
+            $createdAt = $enquiry->created_at?->copy()->startOfDay() ?? $today->copy();
+            $daysOpen = (int) $createdAt->diffInDays($today);
+
+            $lastCallAt = $student?->last_call_at?->copy();
+            $lastVisitDate = filled($student?->last_visit_date ?? null)
+                ? Carbon::parse((string) $student->last_visit_date)->startOfDay()
+                : null;
+
+            $lastContactAt = collect([
+                $lastCallAt?->copy()->startOfDay(),
+                $lastVisitDate,
+            ])->filter()->sort()->last();
+
+            if ($lastContactAt instanceof Carbon) {
+                $daysSinceContact = (int) $lastContactAt->diffInDays($today);
+                $lastContactType = match (true) {
+                    $lastCallAt && $lastVisitDate => $lastCallAt->startOfDay()->greaterThanOrEqualTo($lastVisitDate) ? 'Call' : 'Visit',
+                    $lastCallAt !== null => 'Call',
+                    $lastVisitDate !== null => 'Visit',
+                    default => '—',
+                };
+            } else {
+                $daysSinceContact = $daysOpen;
+                $lastContactType = '—';
+            }
+
+            if ($minDaysOpen !== null && $daysOpen < $minDaysOpen) {
+                continue;
+            }
+
+            if ($minDaysSinceContact !== null && $daysSinceContact < $minDaysSinceContact) {
+                continue;
+            }
+
+            $nextVisitFollowUp = $enquiry->visits->first()?->next_follow_up_date;
+            $nextFollowUpParts = [];
+
+            if ($student?->next_call_followup_at) {
+                $nextFollowUpParts[] = 'Call '.$student->next_call_followup_at->format('d M Y');
+            }
+
+            if ($nextVisitFollowUp) {
+                $nextFollowUpParts[] = 'Visit '.$nextVisitFollowUp->format('d M Y');
+            }
+
+            $rows[] = [
+                'days_since_contact' => $daysSinceContact,
+                'days_open' => $daysOpen,
+                'cells' => [
+                    $enquiry->enquiry_number,
+                    $student?->name ?? '—',
+                    $student?->mobile ?? '—',
+                    $enquiry->course?->name ?? '—',
+                    $enquiry->lead_source->label(),
+                    $enquiry->latest_visit_status?->label() ?? '—',
+                    $enquiry->meetingWith?->name ?? '—',
+                    $daysOpen,
+                    $daysSinceContact,
+                    $lastContactType,
+                    $nextFollowUpParts !== [] ? implode(' · ', $nextFollowUpParts) : '—',
+                ],
+            ];
+        }
+
+        usort($rows, function (array $left, array $right): int {
+            $byContact = $right['days_since_contact'] <=> $left['days_since_contact'];
+
+            if ($byContact !== 0) {
+                return $byContact;
+            }
+
+            return $right['days_open'] <=> $left['days_open'];
+        });
+
+        return $this->finalizeDetailReport([
+            'title' => 'Open leads — aging · as of '.$today->format('d M Y'),
+            'columns' => [
+                'Enquiry #',
+                'Student',
+                'Mobile',
+                'Course',
+                'Source',
+                'Status',
+                'Assigned to',
+                'Days open',
+                'Days since contact',
+                'Last contact',
+                'Next follow-up',
+            ],
+            'rows' => array_map(
+                static fn (array $row): array => $row['cells'],
+                $rows,
+            ),
         ]);
     }
 

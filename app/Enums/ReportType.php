@@ -5,6 +5,7 @@ namespace App\Enums;
 enum ReportType: string
 {
     case Enquiries = 'enquiries';
+    case LeadAging = 'lead_aging';
     case EnquirySources = 'enquiry_sources';
     case AdmissionsByCourse = 'admissions_by_course';
     case AdmissionsByStaff = 'admissions_by_staff';
@@ -28,6 +29,7 @@ enum ReportType: string
     {
         return match ($this) {
             self::Enquiries => 'Enquiries (date range)',
+            self::LeadAging => 'Open leads — aging',
             self::EnquirySources => 'Enquiry source-wise',
             self::AdmissionsByCourse => 'Admissions by course',
             self::AdmissionsByStaff => 'Admissions by staff',
@@ -66,7 +68,7 @@ enum ReportType: string
     public function requiredLicenseFeature(): ?LicenseFeature
     {
         return match ($this) {
-            self::Enquiries, self::EnquirySources => LicenseFeature::Enquiries,
+            self::Enquiries, self::LeadAging, self::EnquirySources => LicenseFeature::Enquiries,
             self::AdmissionsByCourse, self::AdmissionsByStaff => LicenseFeature::Admissions,
             self::AttendanceByBatch,
             self::AttendanceByStudent,
@@ -88,5 +90,15 @@ enum ReportType: string
     public function staffCanExport(): bool
     {
         return ! $this->isFinancial();
+    }
+
+    public function usesDateRange(): bool
+    {
+        return match ($this) {
+            self::PendingFees,
+            self::OverdueInstallments,
+            self::LeadAging => false,
+            default => true,
+        };
     }
 }
