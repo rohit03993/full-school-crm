@@ -24,7 +24,9 @@ use App\Support\CrmNavigation;
 use App\Support\InstituteProfile;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -98,14 +100,11 @@ class ReportsPage extends Page
 
     public function mount(): void
     {
-        $this->filters = [
-            'date_from' => now()->startOfMonth()->toDateString(),
-            'date_to' => now()->toDateString(),
-            'max_percentage' => 75,
-        ];
+        $this->filters = $this->defaultFiltersForSelectedReport();
+        $this->runReport(app(ReportService::class), notify: false);
     }
 
-    public function runReport(ReportService $reports): void
+    public function runReport(ReportService $reports, bool $notify = true): void
     {
         $type = ReportType::tryFrom((string) $this->reportType);
 
@@ -113,13 +112,21 @@ class ReportsPage extends Page
             return;
         }
 
-        $this->report = $reports->generate($type, $this->filters);
+        $this->report = $reports->generate($type, $this->normalizedFilters());
 
-        Notification::make()
-            ->title('Report generated')
-            ->body(count($this->report['rows']).' row(s) · '.$this->report['title'])
-            ->success()
-            ->send();
+        if ($notify) {
+            Notification::make()
+                ->title('Report updated')
+                ->body(count($this->report['rows']).' row(s) · '.$this->report['title'])
+                ->success()
+                ->send();
+        }
+    }
+
+    public function clearFilters(): void
+    {
+        $this->filters = $this->defaultFiltersForSelectedReport();
+        $this->runReport(app(ReportService::class), notify: false);
     }
 
     public function exportCsv(ReportService $reports): StreamedResponse
@@ -128,7 +135,7 @@ class ReportsPage extends Page
         $filename = Str::slug($type->value).'-'.now()->format('Y-m-d').'.csv';
 
         return response()->streamDownload(
-            fn () => print ReportCsvExporter::export($this->report ?? $reports->generate($type, $this->filters)),
+            fn () => print ReportCsvExporter::export($this->report ?? $reports->generate($type, $this->normalizedFilters())),
             $filename,
             ['Content-Type' => 'text/csv'],
         );
@@ -137,7 +144,7 @@ class ReportsPage extends Page
     public function exportExcel(ReportService $reports): BinaryFileResponse
     {
         $type = $this->resolveAuthorizedReport($reports);
-        $data = $this->report ?? $reports->generate($type, $this->filters);
+        $data = $this->report ?? $reports->generate($type, $this->normalizedFilters());
         $filename = Str::slug($type->value).'-'.now()->format('Y-m-d').'.xlsx';
 
         return Excel::download(new ReportExport($data), $filename);
@@ -146,7 +153,7 @@ class ReportsPage extends Page
     public function exportPdf(ReportService $reports, ReportPdfService $pdf): StreamedResponse
     {
         $type = $this->resolveAuthorizedReport($reports);
-        $data = $this->report ?? $reports->generate($type, $this->filters);
+        $data = $this->report ?? $reports->generate($type, $this->normalizedFilters());
         $filename = Str::slug($type->value).'-'.now()->format('Y-m-d').'.pdf';
 
         return response()->streamDownload(
@@ -164,38 +171,104 @@ class ReportsPage extends Page
         abort_unless($policy->export(Auth::user(), $type), 403);
 
         if (! $this->report) {
-            $this->report = $reports->generate($type, $this->filters);
+            $this->report = $reports->generate($type, $this->normalizedFilters());
         }
 
         return $type;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function normalizedFilters(): array
+    {
+        $filters = $this->filters;
+
+        foreach (['course_id', 'batch_id', 'student_id', 'user_id', 'activity_type_id', 'lead_source'] as $key) {
+            if (! array_key_exists($key, $filters) || $filters[$key] === '' || $filters[$key] === null) {
+                unset($filters[$key]);
+            }
+        }
+
+        foreach (['min_days_open', 'min_days_since_contact'] as $key) {
+            if (! array_key_exists($key, $filters) || $filters[$key] === '' || $filters[$key] === null) {
+                unset($filters[$key]);
+            }
+        }
+
+        return $filters;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function defaultFiltersForSelectedReport(): array
+    {
+        $type = ReportType::tryFrom((string) $this->reportType) ?? ReportType::Enquiries;
+
+        return self::defaultFiltersFor($type);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function defaultFiltersFor(ReportType $type): array
+    {
+        $filters = [];
+
+        if ($type->usesDateRange()) {
+            $filters['date_from'] = now()->startOfMonth()->toDateString();
+            $filters['date_to'] = now()->toDateString();
+        }
+
+        if ($type === ReportType::LowAttendanceAlert) {
+            $filters['max_percentage'] = 75;
+        }
+
+        return $filters;
     }
 
     public function filtersForm(Schema $schema): Schema
     {
         return $schema
             ->statePath('filters')
+            ->columns([
+                'default' => 1,
+                'md' => 2,
+                'xl' => 3,
+            ])
             ->components([
                 DatePicker::make('date_from')
                     ->label('From')
                     ->native(false)
-                    ->visible(fn (): bool => $this->selectedReportUsesDateRange()),
+                    ->visible(fn (): bool => $this->selectedReportShowsFilter('date_from')),
                 DatePicker::make('date_to')
                     ->label('To')
                     ->native(false)
-                    ->visible(fn (): bool => $this->selectedReportUsesDateRange()),
+                    ->visible(fn (): bool => $this->selectedReportShowsFilter('date_to')),
                 Select::make('course_id')
-                    ->label('Course')
+                    ->label(fn (): string => $this->reportType === ReportType::LeadAging->value
+                        ? 'Course interested in'
+                        : 'Course')
                     ->options(fn (): array => InstituteProfile::activeCourseOptions())
                     ->searchable()
-                    ->native(false),
+                    ->placeholder('All courses')
+                    ->nullable()
+                    ->native(false)
+                    ->visible(fn (): bool => $this->selectedReportShowsFilter('course_id')),
                 Select::make('batch_id')
                     ->label('Batch')
                     ->options(fn (): array => Batch::query()->orderBy('name')->pluck('name', 'id')->all())
                     ->searchable()
-                    ->native(false),
+                    ->placeholder('All batches')
+                    ->nullable()
+                    ->native(false)
+                    ->visible(fn (): bool => $this->selectedReportShowsFilter('batch_id')),
                 Select::make('student_id')
                     ->label('Student')
                     ->searchable()
+                    ->placeholder('All students')
+                    ->nullable()
                     ->getSearchResultsUsing(fn (string $search): array => Student::query()
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('mobile', 'like', "%{$search}%")
@@ -203,48 +276,76 @@ class ReportsPage extends Page
                         ->pluck('name', 'id')
                         ->all())
                     ->getOptionLabelUsing(fn ($value): ?string => Student::query()->find($value)?->name)
-                    ->native(false),
+                    ->native(false)
+                    ->visible(fn (): bool => $this->selectedReportShowsFilter('student_id')),
                 Select::make('lead_source')
                     ->label('Lead source')
                     ->options(collect(LeadSource::cases())->mapWithKeys(
                         fn (LeadSource $source) => [$source->value => $source->label()],
                     ))
-                    ->native(false),
+                    ->placeholder('All sources')
+                    ->nullable()
+                    ->native(false)
+                    ->visible(fn (): bool => $this->selectedReportShowsFilter('lead_source')),
                 TextInput::make('min_days_open')
                     ->label('Minimum days open')
                     ->numeric()
                     ->minValue(0)
-                    ->helperText('Open leads — aging only. Example: 7 = leads at least one week old.')
-                    ->visible(fn (): bool => $this->reportType === ReportType::LeadAging->value),
+                    ->placeholder('Any age')
+                    ->helperText('Optional. Example: 7 = at least one week old.')
+                    ->visible(fn (): bool => $this->selectedReportShowsFilter('min_days_open')),
                 TextInput::make('min_days_since_contact')
                     ->label('Minimum days since last contact')
                     ->numeric()
                     ->minValue(0)
-                    ->helperText('Open leads — aging only. Example: 7 = no call or visit in 7+ days.')
-                    ->visible(fn (): bool => $this->reportType === ReportType::LeadAging->value),
+                    ->placeholder('Any contact age')
+                    ->helperText('Optional. Example: 7 = no call or visit in 7+ days.')
+                    ->visible(fn (): bool => $this->selectedReportShowsFilter('min_days_since_contact')),
                 Select::make('user_id')
-                    ->label('Staff')
+                    ->label(fn (): string => $this->reportType === ReportType::LeadAging->value
+                        ? 'Assigned counsellor'
+                        : 'Staff')
                     ->options(fn (): array => User::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id')->all())
                     ->searchable()
-                    ->native(false),
+                    ->placeholder('All staff')
+                    ->nullable()
+                    ->native(false)
+                    ->visible(fn (): bool => $this->selectedReportShowsFilter('user_id')),
                 Select::make('activity_type_id')
                     ->label('Exam type')
                     ->options(fn (): array => ActivityType::query()->enabled()->ordered()->pluck('name', 'id')->all())
-                    ->native(false),
+                    ->placeholder('All exam types')
+                    ->nullable()
+                    ->native(false)
+                    ->visible(fn (): bool => $this->selectedReportShowsFilter('activity_type_id')),
                 TextInput::make('max_percentage')
-                    ->label('Low attendance below %')
+                    ->label('Attendance below %')
                     ->numeric()
                     ->minValue(1)
                     ->maxValue(100)
-                    ->helperText('Used by Low attendance alert (default 75).'),
+                    ->helperText('Students under this percentage are flagged (default 75).')
+                    ->visible(fn (): bool => $this->selectedReportShowsFilter('max_percentage')),
             ]);
     }
 
-    protected function selectedReportUsesDateRange(): bool
+    protected function selectedReportShowsFilter(string $key): bool
     {
         $type = ReportType::tryFrom((string) $this->reportType);
 
-        return $type?->usesDateRange() ?? true;
+        return $type?->showsFilter($key) ?? false;
+    }
+
+    protected function selectedReportHasOptionalFilters(): bool
+    {
+        $type = ReportType::tryFrom((string) $this->reportType);
+
+        if (! $type) {
+            return false;
+        }
+
+        $optionalKeys = array_diff($type->filterKeys(), ['date_from', 'date_to']);
+
+        return $optionalKeys !== [];
     }
 
     /**
@@ -269,6 +370,42 @@ class ReportsPage extends Page
             ->all();
     }
 
+    protected function selectedReportUsesDateRange(): bool
+    {
+        $type = ReportType::tryFrom((string) $this->reportType);
+
+        return $type?->usesDateRange() ?? true;
+    }
+
+    protected function selectedReportHasFilters(): bool
+    {
+        $type = ReportType::tryFrom((string) $this->reportType);
+
+        return $type !== null && $type->filterKeys() !== [];
+    }
+
+    protected function filtersSectionTitle(): string
+    {
+        if ($this->selectedReportUsesDateRange() && ! $this->selectedReportHasOptionalFilters()) {
+            return 'Period';
+        }
+
+        if (! $this->selectedReportUsesDateRange() && $this->selectedReportHasOptionalFilters()) {
+            return 'Narrow results';
+        }
+
+        return 'Filters';
+    }
+
+    protected function filtersSectionDescription(): string
+    {
+        if ($this->selectedReportUsesDateRange() && ! $this->selectedReportHasOptionalFilters()) {
+            return 'Default is this month. Change the dates and tap Apply to refresh.';
+        }
+
+        return 'Optional fields are blank by default (include all). Change only what you need, then tap Apply.';
+    }
+
     public function getFiltersFormComponent(): Component
     {
         return Form::make([EmbeddedSchema::make('filtersForm')])
@@ -276,9 +413,15 @@ class ReportsPage extends Page
             ->livewireSubmitHandler('runReport')
             ->footer([
                 Actions::make([
-                    \Filament\Actions\Action::make('runReport')
-                        ->label('Generate Report')
-                        ->icon(Heroicon::OutlinedPlay)
+                    Action::make('clearFilters')
+                        ->label('Clear filters')
+                        ->color('gray')
+                        ->icon(Heroicon::OutlinedXMark)
+                        ->action('clearFilters')
+                        ->visible(fn (): bool => $this->selectedReportHasOptionalFilters()),
+                    Action::make('runReport')
+                        ->label('Apply')
+                        ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
                         ->submit('runReport'),
                 ])
                     ->alignment(Alignment::Start)
@@ -289,27 +432,49 @@ class ReportsPage extends Page
     public function content(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Report filters')
-                ->description('Staff can export operational reports. Financial exports are Super Admin only.')
+            Section::make('Report')
+                ->description('Pick a report — results load automatically. Financial exports remain Super Admin only.')
                 ->schema([
                     Select::make('reportType')
-                        ->label('Report')
+                        ->label('Report type')
                         ->options($this->availableReportOptions())
                         ->required()
                         ->live()
-                        ->afterStateUpdated(fn () => $this->report = null)
-                        ->native(false),
+                        ->afterStateUpdated(function (): void {
+                            $this->report = null;
+                            $this->filters = $this->defaultFiltersForSelectedReport();
+                            $this->runReport(app(ReportService::class), notify: false);
+                        })
+                        ->native(false)
+                        ->columnSpanFull(),
+                    Placeholder::make('report_filter_hint')
+                        ->label('')
+                        ->content(fn (): string => ReportType::tryFrom((string) $this->reportType)?->filterHint() ?? '')
+                        ->visible(fn (): bool => filled(ReportType::tryFrom((string) $this->reportType)?->filterHint()))
+                        ->columnSpanFull(),
+                ])
+                ->columns(1)
+                ->compact(),
+            Section::make(fn (): string => $this->filtersSectionTitle())
+                ->description(fn (): string => $this->filtersSectionDescription())
+                ->schema([
                     $this->getFiltersFormComponent(),
                 ])
+                ->compact()
+                ->collapsible()
+                ->visible(fn (): bool => $this->selectedReportHasFilters()),
+            Section::make('Results')
+                ->schema([
+                    View::make('filament.pages.partials.reports-preview')
+                        ->viewData(fn (): array => [
+                            'report' => $this->report,
+                            'canExport' => filled($this->reportType) && app(ReportPolicy::class)->export(
+                                Auth::user(),
+                                ReportType::from((string) $this->reportType),
+                            ),
+                        ]),
+                ])
                 ->compact(),
-            View::make('filament.pages.partials.reports-preview')
-                ->viewData(fn (): array => [
-                    'report' => $this->report,
-                    'canExport' => filled($this->reportType) && app(ReportPolicy::class)->export(
-                        Auth::user(),
-                        ReportType::from((string) $this->reportType),
-                    ),
-                ]),
         ]);
     }
 }

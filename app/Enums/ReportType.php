@@ -101,4 +101,57 @@ enum ReportType: string
             default => true,
         };
     }
+
+    /**
+     * Which filter fields apply to this report (hides irrelevant UI on Reports page).
+     *
+     * @return list<string>
+     */
+    public function filterKeys(): array
+    {
+        return match ($this) {
+            self::LeadAging => [
+                'course_id',
+                'lead_source',
+                'user_id',
+                'min_days_open',
+                'min_days_since_contact',
+            ],
+            self::Enquiries => ['date_from', 'date_to'],
+            self::EnquirySources => ['date_from', 'date_to', 'lead_source'],
+            self::AdmissionsByCourse => ['date_from', 'date_to', 'course_id'],
+            self::AdmissionsByStaff => ['date_from', 'date_to', 'user_id'],
+            self::AttendanceByBatch => ['date_from', 'date_to', 'batch_id'],
+            self::AttendanceByStudent => ['date_from', 'date_to', 'student_id'],
+            self::DailyAbsentSheet => ['date_from', 'date_to', 'batch_id'],
+            self::MonthlyStudentAttendance => ['date_from', 'date_to', 'batch_id', 'student_id'],
+            self::LowAttendanceAlert => ['date_from', 'date_to', 'batch_id', 'max_percentage'],
+            self::Activities => ['date_from', 'date_to', 'activity_type_id'],
+            self::TestMarks => ['date_from', 'date_to', 'batch_id', 'activity_type_id'],
+            self::FeeCollection,
+            self::Discounts,
+            self::PaymentModes,
+            self::FinancialSummary => ['date_from', 'date_to'],
+            self::PendingFees,
+            self::OverdueInstallments => ['course_id', 'batch_id'],
+            self::AuditLogs => ['date_from', 'date_to', 'user_id'],
+            self::HomeworkCheckSummary => ['date_from', 'date_to', 'batch_id'],
+        };
+    }
+
+    public function showsFilter(string $key): bool
+    {
+        return in_array($key, $this->filterKeys(), true);
+    }
+
+    public function filterHint(): ?string
+    {
+        return match ($this) {
+            self::LeadAging => 'All open leads in the pipeline (not enrolled, not Joined), newest contact gaps first. Optional filters below narrow the list — leave them blank to include everyone.',
+            self::Enquiries => 'All enquiries created in the date range (including converted leads). Adjust dates below to change the period.',
+            self::PendingFees, self::OverdueInstallments => 'All pending or overdue records. Optionally narrow by course or batch.',
+            self::LowAttendanceAlert => 'Students below the attendance threshold in the date range. Change the % only if you need a stricter cutoff.',
+            default => 'Results load automatically. Leave optional filters blank to include all matching records.',
+        };
+    }
 }

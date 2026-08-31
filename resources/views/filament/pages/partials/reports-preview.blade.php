@@ -1,6 +1,6 @@
 @if (! $report)
     <div class="rounded-xl bg-gray-50 px-4 py-10 text-center text-sm text-gray-500 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10">
-        Choose a report and tap <span class="font-semibold">Generate Report</span> to preview results here.
+        Loading report…
     </div>
 @else
     <div class="space-y-4">
@@ -41,7 +41,7 @@
                 </div>
             @empty
                 <p class="rounded-xl bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:bg-white/5 dark:text-gray-400">
-                    No records for the selected filters.
+                    No records match this report. Try clearing optional filters or widening the date range.
                 </p>
             @endforelse
         </div>
@@ -65,7 +65,7 @@
                     @empty
                         <tr>
                             <td colspan="{{ count($report['columns']) }}" class="px-4 py-6 text-center text-gray-500 dark:text-gray-400">
-                                No records for the selected filters.
+                                No records match this report. Try clearing optional filters or widening the date range.
                             </td>
                         </tr>
                     @endforelse
