@@ -138,6 +138,26 @@ class ReportService
         return $report;
     }
 
+    /**
+     * @param  class-string<\BackedEnum&object{label(): string}>  $enumClass
+     */
+    protected function enumLabel(mixed $value, string $enumClass): string
+    {
+        if ($value instanceof $enumClass) {
+            return $value->label();
+        }
+
+        if (is_string($value) || is_int($value)) {
+            $enum = $enumClass::tryFrom($value);
+
+            if ($enum !== null) {
+                return $enum->label();
+            }
+        }
+
+        return (string) $value;
+    }
+
   /**
      * @return array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>}
      */
@@ -318,10 +338,8 @@ class ReportService
         }
 
         $rows = $query->get()->map(function ($row): array {
-            $enum = LeadSource::tryFrom($row->lead_source);
-
             return [
-                $enum?->label() ?? $row->lead_source,
+                $this->enumLabel($row->lead_source, LeadSource::class),
                 (int) $row->total,
             ];
         })->all();
@@ -892,10 +910,8 @@ class ReportService
             ->groupBy('payment_mode')
             ->get()
             ->map(function ($row): array {
-                $mode = PaymentMode::tryFrom($row->payment_mode);
-
                 return [
-                    $mode?->label() ?? $row->payment_mode,
+                    $this->enumLabel($row->payment_mode, PaymentMode::class),
                     (int) $row->count,
                     number_format((float) $row->total, 2),
                 ];

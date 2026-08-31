@@ -384,19 +384,6 @@ class ReportsPage extends Page
         return $type !== null && $type->filterKeys() !== [];
     }
 
-    protected function filtersSectionTitle(): string
-    {
-        if ($this->selectedReportUsesDateRange() && ! $this->selectedReportHasOptionalFilters()) {
-            return 'Period';
-        }
-
-        if (! $this->selectedReportUsesDateRange() && $this->selectedReportHasOptionalFilters()) {
-            return 'Narrow results';
-        }
-
-        return 'Filters';
-    }
-
     protected function filtersSectionDescription(): string
     {
         if ($this->selectedReportUsesDateRange() && ! $this->selectedReportHasOptionalFilters()) {
@@ -455,7 +442,7 @@ class ReportsPage extends Page
                 ])
                 ->columns(1)
                 ->compact(),
-            Section::make(fn (): string => $this->filtersSectionTitle())
+            Section::make('Filters')
                 ->description(fn (): string => $this->filtersSectionDescription())
                 ->schema([
                     $this->getFiltersFormComponent(),

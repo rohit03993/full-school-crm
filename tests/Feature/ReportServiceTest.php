@@ -74,6 +74,31 @@ class ReportServiceTest extends TestCase
         $this->assertContains('Done %', $report['columns']);
     }
 
+    public function test_enquiry_sources_report_handles_enum_cast_lead_source(): void
+    {
+        $staff = $this->createSuperAdmin();
+        $course = $this->createCourse();
+
+        app(EnquiryService::class)->create([
+            'name' => 'Source Lead',
+            'father_name' => 'Parent',
+            'mobile' => '9811000093',
+            'gender' => Gender::Male->value,
+            'course_id' => $course->id,
+        ], $staff, LeadSource::WalkIn);
+
+        $report = app(ReportService::class)->generate(ReportType::EnquirySources, [
+            'date_from' => now()->subDay()->toDateString(),
+            'date_to' => now()->addDay()->toDateString(),
+        ]);
+
+        $this->assertStringStartsWith('Enquiry sources', $report['title']);
+        $this->assertSame(['Source', 'Count'], $report['columns']);
+        $this->assertCount(1, $report['rows']);
+        $this->assertSame(LeadSource::WalkIn->label(), $report['rows'][0][0]);
+        $this->assertSame(1, $report['rows'][0][1]);
+    }
+
     public function test_lead_aging_report_lists_open_leads_with_age_columns(): void
     {
         $staff = $this->createSuperAdmin();
