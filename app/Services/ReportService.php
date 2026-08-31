@@ -75,7 +75,11 @@ class ReportService
             ReportType::AdmissionsByCourse => $this->admissionsByCourseReport($from, $to, $filters['course_id'] ?? null),
             ReportType::AdmissionsByStaff => $this->admissionsByStaffReport($from, $to, $filters['user_id'] ?? null),
             ReportType::AttendanceByBatch => $this->attendanceByBatchReport($from, $to, $filters['batch_id'] ?? null),
-            ReportType::AttendanceByStudent => $this->attendanceByStudentReport($from, $to, $filters['student_id'] ?? null),
+            ReportType::AttendanceByStudent => $this->attendanceByStudentReport(
+                $from,
+                $to,
+                isset($filters['student_id']) ? (int) $filters['student_id'] : null,
+            ),
             ReportType::DailyAbsentSheet => $this->dailyAbsentSheetReport($from, $to, $filters['batch_id'] ?? null),
             ReportType::MonthlyStudentAttendance => $this->monthlyStudentAttendanceReport($from, $to, $filters['batch_id'] ?? null, $filters['student_id'] ?? null),
             ReportType::LowAttendanceAlert => $this->lowAttendanceAlertReport(
@@ -446,7 +450,7 @@ class ReportService
     {
         if (! $studentId) {
             return [
-                'title' => 'Attendance by student',
+                'title' => 'Attendance by student — select a student',
                 'columns' => ['Date', 'Batch', 'Status'],
                 'rows' => [],
             ];
@@ -457,7 +461,8 @@ class ReportService
         $rows = Attendance::query()
             ->with('batch')
             ->where('student_id', $studentId)
-            ->whereBetween('attendance_date', [$from->toDateString(), $to->toDateString()])
+            ->whereDate('attendance_date', '>=', $from->toDateString())
+            ->whereDate('attendance_date', '<=', $to->toDateString())
             ->orderBy('attendance_date')
             ->limit(self::MAX_DETAIL_ROWS)
             ->get()

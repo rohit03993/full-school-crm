@@ -108,14 +108,34 @@ class ReportsPage extends Page
     public function mount(): void
     {
         $this->filters = $this->defaultFiltersForSelectedReport();
-        $this->runReport(app(ReportService::class), notify: false);
+
+        if ($this->canRunSelectedReport()) {
+            $this->runReport(app(ReportService::class), notify: false);
+        }
     }
 
     public function runReport(ReportService $reports, bool $notify = true): void
     {
+        $this->syncFiltersFormState();
+
         $type = ReportType::tryFrom((string) $this->reportType);
 
         if (! $type) {
+            return;
+        }
+
+        if (! $this->canRunSelectedReport($type)) {
+            $this->report = $reports->generate($type, $this->normalizedFilters());
+            $this->resetPage();
+
+            if ($notify) {
+                Notification::make()
+                    ->title('Select required filters')
+                    ->body($this->missingRequiredFiltersMessage($type))
+                    ->warning()
+                    ->send();
+            }
+
             return;
         }
 
@@ -195,6 +215,12 @@ class ReportsPage extends Page
         foreach (['course_id', 'batch_id', 'student_id', 'user_id', 'activity_type_id', 'lead_source'] as $key) {
             if (! array_key_exists($key, $filters) || $filters[$key] === '' || $filters[$key] === null) {
                 unset($filters[$key]);
+
+                continue;
+            }
+
+            if (in_array($key, ['course_id', 'batch_id', 'student_id', 'user_id', 'activity_type_id'], true)) {
+                $filters[$key] = (int) $filters[$key];
             }
         }
 
@@ -205,6 +231,43 @@ class ReportsPage extends Page
         }
 
         return $filters;
+    }
+
+    protected function syncFiltersFormState(): void
+    {
+        try {
+            $state = $this->getSchema('filtersForm')->getState();
+            $this->filters = array_merge($this->filters, $state);
+        } catch (\Throwable) {
+            // Fall back to bound Livewire state when schema is unavailable.
+        }
+    }
+
+    protected function canRunSelectedReport(?ReportType $type = null): bool
+    {
+        $type ??= ReportType::tryFrom((string) $this->reportType);
+
+        if (! $type) {
+            return false;
+        }
+
+        $filters = $this->normalizedFilters();
+
+        foreach ($type->requiredFilterKeys() as $key) {
+            if (! array_key_exists($key, $filters)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected function missingRequiredFiltersMessage(ReportType $type): string
+    {
+        return match ($type) {
+            ReportType::AttendanceByStudent => 'Choose a student, then tap Apply.',
+            default => 'Fill the required filters, then tap Apply.',
+        };
     }
 
     /**
@@ -299,8 +362,11 @@ class ReportsPage extends Page
                 Select::make('student_id')
                     ->label('Student')
                     ->searchable()
-                    ->placeholder('All students')
-                    ->nullable()
+                    ->placeholder(fn (): string => $this->selectedReportRequiresFilter('student_id')
+                        ? 'Select a student'
+                        : 'All students')
+                    ->required(fn (): bool => $this->selectedReportRequiresFilter('student_id'))
+                    ->nullable(fn (): bool => ! $this->selectedReportRequiresFilter('student_id'))
                     ->getSearchResultsUsing(fn (string $search): array => Student::query()
                         ->where('name', 'like', "%{$search}%")
                         ->orWhere('mobile', 'like', "%{$search}%")
@@ -367,6 +433,13 @@ class ReportsPage extends Page
         return $type?->showsFilter($key) ?? false;
     }
 
+    protected function selectedReportRequiresFilter(string $key): bool
+    {
+        $type = ReportType::tryFrom((string) $this->reportType);
+
+        return $type?->requiresFilter($key) ?? false;
+    }
+
     protected function selectedReportHasOptionalFilters(): bool
     {
         $type = ReportType::tryFrom((string) $this->reportType);
@@ -422,6 +495,10 @@ class ReportsPage extends Page
             return 'Default is this month. Change the dates and tap Apply to refresh.';
         }
 
+        if ($this->selectedReportRequiresFilter('student_id')) {
+            return 'Student is required for this report. Pick the student and date range, then tap Apply.';
+        }
+
         return 'Optional fields are blank by default (include all). Change only what you need, then tap Apply.';
     }
 
@@ -463,7 +540,10 @@ class ReportsPage extends Page
                             $this->report = null;
                             $this->filters = $this->defaultFiltersForSelectedReport();
                             $this->resetPage();
-                            $this->runReport(app(ReportService::class), notify: false);
+
+                            if ($this->canRunSelectedReport()) {
+                                $this->runReport(app(ReportService::class), notify: false);
+                            }
                         })
                         ->native(false)
                         ->columnSpanFull(),

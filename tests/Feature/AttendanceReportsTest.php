@@ -58,6 +58,42 @@ class AttendanceReportsTest extends TestCase
         $this->assertNotContains($presentStudent->name, $names);
     }
 
+    public function test_attendance_by_student_report_lists_selected_student_rows(): void
+    {
+        $this->travelTo('2026-07-11 12:00:00');
+
+        $seed = $this->seedBatchWithTwoStudents();
+        $student = $seed['student_present'];
+        $batch = $seed['batch'];
+        $staff = $seed['staff'];
+
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $student->id,
+            'attendance_date' => '2026-07-11',
+            'status' => AttendanceStatus::Present,
+            'marked_by_user_id' => $staff->id,
+        ]);
+
+        $withoutStudent = app(ReportService::class)->generate(ReportType::AttendanceByStudent, [
+            'date_from' => '2026-07-01',
+            'date_to' => '2026-07-11',
+        ]);
+
+        $this->assertSame('Attendance by student — select a student', $withoutStudent['title']);
+        $this->assertSame([], $withoutStudent['rows']);
+
+        $report = app(ReportService::class)->generate(ReportType::AttendanceByStudent, [
+            'date_from' => '2026-07-01',
+            'date_to' => '2026-07-11',
+            'student_id' => $student->id,
+        ]);
+
+        $this->assertStringContainsString($student->name, $report['title']);
+        $this->assertCount(1, $report['rows']);
+        $this->assertSame('Batch A', $report['rows'][0][1]);
+    }
+
     public function test_monthly_and_low_attendance_reports(): void
     {
         $this->travelTo('2026-07-11 12:00:00'); // Saturday
