@@ -8,6 +8,7 @@ use App\Models\Enrollment;
 use App\Models\HomeworkAssignment;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Payment;
+use App\Models\StudentCertificate;
 use App\Models\StudentMarksheet;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -41,6 +42,7 @@ class StudentDataResetService
             }
 
             $counts['number_sequences'] = $this->resetStudentNumberSequences();
+            $counts['push_subscriptions'] = $this->clearStudentPushSubscriptions();
         } finally {
             Schema::enableForeignKeyConstraints();
         }
@@ -102,6 +104,16 @@ class StudentDataResetService
                     $this->storage->deleteStoredFile($homework->file_path);
                 });
         }
+
+        if (Schema::hasTable('student_certificates')) {
+            StudentCertificate::query()
+                ->whereNotNull('pdf_path')
+                ->select(['pdf_path'])
+                ->cursor()
+                ->each(function (StudentCertificate $certificate): void {
+                    $this->storage->deleteStoredFile($certificate->pdf_path);
+                });
+        }
     }
 
     /**
@@ -122,6 +134,7 @@ class StudentDataResetService
             'result_declarations',
             'exam_window_subjects',
             'exam_windows',
+            'homework_checks',
             'homework_views',
             'homework_assignments',
             'activity_attendances',
@@ -129,10 +142,16 @@ class StudentDataResetService
             'attendance_manual_punches',
             'attendances',
             'batch_students',
+            'student_case_assignments',
             'student_calls',
+            'student_cases',
+            'student_certificates',
             'visit_meeting_assignments',
+            'face_verification_requests',
             'documents',
+            'payment_cancellation_requests',
             'payments',
+            'fee_misc_charge_adjustment_requests',
             'fee_penalties',
             'fee_discount_entries',
             'fee_misc_charges',
@@ -170,6 +189,15 @@ class StudentDataResetService
         return $deleted;
     }
 
+    protected function clearStudentPushSubscriptions(): int
+    {
+        if (! Schema::hasTable('push_subscriptions') || ! Schema::hasColumn('push_subscriptions', 'student_id')) {
+            return 0;
+        }
+
+        return DB::table('push_subscriptions')->whereNotNull('student_id')->delete();
+    }
+
     /**
      * Tables and settings left intact by {@see reset()}.
      *
@@ -201,17 +229,20 @@ class StudentDataResetService
         return [
             'All students and import history',
             'Leads, enquiries, campus visits, assigned meetings',
+            'Student cases (My work / All cases) and case assignments',
+            'Certificates issued to students',
             'Admissions, enrollments, documents, ID cards',
-            'Fees, installments, discounts, penalties, payments, receipts',
+            'Fees, installments, discounts, penalties, payments, receipts, cancel/adjust requests',
             'Fee reminder logs & accounting journal entries',
             'Batch attendance & biometric/manual punch logs',
             'Exam windows, test sessions, marks, result declarations, marksheets',
-            'Homework assignments & view history',
+            'Homework assignments, checks, and view history',
             'Call queue / call logs tied to students',
             'WhatsApp inbox messages, bulk campaigns, and live campaigns',
             'WhatsApp punch notification logs',
+            'Portal push subscriptions (staff push kept)',
             'Audit log history & in-app notifications',
-            'Student roll/receipt number sequences (reset to start)',
+            'Student roll/receipt/case number sequences (reset to start)',
         ];
     }
 }

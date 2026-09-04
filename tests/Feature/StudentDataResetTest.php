@@ -66,6 +66,66 @@ class StudentDataResetTest extends TestCase
         $this->assertSame(1, User::query()->count());
     }
 
+    public function test_reset_students_clears_orphan_cases_and_certificates_tables(): void
+    {
+        if (! Schema::hasTable('student_cases')) {
+            $this->markTestSkipped('Student cases table not migrated.');
+        }
+
+        $staff = User::factory()->create(['is_active' => true]);
+        $staff->assignRole(RoleName::SuperAdmin->value);
+
+        $student = Student::query()->create([
+            'name' => 'Case Student',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2008-01-01',
+            'gender' => Gender::Male,
+            'mobile' => '9876505555',
+            'status' => StudentStatus::Enrolled,
+            'portal_password' => bcrypt('Student@2026'),
+        ]);
+
+        $caseId = \App\Models\StudentCase::query()->create([
+            'case_number' => 'TEST-CASE-0001',
+            'student_id' => $student->id,
+            'case_type' => \App\Enums\CampusVisitPurpose::Academic,
+            'status' => \App\Enums\StudentCaseStatus::Open,
+            'title' => 'Orphan case after wipe',
+            'opened_by_user_id' => $staff->id,
+            'current_assignee_user_id' => $staff->id,
+            'opened_at' => now(),
+        ])->id;
+
+        \App\Models\StudentCaseAssignment::query()->create([
+            'student_case_id' => $caseId,
+            'from_user_id' => null,
+            'to_user_id' => $staff->id,
+            'assigned_by_user_id' => $staff->id,
+            'note' => 'Initial assignment',
+        ]);
+
+        if (Schema::hasTable('student_certificates')) {
+            \App\Models\StudentCertificate::query()->create([
+                'student_id' => $student->id,
+                'type' => \App\Enums\CertificateType::Bonafide,
+                'serial_number' => 'BNF-0001',
+                'serial' => 1,
+                'issued_on' => now()->toDateString(),
+                'issued_by_user_id' => $staff->id,
+            ]);
+        }
+
+        app(StudentDataResetService::class)->reset();
+
+        $this->assertSame(0, Student::query()->count());
+        $this->assertSame(0, \App\Models\StudentCase::query()->count());
+        $this->assertSame(0, \App\Models\StudentCaseAssignment::query()->count());
+
+        if (Schema::hasTable('student_certificates')) {
+            $this->assertSame(0, \App\Models\StudentCertificate::query()->count());
+        }
+    }
+
     public function test_reset_students_command_requires_confirmation(): void
     {
         Student::query()->create([
