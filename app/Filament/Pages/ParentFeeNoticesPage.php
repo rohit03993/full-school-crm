@@ -11,6 +11,7 @@ use App\Models\Batch;
 use App\Services\ParentFeeNoticeService;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
+use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -106,7 +107,7 @@ class ParentFeeNoticesPage extends Page
     public function applyBulkValues(): void
     {
         $amount = trim((string) ($this->bulkAmount ?? ''));
-        $due = filled($this->bulkDueDate) ? (string) $this->bulkDueDate : '';
+        $due = $this->normalizedBulkDueDate();
 
         if ($amount === '' && $due === '') {
             Notification::make()
@@ -136,6 +137,20 @@ class ParentFeeNoticesPage extends Page
             ->title('Applied to selected students')
             ->success()
             ->send();
+    }
+
+    protected function normalizedBulkDueDate(): string
+    {
+        if (blank($this->bulkDueDate)) {
+            return '';
+        }
+
+        try {
+            // HTML date inputs need Y-m-d; Filament pickers may store Carbon / display strings.
+            return Carbon::parse($this->bulkDueDate)->toDateString();
+        } catch (\Throwable) {
+            return '';
+        }
     }
 
     public function selectAllWithMobile(): void
@@ -268,7 +283,9 @@ class ParentFeeNoticesPage extends Page
                         ->placeholder('e.g. 5000'),
                     DatePicker::make('bulkDueDate')
                         ->label('Due date for all selected')
-                        ->native(false),
+                        ->native(true)
+                        ->format('Y-m-d')
+                        ->displayFormat('d M Y'),
                     Actions::make([
                         Action::make('applyBulkValues')
                             ->label('Apply to selected')
