@@ -13,7 +13,6 @@ use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
 use Carbon\Carbon;
 use Filament\Actions\Action;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -268,7 +267,8 @@ class ParentFeeNoticesPage extends Page
                         ->options(fn (ParentFeeNoticeService $notices): array => $notices->templateOptions())
                         ->searchable()
                         ->required()
-                        ->helperText('Prefer a fee reminder template (institute, student, amount, due date).')
+                        ->live()
+                        ->helperText('Use an approved fee_reminder template (4 params). Avoid test templates with 0 params.')
                         ->native(false),
                 ])
                 ->columns(2)
@@ -281,11 +281,10 @@ class ParentFeeNoticesPage extends Page
                         ->numeric()
                         ->minValue(0.01)
                         ->placeholder('e.g. 5000'),
-                    DatePicker::make('bulkDueDate')
+                    TextInput::make('bulkDueDate')
                         ->label('Due date for all selected')
-                        ->native(true)
-                        ->format('Y-m-d')
-                        ->displayFormat('d M Y'),
+                        ->type('date')
+                        ->helperText('Pick a date, then click Apply to selected.'),
                     Actions::make([
                         Action::make('applyBulkValues')
                             ->label('Apply to selected')
@@ -302,6 +301,16 @@ class ParentFeeNoticesPage extends Page
                     ])->alignment(Alignment::Start)->columnSpanFull(),
                 ])
                 ->columns(2)
+                ->compact()
+                ->visible(fn (): bool => $this->rows !== []),
+            Section::make('Message preview')
+                ->description('Shows how the WhatsApp will look for the first selected student with amount and due date filled.')
+                ->schema([
+                    View::make('filament.pages.partials.parent-fee-notices-preview')
+                        ->viewData(fn (): array => [
+                            'preview' => app(ParentFeeNoticeService::class)->preview($this->rows, $this->templateId),
+                        ]),
+                ])
                 ->compact()
                 ->visible(fn (): bool => $this->rows !== []),
             Section::make('Students')

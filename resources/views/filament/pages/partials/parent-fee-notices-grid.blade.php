@@ -47,7 +47,7 @@
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                wire:model="rows.{{ $index }}.amount"
+                                wire:model.blur="rows.{{ $index }}.amount"
                                 @disabled(! ($row['has_mobile'] ?? false))
                                 placeholder="0.00"
                                 class="w-full min-w-[7rem] rounded-lg border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-white/10 dark:bg-white/5"
@@ -56,7 +56,7 @@
                         <td class="px-3 py-2">
                             <input
                                 type="date"
-                                wire:model="rows.{{ $index }}.due_date"
+                                wire:model.blur="rows.{{ $index }}.due_date"
                                 @disabled(! ($row['has_mobile'] ?? false))
                                 class="w-full min-w-[9rem] rounded-lg border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-white/10 dark:bg-white/5"
                             />

@@ -197,6 +197,70 @@ class ParentFeeNoticeTest extends TestCase
         return [$staff, $batch, $studentA, $studentB];
     }
 
+    public function test_preview_fills_body_for_first_selected_student(): void
+    {
+        Setting::setValue('site.name', 'Motion Academy', 'site');
+        Setting::flushValueCache();
+
+        [, , $student] = $this->seedBatchWithOneStudent();
+
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'fee_reminder_overdue',
+            'param_count' => 4,
+            'param_mappings' => [
+                'institute.name',
+                'student.name',
+                'fee.pending_amount',
+                'fee.due_date',
+            ],
+            'body' => "From {{1}}\nStudent: {{2}}\nAmount: {{3}}\nDue: {{4}}",
+            'is_active' => true,
+        ]);
+
+        $preview = app(ParentFeeNoticeService::class)->preview([
+            [
+                'student_id' => $student->id,
+                'include' => true,
+                'has_mobile' => true,
+                'amount' => '20000',
+                'due_date' => '2026-09-24',
+            ],
+        ], $template->id);
+
+        $this->assertTrue($preview['ready']);
+        $this->assertSame($student->name, $preview['student_name']);
+        $this->assertStringContainsString('Motion Academy', (string) $preview['body']);
+        $this->assertStringContainsString('20,000.00', (string) $preview['body']);
+        $this->assertStringContainsString('24 Sep 2026', (string) $preview['body']);
+    }
+
+    public function test_preview_warns_when_template_has_zero_params(): void
+    {
+        [, , $student] = $this->seedBatchWithOneStudent();
+
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'test1',
+            'param_count' => 0,
+            'param_mappings' => [],
+            'body' => 'Hello parent',
+            'is_active' => true,
+        ]);
+
+        $preview = app(ParentFeeNoticeService::class)->preview([
+            [
+                'student_id' => $student->id,
+                'include' => true,
+                'has_mobile' => true,
+                'amount' => '20000',
+                'due_date' => '2026-09-24',
+            ],
+        ], $template->id);
+
+        $this->assertFalse($preview['ready']);
+        $this->assertStringContainsString('0 variables', (string) $preview['warning']);
+        $this->assertSame('Hello parent', $preview['body']);
+    }
+
     /**
      * @return array{0: User, 1: Batch, 2: Student}
      */

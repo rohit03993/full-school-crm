@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\LicenseFeature;
 use App\Enums\ParentFeeNoticeStatus;
 use App\Enums\WhatsAppAudienceType;
 use App\Models\Batch;
@@ -11,7 +12,7 @@ use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppTemplate;
 use App\Support\FeatureGate;
-use App\Enums\LicenseFeature;
+use App\Support\FeeReminderWhatsAppTemplate;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -186,6 +187,139 @@ class ParentFeeNoticeService
             $notice->update(['status' => $mapped]);
             $notice->status = $mapped;
         }
+    }
+
+    /**
+     * Preview filled body for the first selected student with amount + due date.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return array{
+     *     ready: bool,
+     *     warning: ?string,
+     *     template_name: ?string,
+     *     student_name: ?string,
+     *     mobile: ?string,
+     *     body: ?string,
+     *     param_count: int,
+     *     selected_count: int
+     * }
+     */
+    public function preview(array $rows, ?int $templateId): array
+    {
+        $selectedCount = collect($rows)
+            ->filter(fn (array $row): bool => filter_var($row['include'] ?? false, FILTER_VALIDATE_BOOLEAN))
+            ->count();
+
+        $empty = [
+            'ready' => false,
+            'warning' => null,
+            'template_name' => null,
+            'student_name' => null,
+            'mobile' => null,
+            'body' => null,
+            'param_count' => 0,
+            'selected_count' => $selectedCount,
+        ];
+
+        if (! $templateId) {
+            return [...$empty, 'warning' => 'Select a WhatsApp template to preview.'];
+        }
+
+        $template = WhatsAppTemplate::query()
+            ->whereKey($templateId)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $template) {
+            return [...$empty, 'warning' => 'Selected template was not found.'];
+        }
+
+        $paramCount = (int) $template->param_count;
+        $base = [
+            ...$empty,
+            'template_name' => $template->name,
+            'param_count' => $paramCount,
+        ];
+
+        if ($paramCount < 1) {
+            return [
+                ...$base,
+                'warning' => 'This template has 0 variables (e.g. test1). Use an approved fee_reminder template with institute, student, amount, and due date.',
+                'body' => filled($template->body) ? (string) $template->body : null,
+            ];
+        }
+
+        $row = collect($rows)->first(function (array $row): bool {
+            if (! filter_var($row['include'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                return false;
+            }
+
+            return filled($row['amount'] ?? null) && filled($row['due_date'] ?? null) && ($row['has_mobile'] ?? false);
+        });
+
+        if (! $row) {
+            return [
+                ...$base,
+                'warning' => 'Select students and fill amount + due date, then preview uses the first complete row.',
+            ];
+        }
+
+        try {
+            $due = Carbon::parse((string) $row['due_date']);
+            $amount = round((float) str_replace(',', '', (string) $row['amount']), 2);
+        } catch (\Throwable) {
+            return [...$base, 'warning' => 'Fix amount / due date on the selected rows to preview.'];
+        }
+
+        $student = Student::query()->find((int) $row['student_id']);
+
+        if (! $student) {
+            return [...$base, 'warning' => 'Student not found for preview.'];
+        }
+
+        $amountFormatted = number_format($amount, 2, '.', ',');
+        $dueFormatted = $due->format('d M Y');
+        $contexts = [
+            $student->id => [
+                'pending_amount' => $amountFormatted,
+                'due_date' => $dueFormatted,
+                'amount' => $amountFormatted,
+            ],
+        ];
+
+        $campaign = new WhatsAppCampaign([
+            'campaign_variables' => [
+                '_manual_fee_notice_context' => $contexts,
+                '_student_fee_context' => $contexts,
+            ],
+        ]);
+
+        $params = app(WhatsAppTemplateParamResolver::class)->resolveAll(
+            $template->paramSources(),
+            $student,
+            null,
+            null,
+            $campaign,
+        );
+
+        $body = (string) ($template->body ?: FeeReminderWhatsAppTemplate::BODY_OVERDUE);
+
+        foreach ($params as $index => $value) {
+            $body = str_replace('{{'.($index + 1).'}}', (string) $value, $body);
+        }
+
+        return [
+            'ready' => true,
+            'warning' => FeeReminderWhatsAppTemplate::looksLikeName((string) $template->name)
+                ? null
+                : 'Tip: prefer fee_reminder / fee_reminder_overdue so amount and due date map correctly.',
+            'template_name' => $template->name,
+            'student_name' => $student->name,
+            'mobile' => $student->mobile,
+            'body' => $body,
+            'param_count' => $paramCount,
+            'selected_count' => $selectedCount,
+        ];
     }
 
     /**
