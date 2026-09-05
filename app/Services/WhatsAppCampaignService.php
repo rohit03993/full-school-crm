@@ -412,7 +412,7 @@ class WhatsAppCampaignService
         }
 
         $normalized = [];
-        $preserveArrayKeys = ['_student_marks', '_student_ids', '_student_rolls', '_student_attendance_status', '_student_fee_context', '_manual'];
+        $preserveArrayKeys = ['_student_marks', '_student_ids', '_student_rolls', '_student_attendance_status', '_student_fee_context', '_manual_fee_notice_context', '_manual'];
 
         foreach ($variables as $key => $value) {
             if (is_array($value)) {

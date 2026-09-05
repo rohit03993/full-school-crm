@@ -310,14 +310,20 @@ class WhatsAppTemplateParamResolver
      */
     protected function studentFeeContext(?WhatsAppCampaign $campaign, Student $student): array
     {
-        $context = $campaign?->campaignVariable('_student_fee_context', []);
+        foreach (['_manual_fee_notice_context', '_student_fee_context'] as $key) {
+            $context = $campaign?->campaignVariable($key, []);
 
-        if (! is_array($context)) {
-            return [];
+            if (! is_array($context)) {
+                continue;
+            }
+
+            $row = $context[$student->id] ?? $context[(string) $student->id] ?? null;
+
+            if (is_array($row)) {
+                return $row;
+            }
         }
 
-        $row = $context[$student->id] ?? $context[(string) $student->id] ?? null;
-
-        return is_array($row) ? $row : [];
+        return [];
     }
 }

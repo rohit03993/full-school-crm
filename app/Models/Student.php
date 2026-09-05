@@ -132,6 +132,11 @@ class Student extends Model
         return $this->hasMany(StudentCertificate::class);
     }
 
+    public function parentFeeNotices(): HasMany
+    {
+        return $this->hasMany(ParentFeeNotice::class);
+    }
+
     public function enquiry(): HasOne
     {
         return $this->hasOne(Enquiry::class);

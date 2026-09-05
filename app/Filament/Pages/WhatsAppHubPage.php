@@ -45,7 +45,8 @@ class WhatsAppHubPage extends Page
             || ManageWhatsAppSettings::canAccess()
             || MetaWhatsAppTemplateResource::canAccess()
             || WhatsAppCampaignResource::canAccess()
-            || WhatsAppLiveCampaignResource::canAccess();
+            || WhatsAppLiveCampaignResource::canAccess()
+            || ParentFeeNoticesPage::canAccess();
     }
 
     public function getSubheading(): ?string
@@ -72,6 +73,16 @@ class WhatsAppHubPage extends Page
                 'title' => CrmMenuLabels::whatsAppBulkCampaigns(),
                 'description' => 'Send an approved template to a class or course.',
                 'url' => WhatsAppCampaignResource::getUrl('index'),
+            ];
+        }
+
+        if (ParentFeeNoticesPage::canAccess()) {
+            $cards[] = [
+                'title' => 'Parent fee notices',
+                'description' => 'Bulk pending-fee WhatsApp with amount and due date typed per student (no Fees ledger).',
+                'url' => ParentFeeNoticesPage::getUrl(),
+                'badge' => 'Manual amounts',
+                'tone' => 'primary',
             ];
         }
 

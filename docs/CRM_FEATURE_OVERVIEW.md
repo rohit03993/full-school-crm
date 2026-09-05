@@ -60,7 +60,7 @@ Modules can be turned off per school without breaking the rest. Data is kept; UI
 | `marks` | Marks & Exams | Activity types, exam sessions, exam windows, bulk marks import, profile exams tab | Complete enough |
 | `results` | Results Declaration | Publish results to portal (depends on `marks`) | Complete enough |
 | `marksheets` | Marksheets | PDF marksheets (depends on `marks`) | Complete enough |
-| `whatsapp` | WhatsApp (Meta) | Templates, inbox, campaigns, automations, usage analytics, hooks from fees/attendance/homework/calls | Strong ops; settings cleanup ongoing |
+| `whatsapp` | WhatsApp (Meta) | Templates, inbox, campaigns, automations, usage analytics, hooks from fees/attendance/homework/calls; **Parent fee notices** (manual per-student amount bulk WhatsApp, Fees not required) | Strong ops; settings cleanup ongoing |
 | `portal` | Student Portal | Parent/student login, multi-child switch, dashboard, attendance, homework, fees/receipts, ID card, published marks | Incomplete |
 | `reports` | Reports | Operational & academic report hub — CSV, Excel, PDF, 20-row preview pagination | Incomplete |
 | `website` | Website CMS | Hero, logo, courses section, contact, public enquiry form | Incomplete |

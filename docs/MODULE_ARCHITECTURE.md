@@ -288,10 +288,12 @@ Every management system below lists:
 | **Formal name** | WhatsApp Management System |
 | **Key** | `whatsapp` |
 | **Status** | Incomplete (ops strong; settings cleanup) |
-| **Includes** | Meta templates, inbox, campaigns, analytics; soft hooks from fees/attendance/homework/calls/results |
+| **Includes** | Meta templates, inbox, campaigns, analytics; soft hooks from fees/attendance/homework/calls/results; **Parent fee notices** (manual bulk pending-fee WhatsApp — independent of Fees ledger) |
 | **Omit** | AiSensy; bus alerts |
 | **Edit** | Single WhatsApp settings path; docs = Meta only |
 | **Add** | SMS as separate module (`sms`) |
+
+**Parent fee notices:** Staff pick a batch, type amount + due date per student, send via approved template. Logged on Student Profile → Parent updates. Does **not** read or write `fee_installments` / payments. Requires `whatsapp` only (Fees may be OFF).
 
 ---
 
@@ -450,6 +452,7 @@ PLANNED
 
 | Date | Change |
 |------|--------|
+| 2026-09-05 | WhatsApp: Parent fee notices (manual bulk amounts) — independent of Fees; profile Parent updates tab |
 | 2026-08-15 | Nav hubs: Attendance / Fees / WhatsApp / Setup = one sidebar entry each; leaf pages stay URL-reachable and module-gated. Homework hub pattern is the reference. |
 | 2026-08-10 | Initial short architecture |
 | 2026-08-10 | Restructured already-built vs planned |

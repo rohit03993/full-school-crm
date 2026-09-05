@@ -39,6 +39,7 @@ use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\StudentCase;
 use App\Models\StudentCertificate;
+use App\Models\ParentFeeNotice;
 use App\Models\User;
 use App\Models\WhatsAppTemplate;
 use App\Services\ActivityAttendanceService;
@@ -77,6 +78,7 @@ use App\Services\StudentProfileDeleteService;
 use App\Services\StudentUpdateService;
 use App\Services\MetaWhatsAppInboxService;
 use App\Services\StudentWhatsAppThreadService;
+use App\Services\ParentFeeNoticeService;
 use App\Services\WhatsAppProviderResolver;
 use App\Support\StudentWhatsAppThreadItem;
 use App\Support\StudentWhatsAppTemplateComposer;
@@ -134,6 +136,8 @@ class StudentProfilePage extends Page
     public bool $casesTabLoaded = false;
 
     public bool $certificatesTabLoaded = false;
+
+    public bool $parentUpdatesTabLoaded = false;
 
     public bool $messagesTabLoaded = false;
 
@@ -218,6 +222,11 @@ class StudentProfilePage extends Page
      * @var Collection<int, StudentCertificate>
      */
     public Collection $certificates;
+
+    /**
+     * @var Collection<int, ParentFeeNotice>
+     */
+    public Collection $parentFeeNotices;
 
     public string $profileCertificateType = '';
 
@@ -382,6 +391,7 @@ class StudentProfilePage extends Page
         $this->calls = new Collection;
         $this->cases = new Collection;
         $this->certificates = new Collection;
+        $this->parentFeeNotices = new Collection;
         $this->profileCertificateType = CertificateType::Bonafide->value;
         $this->openCaseBanners = [];
         $this->messageThread = [];
@@ -501,6 +511,7 @@ class StudentProfilePage extends Page
             'calls' => $this->loadCallsTab(),
             'cases' => $this->loadCasesTab(),
             'certificates' => $this->loadCertificatesTab(),
+            'parent_updates' => $this->loadParentUpdatesTab(),
             'messages' => $this->loadMessagesTab(),
             'documents' => $this->loadDocumentsTab(),
             'fees' => $this->loadFeesTab(),
@@ -539,6 +550,7 @@ class StudentProfilePage extends Page
         }
 
         if ($this->licensed(LicenseFeature::WhatsApp)) {
+            $tabs[] = 'parent_updates';
             $tabs[] = 'messages';
         }
 
@@ -872,6 +884,16 @@ class StudentProfilePage extends Page
             ->orderByDesc('id')
             ->limit(CrmPagination::PER_PAGE)
             ->get();
+    }
+
+    public function loadParentUpdatesTab(): void
+    {
+        if ($this->parentUpdatesTabLoaded) {
+            return;
+        }
+
+        $this->parentUpdatesTabLoaded = true;
+        $this->parentFeeNotices = app(ParentFeeNoticeService::class)->noticesForStudent($this->record);
     }
 
     public function issueProfileCertificate(): void
@@ -3381,6 +3403,16 @@ class StudentProfilePage extends Page
                                     'typeOptions' => CertificateType::options(),
                                     'profileCertificateType' => $this->profileCertificateType,
                                     'profileCertificateRemarks' => $this->profileCertificateRemarks,
+                                ]),
+                        ]),
+                    'parent_updates' => Tab::make('Parent updates')
+                        ->icon('heroicon-o-bell-alert')
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::WhatsApp))
+                        ->schema([
+                            View::make('filament.pages.partials.student-profile-parent-updates')
+                                ->viewData(fn (): array => [
+                                    'parentUpdatesTabLoaded' => $this->parentUpdatesTabLoaded,
+                                    'parentFeeNotices' => $this->parentFeeNotices,
                                 ]),
                         ]),
                     'messages' => Tab::make('Messages')
