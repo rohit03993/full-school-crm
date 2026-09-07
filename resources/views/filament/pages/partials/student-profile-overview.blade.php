@@ -11,7 +11,7 @@
         <div class="border-b border-gray-100 px-4 py-3.5 sm:px-6 dark:border-white/10">
             <h3 class="text-sm font-bold text-gray-950 dark:text-white">Activity timeline</h3>
             <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                Everything related to this student — newest first. Click a row to open the detail tab.
+                Student journey route — newest stop first. Click a stop to open the detail tab.
             </p>
         </div>
 
@@ -22,27 +22,34 @@
                 No activity recorded yet for this student.
             </p>
         @else
-            <div class="divide-y divide-gray-100 dark:divide-white/10">
+            <div class="px-3 py-4 sm:px-6 sm:py-5">
                 @foreach ($grouped as $date => $items)
-                    <div>
-                        <div class="bg-gray-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400 sm:px-6">
+                    <div class="mb-2 mt-4 first:mt-0">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             {{ $items->first()['occurred_date_label'] ?? $date }}
-                        </div>
-                        <ul class="divide-y divide-gray-100 dark:divide-white/10">
-                            @foreach ($items as $item)
+                        </p>
+                    </div>
+
+                    <div class="relative">
+                        {{-- Route spine --}}
+                        <div class="pointer-events-none absolute bottom-2 top-2 left-[4.75rem] w-0.5 bg-gray-200 sm:left-[5.25rem] dark:bg-white/15" aria-hidden="true"></div>
+
+                        <ul class="space-y-0">
+                            @foreach ($items as $itemIndex => $item)
                                 @php
-                                    $tone = match ($item['type'] ?? '') {
-                                        'call' => 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300',
-                                        'visit' => 'bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300',
-                                        'case' => 'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-300',
-                                        'fee' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
-                                        'whatsapp' => 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300',
-                                        'attendance' => 'bg-indigo-100 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-300',
-                                        'homework' => 'bg-orange-100 text-orange-900 dark:bg-orange-500/15 dark:text-orange-300',
-                                        'exam' => 'bg-fuchsia-100 text-fuchsia-900 dark:bg-fuchsia-500/15 dark:text-fuchsia-300',
-                                        'certificate' => 'bg-teal-100 text-teal-800 dark:bg-teal-500/15 dark:text-teal-300',
-                                        'document' => 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-gray-300',
-                                        default => 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300',
+                                    $dot = match ($item['type'] ?? '') {
+                                        'call' => 'border-sky-500 bg-sky-500',
+                                        'visit' => 'border-violet-500 bg-violet-500',
+                                        'case' => 'border-amber-500 bg-amber-500',
+                                        'fee' => 'border-emerald-500 bg-emerald-500',
+                                        'whatsapp' => 'border-green-500 bg-green-500',
+                                        'attendance' => 'border-indigo-500 bg-indigo-500',
+                                        'homework' => 'border-orange-500 bg-orange-500',
+                                        'exam' => 'border-fuchsia-500 bg-fuchsia-500',
+                                        'certificate' => 'border-teal-500 bg-teal-500',
+                                        'document' => 'border-slate-500 bg-slate-500',
+                                        'enrollment', 'batch' => 'border-primary-500 bg-primary-500',
+                                        default => 'border-gray-400 bg-white dark:bg-gray-900',
                                     };
                                     $clickable = filled($item['tab'] ?? null) && ($item['tab'] ?? '') !== 'overview';
                                 @endphp
@@ -51,37 +58,53 @@
                                         wire:click="openActivityTimelineTab(@js($item['tab']))"
                                         role="button"
                                         tabindex="0"
-                                        class="cursor-pointer px-4 py-3.5 transition hover:bg-primary-50/60 sm:px-6 dark:hover:bg-white/5"
+                                        class="group relative grid cursor-pointer grid-cols-[4.25rem_1.5rem_minmax(0,1fr)] gap-x-2 py-3 sm:grid-cols-[4.75rem_1.5rem_minmax(0,1fr)] sm:gap-x-3"
                                     @else
-                                        class="px-4 py-3.5 sm:px-6"
+                                        class="relative grid grid-cols-[4.25rem_1.5rem_minmax(0,1fr)] gap-x-2 py-3 sm:grid-cols-[4.75rem_1.5rem_minmax(0,1fr)] sm:gap-x-3"
                                     @endif
                                 >
-                                    <div class="flex items-start gap-3">
-                                        <span class="mt-0.5 shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide {{ $tone }}">
+                                    {{-- Left: time (like scheduled arrival) --}}
+                                    <div class="pt-0.5 text-right">
+                                        <p class="text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                                            {{ $item['occurred_at_label'] }}
+                                        </p>
+                                        <p class="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">
                                             {{ $item['category'] ?? 'EVENT' }}
-                                        </span>
-                                        <div class="min-w-0 flex-1">
-                                            <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                                                <p class="font-semibold text-gray-950 dark:text-white">{{ $item['title'] }}</p>
-                                                <p class="shrink-0 text-xs text-gray-500 dark:text-gray-400">
-                                                    {{ $item['occurred_at_label'] }}
-                                                    @if (filled($item['staff_name'] ?? null))
-                                                        · {{ $item['staff_name'] }}
-                                                    @endif
-                                                </p>
-                                            </div>
-                                            @if (filled($item['summary'] ?? null))
-                                                <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ $item['summary'] }}</p>
-                                            @endif
-                                            @if (filled($item['detail'] ?? null))
-                                                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ $item['detail'] }}</p>
-                                            @endif
-                                            @if ($clickable)
-                                                <p class="mt-1 text-[11px] font-medium text-primary-600 dark:text-primary-400">
-                                                    View in {{ str_replace('_', ' ', (string) $item['tab']) }} →
-                                                </p>
+                                        </p>
+                                    </div>
+
+                                    {{-- Center: station node --}}
+                                    <div class="relative flex justify-center pt-1">
+                                        <span
+                                            @class([
+                                                'relative z-10 h-3.5 w-3.5 shrink-0 rounded-full border-2 ring-4 ring-white dark:ring-gray-900',
+                                                $dot,
+                                            ])
+                                            aria-hidden="true"
+                                        ></span>
+                                    </div>
+
+                                    {{-- Right: event name + details --}}
+                                    <div class="min-w-0 rounded-lg px-1 transition group-hover:bg-gray-50 dark:group-hover:bg-white/5 sm:px-2">
+                                        <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-0.5">
+                                            <p class="text-sm font-semibold text-gray-950 group-hover:text-primary-700 dark:text-white dark:group-hover:text-primary-300">
+                                                {{ $item['title'] }}
+                                            </p>
+                                            @if (filled($item['staff_name'] ?? null))
+                                                <p class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{{ $item['staff_name'] }}</p>
                                             @endif
                                         </div>
+                                        @if (filled($item['summary'] ?? null))
+                                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ $item['summary'] }}</p>
+                                        @endif
+                                        @if (filled($item['detail'] ?? null))
+                                            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ $item['detail'] }}</p>
+                                        @endif
+                                        @if ($clickable)
+                                            <p class="mt-1 text-[11px] font-medium text-primary-600 dark:text-primary-400">
+                                                View in {{ str_replace('_', ' ', (string) $item['tab']) }} →
+                                            </p>
+                                        @endif
                                     </div>
                                 </li>
                             @endforeach

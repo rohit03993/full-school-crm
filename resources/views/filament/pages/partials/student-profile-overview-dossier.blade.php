@@ -9,30 +9,6 @@
 <div class="space-y-4 lg:space-y-5">
     @include('filament.pages.partials.student-open-cases-banner', ['profile' => $profile])
 
-    @if ($admission)
-        <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <div class="border-b border-gray-100 px-4 py-3.5 sm:px-6 dark:border-white/10">
-                <h3 class="text-sm font-bold text-gray-950 dark:text-white">Academic record</h3>
-                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">From admission form</p>
-            </div>
-            <div class="grid gap-3 p-4 sm:grid-cols-3 sm:p-6">
-                @foreach ([
-                    ['label' => 'Class 10th', 'board' => $admission->tenth_board, 'pct' => $admission->tenth_percentage],
-                    ['label' => 'Class 12th', 'board' => $admission->twelfth_board, 'pct' => $admission->twelfth_percentage],
-                    ['label' => 'Graduation', 'board' => $admission->graduation, 'pct' => $admission->graduation_percentage],
-                ] as $level)
-                    <div class="rounded-xl border border-gray-100 bg-gradient-to-br from-gray-50 to-white p-4 dark:border-white/10 dark:from-white/5 dark:to-transparent">
-                        <p class="text-[10px] font-bold uppercase tracking-wider text-primary-600 dark:text-primary-400">{{ $level['label'] }}</p>
-                        <p class="mt-2 text-sm font-semibold text-gray-950 dark:text-white">{{ filled($level['board']) ? $level['board'] : '—' }}</p>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            {{ $level['pct'] !== null ? number_format((float) $level['pct'], 2).'%' : 'Percentage not recorded' }}
-                        </p>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-    @endif
-
     <div class="grid gap-4 lg:gap-5">
         <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
             <div class="border-b border-gray-100 px-4 py-3.5 sm:px-6 dark:border-white/10">
