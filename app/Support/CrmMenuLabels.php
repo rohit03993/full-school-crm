@@ -130,6 +130,11 @@ final class CrmMenuLabels
         return 'Bulk campaigns';
     }
 
+    public static function whatsAppFeeNotices(): string
+    {
+        return 'Fee notices';
+    }
+
     public static function whatsAppMessageLog(): string
     {
         return 'Message history';

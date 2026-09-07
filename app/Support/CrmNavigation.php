@@ -173,7 +173,9 @@ class CrmNavigation
             $packs[] = 'academic';
         }
 
-        if ($has(StaffJobRole::MessagingCoordinator)) {
+        if (collect(StaffJobRole::whatsappRoles())->contains(
+            fn (StaffJobRole $role): bool => $has($role)
+        )) {
             $packs[] = 'messaging';
         }
 

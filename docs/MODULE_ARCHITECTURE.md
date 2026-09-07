@@ -289,6 +289,7 @@ Every management system below lists:
 | **Key** | `whatsapp` |
 | **Status** | Incomplete (ops strong; settings cleanup) |
 | **Includes** | Meta templates, inbox, campaigns, analytics; soft hooks from fees/attendance/homework/calls/results; **Parent fee notices** (manual bulk pending-fee WhatsApp — independent of Fees ledger) |
+| **Staff roles** | Separate ticks: WhatsApp inbox, bulk campaigns, fee notices; optional **WhatsApp desk (full)** keeps templates/live (legacy Messaging) |
 | **Omit** | AiSensy; bus alerts |
 | **Edit** | Single WhatsApp settings path; docs = Meta only |
 | **Add** | SMS as separate module (`sms`) |
@@ -452,6 +453,7 @@ PLANNED
 
 | Date | Change |
 |------|--------|
+| 2026-09-07 | WhatsApp staff access: inbox / bulk campaigns / fee notices as separate job roles + sidebar leaves; full desk role kept for legacy |
 | 2026-09-05 | WhatsApp: Parent fee notices (manual bulk amounts) — independent of Fees; profile Parent updates tab |
 | 2026-08-15 | Nav hubs: Attendance / Fees / WhatsApp / Setup = one sidebar entry each; leaf pages stay URL-reachable and module-gated. Homework hub pattern is the reference. |
 | 2026-08-10 | Initial short architecture |

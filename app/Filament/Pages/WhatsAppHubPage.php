@@ -78,7 +78,7 @@ class WhatsAppHubPage extends Page
 
         if (ParentFeeNoticesPage::canAccess()) {
             $cards[] = [
-                'title' => 'Parent fee notices',
+                'title' => CrmMenuLabels::whatsAppFeeNotices(),
                 'description' => 'Bulk pending-fee WhatsApp with amount and due date typed per student (no Fees ledger).',
                 'url' => ParentFeeNoticesPage::getUrl(),
                 'badge' => 'Manual amounts',

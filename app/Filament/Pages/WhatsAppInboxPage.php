@@ -25,11 +25,9 @@ class WhatsAppInboxPage extends Page
     use InteractsWithStudentWhatsAppInbox;
     use RequiresCrmPermission;
 
-    protected static bool $shouldRegisterNavigation = false;
-
     protected static function requiredCrmPermission(): CrmPermission
     {
-        return CrmPermission::WhatsappOps;
+        return CrmPermission::WhatsappInbox;
     }
 
     protected static function requiredLicenseFeature(): ?LicenseFeature

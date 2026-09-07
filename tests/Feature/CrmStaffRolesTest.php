@@ -45,7 +45,9 @@ class CrmStaffRolesTest extends TestCase
         $this->assertTrue($user->canCrm(CrmPermission::AttendanceMark));
         $this->assertTrue($user->canCrm(CrmPermission::AcademicsManage));
         $this->assertTrue($user->canCrm(CrmPermission::MarksPublish));
+        $this->assertTrue($user->canCrm(CrmPermission::WhatsappInbox));
         $this->assertTrue($user->canCrm(CrmPermission::WhatsappCampaigns));
+        $this->assertTrue($user->canCrm(CrmPermission::WhatsappFeeNotices));
         $this->assertTrue($user->canCrm(CrmPermission::WhatsappOps));
         $this->assertTrue($user->canCrm(CrmPermission::ReportsExport));
         $this->assertFalse($user->canCrm(CrmPermission::SettingsManage));
@@ -214,7 +216,9 @@ class CrmStaffRolesTest extends TestCase
 
         $this->actingAs($user);
 
+        $this->assertTrue($user->canCrm(CrmPermission::WhatsappInbox));
         $this->assertTrue($user->canCrm(CrmPermission::WhatsappCampaigns));
+        $this->assertTrue($user->canCrm(CrmPermission::WhatsappFeeNotices));
         $this->assertTrue($user->canCrm(CrmPermission::WhatsappOps));
         $this->assertFalse($user->canCrm(CrmPermission::HomeworkManage));
         $this->assertFalse($user->canCrm(CrmPermission::MarksImport));
@@ -223,9 +227,48 @@ class CrmStaffRolesTest extends TestCase
         $this->assertFalse(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::canAccess());
         $this->assertTrue(\App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource::canAccess());
         $this->assertTrue(\App\Filament\Pages\WhatsAppInboxPage::canAccess());
+        $this->assertTrue(\App\Filament\Pages\ParentFeeNoticesPage::canAccess());
         $this->assertTrue(\App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource::canAccess());
         $this->assertFalse(\App\Filament\Pages\ManageMetaWhatsAppSettings::canAccess());
         $this->assertFalse(\App\Filament\Pages\ManageWhatsAppSettings::canAccess());
+    }
+
+    public function test_whatsapp_inbox_role_cannot_open_campaigns_or_fee_notices(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole(StaffJobRole::WhatsappInbox->value);
+        $this->actingAs($user);
+
+        $this->assertTrue(\App\Filament\Pages\WhatsAppInboxPage::canAccess());
+        $this->assertTrue(\App\Filament\Pages\WhatsAppHubPage::canAccess());
+        $this->assertFalse(\App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource::canAccess());
+        $this->assertFalse(\App\Filament\Pages\ParentFeeNoticesPage::canAccess());
+        $this->assertFalse(\App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource::canAccess());
+    }
+
+    public function test_whatsapp_bulk_campaigns_role_cannot_open_inbox_or_fee_notices(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole(StaffJobRole::WhatsappBulkCampaigns->value);
+        $this->actingAs($user);
+
+        $this->assertTrue(\App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource::canAccess());
+        $this->assertTrue(\App\Filament\Pages\WhatsAppHubPage::canAccess());
+        $this->assertFalse(\App\Filament\Pages\WhatsAppInboxPage::canAccess());
+        $this->assertFalse(\App\Filament\Pages\ParentFeeNoticesPage::canAccess());
+    }
+
+    public function test_whatsapp_fee_notices_role_cannot_open_inbox_or_campaigns(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole(StaffJobRole::WhatsappFeeNotices->value);
+        $this->actingAs($user);
+
+        $this->assertTrue(\App\Filament\Pages\ParentFeeNoticesPage::canAccess());
+        $this->assertTrue(\App\Filament\Pages\WhatsAppHubPage::canAccess());
+        $this->assertFalse(\App\Filament\Pages\WhatsAppInboxPage::canAccess());
+        $this->assertFalse(\App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource::canAccess());
+        $this->assertFalse(\App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource::canAccess());
     }
 
     public function test_super_admin_keeps_vault_pages_staff_cannot(): void

@@ -9,6 +9,7 @@ use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Models\Batch;
 use App\Services\ParentFeeNoticeService;
+use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
 use Carbon\Carbon;
@@ -31,11 +32,9 @@ class ParentFeeNoticesPage extends Page
 {
     use RequiresCrmPermission;
 
-    protected static bool $shouldRegisterNavigation = false;
-
     protected static function requiredCrmPermission(): CrmPermission
     {
-        return CrmPermission::WhatsappCampaigns;
+        return CrmPermission::WhatsappFeeNotices;
     }
 
     protected static function requiredLicenseFeature(): ?LicenseFeature
@@ -45,15 +44,20 @@ class ParentFeeNoticesPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 
-    protected static ?string $navigationLabel = 'Parent fee notices';
+    protected static ?string $navigationLabel = 'Fee notices';
 
     protected static ?string $title = 'Parent fee notices';
 
     protected static ?string $slug = 'parent-fee-notices';
 
-    protected static ?int $navigationSort = 26;
+    protected static ?int $navigationSort = 14;
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_META_WHATSAPP;
+
+    public static function getNavigationLabel(): string
+    {
+        return CrmMenuLabels::whatsAppFeeNotices();
+    }
 
     public ?int $batchId = null;
 

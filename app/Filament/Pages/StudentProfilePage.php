@@ -550,8 +550,17 @@ class StudentProfilePage extends Page
         }
 
         if ($this->licensed(LicenseFeature::WhatsApp)) {
-            $tabs[] = 'parent_updates';
-            $tabs[] = 'messages';
+            if ($this->userCan(CrmPermission::WhatsappFeeNotices)) {
+                $tabs[] = 'parent_updates';
+            }
+
+            if ($this->userCanAny(
+                CrmPermission::WhatsappInbox,
+                CrmPermission::WhatsappOps,
+                CrmPermission::WhatsappCampaigns,
+            )) {
+                $tabs[] = 'messages';
+            }
         }
 
         if ($this->licensed(LicenseFeature::Fees)
@@ -1508,6 +1517,11 @@ class StudentProfilePage extends Page
     protected function userCan(CrmPermission $permission): bool
     {
         return CrmAccess::can(Auth::user(), $permission);
+    }
+
+    protected function userCanAny(CrmPermission ...$permissions): bool
+    {
+        return CrmAccess::canAny(Auth::user(), ...$permissions);
     }
 
     protected function userCanViewFees(): bool
@@ -3407,7 +3421,8 @@ class StudentProfilePage extends Page
                         ]),
                     'parent_updates' => Tab::make('Parent updates')
                         ->icon('heroicon-o-bell-alert')
-                        ->visible(fn (): bool => $this->licensed(LicenseFeature::WhatsApp))
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::WhatsApp)
+                            && $this->userCan(CrmPermission::WhatsappFeeNotices))
                         ->schema([
                             View::make('filament.pages.partials.student-profile-parent-updates')
                                 ->viewData(fn (): array => [
@@ -3417,7 +3432,12 @@ class StudentProfilePage extends Page
                         ]),
                     'messages' => Tab::make('Messages')
                         ->icon('heroicon-o-chat-bubble-left-right')
-                        ->visible(fn (): bool => $this->licensed(LicenseFeature::WhatsApp))
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::WhatsApp)
+                            && $this->userCanAny(
+                                CrmPermission::WhatsappInbox,
+                                CrmPermission::WhatsappOps,
+                                CrmPermission::WhatsappCampaigns,
+                            ))
                         ->schema([
                             View::make('filament.pages.partials.student-profile-messages')
                                 ->viewData(fn (): array => $this->whatsAppMessagesViewData()),

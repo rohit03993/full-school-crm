@@ -40,7 +40,7 @@ class CrmHint
         'sessions.list' => 'Create the academic year (e.g. 2025–26) and mark one as current. Batches and enrollments use the current session.',
         'enquiries.list' => 'All leads for Admission officers and Super Admin — filter, bulk-assign for calling. Counsellors see their list under Assigned to Call.',
         'students.search' => 'Fastest way to open a student profile when you know the mobile number. For browsing all institute leads, use All Leads; for your calling list, use Assigned to Call.',
-        'staff.list' => 'Create logins with one or more job roles (Counsellor, Admission, Accountant, Fee adjuster, Academic, Teacher, Messaging). Permissions combine across selected roles. Only Super Admin creates staff accounts.',
+        'staff.list' => 'Create logins with one or more job roles (Counsellor, Admission, Accountant, Fee adjuster, Academic, Teacher, WhatsApp inbox / bulk campaigns / fee notices, or full WhatsApp desk). Permissions combine across selected roles. Only Super Admin creates staff accounts.',
         'staff.create' => 'Set mobile, password, and tick every role this person needs. Super Admin alone creates accounts and changes Setup. Day-to-day work (calls, fees collect, exams, WhatsApp ops) belongs on job roles so staff do not wait.',
         'staff.edit' => 'Add or remove job roles anytime. Turn Active off to deactivate (history stays). Super Admin vault: staff accounts, Setup, fee waive/discount approval, All cases, audit, backups. Fee adjuster requests waives — Super Admin approves.',
         'admissions.list' => 'Admission forms list. Admission officers can approve and create roll numbers; Super Admin also can.',

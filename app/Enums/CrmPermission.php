@@ -41,7 +41,9 @@ enum CrmPermission: string
     case HomeworkManage = 'crm.homework.manage';
     case AcademicsManage = 'crm.academics.manage';
 
+    case WhatsappInbox = 'crm.whatsapp.inbox';
     case WhatsappCampaigns = 'crm.whatsapp.campaigns';
+    case WhatsappFeeNotices = 'crm.whatsapp.fee_notices';
     case WhatsappOps = 'crm.whatsapp.ops';
     case WhatsappSettings = 'crm.whatsapp.settings';
     case MetaWhatsappSettings = 'crm.meta_whatsapp.settings';
@@ -84,8 +86,10 @@ enum CrmPermission: string
             self::MarksPublish => 'Publish marks to parents',
             self::HomeworkManage => 'Assign homework & view tracking',
             self::AcademicsManage => 'Manage courses, batches, exam types',
-            self::WhatsappCampaigns => 'WhatsApp campaigns',
-            self::WhatsappOps => 'WhatsApp inbox, templates & live campaigns',
+            self::WhatsappInbox => 'WhatsApp inbox',
+            self::WhatsappCampaigns => 'WhatsApp bulk campaigns',
+            self::WhatsappFeeNotices => 'WhatsApp fee notices',
+            self::WhatsappOps => 'WhatsApp templates, live campaigns & usage',
             self::WhatsappSettings => 'WhatsApp settings',
             self::MetaWhatsappSettings => 'Meta WhatsApp settings',
             self::ReportsView => 'View reports',

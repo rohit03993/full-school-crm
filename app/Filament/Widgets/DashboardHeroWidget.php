@@ -14,6 +14,7 @@ use App\Filament\Pages\HomeworkPage;
 use App\Filament\Pages\MyLeadsPage;
 use App\Filament\Pages\MyMeetingsPage;
 use App\Filament\Pages\MyTeachingAssignmentsPage;
+use App\Filament\Pages\ParentFeeNoticesPage;
 use App\Filament\Pages\ReportsPage;
 use App\Filament\Pages\StaffAttendancePage;
 use App\Filament\Pages\StudentSearchPage;
@@ -21,6 +22,7 @@ use App\Filament\Pages\WhatsAppInboxPage;
 use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
 use App\Filament\Resources\Admissions\AdmissionResource;
 use App\Filament\Resources\Enquiries\EnquiryResource;
+use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Filament\Widgets\Concerns\UsesDashboardFilters;
 use App\Models\AcademicSession;
 use App\Services\CrmDashboardService;
@@ -793,6 +795,22 @@ class DashboardHeroWidget extends Widget
                 'url' => WhatsAppInboxPage::getUrl(),
                 'feature' => LicenseFeature::WhatsApp,
                 'can' => fn ($user): bool => WhatsAppInboxPage::canAccess(),
+            ],
+            [
+                'label' => 'Bulk campaigns',
+                'description' => 'Send templates to a class',
+                'icon' => 'heroicon-o-megaphone',
+                'url' => WhatsAppCampaignResource::getUrl('index'),
+                'feature' => LicenseFeature::WhatsApp,
+                'can' => fn ($user): bool => WhatsAppCampaignResource::canAccess(),
+            ],
+            [
+                'label' => 'Fee notices',
+                'description' => 'Manual amount + due date WhatsApp',
+                'icon' => 'heroicon-o-banknotes',
+                'url' => ParentFeeNoticesPage::getUrl(),
+                'feature' => LicenseFeature::WhatsApp,
+                'can' => fn ($user): bool => ParentFeeNoticesPage::canAccess(),
             ],
             $this->findStudentAction('Open any profile'),
             $this->myWorkAction(),

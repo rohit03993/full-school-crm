@@ -55,7 +55,7 @@ class WhatsAppCampaignResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return true;
     }
 
     protected static ?string $model = WhatsAppCampaign::class;
@@ -73,7 +73,7 @@ class WhatsAppCampaignResource extends Resource
         return CrmMenuLabels::whatsAppBulkCampaigns();
     }
 
-    protected static ?int $navigationSort = 25;
+    protected static ?int $navigationSort = 13;
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_META_WHATSAPP;
 

@@ -47,6 +47,14 @@ class CrmNavigationRolePacksTest extends TestCase
         $this->assertSame(['admissions'], CrmNavigation::navRolePacks($user));
     }
 
+    public function test_whatsapp_inbox_role_gets_messaging_pack(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole(StaffJobRole::WhatsappInbox->value);
+
+        $this->assertSame(['messaging'], CrmNavigation::navRolePacks($user));
+    }
+
     public function test_legacy_staff_without_job_role_gets_default(): void
     {
         Role::query()->firstOrCreate(['name' => RoleName::Staff->value, 'guard_name' => 'web']);

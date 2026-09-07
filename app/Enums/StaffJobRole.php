@@ -14,6 +14,10 @@ enum StaffJobRole: string
     case FeeAdjuster = 'fee_adjuster';
     case AcademicCoordinator = 'academic_coordinator';
     case Teacher = 'teacher';
+    case WhatsappInbox = 'whatsapp_inbox';
+    case WhatsappBulkCampaigns = 'whatsapp_bulk_campaigns';
+    case WhatsappFeeNotices = 'whatsapp_fee_notices';
+    /** Full WhatsApp desk (inbox + campaigns + fee notices + templates/live). Kept for existing staff. */
     case MessagingCoordinator = 'messaging_coordinator';
 
     public function label(): string
@@ -25,7 +29,10 @@ enum StaffJobRole: string
             self::FeeAdjuster => 'Fee adjuster (discounts & structure)',
             self::AcademicCoordinator => 'Academic coordinator',
             self::Teacher => 'Teacher / Faculty',
-            self::MessagingCoordinator => 'Messaging (WhatsApp)',
+            self::WhatsappInbox => 'WhatsApp inbox',
+            self::WhatsappBulkCampaigns => 'WhatsApp bulk campaigns',
+            self::WhatsappFeeNotices => 'WhatsApp fee notices',
+            self::MessagingCoordinator => 'WhatsApp desk (full)',
         };
     }
 
@@ -38,8 +45,26 @@ enum StaffJobRole: string
             self::FeeAdjuster => 'Adjust fee plan, discounts, installments; request waive/discount (admin approves)',
             self::AcademicCoordinator => 'Courses, batches, exams, attendance, marks upload & publish, homework',
             self::Teacher => 'Own classes only: attendance, homework submit, marks entry (no publish or setup)',
-            self::MessagingCoordinator => 'WhatsApp campaigns, inbox, templates & live sends (not API settings)',
+            self::WhatsappInbox => 'Read parent replies and send follow-up messages',
+            self::WhatsappBulkCampaigns => 'Send approved templates to a class or course',
+            self::WhatsappFeeNotices => 'Bulk pending-fee WhatsApp with amount and due date per student',
+            self::MessagingCoordinator => 'Inbox, bulk campaigns, fee notices, templates & live sends (not API settings)',
         };
+    }
+
+    /**
+     * Roles that unlock the messaging dashboard pack.
+     *
+     * @return list<self>
+     */
+    public static function whatsappRoles(): array
+    {
+        return [
+            self::WhatsappInbox,
+            self::WhatsappBulkCampaigns,
+            self::WhatsappFeeNotices,
+            self::MessagingCoordinator,
+        ];
     }
 
     /**

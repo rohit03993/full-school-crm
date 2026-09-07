@@ -14,6 +14,7 @@ use App\Filament\Pages\HomeworkReviewPage;
 use App\Filament\Pages\MiscChargeAdjustmentRequestsPage;
 use App\Filament\Pages\MyLeadsPage;
 use App\Filament\Pages\MyMeetingsPage;
+use App\Filament\Pages\ParentFeeNoticesPage;
 use App\Filament\Pages\PaymentCancellationRequestsPage;
 use App\Filament\Pages\WhatsAppHubPage;
 use App\Filament\Pages\WhatsAppInboxPage;
@@ -346,6 +347,7 @@ class DashboardAttentionWidget extends Widget
         $inboxUrl = WhatsAppInboxPage::canAccess() ? WhatsAppInboxPage::getUrl() : null;
         $hubUrl = WhatsAppHubPage::canAccess() ? WhatsAppHubPage::getUrl() : null;
         $campaignsUrl = WhatsAppCampaignResource::canAccess() ? WhatsAppCampaignResource::getUrl('index') : null;
+        $feeNoticesUrl = ParentFeeNoticesPage::canAccess() ? ParentFeeNoticesPage::getUrl() : null;
 
         return [
             [
@@ -354,8 +356,8 @@ class DashboardAttentionWidget extends Widget
                 'value' => 'Open',
                 'meta' => 'Replies and live chats',
                 'tone' => 'info',
-                'url' => $inboxUrl ?? $hubUrl,
-                'show' => FeatureGate::enabled(LicenseFeature::WhatsApp) && ($inboxUrl || $hubUrl),
+                'url' => $inboxUrl,
+                'show' => FeatureGate::enabled(LicenseFeature::WhatsApp) && $inboxUrl !== null,
             ],
             [
                 'key' => 'whatsapp_campaigns',
@@ -363,8 +365,30 @@ class DashboardAttentionWidget extends Widget
                 'value' => 'Open',
                 'meta' => 'Send and track campaigns',
                 'tone' => 'primary',
-                'url' => $campaignsUrl ?? $hubUrl,
-                'show' => FeatureGate::enabled(LicenseFeature::WhatsApp) && ($campaignsUrl || $hubUrl),
+                'url' => $campaignsUrl,
+                'show' => FeatureGate::enabled(LicenseFeature::WhatsApp) && $campaignsUrl !== null,
+            ],
+            [
+                'key' => 'whatsapp_fee_notices',
+                'label' => 'Fee notices',
+                'value' => 'Open',
+                'meta' => 'Manual amount + due date WhatsApp',
+                'tone' => 'warning',
+                'url' => $feeNoticesUrl,
+                'show' => FeatureGate::enabled(LicenseFeature::WhatsApp) && $feeNoticesUrl !== null,
+            ],
+            [
+                'key' => 'whatsapp_hub',
+                'label' => 'WhatsApp desk',
+                'value' => 'Open',
+                'meta' => 'Templates, automations, setup',
+                'tone' => 'gray',
+                'url' => $hubUrl,
+                'show' => FeatureGate::enabled(LicenseFeature::WhatsApp)
+                    && $hubUrl !== null
+                    && $inboxUrl === null
+                    && $campaignsUrl === null
+                    && $feeNoticesUrl === null,
             ],
             [
                 'key' => 'open_cases',
