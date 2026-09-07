@@ -29,6 +29,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 class ManageMetaWhatsAppSettings extends Page
@@ -426,6 +427,11 @@ class ManageMetaWhatsAppSettings extends Page
             $params,
             $language,
             (int) ($template?->param_count ?? count($params)),
+            [
+                'message_source' => \App\Enums\WhatsAppMessageSource::Test->value,
+                'send_actor' => \App\Enums\WhatsAppSendActor::Staff->value,
+                'sent_by_user_id' => Auth::id(),
+            ],
         );
 
         $this->refillForm($settings);

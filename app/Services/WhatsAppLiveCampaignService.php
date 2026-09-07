@@ -103,6 +103,10 @@ class WhatsAppLiveCampaignService
             $userName,
             $paramCount,
             $metaTemplate->language,
+            [
+                'message_source' => \App\Enums\WhatsAppMessageSource::Automation->value,
+                'send_actor' => \App\Enums\WhatsAppSendActor::Automatic->value,
+            ],
         );
 
         $result['campaign_id'] = $campaign->id;

@@ -31,6 +31,7 @@
                     <tr class="text-left text-xs font-medium uppercase tracking-wide text-gray-500">
                         <th class="px-4 py-3">When</th>
                         <th class="px-4 py-3">Direction</th>
+                        <th class="px-4 py-3">Sent by</th>
                         <th class="px-4 py-3">Student</th>
                         <th class="px-4 py-3">Phone</th>
                         <th class="px-4 py-3">Status</th>
@@ -63,6 +64,9 @@
                                     {{ $message->direction === 'inbound' ? 'Parent' : 'School' }}
                                 </span>
                             </td>
+                            <td class="px-4 py-3 text-gray-700 dark:text-gray-200" data-label="Sent by">
+                                {{ $message->direction === 'outbound' ? $message->senderLabel() : '—' }}
+                            </td>
                             <td class="crm-responsive-table__title px-4 py-3" data-label="">
                                 @if ($message->student)
                                     <a
@@ -88,7 +92,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-12 text-center">
+                            <td colspan="8" class="px-4 py-12 text-center">
                                 <p class="text-sm font-medium text-gray-700 dark:text-gray-200">No Meta WhatsApp messages yet</p>
                                 <p class="mt-1 text-xs text-gray-500">Send a test from Connection &amp; Setup or configure the Meta webhook.</p>
                             </td>

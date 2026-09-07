@@ -155,6 +155,65 @@ class WhatsAppAnalyticsTest extends TestCase
         $this->assertSame(0.7846, $summary['campaigns'][0]['estimated_total_cost_inr']);
         $this->assertArrayHasKey('gap', $summary);
         $this->assertSame(1, $summary['gap']['crm_volume']);
+        $this->assertArrayHasKey('by_staff', $summary);
+    }
+
+    public function test_staff_usage_breakdown_groups_by_sender(): void
+    {
+        $staff = User::factory()->create(['name' => 'Anita Desk', 'is_active' => true]);
+        $other = User::factory()->create(['name' => 'Ravi Bulk', 'is_active' => true]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.STAFF1',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '918320936488',
+            'sent_by_user_id' => $staff->id,
+            'send_actor' => 'staff',
+            'body_preview' => 'Inbox reply',
+            'message_type' => 'text',
+            'conversation_category' => 'SERVICE',
+            'message_source' => WhatsAppMessageSource::Inbox->value,
+            'estimated_cost_inr' => 0.15,
+            'status' => 'sent',
+            'status_at' => now(),
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.STAFF2',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '918320936489',
+            'sent_by_user_id' => $other->id,
+            'send_actor' => 'staff',
+            'body_preview' => 'Campaign',
+            'message_type' => 'text',
+            'conversation_category' => 'UTILITY',
+            'message_source' => WhatsAppMessageSource::Campaign->value,
+            'estimated_cost_inr' => 0.5,
+            'status' => 'sent',
+            'status_at' => now(),
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.AUTO1',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '918320936490',
+            'send_actor' => 'automatic',
+            'body_preview' => 'Punch alert',
+            'message_type' => 'text',
+            'conversation_category' => 'UTILITY',
+            'message_source' => WhatsAppMessageSource::Punch->value,
+            'estimated_cost_inr' => 0.4,
+            'status' => 'sent',
+            'status_at' => now(),
+        ]);
+
+        $byStaff = app(WhatsAppAnalyticsService::class)->breakdownByStaff(now()->subDay(), now()->addDay());
+
+        $this->assertCount(2, $byStaff);
+        $this->assertSame('Ravi Bulk', $byStaff[0]['name']);
+        $this->assertSame(0.5, $byStaff[0]['cost_inr']);
+        $this->assertSame('Anita Desk', $byStaff[1]['name']);
+        $this->assertSame(0.15, $byStaff[1]['cost_inr']);
     }
 
     public function test_usage_and_cost_page_renders(): void
@@ -171,7 +230,8 @@ class WhatsAppAnalyticsTest extends TestCase
 
         Livewire::test(WhatsAppAnalyticsPage::class)
             ->assertSuccessful()
-            ->assertSee('Cost by source');
+            ->assertSee('Cost by source')
+            ->assertSee('Staff usage');
     }
 
     public function test_coverage_gap_compares_meta_and_crm_volumes(): void

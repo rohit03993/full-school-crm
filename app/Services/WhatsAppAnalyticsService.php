@@ -5,10 +5,13 @@ namespace App\Services;
 use App\Enums\MetaWhatsAppMessageDirection;
 use App\Enums\WhatsAppMessageSource;
 use App\Enums\WhatsAppPricingCategory;
+use App\Enums\WhatsAppSendActor;
 use App\Models\MetaWhatsAppMessage;
+use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 class WhatsAppAnalyticsService
 {
@@ -35,6 +38,7 @@ class WhatsAppAnalyticsService
             'campaigns' => $this->campaignBreakdown($from, $to),
             'by_source' => $this->breakdownBySource($from, $to),
             'by_category' => $this->breakdownByCategory($from, $to),
+            'by_staff' => $this->breakdownByStaff($from, $to),
         ];
     }
 
@@ -181,6 +185,54 @@ class WhatsAppAnalyticsService
         }
 
         return $breakdown;
+    }
+
+    /**
+     * CRM-estimated cost attributed to staff who sent inbox / campaign / test messages.
+     * Automatic and system sends are excluded (no sent_by_user_id).
+     *
+     * @return list<array{user_id: int|null, name: string, count: int, cost_inr: float}>
+     */
+    public function breakdownByStaff(Carbon $from, Carbon $to): array
+    {
+        if (! Schema::hasColumn('meta_whatsapp_messages', 'sent_by_user_id')) {
+            return [];
+        }
+
+        $rows = $this->outboundQuery($from, $to)
+            ->where(function (Builder $query): void {
+                $query->where('send_actor', WhatsAppSendActor::Staff->value)
+                    ->orWhere(function (Builder $inner): void {
+                        $inner->whereNull('send_actor')
+                            ->whereNotNull('sent_by_user_id');
+                    });
+            })
+            ->selectRaw('sent_by_user_id, COUNT(*) as message_count, COALESCE(SUM(estimated_cost_inr), 0) as total_cost')
+            ->groupBy('sent_by_user_id')
+            ->orderByDesc('total_cost')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $names = User::query()
+            ->whereIn('id', $rows->pluck('sent_by_user_id')->filter()->all())
+            ->pluck('name', 'id');
+
+        return $rows
+            ->map(function ($row) use ($names): array {
+                $userId = $row->sent_by_user_id ? (int) $row->sent_by_user_id : null;
+
+                return [
+                    'user_id' => $userId,
+                    'name' => $userId ? (string) ($names[$userId] ?? 'Former staff #'.$userId) : 'Unknown staff',
+                    'count' => (int) $row->message_count,
+                    'cost_inr' => round((float) $row->total_cost, 4),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     public function refreshCampaignCostTotals(WhatsAppCampaign $campaign): void

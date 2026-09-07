@@ -220,6 +220,7 @@ class HomeworkWhatsAppService
                     logContext: [
                         'student_id' => $student->id,
                         'message_source' => WhatsAppMessageSource::Homework->value,
+                        'send_actor' => \App\Enums\WhatsAppSendActor::Automatic->value,
                     ],
                 );
             } catch (Throwable $exception) {
@@ -407,6 +408,7 @@ class HomeworkWhatsAppService
             logContext: [
                 'student_id' => $student->id,
                 'message_source' => WhatsAppMessageSource::Homework->value,
+                'send_actor' => \App\Enums\WhatsAppSendActor::Automatic->value,
             ],
         );
 

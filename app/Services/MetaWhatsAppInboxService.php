@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\MetaWhatsAppMessageStatus;
 use App\Enums\WhatsAppMessageSource;
+use App\Enums\WhatsAppSendActor;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\MetaWhatsAppInboundMessageParser;
@@ -84,7 +85,7 @@ class MetaWhatsAppInboxService
                 $sender?->name ? 'Reply by '.$sender->name : 'Session reply',
                 is_array($result['response'] ?? null) ? $result['response'] : null,
                 $studentId,
-                ['message_source' => $source->value],
+                $this->staffLogContext($source, $sender),
             );
         }
 
@@ -186,11 +187,28 @@ class MetaWhatsAppInboxService
             $sender?->name ? 'Media by '.$sender->name : 'Session media reply',
             is_array($result['response'] ?? null) ? $result['response'] : null,
             $studentId,
-            ['message_source' => $source->value],
+            $this->staffLogContext($source, $sender),
         );
 
         $this->media->storeOutboundCopy($logged, $file);
 
         return $result;
+    }
+
+    /**
+     * @return array{message_source: string, send_actor: string, sent_by_user_id?: int}
+     */
+    protected function staffLogContext(WhatsAppMessageSource $source, ?User $sender): array
+    {
+        $context = [
+            'message_source' => $source->value,
+            'send_actor' => WhatsAppSendActor::Staff->value,
+        ];
+
+        if ($sender?->id) {
+            $context['sent_by_user_id'] = $sender->id;
+        }
+
+        return $context;
     }
 }

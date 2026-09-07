@@ -135,6 +135,7 @@ class StudentWhatsAppThreadService
     protected function loadMetaMessages(Student $student, string $phone, int $limit): Collection
     {
         $metaQuery = MetaWhatsAppMessage::query()
+            ->with('sentBy:id,name')
             ->orderByDesc('created_at')
             ->limit($limit);
 
@@ -156,6 +157,7 @@ class StudentWhatsAppThreadService
     protected function loadMetaMessagesByPhone(string $phone, int $limit): Collection
     {
         $rows = MetaWhatsAppMessage::query()
+            ->with('sentBy:id,name')
             ->where('phone', $phone)
             ->orderByDesc('created_at')
             ->limit($limit)
@@ -173,6 +175,7 @@ class StudentWhatsAppThreadService
         if ($rows->isNotEmpty()) {
             $this->media->syncPendingDownloads($rows);
             $rows = MetaWhatsAppMessage::query()
+                ->with('sentBy:id,name')
                 ->whereIn('id', $rows->pluck('id'))
                 ->orderByDesc('created_at')
                 ->get();
@@ -199,6 +202,11 @@ class StudentWhatsAppThreadService
                         && $mediaUrl === null
                         && filled($row->media_id ?? $this->mediaIdFromRowPayload($row));
 
+                    $senderLabel = null;
+                    if (Schema::hasColumn('meta_whatsapp_messages', 'send_actor')) {
+                        $senderLabel = $row->senderLabel();
+                    }
+
                     return new StudentWhatsAppThreadItem(
                         key: 'meta-'.$row->id,
                         source: 'meta',
@@ -217,6 +225,7 @@ class StudentWhatsAppThreadService
                         locationUrl: $locationUrl,
                         mediaPending: $mediaPending,
                         metaMessageId: $row->id,
+                        senderLabel: $senderLabel,
                     );
                 } catch (\Throwable $exception) {
                     report($exception);

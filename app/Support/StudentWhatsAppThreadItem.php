@@ -25,6 +25,7 @@ readonly class StudentWhatsAppThreadItem
         public ?string $locationUrl = null,
         public bool $mediaPending = false,
         public ?int $metaMessageId = null,
+        public ?string $senderLabel = null,
     ) {}
 
     public function isInbound(): bool
@@ -62,6 +63,7 @@ readonly class StudentWhatsAppThreadItem
             'locationUrl' => $this->locationUrl,
             'mediaPending' => $this->mediaPending,
             'metaMessageId' => $this->metaMessageId,
+            'senderLabel' => $this->senderLabel,
         ];
     }
 }

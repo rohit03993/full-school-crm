@@ -164,6 +164,40 @@
 
     <section class="crm-wa-analytics__panel">
         <div class="mb-4 flex items-center justify-between gap-3">
+            <div>
+                <h3 class="crm-wa-analytics__panel-title">Staff usage (CRM estimate)</h3>
+                <p class="mt-1 text-xs text-gray-500">Inbox, bulk campaigns, profile / fee notices, and test sends attributed to the staff member who clicked Send. Automatic alerts and OTP are excluded.</p>
+            </div>
+        </div>
+        @php $staffRows = $data['by_staff'] ?? []; @endphp
+        @if ($staffRows === [])
+            <p class="text-sm text-gray-500">No staff-attributed sends in this period yet. New outbound messages will appear here after the sender columns are migrated.</p>
+        @else
+            <x-crm.responsive-table>
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs uppercase text-gray-500">
+                            <th class="py-2 pr-3">Staff</th>
+                            <th class="py-2 pr-3">Messages</th>
+                            <th class="py-2">Est. cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($staffRows as $row)
+                            <tr class="border-t border-gray-100 dark:border-white/10">
+                                <td class="crm-responsive-table__title py-2 pr-3 font-medium" data-label="">{{ $row['name'] ?? '—' }}</td>
+                                <td class="py-2 pr-3 tabular-nums" data-label="Messages">{{ number_format((int) ($row['count'] ?? 0)) }}</td>
+                                <td class="py-2 tabular-nums font-semibold" data-label="Est. cost">{{ $this->formatMoney((float) ($row['cost_inr'] ?? 0)) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </x-crm.responsive-table>
+        @endif
+    </section>
+
+    <section class="crm-wa-analytics__panel">
+        <div class="mb-4 flex items-center justify-between gap-3">
             <h3 class="crm-wa-analytics__panel-title">Campaigns in range (CRM estimates)</h3>
             <span class="text-xs text-gray-500">{{ $data['from'] ?? '' }} → {{ $data['to'] ?? '' }}</span>
         </div>

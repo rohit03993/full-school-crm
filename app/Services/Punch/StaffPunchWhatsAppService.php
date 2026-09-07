@@ -82,6 +82,7 @@ class StaffPunchWhatsAppService
                 languageCode: data_get($template->provider_meta, 'language_code', 'en'),
                 logContext: [
                     'message_source' => \App\Enums\WhatsAppMessageSource::Punch->value,
+                    'send_actor' => \App\Enums\WhatsAppSendActor::Automatic->value,
                     'source' => 'staff_punch',
                     'user_id' => $staffMember->id,
                     'employee_code' => $employeeCode,

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\MetaWhatsAppMessageDirection;
 use App\Enums\MetaWhatsAppMessageStatus;
 use App\Enums\WhatsAppMessageSource;
+use App\Enums\WhatsAppSendActor;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Student;
@@ -24,6 +25,8 @@ class MetaWhatsAppMessageLogger
      *     whatsapp_campaign_recipient_id?: int|null,
      *     conversation_category?: string|null,
      *     estimated_cost_inr?: float|null,
+     *     sent_by_user_id?: int|null,
+     *     send_actor?: string|null,
      * }  $context
      */
     public function recordOutbound(
@@ -41,18 +44,22 @@ class MetaWhatsAppMessageLogger
     ): MetaWhatsAppMessage {
         $preview = $bodyPreview ?? $this->buildOutboundPreview($templateName, $language, $bodyParams);
         $estimate = $this->costEstimator->estimateForTemplate($templateName, $language !== '' ? $language : null);
+        $messageSource = $this->resolveMessageSource($context, WhatsAppMessageSource::Automation);
+        $attribution = $this->attributionAttributes($context, $messageSource);
 
         return MetaWhatsAppMessage::query()->create([
             'wamid' => $wamid,
             'direction' => MetaWhatsAppMessageDirection::Outbound->value,
             'phone' => $this->normalizePhone($phone),
             'student_id' => $context['student_id'] ?? $studentId ?? $this->guessStudentId($phone),
+            'sent_by_user_id' => $attribution['sent_by_user_id'],
+            'send_actor' => $attribution['send_actor'],
             'template_name' => $templateName !== '' ? $templateName : null,
             'language' => $language !== '' ? $language : null,
             'body_preview' => mb_substr($preview, 0, 500),
             'message_type' => 'text',
             'conversation_category' => $context['conversation_category'] ?? $estimate['category'],
-            'message_source' => $this->resolveMessageSource($context, WhatsAppMessageSource::Automation),
+            'message_source' => $messageSource,
             'estimated_cost_inr' => $context['estimated_cost_inr'] ?? $estimate['cost_inr'],
             'whatsapp_campaign_recipient_id' => $context['whatsapp_campaign_recipient_id'] ?? null,
             'status' => $status->value,
@@ -70,6 +77,8 @@ class MetaWhatsAppMessageLogger
      *     whatsapp_campaign_recipient_id?: int|null,
      *     conversation_category?: string|null,
      *     estimated_cost_inr?: float|null,
+     *     sent_by_user_id?: int|null,
+     *     send_actor?: string|null,
      * }  $context
      */
     public function recordOutboundMedia(
@@ -83,16 +92,20 @@ class MetaWhatsAppMessageLogger
         array $context = [],
     ): MetaWhatsAppMessage {
         $estimate = $this->costEstimator->estimateForSessionMedia();
+        $messageSource = $this->resolveMessageSource($context, WhatsAppMessageSource::Profile);
+        $attribution = $this->attributionAttributes($context, $messageSource);
 
         return MetaWhatsAppMessage::query()->create([
             'wamid' => $wamid,
             'direction' => MetaWhatsAppMessageDirection::Outbound->value,
             'phone' => $this->normalizePhone($phone),
             'student_id' => $context['student_id'] ?? $studentId ?? $this->guessStudentId($phone),
+            'sent_by_user_id' => $attribution['sent_by_user_id'],
+            'send_actor' => $attribution['send_actor'],
             'body_preview' => mb_substr((string) ($mediaAttributes['body_preview'] ?? 'Media message'), 0, 500),
             'message_type' => (string) ($mediaAttributes['message_type'] ?? 'document'),
             'conversation_category' => $context['conversation_category'] ?? $estimate['category'],
-            'message_source' => $this->resolveMessageSource($context, WhatsAppMessageSource::Profile),
+            'message_source' => $messageSource,
             'estimated_cost_inr' => $context['estimated_cost_inr'] ?? $estimate['cost_inr'],
             'whatsapp_campaign_recipient_id' => $context['whatsapp_campaign_recipient_id'] ?? null,
             'media_id' => $mediaAttributes['media_id'] ?? null,
@@ -112,6 +125,8 @@ class MetaWhatsAppMessageLogger
      *     student_id?: int|null,
      *     message_source?: string|null,
      *     whatsapp_campaign_recipient_id?: int|null,
+     *     sent_by_user_id?: int|null,
+     *     send_actor?: string|null,
      * }  $context
      */
     public function recordOutboundText(
@@ -125,16 +140,20 @@ class MetaWhatsAppMessageLogger
         array $context = [],
     ): MetaWhatsAppMessage {
         $estimate = $this->costEstimator->estimateForSessionReply();
+        $messageSource = $this->resolveMessageSource($context, WhatsAppMessageSource::Inbox);
+        $attribution = $this->attributionAttributes($context, $messageSource);
 
         return MetaWhatsAppMessage::query()->create([
             'wamid' => $wamid,
             'direction' => MetaWhatsAppMessageDirection::Outbound->value,
             'phone' => $this->normalizePhone($phone),
             'student_id' => $context['student_id'] ?? $studentId ?? $this->guessStudentId($phone),
+            'sent_by_user_id' => $attribution['sent_by_user_id'],
+            'send_actor' => $attribution['send_actor'],
             'body_preview' => mb_substr($bodyPreview, 0, 500),
             'message_type' => 'text',
             'conversation_category' => $estimate['category'],
-            'message_source' => $this->resolveMessageSource($context, WhatsAppMessageSource::Inbox),
+            'message_source' => $messageSource,
             'estimated_cost_inr' => $estimate['cost_inr'],
             'whatsapp_campaign_recipient_id' => $context['whatsapp_campaign_recipient_id'] ?? null,
             'status' => $status->value,
@@ -284,6 +303,36 @@ class MetaWhatsAppMessageLogger
             'test' => WhatsAppMessageSource::Test->value,
             default => $default->value,
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array{sent_by_user_id: int|null, send_actor: string|null}
+     */
+    protected function attributionAttributes(array $context, string $messageSource): array
+    {
+        $actor = WhatsAppSendActor::tryFrom(trim((string) ($context['send_actor'] ?? '')));
+        $userId = isset($context['sent_by_user_id']) && filled($context['sent_by_user_id'])
+            ? (int) $context['sent_by_user_id']
+            : null;
+
+        if ($actor === null) {
+            $actor = match ($messageSource) {
+                WhatsAppMessageSource::Punch->value,
+                WhatsAppMessageSource::Homework->value,
+                WhatsAppMessageSource::Automation->value => WhatsAppSendActor::Automatic,
+                default => $userId !== null ? WhatsAppSendActor::Staff : null,
+            };
+        }
+
+        if ($actor === WhatsAppSendActor::System || $actor === WhatsAppSendActor::Automatic) {
+            $userId = null;
+        }
+
+        return [
+            'sent_by_user_id' => $userId,
+            'send_actor' => $actor?->value,
+        ];
     }
 
     protected function guessStudentId(string $phone): ?int

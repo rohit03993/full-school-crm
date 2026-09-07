@@ -697,6 +697,7 @@ class MetaWhatsAppService
                     'OTP login code',
                     [
                         'message_source' => \App\Enums\WhatsAppMessageSource::Automation->value,
+                        'send_actor' => \App\Enums\WhatsAppSendActor::System->value,
                         'contact_name' => $contactName,
                     ],
                 );
@@ -723,6 +724,7 @@ class MetaWhatsAppService
                 'OTP login code',
                 [
                     'message_source' => \App\Enums\WhatsAppMessageSource::Automation->value,
+                    'send_actor' => \App\Enums\WhatsAppSendActor::System->value,
                 ],
             );
 

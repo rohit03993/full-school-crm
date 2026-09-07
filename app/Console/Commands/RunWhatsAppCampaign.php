@@ -6,6 +6,7 @@ use App\Enums\WhatsAppAutoStatus;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Enums\WhatsAppMessageSource;
 use App\Enums\WhatsAppRecipientStatus;
+use App\Enums\WhatsAppSendActor;
 use App\Jobs\RunWhatsAppCampaignJob;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Setting;
@@ -149,11 +150,7 @@ class RunWhatsAppCampaign extends Command
                 (string) ($student->name ?? 'User'),
                 $expectedParamCount,
                 $languageCode,
-                [
-                    'message_source' => WhatsAppMessageSource::Campaign->value,
-                    'whatsapp_campaign_recipient_id' => $recipient->id,
-                    'student_id' => $student->id,
-                ],
+                $this->outboundLogContext($campaign, $recipient, $sender),
             );
 
             $recipient->template_params = $templateParams;
@@ -347,5 +344,54 @@ class RunWhatsAppCampaign extends Command
         if ($micros > 0) {
             usleep($micros);
         }
+    }
+
+    /**
+     * @return array{
+     *     message_source: string,
+     *     send_actor: string,
+     *     whatsapp_campaign_recipient_id: int,
+     *     student_id: int|null,
+     *     sent_by_user_id?: int
+     * }
+     */
+    protected function outboundLogContext(
+        WhatsAppCampaign $campaign,
+        WhatsAppCampaignRecipient $recipient,
+        ?User $sender,
+    ): array {
+        [$source, $actor] = $this->resolveCampaignAttribution($campaign);
+
+        $context = [
+            'message_source' => $source->value,
+            'send_actor' => $actor->value,
+            'whatsapp_campaign_recipient_id' => $recipient->id,
+            'student_id' => $recipient->student_id,
+        ];
+
+        if ($actor === WhatsAppSendActor::Staff && $sender?->id) {
+            $context['sent_by_user_id'] = $sender->id;
+        }
+
+        return $context;
+    }
+
+    /**
+     * @return array{0: WhatsAppMessageSource, 1: WhatsAppSendActor}
+     */
+    protected function resolveCampaignAttribution(WhatsAppCampaign $campaign): array
+    {
+        $audience = (string) ($campaign->campaignVariable('audience_source') ?? '');
+
+        return match (true) {
+            in_array($audience, ['punch_manual', 'punch_biometric', 'attendance'], true)
+                => [WhatsAppMessageSource::Punch, WhatsAppSendActor::Automatic],
+            $audience === 'homework_check'
+                => [WhatsAppMessageSource::Homework, WhatsAppSendActor::Automatic],
+            in_array($audience, ['fee_reminder', 'activity_marks'], true)
+                => [WhatsAppMessageSource::Automation, WhatsAppSendActor::Automatic],
+            default
+                => [WhatsAppMessageSource::Campaign, WhatsAppSendActor::Staff],
+        };
     }
 }

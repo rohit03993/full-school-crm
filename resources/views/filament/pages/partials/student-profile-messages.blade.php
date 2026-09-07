@@ -82,7 +82,7 @@
                             'crm-wa-bubble--failed' => ($message['status'] ?? '') === 'failed',
                         ])>
                             <div class="crm-wa-bubble__meta">
-                                <span>{{ ($message['direction'] ?? '') === 'inbound' ? 'Parent' : 'You' }}</span>
+                                <span>{{ $message['senderLabel'] ?? (($message['direction'] ?? '') === 'inbound' ? 'Parent' : 'You') }}</span>
                                 <span>{{ $message['at_label'] ?? '' }}</span>
                             </div>
                             @include('filament.pages.partials.whatsapp-message-bubble', ['message' => $message])

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\WhatsAppSendActor;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -14,6 +15,8 @@ class MetaWhatsAppMessage extends Model
         'direction',
         'phone',
         'student_id',
+        'sent_by_user_id',
+        'send_actor',
         'template_name',
         'language',
         'body_preview',
@@ -39,11 +42,53 @@ class MetaWhatsAppMessage extends Model
             'payload' => 'array',
             'status_at' => 'datetime',
             'estimated_cost_inr' => 'float',
+            'send_actor' => WhatsAppSendActor::class,
         ];
     }
 
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
+    }
+
+    public function sentBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sent_by_user_id');
+    }
+
+    /**
+     * Human label for inbox / history (CRM-only attribution).
+     */
+    public function senderLabel(): string
+    {
+        if ($this->direction === 'inbound') {
+            return 'Parent';
+        }
+
+        $actor = $this->send_actor instanceof WhatsAppSendActor
+            ? $this->send_actor
+            : WhatsAppSendActor::tryFrom((string) $this->send_actor);
+
+        if ($actor === WhatsAppSendActor::System) {
+            $template = strtolower((string) ($this->template_name ?? ''));
+
+            return str_contains($template, 'otp') || str_contains($template, 'login')
+                ? 'System · OTP'
+                : 'System';
+        }
+
+        if ($actor === WhatsAppSendActor::Automatic) {
+            return 'Automatic';
+        }
+
+        if ($actor === WhatsAppSendActor::Staff || filled($this->sent_by_user_id)) {
+            $name = $this->relationLoaded('sentBy')
+                ? $this->sentBy?->name
+                : $this->sentBy()->value('name');
+
+            return filled($name) ? 'Sent by '.$name : 'Staff';
+        }
+
+        return 'Unknown';
     }
 }

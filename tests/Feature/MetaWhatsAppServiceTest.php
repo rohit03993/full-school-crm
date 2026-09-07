@@ -125,6 +125,7 @@ class MetaWhatsAppServiceTest extends TestCase
             'wamid' => 'wamid.TEST123',
             'status' => 'sent',
             'template_name' => 'parent_checkin',
+            'send_actor' => 'automatic',
         ]);
 
         Http::assertSent(function ($request): bool {
@@ -136,6 +137,47 @@ class MetaWhatsAppServiceTest extends TestCase
                 && $json['template']['language']['code'] === 'en'
                 && $json['template']['components'][0]['parameters'][0]['text'] === 'Rohit';
         });
+    }
+
+    public function test_send_template_persists_staff_sender_from_log_context(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.phone_number_id' => '1234567890',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+        ]);
+
+        $staff = \App\Models\User::factory()->create(['name' => 'Neha Ops', 'is_active' => true]);
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/1234567890/messages' => Http::response([
+                'messages' => [['id' => 'wamid.STAFFCTX']],
+            ], 200),
+        ]);
+
+        $result = app(MetaWhatsAppService::class)->sendTemplate(
+            '9811223344',
+            'fee_notice',
+            ['5000'],
+            'en',
+            1,
+            [
+                'message_source' => 'campaign',
+                'send_actor' => 'staff',
+                'sent_by_user_id' => $staff->id,
+            ],
+        );
+
+        $this->assertSame('success', $result['status']);
+        $this->assertDatabaseHas('meta_whatsapp_messages', [
+            'wamid' => 'wamid.STAFFCTX',
+            'sent_by_user_id' => $staff->id,
+            'send_actor' => 'staff',
+            'message_source' => 'campaign',
+        ]);
+
+        $message = \App\Models\MetaWhatsAppMessage::query()->where('wamid', 'wamid.STAFFCTX')->firstOrFail();
+        $this->assertSame('Sent by Neha Ops', $message->senderLabel());
     }
 
     public function test_validate_connection_reads_phone_number_fields(): void
@@ -322,7 +364,7 @@ class MetaWhatsAppServiceTest extends TestCase
             'name' => 'homework_update',
             'language' => 'en',
             'category' => 'UTILITY',
-            'body_text' => "Dear Parent,\nHomework for {{1}} (Roll: {{2}})\nTitle: {{3}}\nOpen: {{4}}",
+            'body_text' => "Dear Parent,\nHomework for {{1}} (Roll: {{2}})\nTitle: {{3}}\nOpen: {{4}}\nThank you.",
             'body_examples' => ['Rohit Sharma', '12-A-042', 'Test HW', $link],
         ]);
 
