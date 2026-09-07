@@ -185,6 +185,9 @@ class WhatsAppInboxPage extends Page
                     'selectedStudentId' => $this->selectedStudentId,
                     'selectedPhone' => $this->selectedPhone,
                     'chatStudent' => $this->whatsAppMessageStudent(),
+                    'chatContact' => filled($this->selectedPhone)
+                        ? app(\App\Services\WhatsAppInboxContactResolver::class)->resolve((string) $this->selectedPhone)
+                        : \App\Support\WhatsAppInboxContact::unknown(),
                     'metaRoutingActive' => $this->metaRoutingActive,
                     'metaSessionOpen' => $this->metaSessionOpen,
                     'messagesViewData' => ((filled($this->selectedPhone) || $this->selectedStudentId) && $this->messagesTabLoaded)

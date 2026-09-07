@@ -8,7 +8,7 @@
                         @if ($inboxLoaded)
                             {{ count($conversations) }} conversation{{ count($conversations) === 1 ? '' : 's' }} — scroll for more
                         @else
-                            All WhatsApp conversations — students and unknown numbers
+                            All WhatsApp conversations — students, leads, staff, and unknown numbers
                         @endif
                     </p>
                 </div>
@@ -39,6 +39,7 @@
                         @php
                             $isActive = filled($selectedPhone)
                                 && (string) $selectedPhone === (string) ($conversation['phone'] ?? '');
+                            $contactTags = $conversation['contact_tags'] ?? [];
                         @endphp
                         <button
                             type="button"
@@ -56,6 +57,14 @@
                                 <span class="crm-wa-global-inbox__item-top">
                                     <span class="crm-wa-global-inbox__item-name">
                                         {{ $conversation['student_name'] }}
+                                        @foreach ($contactTags as $tag)
+                                            <span @class([
+                                                'crm-wa-contact-tag',
+                                                'crm-wa-contact-tag--staff' => $tag === 'Staff',
+                                                'crm-wa-contact-tag--student' => $tag === 'Student',
+                                                'crm-wa-contact-tag--lead' => $tag === 'Lead',
+                                            ])>{{ $tag }}</span>
+                                        @endforeach
                                         @unless ($conversation['is_linked'] ?? true)
                                             <span class="ml-1 rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-bold uppercase text-amber-800 dark:text-amber-200">New</span>
                                         @endunless
@@ -95,10 +104,25 @@
                     </p>
                 </div>
             @else
+                @php
+                    $chatContact = $chatContact ?? \App\Support\WhatsAppInboxContact::unknown();
+                    $headerName = $chatContact->isLinked()
+                        ? $chatContact->displayName
+                        : ($chatStudent?->name ?? 'Unknown contact');
+                    $headerTags = $chatContact->tagLabels();
+                @endphp
                 <div class="crm-wa-global-inbox__chat-head">
                     <div class="crm-wa-global-inbox__chat-head-main">
                         <p class="crm-wa-global-inbox__chat-name">
-                            {{ $chatStudent?->name ?? 'Unknown contact' }}
+                            {{ $headerName }}
+                            @foreach ($headerTags as $tag)
+                                <span @class([
+                                    'crm-wa-contact-tag',
+                                    'crm-wa-contact-tag--staff' => $tag === 'Staff',
+                                    'crm-wa-contact-tag--student' => $tag === 'Student',
+                                    'crm-wa-contact-tag--lead' => $tag === 'Lead',
+                                ])>{{ $tag }}</span>
+                            @endforeach
                         </p>
                         <p class="crm-wa-global-inbox__chat-phone">
                             {{ $chatStudent?->mobile ?? $selectedPhone }}
@@ -118,8 +142,12 @@
                             href="{{ \App\Filament\Pages\StudentProfilePage::getUrl(['record' => $chatStudent->id]).'?tab=messages' }}"
                             class="crm-wa-global-inbox__profile-link"
                         >
-                            Open student profile
+                            Open {{ ($chatContact->kind->value ?? '') === 'lead' ? 'lead' : 'student' }} profile
                         </a>
+                    @elseif (($chatContact->kind->value ?? '') === 'staff')
+                        <span class="crm-wa-global-inbox__profile-link crm-wa-global-inbox__profile-link--muted">
+                            Staff contact
+                        </span>
                     @else
                         <a
                             href="{{ \App\Filament\Resources\Students\StudentResource::getUrl('index').'?action=addStudent' }}"

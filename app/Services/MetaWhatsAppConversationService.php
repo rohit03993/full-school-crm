@@ -3,11 +3,13 @@
 namespace App\Services;
 
 use App\Enums\MetaWhatsAppMessageDirection;
+use App\Enums\WhatsAppContactKind;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Student;
 use App\Models\WhatsAppCampaignRecipient;
-use App\Support\MetaWhatsAppInboundMessageParser;
 use App\Support\MetaWhatsAppConversation;
+use App\Support\MetaWhatsAppInboundMessageParser;
+use App\Support\WhatsAppInboxContact;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -16,6 +18,7 @@ class MetaWhatsAppConversationService
 {
     public function __construct(
         protected StudentWhatsAppThreadService $thread,
+        protected WhatsAppInboxContactResolver $contacts,
     ) {}
 
     /**
@@ -40,6 +43,15 @@ class MetaWhatsAppConversationService
             ->orderByDesc(DB::raw('COALESCE(status_at, created_at)'))
             ->get();
 
+        $phones = $latestMeta
+            ->map(fn (MetaWhatsAppMessage $message): string => $this->thread->normalizePhoneForStorage((string) $message->phone))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $resolvedContacts = $this->contacts->resolveMany($phones);
+
         $conversations = collect();
         $seenStudentIds = [];
         $seenPhones = [];
@@ -52,13 +64,14 @@ class MetaWhatsAppConversationService
             }
 
             $seenPhones[$phone] = true;
-            $student = $message->student ?? $this->thread->findStudentByPhone($phone);
+            $contact = $resolvedContacts->get($phone) ?? WhatsAppInboxContact::unknown();
+            $student = $contact->student ?? $message->student;
 
             if ($student) {
                 $seenStudentIds[$student->id] = true;
             }
 
-            $conversations->push($this->conversationFromMetaMessage($message, $student, $phone));
+            $conversations->push($this->conversationFromMetaMessage($message, $contact, $phone));
         }
 
         WhatsAppCampaignRecipient::query()
@@ -86,7 +99,11 @@ class MetaWhatsAppConversationService
                     $seenPhones[$phone] = true;
                 }
 
-                $conversations->push($this->conversationFromCampaignRecipient($recipient, $student));
+                $contact = $phone !== ''
+                    ? $this->contacts->resolve($phone)
+                    : $this->contactFromStudentOnly($student);
+
+                $conversations->push($this->conversationFromCampaignRecipient($recipient, $contact));
             });
 
         return $this->filterAndSort($conversations, $search, $limit);
@@ -107,7 +124,16 @@ class MetaWhatsAppConversationService
             ->map(function (WhatsAppCampaignRecipient $recipient): ?MetaWhatsAppConversation {
                 $student = $recipient->student;
 
-                return $student ? $this->conversationFromCampaignRecipient($recipient, $student) : null;
+                if (! $student) {
+                    return null;
+                }
+
+                $phone = $this->thread->normalizePhoneForStorage((string) $student->mobile);
+                $contact = $phone !== ''
+                    ? $this->contacts->resolve($phone)
+                    : $this->contactFromStudentOnly($student);
+
+                return $this->conversationFromCampaignRecipient($recipient, $contact);
             })
             ->filter()
             ->values();
@@ -117,7 +143,7 @@ class MetaWhatsAppConversationService
 
     protected function conversationFromMetaMessage(
         MetaWhatsAppMessage $message,
-        ?Student $student,
+        WhatsAppInboxContact $contact,
         ?string $normalizedPhone = null,
     ): MetaWhatsAppConversation {
         $messageType = Schema::hasColumn('meta_whatsapp_messages', 'message_type')
@@ -146,27 +172,30 @@ class MetaWhatsAppConversationService
 
         $lastAt = $message->status_at ?? $message->created_at;
         $phone = $normalizedPhone ?: $this->thread->normalizePhoneForStorage((string) $message->phone);
-        $linked = $student !== null;
+        $student = $contact->student;
 
         return new MetaWhatsAppConversation(
             studentId: $student?->id,
-            studentName: $linked ? (string) $student->name : 'Unknown contact',
+            studentName: $contact->displayName,
             phone: $phone,
-            phoneDisplay: $this->displayPhone((string) ($student?->mobile ?: $phone)),
+            phoneDisplay: $this->displayPhone((string) ($student?->mobile ?: $contact->staff?->mobile ?: $phone)),
             preview: $preview,
             lastDirection: $direction,
             lastAt: $lastAt,
-            sessionOpen: $linked
+            sessionOpen: $student
                 ? $this->thread->sessionOpenForStudent($student)
                 : $this->thread->sessionOpenForPhone($phone),
             needsReply: $direction === 'inbound',
-            isLinked: $linked,
+            isLinked: $contact->isLinked(),
+            contactKind: $contact->kind->value,
+            contactTags: $contact->tagLabels(),
+            staffUserId: $contact->staff?->id,
         );
     }
 
     protected function conversationFromCampaignRecipient(
         WhatsAppCampaignRecipient $recipient,
-        Student $student,
+        WhatsAppInboxContact $contact,
     ): MetaWhatsAppConversation {
         $preview = trim((string) ($recipient->message_sent ?? ''));
 
@@ -174,17 +203,38 @@ class MetaWhatsAppConversationService
             $preview = (string) ($recipient->campaign?->template?->name ?? 'WhatsApp message');
         }
 
+        $student = $contact->student ?? $recipient->student;
+        $phone = $this->thread->normalizePhoneForStorage((string) ($student?->mobile ?? ''));
+
         return new MetaWhatsAppConversation(
-            studentId: $student->id,
-            studentName: (string) $student->name,
-            phone: $this->thread->normalizePhoneForStorage((string) $student->mobile),
-            phoneDisplay: $this->displayPhone((string) $student->mobile),
+            studentId: $student?->id,
+            studentName: $contact->displayName,
+            phone: $phone,
+            phoneDisplay: $this->displayPhone((string) ($student?->mobile ?? $phone)),
             preview: $preview,
             lastDirection: 'outbound',
             lastAt: $recipient->updated_at ?? $recipient->created_at,
-            sessionOpen: $this->thread->sessionOpenForStudent($student),
+            sessionOpen: $student ? $this->thread->sessionOpenForStudent($student) : false,
             needsReply: false,
-            isLinked: true,
+            isLinked: $contact->isLinked(),
+            contactKind: $contact->kind->value,
+            contactTags: $contact->tagLabels(),
+            staffUserId: $contact->staff?->id,
+        );
+    }
+
+    protected function contactFromStudentOnly(Student $student): WhatsAppInboxContact
+    {
+        $kind = $student->status === \App\Enums\StudentStatus::Enquiry
+            || (string) $student->status === \App\Enums\StudentStatus::Enquiry->value
+            ? WhatsAppContactKind::Lead
+            : WhatsAppContactKind::Student;
+
+        return new WhatsAppInboxContact(
+            displayName: (string) $student->name,
+            kind: $kind,
+            tags: [$kind],
+            student: $student,
         );
     }
 
@@ -199,10 +249,14 @@ class MetaWhatsAppConversationService
         return $conversations
             ->when($needle !== '', function (Collection $rows) use ($needle): Collection {
                 return $rows->filter(function (MetaWhatsAppConversation $conversation) use ($needle): bool {
+                    $tags = strtolower(implode(' ', $conversation->contactTags));
+
                     return str_contains(strtolower($conversation->studentName), $needle)
                         || str_contains(strtolower($conversation->phoneDisplay), $needle)
                         || str_contains(strtolower($conversation->phone), $needle)
-                        || str_contains(strtolower($conversation->preview), $needle);
+                        || str_contains(strtolower($conversation->preview), $needle)
+                        || str_contains($tags, $needle)
+                        || str_contains(strtolower($conversation->contactKind), $needle);
                 });
             })
             ->sortByDesc(fn (MetaWhatsAppConversation $conversation): int => $conversation->lastAt?->timestamp ?? 0)

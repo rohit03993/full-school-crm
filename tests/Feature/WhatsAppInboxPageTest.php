@@ -120,6 +120,41 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertStatus(200);
     }
 
+    public function test_staff_number_shows_staff_name_not_unknown(): void
+    {
+        Http::fake();
+
+        $admin = $this->createSuperAdmin();
+
+        User::factory()->create([
+            'name' => 'Rohit Pal',
+            'mobile' => '8109432345',
+            'is_active' => true,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.STAFFCHAT',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '918109432345',
+            'student_id' => null,
+            'body_preview' => 'Hello this is me',
+            'message_type' => 'text',
+            'status' => 'received',
+            'status_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(WhatsAppInboxPage::class)
+            ->assertSee('Rohit Pal')
+            ->assertSee('Staff')
+            ->assertDontSee('Unknown contact')
+            ->call('selectConversation', '918109432345')
+            ->assertSee('Rohit Pal')
+            ->assertSee('Staff contact')
+            ->assertStatus(200);
+    }
+
     public function test_inbound_parent_image_opens_with_reply_composer_in_inbox(): void
     {
         Http::fake();

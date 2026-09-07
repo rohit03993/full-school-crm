@@ -1858,7 +1858,23 @@
     }
 
     .crm-wa-global-inbox__item-name {
-        @apply truncate text-sm font-semibold text-gray-950 dark:text-white;
+        @apply inline-flex max-w-full flex-wrap items-center gap-1 text-sm font-semibold text-gray-950 dark:text-white;
+    }
+
+    .crm-wa-contact-tag {
+        @apply inline-flex shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide;
+    }
+
+    .crm-wa-contact-tag--staff {
+        @apply bg-violet-500/15 text-violet-800 dark:bg-violet-500/20 dark:text-violet-200;
+    }
+
+    .crm-wa-contact-tag--student {
+        @apply bg-sky-500/15 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200;
+    }
+
+    .crm-wa-contact-tag--lead {
+        @apply bg-amber-500/15 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100;
     }
 
     .crm-wa-global-inbox__item-time {
@@ -1910,7 +1926,7 @@
     }
 
     .crm-wa-global-inbox__chat-name {
-        @apply text-sm font-semibold text-gray-950 dark:text-white;
+        @apply inline-flex flex-wrap items-center gap-1 text-sm font-semibold text-gray-950 dark:text-white;
     }
 
     .crm-wa-global-inbox__chat-phone {
@@ -1919,6 +1935,10 @@
 
     .crm-wa-global-inbox__profile-link {
         @apply shrink-0 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10;
+    }
+
+    .crm-wa-global-inbox__profile-link--muted {
+        @apply pointer-events-none cursor-default opacity-70 no-underline;
     }
 
     .crm-wa-global-inbox__placeholder {

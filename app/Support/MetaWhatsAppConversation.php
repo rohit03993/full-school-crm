@@ -6,6 +6,9 @@ use Carbon\Carbon;
 
 readonly class MetaWhatsAppConversation
 {
+    /**
+     * @param  list<string>  $contactTags
+     */
     public function __construct(
         public ?int $studentId,
         public string $studentName,
@@ -17,6 +20,9 @@ readonly class MetaWhatsAppConversation
         public bool $sessionOpen,
         public bool $needsReply,
         public bool $isLinked = true,
+        public string $contactKind = 'unknown',
+        public array $contactTags = [],
+        public ?int $staffUserId = null,
     ) {}
 
     /**
@@ -36,6 +42,9 @@ readonly class MetaWhatsAppConversation
             'session_open' => $this->sessionOpen,
             'needs_reply' => $this->needsReply,
             'is_linked' => $this->isLinked,
+            'contact_kind' => $this->contactKind,
+            'contact_tags' => $this->contactTags,
+            'staff_user_id' => $this->staffUserId,
         ];
     }
 
