@@ -128,6 +128,7 @@
                             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Caller</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Status</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Type</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Purpose</th>
                             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Notes</th>
                             <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"></th>
                         </tr>
@@ -172,6 +173,15 @@
                                     ])>
                                         {{ $isNew ? 'New' : 'Follow-up' }}
                                     </span>
+                                </td>
+                                <td class="px-4 py-3" data-label="Purpose">
+                                    @if ($call->call_purpose)
+                                        <span class="inline-flex rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-800 dark:bg-white/10 dark:text-gray-200">
+                                            {{ $call->call_purpose->label() }}
+                                        </span>
+                                    @else
+                                        <span class="text-sm text-gray-400 dark:text-gray-500">—</span>
+                                    @endif
                                 </td>
                                 <td class="crm-responsive-table__wide px-4 py-3 text-sm text-gray-600 dark:text-gray-300" data-label="Notes">
                                     {{ $call->call_notes ? \Illuminate\Support\Str::limit($call->call_notes, 80) : '—' }}

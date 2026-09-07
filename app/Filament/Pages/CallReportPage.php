@@ -196,7 +196,8 @@ class CallReportPage extends Page
                 'Staff',
                 'Status',
                 'Direction',
-                'Purpose / visit status',
+                'Purpose',
+                'Visit status set to',
                 'Notes',
             ]);
 
@@ -212,8 +213,8 @@ class CallReportPage extends Page
                             $call->staff?->name,
                             $call->call_status?->label(),
                             $call->call_direction?->label(),
-                            $call->call_purpose?->label()
-                                ?? $call->visit_status_changed_to?->label(),
+                            $call->call_purpose?->label() ?? '',
+                            $call->visit_status_changed_to?->label() ?? '',
                             $call->call_notes,
                         ]);
                     }
