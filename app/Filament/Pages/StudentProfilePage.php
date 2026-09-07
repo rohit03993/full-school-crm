@@ -153,6 +153,17 @@ class StudentProfilePage extends Page
 
     public bool $homeworkTabLoaded = false;
 
+    public bool $activityTimelineLoaded = false;
+
+    /**
+     * @var list<array<string, mixed>>
+     */
+    public array $activityTimeline = [];
+
+    public bool $activityTimelineHasMore = false;
+
+    public int $activityTimelineLimit = 40;
+
     /**
      * @var array<int, bool>
      */
@@ -441,6 +452,10 @@ class StudentProfilePage extends Page
             $this->profileTab = 'overview';
         }
 
+        if ($this->profileTab === 'overview') {
+            $this->loadOverviewTab();
+        }
+
         $this->syncCatalogCourseFeeIfNeeded();
 
         if (
@@ -507,6 +522,7 @@ class StudentProfilePage extends Page
         }
 
         match ($this->profileTab) {
+            'overview' => $this->loadOverviewTab(),
             'visits' => $this->loadVisitsTab(),
             'calls' => $this->loadCallsTab(),
             'cases' => $this->loadCasesTab(),
@@ -520,6 +536,62 @@ class StudentProfilePage extends Page
             'homework' => $this->loadHomeworkTab(),
             default => null,
         };
+    }
+
+    public function loadOverviewTab(): void
+    {
+        if ($this->activityTimelineLoaded) {
+            return;
+        }
+
+        $this->activityTimelineLoaded = true;
+
+        $result = app(\App\Services\StudentActivityTimelineService::class)
+            ->forStudent($this->record, Auth::user(), $this->activityTimelineLimit);
+
+        $this->activityTimeline = collect($result['items'])
+            ->map(function (array $item): array {
+                /** @var \Illuminate\Support\Carbon $at */
+                $at = $item['occurred_at'];
+
+                return [
+                    'id' => $item['id'],
+                    'type' => $item['type'],
+                    'category' => $item['category'],
+                    'title' => $item['title'],
+                    'summary' => $item['summary'],
+                    'detail' => $item['detail'],
+                    'staff_name' => $item['staff_name'],
+                    'tab' => $item['tab'],
+                    'occurred_at' => $at->toIso8601String(),
+                    'occurred_at_label' => $at->format('h:i A'),
+                    'occurred_date' => $at->toDateString(),
+                    'occurred_date_label' => $at->format('d M Y'),
+                ];
+            })
+            ->all();
+        $this->activityTimelineHasMore = $result['has_more'];
+    }
+
+    public function loadMoreActivityTimeline(): void
+    {
+        $this->activityTimelineLimit = min(200, $this->activityTimelineLimit + 40);
+        $this->activityTimelineLoaded = false;
+        $this->loadOverviewTab();
+    }
+
+    public function openActivityTimelineTab(?string $tab): void
+    {
+        if (! filled($tab) || $tab === 'overview') {
+            return;
+        }
+
+        if (! in_array($tab, $this->validProfileTabs(), true)) {
+            return;
+        }
+
+        $this->profileTab = $tab;
+        $this->updatedProfileTab();
     }
 
     /**
@@ -3350,6 +3422,9 @@ class StudentProfilePage extends Page
                                     'record' => $this->record,
                                     'enquiries' => $this->record->enquiries,
                                     'profile' => $this->profileSummary(),
+                                    'activityTimeline' => $this->activityTimeline,
+                                    'activityTimelineHasMore' => $this->activityTimelineHasMore,
+                                    'activityTimelineLoaded' => $this->activityTimelineLoaded,
                                 ]),
                         ]),
                     'visits' => Tab::make('Visits')

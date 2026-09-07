@@ -453,6 +453,7 @@ PLANNED
 
 | Date | Change |
 |------|--------|
+| 2026-09-07 | Student Profile Overview = activity timeline (calls, fees, WhatsApp, attendance, etc.; click-through to tabs) |
 | 2026-09-07 | WhatsApp staff access: inbox / bulk campaigns / fee notices as separate job roles + sidebar leaves; full desk role kept for legacy |
 | 2026-09-05 | WhatsApp: Parent fee notices (manual bulk amounts) — independent of Fees; profile Parent updates tab |
 | 2026-08-15 | Nav hubs: Attendance / Fees / WhatsApp / Setup = one sidebar entry each; leaf pages stay URL-reachable and module-gated. Homework hub pattern is the reference. |
