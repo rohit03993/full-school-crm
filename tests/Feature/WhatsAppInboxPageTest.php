@@ -124,6 +124,10 @@ class WhatsAppInboxPageTest extends TestCase
     {
         Http::fake();
 
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-token'), 'meta_whatsapp');
+
         $admin = $this->createSuperAdmin();
 
         User::factory()->create([
@@ -152,6 +156,9 @@ class WhatsAppInboxPageTest extends TestCase
             ->call('selectConversation', '918109432345')
             ->assertSee('Rohit Pal')
             ->assertSee('Staff contact')
+            ->assertSet('metaSessionOpen', true)
+            ->assertSee('Type a message')
+            ->assertSee('wire:model="metaReplyAttachment"', false)
             ->assertStatus(200);
     }
 
@@ -201,8 +208,9 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertSet('metaSessionOpen', true)
             ->assertSee('Amit Verma')
             ->assertSee('Type a message')
-            ->assertSee('Open student profile')
-            ->assertDontSee('wire:model="metaReplyAttachment"', false)
+            ->assertSee('Open lead profile')
+            ->assertSee('wire:model="metaReplyAttachment"', false)
+            ->assertSee('24h window open')
             ->assertStatus(200);
     }
 

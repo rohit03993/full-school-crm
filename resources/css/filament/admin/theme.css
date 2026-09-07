@@ -1335,11 +1335,51 @@
     }
 
     .crm-wa-inbox__compose {
-        @apply max-h-[min(45vh,22rem)] shrink-0 space-y-2 overflow-y-auto overscroll-contain border-t border-gray-200/70 bg-gray-50/90 p-3 dark:border-white/10 dark:bg-gray-900/60;
+        @apply max-h-[min(48vh,24rem)] shrink-0 space-y-2 overflow-y-auto overscroll-contain border-t border-gray-200/70 bg-[#f0f2f5] p-3 pb-5 dark:border-white/10 dark:bg-gray-900/70;
     }
 
     .crm-wa-inbox__compose .crm-wa-inbox__composer {
-        @apply rounded-xl border border-gray-200/70 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-gray-950/80;
+        @apply rounded-2xl border border-gray-200/70 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-gray-950/80;
+    }
+
+    .crm-wa-inbox__templates {
+        @apply overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm dark:border-white/10 dark:bg-gray-950/80;
+    }
+
+    .crm-wa-inbox__templates-summary {
+        @apply flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-sm font-semibold text-gray-800 marker:content-none dark:text-gray-100;
+    }
+
+    .crm-wa-inbox__templates-summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .crm-wa-inbox__templates-summary-main {
+        @apply inline-flex items-center gap-2;
+    }
+
+    .crm-wa-inbox__templates-summary-hint {
+        @apply text-[11px] font-medium text-gray-500 dark:text-gray-400;
+    }
+
+    .crm-wa-inbox__templates-body {
+        @apply space-y-3 border-t border-gray-100 px-3 py-3 dark:border-white/10;
+    }
+
+    .crm-wa-inbox__attach-chip {
+        @apply mb-2 flex items-center gap-2 rounded-xl border border-emerald-200/80 bg-emerald-50/80 px-3 py-2 text-xs font-medium text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100;
+    }
+
+    .crm-wa-inbox__attach-chip-name {
+        @apply min-w-0 flex-1 truncate;
+    }
+
+    .crm-wa-inbox__attach-chip-remove {
+        @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-emerald-800 transition hover:bg-emerald-100 dark:text-emerald-100 dark:hover:bg-white/10;
+    }
+
+    .crm-wa-inbox__composer--reply {
+        @apply !rounded-2xl !border-emerald-200/70 !bg-white !p-2.5 dark:!border-emerald-500/20 dark:!bg-gray-950/90;
     }
 
     .crm-wa-inbox__thread {
@@ -1383,15 +1423,15 @@
     }
 
     .crm-wa-inbox__icon-btn {
-        @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/10;
+        @apply inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/10;
     }
 
     .crm-wa-inbox__textarea--reply {
-        @apply mt-0 max-h-32 min-h-[2.75rem] resize-y rounded-3xl py-2.5;
+        @apply mt-0 max-h-32 min-h-[2.75rem] resize-none rounded-3xl border-0 bg-[#f0f2f5] py-2.5 shadow-none focus:ring-2 focus:ring-emerald-500/30 dark:bg-white/5;
     }
 
     .crm-wa-inbox__send-btn--icon {
-        @apply h-11 w-11 shrink-0 rounded-full p-0;
+        @apply h-11 w-11 shrink-0 rounded-full bg-emerald-600 p-0 text-white hover:bg-emerald-500;
     }
 
     .crm-wa-inbox__send-btn--template {
@@ -1400,6 +1440,18 @@
 
     .crm-wa-inbox__hint--inline {
         @apply mt-0 shrink-0 text-[11px] leading-snug;
+    }
+
+    .crm-wa-bubble__media {
+        @apply space-y-2;
+    }
+
+    .crm-wa-bubble__download {
+        @apply inline-flex items-center gap-1 rounded-lg bg-black/5 px-2 py-1 text-[11px] font-semibold text-gray-700 transition hover:bg-black/10 dark:bg-white/10 dark:text-gray-100 dark:hover:bg-white/15;
+    }
+
+    .crm-wa-bubble__document-action {
+        @apply ml-auto shrink-0 text-[11px] font-semibold uppercase tracking-wide text-primary-600 dark:text-primary-300;
     }
 
     .crm-wa-inbox__composer-lead {
@@ -1768,11 +1820,20 @@
     }
 
     .crm-wa-inbox--compact .crm-wa-inbox__compose {
-        @apply max-h-[min(42%,20rem)] shrink-0 gap-2 border-t border-gray-200/70 p-3 dark:border-white/10;
+        @apply max-h-[min(46%,22rem)] shrink-0 gap-2 border-t border-gray-200/70 p-3 pb-6 pe-16 dark:border-white/10;
     }
 
     .crm-wa-inbox--compact .crm-wa-inbox__composer {
-        @apply p-3 shadow-none;
+        @apply p-2.5 shadow-none;
+    }
+
+    /* Keep Ask CRM clear of the WhatsApp compose bar on desktop */
+    .fi-page:has(.crm-wa-global-inbox) .crm-ask {
+        @apply bottom-28 end-6;
+    }
+
+    .fi-page:has(.crm-wa-global-inbox) .crm-wa-global-inbox__chat {
+        @apply pe-0;
     }
 
     .crm-wa-global-inbox {

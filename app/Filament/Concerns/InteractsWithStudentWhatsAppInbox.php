@@ -203,6 +203,12 @@ trait InteractsWithStudentWhatsAppInbox
         $this->showMetaReplyAttachment = true;
     }
 
+    public function clearMetaReplyAttachment(): void
+    {
+        $this->metaReplyAttachment = null;
+        $this->showMetaReplyAttachment = false;
+    }
+
     public function refreshThreadMedia(): void
     {
         if (! $this->messagesTabLoaded) {

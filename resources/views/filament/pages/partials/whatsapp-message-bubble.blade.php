@@ -5,13 +5,32 @@
     $body = trim((string) ($message['body'] ?? ''));
     $showBody = $body !== '' && ! in_array($messageType, ['reaction'], true);
     $showCaption = $caption !== '' && $caption !== $body && in_array($messageType, ['image', 'video', 'document'], true);
+    $downloadName = $message['mediaFilename']
+        ?? match ($messageType) {
+            'image', 'sticker' => 'whatsapp-photo.jpg',
+            'video' => 'whatsapp-video.mp4',
+            'audio' => 'whatsapp-audio.ogg',
+            default => 'whatsapp-file',
+        };
 @endphp
 
 @if ($messageType === 'image' || $messageType === 'sticker')
     @if ($mediaUrl)
-        <button type="button" class="crm-wa-bubble__media-trigger js-media-preview-trigger" data-crm-preview-image="{{ $mediaUrl }}" data-crm-preview-title="{{ $messageType === 'sticker' ? 'Sticker' : 'Photo' }}">
-            <img src="{{ $mediaUrl }}" alt="{{ $messageType === 'sticker' ? 'Sticker' : 'Photo' }}" class="crm-wa-bubble__image" loading="lazy" />
-        </button>
+        <div class="crm-wa-bubble__media">
+            <button type="button" class="crm-wa-bubble__media-trigger js-media-preview-trigger" data-crm-preview-image="{{ $mediaUrl }}" data-crm-preview-title="{{ $messageType === 'sticker' ? 'Sticker' : 'Photo' }}">
+                <img src="{{ $mediaUrl }}" alt="{{ $messageType === 'sticker' ? 'Sticker' : 'Photo' }}" class="crm-wa-bubble__image" loading="lazy" />
+            </button>
+            <a
+                href="{{ $mediaUrl }}"
+                download="{{ $downloadName }}"
+                target="_blank"
+                rel="noopener"
+                class="crm-wa-bubble__download"
+            >
+                <x-filament::icon icon="heroicon-o-arrow-down-tray" class="h-3.5 w-3.5" />
+                Download
+            </a>
+        </div>
     @elseif ($message['mediaPending'] ?? false)
         <div class="crm-wa-bubble__media-pending">
             <div class="crm-wa-bubble__media-pending-icon" aria-hidden="true">📷</div>
@@ -22,7 +41,19 @@
     @endif
 @elseif ($messageType === 'video')
     @if ($mediaUrl)
-        <video src="{{ $mediaUrl }}" class="crm-wa-bubble__video" controls playsinline preload="metadata"></video>
+        <div class="crm-wa-bubble__media">
+            <video src="{{ $mediaUrl }}" class="crm-wa-bubble__video" controls playsinline preload="metadata"></video>
+            <a
+                href="{{ $mediaUrl }}"
+                download="{{ $downloadName }}"
+                target="_blank"
+                rel="noopener"
+                class="crm-wa-bubble__download"
+            >
+                <x-filament::icon icon="heroicon-o-arrow-down-tray" class="h-3.5 w-3.5" />
+                Download video
+            </a>
+        </div>
     @elseif ($message['mediaPending'] ?? false)
         <div class="crm-wa-bubble__media-pending">
             <div class="crm-wa-bubble__media-pending-icon" aria-hidden="true">🎬</div>
@@ -33,7 +64,19 @@
     @endif
 @elseif ($messageType === 'audio')
     @if ($mediaUrl)
-        <audio src="{{ $mediaUrl }}" class="crm-wa-bubble__audio" controls preload="metadata"></audio>
+        <div class="crm-wa-bubble__media">
+            <audio src="{{ $mediaUrl }}" class="crm-wa-bubble__audio" controls preload="metadata"></audio>
+            <a
+                href="{{ $mediaUrl }}"
+                download="{{ $downloadName }}"
+                target="_blank"
+                rel="noopener"
+                class="crm-wa-bubble__download"
+            >
+                <x-filament::icon icon="heroicon-o-arrow-down-tray" class="h-3.5 w-3.5" />
+                Download
+            </a>
+        </div>
     @elseif ($message['mediaPending'] ?? false)
         <div class="crm-wa-bubble__media-pending">
             <div class="crm-wa-bubble__media-pending-icon" aria-hidden="true">🎤</div>
@@ -44,9 +87,10 @@
     @endif
 @elseif ($messageType === 'document')
     @if ($mediaUrl)
-        <a href="{{ $mediaUrl }}" target="_blank" rel="noopener" class="crm-wa-bubble__document">
+        <a href="{{ $mediaUrl }}" target="_blank" rel="noopener" download="{{ $downloadName }}" class="crm-wa-bubble__document">
             <x-filament::icon icon="heroicon-o-document-arrow-down" class="crm-wa-bubble__document-icon" />
             <span class="crm-wa-bubble__document-name">{{ $message['mediaFilename'] ?? 'Document' }}</span>
+            <span class="crm-wa-bubble__document-action">Open / download</span>
         </a>
     @elseif ($message['mediaPending'] ?? false)
         <div class="crm-wa-bubble__media-pending">

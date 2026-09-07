@@ -155,9 +155,9 @@ class StudentProfileMessagesTabTest extends TestCase
             ->set('profileTab', 'messages')
             ->assertSet('metaSessionOpen', true)
             ->assertSee('Type a message')
-            ->assertSee('Attach photo or file')
+            ->assertSee('Attach photo, video, or file')
             ->assertSee('crm-wa-bubble__media-pending', false)
-            ->assertDontSee('wire:model="metaReplyAttachment"', false)
+            ->assertSee('wire:model="metaReplyAttachment"', false)
             ->assertStatus(200);
     }
 

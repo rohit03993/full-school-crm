@@ -18,12 +18,14 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Livewire\WithFileUploads;
 use UnitEnum;
 
 class WhatsAppInboxPage extends Page
 {
     use InteractsWithStudentWhatsAppInbox;
     use RequiresCrmPermission;
+    use WithFileUploads;
 
     protected static function requiredCrmPermission(): CrmPermission
     {
