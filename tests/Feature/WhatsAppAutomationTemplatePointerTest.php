@@ -92,6 +92,33 @@ class WhatsAppAutomationTemplatePointerTest extends TestCase
         $this->assertNull($formId);
     }
 
+    public function test_save_drops_invalid_homework_not_done_template_without_failing(): void
+    {
+        $wrong = WhatsAppTemplate::query()->create([
+            'name' => 'wrong_params',
+            'param_count' => 1,
+            'is_active' => true,
+        ]);
+
+        $in = WhatsAppTemplate::query()->create([
+            'name' => 'parent_attendance_auto_in_agra',
+            'param_count' => 4,
+            'is_active' => true,
+        ]);
+
+        $settings = app(WhatsAppSettingsService::class);
+        $result = $settings->save([
+            'punch_autosend_enabled' => true,
+            'punch_in_autosend_live_campaign_id' => $in->id,
+            'homework_not_done_live_campaign_id' => $wrong->id,
+        ]);
+
+        $this->assertTrue($result['ok']);
+        Setting::flushValueCache();
+        $this->assertSame('', (string) Setting::getValue('whatsapp.homework_not_done_live_campaign_id'));
+        $this->assertSame('template:'.$in->id, Setting::getValue('whatsapp.punch_in_autosend_live_campaign_id'));
+    }
+
     public function test_save_stores_homework_share_template_prefix(): void
     {
         $combined = WhatsAppTemplate::query()->create([

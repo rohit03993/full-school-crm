@@ -104,7 +104,7 @@ class ManageWhatsAppSettings extends Page
                     .'<strong>Student attendance</strong> = student IN/OUT, WhatsApp to parents. '
                     .'<strong>Staff attendance</strong> = staff punch, WhatsApp to the staff phone. '
                     .'<strong>Homework</strong> = share templates (staff click Send) and optional Not Done alerts. '
-                    .'Pick an approved template on each tab. Live API campaigns are only for external POST / API key, not these automations.'
+                    .'Pick an approved template on each tab. <strong>Save settings</strong> stores every tab at once, but you stay on the tab you are editing.'
                     .'</p>'
                 ))
                 ->columnSpanFull(),
@@ -367,7 +367,13 @@ class ManageWhatsAppSettings extends Page
 
     public function save(WhatsAppSettingsService $settings): void
     {
-        $result = $settings->save($this->form->getState());
+        // This page is one form with many tabs. form->getState() validates every Select,
+        // including hidden tabs — a stale Homework template then jumps the UI away from
+        // Student attendance and blocks Save. Snapshot skips that option check; the
+        // settings service still sanitizes template IDs before writing.
+        $state = $this->form->getStateSnapshot();
+
+        $result = $settings->save($state);
 
         if (! $result['ok']) {
             Notification::make()
@@ -383,7 +389,7 @@ class ManageWhatsAppSettings extends Page
 
         Notification::make()
             ->title('Automations saved')
-            ->body('Automation and campaign settings are saved. Sends route through Meta Cloud API.')
+            ->body('All automation tabs were saved. You stay on this tab — opens route through Meta Cloud API.')
             ->success()
             ->send();
     }

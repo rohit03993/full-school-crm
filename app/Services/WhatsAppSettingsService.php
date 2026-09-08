@@ -175,6 +175,8 @@ class WhatsAppSettingsService
      */
     public function save(array $data): array
     {
+        $data = $this->sanitizeAutomationTemplateSelections($data);
+
         Setting::setValue(
             'whatsapp.postcall_autosend_enabled',
             ! empty($data['postcall_autosend_enabled']) ? '1' : '0',
@@ -411,6 +413,72 @@ class WhatsAppSettingsService
         }
 
         return (string) $template->id;
+    }
+
+    /**
+     * Drop inactive / wrong-param template picks so one bad tab cannot corrupt saves.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function sanitizeAutomationTemplateSelections(array $data): array
+    {
+        $keysWithParamCount = [
+            'homework_combined_live_campaign_id' => 4,
+            'homework_share_live_campaign_id' => 4,
+            'homework_not_done_live_campaign_id' => 5,
+        ];
+
+        foreach ($keysWithParamCount as $key => $paramCount) {
+            $data[$key] = $this->sanitizeSelectedTemplateId($data[$key] ?? null, $paramCount);
+        }
+
+        foreach ([
+            'postcall_autosend_live_campaign_id',
+            'fee_reminder_live_campaign_id',
+            'fee_reminder_upcoming_live_campaign_id',
+            'fee_reminder_due_live_campaign_id',
+            'fee_reminder_overdue_live_campaign_id',
+            'attendance_autosend_live_campaign_id',
+            'punch_in_autosend_live_campaign_id',
+            'punch_out_autosend_live_campaign_id',
+            'punch_manual_in_autosend_live_campaign_id',
+            'punch_manual_out_autosend_live_campaign_id',
+            'staff_punch_in_autosend_live_campaign_id',
+            'staff_punch_out_autosend_live_campaign_id',
+        ] as $key) {
+            $data[$key] = $this->sanitizeSelectedTemplateId($data[$key] ?? null);
+        }
+
+        return $data;
+    }
+
+    protected function sanitizeSelectedTemplateId(mixed $value, ?int $requiredParamCount = null): ?int
+    {
+        if (! filled($value)) {
+            return null;
+        }
+
+        $raw = (string) $value;
+        if (str_starts_with($raw, self::AUTOMATION_TEMPLATE_PREFIX)) {
+            $raw = substr($raw, strlen(self::AUTOMATION_TEMPLATE_PREFIX));
+        }
+
+        if (! ctype_digit($raw)) {
+            return null;
+        }
+
+        $template = $this->activeTemplate((int) $raw);
+
+        if (! $template) {
+            return null;
+        }
+
+        if ($requiredParamCount !== null && (int) $template->param_count !== $requiredParamCount) {
+            return null;
+        }
+
+        return (int) $template->id;
     }
 
     protected function activeTemplate(int $id): ?WhatsAppTemplate
