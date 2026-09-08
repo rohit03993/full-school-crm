@@ -41,10 +41,10 @@ class WhatsAppSettingsService
                 Setting::getValue('whatsapp.fee_reminder_overdue_live_campaign_id')
                     ?: Setting::getValue('whatsapp.fee_reminder_live_campaign_id'),
             ),
-            'homework_combined_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_combined_live_campaign_id')),
-            'homework_share_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_share_live_campaign_id')),
+            'homework_combined_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_combined_live_campaign_id'), 4),
+            'homework_share_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_share_live_campaign_id'), 4),
             'homework_not_done_autosend_enabled' => (bool) Setting::getValue('whatsapp.homework_not_done_autosend_enabled', false),
-            'homework_not_done_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_not_done_live_campaign_id')),
+            'homework_not_done_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_not_done_live_campaign_id'), 5),
             'attendance_autosend_enabled' => (bool) Setting::getValue('whatsapp.attendance_autosend_enabled', false),
             'attendance_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.attendance_autosend_live_campaign_id')),
             'punch_autosend_enabled' => (bool) Setting::getValue('whatsapp.punch_autosend_enabled', true),
@@ -393,7 +393,7 @@ class WhatsAppSettingsService
         return self::AUTOMATION_TEMPLATE_PREFIX.(int) $raw;
     }
 
-    public function formTemplateIdFromStored(mixed $stored): ?string
+    public function formTemplateIdFromStored(mixed $stored, ?int $requiredParamCount = null): ?string
     {
         if (! filled($stored)) {
             return null;
@@ -401,7 +401,16 @@ class WhatsAppSettingsService
 
         $template = $this->resolveAutomationTemplate((string) $stored, null);
 
-        return $template ? (string) $template->id : null;
+        if (! $template) {
+            return null;
+        }
+
+        // Stale IDs (wrong param count) must not stay selected — Filament blocks the whole Automations save.
+        if ($requiredParamCount !== null && (int) $template->param_count !== $requiredParamCount) {
+            return null;
+        }
+
+        return (string) $template->id;
     }
 
     protected function activeTemplate(int $id): ?WhatsAppTemplate
