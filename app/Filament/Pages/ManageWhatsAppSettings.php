@@ -302,7 +302,6 @@ class ManageWhatsAppSettings extends Page
                         ->nullable()
                         ->native(false)
                         ->placeholder('Choose template…')
-                        ->disableOptionValidation()
                         ->helperText('Used on Homework Review → Send to parents. Template homework_combined (4 params).'),
                     Select::make('homework_share_live_campaign_id')
                         ->label('Single-subject homework share')
@@ -311,7 +310,6 @@ class ManageWhatsAppSettings extends Page
                         ->nullable()
                         ->native(false)
                         ->placeholder('Choose template…')
-                        ->disableOptionValidation()
                         ->helperText('Used when uploading one homework with Send WhatsApp on. Template homework_api / homework_update (4 params).'),
                 ])
                 ->columns(2),
@@ -333,7 +331,6 @@ class ManageWhatsAppSettings extends Page
                         ->nullable()
                         ->native(false)
                         ->placeholder('Choose template…')
-                        ->disableOptionValidation()
                         ->helperText('Template homework_not_done (5 params). Map student.name, homework.class_section, homework.subject, homework.topic, institute.name.'),
                 ])
                 ->columns(2),
