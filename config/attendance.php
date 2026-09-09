@@ -27,8 +27,9 @@ return [
 
     /*
     | Student attendance % on profile / counters / marksheets.
-    | Past months = full calendar month. Current month = month-to-date through today.
-    | Window also starts at batch join date if later. Sundays excluded by default (India coaching).
+    | Selected / current calendar month = 1st → last day (full month).
+    | Sundays excluded by default (India coaching). Days with no row count as absent until backfilled.
+    | Custom date-range reports may still respect batch join date via summaryForStudentInRange().
     */
     'percentage' => [
         'period' => env('ATTENDANCE_PERCENTAGE_PERIOD', 'month_to_date'),

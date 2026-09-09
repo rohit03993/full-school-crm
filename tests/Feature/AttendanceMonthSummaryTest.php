@@ -28,7 +28,7 @@ class AttendanceMonthSummaryTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_current_month_summary_is_month_to_date_with_clear_label(): void
+    public function test_current_month_summary_uses_full_calendar_month(): void
     {
         $this->travelTo('2026-09-09 12:00:00');
 
@@ -48,14 +48,13 @@ class AttendanceMonthSummaryTest extends TestCase
         $summary = app(AttendanceService::class)->summaryForStudentInMonth($student->fresh(), '2026-09');
 
         $this->assertNotNull($summary);
-        $this->assertSame('month_to_date', $summary['scope']);
-        // 4–9 Sep excluding Sunday 6 Sep = 5 working days
-        $this->assertSame(5, $summary['expected_days']);
+        $this->assertSame('calendar_month', $summary['scope']);
+        // Sep 2026 = 30 days, 4 Sundays → 26 working days (join date ignored)
+        $this->assertSame(26, $summary['expected_days']);
         $this->assertSame(1, $summary['present_days']);
-        $this->assertSame(20.0, $summary['percentage']);
-        $this->assertStringStartsWith('so far ', $summary['period_label']);
-        $this->assertStringContainsString('04 Sep', $summary['period_label']);
-        $this->assertStringContainsString('09 Sep 2026', $summary['period_label']);
+        $this->assertSame(3.8, $summary['percentage']);
+        $this->assertSame('01 Sep – 30 Sep 2026', $summary['period_label']);
+        $this->assertStringNotContainsString('so far', $summary['period_label']);
     }
 
     public function test_past_month_summary_uses_full_calendar_month(): void
@@ -82,9 +81,7 @@ class AttendanceMonthSummaryTest extends TestCase
         // Aug 2026 = 31 days, 5 Sundays → 26 working days
         $this->assertSame(26, $summary['expected_days']);
         $this->assertSame(1, $summary['present_days']);
-        $this->assertStringStartsWith('01 Aug', $summary['period_label']);
-        $this->assertStringContainsString('31 Aug 2026', $summary['period_label']);
-        $this->assertStringNotContainsString('so far', $summary['period_label']);
+        $this->assertSame('01 Aug – 31 Aug 2026', $summary['period_label']);
     }
 
     /**

@@ -113,7 +113,7 @@ class AttendanceService
     }
 
     /**
-     * Month-to-date attendance for the current calendar month (through today).
+     * Current calendar month attendance (full month — same rules as the month picker).
      *
      * @return array{
      *     percentage: float,
@@ -130,22 +130,13 @@ class AttendanceService
      */
     public function monthToDateSummaryForStudent(Student $student): ?array
     {
-        $today = now()->startOfDay();
-
-        return $this->withMonthSummaryMeta(
-            $this->summaryForStudentInRange(
-                $student,
-                $today->copy()->startOfMonth(),
-                $today,
-            ),
-            monthToDate: true,
-        );
+        return $this->summaryForStudentInMonth($student, now()->format('Y-m'));
     }
 
     /**
      * Attendance summary for a calendar month (Y-m).
-     * Past months: full month. Current month: through today only (month-to-date).
-     * Always respects batch join date. Does not invent future absences.
+     * Always uses the full month (1st → last day), Sundays excluded.
+     * Does not cut off at today or batch join / install date — days without a row count as absent until backfilled.
      *
      * @return array{
      *     percentage: float,
@@ -164,13 +155,15 @@ class AttendanceService
     {
         $month = Carbon::createFromFormat('Y-m', $yearMonth)->startOfMonth();
         $monthEnd = $month->copy()->endOfMonth()->startOfDay();
-        $today = now()->startOfDay();
-        $end = $monthEnd->greaterThan($today) ? $today->copy() : $monthEnd->copy();
-        $monthToDate = $end->lt($monthEnd);
 
         return $this->withMonthSummaryMeta(
-            $this->summaryForStudentInRange($student, $month, $end),
-            monthToDate: $monthToDate,
+            $this->summaryForStudentInRange(
+                $student,
+                $month,
+                $monthEnd,
+                applyJoinDate: false,
+            ),
+            monthToDate: false,
         );
     }
 
@@ -210,9 +203,7 @@ class AttendanceService
         $range = $from->format('d M').' – '.$to->format('d M Y');
 
         $summary['scope'] = $monthToDate ? 'month_to_date' : 'calendar_month';
-        $summary['period_label'] = $monthToDate
-            ? 'so far '.$range
-            : $range;
+        $summary['period_label'] = $range;
 
         return $summary;
     }
@@ -230,7 +221,12 @@ class AttendanceService
      *     to: string,
      * }|null
      */
-    public function summaryForStudentInRange(Student $student, Carbon $rangeStart, Carbon $rangeEnd): ?array
+    public function summaryForStudentInRange(
+        Student $student,
+        Carbon $rangeStart,
+        Carbon $rangeEnd,
+        bool $applyJoinDate = true,
+    ): ?array
     {
         $student->loadMissing('activeBatchStudent');
 
@@ -248,16 +244,18 @@ class AttendanceService
             return null;
         }
 
-        $joined = $batchStudent->assigned_at
-            ? Carbon::parse($batchStudent->assigned_at)->startOfDay()
-            : $from;
+        if ($applyJoinDate) {
+            $joined = $batchStudent->assigned_at
+                ? Carbon::parse($batchStudent->assigned_at)->startOfDay()
+                : $from;
 
-        if ($joined->greaterThan($from)) {
-            $from = $joined;
-        }
+            if ($joined->greaterThan($from)) {
+                $from = $joined;
+            }
 
-        if ($from->greaterThan($to)) {
-            return null;
+            if ($from->greaterThan($to)) {
+                return null;
+            }
         }
 
         $workingDates = $this->workingDatesBetween($from, $to);
