@@ -28,6 +28,11 @@
                             {{ $attendanceSummary['credited_days'] }}/{{ $attendanceSummary['expected_days'] }} working days
                             <span class="text-gray-400">({{ $attendanceSummary['period_label'] }})</span>
                         </p>
+                        @if (($attendanceSummary['scope'] ?? '') === 'month_to_date')
+                            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                Current month counts only through today — days still ahead are not marked absent yet.
+                            </p>
+                        @endif
                         <p class="mt-0.5 text-xs text-gray-500">
                             Present {{ $attendanceSummary['present_days'] }}
                             · Leave {{ $attendanceSummary['leave_days'] }}
@@ -59,7 +64,7 @@
         <div class="rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-600 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10">
             <p class="font-semibold text-gray-950 dark:text-white">How to read this</p>
             <ul class="mt-2 list-inside list-disc space-y-1">
-                <li><strong>%</strong> — Selected month: Present(+Leave) ÷ all working days in that month (Sundays excluded). Missing days count as absent until marked / backfilled.</li>
+                <li><strong>%</strong> — Present(+Leave) ÷ working days (Sundays excluded). Current month = 1st through today only; past months = full month. Missing days in that window count as absent.</li>
                 <li><strong>Visits</strong> — Each IN→OUT pair with source under the punch (machine or manually marked)</li>
                 <li>Use month filter + Print/PDF for parent or file copies. Full class reports: Reports menu.</li>
             </ul>

@@ -28,7 +28,7 @@ class AttendanceMonthSummaryTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_current_month_summary_uses_full_calendar_month(): void
+    public function test_current_month_summary_counts_only_through_today(): void
     {
         $this->travelTo('2026-09-09 12:00:00');
 
@@ -48,13 +48,14 @@ class AttendanceMonthSummaryTest extends TestCase
         $summary = app(AttendanceService::class)->summaryForStudentInMonth($student->fresh(), '2026-09');
 
         $this->assertNotNull($summary);
-        $this->assertSame('calendar_month', $summary['scope']);
-        // Sep 2026 = 30 days, 4 Sundays → 26 working days (join date ignored)
-        $this->assertSame(26, $summary['expected_days']);
+        $this->assertSame('month_to_date', $summary['scope']);
+        // 1–9 Sep excluding Sunday 6 Sep = 8 working days (join date does not shrink the month window)
+        $this->assertSame(8, $summary['expected_days']);
         $this->assertSame(1, $summary['present_days']);
-        $this->assertSame(3.8, $summary['percentage']);
-        $this->assertSame('01 Sep – 30 Sep 2026', $summary['period_label']);
-        $this->assertStringNotContainsString('so far', $summary['period_label']);
+        $this->assertSame(12.5, $summary['percentage']);
+        $this->assertStringStartsWith('so far ', $summary['period_label']);
+        $this->assertStringContainsString('01 Sep', $summary['period_label']);
+        $this->assertStringContainsString('09 Sep 2026', $summary['period_label']);
     }
 
     public function test_past_month_summary_uses_full_calendar_month(): void
@@ -82,6 +83,7 @@ class AttendanceMonthSummaryTest extends TestCase
         $this->assertSame(26, $summary['expected_days']);
         $this->assertSame(1, $summary['present_days']);
         $this->assertSame('01 Aug – 31 Aug 2026', $summary['period_label']);
+        $this->assertStringNotContainsString('so far', $summary['period_label']);
     }
 
     /**

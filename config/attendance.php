@@ -27,8 +27,8 @@ return [
 
     /*
     | Student attendance % on profile / counters / marksheets.
-    | Selected / current calendar month = 1st → last day (full month).
-    | Sundays excluded by default (India coaching). Days with no row count as absent until backfilled.
+    | Current month = 1st → today (future days not counted as absent).
+    | Past months = full calendar month. Sundays excluded by default (India coaching).
     | Custom date-range reports may still respect batch join date via summaryForStudentInRange().
     */
     'percentage' => [

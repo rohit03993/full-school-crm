@@ -113,7 +113,7 @@ class AttendanceService
     }
 
     /**
-     * Current calendar month attendance (full month — same rules as the month picker).
+     * Current calendar month attendance through today (same smart rules as the month picker).
      *
      * @return array{
      *     percentage: float,
@@ -135,8 +135,10 @@ class AttendanceService
 
     /**
      * Attendance summary for a calendar month (Y-m).
-     * Always uses the full month (1st → last day), Sundays excluded.
-     * Does not cut off at today or batch join / install date — days without a row count as absent until backfilled.
+     * Smart rules:
+     * - Current month → 1st through today only (future days are not absent yet)
+     * - Past months → full calendar month
+     * Sundays excluded. Month window starts on the 1st (join date does not shrink it).
      *
      * @return array{
      *     percentage: float,
@@ -155,15 +157,18 @@ class AttendanceService
     {
         $month = Carbon::createFromFormat('Y-m', $yearMonth)->startOfMonth();
         $monthEnd = $month->copy()->endOfMonth()->startOfDay();
+        $today = now()->startOfDay();
+        $end = $monthEnd->greaterThan($today) ? $today->copy() : $monthEnd->copy();
+        $monthToDate = $end->lt($monthEnd);
 
         return $this->withMonthSummaryMeta(
             $this->summaryForStudentInRange(
                 $student,
                 $month,
-                $monthEnd,
+                $end,
                 applyJoinDate: false,
             ),
-            monthToDate: false,
+            monthToDate: $monthToDate,
         );
     }
 
@@ -203,7 +208,9 @@ class AttendanceService
         $range = $from->format('d M').' – '.$to->format('d M Y');
 
         $summary['scope'] = $monthToDate ? 'month_to_date' : 'calendar_month';
-        $summary['period_label'] = $range;
+        $summary['period_label'] = $monthToDate
+            ? 'so far '.$range
+            : $range;
 
         return $summary;
     }

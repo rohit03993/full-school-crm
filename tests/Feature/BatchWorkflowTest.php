@@ -61,7 +61,7 @@ class BatchWorkflowTest extends TestCase
         $this->assertSame(2, BatchStudent::query()->where('student_id', $student->id)->count());
     }
 
-    public function test_attendance_percentage_uses_full_month_working_days(): void
+    public function test_attendance_percentage_uses_month_to_date_working_days(): void
     {
         $this->travelTo('2026-06-02 12:00:00');
 
@@ -97,12 +97,12 @@ class BatchWorkflowTest extends TestCase
 
         $summary = app(AttendanceService::class)->monthToDateSummaryForStudent($student->fresh());
 
-        // Full Jun 2026 = 26 working days (Sundays excluded); 1 present → 3.8%
-        $this->assertSame(3.8, $summary['percentage']);
+        // 1 Jun–2 Jun = 2 working days; 1 present → 50%
+        $this->assertSame(50.0, $summary['percentage']);
         $this->assertSame(1, $summary['present_days']);
-        $this->assertSame(26, $summary['expected_days']);
-        $this->assertSame('calendar_month', $summary['scope']);
-        $this->assertSame('01 Jun – 30 Jun 2026', $summary['period_label']);
+        $this->assertSame(2, $summary['expected_days']);
+        $this->assertSame('month_to_date', $summary['scope']);
+        $this->assertStringStartsWith('so far ', $summary['period_label']);
     }
 
     public function test_manual_batch_attendance_rejects_backdated_dates(): void
