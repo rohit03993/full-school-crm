@@ -123,6 +123,7 @@ class AttendanceService
      *     expected_days: int,
      *     absent_days: int,
      *     period_label: string,
+     *     scope: 'month_to_date'|'calendar_month',
      *     from: string,
      *     to: string,
      * }|null
@@ -131,15 +132,20 @@ class AttendanceService
     {
         $today = now()->startOfDay();
 
-        return $this->summaryForStudentInRange(
-            $student,
-            $today->copy()->startOfMonth(),
-            $today,
+        return $this->withMonthSummaryMeta(
+            $this->summaryForStudentInRange(
+                $student,
+                $today->copy()->startOfMonth(),
+                $today,
+            ),
+            monthToDate: true,
         );
     }
 
     /**
-     * Attendance summary for a calendar month (Y-m). Caps at today for the current month.
+     * Attendance summary for a calendar month (Y-m).
+     * Past months: full month. Current month: through today only (month-to-date).
+     * Always respects batch join date. Does not invent future absences.
      *
      * @return array{
      *     percentage: float,
@@ -149,6 +155,7 @@ class AttendanceService
      *     expected_days: int,
      *     absent_days: int,
      *     period_label: string,
+     *     scope: 'month_to_date'|'calendar_month',
      *     from: string,
      *     to: string,
      * }|null
@@ -156,14 +163,58 @@ class AttendanceService
     public function summaryForStudentInMonth(Student $student, string $yearMonth): ?array
     {
         $month = Carbon::createFromFormat('Y-m', $yearMonth)->startOfMonth();
-        $end = $month->copy()->endOfMonth()->startOfDay();
+        $monthEnd = $month->copy()->endOfMonth()->startOfDay();
         $today = now()->startOfDay();
+        $end = $monthEnd->greaterThan($today) ? $today->copy() : $monthEnd->copy();
+        $monthToDate = $end->lt($monthEnd);
 
-        if ($end->greaterThan($today)) {
-            $end = $today;
+        return $this->withMonthSummaryMeta(
+            $this->summaryForStudentInRange($student, $month, $end),
+            monthToDate: $monthToDate,
+        );
+    }
+
+    /**
+     * @param  array{
+     *     percentage: float,
+     *     present_days: int,
+     *     leave_days: int,
+     *     credited_days: int,
+     *     expected_days: int,
+     *     absent_days: int,
+     *     period_label: string,
+     *     from: string,
+     *     to: string,
+     * }|null  $summary
+     * @return array{
+     *     percentage: float,
+     *     present_days: int,
+     *     leave_days: int,
+     *     credited_days: int,
+     *     expected_days: int,
+     *     absent_days: int,
+     *     period_label: string,
+     *     scope: 'month_to_date'|'calendar_month',
+     *     from: string,
+     *     to: string,
+     * }|null
+     */
+    protected function withMonthSummaryMeta(?array $summary, bool $monthToDate): ?array
+    {
+        if ($summary === null) {
+            return null;
         }
 
-        return $this->summaryForStudentInRange($student, $month, $end);
+        $from = Carbon::parse($summary['from'])->startOfDay();
+        $to = Carbon::parse($summary['to'])->startOfDay();
+        $range = $from->format('d M').' – '.$to->format('d M Y');
+
+        $summary['scope'] = $monthToDate ? 'month_to_date' : 'calendar_month';
+        $summary['period_label'] = $monthToDate
+            ? 'so far '.$range
+            : $range;
+
+        return $summary;
     }
 
     /**

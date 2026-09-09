@@ -101,6 +101,8 @@ class BatchWorkflowTest extends TestCase
         $this->assertSame(50.0, $summary['percentage']);
         $this->assertSame(1, $summary['present_days']);
         $this->assertSame(2, $summary['expected_days']);
+        $this->assertSame('month_to_date', $summary['scope']);
+        $this->assertStringStartsWith('so far ', $summary['period_label']);
     }
 
     public function test_manual_batch_attendance_rejects_backdated_dates(): void

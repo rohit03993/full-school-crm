@@ -27,8 +27,8 @@ return [
 
     /*
     | Student attendance % on profile / counters / marksheets.
-    | month_to_date = Present(+Leave) ÷ working days from 1st of month → today
-    | (or from batch join date if later). Sundays excluded by default (India coaching).
+    | Past months = full calendar month. Current month = month-to-date through today.
+    | Window also starts at batch join date if later. Sundays excluded by default (India coaching).
     */
     'percentage' => [
         'period' => env('ATTENDANCE_PERCENTAGE_PERIOD', 'month_to_date'),

@@ -10,7 +10,11 @@
             <div>
                 <h2 class="font-display text-lg font-bold text-navy-900">Attendance</h2>
                 <p class="mt-0.5 text-sm text-navy-500">
-                    {{ $summary['period_label'] ?? 'This month' }} · {{ $student->name }}
+                    {{ $summary['period_label'] ?? 'This month' }}
+                    @if (($summary['scope'] ?? '') === 'month_to_date')
+                        <span class="text-navy-400">(through today)</span>
+                    @endif
+                    · {{ $student->name }}
                 </p>
             </div>
             <form method="GET" action="{{ route('portal.dashboard') }}" class="flex items-center gap-2">

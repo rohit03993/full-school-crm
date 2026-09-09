@@ -28,6 +28,11 @@
                             {{ $attendanceSummary['credited_days'] }}/{{ $attendanceSummary['expected_days'] }} working days
                             <span class="text-gray-400">({{ $attendanceSummary['period_label'] }})</span>
                         </p>
+                        @if (($attendanceSummary['scope'] ?? '') === 'month_to_date')
+                            <p class="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                                Current month is counted through today only (and from batch join date). Days still ahead in this month are not included yet.
+                            </p>
+                        @endif
                         <p class="mt-0.5 text-xs text-gray-500">
                             Present {{ $attendanceSummary['present_days'] }}
                             · Leave {{ $attendanceSummary['leave_days'] }}
@@ -59,7 +64,7 @@
         <div class="rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-600 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10">
             <p class="font-semibold text-gray-950 dark:text-white">How to read this</p>
             <ul class="mt-2 list-inside list-disc space-y-1">
-                <li><strong>%</strong> — Selected month: Present(+Leave) ÷ working days (Sundays excluded)</li>
+                <li><strong>%</strong> — Present(+Leave) ÷ working days (Sundays excluded). Past months = full month; current month = through today only, from batch join date.</li>
                 <li><strong>Visits</strong> — Each IN→OUT pair with source under the punch (machine or manually marked)</li>
                 <li>Use month filter + Print/PDF for parent or file copies. Full class reports: Reports menu.</li>
             </ul>

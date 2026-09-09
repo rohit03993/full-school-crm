@@ -180,7 +180,7 @@ class StudentProfilePage extends Page
 
     public ?float $attendancePercentage = null;
 
-    /** @var array{percentage: float, present_days: int, leave_days: int, credited_days: int, expected_days: int, absent_days?: int, period_label: string, from?: string, to?: string}|null */
+    /** @var array{percentage: float, present_days: int, leave_days: int, credited_days: int, expected_days: int, absent_days?: int, period_label: string, scope?: string, from?: string, to?: string}|null */
     public ?array $attendanceSummary = null;
 
     public string $attendanceMonth = '';
