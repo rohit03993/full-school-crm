@@ -286,6 +286,15 @@ class StudentWhatsAppThreadService
         }
 
         if ($preview !== '' && ! $this->isTemplateSlug($preview, $templateName)) {
+            if (! str_contains($preview, '{{')) {
+                return $preview;
+            }
+
+            $rebuilt = $this->rebuildOutboundPreview($row);
+            if ($rebuilt !== null && $rebuilt !== '') {
+                return $rebuilt;
+            }
+
             return $preview;
         }
 
@@ -293,11 +302,60 @@ class StudentWhatsAppThreadService
             $metaTemplate = $this->metaTemplate($templateName, (string) ($row->language ?? ''));
 
             if ($metaTemplate && filled($metaTemplate->body)) {
+                $rebuilt = $this->rebuildOutboundPreview($row);
+                if ($rebuilt !== null && $rebuilt !== '') {
+                    return $rebuilt;
+                }
+
                 return (string) $metaTemplate->body;
             }
         }
 
         return $preview !== '' ? $preview : 'Message';
+    }
+
+    protected function rebuildOutboundPreview(MetaWhatsAppMessage $row): ?string
+    {
+        $recipientId = $row->whatsapp_campaign_recipient_id;
+
+        if (! filled($recipientId)) {
+            return null;
+        }
+
+        $recipient = WhatsAppCampaignRecipient::query()->find($recipientId);
+
+        if (! $recipient) {
+            return null;
+        }
+
+        $messageSent = trim((string) ($recipient->message_sent ?? ''));
+        if ($messageSent !== '' && ! str_contains($messageSent, '{{')) {
+            return $messageSent;
+        }
+
+        $params = is_array($recipient->template_params) ? array_values($recipient->template_params) : [];
+        if ($params === []) {
+            return null;
+        }
+
+        $templateName = (string) ($row->template_name ?? '');
+        if ($templateName === '') {
+            return null;
+        }
+
+        $metaTemplate = $this->metaTemplate($templateName, (string) ($row->language ?? ''));
+        if (! $metaTemplate || blank($metaTemplate->body)) {
+            return null;
+        }
+
+        $bodyVariables = data_get($metaTemplate->provider_meta, 'body_variables', []);
+        $bodyVariables = is_array($bodyVariables) ? array_values($bodyVariables) : [];
+
+        return $this->paramResolver->buildPreview(
+            (string) $metaTemplate->body,
+            $params,
+            $bodyVariables,
+        );
     }
 
     protected function mediaIdFromRowPayload(MetaWhatsAppMessage $row): ?string

@@ -152,9 +152,19 @@ class MetaWhatsAppConversationService
         $caption = Schema::hasColumn('meta_whatsapp_messages', 'caption')
             ? (string) ($message->caption ?? '')
             : '';
+        $rawPreview = (string) ($message->body_preview ?? '');
+        if (str_contains($rawPreview, '{{') && filled($message->whatsapp_campaign_recipient_id)) {
+            $messageSent = WhatsAppCampaignRecipient::query()
+                ->whereKey($message->whatsapp_campaign_recipient_id)
+                ->value('message_sent');
+            if (is_string($messageSent) && $messageSent !== '' && ! str_contains($messageSent, '{{')) {
+                $rawPreview = $messageSent;
+            }
+        }
+
         $preview = MetaWhatsAppInboundMessageParser::previewLabel(
             $messageType,
-            (string) ($message->body_preview ?? ''),
+            $rawPreview,
             $caption,
         );
 

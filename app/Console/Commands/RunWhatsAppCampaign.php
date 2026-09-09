@@ -178,6 +178,13 @@ class RunWhatsAppCampaign extends Command
                         $recipient->wamid = (string) $result['message_id'];
                         $recipient->meta_whatsapp_message_id = $metaMessage->id;
                         $recipient->estimated_cost_inr = $metaMessage->estimated_cost_inr;
+
+                        // Keep inbox preview in sync with the filled campaign text.
+                        if (filled($recipient->message_sent) && ! str_contains((string) $recipient->message_sent, '{{')) {
+                            $metaMessage->forceFill([
+                                'body_preview' => mb_substr((string) $recipient->message_sent, 0, 500),
+                            ])->save();
+                        }
                     }
                 }
 

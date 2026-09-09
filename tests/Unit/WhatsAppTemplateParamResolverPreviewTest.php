@@ -44,6 +44,21 @@ class WhatsAppTemplateParamResolverPreviewTest extends TestCase
         $this->assertSame('Ward Aarav / 2017', $preview);
     }
 
+    public function test_it_fills_named_placeholders_even_when_body_variables_are_positional(): void
+    {
+        $preview = app(WhatsAppTemplateParamResolver::class)->buildPreview(
+            'Dear Parent, {{student_name}} roll {{roll_number}} at {{check_out_time}} on {{date}}.',
+            ['PRANAV', '99', '14:18', '2026-09-09'],
+            ['1', '2', '3', '4'], // stale Meta meta — must not block body fill
+        );
+
+        $this->assertSame(
+            'Dear Parent, PRANAV roll 99 at 14:18 on 2026-09-09.',
+            $preview,
+        );
+        $this->assertStringNotContainsString('{{', $preview);
+    }
+
     public function test_it_escapes_dollar_signs_in_replacement_values(): void
     {
         $preview = app(WhatsAppTemplateParamResolver::class)->buildPreview(

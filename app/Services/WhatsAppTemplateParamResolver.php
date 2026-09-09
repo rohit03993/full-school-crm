@@ -218,8 +218,11 @@ class WhatsAppTemplateParamResolver
      * placeholders ({{student_name}}) and positional ones ({{1}}). Does not change
      * what Meta sends — preview only.
      *
+     * Placeholder names are taken from the body text in order (not from possibly
+     * stale provider_meta.body_variables), so OUT templates with named bodies still fill.
+     *
      * @param  list<string>|array<int, string>  $templateParams
-     * @param  list<string>|null  $bodyVariableNames  Optional order from provider_meta.body_variables
+     * @param  list<string>|null  $bodyVariableNames  Unused for replacement; kept for call-site compatibility
      */
     public function buildPreview(?string $body, array $templateParams, ?array $bodyVariableNames = null): ?string
     {
@@ -229,48 +232,20 @@ class WhatsAppTemplateParamResolver
 
         $message = (string) $body;
         $params = array_values($templateParams);
-        $names = $this->previewPlaceholderNames($bodyVariableNames, $message, count($params));
 
-        foreach ($params as $index => $value) {
-            $text = (string) $value;
-            $positional = (string) ($index + 1);
-            $name = $names[$index] ?? $positional;
+        if (preg_match_all('/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/', $message, $matches) === 0) {
+            return $message;
+        }
 
-            if ($name !== '' && $name !== $positional) {
-                $message = $this->replacePreviewPlaceholder($message, $name, $text);
+        foreach (array_values($matches[1]) as $index => $token) {
+            if (! array_key_exists($index, $params)) {
+                break;
             }
 
-            $message = $this->replacePreviewPlaceholder($message, $positional, $text);
+            $message = $this->replacePreviewPlaceholder($message, (string) $token, (string) $params[$index]);
         }
 
         return $message;
-    }
-
-    /**
-     * @param  list<string>|null  $provided
-     * @return list<string>
-     */
-    protected function previewPlaceholderNames(?array $provided, string $body, int $paramCount): array
-    {
-        if (is_array($provided) && $provided !== []) {
-            return array_values(array_map(
-                static fn (mixed $name): string => trim((string) $name),
-                $provided,
-            ));
-        }
-
-        if (preg_match_all('/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/', $body, $matches) > 0) {
-            return array_values($matches[1]);
-        }
-
-        if ($paramCount < 1) {
-            return [];
-        }
-
-        return array_map(
-            static fn (int $i): string => (string) ($i + 1),
-            range(0, $paramCount - 1),
-        );
     }
 
     protected function replacePreviewPlaceholder(string $message, string $placeholder, string $value): string
