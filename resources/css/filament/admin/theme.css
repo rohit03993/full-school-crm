@@ -159,9 +159,11 @@
 
     /* Select panels are absolutely positioned inside this card, and the hero and
        widgets below are positioned too — without a stacking context of its own
-       the toolbar's open dropdown gets painted over by them. */
+       the toolbar's open dropdown gets painted over by them.
+       Keep below Filament's mobile sidebar/overlay (z-30) so the open menu is not
+       covered by this filter card; on lg the sidebar is z-20 so z-30 is fine. */
     .crm-dash-filters {
-        @apply relative z-30;
+        @apply relative z-20 lg:z-30;
     }
 
     .crm-dash-filters .fi-section,
