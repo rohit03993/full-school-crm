@@ -70,7 +70,7 @@ class StudentWhatsAppTemplateComposer
             'param_count' => $paramCount,
             'fields' => $fields,
             'defaults' => $defaults,
-            'preview_body' => $this->resolver->buildPreview($body, $defaultValues),
+            'preview_body' => $this->resolver->buildPreview($body, $defaultValues, $bodyVariables),
             'template_body' => $body,
             'template_name' => $template->name,
         ];
@@ -88,6 +88,8 @@ class StudentWhatsAppTemplateComposer
             ->first();
 
         $body = $metaTemplate?->body ?? $template->body;
+        $bodyVariables = data_get($metaTemplate?->provider_meta ?? $template->provider_meta, 'body_variables', []);
+        $bodyVariables = is_array($bodyVariables) ? array_values($bodyVariables) : [];
         $count = max(
             $metaTemplate ? (int) $metaTemplate->param_count : 0,
             (int) $template->param_count,
@@ -99,7 +101,7 @@ class StudentWhatsAppTemplateComposer
             $values[] = (string) ($params[$i] ?? '');
         }
 
-        return $this->resolver->buildPreview($body, $values);
+        return $this->resolver->buildPreview($body, $values, $bodyVariables);
     }
 
     protected function fieldLabel(?string $bodyVariable, int $index): string

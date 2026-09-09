@@ -235,7 +235,14 @@ class MetaWhatsAppMessageLogger
             ->first();
 
         if ($metaTemplate && filled($metaTemplate->body)) {
-            $preview = $this->paramResolver->buildPreview((string) $metaTemplate->body, $bodyParams);
+            $bodyVariables = data_get($metaTemplate->provider_meta, 'body_variables', []);
+            $bodyVariables = is_array($bodyVariables) ? array_values($bodyVariables) : [];
+
+            $preview = $this->paramResolver->buildPreview(
+                (string) $metaTemplate->body,
+                $bodyParams,
+                $bodyVariables,
+            );
 
             if (filled($preview)) {
                 return $preview;

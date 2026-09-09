@@ -250,7 +250,9 @@ class StudentWhatsAppThreadService
 
         if ($templateBody !== '') {
             $params = is_array($row->template_params) ? array_values($row->template_params) : [];
-            $preview = $this->paramResolver->buildPreview($templateBody, $params);
+            $bodyVariables = data_get($row->campaign?->template?->provider_meta, 'body_variables', []);
+            $bodyVariables = is_array($bodyVariables) ? array_values($bodyVariables) : [];
+            $preview = $this->paramResolver->buildPreview($templateBody, $params, $bodyVariables);
 
             if (filled($preview)) {
                 return $preview;

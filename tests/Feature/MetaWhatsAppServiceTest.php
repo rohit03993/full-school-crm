@@ -95,6 +95,12 @@ class MetaWhatsAppServiceTest extends TestCase
                 && ($params[2]['parameter_name'] ?? null) === 'check_in_time'
                 && ($params[3]['text'] ?? null) === '2026-07-15';
         });
+
+        $this->assertDatabaseHas('meta_whatsapp_messages', [
+            'wamid' => 'wamid.NAMED123',
+            'template_name' => 'parent_attendance_manual_in',
+            'body_preview' => 'Dear Parent, Aarav 20171000001 18:49:42 2026-07-15',
+        ]);
     }
 
     public function test_send_posts_meta_template_payload(): void

@@ -154,7 +154,12 @@ class RunWhatsAppCampaign extends Command
             );
 
             $recipient->template_params = $templateParams;
-            $recipient->message_sent = $paramResolver->buildPreview($template->body, $templateParams);
+            $bodyVariables = data_get($template->provider_meta, 'body_variables');
+            $recipient->message_sent = $paramResolver->buildPreview(
+                $template->body,
+                $templateParams,
+                is_array($bodyVariables) ? array_values($bodyVariables) : null,
+            );
             $recipient->provider_response = [
                 'provider' => $result['provider'] ?? 'meta',
                 'response' => $result['response'] ?? null,

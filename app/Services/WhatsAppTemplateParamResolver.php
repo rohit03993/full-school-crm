@@ -213,19 +213,75 @@ class WhatsAppTemplateParamResolver
         return collect($params)->contains(fn (string $value): bool => trim($value) !== '' && $value !== '—');
     }
 
-    public function buildPreview(?string $body, array $templateParams): ?string
+    /**
+     * Fill template body for CRM display (inbox / history). Supports Meta named
+     * placeholders ({{student_name}}) and positional ones ({{1}}). Does not change
+     * what Meta sends — preview only.
+     *
+     * @param  list<string>|array<int, string>  $templateParams
+     * @param  list<string>|null  $bodyVariableNames  Optional order from provider_meta.body_variables
+     */
+    public function buildPreview(?string $body, array $templateParams, ?array $bodyVariableNames = null): ?string
     {
         if (blank($body)) {
             return null;
         }
 
-        $message = $body;
+        $message = (string) $body;
+        $params = array_values($templateParams);
+        $names = $this->previewPlaceholderNames($bodyVariableNames, $message, count($params));
 
-        foreach ($templateParams as $index => $value) {
-            $message = str_replace('{{'.($index + 1).'}}', (string) $value, $message);
+        foreach ($params as $index => $value) {
+            $text = (string) $value;
+            $positional = (string) ($index + 1);
+            $name = $names[$index] ?? $positional;
+
+            if ($name !== '' && $name !== $positional) {
+                $message = $this->replacePreviewPlaceholder($message, $name, $text);
+            }
+
+            $message = $this->replacePreviewPlaceholder($message, $positional, $text);
         }
 
         return $message;
+    }
+
+    /**
+     * @param  list<string>|null  $provided
+     * @return list<string>
+     */
+    protected function previewPlaceholderNames(?array $provided, string $body, int $paramCount): array
+    {
+        if (is_array($provided) && $provided !== []) {
+            return array_values(array_map(
+                static fn (mixed $name): string => trim((string) $name),
+                $provided,
+            ));
+        }
+
+        if (preg_match_all('/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/', $body, $matches) > 0) {
+            return array_values($matches[1]);
+        }
+
+        if ($paramCount < 1) {
+            return [];
+        }
+
+        return array_map(
+            static fn (int $i): string => (string) ($i + 1),
+            range(0, $paramCount - 1),
+        );
+    }
+
+    protected function replacePreviewPlaceholder(string $message, string $placeholder, string $value): string
+    {
+        $replacement = str_replace(['\\', '$'], ['\\\\', '\\$'], $value);
+
+        return preg_replace(
+            '/\{\{\s*'.preg_quote($placeholder, '/').'\s*\}\}/',
+            $replacement,
+            $message,
+        ) ?? $message;
     }
 
     protected function resolveCampaignDate(?WhatsAppCampaign $campaign): string
