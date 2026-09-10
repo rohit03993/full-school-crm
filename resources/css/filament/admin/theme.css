@@ -846,7 +846,7 @@
         @apply text-[11px] text-gray-400 dark:text-gray-500 sm:hidden;
     }
 
-    /* Student profile & custom partials */
+    /* Student profile & custom partials — mobile polish (8px gutter, denser cards) */
     @media (max-width: 639px) {
         .fi-student-profile-actions {
             @apply flex w-full flex-col gap-2;
@@ -856,19 +856,55 @@
             @apply w-full justify-center;
         }
 
+        /* Shared page gutter — profile only */
+        .fi-page:has(.fi-student-profile-shell) .fi-page-header,
+        .fi-page:has(.fi-student-profile-shell) .fi-page-header-main-ctn,
+        .fi-page:has(.fi-student-profile-shell) .fi-page-main,
+        .fi-page:has(.fi-student-profile-shell) .fi-page-content {
+            padding-inline: 0.5rem !important;
+        }
+
+        .fi-page:has(.fi-student-profile-shell) .fi-header {
+            @apply gap-2;
+        }
+
+        .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
+            @apply gap-1.5 rounded-xl p-1.5;
+        }
+
+        .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn {
+            @apply min-h-10 rounded-lg px-1.5 text-[10px] leading-tight;
+        }
+
         .fi-student-profile-shell {
-            @apply mx-0;
+            @apply mx-0 mb-2.5 w-full max-w-full;
         }
 
         .fi-student-profile-tabs {
-            @apply max-w-full overflow-hidden;
+            @apply mt-0.5 max-w-full overflow-hidden;
+        }
+
+        .fi-student-profile-tabs > .fi-tabs {
+            @apply gap-1 rounded-xl p-1;
+        }
+
+        .fi-student-profile-tabs .fi-tabs-item {
+            @apply rounded-lg px-1.5 py-1.5 text-[9px];
         }
 
         .fi-student-profile-tabs .fi-sc-tabs-tab.fi-active {
-            @apply overflow-x-hidden;
+            @apply mt-3 overflow-x-hidden rounded-xl p-2.5;
         }
 
         .fi-student-profile-dossier {
+            @apply rounded-xl shadow-sm;
+        }
+
+        .fi-student-profile-shell .space-y-5 {
+            row-gap: 0.75rem;
+        }
+
+        .fi-student-profile-shell .rounded-2xl {
             @apply rounded-xl;
         }
     }
@@ -1159,7 +1195,7 @@
     }
 
     .fi-student-profile-shell {
-        @apply mb-3;
+        @apply mb-3 w-full;
     }
 
     .fi-student-profile-dossier {

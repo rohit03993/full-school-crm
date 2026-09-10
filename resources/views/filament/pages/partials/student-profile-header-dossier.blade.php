@@ -22,12 +22,12 @@
     ];
 @endphp
 
-<div class="fi-student-profile-dossier overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+<div class="fi-student-profile-dossier overflow-hidden rounded-xl bg-white shadow-md ring-1 ring-gray-950/5 sm:rounded-2xl dark:bg-gray-900 dark:ring-white/10">
     {{-- Identity row — compact side-by-side on mobile --}}
     <div class="relative overflow-hidden border-b border-gray-100 dark:border-white/10">
         <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary-500/[0.07] via-transparent to-emerald-500/[0.05] dark:from-primary-500/10 dark:to-emerald-500/5"></div>
 
-        <div class="relative flex flex-row items-start gap-3 p-3 sm:gap-4 sm:p-5 lg:gap-5">
+        <div class="relative flex flex-row items-start gap-2.5 p-2.5 sm:gap-4 sm:p-5 lg:gap-5">
             {{-- Photo --}}
             <div class="shrink-0">
                 @if ($photo && $photo->isImage() && $photo->fileExistsOnDisk())

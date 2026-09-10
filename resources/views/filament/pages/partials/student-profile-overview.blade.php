@@ -6,23 +6,23 @@
     $grouped = $timeline->groupBy('occurred_date');
 @endphp
 
-<div class="space-y-5">
-    <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-        <div class="border-b border-gray-100 px-4 py-3.5 sm:px-6 dark:border-white/10">
+<div class="space-y-3 sm:space-y-5">
+    <div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 sm:rounded-2xl dark:bg-gray-900 dark:ring-white/10">
+        <div class="border-b border-gray-100 px-3 py-3 sm:px-6 sm:py-3.5 dark:border-white/10">
             <h3 class="text-sm font-bold text-gray-950 dark:text-white">Activity timeline</h3>
             <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                Student journey route — newest stop first. Click a stop to open the detail tab.
+                Student journey — newest first. Tap a stop to open that tab.
             </p>
         </div>
 
         @if (! ($activityTimelineLoaded ?? false))
-            <p class="px-4 py-8 text-center text-sm text-gray-500 sm:px-6 dark:text-gray-400">Loading activity…</p>
+            <p class="px-3 py-8 text-center text-sm text-gray-500 sm:px-6 dark:text-gray-400">Loading activity…</p>
         @elseif ($timeline->isEmpty())
-            <p class="px-4 py-8 text-center text-sm text-gray-500 sm:px-6 dark:text-gray-400">
+            <p class="px-3 py-8 text-center text-sm text-gray-500 sm:px-6 dark:text-gray-400">
                 No activity recorded yet for this student.
             </p>
         @else
-            <div class="px-3 py-4 sm:px-6 sm:py-5">
+            <div class="px-2.5 py-3 sm:px-6 sm:py-5">
                 @foreach ($grouped as $date => $items)
                     <div class="mb-2 mt-4 first:mt-0">
                         <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -31,8 +31,8 @@
                     </div>
 
                     <div class="relative">
-                        {{-- Route spine --}}
-                        <div class="pointer-events-none absolute bottom-2 top-2 left-[4.75rem] w-0.5 bg-gray-200 sm:left-[5.25rem] dark:bg-white/15" aria-hidden="true"></div>
+                        {{-- Route spine — narrower time column on phones so notes get width --}}
+                        <div class="pointer-events-none absolute bottom-2 top-2 left-[3.85rem] w-0.5 bg-gray-200 sm:left-[5.25rem] dark:bg-white/15" aria-hidden="true"></div>
 
                         <ul class="space-y-0">
                             @foreach ($items as $itemIndex => $item)
@@ -58,17 +58,17 @@
                                         wire:click="openActivityTimelineTab(@js($item['tab']))"
                                         role="button"
                                         tabindex="0"
-                                        class="group relative grid cursor-pointer grid-cols-[4.25rem_1.5rem_minmax(0,1fr)] gap-x-2 py-3 sm:grid-cols-[4.75rem_1.5rem_minmax(0,1fr)] sm:gap-x-3"
+                                        class="group relative grid cursor-pointer grid-cols-[3.5rem_1.25rem_minmax(0,1fr)] gap-x-1.5 py-2.5 sm:grid-cols-[4.75rem_1.5rem_minmax(0,1fr)] sm:gap-x-3 sm:py-3"
                                     @else
-                                        class="relative grid grid-cols-[4.25rem_1.5rem_minmax(0,1fr)] gap-x-2 py-3 sm:grid-cols-[4.75rem_1.5rem_minmax(0,1fr)] sm:gap-x-3"
+                                        class="relative grid grid-cols-[3.5rem_1.25rem_minmax(0,1fr)] gap-x-1.5 py-2.5 sm:grid-cols-[4.75rem_1.5rem_minmax(0,1fr)] sm:gap-x-3 sm:py-3"
                                     @endif
                                 >
                                     {{-- Left: time (like scheduled arrival) --}}
                                     <div class="pt-0.5 text-right">
-                                        <p class="text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                                        <p class="text-xs font-semibold tabular-nums text-gray-900 sm:text-sm dark:text-gray-100">
                                             {{ $item['occurred_at_label'] }}
                                         </p>
-                                        <p class="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                                        <p class="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-gray-400 sm:text-[10px] dark:text-gray-500">
                                             {{ $item['category'] ?? 'EVENT' }}
                                         </p>
                                     </div>
@@ -114,7 +114,7 @@
             </div>
 
             @if ($activityTimelineHasMore ?? false)
-                <div class="border-t border-gray-100 px-4 py-3 dark:border-white/10 sm:px-6">
+                <div class="border-t border-gray-100 px-3 py-3 dark:border-white/10 sm:px-6">
                     <button
                         type="button"
                         wire:click="loadMoreActivityTimeline"
