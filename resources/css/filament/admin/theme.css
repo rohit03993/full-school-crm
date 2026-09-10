@@ -1185,21 +1185,7 @@
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
-        @apply grid w-full grid-cols-2 gap-1.5 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end;
-    }
-
-    @media (max-width: 639px) {
-        .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.375rem;
-        }
-
-        .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn {
-            min-height: 2.25rem;
-            font-size: 0.6875rem;
-            padding-inline: 0.375rem;
-            line-height: 1.15;
-        }
+        @apply grid w-full grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end lg:gap-1.5;
     }
 
     @media (min-width: 1024px) {
@@ -1209,7 +1195,7 @@
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn {
-        @apply min-h-10 w-full flex-none rounded-xl px-2 text-[11px] font-semibold shadow-none sm:min-h-9 sm:w-auto sm:shrink-0 sm:px-3 sm:text-sm;
+        @apply min-h-10 w-full flex-none justify-center rounded-xl px-2 text-[11px] font-semibold shadow-none sm:min-h-9 sm:w-auto sm:shrink-0 sm:px-3 sm:text-sm;
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-gray.fi-btn-outlined {
@@ -2531,16 +2517,121 @@
     body.fi-body:has(.fi-student-profile-page) .fi-header-actions {
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.5rem !important;
     }
 
+    /* Strict equal 2-col toolbar — beats Filament flex-wrap uneven rows */
     body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-ac,
     body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-ac {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 0.5rem !important;
+        width: 100% !important;
         border-width: 0 !important;
         background-color: transparent !important;
         box-shadow: none !important;
         padding: 0 !important;
-        border-radius: 0.5rem !important;
-        gap: 0.25rem !important;
+        border-radius: 0 !important;
+        align-items: stretch !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-ac > *,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-ac > * {
+        min-width: 0 !important;
+        display: flex !important;
+        width: 100% !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-ac > * > .fi-btn,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-ac > * > .fi-btn {
+        flex: 1 1 auto !important;
+    }
+
+    /* Page already has Back — hide duplicate search link on phones */
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-student-profile-action-back,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-student-profile-action-back {
+        display: none !important;
+    }
+
+    /* If class is on the button, hide its grid cell via :has */
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-ac > *:has(.fi-student-profile-action-back),
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-ac > *:has(.fi-student-profile-action-back) {
+        display: none !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        min-height: 2.75rem !important;
+        height: auto !important;
+        justify-content: center !important;
+        align-items: center !important;
+        gap: 0.35rem !important;
+        margin: 0 !important;
+        border-radius: 0.75rem !important;
+        padding: 0.55rem 0.65rem !important;
+        font-size: 0.75rem !important;
+        line-height: 1.15 !important;
+        font-weight: 600 !important;
+        box-shadow: none !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn .fi-icon,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn .fi-icon {
+        width: 1rem !important;
+        height: 1rem !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Quiet solid fills — less rainbow noise, still colour-coded */
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-primary:not(.fi-btn-outlined),
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-color-primary:not(.fi-btn-outlined) {
+        background-color: rgb(255 251 235) !important;
+        border: 1px solid rgb(253 230 138) !important;
+        color: rgb(146 64 14) !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-success:not(.fi-btn-outlined),
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-color-success:not(.fi-btn-outlined) {
+        background-color: rgb(236 253 245) !important;
+        border: 1px solid rgb(167 243 208) !important;
+        color: rgb(6 95 70) !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-warning:not(.fi-btn-outlined),
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-color-warning:not(.fi-btn-outlined) {
+        background-color: rgb(255 247 237) !important;
+        border: 1px solid rgb(254 215 170) !important;
+        color: rgb(154 52 18) !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-danger:not(.fi-btn-outlined),
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-color-danger:not(.fi-btn-outlined) {
+        background-color: rgb(254 242 242) !important;
+        border: 1px solid rgb(254 202 202) !important;
+        color: rgb(153 27 27) !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-btn-outlined,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-btn-outlined {
+        background-color: rgb(255 255 255) !important;
+        border: 1px solid rgb(229 231 235) !important;
+        color: rgb(55 65 81) !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-primary.fi-btn-outlined,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-color-primary.fi-btn-outlined,
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-gray.fi-btn-outlined,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-color-gray.fi-btn-outlined {
+        background-color: rgb(255 255 255) !important;
+        border: 1px solid rgb(229 231 235) !important;
+        color: rgb(55 65 81) !important;
     }
 
     body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-shell,

@@ -2538,7 +2538,8 @@ class StudentProfilePage extends Page
                 ->url(StudentSearchPage::getUrl())
                 ->color('gray')
                 ->button()
-                ->outlined(),
+                ->outlined()
+                ->extraAttributes(['class' => 'fi-student-profile-action-back']),
             Action::make('sendFeeReminder')
                 ->label('Send fee reminder')
                 ->icon('heroicon-o-chat-bubble-left-ellipsis')
@@ -3192,7 +3193,7 @@ class StudentProfilePage extends Page
                 })
                 ->visible(fn (): bool => $this->userCan(CrmPermission::StudentsEdit)),
             Action::make('pullFacePhoto')
-                ->label('Pull Face Photo')
+                ->label('Face Photo')
                 ->icon('heroicon-o-camera')
                 ->button()
                 ->color('gray')
