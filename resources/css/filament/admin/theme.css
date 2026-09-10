@@ -846,7 +846,7 @@
         @apply text-[11px] text-gray-400 dark:text-gray-500 sm:hidden;
     }
 
-    /* Student profile & custom partials — near full-bleed on phones/tablets */
+    /* Student profile denser chrome on phones — width/padding overrides are UNLAYERED at file end */
     @media (max-width: 1023px) {
         .fi-student-profile-actions {
             @apply flex w-full flex-col gap-2;
@@ -854,36 +854,6 @@
 
         .fi-student-profile-actions .fi-btn {
             @apply w-full justify-center;
-        }
-
-        /*
-         * Kill stacked gutters: Filament main-ctn + page-content both pad.
-         * Scope via body:has so we can zero the ancestor main-ctn too.
-         */
-        .fi-body:has(.fi-student-profile-shell) .fi-main-ctn {
-            padding-inline: 0 !important;
-        }
-
-        .fi-body:has(.fi-student-profile-shell) .fi-page-header,
-        .fi-body:has(.fi-student-profile-shell) .fi-page-header-main-ctn,
-        .fi-body:has(.fi-student-profile-shell) .fi-page-main,
-        .fi-body:has(.fi-student-profile-shell) .fi-page-content,
-        .fi-body:has(.fi-student-profile-shell) .fi-page {
-            padding-inline: 0.25rem !important;
-            max-width: 100% !important;
-            margin-inline: 0 !important;
-        }
-
-        .fi-body:has(.fi-student-profile-shell) .fi-header {
-            @apply gap-2;
-        }
-
-        .fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
-            @apply gap-1 rounded-lg border-0 bg-transparent p-0 shadow-none ring-0;
-        }
-
-        .fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn {
-            @apply min-h-10 rounded-lg px-1.5 text-[10px] leading-tight shadow-sm ring-1 ring-gray-200/80;
         }
 
         .fi-student-profile-shell {
@@ -916,10 +886,6 @@
 
         .fi-student-profile-shell .rounded-2xl {
             @apply rounded-xl;
-        }
-
-        .fi-student-profile-mobile-call__bar {
-            padding-inline: 0.25rem !important;
         }
     }
 
@@ -1185,7 +1151,13 @@
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
-        @apply grid w-full grid-cols-2 gap-1.5 rounded-2xl border border-gray-200/80 bg-white p-2 shadow-sm dark:border-white/10 dark:bg-gray-900 lg:flex lg:flex-wrap lg:justify-end;
+        @apply grid w-full grid-cols-2 gap-1.5 lg:flex lg:flex-wrap lg:justify-end;
+    }
+
+    @media (min-width: 1024px) {
+        .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
+            @apply rounded-2xl border border-gray-200/80 bg-white p-2 shadow-sm dark:border-white/10 dark:bg-gray-900;
+        }
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn {
@@ -2459,5 +2431,51 @@
 
     .crm-responsive-table td[class~='md:hidden'] {
         display: none !important;
+    }
+}
+
+/*
+ * Student profile mobile FULL-BLEED — unlayered so it beats Filament @layer utilities
+ * (px-4 / px-6 on page chrome). Previous attempts inside @layer components never won.
+ */
+@media (max-width: 1023px) {
+    body.fi-body:has(.fi-student-profile-shell) .fi-main-ctn,
+    body.fi-body:has(.fi-student-profile-shell) .fi-main,
+    body.fi-body:has(.fi-student-profile-shell) .fi-page,
+    body.fi-body:has(.fi-student-profile-shell) .fi-page-header,
+    body.fi-body:has(.fi-student-profile-shell) .fi-page-header-main-ctn,
+    body.fi-body:has(.fi-student-profile-shell) .fi-page-main,
+    body.fi-body:has(.fi-student-profile-shell) .fi-page-content,
+    body.fi-body:has(.fi-student-profile-shell) .fi-section,
+    body.fi-body:has(.fi-student-profile-shell) .fi-section-content-ctn {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
+        border-width: 0 !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        border-radius: 0.5rem !important;
+        gap: 0.25rem !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-shell,
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-dossier,
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-mobile-call__bar {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
     }
 }
