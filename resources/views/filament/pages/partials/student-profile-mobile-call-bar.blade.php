@@ -7,7 +7,7 @@
     {{-- Fixed above the bottom nav. Bottom clearance comes from theme.css
          (.fi-body:has(.fi-student-profile-mobile-call)) so list content is not covered. --}}
     <div class="fi-student-profile-mobile-call lg:hidden" aria-hidden="false">
-        <div class="fi-student-profile-mobile-call__bar fixed inset-x-0 z-40 border-t border-emerald-500/20 bg-white/95 px-2 py-2.5 shadow-[0_-6px_24px_rgba(5,150,105,0.18)] backdrop-blur-md dark:border-emerald-500/25 dark:bg-gray-900/95">
+        <div class="fi-student-profile-mobile-call__bar fixed inset-x-0 z-40 border-t border-emerald-500/20 bg-white/95 px-1 py-2.5 shadow-[0_-6px_24px_rgba(5,150,105,0.18)] backdrop-blur-md dark:border-emerald-500/25 dark:bg-gray-900/95">
             <div class="mx-auto flex w-full items-stretch">
                 <button
                     type="button"
