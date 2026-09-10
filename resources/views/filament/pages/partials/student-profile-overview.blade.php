@@ -7,7 +7,7 @@
 @endphp
 
 <div class="space-y-3 sm:space-y-5">
-    <div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 sm:rounded-2xl dark:bg-gray-900 dark:ring-white/10">
+    <div class="fi-student-profile-card overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 sm:rounded-2xl dark:bg-gray-900 dark:ring-white/10">
         <div class="border-b border-gray-100 px-3 py-3 sm:px-6 sm:py-3.5 dark:border-white/10">
             <h3 class="text-sm font-bold text-gray-950 dark:text-white">Activity timeline</h3>
             <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">

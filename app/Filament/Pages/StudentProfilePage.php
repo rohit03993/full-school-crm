@@ -3374,7 +3374,9 @@ class StudentProfilePage extends Page
 
     public function content(Schema $schema): Schema
     {
-        return $schema->components([
+        return $schema
+            ->extraAttributes(['class' => 'fi-student-profile-page'])
+            ->components([
             View::make('filament.pages.partials.close-meeting-modal')
                 ->viewData(fn (): array => [
                     'showCloseMeetingModal' => $this->showCloseMeetingModal,

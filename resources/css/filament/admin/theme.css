@@ -2436,7 +2436,7 @@
 
 /*
  * Student profile mobile FULL-BLEED — unlayered so it beats Filament @layer utilities
- * (px-4 / px-6 on page chrome). Previous attempts inside @layer components never won.
+ * (px-4 / px-6 on page chrome). Desktop (lg / 1024px+) is untouched.
  */
 @media (max-width: 1023px) {
     body.fi-body:has(.fi-student-profile-shell) .fi-main-ctn,
@@ -2447,16 +2447,38 @@
     body.fi-body:has(.fi-student-profile-shell) .fi-page-main,
     body.fi-body:has(.fi-student-profile-shell) .fi-page-content,
     body.fi-body:has(.fi-student-profile-shell) .fi-section,
-    body.fi-body:has(.fi-student-profile-shell) .fi-section-content-ctn {
-        padding-left: 0.25rem !important;
-        padding-right: 0.25rem !important;
+    body.fi-body:has(.fi-student-profile-shell) .fi-section-content-ctn,
+    body.fi-body:has(.fi-student-profile-page) .fi-main-ctn,
+    body.fi-body:has(.fi-student-profile-page) .fi-main,
+    body.fi-body:has(.fi-student-profile-page) .fi-page,
+    body.fi-body:has(.fi-student-profile-page) .fi-page-header,
+    body.fi-body:has(.fi-student-profile-page) .fi-page-header-main-ctn,
+    body.fi-body:has(.fi-student-profile-page) .fi-page-main,
+    body.fi-body:has(.fi-student-profile-page) .fi-page-content,
+    body.fi-body:has(.fi-student-profile-page) .fi-section,
+    body.fi-body:has(.fi-student-profile-page) .fi-section-content-ctn {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
         margin-left: 0 !important;
         margin-right: 0 !important;
         max-width: 100% !important;
         width: 100% !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
+    body.fi-body:has(.fi-student-profile-shell) .fi-topbar,
+    body.fi-body:has(.fi-student-profile-page) .fi-topbar {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-ac,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-ac {
         border-width: 0 !important;
         background-color: transparent !important;
         box-shadow: none !important;
@@ -2467,15 +2489,51 @@
 
     body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-shell,
     body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-dossier,
-    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs {
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-shell,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-dossier,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs {
         width: 100% !important;
         max-width: 100% !important;
         margin-left: 0 !important;
         margin-right: 0 !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-mobile-call__bar {
-        padding-left: 0.25rem !important;
-        padding-right: 0.25rem !important;
+    /* Flush cards — remove floating “boxed” look on phones only */
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-dossier,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-dossier,
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-shell > .rounded-2xl,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-shell > .rounded-2xl,
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-card,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-card,
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs > .fi-tabs,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs > .fi-tabs,
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .overflow-hidden.rounded-xl,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .overflow-hidden.rounded-xl,
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .overflow-hidden.rounded-2xl,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .overflow-hidden.rounded-2xl,
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .fi-section.rounded-xl,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .fi-section.rounded-xl {
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .fi-sc-tabs-tab.fi-active,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .fi-sc-tabs-tab.fi-active {
+        border-radius: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* Keep a hairline gap between stacked flush panels */
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .fi-sc-tabs-tab.fi-active > .space-y-3,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .fi-sc-tabs-tab.fi-active > .space-y-3 {
+        row-gap: 0.5rem;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-mobile-call__bar,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-mobile-call__bar {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
     }
 }

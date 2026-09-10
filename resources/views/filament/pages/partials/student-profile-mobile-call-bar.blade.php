@@ -7,12 +7,12 @@
     {{-- Fixed above the bottom nav. Bottom clearance comes from theme.css
          (.fi-body:has(.fi-student-profile-mobile-call)) so list content is not covered. --}}
     <div class="fi-student-profile-mobile-call lg:hidden" aria-hidden="false">
-        <div class="fi-student-profile-mobile-call__bar fixed inset-x-0 z-40 border-t border-emerald-500/20 bg-white/95 px-1 py-2.5 shadow-[0_-6px_24px_rgba(5,150,105,0.18)] backdrop-blur-md dark:border-emerald-500/25 dark:bg-gray-900/95">
-            <div class="mx-auto flex w-full items-stretch">
+        <div class="fi-student-profile-mobile-call__bar fixed inset-x-0 z-40 border-t border-emerald-500/20 bg-white/95 px-0 py-2 shadow-[0_-6px_24px_rgba(5,150,105,0.18)] backdrop-blur-md dark:border-emerald-500/25 dark:bg-gray-900/95">
+            <div class="flex w-full items-stretch px-2">
                 <button
                     type="button"
                     onclick="window.CrmPendingCall.start({{ $record->id }}, @js($record->name), @js($record->mobile), @js($telUrl), {{ $notConnectedAttempts }})"
-                    class="fi-student-call-bar__primary inline-flex min-h-[3rem] w-full touch-manipulation items-center justify-center gap-2.5 rounded-xl bg-emerald-600 px-4 text-base font-bold text-white shadow-md shadow-emerald-600/25 transition active:scale-[0.98] hover:bg-emerald-500"
+                    class="fi-student-call-bar__primary inline-flex min-h-[3rem] w-full touch-manipulation items-center justify-center gap-2.5 rounded-lg bg-emerald-600 px-4 text-base font-bold text-white shadow-md shadow-emerald-600/25 transition active:scale-[0.98] hover:bg-emerald-500"
                 >
                     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">

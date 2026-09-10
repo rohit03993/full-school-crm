@@ -14,7 +14,7 @@
             class="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur-md dark:border-white/10 dark:bg-gray-900/95"
             aria-label="Quick navigation"
         >
-            <div class="mx-auto flex h-[4.25rem] max-w-lg items-stretch justify-around px-0.5 pb-[env(safe-area-inset-bottom)]">
+            <div class="flex h-[4.25rem] w-full items-stretch justify-around px-0.5 pb-[env(safe-area-inset-bottom)]">
                 @foreach ($tabs as $tab)
                     <a
                         href="{{ $tab['url'] }}"
