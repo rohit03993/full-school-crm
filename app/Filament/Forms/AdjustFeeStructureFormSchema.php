@@ -107,14 +107,6 @@ class AdjustFeeStructureFormSchema
                                         .' · Total discount ₹'.$format($newTotalDiscount);
                                 })
                                 ->columnSpanFull(),
-                            Textarea::make('reason')
-                                ->label('Reason for discount')
-                                ->required(fn (Get $get): bool => self::requiresReasonFromGet($feeStructure, self::mountedSliceFromGet($get)))
-                                ->visible(fn (Get $get): bool => self::requiresReasonFromGet($feeStructure, self::mountedSliceFromGet($get)))
-                                ->rows(2)
-                                ->maxLength(1000)
-                                ->placeholder('e.g. Sibling discount, staff concession')
-                                ->columnSpanFull(),
                             Placeholder::make('installments_tab_hint')
                                 ->label('')
                                 ->content('Balance changed — open the Installments tab to review the pending schedule.')
@@ -324,6 +316,15 @@ class AdjustFeeStructureFormSchema
             Tabs::make('adjustFeeTabs')
                 ->tabs($tabs)
                 ->columnSpanFull(),
+            Textarea::make('reason')
+                ->label('Reason for this change')
+                ->required(fn (Get $get): bool => self::requiresReasonFromGet($feeStructure, self::mountedSliceFromGet($get)))
+                ->visible(fn (Get $get): bool => self::requiresReasonFromGet($feeStructure, self::mountedSliceFromGet($get)))
+                ->rows(2)
+                ->maxLength(1000)
+                ->placeholder('e.g. Sibling discount, parent promised payment on 15 Sep')
+                ->helperText('Required when discount or installment dates/amounts change.')
+                ->columnSpanFull(),
         ];
     }
 
@@ -444,7 +445,110 @@ class AdjustFeeStructureFormSchema
     {
         $newDiscount = self::resolveDiscountAmount($feeStructure, $data);
 
-        return abs($newDiscount - (float) $feeStructure->discount_amount) > 0.01;
+        if (abs($newDiscount - (float) $feeStructure->discount_amount) > 0.01) {
+            return true;
+        }
+
+        return self::scheduleChangesFromMounted($feeStructure, $data) !== [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<array{label: string, old_due_date: ?string, new_due_date: ?string, old_amount: ?float, new_amount: ?float}>
+     */
+    public static function scheduleChangesFromMounted(FeeStructure $feeStructure, array $data): array
+    {
+        if (! (bool) ($data['reschedule_installments'] ?? false)) {
+            return [];
+        }
+
+        $plan = $data['installment_plan'] ?? [];
+        if (! is_array($plan)) {
+            return [];
+        }
+
+        $lightweight = [];
+
+        foreach (array_values($plan) as $index => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $label = trim((string) ($row['label'] ?? ''));
+            $amount = round((float) ($row['amount'] ?? 0), 2);
+
+            if ($label === '' && $amount <= 0) {
+                continue;
+            }
+
+            $lightweight[] = [
+                'label' => $label !== '' ? $label : ('Installment '.($index + 1)),
+                'amount' => $amount,
+                'due_date' => filled($row['due_date'] ?? null) ? (string) $row['due_date'] : null,
+                'sort_order' => $index + 1,
+            ];
+        }
+
+        return self::buildScheduleChanges($feeStructure, $lightweight);
+    }
+
+    /**
+     * Diff pending installments against a proposed plan (by position).
+     *
+     * @param  list<array{label?: string, amount?: float|int|string, due_date?: ?string, sort_order?: int}>  $newPlan
+     * @return list<array{label: string, old_due_date: ?string, new_due_date: ?string, old_amount: ?float, new_amount: ?float}>
+     */
+    public static function buildScheduleChanges(FeeStructure $feeStructure, array $newPlan): array
+    {
+        $feeStructure->loadMissing('installments');
+
+        $oldRows = $feeStructure->installments
+            ->filter(fn ($row): bool => (float) $row->pending_amount > 0.01)
+            ->sortBy(fn ($row): array => [
+                $row->due_date?->toDateString() ?? '9999-12-31',
+                $row->sort_order,
+                $row->id,
+            ])
+            ->values();
+
+        $newRows = collect($newPlan)
+            ->sortBy(fn (array $row): int => (int) ($row['sort_order'] ?? 0))
+            ->values();
+
+        $max = max($oldRows->count(), $newRows->count());
+        $changes = [];
+
+        for ($i = 0; $i < $max; $i++) {
+            $old = $oldRows->get($i);
+            $new = $newRows->get($i);
+
+            $oldDate = $old?->due_date?->toDateString();
+            $newDate = $new !== null && filled($new['due_date'] ?? null)
+                ? (string) $new['due_date']
+                : null;
+            $oldAmount = $old !== null ? round((float) $old->pending_amount, 2) : null;
+            $newAmount = $new !== null ? round((float) ($new['amount'] ?? 0), 2) : null;
+
+            $dateChanged = $oldDate !== $newDate;
+            $amountChanged = $old === null || $new === null
+                || abs(($oldAmount ?? 0) - ($newAmount ?? 0)) > 0.01;
+
+            if (! $dateChanged && ! $amountChanged) {
+                continue;
+            }
+
+            $label = (string) ($new['label'] ?? $old?->label ?? ('Installment '.($i + 1)));
+
+            $changes[] = [
+                'label' => $label,
+                'old_due_date' => $oldDate,
+                'new_due_date' => $newDate,
+                'old_amount' => $oldAmount,
+                'new_amount' => $newAmount,
+            ];
+        }
+
+        return $changes;
     }
 
     /**
@@ -457,6 +561,8 @@ class AdjustFeeStructureFormSchema
             'discount_mode' => $get('discount_mode'),
             'discount_adjustment' => $get('discount_adjustment'),
             'additional_discount' => $get('additional_discount'),
+            'reschedule_installments' => $get('reschedule_installments'),
+            'installment_plan' => $get('installment_plan'),
         ];
     }
 

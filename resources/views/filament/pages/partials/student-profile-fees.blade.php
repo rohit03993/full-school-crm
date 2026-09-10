@@ -753,9 +753,39 @@
                             <p class="font-semibold text-gray-900 dark:text-white">
                                 Net ₹{{ number_format((float) $entry->old_net_fee, 0) }} → ₹{{ number_format((float) $entry->new_net_fee, 0) }}
                                 <span class="font-normal text-gray-500">· {{ $entry->changed_at?->format('d M Y') }}</span>
+                                @if ($entry->changedBy)
+                                    <span class="font-normal text-gray-500">· {{ $entry->changedBy->name }}</span>
+                                @endif
                             </p>
                             @if ($entry->reason)
                                 <p class="mt-0.5 text-gray-500">{{ $entry->reason }}</p>
+                            @endif
+                            @if (! empty($entry->schedule_changes) && is_array($entry->schedule_changes))
+                                <ul class="mt-1.5 space-y-0.5 text-gray-600 dark:text-gray-300">
+                                    @foreach ($entry->schedule_changes as $change)
+                                        @php
+                                            $label = (string) ($change['label'] ?? 'Installment');
+                                            $parts = [];
+                                            $oldDue = $change['old_due_date'] ?? null;
+                                            $newDue = $change['new_due_date'] ?? null;
+                                            if ($oldDue !== $newDue) {
+                                                $oldDueLabel = $oldDue ? \Illuminate\Support\Carbon::parse($oldDue)->format('d M Y') : '—';
+                                                $newDueLabel = $newDue ? \Illuminate\Support\Carbon::parse($newDue)->format('d M Y') : '—';
+                                                $parts[] = 'due '.$oldDueLabel.' → '.$newDueLabel;
+                                            }
+                                            $oldAmt = $change['old_amount'] ?? null;
+                                            $newAmt = $change['new_amount'] ?? null;
+                                            if ($oldAmt === null || $newAmt === null || abs((float) $oldAmt - (float) $newAmt) > 0.01) {
+                                                $oldAmtLabel = $oldAmt !== null ? '₹'.number_format((float) $oldAmt, 0) : '—';
+                                                $newAmtLabel = $newAmt !== null ? '₹'.number_format((float) $newAmt, 0) : '—';
+                                                $parts[] = 'amount '.$oldAmtLabel.' → '.$newAmtLabel;
+                                            }
+                                        @endphp
+                                        @if ($parts !== [])
+                                            <li>{{ $label }}: {{ implode(' · ', $parts) }}</li>
+                                        @endif
+                                    @endforeach
+                                </ul>
                             @endif
                         </div>
                     @endforeach

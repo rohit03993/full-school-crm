@@ -231,6 +231,80 @@
     <div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
         <div class="flex flex-col gap-2 border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
+                <h2 class="text-base font-semibold text-gray-950 dark:text-white">Due today</h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                    Unpaid installments due today — call list for collection
+                    @if (($dueTodayTotal ?? 0) > 0)
+                        · {{ (int) $dueTodayTotal }} installment(s)
+                    @endif
+                </p>
+            </div>
+        </div>
+
+        @if (($dueToday ?? collect())->isEmpty())
+            <p class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400 sm:px-6">No installments due today.</p>
+        @else
+            <x-crm.responsive-table>
+                <table class="w-full min-w-[640px] text-left text-sm">
+                    <thead class="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500 dark:border-white/10 dark:text-gray-400">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold sm:px-6">Student</th>
+                            <th class="px-4 py-3 font-semibold">Course</th>
+                            <th class="px-4 py-3 font-semibold">Installment</th>
+                            <th class="px-4 py-3 font-semibold text-right">Amount due</th>
+                            <th class="crm-responsive-table__actions px-4 py-3 font-semibold text-right">Collect</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-white/10">
+                        @foreach ($dueToday as $row)
+                            <tr class="hover:bg-gray-50/80 dark:hover:bg-white/5">
+                                <td class="crm-responsive-table__title px-4 py-3 sm:px-6" data-label="">
+                                    <a href="{{ $row['profile_url'] }}" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">
+                                        {{ $row['student_name'] }}
+                                    </a>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ $row['enrollment_number'] ?? '—' }}
+                                        @if ($row['mobile'])
+                                            · {{ $row['mobile'] }}
+                                        @endif
+                                    </p>
+                                </td>
+                                <td class="px-4 py-3 text-gray-700 dark:text-gray-300" data-label="Course">{{ $row['course_name'] ?? '—' }}</td>
+                                <td class="px-4 py-3 text-gray-700 dark:text-gray-300" data-label="Installment">{{ $row['installment_label'] ?? '—' }}</td>
+                                <td class="px-4 py-3 text-right font-semibold text-amber-800 dark:text-amber-300" data-label="Amount due">
+                                    ₹{{ number_format((float) $row['pending_amount'], 2) }}
+                                </td>
+                                <td class="crm-responsive-table__actions px-4 py-3 text-right" data-label="">
+                                    <a
+                                        href="{{ $row['profile_url'] }}"
+                                        class="inline-flex rounded-lg bg-primary-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-primary-500"
+                                    >
+                                        Collect
+                                    </a>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </x-crm.responsive-table>
+            @if (($dueTodayLastPage ?? 1) > 1)
+                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-4 py-3 text-xs text-gray-500 dark:border-white/10 sm:px-6">
+                    <p>
+                        Page {{ $dueTodayPage ?? 1 }} / {{ $dueTodayLastPage }}
+                        · {{ (int) ($dueTodayTotal ?? 0) }} total
+                    </p>
+                    <div class="flex gap-2">
+                        <button type="button" wire:click="previousDueTodayPage" @disabled(($dueTodayPage ?? 1) <= 1) class="rounded-lg px-3 py-1.5 font-semibold ring-1 ring-gray-200 disabled:opacity-40 dark:ring-white/10">Prev</button>
+                        <button type="button" wire:click="nextDueTodayPage" @disabled(($dueTodayPage ?? 1) >= ($dueTodayLastPage ?? 1)) class="rounded-lg px-3 py-1.5 font-semibold ring-1 ring-gray-200 disabled:opacity-40 dark:ring-white/10">Next</button>
+                    </div>
+                </div>
+            @endif
+        @endif
+    </div>
+
+    <div class="fi-section rounded-xl shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10">
+        <div class="flex flex-col gap-2 border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div>
                 <h2 class="text-base font-semibold text-gray-950 dark:text-white">Defaulters</h2>
                 <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
                     Students with overdue installment balances (as of now)

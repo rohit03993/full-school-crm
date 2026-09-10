@@ -19,6 +19,7 @@ class FeeStructureHistory extends Model
         'new_net_fee',
         'changed_by_user_id',
         'reason',
+        'schedule_changes',
         'changed_at',
     ];
 
@@ -31,6 +32,7 @@ class FeeStructureHistory extends Model
             'new_discount' => 'decimal:2',
             'old_net_fee' => 'decimal:2',
             'new_net_fee' => 'decimal:2',
+            'schedule_changes' => 'array',
             'changed_at' => 'datetime',
         ];
     }

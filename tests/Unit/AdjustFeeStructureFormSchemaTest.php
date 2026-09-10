@@ -127,6 +127,17 @@ class AdjustFeeStructureFormSchemaTest extends TestCase
             'pending_amount' => 115000,
         ]);
 
+        $feeStructure->setRelation('installments', new Collection([
+            new FeeInstallment([
+                'label' => 'Term 1',
+                'amount' => 115000,
+                'paid_amount' => 0,
+                'pending_amount' => 115000,
+                'due_date' => null,
+                'sort_order' => 1,
+            ]),
+        ]));
+
         $resolved = AdjustFeeStructureFormSchema::resolveForSave($feeStructure, [
             'course_fee' => 120000,
             'additional_discount' => 0,
@@ -139,6 +150,44 @@ class AdjustFeeStructureFormSchemaTest extends TestCase
 
         $this->assertSame(5000.0, $resolved['discount_amount']);
         $this->assertSame(AdjustFeeStructureFormSchema::INSTALLMENT_ONLY_REASON, $resolved['reason']);
+    }
+
+    public function test_requires_reason_when_installment_due_date_changes(): void
+    {
+        $feeStructure = new FeeStructure([
+            'course_fee' => 100000,
+            'discount_amount' => 0,
+            'net_fee' => 100000,
+            'paid_amount' => 0,
+            'pending_amount' => 100000,
+        ]);
+
+        $feeStructure->setRelation('installments', new Collection([
+            new FeeInstallment([
+                'label' => 'Term 1',
+                'amount' => 100000,
+                'paid_amount' => 0,
+                'pending_amount' => 100000,
+                'due_date' => '2026-09-10',
+                'sort_order' => 1,
+            ]),
+        ]));
+
+        $this->assertTrue(AdjustFeeStructureFormSchema::requiresReasonFromMounted($feeStructure, [
+            'additional_discount' => 0,
+            'reschedule_installments' => true,
+            'installment_plan' => [
+                ['label' => 'Term 1', 'amount' => 100000, 'due_date' => '2026-09-15'],
+            ],
+        ]));
+
+        $this->assertFalse(AdjustFeeStructureFormSchema::requiresReasonFromMounted($feeStructure, [
+            'additional_discount' => 0,
+            'reschedule_installments' => true,
+            'installment_plan' => [
+                ['label' => 'Term 1', 'amount' => 100000, 'due_date' => '2026-09-10'],
+            ],
+        ]));
     }
 
     public function test_discount_adjustment_updates_preview_net(): void

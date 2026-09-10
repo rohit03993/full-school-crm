@@ -121,6 +121,25 @@ class FeesDashboardServiceTest extends TestCase
         $this->assertTrue($page['rows']->contains(fn (array $row): bool => $row['student_id'] === $student->id));
     }
 
+    public function test_due_today_lists_only_todays_pending_installments(): void
+    {
+        $staff = $this->createSuperAdmin();
+        $dueTodayStudent = $this->enrollStudentWithInstallments($staff, now()->toDateString(), '9876543281');
+        $overdueStudent = $this->enrollStudentWithInstallments($staff, now()->subDays(3)->toDateString(), '9876543282');
+        $futureStudent = $this->enrollStudentWithInstallments($staff, now()->addDays(5)->toDateString(), '9876543283');
+
+        $page = app(FeesDashboardService::class)->paginateDueToday(now(), 1, 15);
+
+        $this->assertTrue($page['rows']->contains(fn (array $row): bool => $row['student_id'] === $dueTodayStudent->id));
+        $this->assertFalse($page['rows']->contains(fn (array $row): bool => $row['student_id'] === $overdueStudent->id));
+        $this->assertFalse($page['rows']->contains(fn (array $row): bool => $row['student_id'] === $futureStudent->id));
+
+        $dueRow = $page['rows']->first(fn (array $row): bool => $row['student_id'] === $dueTodayStudent->id);
+        $this->assertNotNull($dueRow);
+        $this->assertSame(now()->toDateString(), $dueRow['due_date']);
+        $this->assertGreaterThan(0, $dueRow['pending_amount']);
+    }
+
     protected function createSuperAdmin(): User
     {
         Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);
@@ -131,21 +150,21 @@ class FeesDashboardServiceTest extends TestCase
         return $user;
     }
 
-    protected function enrollStudentWithInstallments(User $staff, string $firstDueDate): Student
+    protected function enrollStudentWithInstallments(User $staff, string $firstDueDate, string $mobile = '9876543288'): Student
     {
         $student = Student::query()->create([
             'name' => 'Fees Dashboard Student',
             'father_name' => 'Parent',
             'date_of_birth' => '2000-05-15',
             'gender' => Gender::Male,
-            'mobile' => '9876543288',
+            'mobile' => $mobile,
             'status' => StudentStatus::Enquiry,
             'portal_password' => app(\App\Services\StudentAuthService::class)->hashPortalPassword('15052000'),
         ]);
 
         $course = Course::query()->create([
             'name' => 'Fees Dashboard Course',
-            'code' => 'FEE-DASH',
+            'code' => 'FEE-DASH-'.substr($mobile, -4),
             'programme_category' => 'coaching',
             'duration' => 12,
             'duration_type' => 'months',

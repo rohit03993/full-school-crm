@@ -79,7 +79,7 @@ class FeeStructureHistoryTest extends TestCase
         $this->assertSame(20000.0, (float) $updated->installments->first()->pending_amount);
     }
 
-    public function test_installment_reschedule_does_not_require_discount_reason(): void
+    public function test_installment_date_change_requires_reason_and_stores_schedule_changes(): void
     {
         Storage::fake('local');
 
@@ -88,24 +88,106 @@ class FeeStructureHistoryTest extends TestCase
         $student = $this->createEnrolledStudent($staff);
         $feeStructure = $student->activeEnrollment->feeStructure;
 
+        $oldDue = now()->addMonth()->toDateString();
+        $newDue = now()->addMonths(2)->toDateString();
+
+        app(FeeStructureService::class)->updateByAdmin($feeStructure, [
+            'course_fee' => 50000,
+            'discount_amount' => 0,
+            'reason' => 'Initial two-part plan',
+            'reschedule_installments' => true,
+            'installment_plan' => [
+                ['label' => 'Term 1', 'amount' => 25000, 'due_date' => $oldDue],
+                ['label' => 'Term 2', 'amount' => 25000, 'due_date' => now()->addMonths(3)->toDateString()],
+            ],
+        ], $admin);
+
+        $feeStructure = $feeStructure->fresh('installments');
+
+        try {
+            app(FeeStructureService::class)->updateByAdmin($feeStructure, [
+                'course_fee' => 50000,
+                'discount_amount' => 0,
+                'reason' => '',
+                'reschedule_installments' => true,
+                'installment_plan' => [
+                    ['label' => 'Term 1', 'amount' => 25000, 'due_date' => $newDue],
+                    ['label' => 'Term 2', 'amount' => 25000, 'due_date' => now()->addMonths(3)->toDateString()],
+                ],
+            ], $admin);
+            $this->fail('Expected ValidationException when schedule changes without reason.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertArrayHasKey('reason', $e->errors());
+        }
+
+        $updated = app(FeeStructureService::class)->updateByAdmin($feeStructure->fresh('installments'), [
+            'course_fee' => 50000,
+            'discount_amount' => 0,
+            'reason' => 'Parent promised payment on '.$newDue,
+            'reschedule_installments' => true,
+            'installment_plan' => [
+                ['label' => 'Term 1', 'amount' => 25000, 'due_date' => $newDue],
+                ['label' => 'Term 2', 'amount' => 25000, 'due_date' => now()->addMonths(3)->toDateString()],
+            ],
+        ], $admin);
+
+        $this->assertSame(50000.0, (float) $updated->net_fee);
+
+        $history = FeeStructureHistory::query()
+            ->where('fee_structure_id', $feeStructure->id)
+            ->where('reason', 'Parent promised payment on '.$newDue)
+            ->first();
+
+        $this->assertNotNull($history);
+        $this->assertIsArray($history->schedule_changes);
+        $this->assertNotEmpty($history->schedule_changes);
+        $this->assertSame($oldDue, $history->schedule_changes[0]['old_due_date']);
+        $this->assertSame($newDue, $history->schedule_changes[0]['new_due_date']);
+    }
+
+    public function test_identical_reschedule_keeps_canned_reason_without_schedule_changes(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->createAdminUser();
+        $staff = $this->createStaffUser();
+        $student = $this->createEnrolledStudent($staff);
+        $feeStructure = $student->activeEnrollment->feeStructure;
+
+        $due1 = now()->addMonth()->toDateString();
+        $due2 = now()->addMonths(2)->toDateString();
+
+        app(FeeStructureService::class)->updateByAdmin($feeStructure, [
+            'course_fee' => 50000,
+            'discount_amount' => 0,
+            'reason' => 'Set schedule',
+            'reschedule_installments' => true,
+            'installment_plan' => [
+                ['label' => 'Term 1', 'amount' => 25000, 'due_date' => $due1],
+                ['label' => 'Term 2', 'amount' => 25000, 'due_date' => $due2],
+            ],
+        ], $admin);
+
+        $feeStructure = $feeStructure->fresh('installments');
+        FeeStructureHistory::query()->delete();
+
         $updated = app(FeeStructureService::class)->updateByAdmin($feeStructure, [
             'course_fee' => 50000,
             'discount_amount' => 0,
             'reason' => '',
             'reschedule_installments' => true,
             'installment_plan' => [
-                ['label' => 'Term 1', 'amount' => 25000, 'due_date' => now()->addMonth()->toDateString()],
-                ['label' => 'Term 2', 'amount' => 25000, 'due_date' => now()->addMonths(2)->toDateString()],
+                ['label' => 'Term 1', 'amount' => 25000, 'due_date' => $due1],
+                ['label' => 'Term 2', 'amount' => 25000, 'due_date' => $due2],
             ],
         ], $admin);
 
-        $this->assertSame(50000.0, (float) $updated->net_fee);
         $this->assertCount(2, $updated->installments);
 
-        $this->assertDatabaseHas('fee_structure_history', [
-            'fee_structure_id' => $feeStructure->id,
-            'reason' => AdjustFeeStructureFormSchema::INSTALLMENT_ONLY_REASON,
-        ]);
+        $history = FeeStructureHistory::query()->where('fee_structure_id', $feeStructure->id)->first();
+        $this->assertNotNull($history);
+        $this->assertSame(AdjustFeeStructureFormSchema::INSTALLMENT_ONLY_REASON, $history->reason);
+        $this->assertNull($history->schedule_changes);
     }
 
     public function test_discount_change_still_requires_reason(): void

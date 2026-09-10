@@ -121,16 +121,6 @@ class FeeStructureService
         $previousDiscount = round((float) $feeStructure->discount_amount, 2);
         $discountChanged = abs($discount - $previousDiscount) > 0.01;
 
-        if ($discountChanged && $reason === '') {
-            throw ValidationException::withMessages([
-                'reason' => 'Please enter why this discount is being given.',
-            ]);
-        }
-
-        if ($reason === '') {
-            $reason = AdjustFeeStructureFormSchema::INSTALLMENT_ONLY_REASON;
-        }
-
         if ($discount > $courseFee) {
             throw ValidationException::withMessages([
                 'discount_amount' => 'Discount cannot exceed course fee.',
@@ -161,6 +151,26 @@ class FeeStructureService
 
         if ($reschedule && $newPending > 0) {
             app(AdmissionFeePlanService::class)->assertInstallmentPlanValid($installmentPlan, $newPending);
+        }
+
+        $scheduleChanges = $reschedule
+            ? AdjustFeeStructureFormSchema::buildScheduleChanges($feeStructure, $installmentPlan)
+            : [];
+
+        if ($discountChanged && $reason === '') {
+            throw ValidationException::withMessages([
+                'reason' => 'Please enter why this discount is being given.',
+            ]);
+        }
+
+        if ($scheduleChanges !== [] && $reason === '') {
+            throw ValidationException::withMessages([
+                'reason' => 'Please enter why the installment schedule is changing.',
+            ]);
+        }
+
+        if ($reason === '') {
+            $reason = AdjustFeeStructureFormSchema::INSTALLMENT_ONLY_REASON;
         }
 
         $plannedCash = $feeStructure->planned_cash_amount;
@@ -194,6 +204,7 @@ class FeeStructureService
             $installmentPlan,
             $plannedCash,
             $plannedOnline,
+            $scheduleChanges,
         ): FeeStructure {
             $oldInstallmentSnapshot = $feeStructure->installments()
                 ->orderBy('sort_order')
@@ -225,6 +236,7 @@ class FeeStructureService
                 'new_net_fee' => $newNet,
                 'changed_by_user_id' => $admin->id,
                 'reason' => $reason,
+                'schedule_changes' => $scheduleChanges !== [] ? $scheduleChanges : null,
                 'changed_at' => now(),
             ]);
 
@@ -279,6 +291,7 @@ class FeeStructureService
                     'pending_amount' => $newPending,
                     'installments' => $newInstallmentSnapshot,
                     'rescheduled_installments' => $reschedule,
+                    'schedule_changes' => $scheduleChanges,
                 ],
                 reason: $reason,
                 user: $admin,

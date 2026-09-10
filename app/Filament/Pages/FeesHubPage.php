@@ -53,7 +53,7 @@ class FeesHubPage extends Page
         if (FeesDashboardPage::canAccess()) {
             $cards[] = [
                 'title' => 'Fees dashboard',
-                'description' => 'Collections overview, defaulters, and the fee ledger.',
+                'description' => 'Collections overview, due today, defaulters, and the fee ledger.',
                 'url' => FeesDashboardPage::getUrl(),
                 'badge' => 'Start here',
                 'tone' => 'primary',

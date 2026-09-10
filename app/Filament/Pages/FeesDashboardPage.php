@@ -64,6 +64,17 @@ class FeesDashboardPage extends Page
 
     public int $defaultersLastPage = 1;
 
+    /**
+     * @var Collection<int, array<string, mixed>>
+     */
+    public Collection $dueToday;
+
+    public int $dueTodayPage = 1;
+
+    public int $dueTodayTotal = 0;
+
+    public int $dueTodayLastPage = 1;
+
     public int $ledgerEntriesPage = 1;
 
     public int $ledgerEntriesTotal = 0;
@@ -85,6 +96,7 @@ class FeesDashboardPage extends Page
     public function boot(): void
     {
         $this->defaulters = collect();
+        $this->dueToday = collect();
     }
 
     public static function canAccess(): bool
@@ -142,6 +154,7 @@ class FeesDashboardPage extends Page
         }
 
         $this->defaultersPage = 1;
+        $this->dueTodayPage = 1;
         $this->ledgerEntriesPage = 1;
         $this->refreshData($fees);
         $this->refreshLedger($ledger);
@@ -152,6 +165,7 @@ class FeesDashboardPage extends Page
         $this->rangePreset = DashboardFilters::RANGE_CUSTOM;
         $this->normalizeDates();
         $this->defaultersPage = 1;
+        $this->dueTodayPage = 1;
         $this->ledgerEntriesPage = 1;
         $this->refreshData($fees);
         $this->refreshLedger($ledger);
@@ -173,6 +187,18 @@ class FeesDashboardPage extends Page
     {
         $this->defaultersPage = min($this->defaultersLastPage, $this->defaultersPage + 1);
         $this->refreshDefaulters($fees);
+    }
+
+    public function previousDueTodayPage(FeesDashboardService $fees): void
+    {
+        $this->dueTodayPage = max(1, $this->dueTodayPage - 1);
+        $this->refreshDueToday($fees);
+    }
+
+    public function nextDueTodayPage(FeesDashboardService $fees): void
+    {
+        $this->dueTodayPage = min($this->dueTodayLastPage, $this->dueTodayPage + 1);
+        $this->refreshDueToday($fees);
     }
 
     public function previousLedgerEntriesPage(): void
@@ -202,7 +228,19 @@ class FeesDashboardPage extends Page
         [$from, $to] = $this->periodBounds();
 
         $this->summary = $fees->overview($from, $to);
+        $this->refreshDueToday($fees);
         $this->refreshDefaulters($fees, $to);
+    }
+
+    protected function refreshDueToday(FeesDashboardService $fees, ?Carbon $asOf = null): void
+    {
+        $asOf ??= now();
+        $page = $fees->paginateDueToday($asOf, $this->dueTodayPage, CrmPagination::PER_PAGE);
+
+        $this->dueToday = $page['rows'];
+        $this->dueTodayTotal = $page['total'];
+        $this->dueTodayPage = $page['page'];
+        $this->dueTodayLastPage = $page['last_page'];
     }
 
     protected function refreshDefaulters(FeesDashboardService $fees, ?Carbon $asOf = null): void

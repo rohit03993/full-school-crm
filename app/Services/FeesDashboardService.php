@@ -192,6 +192,96 @@ class FeesDashboardService
     }
 
     /**
+     * Unpaid installments due on the as-of date (not overdue).
+     *
+     * @return Collection<int, array{
+     *     student_id: int,
+     *     student_name: string,
+     *     enrollment_number: ?string,
+     *     course_name: ?string,
+     *     mobile: ?string,
+     *     installment_label: string,
+     *     due_date: ?string,
+     *     pending_amount: float,
+     *     profile_url: string,
+     * }>
+     */
+    public function dueToday(?Carbon $asOf = null, ?int $limit = null): Collection
+    {
+        $installments = $this->dueTodayInstallmentsQuery($asOf)
+            ->with([
+                'feeStructure.enrollment.student',
+                'feeStructure.enrollment.course',
+            ])
+            ->orderBy('sort_order')
+            ->get();
+
+        $rows = $installments
+            ->map(function (FeeInstallment $row): ?array {
+                $enrollment = $row->feeStructure?->enrollment;
+                $student = $enrollment?->student;
+
+                if (! $student) {
+                    return null;
+                }
+
+                return [
+                    'student_id' => (int) $student->id,
+                    'student_name' => (string) $student->name,
+                    'enrollment_number' => $enrollment?->enrollment_number,
+                    'course_name' => $enrollment?->course?->name,
+                    'mobile' => $student->mobile,
+                    'installment_label' => (string) $row->label,
+                    'due_date' => $row->due_date?->toDateString(),
+                    'pending_amount' => round((float) $row->pending_amount, 2),
+                    'profile_url' => \App\Filament\Pages\StudentProfilePage::getUrl([
+                        'record' => $student->id,
+                        'tab' => 'fees',
+                        'collect' => 1,
+                    ]),
+                ];
+            })
+            ->filter()
+            ->sortBy([
+                ['student_name', 'asc'],
+                ['installment_label', 'asc'],
+            ])
+            ->values();
+
+        if ($limit !== null) {
+            return $rows->take($limit)->values();
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return array{
+     *     rows: Collection<int, array<string, mixed>>,
+     *     total: int,
+     *     page: int,
+     *     last_page: int,
+     *     per_page: int,
+     * }
+     */
+    public function paginateDueToday(?Carbon $asOf = null, int $page = 1, int $perPage = 15): array
+    {
+        $perPage = max(1, $perPage);
+        $all = $this->dueToday($asOf);
+        $total = $all->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = min(max(1, $page), $lastPage);
+
+        return [
+            'rows' => $all->forPage($page, $perPage)->values(),
+            'total' => $total,
+            'page' => $page,
+            'last_page' => $lastPage,
+            'per_page' => $perPage,
+        ];
+    }
+
+    /**
      * @return array{
      *     rows: Collection<int, array<string, mixed>>,
      *     total: int,
@@ -400,6 +490,22 @@ class FeesDashboardService
             'count' => (int) ($row->entry_count ?? 0),
             'total' => round((float) ($row->entry_total ?? 0), 2),
         ];
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<FeeInstallment>
+     */
+    protected function dueTodayInstallmentsQuery(?Carbon $asOf = null): \Illuminate\Database\Eloquent\Builder
+    {
+        $today = ($asOf ?? now())->toDateString();
+
+        return FeeInstallment::query()
+            ->where('pending_amount', '>', 0)
+            ->whereNotNull('due_date')
+            ->whereDate('due_date', '=', $today)
+            ->whereHas('feeStructure.enrollment', fn ($query) => $query
+                ->where('is_active', true)
+                ->where('status', EnrollmentStatus::Enrolled));
     }
 
     /**
