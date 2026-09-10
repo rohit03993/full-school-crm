@@ -701,15 +701,18 @@
             @apply text-xs leading-relaxed;
         }
 
-        .fi-header-actions {
+        .fi-header-actions,
+        .fi-header-actions-ctn {
             @apply w-full;
         }
 
-        .fi-header-actions .fi-ac {
+        .fi-header-actions .fi-ac,
+        .fi-header-actions-ctn > .fi-ac {
             @apply w-full flex-wrap gap-2;
         }
 
-        .fi-header-actions .fi-btn {
+        .fi-header-actions .fi-btn,
+        .fi-header-actions-ctn .fi-btn {
             @apply min-h-11 flex-1 touch-manipulation text-sm;
         }
 
@@ -1180,38 +1183,31 @@
         @apply hidden;
     }
 
-    .fi-page:has(.fi-student-profile-shell) .fi-header-actions {
-        @apply w-full lg:w-auto lg:shrink-0;
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions-ctn,
+    .fi-page:has(.fi-student-profile-page) .fi-header-actions-ctn {
+        @apply w-full shrink-0 lg:w-auto;
     }
 
-    .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions-ctn > .fi-ac,
+    .fi-page:has(.fi-student-profile-page) .fi-header-actions-ctn > .fi-ac {
         @apply grid w-full grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end lg:gap-1.5;
     }
 
     @media (min-width: 1024px) {
-        .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
+        .fi-page:has(.fi-student-profile-shell) .fi-header-actions-ctn > .fi-ac,
+        .fi-page:has(.fi-student-profile-page) .fi-header-actions-ctn > .fi-ac {
             @apply rounded-2xl border border-gray-200/80 bg-white p-2 shadow-sm dark:border-white/10 dark:bg-gray-900;
         }
     }
 
-    .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn {
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn,
+    .fi-page:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn {
         @apply min-h-10 w-full flex-none justify-center rounded-xl px-2 text-[11px] font-semibold shadow-none sm:min-h-9 sm:w-auto sm:shrink-0 sm:px-3 sm:text-sm;
     }
 
-    .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-gray.fi-btn-outlined {
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-color-gray.fi-outlined,
+    .fi-page:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-color-gray.fi-outlined {
         @apply border-gray-200/80 bg-gray-50/80 text-gray-700 hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10;
-    }
-
-    .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-primary:not(.fi-btn-outlined) {
-        @apply shadow-sm shadow-primary-500/20;
-    }
-
-    .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-success {
-        @apply shadow-sm shadow-success-500/25;
-    }
-
-    .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-warning {
-        @apply shadow-sm shadow-warning-500/20;
     }
 
     .fi-student-profile-shell {
@@ -2513,125 +2509,107 @@
         padding-right: 0.5rem !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions,
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-        padding-top: 0.25rem !important;
-        padding-bottom: 0.5rem !important;
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn {
+        display: block !important;
+        width: 100% !important;
+        flex: none !important;
+        padding: 0.35rem 0.5rem 0.65rem !important;
     }
 
-    /* Strict equal 2-col toolbar — beats Filament flex-wrap uneven rows */
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-ac,
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-ac {
+    /*
+     * Equal 2-col action tiles. Filament v5 uses .fi-header-actions-ctn + .fi-outlined
+     * (not .fi-header-actions / .fi-btn-outlined) — that mismatch is why earlier CSS never stuck.
+     */
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn > .fi-ac,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn > .fi-ac {
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 0.5rem !important;
         width: 100% !important;
-        border-width: 0 !important;
-        background-color: transparent !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-        border-radius: 0 !important;
+        flex: none !important;
         align-items: stretch !important;
+        justify-content: stretch !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-ac > *,
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-ac > * {
-        min-width: 0 !important;
-        display: flex !important;
-        width: 100% !important;
-    }
-
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-ac > * > .fi-btn,
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-ac > * > .fi-btn {
-        flex: 1 1 auto !important;
-    }
-
-    /* Page already has Back — hide duplicate search link on phones */
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-student-profile-action-back,
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-student-profile-action-back {
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-student-profile-action-back,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-student-profile-action-back {
         display: none !important;
     }
 
-    /* If class is on the button, hide its grid cell via :has */
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-ac > *:has(.fi-student-profile-action-back),
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-ac > *:has(.fi-student-profile-action-back) {
-        display: none !important;
-    }
-
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn,
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn {
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-ac-btn-action,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-ac-btn-action {
+        display: inline-flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0.3rem !important;
         width: 100% !important;
         min-width: 0 !important;
         max-width: none !important;
-        min-height: 2.75rem !important;
+        flex: none !important;
+        min-height: 3.6rem !important;
         height: auto !important;
-        justify-content: center !important;
-        align-items: center !important;
-        gap: 0.35rem !important;
         margin: 0 !important;
-        border-radius: 0.75rem !important;
-        padding: 0.55rem 0.65rem !important;
-        font-size: 0.75rem !important;
+        border-radius: 0.9rem !important;
+        padding: 0.65rem 0.45rem !important;
+        font-size: 0.6875rem !important;
         line-height: 1.15 !important;
-        font-weight: 600 !important;
-        box-shadow: none !important;
-        white-space: nowrap !important;
+        font-weight: 650 !important;
+        letter-spacing: 0.01em !important;
+        text-align: center !important;
+        white-space: normal !important;
         overflow: hidden !important;
-        text-overflow: ellipsis !important;
+        box-shadow: none !important;
+        background-image: none !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn .fi-icon,
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn .fi-icon {
-        width: 1rem !important;
-        height: 1rem !important;
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-ac-btn-action .fi-icon,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-ac-btn-action .fi-icon {
+        width: 1.2rem !important;
+        height: 1.2rem !important;
+        margin: 0 !important;
         flex-shrink: 0 !important;
     }
 
-    /* Quiet solid fills — less rainbow noise, still colour-coded */
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-primary:not(.fi-btn-outlined),
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-color-primary:not(.fi-btn-outlined) {
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-color-primary:not(.fi-outlined),
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-color-primary:not(.fi-outlined) {
         background-color: rgb(255 251 235) !important;
         border: 1px solid rgb(253 230 138) !important;
         color: rgb(146 64 14) !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-success:not(.fi-btn-outlined),
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-color-success:not(.fi-btn-outlined) {
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-color-success:not(.fi-outlined),
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-color-success:not(.fi-outlined) {
         background-color: rgb(236 253 245) !important;
         border: 1px solid rgb(167 243 208) !important;
         color: rgb(6 95 70) !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-warning:not(.fi-btn-outlined),
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-color-warning:not(.fi-btn-outlined) {
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-color-warning:not(.fi-outlined),
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-color-warning:not(.fi-outlined) {
         background-color: rgb(255 247 237) !important;
         border: 1px solid rgb(254 215 170) !important;
         color: rgb(154 52 18) !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-danger:not(.fi-btn-outlined),
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-color-danger:not(.fi-btn-outlined) {
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-color-danger:not(.fi-outlined),
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-color-danger:not(.fi-outlined) {
         background-color: rgb(254 242 242) !important;
         border: 1px solid rgb(254 202 202) !important;
         color: rgb(153 27 27) !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-btn-outlined,
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-btn-outlined {
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-outlined,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-outlined {
         background-color: rgb(255 255 255) !important;
-        border: 1px solid rgb(229 231 235) !important;
-        color: rgb(55 65 81) !important;
-    }
-
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-primary.fi-btn-outlined,
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-color-primary.fi-btn-outlined,
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions .fi-btn.fi-color-gray.fi-btn-outlined,
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions .fi-btn.fi-color-gray.fi-btn-outlined {
-        background-color: rgb(255 255 255) !important;
-        border: 1px solid rgb(229 231 235) !important;
-        color: rgb(55 65 81) !important;
+        border: 1px solid rgb(226 232 240) !important;
+        color: rgb(51 65 85) !important;
     }
 
     body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-shell,
