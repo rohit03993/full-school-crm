@@ -886,11 +886,12 @@
         }
 
         .fi-student-profile-tabs .fi-tabs-item {
-            @apply flex-row items-center gap-1.5 rounded-full border border-gray-200/80 bg-gray-50 px-3 py-2 text-[11px] font-semibold normal-case tracking-normal text-gray-600 shadow-none dark:border-white/10 dark:bg-white/5 dark:text-gray-300;
+            @apply flex-row items-center gap-1.5 rounded-full border border-gray-200/80 bg-gray-50 px-3.5 py-2.5 text-xs font-semibold normal-case tracking-normal text-gray-700 shadow-none dark:border-white/10 dark:bg-white/5 dark:text-gray-200;
+            min-height: 2.5rem;
         }
 
         .fi-student-profile-tabs .fi-tabs-item .fi-icon {
-            @apply h-4 w-4 opacity-80;
+            @apply h-[1.125rem] w-[1.125rem] opacity-80;
         }
 
         .fi-student-profile-tabs .fi-tabs-item.fi-active {
@@ -1184,7 +1185,21 @@
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
-        @apply grid w-full grid-cols-2 gap-1.5 lg:flex lg:flex-wrap lg:justify-end;
+        @apply grid w-full grid-cols-2 gap-1.5 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end;
+    }
+
+    @media (max-width: 639px) {
+        .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-ac {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.375rem;
+        }
+
+        .fi-page:has(.fi-student-profile-shell) .fi-header-actions .fi-btn {
+            min-height: 2.25rem;
+            font-size: 0.6875rem;
+            padding-inline: 0.375rem;
+            line-height: 1.15;
+        }
     }
 
     @media (min-width: 1024px) {
@@ -2609,29 +2624,47 @@
         display: inline-flex !important;
         flex-direction: row !important;
         align-items: center !important;
-        gap: 0.375rem !important;
+        justify-content: center !important;
+        gap: 0.4rem !important;
         min-width: max-content !important;
         max-width: none !important;
+        min-height: 2.5rem !important;
         white-space: nowrap !important;
         border-radius: 9999px !important;
-        border: 1px solid rgb(229 231 235 / 0.9) !important;
+        border: 1px solid rgb(229 231 235 / 0.95) !important;
         background: rgb(249 250 251) !important;
-        padding: 0.5rem 0.75rem !important;
-        font-size: 0.6875rem !important;
-        line-height: 1.1 !important;
+        padding: 0.55rem 0.9rem !important;
+        font-size: 0.8125rem !important;
+        line-height: 1.15 !important;
         font-weight: 600 !important;
         letter-spacing: 0 !important;
         text-transform: none !important;
-        color: rgb(75 85 99) !important;
+        color: rgb(55 65 81) !important;
         box-shadow: none !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .fi-tabs-item .fi-icon,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .fi-tabs-item .fi-icon {
+        width: 1.125rem !important;
+        height: 1.125rem !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Filament sometimes nests label/icon in a column wrapper — force row */
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .fi-tabs-item > *,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .fi-tabs-item > * {
+        display: inline-flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 0.4rem !important;
     }
 
     body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .fi-tabs-item.fi-active,
     body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .fi-tabs-item.fi-active {
-        border-color: rgb(245 158 11 / 0.35) !important;
+        border-color: rgb(245 158 11 / 0.4) !important;
         background: rgb(245 158 11) !important;
         color: #fff !important;
-        box-shadow: 0 1px 2px rgb(245 158 11 / 0.25) !important;
+        box-shadow: 0 1px 3px rgb(245 158 11 / 0.3) !important;
     }
 
     body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .fi-tabs-item.fi-active::before,
@@ -2644,5 +2677,20 @@
     body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .fi-tabs-item.fi-active .fi-icon {
         color: #fff !important;
         opacity: 1 !important;
+    }
+
+    /* Keep dossier identity readable when flush full-bleed is on */
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-dossier,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-dossier {
+        border-radius: 0 !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-dossier h2,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-dossier h2 {
+        font-size: 1.25rem !important;
+        line-height: 1.25 !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        white-space: normal !important;
     }
 }
