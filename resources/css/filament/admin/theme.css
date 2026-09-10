@@ -728,11 +728,11 @@
         }
 
         .fi-student-profile-tabs > .fi-tabs {
-            @apply sticky top-0 z-20 flex-wrap overflow-x-hidden;
+            @apply sticky top-0 z-20 flex-nowrap overflow-x-auto;
         }
 
         .fi-student-profile-tabs .fi-tabs-item {
-            @apply min-w-0 flex-1 basis-[calc(33.333%-0.35rem)] shrink whitespace-normal;
+            @apply min-w-0 shrink-0 grow-0 basis-auto whitespace-nowrap;
         }
 
         .fi-student-profile-dossier-banners > div {
@@ -861,19 +861,52 @@
         }
 
         .fi-student-profile-tabs {
-            @apply mt-0.5 max-w-full overflow-hidden;
+            @apply relative mt-0.5 max-w-full overflow-visible;
+        }
+
+        /* Hint that more tabs are off-screen to the right */
+        .fi-student-profile-tabs::after {
+            content: '';
+            pointer-events: none;
+            position: absolute;
+            top: 0.5rem;
+            right: 0;
+            z-index: 25;
+            height: 2.5rem;
+            width: 1.75rem;
+            background: linear-gradient(to right, rgb(255 255 255 / 0), rgb(255 255 255 / 0.95));
+        }
+
+        .dark .fi-student-profile-tabs::after {
+            background: linear-gradient(to right, rgb(3 7 18 / 0), rgb(3 7 18 / 0.95));
         }
 
         .fi-student-profile-tabs > .fi-tabs {
-            @apply gap-1 rounded-xl p-1;
+            @apply gap-1.5 rounded-none border-x-0 border-t-0 border-b border-gray-200/90 bg-white/95 p-2 shadow-none backdrop-blur-md dark:border-white/10 dark:bg-gray-950/95;
         }
 
         .fi-student-profile-tabs .fi-tabs-item {
-            @apply rounded-lg px-1.5 py-1.5 text-[9px];
+            @apply flex-row items-center gap-1.5 rounded-full border border-gray-200/80 bg-gray-50 px-3 py-2 text-[11px] font-semibold normal-case tracking-normal text-gray-600 shadow-none dark:border-white/10 dark:bg-white/5 dark:text-gray-300;
+        }
+
+        .fi-student-profile-tabs .fi-tabs-item .fi-icon {
+            @apply h-4 w-4 opacity-80;
+        }
+
+        .fi-student-profile-tabs .fi-tabs-item.fi-active {
+            @apply border-primary-500/30 bg-primary-500 text-white shadow-sm shadow-primary-500/25 dark:border-primary-400/40 dark:bg-primary-500 dark:text-white;
+        }
+
+        .fi-student-profile-tabs .fi-tabs-item.fi-active::before {
+            content: none;
+        }
+
+        .fi-student-profile-tabs .fi-tabs-item.fi-active .fi-icon {
+            @apply text-white opacity-100;
         }
 
         .fi-student-profile-tabs .fi-sc-tabs-tab.fi-active {
-            @apply mt-3 overflow-x-hidden rounded-xl p-2.5;
+            @apply mt-2 overflow-x-hidden rounded-none p-0 shadow-none;
         }
 
         .fi-student-profile-dossier {
@@ -1223,12 +1256,13 @@
         @apply mt-1;
     }
 
+    /* Desktop / tablet+: wrapped chip grid. Phones override to a single swipe row below. */
     .fi-student-profile-tabs > .fi-tabs {
-        @apply flex-wrap gap-1 overflow-x-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-b from-gray-50 to-gray-100/80 p-1.5 shadow-sm dark:border-white/10 dark:from-gray-900 dark:to-gray-950/80;
+        @apply flex-wrap gap-1.5 overflow-x-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-b from-gray-50 to-gray-100/80 p-1.5 shadow-sm dark:border-white/10 dark:from-gray-900 dark:to-gray-950/80;
     }
 
     .fi-student-profile-tabs .fi-tabs-item {
-        @apply relative min-w-0 flex-1 basis-[calc(33.333%-0.35rem)] flex-col gap-1 whitespace-normal rounded-xl border border-transparent px-2 py-2 text-[10px] font-semibold uppercase tracking-wide sm:basis-auto sm:min-w-[7rem] sm:shrink-0 sm:flex-row sm:gap-2 sm:px-3 sm:py-2.5 sm:text-xs sm:normal-case sm:tracking-normal;
+        @apply relative min-w-0 shrink-0 basis-auto flex-row items-center gap-2 whitespace-nowrap rounded-xl border border-transparent px-3 py-2.5 text-xs font-semibold normal-case tracking-normal;
     }
 
     .fi-student-profile-tabs .fi-tabs-item .fi-icon {
@@ -2383,21 +2417,28 @@
 
     .fi-student-profile-tabs {
         max-width: 100%;
-        overflow: hidden;
+        overflow: visible;
     }
 
     .fi-student-profile-tabs > .fi-tabs {
         display: flex !important;
-        flex-wrap: wrap !important;
-        overflow-x: clip !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
         max-width: 100% !important;
+        overscroll-behavior-x: contain;
+    }
+
+    .fi-student-profile-tabs > .fi-tabs::-webkit-scrollbar {
+        display: none;
     }
 
     .fi-student-profile-tabs .fi-tabs-item {
-        flex: 1 1 calc(33.333% - 0.35rem) !important;
-        min-width: 0 !important;
-        max-width: 100% !important;
-        white-space: normal !important;
+        flex: 0 0 auto !important;
+        min-width: max-content !important;
+        max-width: none !important;
+        white-space: nowrap !important;
     }
 
     .fi-student-profile-tabs .fi-sc-tabs-tab.fi-active {
@@ -2535,5 +2576,73 @@
     body.fi-body:has(.fi-student-profile-page) .fi-student-profile-mobile-call__bar {
         padding-left: 0 !important;
         padding-right: 0 !important;
+    }
+
+    /* Swipeable chip tabs — one row instead of a tall 3-col grid */
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs > .fi-tabs,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs > .fi-tabs {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 0.375rem !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 0.5rem 0.75rem !important;
+        border-radius: 0 !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+        border-top: 0 !important;
+        border-bottom: 1px solid rgb(229 231 235 / 0.9) !important;
+        background: rgb(255 255 255 / 0.96) !important;
+        box-shadow: none !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs > .fi-tabs::-webkit-scrollbar,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs > .fi-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .fi-tabs-item,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .fi-tabs-item {
+        flex: 0 0 auto !important;
+        display: inline-flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 0.375rem !important;
+        min-width: max-content !important;
+        max-width: none !important;
+        white-space: nowrap !important;
+        border-radius: 9999px !important;
+        border: 1px solid rgb(229 231 235 / 0.9) !important;
+        background: rgb(249 250 251) !important;
+        padding: 0.5rem 0.75rem !important;
+        font-size: 0.6875rem !important;
+        line-height: 1.1 !important;
+        font-weight: 600 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+        color: rgb(75 85 99) !important;
+        box-shadow: none !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .fi-tabs-item.fi-active,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .fi-tabs-item.fi-active {
+        border-color: rgb(245 158 11 / 0.35) !important;
+        background: rgb(245 158 11) !important;
+        color: #fff !important;
+        box-shadow: 0 1px 2px rgb(245 158 11 / 0.25) !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .fi-tabs-item.fi-active::before,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .fi-tabs-item.fi-active::before {
+        content: none !important;
+        display: none !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-tabs .fi-tabs-item.fi-active .fi-icon,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-tabs .fi-tabs-item.fi-active .fi-icon {
+        color: #fff !important;
+        opacity: 1 !important;
     }
 }
