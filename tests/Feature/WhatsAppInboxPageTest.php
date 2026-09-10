@@ -86,6 +86,12 @@ class WhatsAppInboxPageTest extends TestCase
             ->call('selectConversation', '918320936486', $student->id)
             ->assertSet('selectedStudentId', $student->id)
             ->assertSee('Dear Parent, attendance update for Kapil.')
+            ->assertSeeHtml('crm-wa-global-inbox__shell--chat-open')
+            ->assertSeeHtml('crm-wa-global-inbox__back')
+            ->call('clearConversation')
+            ->assertSet('selectedStudentId', null)
+            ->assertSet('selectedPhone', null)
+            ->assertDontSeeHtml('crm-wa-global-inbox__shell--chat-open')
             ->assertStatus(200);
 
         Http::assertNothingSent();

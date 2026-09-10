@@ -148,6 +148,14 @@ class WhatsAppInboxPage extends Page
         }
     }
 
+    public function clearConversation(): void
+    {
+        $this->selectedPhone = null;
+        $this->selectedStudentId = null;
+        $this->resetMessagesTab();
+        $this->loadInbox();
+    }
+
     protected function whatsAppMessageStudent(): ?Student
     {
         if ($this->selectedStudentId) {

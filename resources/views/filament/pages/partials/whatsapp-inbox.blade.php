@@ -1,14 +1,24 @@
-<div class="crm-wa-global-inbox">
-    <div class="crm-wa-global-inbox__shell">
+@php
+    $chatOpen = filled($selectedPhone) || filled($selectedStudentId);
+@endphp
+
+<div @class([
+    'crm-wa-global-inbox',
+    'crm-wa-global-inbox--chat-open' => $chatOpen,
+])>
+    <div @class([
+        'crm-wa-global-inbox__shell',
+        'crm-wa-global-inbox__shell--chat-open' => $chatOpen,
+    ])>
         <aside class="crm-wa-global-inbox__list" aria-label="Recent chats">
             <div class="crm-wa-global-inbox__list-head">
                 <div>
-                    <h2 class="crm-wa-global-inbox__list-title">Recent chats</h2>
+                    <h2 class="crm-wa-global-inbox__list-title">Chats</h2>
                     <p class="crm-wa-global-inbox__list-sub">
                         @if ($inboxLoaded)
-                            {{ count($conversations) }} conversation{{ count($conversations) === 1 ? '' : 's' }} — scroll for more
+                            {{ count($conversations) }} conversation{{ count($conversations) === 1 ? '' : 's' }}
                         @else
-                            All WhatsApp conversations — students, leads, staff, and unknown numbers
+                            Loading…
                         @endif
                     </p>
                 </div>
@@ -19,7 +29,7 @@
                 <input
                     type="search"
                     wire:model.live.debounce.300ms="search"
-                    placeholder="Search name, mobile, or message…"
+                    placeholder="Search name or mobile…"
                     class="crm-wa-global-inbox__search-input"
                 />
             </div>
@@ -73,10 +83,10 @@
                                 </span>
                                 <span class="crm-wa-global-inbox__item-bottom">
                                     <span class="crm-wa-global-inbox__item-preview">
-                                        @if (($conversation['last_direction'] ?? '') === 'inbound')
-                                            <span class="crm-wa-global-inbox__item-you">Them:</span>
+                                        @if (($conversation['last_direction'] ?? '') === 'outbound')
+                                            <span class="crm-wa-global-inbox__item-you">You:</span>
                                         @endif
-                                        {{ \Illuminate\Support\Str::limit($conversation['preview'], 72) }}
+                                        {{ \Illuminate\Support\Str::limit($conversation['preview'], 64) }}
                                     </span>
                                     @if ($conversation['needs_reply'] ?? false)
                                         <span class="crm-wa-global-inbox__badge">Reply</span>
@@ -84,7 +94,6 @@
                                         <span class="crm-wa-global-inbox__badge crm-wa-global-inbox__badge--open">24h</span>
                                     @endif
                                 </span>
-                                <span class="crm-wa-global-inbox__item-phone">{{ $conversation['phone_display'] }}</span>
                             </span>
                         </button>
                     @endforeach
@@ -93,14 +102,14 @@
         </aside>
 
         <section class="crm-wa-global-inbox__chat" aria-label="Selected conversation">
-            @if (! filled($selectedPhone) && ! $selectedStudentId)
-                <div class="crm-wa-global-inbox__placeholder">
+            @if (! $chatOpen)
+                <div class="crm-wa-global-inbox__placeholder crm-wa-global-inbox__placeholder--desktop">
                     <div class="crm-wa-global-inbox__placeholder-icon">
                         <x-filament::icon icon="heroicon-o-chat-bubble-left-right" class="h-8 w-8" />
                     </div>
                     <p class="text-base font-semibold text-gray-900 dark:text-white">Select a chat</p>
                     <p class="mt-2 max-w-sm text-sm text-gray-500 dark:text-gray-400">
-                        Pick any conversation on the left to read messages or reply within the 24-hour window.
+                        Pick a conversation to read messages or reply within the 24-hour window.
                     </p>
                 </div>
             @else
@@ -110,8 +119,20 @@
                         ? $chatContact->displayName
                         : ($chatStudent?->name ?? 'Unknown contact');
                     $headerTags = $chatContact->tagLabels();
+                    $headerInitial = strtoupper(substr($headerName, 0, 1));
                 @endphp
                 <div class="crm-wa-global-inbox__chat-head">
+                    <button
+                        type="button"
+                        wire:click="clearConversation"
+                        class="crm-wa-global-inbox__back"
+                        aria-label="Back to chats"
+                    >
+                        <x-filament::icon icon="heroicon-m-chevron-left" class="h-5 w-5" />
+                    </button>
+
+                    <span class="crm-wa-global-inbox__chat-avatar" aria-hidden="true">{{ $headerInitial }}</span>
+
                     <div class="crm-wa-global-inbox__chat-head-main">
                         <p class="crm-wa-global-inbox__chat-name">
                             {{ $headerName }}
@@ -126,34 +147,29 @@
                         </p>
                         <p class="crm-wa-global-inbox__chat-phone">
                             {{ $chatStudent?->mobile ?? $selectedPhone }}
+                            @if ($metaRoutingActive ?? false)
+                                · {{ ($metaSessionOpen ?? false) ? '24h open' : 'Templates only' }}
+                            @endif
                         </p>
-                        @if ($metaRoutingActive ?? false)
-                            <span @class([
-                                'crm-wa-pill crm-wa-global-inbox__session-pill',
-                                'crm-wa-pill--open' => $metaSessionOpen ?? false,
-                                'crm-wa-pill--closed' => ! ($metaSessionOpen ?? false),
-                            ])>
-                                {{ ($metaSessionOpen ?? false) ? '24h window open' : 'Templates only' }}
-                            </span>
-                        @endif
                     </div>
+
                     @if ($chatStudent)
                         <a
                             href="{{ \App\Filament\Pages\StudentProfilePage::getUrl(['record' => $chatStudent->id]).'?tab=messages' }}"
                             class="crm-wa-global-inbox__profile-link"
                         >
-                            Open {{ ($chatContact->kind->value ?? '') === 'lead' ? 'lead' : 'student' }} profile
+                            Profile
                         </a>
                     @elseif (($chatContact->kind->value ?? '') === 'staff')
                         <span class="crm-wa-global-inbox__profile-link crm-wa-global-inbox__profile-link--muted">
-                            Staff contact
+                            Staff
                         </span>
                     @else
                         <a
                             href="{{ \App\Filament\Resources\Students\StudentResource::getUrl('index').'?action=addStudent' }}"
                             class="crm-wa-global-inbox__profile-link"
                         >
-                            Add as student
+                            Add
                         </a>
                     @endif
                 </div>
