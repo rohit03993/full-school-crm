@@ -111,7 +111,7 @@ class CertificatesPage extends Page
         $this->issueStudentId = $studentId;
         $student = Student::query()->find($studentId);
         $this->issueStudentSearch = $student
-            ? trim($student->name.' · '.($student->mobile ?? ''))
+            ? trim($student->name.' · '.\App\Support\CrmAccess::studentMobileLabel(Auth::user(), $student->mobile))
             : '';
     }
 

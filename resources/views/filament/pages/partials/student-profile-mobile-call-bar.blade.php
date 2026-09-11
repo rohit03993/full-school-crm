@@ -1,4 +1,8 @@
-@if ($record->isCallable())
+@php
+    $canViewMobile = \App\Support\CrmAccess::canViewStudentMobile(auth()->user());
+@endphp
+
+@if ($canViewMobile && $record->isCallable())
     @php
         $telUrl = $record->telUrl();
         $notConnectedAttempts = (int) ($record->not_connected_attempts_count ?? 0);

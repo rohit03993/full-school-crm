@@ -1352,7 +1352,7 @@ class StudentProfilePage extends Page
 
         Notification::make()
             ->title('WhatsApp sent')
-            ->body('Message delivered to '.$this->record->mobile.'.')
+            ->body('Message delivered to '.CrmAccess::studentMobileLabel(Auth::user(), $this->record->mobile).'.')
             ->success()
             ->send();
     }
@@ -3132,8 +3132,8 @@ class StudentProfilePage extends Page
                     'father_name' => $this->record->father_name,
                     'date_of_birth' => $this->record->date_of_birth,
                     'gender' => $this->record->gender?->value,
-                    'mobile' => $this->record->mobile,
-                    'alternate_mobile' => $this->record->alternate_mobile,
+                    'mobile' => CrmAccess::canViewStudentMobile(Auth::user()) ? $this->record->mobile : null,
+                    'alternate_mobile' => CrmAccess::canViewStudentMobile(Auth::user()) ? $this->record->alternate_mobile : null,
                     'address' => $this->record->address,
                     'city' => $this->record->city,
                     'state' => $this->record->state,
@@ -3282,7 +3282,7 @@ class StudentProfilePage extends Page
                 ->modalHeading(fn (): string => 'Permanently delete '.$this->record->name.'?')
                 ->modalDescription(function (): string {
                     $mobile = filled($this->record->mobile)
-                        ? $this->record->mobile
+                        ? CrmAccess::studentMobileLabel(Auth::user(), $this->record->mobile)
                         : 'no mobile on file';
 
                     return 'This permanently removes the student profile, enquiries, admissions, enrollments, fees, payments, attendance, and related records. '
@@ -3397,7 +3397,9 @@ class StudentProfilePage extends Page
                     'logCallContext' => $this->logCallContext,
                     'logCallModalMode' => $this->logCallStudentCaseId ? 'case' : 'profile',
                     'logCallLeadName' => $this->record->name,
-                    'logCallLeadPhone' => $this->record->mobile,
+                    'logCallLeadPhone' => CrmAccess::canViewStudentMobile(Auth::user())
+                        ? $this->record->mobile
+                        : null,
                     'logCallCaseNumber' => $this->logCallStudentCaseId
                         ? StudentCase::query()->find($this->logCallStudentCaseId)?->case_number
                         : null,

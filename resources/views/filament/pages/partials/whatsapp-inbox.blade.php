@@ -146,7 +146,11 @@
                             @endforeach
                         </p>
                         <p class="crm-wa-global-inbox__chat-phone">
-                            {{ $chatStudent?->mobile ?? $selectedPhone }}
+                            @if (\App\Support\CrmAccess::canViewStudentMobile(auth()->user()))
+                                {{ $chatStudent?->mobile ?? $selectedPhone }}
+                            @else
+                                Hidden
+                            @endif
                             @if ($metaRoutingActive ?? false)
                                 · {{ ($metaSessionOpen ?? false) ? '24h open' : 'Templates only' }}
                             @endif

@@ -36,7 +36,7 @@
                                     >
                                         <span class="font-medium text-gray-950 dark:text-white">{{ $suggestion->name }}</span>
                                         <span class="text-xs text-gray-500">
-                                            {{ $suggestion->mobile }}
+                                            <x-crm.student-mobile :mobile="$suggestion->mobile" />
                                             @if ($suggestion->activeEnrollment)
                                                 · {{ $suggestion->activeEnrollment->enrollment_number }}
                                             @endif

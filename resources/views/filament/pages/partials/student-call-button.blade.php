@@ -1,8 +1,9 @@
 @php
     $hideOnMobile = $hideOnMobile ?? false;
+    $canViewMobile = \App\Support\CrmAccess::canViewStudentMobile(auth()->user());
 @endphp
 
-@if ($record->isCallable())
+@if ($canViewMobile && $record->isCallable())
     @php
         $telUrl = $record->telUrl();
         $notConnectedAttempts = (int) ($record->not_connected_attempts_count ?? 0);

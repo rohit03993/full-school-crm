@@ -92,7 +92,14 @@ class AdmissionResource extends Resource
                     ->label('Student')
                     ->searchable()
                     ->sortable()
-                    ->description(fn (Admission $record): string => $record->student?->mobile ?? ''),
+                    ->description(function (Admission $record): string {
+                        $label = \App\Support\CrmAccess::studentMobileLabel(
+                            auth()->user(),
+                            $record->student?->mobile,
+                        );
+
+                        return $label === '—' ? '' : $label;
+                    }),
                 TextColumn::make('enquiry.course.name')
                     ->label('Course')
                     ->placeholder('—')

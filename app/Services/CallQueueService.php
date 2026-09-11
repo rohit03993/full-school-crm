@@ -9,11 +9,13 @@ use App\Models\Enquiry;
 use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\User;
+use App\Support\CrmAccess;
 use App\Support\CrmPagination;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 
 class CallQueueService
 {
@@ -191,6 +193,7 @@ class CallQueueService
         /** @var Enquiry|null $enquiry */
         $enquiry = $student->enquiries->first();
         $mobile = $student->dialableMobile();
+        $canViewMobile = CrmAccess::canViewStudentMobile(Auth::user());
         $status = $enquiry?->latest_visit_status;
         $followUp = $student->next_call_followup_at;
 
@@ -198,8 +201,11 @@ class CallQueueService
             'id' => $student->id,
             'name' => $student->name,
             'father_name' => $student->father_name,
-            'mobile_display' => $mobile ? '+91'.substr($mobile, -10) : '—',
-            'mobile_raw' => $mobile,
+            'mobile_display' => $canViewMobile && $mobile
+                ? '+91'.substr($mobile, -10)
+                : ($mobile ? 'Hidden' : '—'),
+            'mobile_raw' => $canViewMobile ? $mobile : null,
+            'can_view_mobile' => $canViewMobile,
             'course' => $enquiry?->course?->name ?? 'Not decided',
             'status_label' => $status?->label() ?? 'New lead',
             'total_calls' => (int) $student->total_calls,

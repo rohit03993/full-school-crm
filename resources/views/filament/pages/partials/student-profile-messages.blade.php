@@ -25,7 +25,13 @@
             <div class="crm-wa-inbox__toolbar-copy">
                 <p class="crm-wa-inbox__title">WhatsApp with parent</p>
                 <p class="crm-wa-inbox__subtitle">
-                    <span class="crm-wa-inbox__phone">{{ $record?->mobile ?? $chatPhone ?? 'No mobile on file' }}</span>
+                    <span class="crm-wa-inbox__phone">
+                        @if (\App\Support\CrmAccess::canViewStudentMobile(auth()->user()))
+                            {{ $record?->mobile ?? $chatPhone ?? 'No mobile on file' }}
+                        @else
+                            {{ filled($record?->mobile) || filled($chatPhone ?? null) ? 'Hidden' : 'No mobile on file' }}
+                        @endif
+                    </span>
                 </p>
             </div>
             @if ($metaRoutingActive)

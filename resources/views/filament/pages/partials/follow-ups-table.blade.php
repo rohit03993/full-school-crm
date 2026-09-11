@@ -55,7 +55,7 @@
                                     :name="$visit->student?->name ?? '—'"
                                     class="text-sm"
                                 />
-                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ $visit->student?->mobile ?? '—' }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400"><x-crm.student-mobile :mobile="$visit->student?->mobile" /></p>
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" data-label="Course">
                                 {{ $visit->enquiry?->course?->name ?? 'Not decided' }}

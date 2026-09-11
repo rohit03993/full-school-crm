@@ -82,7 +82,7 @@
                     ['Father\'s Name', $student?->father_name],
                     ['Date of Birth', $student?->date_of_birth?->format('d M Y')],
                     ['Gender', $student?->gender?->label()],
-                    ['Mobile', $student?->mobile],
+                    ['Mobile', \App\Support\CrmAccess::studentMobileLabel(auth()->user(), $student?->mobile)],
                     ['Email', $student?->email],
                     ['Admission No.', $admission->admission_number],
                     ['Course', $admission->enquiry?->course?->name],

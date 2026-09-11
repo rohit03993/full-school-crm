@@ -48,6 +48,26 @@ class CrmAccess
         );
     }
 
+    /**
+     * See student/parent mobile numbers and use Dial / tel: / call-bar.
+     */
+    public static function canViewStudentMobile(?User $user): bool
+    {
+        return self::can($user, CrmPermission::StudentsViewMobile);
+    }
+
+    /**
+     * Visible label for a student mobile. When denied: "Hidden" (never the real digits).
+     */
+    public static function studentMobileLabel(?User $user, ?string $mobile): string
+    {
+        if (! filled($mobile)) {
+            return '—';
+        }
+
+        return self::canViewStudentMobile($user) ? (string) $mobile : 'Hidden';
+    }
+
     public static function hasPanelAccess(?User $user): bool
     {
         if (! $user?->is_active) {

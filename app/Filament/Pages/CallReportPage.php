@@ -209,7 +209,7 @@ class CallReportPage extends Page
                         fputcsv($handle, [
                             $call->called_at?->format('Y-m-d H:i:s'),
                             $call->student?->name,
-                            $call->student?->mobile,
+                            CrmAccess::studentMobileLabel($viewer, $call->student?->mobile),
                             $call->staff?->name,
                             $call->call_status?->label(),
                             $call->call_direction?->label(),

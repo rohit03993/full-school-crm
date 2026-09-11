@@ -75,7 +75,7 @@
                         <div class="grid gap-2 sm:grid-cols-12 sm:items-center sm:gap-3">
                             <div class="sm:col-span-3">
                                 <p class="text-sm font-semibold text-gray-950 dark:text-white">{{ $student?->name ?? '—' }}</p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ $student?->mobile ?? '' }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400"><x-crm.student-mobile :mobile="$student?->mobile" /></p>
                             </div>
                             <div class="sm:col-span-2">
                                 @if ($call->call_purpose)

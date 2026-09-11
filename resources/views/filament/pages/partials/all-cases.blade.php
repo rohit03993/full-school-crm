@@ -93,7 +93,7 @@
                             </div>
                             <div class="sm:col-span-3">
                                 <p class="text-sm font-medium text-gray-950 dark:text-white">{{ $student?->name ?? '—' }}</p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ $student?->mobile ?? '' }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400"><x-crm.student-mobile :mobile="$student?->mobile" /></p>
                             </div>
                             <div class="text-sm text-gray-700 dark:text-gray-300 sm:col-span-2">{{ $case->case_type->label() }}</div>
                             <div class="text-sm font-medium text-violet-700 dark:text-violet-300 sm:col-span-2">{{ $case->currentAssignee?->name ?? '—' }}</div>

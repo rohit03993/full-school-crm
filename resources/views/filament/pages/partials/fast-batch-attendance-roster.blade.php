@@ -33,7 +33,9 @@
         return [
             'id' => $student->id,
             'name' => $student->name,
-            'mobile' => $student->mobile,
+            'mobile' => \App\Support\CrmAccess::canViewStudentMobile(auth()->user())
+                ? $student->mobile
+                : null,
             'roll' => $roll,
             'checked_in' => $checkedIn,
             'checked_out' => $checkedOut,
@@ -275,7 +277,7 @@
                                         <span class="text-amber-600">No roll</span>
                                     @endif
                                     @if (filled($row['mobile']))
-                                        <span class="text-gray-300 dark:text-gray-600">·</span> {{ $row['mobile'] }}
+                                        <span class="text-gray-300 dark:text-gray-600">·</span> <x-crm.student-mobile :mobile="$row['mobile']" />
                                     @endif
                                     @if ($row['attendance'] === 'leave')
                                         <span class="ml-1 rounded bg-amber-500/10 px-1 py-0.5 text-[10px] font-bold uppercase text-amber-800 dark:text-amber-300">Leave</span>

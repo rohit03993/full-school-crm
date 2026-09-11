@@ -141,7 +141,7 @@
                 </div>
                 <dl class="grid gap-3 px-4 py-4 text-sm sm:grid-cols-2 sm:gap-4 sm:px-6 sm:pb-6">
                     <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Name</dt><dd class="mt-0.5 font-medium text-gray-950 dark:text-white">{{ $record->name }}</dd></div>
-                    <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Mobile</dt><dd class="mt-0.5 font-medium text-gray-950 dark:text-white">{{ $record->mobile }}</dd></div>
+                    <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Mobile</dt><dd class="mt-0.5 font-medium text-gray-950 dark:text-white"><x-crm.student-mobile :mobile="$record->mobile" /></dd></div>
                     <div class="sm:col-span-2"><dt class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Address</dt><dd class="mt-0.5 font-medium text-gray-950 dark:text-white">{{ collect([$record->address, $record->city, $record->state, $record->pincode])->filter()->implode(', ') ?: '—' }}</dd></div>
                 </dl>
             </div>

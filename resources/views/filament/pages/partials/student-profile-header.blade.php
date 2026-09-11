@@ -28,7 +28,7 @@
                 <div class="min-w-0 flex-1">
                     <h2 class="truncate text-base font-bold text-gray-950 sm:text-xl dark:text-white">{{ $record->name }}</h2>
                     <div class="mt-1 flex items-center gap-2">
-                        <p class="text-base font-semibold text-primary-600 dark:text-primary-400">{{ $record->mobile }}</p>
+                        <x-crm.student-mobile :mobile="$record->mobile" class="text-base font-semibold text-primary-600 dark:text-primary-400" />
                         @include('filament.pages.partials.student-call-button', ['record' => $record, 'hideOnMobile' => true])
                     </div>
                     @if ($record->activeEnrollment)

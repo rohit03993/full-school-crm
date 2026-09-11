@@ -70,7 +70,7 @@
                             class="truncate block"
                         />
                         @if (filled($student->mobile))
-                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ $student->mobile }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400"><x-crm.student-mobile :mobile="$student->mobile" /></p>
                         @endif
                     </div>
                     <div class="flex shrink-0 gap-1.5">

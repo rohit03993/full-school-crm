@@ -323,4 +323,55 @@ class CrmStaffRolesTest extends TestCase
             }
         }
     }
+
+    public function test_counsellor_and_admission_can_view_student_mobile_by_default(): void
+    {
+        $counsellor = User::factory()->create(['is_active' => true]);
+        $counsellor->assignRole(StaffJobRole::Counsellor->value);
+
+        $admission = User::factory()->create(['is_active' => true]);
+        $admission->assignRole(StaffJobRole::AdmissionOfficer->value);
+
+        $this->assertTrue($counsellor->canCrm(CrmPermission::StudentsViewMobile));
+        $this->assertTrue(\App\Support\CrmAccess::canViewStudentMobile($counsellor));
+        $this->assertSame('9876543210', \App\Support\CrmAccess::studentMobileLabel($counsellor, '9876543210'));
+
+        $this->assertTrue($admission->canCrm(CrmPermission::StudentsViewMobile));
+        $this->assertTrue(\App\Support\CrmAccess::canViewStudentMobile($admission));
+    }
+
+    public function test_teacher_accounts_and_whatsapp_roles_cannot_view_student_mobile_by_default(): void
+    {
+        $hiddenRoles = [
+            StaffJobRole::Teacher,
+            StaffJobRole::AcademicCoordinator,
+            StaffJobRole::Accountant,
+            StaffJobRole::FeeAdjuster,
+            StaffJobRole::WhatsappInbox,
+            StaffJobRole::WhatsappBulkCampaigns,
+            StaffJobRole::WhatsappFeeNotices,
+            StaffJobRole::MessagingCoordinator,
+        ];
+
+        foreach ($hiddenRoles as $role) {
+            $user = User::factory()->create(['is_active' => true]);
+            $user->assignRole($role->value);
+
+            $this->assertFalse(
+                $user->canCrm(CrmPermission::StudentsViewMobile),
+                "{$role->value} should not view student mobile by default",
+            );
+            $this->assertFalse(\App\Support\CrmAccess::canViewStudentMobile($user));
+            $this->assertSame('Hidden', \App\Support\CrmAccess::studentMobileLabel($user, '9876543210'));
+        }
+    }
+
+    public function test_super_admin_can_always_view_student_mobile(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole(RoleName::SuperAdmin->value);
+
+        $this->assertTrue(\App\Support\CrmAccess::canViewStudentMobile($user));
+        $this->assertSame('9876543210', \App\Support\CrmAccess::studentMobileLabel($user, '9876543210'));
+    }
 }

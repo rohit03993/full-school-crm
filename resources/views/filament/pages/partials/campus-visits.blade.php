@@ -136,7 +136,7 @@
 
                     <div class="min-w-0 flex-1">
                       <p class="truncate text-sm font-semibold text-gray-950 dark:text-white">{{ $student?->name ?? '—' }}</p>
-                      <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ $student?->mobile ?? '—' }}</p>
+                      <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400"><x-crm.student-mobile :mobile="$student?->mobile" /></p>
                     </div>
 
                     <x-crm.badge :tone="$isEnrolled ? 'success' : 'info'" class="lg:hidden">
@@ -164,7 +164,7 @@
                 </td>
                 <td class="crm-responsive-table__actions whitespace-nowrap px-4 py-3" data-label="">
                   <div class="flex items-center gap-2 lg:justify-end">
-                    @if (filled($student?->mobile))
+                    @if (filled($student?->mobile) && \App\Support\CrmAccess::canViewStudentMobile(auth()->user()))
                       <a
                         href="tel:{{ $student->mobile }}"
                         class="inline-flex min-h-11 flex-1 touch-manipulation items-center justify-center gap-1.5 rounded-xl bg-gray-100 px-3 text-sm font-semibold text-gray-700 transition active:scale-[0.98] hover:bg-gray-200 lg:hidden dark:bg-white/10 dark:text-gray-200 dark:hover:bg-white/15"

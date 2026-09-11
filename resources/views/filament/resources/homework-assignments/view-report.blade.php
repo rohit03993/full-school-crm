@@ -32,7 +32,7 @@
                         <td class="px-4 py-3 font-mono text-gray-700 dark:text-gray-300" data-label="{{ \App\Support\StudentLabels::rollNumberLabel() }}">
                             {{ $row['student']->activeEnrollment?->enrollment_number ?? '—' }}
                         </td>
-                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300" data-label="Mobile">{{ $row['student']->mobile }}</td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300" data-label="Mobile"><x-crm.student-mobile :mobile="$row['student']->mobile" /></td>
                         <td class="px-4 py-3" data-label="Viewed">
                             @if ($row['viewed'])
                                 <span class="text-emerald-600 dark:text-emerald-400">Yes</span>

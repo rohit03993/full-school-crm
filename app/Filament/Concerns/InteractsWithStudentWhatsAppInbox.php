@@ -446,7 +446,7 @@ trait InteractsWithStudentWhatsAppInbox
 
         Notification::make()
             ->title('WhatsApp sent')
-            ->body('Message delivered to '.$student->mobile.'.')
+            ->body('Message delivered to '.\App\Support\CrmAccess::studentMobileLabel(auth()->user(), $student->mobile).'.')
             ->success()
             ->send();
     }

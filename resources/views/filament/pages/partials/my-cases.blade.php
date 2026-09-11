@@ -89,8 +89,8 @@
                             <p class="mt-1 text-base font-bold text-gray-950 dark:text-white">{{ $case->title }}</p>
                             <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-300">
                                 {{ $student?->name ?? 'Student' }}
-                                @if ($student?->mobile)
-                                    · {{ $student->mobile }}
+                                @if (filled($student?->mobile))
+                                    · <x-crm.student-mobile :mobile="$student->mobile" />
                                 @endif
                             </p>
                         </div>

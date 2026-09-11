@@ -138,9 +138,11 @@ class StudentProfileFormSchema
                     TextInput::make('mobile')
                         ->label('Mobile')
                         ->tel()
-                        ->required()
+                        ->required(fn (): bool => \App\Support\CrmAccess::canViewStudentMobile(Auth::user()))
                         ->maxLength(10)
                         ->rule('regex:/^[6-9]\d{9}$/')
+                        ->visible(fn (): bool => \App\Support\CrmAccess::canViewStudentMobile(Auth::user()))
+                        ->dehydrated(fn (): bool => \App\Support\CrmAccess::canViewStudentMobile(Auth::user()))
                         ->rules(fn (): array => Auth::user()?->hasRole(RoleName::SuperAdmin->value)
                             ? []
                             : [Rule::unique('students', 'mobile')->ignore($studentId)])
@@ -151,6 +153,8 @@ class StudentProfileFormSchema
                         ->label('Alternate mobile')
                         ->tel()
                         ->maxLength(10)
+                        ->visible(fn (): bool => \App\Support\CrmAccess::canViewStudentMobile(Auth::user()))
+                        ->dehydrated(fn (): bool => \App\Support\CrmAccess::canViewStudentMobile(Auth::user()))
                         ->rules(['nullable', 'regex:/^[6-9]\d{9}$/']),
                     Select::make('category')
                         ->options(self::categoryOptions())

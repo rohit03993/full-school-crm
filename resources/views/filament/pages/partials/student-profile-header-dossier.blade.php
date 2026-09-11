@@ -97,7 +97,7 @@
 
                 {{-- Mobile: contact + call inline (desktop uses Contact card below) --}}
                 <div class="mt-2 flex flex-wrap items-center gap-2 sm:hidden">
-                    <span class="text-base font-bold tabular-nums text-gray-950 dark:text-white">{{ $record->mobile }}</span>
+                    <x-crm.student-mobile :mobile="$record->mobile" class="text-base font-bold tabular-nums" />
                 </div>
 
                 <div class="fi-student-profile-dossier-banners">
@@ -122,7 +122,7 @@
                     <div class="rounded-xl border border-gray-100 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
                         <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Contact</p>
                         <div class="mt-0.5 flex flex-wrap items-center gap-1.5">
-                            <span class="text-sm font-bold text-gray-950 dark:text-white">{{ $record->mobile }}</span>
+                            <x-crm.student-mobile :mobile="$record->mobile" class="text-sm font-bold" />
                             @include('filament.pages.partials.student-call-button', ['record' => $record])
                         </div>
                     </div>

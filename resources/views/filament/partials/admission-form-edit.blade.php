@@ -52,7 +52,7 @@
                         ['Father\'s Name', $record->father_name],
                         ['Date of Birth', $record->date_of_birth?->format('d M Y')],
                         ['Gender', $record->gender?->label()],
-                        ['Mobile', $record->mobile],
+                        ['Mobile', \App\Support\CrmAccess::studentMobileLabel(auth()->user(), $record->mobile)],
                         ['Email', $record->email],
                     ] as [$label, $value])
                         <div class="rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5">

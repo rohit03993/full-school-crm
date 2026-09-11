@@ -149,7 +149,7 @@
                                         :name="$call->student?->name ?? '—'"
                                         class="text-sm"
                                     />
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ $call->student?->mobile ?? '—' }}</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400"><x-crm.student-mobile :mobile="$call->student?->mobile" /></p>
                                     @if ($call->enquiry?->course)
                                         <p class="mt-0.5 text-xs text-gray-400">{{ $call->enquiry->course->name }}</p>
                                     @endif

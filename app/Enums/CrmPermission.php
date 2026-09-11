@@ -21,6 +21,7 @@ enum CrmPermission: string
     case CasesViewAll = 'crm.cases.view_all';
 
     case StudentsView = 'crm.students.view';
+    case StudentsViewMobile = 'crm.students.view_mobile';
     case StudentsEdit = 'crm.students.edit';
     case StudentsImport = 'crm.students.import';
 
@@ -71,6 +72,7 @@ enum CrmPermission: string
             self::CasesClose => 'Close assigned cases',
             self::CasesViewAll => 'View all student cases',
             self::StudentsView => 'View students',
+            self::StudentsViewMobile => 'View student mobile & call',
             self::StudentsEdit => 'Edit student details',
             self::StudentsImport => 'Import students',
             self::CertificatesView => 'View certificates',

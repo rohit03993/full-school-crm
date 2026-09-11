@@ -41,7 +41,7 @@
                             </div>
 
                             <p class="mt-0.5 text-xs font-semibold text-primary-600 dark:text-primary-400 sm:text-sm">
-                                {{ $enquiry->student?->mobile ?? '—' }}
+                                <x-crm.student-mobile :mobile="$enquiry->student?->mobile" />
                             </p>
 
                             <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">

@@ -106,7 +106,10 @@ class EnquiryResource extends Resource
                         ? StudentProfilePage::getUrl(['record' => $record->student_id])
                         : null)
                     ->color('primary')
-                    ->description(fn (Enquiry $record): string => $record->student?->mobile ?? ''),
+                    ->description(fn (Enquiry $record): string => \App\Support\CrmAccess::studentMobileLabel(
+                        auth()->user(),
+                        $record->student?->mobile,
+                    )),
                 TextColumn::make('course.name')
                     ->label('Course')
                     ->placeholder('Not decided')

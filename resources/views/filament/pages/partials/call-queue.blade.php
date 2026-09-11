@@ -101,7 +101,7 @@
                 </dl>
 
                 <div class="flex flex-col gap-2 sm:flex-row">
-                    @if ($currentLead['mobile_raw'])
+                    @if (($currentLead['can_view_mobile'] ?? false) && filled($currentLead['mobile_raw'] ?? null))
                         <button
                             type="button"
                             onclick="window.CrmPendingCall.start({{ $currentLead['id'] }}, @js($currentLead['name']), @js($currentLead['mobile_display']), @js('tel:+91'.substr($currentLead['mobile_raw'], -10)), {{ (int) ($currentLead['not_connected_attempts_count'] ?? 0) }})"
