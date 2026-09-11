@@ -147,6 +147,29 @@ class AttendanceHubClassWiseTest extends TestCase
         $this->assertSame(AttendanceStatus::Leave, $leaveRow->status);
     }
 
+    public function test_hub_can_mark_present_via_manual_in_from_absent_drill(): void
+    {
+        $this->travelTo('2026-09-11 10:00:00');
+
+        [$batch, , , , $unmarked] = $this->seedClassWithFourStatuses();
+        $this->actingAsAdmin();
+
+        Livewire::test(AttendanceHubPage::class)
+            ->set('overviewDate', '2026-09-11')
+            ->call('openClassDrill', $batch->id, 'absent')
+            ->call('markHubPresent', $unmarked->id);
+
+        $row = Attendance::query()
+            ->where('student_id', $unmarked->id)
+            ->whereDate('attendance_date', '2026-09-11')
+            ->first();
+
+        $this->assertNotNull($row);
+        $this->assertSame(AttendanceStatus::Present, $row->status);
+        $this->assertSame('manual', $row->punch_source);
+        $this->assertNotNull($row->checked_in_at);
+    }
+
     protected function actingAsAdmin(): User
     {
         $admin = User::factory()->create(['is_active' => true]);

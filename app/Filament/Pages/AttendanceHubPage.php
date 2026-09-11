@@ -122,6 +122,54 @@ class AttendanceHubPage extends Page
         $this->leaveReasonCustom = '';
     }
 
+    public function markHubPresent(int $studentId): void
+    {
+        $user = Auth::user();
+        if (! $user || $this->classDrillBatchId === null) {
+            return;
+        }
+
+        $student = Student::query()->find($studentId);
+        if (! $student) {
+            return;
+        }
+
+        // Same path as Students → manual batch IN (WhatsApp / SMS automations included).
+        $result = app(ManualBatchAttendanceService::class)->manualIn(
+            $student,
+            $this->resolvedDate(),
+            $user,
+        );
+
+        if (! $result['ok']) {
+            Notification::make()
+                ->title('Could not mark present')
+                ->body($result['message'])
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $body = $student->name.': '.$result['message'];
+        if ($whatsapp = $result['whatsapp'] ?? null) {
+            $body .= ' '.$whatsapp['message'];
+        }
+
+        $notification = Notification::make()
+            ->title('Marked present (IN)')
+            ->body($body)
+            ->duration(10000);
+
+        if (($result['whatsapp']['queued'] ?? false) === true) {
+            $notification->success();
+        } else {
+            $notification->warning();
+        }
+
+        $notification->send();
+    }
+
     public function markHubAbsent(int $studentId): void
     {
         $user = Auth::user();
