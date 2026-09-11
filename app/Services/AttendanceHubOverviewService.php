@@ -37,7 +37,7 @@ class AttendanceHubOverviewService
      *     staff_leave: int,
      *     staff_marked: int,
      *     staff_unmarked: int,
-     *     class_rows: list<array{batch_id: int, name: string, expected: int, present: int, absent: int, leave: int, unmarked: int}>
+     *     class_rows: list<array{batch_id: int, name: string, expected: int, present: int, absent: int, leave: int}>
      * }
      */
     public function overview(string $date): array
@@ -98,7 +98,7 @@ class AttendanceHubOverviewService
     }
 
     /**
-     * @return list<array{batch_id: int, name: string, expected: int, present: int, absent: int, leave: int, unmarked: int}>
+     * @return list<array{batch_id: int, name: string, expected: int, present: int, absent: int, leave: int}>
      */
     protected function classRows(string $day): array
     {
@@ -120,17 +120,14 @@ class AttendanceHubOverviewService
                 ->whereDate('attendance_date', $day)
                 ->where('status', AttendanceStatus::Present)
                 ->count();
-            $absent = (int) Attendance::query()
-                ->where('batch_id', $batch->id)
-                ->whereDate('attendance_date', $day)
-                ->where('status', AttendanceStatus::Absent)
-                ->count();
             $leave = (int) Attendance::query()
                 ->where('batch_id', $batch->id)
                 ->whereDate('attendance_date', $day)
                 ->where('status', AttendanceStatus::Leave)
                 ->count();
-            $marked = $present + $absent + $leave;
+
+            // Absent column = not present and not leave (explicit absent + still unmarked)
+            $absent = max(0, $expected - $present - $leave);
 
             $rows[] = [
                 'batch_id' => $batch->id,
@@ -139,11 +136,98 @@ class AttendanceHubOverviewService
                 'present' => $present,
                 'absent' => $absent,
                 'leave' => $leave,
-                'unmarked' => max(0, $expected - $marked),
             ];
         }
 
         return $rows;
+    }
+
+    /**
+     * Students in a class for Present / Absent drill-down on the hub.
+     *
+     * @param  'present'|'absent'  $bucket
+     * @return array{
+     *     batch_id: int,
+     *     batch_name: string,
+     *     bucket: string,
+     *     date: string,
+     *     date_label: string,
+     *     students: list<array{id: int, name: string, roll: ?string, status: string, status_label: string, can_mark: bool}>
+     * }|null
+     */
+    public function classBucketRoster(int $batchId, string $date, string $bucket): ?array
+    {
+        $bucket = in_array($bucket, ['present', 'absent'], true) ? $bucket : 'absent';
+        $day = Carbon::parse($date)->toDateString();
+
+        $batch = Batch::query()->find($batchId);
+        if (! $batch) {
+            return null;
+        }
+
+        $activeLinks = BatchStudent::query()
+            ->where('batch_id', $batchId)
+            ->where('is_active', true)
+            ->with(['student.activeEnrollment'])
+            ->get();
+
+        $attendanceByStudent = Attendance::query()
+            ->where('batch_id', $batchId)
+            ->whereDate('attendance_date', $day)
+            ->get()
+            ->keyBy('student_id');
+
+        $students = [];
+
+        foreach ($activeLinks as $link) {
+            $student = $link->student;
+            if (! $student) {
+                continue;
+            }
+
+            $row = $attendanceByStudent->get($student->id);
+            $status = $row?->status instanceof AttendanceStatus
+                ? $row->status
+                : AttendanceStatus::tryFrom((string) ($row?->status ?? ''));
+
+            $isPresent = $status === AttendanceStatus::Present;
+            $isLeave = $status === AttendanceStatus::Leave;
+            $isAbsentBucket = ! $isPresent && ! $isLeave;
+
+            if ($bucket === 'present' && ! $isPresent) {
+                continue;
+            }
+            if ($bucket === 'absent' && ! $isAbsentBucket) {
+                continue;
+            }
+
+            $statusValue = $status?->value ?? 'unmarked';
+            $statusLabel = match ($statusValue) {
+                'absent' => 'Absent',
+                'unmarked', '' => 'Not marked',
+                default => $status?->label() ?? 'Not marked',
+            };
+
+            $students[] = [
+                'id' => $student->id,
+                'name' => $student->name,
+                'roll' => $student->activeEnrollment?->enrollment_number,
+                'status' => $statusValue === '' ? 'unmarked' : $statusValue,
+                'status_label' => $statusLabel,
+                'can_mark' => $bucket === 'absent',
+            ];
+        }
+
+        usort($students, fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+
+        return [
+            'batch_id' => $batch->id,
+            'batch_name' => ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false),
+            'bucket' => $bucket,
+            'date' => $day,
+            'date_label' => Carbon::parse($day)->format('d M Y'),
+            'students' => $students,
+        ];
     }
 
     /**

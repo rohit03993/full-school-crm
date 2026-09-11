@@ -2138,6 +2138,39 @@
         @apply mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-300;
     }
 
+    /* Attendance hub — dense class-wise table (no inner scroll for ~10 classes) */
+    .crm-att-hub-classes__row td {
+        @apply align-middle;
+    }
+
+    .crm-att-hub-classes__count {
+        @apply inline-flex min-h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-bold transition;
+    }
+
+    .crm-att-hub-classes__count:disabled {
+        @apply cursor-default opacity-50;
+    }
+
+    .crm-att-hub-classes__count--present {
+        @apply bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30 dark:hover:bg-emerald-500/20;
+    }
+
+    .crm-att-hub-classes__count--present:disabled {
+        @apply bg-transparent text-emerald-700/70 ring-0 dark:text-emerald-300/70;
+    }
+
+    .crm-att-hub-classes__count--absent {
+        @apply bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30 dark:hover:bg-rose-500/20;
+    }
+
+    .crm-att-hub-classes__count--absent:disabled {
+        @apply bg-transparent text-rose-700/70 ring-0 dark:text-rose-300/70;
+    }
+
+    .crm-att-hub-classes__count:not(:disabled) {
+        @apply cursor-pointer;
+    }
+
     .crm-wa-analytics__preset {
         @apply rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5;
     }
