@@ -681,6 +681,24 @@
         .fi-ta-stack .fi-ta-actions {
             @apply mt-2 border-t border-gray-100 pt-2 dark:border-white/10;
         }
+
+        /* Students directory — compact Name / Roll / Class cards */
+        .crm-students-directory .fi-ta-stack .fi-ta-record {
+            @apply mb-2 px-3 py-2.5;
+        }
+
+        .crm-students-directory .fi-ta-stack .fi-ta-text-item-label {
+            @apply text-[10px] font-semibold uppercase tracking-wide text-gray-400;
+        }
+
+        .crm-students-directory .fi-ta-stack .fi-ta-text {
+            @apply text-sm leading-snug;
+        }
+
+        .crm-students-directory .fi-ta-stack .fi-ta-actions:empty,
+        .crm-students-directory .fi-ta-stack .fi-ta-actions:not(:has(*)) {
+            @apply hidden border-0 m-0 p-0;
+        }
     }
 
     /* Mobile-first CRM polish */

@@ -7,7 +7,6 @@ use App\Enums\RoleName;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Forms\AddStudentFormSchema;
 use App\Filament\Pages\StudentProfilePage;
-use App\Filament\Pages\StudentSearchPage;
 use App\Filament\Resources\Students\StudentResource;
 use App\Models\Batch;
 use App\Models\Student;
@@ -35,6 +34,11 @@ class ListStudents extends ListRecords
     protected static function crmHintKey(): ?string
     {
         return 'students.list';
+    }
+
+    public function getSubheading(): ?string
+    {
+        return 'Search by name, roll number, or mobile on this page. Tap a student to open their profile.';
     }
 
     public function mount(): void
@@ -168,12 +172,6 @@ class ListStudents extends ListRecords
                     }
                 });
         }
-
-        $actions[] = Action::make('searchStudent')
-            ->label('Search Student')
-            ->icon(Heroicon::OutlinedMagnifyingGlass)
-            ->url(StudentSearchPage::getUrl())
-            ->color('gray');
 
         if ($this->missingMobileCount() > 0) {
             $actions[] = Action::make('missingMobile')

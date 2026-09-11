@@ -8,7 +8,6 @@ use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Pages\StudentProfilePage;
-use App\Filament\Pages\StudentSearchPage;
 use App\Filament\Resources\Students\Pages\ListStudents;
 use App\Filament\Support\CrmTable;
 use App\Models\AcademicSession;
@@ -89,39 +88,51 @@ class StudentResource extends Resource
     {
         return CrmTable::configure($table)
             ->deferFilters(false)
-            ->filtersLayout(FiltersLayout::AboveContent)
+            ->filtersLayout(FiltersLayout::AboveContentCollapsible)
             ->filtersFormColumns([
-                'default' => 1,
-                'md' => 2,
-                'xl' => 3,
+                'default' => 2,
+                'md' => 3,
+                'xl' => 5,
             ])
+            ->searchPlaceholder('Name, roll no., or mobile…')
+            ->searchDebounce('400ms')
+            ->persistSearchInSession()
+            ->persistFiltersInSession()
+            ->extraAttributes(['class' => 'crm-students-directory'])
             ->recordClasses(fn (Student $record): ?string => blank($record->mobile)
                 ? 'bg-danger-50/60 dark:bg-danger-500/5'
                 : null)
             ->columns([
-                TextColumn::make('activeEnrollment.enrollment_number')
-                    ->label('Roll No.')
-                    ->searchable()
-                    ->sortable()
-                    ->fontFamily('mono')
-                    ->weight('bold')
-                    ->placeholder('—'),
                 TextColumn::make('name')
                     ->label('Student')
-                    ->searchable()
+                    ->searchable(query: function (Builder $query, string $search): void {
+                        $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], trim($search)).'%';
+
+                        $query->where(function (Builder $inner) use ($term): void {
+                            $inner->where('name', 'like', $term)
+                                ->orWhere('father_name', 'like', $term);
+                        });
+                    })
                     ->sortable()
-                    ->description(fn (Student $record): string => $record->father_name ?? ''),
-                TextColumn::make('mobile')
-                    ->label('Mobile')
-                    ->searchable()
+                    ->weight('bold')
+                    ->url(fn (Student $record): string => StudentProfilePage::getUrl(['record' => $record->id]))
+                    ->color('primary'),
+                TextColumn::make('activeEnrollment.enrollment_number')
+                    ->label('Roll No.')
+                    ->searchable(query: function (Builder $query, string $search): void {
+                        $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], trim($search)).'%';
+
+                        $query->whereHas(
+                            'activeEnrollment',
+                            fn (Builder $enrollment): Builder => $enrollment->where('enrollment_number', 'like', $term),
+                        );
+                    })
+                    ->sortable()
                     ->fontFamily('mono')
-                    ->copyable(fn (?string $state): bool => filled($state))
-                    ->formatStateUsing(fn (?string $state): string => filled($state) ? $state : 'Missing — add from profile')
-                    ->description(fn (Student $record): ?string => blank($record->mobile) ? $record->mobile_import_note : null)
-                    ->badge(fn (?string $state): bool => blank($state))
-                    ->color(fn (?string $state): string => blank($state) ? 'danger' : 'gray'),
+                    ->weight('semibold')
+                    ->placeholder('—'),
                 TextColumn::make('class_section')
-                    ->label('Class & section')
+                    ->label('Class')
                     ->state(function (Student $record): string {
                         $batch = $record->activeBatchStudent?->batch;
 
@@ -137,12 +148,33 @@ class StudentResource extends Resource
                     })
                     ->wrap()
                     ->toggleable(false),
+                TextColumn::make('mobile')
+                    ->label('Mobile')
+                    ->searchable(query: function (Builder $query, string $search): void {
+                        $digits = preg_replace('/\D+/', '', $search) ?? '';
+                        $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], trim($search)).'%';
+
+                        $query->where(function (Builder $inner) use ($term, $digits): void {
+                            $inner->where('mobile', 'like', $term);
+                            if (strlen($digits) >= 4) {
+                                $inner->orWhere('mobile', 'like', '%'.$digits.'%');
+                            }
+                        });
+                    })
+                    ->fontFamily('mono')
+                    ->copyable(fn (?string $state): bool => filled($state))
+                    ->formatStateUsing(fn (?string $state): string => filled($state) ? $state : 'Missing — add from profile')
+                    ->badge(fn (?string $state): bool => blank($state))
+                    ->color(fn (?string $state): string => blank($state) ? 'danger' : 'gray')
+                    ->visibleFrom('md'),
                 TextColumn::make('activeEnrollment.feeStructure.pending_amount')
                     ->label('Fee pending')
                     ->money('INR')
                     ->placeholder('—')
                     ->sortable()
                     ->color(fn ($state): string => (float) ($state ?? 0) > 0 ? 'warning' : 'success')
+                    ->visibleFrom('md')
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees) || ! CrmAccess::canViewFees(Auth::user())),
                 TextColumn::make('fee_next_due')
                     ->label('Next due')
@@ -152,8 +184,8 @@ class StudentResource extends Resource
                         return $date?->format('d M Y');
                     })
                     ->placeholder('—')
-                    ->toggleable()
-                    ->hiddenFrom('md')
+                    ->visibleFrom('md')
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees) || ! CrmAccess::canViewFees(Auth::user())),
                 TextColumn::make('fee_status')
                     ->label('Fee status')
@@ -165,14 +197,14 @@ class StudentResource extends Resource
                         return app(FeesDashboardService::class)->feeStatusForStudent($record)['color'] ?? 'gray';
                     })
                     ->placeholder('—')
-                    ->toggleable()
-                    ->hiddenFrom('md')
+                    ->visibleFrom('md')
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->hidden(fn (): bool => ! FeatureGate::enabled(LicenseFeature::Fees) || ! CrmAccess::canViewFees(Auth::user())),
                 TextColumn::make('activeEnrollment.academicSession.name')
                     ->label('Session')
                     ->placeholder('—')
-                    ->toggleable()
-                    ->hiddenFrom('md'),
+                    ->visibleFrom('md')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('status')
                     ->badge()
                     ->color(fn (StudentStatus $state): string => match ($state) {
@@ -182,33 +214,18 @@ class StudentResource extends Resource
                         StudentStatus::Dropped => 'danger',
                         default => 'warning',
                     })
-                    ->formatStateUsing(fn (StudentStatus $state): string => $state->label()),
+                    ->formatStateUsing(fn (StudentStatus $state): string => $state->label())
+                    ->visibleFrom('md')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('activeEnrollment.enrolled_at')
                     ->label('Enrolled')
                     ->date('d M Y')
                     ->sortable()
+                    ->visibleFrom('md')
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('name')
             ->filters([
-                TernaryFilter::make('missing_mobile')
-                    ->label('Mobile number')
-                    ->placeholder('All students')
-                    ->trueLabel('Missing mobile / import issue')
-                    ->falseLabel('Has mobile')
-                    ->queries(
-                        true: fn (Builder $query): Builder => $query->whereNull('mobile'),
-                        false: fn (Builder $query): Builder => $query->whereNotNull('mobile'),
-                        blank: fn (Builder $query): Builder => $query,
-                    ),
-                SelectFilter::make('status')
-                    ->options(collect([
-                        StudentStatus::Enrolled,
-                        StudentStatus::Completed,
-                        StudentStatus::Dropped,
-                    ])->mapWithKeys(
-                        fn (StudentStatus $status) => [$status->value => $status->label()],
-                    )),
                 SelectFilter::make('section')
                     ->label('Class & section')
                     ->options(fn (): array => BatchSelectOptions::activeOptions())
@@ -220,16 +237,6 @@ class StudentResource extends Resource
                             fn (Builder $query): Builder => $query->where('batch_id', $data['value']),
                         ),
                     )),
-                TernaryFilter::make('section_assigned')
-                    ->label('Section assigned')
-                    ->placeholder('All students')
-                    ->trueLabel('Has class & section')
-                    ->falseLabel('No section assigned')
-                    ->queries(
-                        true: fn (Builder $query): Builder => $query->whereHas('activeBatchStudent'),
-                        false: fn (Builder $query): Builder => $query->whereDoesntHave('activeBatchStudent'),
-                        blank: fn (Builder $query): Builder => $query,
-                    ),
                 SelectFilter::make('academic_session')
                     ->label('Session')
                     ->options(fn (): array => AcademicSession::query()
@@ -244,6 +251,34 @@ class StudentResource extends Resource
                             fn (Builder $query): Builder => $query->where('academic_session_id', $data['value']),
                         ),
                     )),
+                SelectFilter::make('status')
+                    ->options(collect([
+                        StudentStatus::Enrolled,
+                        StudentStatus::Completed,
+                        StudentStatus::Dropped,
+                    ])->mapWithKeys(
+                        fn (StudentStatus $status) => [$status->value => $status->label()],
+                    )),
+                TernaryFilter::make('section_assigned')
+                    ->label('Section')
+                    ->placeholder('All')
+                    ->trueLabel('Has section')
+                    ->falseLabel('No section')
+                    ->queries(
+                        true: fn (Builder $query): Builder => $query->whereHas('activeBatchStudent'),
+                        false: fn (Builder $query): Builder => $query->whereDoesntHave('activeBatchStudent'),
+                        blank: fn (Builder $query): Builder => $query,
+                    ),
+                TernaryFilter::make('missing_mobile')
+                    ->label('Mobile')
+                    ->placeholder('All')
+                    ->trueLabel('Missing mobile')
+                    ->falseLabel('Has mobile')
+                    ->queries(
+                        true: fn (Builder $query): Builder => $query->whereNull('mobile'),
+                        false: fn (Builder $query): Builder => $query->whereNotNull('mobile'),
+                        blank: fn (Builder $query): Builder => $query,
+                    ),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -330,12 +365,8 @@ class StudentResource extends Resource
                 ]),
             ])
             ->recordActions([
-                Action::make('openProfile')
-                    ->label('Open profile')
-                    ->icon(Heroicon::OutlinedUser)
-                    ->url(fn (Student $record): string => StudentProfilePage::getUrl(['record' => $record->id])),
                 Action::make('syncFaceVerify')
-                    ->label('Sync to Face API')
+                    ->label('Sync Face')
                     ->icon(Heroicon::OutlinedArrowPath)
                     ->visible(fn (): bool => (bool) config('face_verify.enabled', false)
                         && (Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false))
@@ -364,13 +395,7 @@ class StudentResource extends Resource
             ])
             ->recordUrl(fn (Student $record): string => StudentProfilePage::getUrl(['record' => $record->id]))
             ->emptyStateHeading('No students found')
-            ->emptyStateDescription('Enrolled students appear here. Use Search Student to look up a mobile or roll number.')
-            ->emptyStateActions([
-                Action::make('searchStudent')
-                    ->label('Search Student')
-                    ->icon(Heroicon::OutlinedMagnifyingGlass)
-                    ->url(StudentSearchPage::getUrl()),
-            ]);
+            ->emptyStateDescription('Try another name, roll number, or mobile — or clear filters.');
     }
 
     public static function getPages(): array
