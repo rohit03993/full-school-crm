@@ -2139,6 +2139,10 @@
     }
 
     /* Attendance hub — dense class-wise table (no inner scroll for ~10 classes) */
+    .crm-att-hub-overview__cell p:first-child {
+        @apply leading-tight;
+    }
+
     .crm-att-hub-classes__row td {
         @apply align-middle;
     }

@@ -26,37 +26,43 @@
         </p>
     </div>
 
-    {{-- Totals --}}
-    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div class="rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Students present</p>
-            <p class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">
-                {{ $overview['students_present'] }}
-                <span class="text-sm font-medium text-gray-500">/ {{ $overview['students_expected'] }}</span>
-            </p>
-            <p class="mt-1 text-xs text-gray-500">
-                Absent {{ $overview['students_absent'] }} · Leave {{ $overview['students_leave'] }} · Unmarked {{ $overview['students_unmarked'] }}
-            </p>
+    {{-- Totals: one section, always 2×2 --}}
+    <div class="crm-att-hub-overview overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
+        <div class="border-b border-gray-100 px-3 py-2 dark:border-white/10 sm:px-4 sm:py-2.5">
+            <h3 class="text-sm font-bold text-gray-950 dark:text-white">Today’s overview</h3>
+            <p class="text-xs text-gray-500">Students and staff for {{ $overview['date_label'] }}</p>
         </div>
-        <div class="rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Staff present</p>
-            <p class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">
-                {{ $overview['staff_present'] }}
-                <span class="text-sm font-medium text-gray-500">/ {{ $overview['staff_expected'] }}</span>
-            </p>
-            <p class="mt-1 text-xs text-gray-500">
-                Absent {{ $overview['staff_absent'] }} · Leave {{ $overview['staff_leave'] }} · Unmarked {{ $overview['staff_unmarked'] }}
-            </p>
-        </div>
-        <div class="rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Students marked</p>
-            <p class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">{{ $overview['students_marked'] }}</p>
-            <p class="mt-1 text-xs text-gray-500">P + A + L for this date</p>
-        </div>
-        <div class="rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Staff marked</p>
-            <p class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">{{ $overview['staff_marked'] }}</p>
-            <p class="mt-1 text-xs text-gray-500">Teachers + office for this date</p>
+        <div class="grid grid-cols-2 divide-x divide-y divide-gray-100 dark:divide-white/10">
+            <div class="crm-att-hub-overview__cell px-3 py-2.5 sm:px-4 sm:py-3">
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Students present</p>
+                <p class="mt-0.5 text-xl font-bold tabular-nums text-gray-950 sm:text-2xl dark:text-white">
+                    {{ $overview['students_present'] }}
+                    <span class="text-sm font-medium text-gray-500">/ {{ $overview['students_expected'] }}</span>
+                </p>
+                <p class="mt-0.5 text-[11px] leading-snug text-gray-500">
+                    Abs {{ $overview['students_absent'] }} · Leave {{ $overview['students_leave'] }} · Unmk {{ $overview['students_unmarked'] }}
+                </p>
+            </div>
+            <div class="crm-att-hub-overview__cell px-3 py-2.5 sm:px-4 sm:py-3">
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Staff present</p>
+                <p class="mt-0.5 text-xl font-bold tabular-nums text-gray-950 sm:text-2xl dark:text-white">
+                    {{ $overview['staff_present'] }}
+                    <span class="text-sm font-medium text-gray-500">/ {{ $overview['staff_expected'] }}</span>
+                </p>
+                <p class="mt-0.5 text-[11px] leading-snug text-gray-500">
+                    Abs {{ $overview['staff_absent'] }} · Leave {{ $overview['staff_leave'] }} · Unmk {{ $overview['staff_unmarked'] }}
+                </p>
+            </div>
+            <div class="crm-att-hub-overview__cell px-3 py-2.5 sm:px-4 sm:py-3">
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Students marked</p>
+                <p class="mt-0.5 text-xl font-bold tabular-nums text-gray-950 sm:text-2xl dark:text-white">{{ $overview['students_marked'] }}</p>
+                <p class="mt-0.5 text-[11px] text-gray-500">P + A + L</p>
+            </div>
+            <div class="crm-att-hub-overview__cell px-3 py-2.5 sm:px-4 sm:py-3">
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Staff marked</p>
+                <p class="mt-0.5 text-xl font-bold tabular-nums text-gray-950 sm:text-2xl dark:text-white">{{ $overview['staff_marked'] }}</p>
+                <p class="mt-0.5 text-[11px] text-gray-500">Teachers + office</p>
+            </div>
         </div>
     </div>
 
@@ -228,34 +234,76 @@
             </div>
             <div class="divide-y divide-gray-100 dark:divide-white/10">
                 @foreach ($feed as $row)
-                    <div class="grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-12 sm:items-center sm:gap-2" wire:key="feed-{{ $row['kind'] }}-{{ $loop->index }}-{{ $row['name'] }}">
-                        <div class="sm:col-span-2">
+                    @php
+                        $feedKey = 'feed-'.$row['kind'].'-'.$loop->index.'-'.$row['name'];
+                    @endphp
+
+                    {{-- Mobile: compact two-column row --}}
+                    <div class="crm-att-hub-feed__row sm:hidden px-3 py-2.5" wire:key="{{ $feedKey }}-m">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span @class([
+                                        'inline-flex shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white',
+                                        'bg-amber-500' => $row['kind'] === 'student',
+                                        'bg-sky-600' => $row['kind'] === 'staff',
+                                    ])>{{ $row['kind'] === 'student' ? 'Stu' : 'Staff' }}</span>
+                                    <p class="truncate text-sm font-semibold text-gray-950 dark:text-white">{{ $row['name'] }}</p>
+                                </div>
+                                <p class="mt-0.5 truncate text-[11px] text-gray-500">{{ $row['detail'] }}</p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                                <p @class([
+                                    'text-sm font-semibold',
+                                    'text-emerald-700 dark:text-emerald-300' => ($row['status_value'] ?? '') === 'present',
+                                    'text-rose-700 dark:text-rose-300' => ($row['status_value'] ?? '') === 'absent',
+                                    'text-amber-700 dark:text-amber-300' => ($row['status_value'] ?? '') === 'leave',
+                                ])>{{ $row['status'] }}</p>
+                                <p class="text-[11px] tabular-nums text-gray-600 dark:text-gray-300">
+                                    {{ $row['in_at'] ?? '—' }}
+                                    @if (! empty($row['out_at']) && $row['out_at'] !== '—')
+                                        · {{ $row['out_at'] }}
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+                        <p class="mt-1 truncate text-[11px] text-gray-500">
+                            {{ $row['channel'] }}
+                            @if (! empty($row['source']))
+                                · {{ $row['source'] }}
+                            @endif
+                            · WA {{ $row['whatsapp'] }}
+                        </p>
+                    </div>
+
+                    {{-- Desktop: existing columns --}}
+                    <div class="hidden grid-cols-12 items-center gap-2 px-4 py-3 sm:grid" wire:key="{{ $feedKey }}-d">
+                        <div class="col-span-2">
                             <span @class([
                                 'inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold text-white',
                                 'bg-amber-500' => $row['kind'] === 'student',
                                 'bg-sky-600' => $row['kind'] === 'staff',
                             ])>{{ $row['kind_label'] }}</span>
                         </div>
-                        <div class="sm:col-span-3">
+                        <div class="col-span-3">
                             <p class="font-semibold text-gray-950 dark:text-white">{{ $row['name'] }}</p>
                             <p class="text-xs text-gray-500">{{ $row['detail'] }}</p>
                         </div>
-                        <div class="sm:col-span-2">
+                        <div class="col-span-2">
                             <span @class([
                                 'text-sm font-semibold',
                                 'text-emerald-700 dark:text-emerald-300' => ($row['status_value'] ?? '') === 'present',
                                 'text-rose-700 dark:text-rose-300' => ($row['status_value'] ?? '') === 'absent',
                                 'text-amber-700 dark:text-amber-300' => ($row['status_value'] ?? '') === 'leave',
                             ])>{{ $row['status'] }}</span>
-                            <p class="text-[11px] text-gray-500 sm:hidden">{{ $row['source'] }}</p>
                         </div>
-                        <div class="sm:col-span-2">
+                        <div class="col-span-2">
                             <p class="text-sm text-gray-800 dark:text-gray-200">{{ $row['channel'] }}</p>
-                            <p class="hidden text-[11px] text-gray-500 sm:block">{{ $row['source'] }}</p>
+                            <p class="text-[11px] text-gray-500">{{ $row['source'] }}</p>
                         </div>
-                        <div class="text-sm text-gray-700 dark:text-gray-300 sm:col-span-1">{{ $row['in_at'] ?? '—' }}</div>
-                        <div class="text-sm text-gray-700 dark:text-gray-300 sm:col-span-1">{{ $row['out_at'] ?? '—' }}</div>
-                        <div class="text-sm text-gray-700 dark:text-gray-300 sm:col-span-1">{{ $row['whatsapp'] }}</div>
+                        <div class="col-span-1 text-sm text-gray-700 dark:text-gray-300">{{ $row['in_at'] ?? '—' }}</div>
+                        <div class="col-span-1 text-sm text-gray-700 dark:text-gray-300">{{ $row['out_at'] ?? '—' }}</div>
+                        <div class="col-span-1 text-sm text-gray-700 dark:text-gray-300">{{ $row['whatsapp'] }}</div>
                     </div>
                 @endforeach
             </div>
