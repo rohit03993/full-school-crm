@@ -684,20 +684,47 @@
 
         /* Students directory — compact Name / Roll / Class cards */
         .crm-students-directory .fi-ta-stack .fi-ta-record {
-            @apply mb-2 px-3 py-2.5;
+            @apply mb-2 rounded-2xl px-3.5 py-3 shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10;
         }
 
-        .crm-students-directory .fi-ta-stack .fi-ta-text-item-label {
-            @apply text-[10px] font-semibold uppercase tracking-wide text-gray-400;
+        .crm-students-directory .fi-ta-stack .fi-ta-text-item-label,
+        .crm-students-directory .fi-ta-stack .fi-ta-col-label {
+            @apply hidden;
         }
 
-        .crm-students-directory .fi-ta-stack .fi-ta-text {
-            @apply text-sm leading-snug;
+        .crm-students-directory .fi-ta-stack .fi-ta-text,
+        .crm-students-directory .fi-ta-stack .fi-ta-col {
+            @apply text-[15px] font-semibold leading-snug;
         }
 
-        .crm-students-directory .fi-ta-stack .fi-ta-actions:empty,
-        .crm-students-directory .fi-ta-stack .fi-ta-actions:not(:has(*)) {
-            @apply hidden border-0 m-0 p-0;
+        .crm-students-directory .fi-ta-stack .fi-ta-col-description,
+        .crm-students-directory .fi-ta-stack .fi-ta-text-item-description,
+        .crm-students-directory .fi-ta-stack .fi-ta-description {
+            @apply mt-1 text-[12px] font-medium leading-snug text-gray-500 dark:text-gray-400;
+        }
+
+        .crm-students-directory .fi-ta-stack .fi-ta-actions {
+            @apply hidden;
+        }
+
+        .crm-students-directory .fi-ta-header-toolbar {
+            @apply sticky top-0 z-20 gap-2 bg-white/95 py-2 backdrop-blur dark:bg-gray-950/95;
+        }
+
+        .crm-students-directory .fi-ta-header-toolbar .fi-ta-actions {
+            @apply w-full flex-wrap gap-2;
+        }
+
+        .crm-students-directory .fi-ta-header-toolbar .fi-btn {
+            @apply min-h-10 flex-1 justify-center text-sm;
+        }
+
+        .crm-students-directory .fi-ta-selection-indicator {
+            @apply sticky top-12 z-10 rounded-xl;
+        }
+
+        .crm-students-directory__row--missing-mobile {
+            @apply bg-danger-50/60 dark:bg-danger-500/5;
         }
     }
 

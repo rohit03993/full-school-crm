@@ -38,7 +38,7 @@ class ListStudents extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Search by name, roll number, or mobile on this page. Tap a student to open their profile.';
+        return 'Search by name, roll, or mobile. Select rows for Assign section. Tap a name to open the profile.';
     }
 
     public function mount(): void
