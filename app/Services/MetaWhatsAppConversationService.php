@@ -11,7 +11,6 @@ use App\Support\MetaWhatsAppConversation;
 use App\Support\MetaWhatsAppInboundMessageParser;
 use App\Support\WhatsAppInboxContact;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class MetaWhatsAppConversationService
@@ -40,7 +39,7 @@ class MetaWhatsAppConversationService
         $latestMeta = MetaWhatsAppMessage::query()
             ->with('student:id,name,mobile,status')
             ->whereIn('id', $latestIds)
-            ->orderByDesc(DB::raw('COALESCE(status_at, created_at)'))
+            ->orderByDesc('created_at')
             ->get();
 
         $phones = $latestMeta
@@ -180,7 +179,7 @@ class MetaWhatsAppConversationService
             ? 'inbound'
             : 'outbound';
 
-        $lastAt = $message->status_at ?? $message->created_at;
+        $lastAt = $message->created_at;
         $phone = $normalizedPhone ?: $this->thread->normalizePhoneForStorage((string) $message->phone);
         $student = $contact->student;
 

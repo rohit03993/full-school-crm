@@ -214,7 +214,7 @@ class StudentWhatsAppThreadService
                         body: $body,
                         status: $row->status,
                         statusLabel: $status?->label() ?? ucfirst($row->status),
-                        at: $row->status_at ?? $row->created_at,
+                        at: $row->created_at,
                         templateName: null,
                         provider: 'meta',
                         messageType: $messageType,

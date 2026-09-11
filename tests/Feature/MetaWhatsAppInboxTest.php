@@ -64,6 +64,36 @@ class MetaWhatsAppInboxTest extends TestCase
         $this->assertStringContainsString('first message', $thread->first()->body);
     }
 
+    public function test_thread_bubble_time_uses_sent_time_not_read_status_time(): void
+    {
+        $student = Student::query()->create([
+            'name' => 'Test Student',
+            'mobile' => '9811223344',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $sentAt = now()->subMinutes(30);
+        $readAt = now();
+
+        MetaWhatsAppMessage::query()->create([
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '919811223344',
+            'student_id' => $student->id,
+            'body_preview' => 'Check-in notice',
+            'status' => 'read',
+            'created_at' => $sentAt,
+            'updated_at' => $readAt,
+            'status_at' => $readAt,
+        ]);
+
+        $item = app(StudentWhatsAppThreadService::class)->threadForStudent($student)->first();
+
+        $this->assertNotNull($item);
+        $this->assertSame('read', $item->status);
+        $this->assertSame($sentAt->format('d M, h:i A'), $item->toArray()['at_label']);
+        $this->assertTrue($item->at?->equalTo($sentAt));
+    }
+
     public function test_thread_merges_campaign_and_meta_messages(): void
     {
         $student = Student::query()->create([
