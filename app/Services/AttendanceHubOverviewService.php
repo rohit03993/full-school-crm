@@ -30,6 +30,7 @@ class AttendanceHubOverviewService
      *     students_absent: int,
      *     students_leave: int,
      *     students_marked: int,
+     *     students_manual_marked: int,
      *     students_unmarked: int,
      *     staff_expected: int,
      *     staff_present: int,
@@ -59,6 +60,10 @@ class AttendanceHubOverviewService
             ->where('status', AttendanceStatus::Leave)
             ->count();
         $studentsMarked = $studentsPresent + $studentsAbsent + $studentsLeave;
+        $studentsManualMarked = (int) Attendance::query()
+            ->whereDate('attendance_date', $day)
+            ->whereIn('punch_source', ['manual', 'roll_call'])
+            ->count();
 
         $staffExpected = (int) StaffProfile::query()
             ->whereHas('user', fn ($q) => $q->where('is_active', true))
@@ -86,6 +91,7 @@ class AttendanceHubOverviewService
             'students_absent' => $studentsAbsent,
             'students_leave' => $studentsLeave,
             'students_marked' => $studentsMarked,
+            'students_manual_marked' => $studentsManualMarked,
             'students_unmarked' => max(0, $studentsExpected - $studentsMarked),
             'staff_expected' => $staffExpected,
             'staff_present' => $staffPresent,
@@ -307,6 +313,7 @@ class AttendanceHubOverviewService
             return [
                 'kind' => 'student',
                 'kind_label' => 'Student',
+                'student_id' => $row->student_id ? (int) $row->student_id : null,
                 'name' => $row->student?->name ?? '—',
                 'detail' => $detail,
                 'status' => $status?->label() ?? '—',

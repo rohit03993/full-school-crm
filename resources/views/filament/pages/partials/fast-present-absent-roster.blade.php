@@ -64,7 +64,11 @@
                 @php $student = $row->student; @endphp
                 <div class="flex flex-col gap-3 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:bg-gray-900">
                     <div class="min-w-0">
-                        <p class="truncate font-semibold text-gray-950 dark:text-white">{{ $student->name }}</p>
+                        <x-crm.person-name
+                            :student-id="$student->id"
+                            :name="$student->name"
+                            class="truncate block"
+                        />
                         @if (filled($student->mobile))
                             <p class="text-xs text-gray-500 dark:text-gray-400">{{ $student->mobile }}</p>
                         @endif

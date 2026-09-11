@@ -25,7 +25,15 @@
                         <div class="rounded-xl bg-white p-3 ring-1 ring-emerald-100 dark:bg-gray-900 dark:ring-emerald-500/20">
                             <div class="flex items-start justify-between gap-2">
                                 <div class="min-w-0">
-                                    <p class="truncate font-semibold text-gray-950 dark:text-white">{{ $row['student_name'] }}</p>
+                                    @if (filled($row['student_id'] ?? null))
+                                        <x-crm.person-name
+                                            :student-id="$row['student_id']"
+                                            :name="$row['student_name']"
+                                            class="truncate block"
+                                        />
+                                    @else
+                                        <p class="truncate font-semibold text-gray-950 dark:text-white">{{ $row['student_name'] }}</p>
+                                    @endif
                                     <p class="mt-0.5 font-mono text-xs text-primary-600 dark:text-primary-400">{{ $row['roll'] }}</p>
                                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                         IN {{ $row['pairs'][0]['in'] ?? '—' }}
@@ -59,7 +67,15 @@
                         <div class="rounded-xl bg-white p-3 ring-1 ring-rose-100 dark:bg-gray-900 dark:ring-rose-500/20">
                             <div class="flex items-start justify-between gap-2">
                                 <div class="min-w-0">
-                                    <p class="truncate font-semibold text-gray-950 dark:text-white">{{ $row['student_name'] }}</p>
+                                    @if (filled($row['student_id'] ?? null))
+                                        <x-crm.person-name
+                                            :student-id="$row['student_id']"
+                                            :name="$row['student_name']"
+                                            class="truncate block"
+                                        />
+                                    @else
+                                        <p class="truncate font-semibold text-gray-950 dark:text-white">{{ $row['student_name'] }}</p>
+                                    @endif
                                     <p class="mt-0.5 font-mono text-xs text-gray-500 dark:text-gray-400">{{ $row['roll'] ?? 'No roll' }}</p>
                                     @if (filled($row['mobile'] ?? null))
                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $row['mobile'] }}</p>

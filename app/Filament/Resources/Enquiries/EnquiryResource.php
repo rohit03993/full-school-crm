@@ -102,6 +102,10 @@ class EnquiryResource extends Resource
                     ->label('Student')
                     ->searchable()
                     ->sortable()
+                    ->url(fn (Enquiry $record): ?string => $record->student_id
+                        ? StudentProfilePage::getUrl(['record' => $record->student_id])
+                        : null)
+                    ->color('primary')
                     ->description(fn (Enquiry $record): string => $record->student?->mobile ?? ''),
                 TextColumn::make('course.name')
                     ->label('Course')

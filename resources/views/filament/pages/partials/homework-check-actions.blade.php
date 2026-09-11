@@ -155,10 +155,18 @@
                                             wire:model.live="selectedStudentIds"
                                             class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800"
                                         />
-                                        <span class="font-medium text-gray-950 md:hidden dark:text-white">{{ $student['name'] }}</span>
+                                        <span class="md:hidden">
+                                            <x-crm.person-name
+                                                :student-id="$student['id']"
+                                                :name="$student['name']"
+                                                class="font-medium"
+                                            />
+                                        </span>
                                     </label>
                                 </td>
-                                <td class="hidden px-4 py-2 font-medium md:table-cell" data-label="Student">{{ $student['name'] }}</td>
+                                <td class="hidden px-4 py-2 font-medium md:table-cell" data-label="Student">
+                                    <x-crm.person-name :student-id="$student['id']" :name="$student['name']" />
+                                </td>
                                 <td class="px-4 py-2 text-gray-500" data-label="Mobile">{{ $student['mobile'] ?: '—' }}</td>
                                 <td class="px-4 py-2 text-xs" data-label="Week ND">
                                     @if (($student['not_done_week'] ?? 0) > 0)
@@ -243,7 +251,12 @@
                                     ], true);
                             @endphp
                             <tr wire:key="hw-check-{{ $row->id }}">
-                                <td class="px-4 py-2 font-medium crm-responsive-table__title" data-label="Student">{{ $row->student?->name }}</td>
+                                <td class="px-4 py-2 font-medium crm-responsive-table__title" data-label="Student">
+                                    <x-crm.person-name
+                                        :student-id="$row->student_id"
+                                        :name="$row->student?->name ?? '—'"
+                                    />
+                                </td>
                                 <td class="px-4 py-2" data-label="Subject">{{ $row->subject_name }}</td>
                                 <td class="crm-responsive-table__wide px-4 py-2 text-gray-600 dark:text-gray-300" data-label="Topic">{{ \Illuminate\Support\Str::limit($row->topic, 40) }}</td>
                                 <td class="px-4 py-2" data-label="Status">{{ $row->status?->label() }}</td>

@@ -194,30 +194,42 @@
                     ])></div>
 
                     <div class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
-                        <button type="button" x-on:click="open = ! open" class="min-w-0 flex-1 text-left">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="rounded-lg bg-primary-500/10 px-2 py-0.5 font-mono text-xs font-bold text-primary-700 dark:text-primary-300">{{ $row['roll'] }}</span>
-                                @if ($isInside)
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Inside
-                                    </span>
+                        <div class="min-w-0 flex-1 text-left">
+                            <button type="button" x-on:click="open = ! open" class="w-full text-left">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="rounded-lg bg-primary-500/10 px-2 py-0.5 font-mono text-xs font-bold text-primary-700 dark:text-primary-300">{{ $row['roll'] }}</span>
+                                    @if ($isInside)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Inside
+                                        </span>
+                                    @else
+                                        <span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 dark:bg-white/10 dark:text-gray-300">Out</span>
+                                    @endif
+                                    @unless ($row['is_mapped'])
+                                        <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">Unmapped</span>
+                                    @endunless
+                                    @if (filled($row['total_duration'] ?? null))
+                                        <span class="rounded-full bg-sky-500/10 px-2.5 py-0.5 text-xs font-semibold text-sky-800 dark:text-sky-200">{{ $row['total_duration'] }}</span>
+                                    @endif
+                                </div>
+                            </button>
+                            <div class="mt-2">
+                                @if ($row['is_mapped'] && filled($row['student_id'] ?? null))
+                                    <x-crm.person-name
+                                        :student-id="$row['student_id']"
+                                        :name="$row['student_name']"
+                                        class="truncate text-lg block"
+                                    />
                                 @else
-                                    <span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 dark:bg-white/10 dark:text-gray-300">Out</span>
-                                @endif
-                                @unless ($row['is_mapped'])
-                                    <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">Unmapped</span>
-                                @endunless
-                                @if (filled($row['total_duration'] ?? null))
-                                    <span class="rounded-full bg-sky-500/10 px-2.5 py-0.5 text-xs font-semibold text-sky-800 dark:text-sky-200">{{ $row['total_duration'] }}</span>
+                                    <p class="truncate text-lg font-bold text-gray-950 dark:text-white">{{ $row['student_name'] }}</p>
                                 @endif
                             </div>
-                            <p class="mt-2 truncate text-lg font-bold text-gray-950 dark:text-white">{{ $row['student_name'] }}</p>
-                            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                            <button type="button" x-on:click="open = ! open" class="mt-0.5 w-full text-left text-xs text-gray-500 dark:text-gray-400">
                                 {{ $row['batch_name'] ?? 'No active batch' }}
                                 @if (filled($row['mobile'])) · {{ $row['mobile'] }} @endif
                                 @if (filled($row['last_device'] ?? null)) · {{ $row['last_device'] }} @endif
-                            </p>
-                        </button>
+                            </button>
+                        </div>
 
                         <div class="flex shrink-0 flex-wrap items-center gap-2">
                             @if ($row['is_mapped'] && filled($row['profile_url'] ?? null))

@@ -144,7 +144,11 @@
                                     <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ $call->call_direction->label() }}</p>
                                 </td>
                                 <td class="crm-responsive-table__title px-4 py-3" data-label="">
-                                    <p class="text-sm font-medium text-gray-950 dark:text-white">{{ $call->student?->name ?? '—' }}</p>
+                                    <x-crm.person-name
+                                        :student-id="$call->student_id"
+                                        :name="$call->student?->name ?? '—'"
+                                        class="text-sm"
+                                    />
                                     <p class="text-xs text-gray-500 dark:text-gray-400">{{ $call->student?->mobile ?? '—' }}</p>
                                     @if ($call->enquiry?->course)
                                         <p class="mt-0.5 text-xs text-gray-400">{{ $call->enquiry->course->name }}</p>

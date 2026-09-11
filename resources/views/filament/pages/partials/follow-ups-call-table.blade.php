@@ -51,7 +51,11 @@
                                 ])>{{ $worklist->followUpStatusLabel($followUpAt) }}</p>
                             </td>
                             <td class="crm-responsive-table__title px-4 py-3" data-label="">
-                                <p class="text-sm font-medium text-gray-950 dark:text-white">{{ $student->name }}</p>
+                                <x-crm.person-name
+                                    :student-id="$student->id"
+                                    :name="$student->name"
+                                    class="text-sm"
+                                />
                                 <p class="text-xs text-gray-500 dark:text-gray-400">{{ $student->mobile ?? '—' }}</p>
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" data-label="Course">

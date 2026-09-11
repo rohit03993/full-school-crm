@@ -166,7 +166,11 @@
                                     {{ strtoupper(substr($student->name, 0, 1)) }}
                                 </span>
                                 <div class="min-w-0">
-                                    <p class="truncate font-semibold text-gray-950 dark:text-white">{{ $student->name }}</p>
+                                    <x-crm.person-name
+                                        :student-id="$student->id"
+                                        :name="$student->name"
+                                        class="truncate block"
+                                    />
                                     @if (filled($student->mobile))
                                         <p class="text-xs text-gray-500 dark:text-gray-400">{{ $student->mobile }}</p>
                                     @endif

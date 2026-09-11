@@ -263,7 +263,11 @@
                                 {{ strtoupper(substr($row['name'], 0, 1)) }}
                             </span>
                             <div class="min-w-0">
-                                <p class="truncate text-sm font-semibold text-gray-950 dark:text-white">{{ $row['name'] }}</p>
+                                <x-crm.person-name
+                                    :student-id="$row['id']"
+                                    :name="$row['name']"
+                                    class="truncate text-sm block"
+                                />
                                 <p class="truncate text-[11px] text-gray-500 dark:text-gray-400">
                                     @if (filled($row['roll']))
                                         <span class="font-mono">{{ $row['roll'] }}</span>

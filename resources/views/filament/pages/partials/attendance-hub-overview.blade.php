@@ -26,13 +26,13 @@
         </p>
     </div>
 
-    {{-- Totals: one section, always 2×2 --}}
+    {{-- Totals: Students present + Staff present only --}}
     <div class="crm-att-hub-overview overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
         <div class="border-b border-gray-100 px-3 py-2 dark:border-white/10 sm:px-4 sm:py-2.5">
             <h3 class="text-sm font-bold text-gray-950 dark:text-white">Today’s overview</h3>
-            <p class="text-xs text-gray-500">Students and staff for {{ $overview['date_label'] }}</p>
+            <p class="text-xs text-gray-500">{{ $overview['date_label'] }} · manual + machine</p>
         </div>
-        <div class="grid grid-cols-2 divide-x divide-y divide-gray-100 dark:divide-white/10">
+        <div class="grid grid-cols-2 divide-x divide-gray-100 dark:divide-white/10">
             <div class="crm-att-hub-overview__cell px-3 py-2.5 sm:px-4 sm:py-3">
                 <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Students present</p>
                 <p class="mt-0.5 text-xl font-bold tabular-nums text-gray-950 sm:text-2xl dark:text-white">
@@ -40,7 +40,10 @@
                     <span class="text-sm font-medium text-gray-500">/ {{ $overview['students_expected'] }}</span>
                 </p>
                 <p class="mt-0.5 text-[11px] leading-snug text-gray-500">
-                    Abs {{ $overview['students_absent'] }} · Leave {{ $overview['students_leave'] }} · Unmk {{ $overview['students_unmarked'] }}
+                    Abs {{ $overview['students_absent'] }}
+                    · Leave {{ $overview['students_leave'] }}
+                    · Marked {{ $overview['students_marked'] }}
+                    · Manual {{ $overview['students_manual_marked'] }}
                 </p>
             </div>
             <div class="crm-att-hub-overview__cell px-3 py-2.5 sm:px-4 sm:py-3">
@@ -50,18 +53,10 @@
                     <span class="text-sm font-medium text-gray-500">/ {{ $overview['staff_expected'] }}</span>
                 </p>
                 <p class="mt-0.5 text-[11px] leading-snug text-gray-500">
-                    Abs {{ $overview['staff_absent'] }} · Leave {{ $overview['staff_leave'] }} · Unmk {{ $overview['staff_unmarked'] }}
+                    Abs {{ $overview['staff_absent'] }}
+                    · Leave {{ $overview['staff_leave'] }}
+                    · Unmk {{ $overview['staff_unmarked'] }}
                 </p>
-            </div>
-            <div class="crm-att-hub-overview__cell px-3 py-2.5 sm:px-4 sm:py-3">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Students marked</p>
-                <p class="mt-0.5 text-xl font-bold tabular-nums text-gray-950 sm:text-2xl dark:text-white">{{ $overview['students_marked'] }}</p>
-                <p class="mt-0.5 text-[11px] text-gray-500">P + A + L</p>
-            </div>
-            <div class="crm-att-hub-overview__cell px-3 py-2.5 sm:px-4 sm:py-3">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Staff marked</p>
-                <p class="mt-0.5 text-xl font-bold tabular-nums text-gray-950 sm:text-2xl dark:text-white">{{ $overview['staff_marked'] }}</p>
-                <p class="mt-0.5 text-[11px] text-gray-500">Teachers + office</p>
             </div>
         </div>
     </div>
@@ -148,7 +143,11 @@
                                 <li class="px-4 py-3" wire:key="drill-student-{{ $student['id'] }}">
                                     <div class="flex items-start justify-between gap-3">
                                         <div class="min-w-0">
-                                            <p class="truncate font-semibold text-gray-950 dark:text-white">{{ $student['name'] }}</p>
+                                            <x-crm.person-name
+                                                :student-id="$student['id']"
+                                                :name="$student['name']"
+                                                class="truncate block"
+                                            />
                                             <p class="text-xs text-gray-500">
                                                 @if ($student['roll'])
                                                     Roll {{ $student['roll'] }} ·
@@ -248,7 +247,15 @@
                                         'bg-amber-500' => $row['kind'] === 'student',
                                         'bg-sky-600' => $row['kind'] === 'staff',
                                     ])>{{ $row['kind'] === 'student' ? 'Stu' : 'Staff' }}</span>
-                                    <p class="truncate text-sm font-semibold text-gray-950 dark:text-white">{{ $row['name'] }}</p>
+                                    @if (($row['kind'] ?? '') === 'student')
+                                        <x-crm.person-name
+                                            :student-id="$row['student_id'] ?? null"
+                                            :name="$row['name']"
+                                            class="truncate text-sm"
+                                        />
+                                    @else
+                                        <p class="truncate text-sm font-semibold text-gray-950 dark:text-white">{{ $row['name'] }}</p>
+                                    @endif
                                 </div>
                                 <p class="mt-0.5 truncate text-[11px] text-gray-500">{{ $row['detail'] }}</p>
                             </div>
@@ -286,7 +293,14 @@
                             ])>{{ $row['kind_label'] }}</span>
                         </div>
                         <div class="col-span-3">
-                            <p class="font-semibold text-gray-950 dark:text-white">{{ $row['name'] }}</p>
+                            @if (($row['kind'] ?? '') === 'student')
+                                <x-crm.person-name
+                                    :student-id="$row['student_id'] ?? null"
+                                    :name="$row['name']"
+                                />
+                            @else
+                                <p class="font-semibold text-gray-950 dark:text-white">{{ $row['name'] }}</p>
+                            @endif
                             <p class="text-xs text-gray-500">{{ $row['detail'] }}</p>
                         </div>
                         <div class="col-span-2">
