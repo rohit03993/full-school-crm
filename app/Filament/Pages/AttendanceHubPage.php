@@ -170,39 +170,6 @@ class AttendanceHubPage extends Page
         $notification->send();
     }
 
-    public function markHubAbsent(int $studentId): void
-    {
-        $user = Auth::user();
-        if (! $user || $this->classDrillBatchId === null) {
-            return;
-        }
-
-        $student = Student::query()->find($studentId);
-        $batch = Batch::query()->find($this->classDrillBatchId);
-        if (! $student || ! $batch) {
-            return;
-        }
-
-        $result = app(ManualBatchAttendanceService::class)->markAbsent(
-            $student,
-            $this->resolvedDate(),
-            $user,
-            $batch,
-        );
-
-        $notification = Notification::make()
-            ->title($result['ok'] ? 'Marked absent' : 'Could not mark')
-            ->body($result['message']);
-
-        if ($result['ok']) {
-            $notification->success();
-        } else {
-            $notification->danger();
-        }
-
-        $notification->send();
-    }
-
     public function confirmHubLeave(): void
     {
         $user = Auth::user();

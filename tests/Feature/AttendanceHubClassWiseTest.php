@@ -96,28 +96,12 @@ class AttendanceHubClassWiseTest extends TestCase
         $this->assertTrue(collect($absentRoster['students'])->every(fn (array $s): bool => $s['can_mark'] === true));
     }
 
-    public function test_hub_can_mark_absent_and_leave_from_class_drill(): void
+    public function test_hub_can_mark_leave_from_class_drill(): void
     {
         $this->travelTo('2026-09-11 10:00:00');
 
-        [$batch, , , , $unmarked] = $this->seedClassWithFourStatuses();
+        [$batch] = $this->seedClassWithFourStatuses();
         $admin = $this->actingAsAdmin();
-
-        Livewire::test(AttendanceHubPage::class)
-            ->set('overviewDate', '2026-09-11')
-            ->call('openClassDrill', $batch->id, 'absent')
-            ->assertSet('classDrillBatchId', $batch->id)
-            ->assertSet('classDrillBucket', 'absent')
-            ->assertSee('Unmarked Student')
-            ->call('markHubAbsent', $unmarked->id);
-
-        $absentRow = Attendance::query()
-            ->where('student_id', $unmarked->id)
-            ->whereDate('attendance_date', '2026-09-11')
-            ->first();
-
-        $this->assertNotNull($absentRow);
-        $this->assertSame(AttendanceStatus::Absent, $absentRow->status);
 
         $leaveStudent = Student::query()->create([
             'name' => 'Leave Target',
@@ -132,6 +116,9 @@ class AttendanceHubClassWiseTest extends TestCase
         Livewire::test(AttendanceHubPage::class)
             ->set('overviewDate', '2026-09-11')
             ->call('openClassDrill', $batch->id, 'absent')
+            ->assertSet('classDrillBatchId', $batch->id)
+            ->assertSet('classDrillBucket', 'absent')
+            ->assertSee('Leave Target')
             ->call('startLeaveMark', $leaveStudent->id)
             ->set('leaveReasonTag', AttendanceLeaveReasons::tags()[0] ?? 'Personal work')
             ->set('leaveReasonCustom', '')

@@ -65,7 +65,7 @@
         <div class="crm-att-hub-classes overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
             <div class="border-b border-gray-100 px-3 py-2.5 dark:border-white/10 sm:px-4 sm:py-3">
                 <h3 class="text-sm font-bold text-gray-950 dark:text-white">Class-wise (students)</h3>
-                <p class="text-xs text-gray-500">Tap Present or Absent to see names. From Absent you can mark Present (manual IN), Absent, or Leave.</p>
+                <p class="text-xs text-gray-500">Tap Present or Absent to see names. From Absent you can mark Present (manual IN) or Leave.</p>
             </div>
             <div class="overflow-x-auto">
                 <table class="crm-att-hub-classes__table min-w-full text-left text-sm">
@@ -158,12 +158,6 @@
                                                     wire:loading.attr="disabled"
                                                     class="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30"
                                                 >Mark present</button>
-                                                <button
-                                                    type="button"
-                                                    wire:click="markHubAbsent({{ $student['id'] }})"
-                                                    wire:loading.attr="disabled"
-                                                    class="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30"
-                                                >Mark absent</button>
                                                 <button
                                                     type="button"
                                                     wire:click="startLeaveMark({{ $student['id'] }})"
