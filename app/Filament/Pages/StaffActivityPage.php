@@ -7,6 +7,7 @@ use App\Enums\StaffActivityType;
 use App\Filament\Pages\StaffActivityDetailPage;
 use App\Models\User;
 use App\Services\StaffActivityService;
+use App\Services\StaffActivityTimelineService;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use Filament\Pages\Page;
@@ -26,6 +27,10 @@ class StaffActivityPage extends Page
     protected static ?int $navigationSort = -198;
 
     public string $range = 'today';
+
+    public string $view = 'counts';
+
+    public int $timelineLimit = StaffActivityTimelineService::PAGE;
 
     public ?int $userId = null;
 
@@ -47,7 +52,7 @@ class StaffActivityPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'What this person did. Today is the default. Tiles follow their access, not the whole school.';
+        return 'What this person did. Counts stay on this page. Timeline is the clock for the same range, newest first.';
     }
 
     public static function canAccess(): bool
@@ -77,6 +82,20 @@ class StaffActivityPage extends Page
     public function setRange(string $range): void
     {
         $this->range = StaffActivityRange::fromRequest($range)->value;
+        $this->timelineLimit = StaffActivityTimelineService::PAGE;
+    }
+
+    public function setView(string $view): void
+    {
+        $this->view = $view === 'timeline' ? 'timeline' : 'counts';
+    }
+
+    public function loadMoreTimeline(): void
+    {
+        $this->timelineLimit = min(
+            StaffActivityTimelineService::MAX,
+            $this->timelineLimit + StaffActivityTimelineService::PAGE,
+        );
     }
 
     public function content(Schema $schema): Schema
@@ -102,7 +121,8 @@ class StaffActivityPage extends Page
             'ranges' => StaffActivityRange::cases(),
             'rangeLabel' => $range->label(),
             'periodLabel' => $this->periodLabel($range),
-            'tiles' => $subject
+            'view' => $this->view,
+            'tiles' => $subject && $this->view === 'counts'
                 ? collect(app(StaffActivityService::class)->tiles($subject, $range))
                     ->map(fn (array $tile): array => [
                         ...$tile,
@@ -114,6 +134,9 @@ class StaffActivityPage extends Page
                     ])
                     ->all()
                 : [],
+            'timeline' => $subject && $this->view === 'timeline'
+                ? app(StaffActivityTimelineService::class)->forStaff($subject, $range, $this->timelineLimit)
+                : ['items' => [], 'has_more' => false],
         ];
     }
 

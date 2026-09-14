@@ -11,11 +11,13 @@ use App\Enums\StaffActivityRange;
 use App\Enums\StaffActivityType;
 use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
+use App\Models\StaffLoginSession;
 use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\User;
 use App\Services\CrmPermissionSyncService;
 use App\Services\StaffActivityService;
+use App\Services\StaffActivityTimelineService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -84,5 +86,43 @@ class StaffActivityServiceTest extends TestCase
 
         $this->assertFalse($service->canView($counsellor, $other));
         $this->assertTrue($service->canView($counsellor, $counsellor));
+    }
+
+    public function test_timeline_orders_login_and_call_without_other_roles(): void
+    {
+        $counsellor = User::factory()->create(['is_active' => true]);
+        $counsellor->assignRole(StaffJobRole::Counsellor->value);
+
+        $student = Student::query()->create([
+            'name' => 'Timeline Student',
+            'mobile' => '9000001101',
+            'gender' => Gender::Male,
+            'status' => StudentStatus::Enquiry,
+            'lead_source' => LeadSource::WalkIn,
+        ]);
+
+        StaffLoginSession::query()->create([
+            'user_id' => $counsellor->id,
+            'logged_in_at' => now()->subHour(),
+            'logged_out_at' => now()->subMinutes(10),
+            'method' => 'password',
+        ]);
+
+        StudentCall::query()->create([
+            'student_id' => $student->id,
+            'user_id' => $counsellor->id,
+            'called_at' => now()->subMinutes(30),
+            'call_direction' => CallDirection::Outgoing,
+            'call_status' => CallStatus::Connected,
+        ]);
+
+        $items = collect(app(StaffActivityTimelineService::class)
+            ->forStaff($counsellor, StaffActivityRange::Today)['items']);
+
+        $this->assertSame(
+            ['Logged out', 'Logged a call', 'Logged in to the CRM'],
+            $items->pluck('title')->all(),
+        );
+        $this->assertFalse($items->contains(fn (array $item): bool => $item['category'] === 'Fees'));
     }
 }
