@@ -10,6 +10,9 @@ class StaffRolePermissions
     /**
      * Permissions granted by each job role. Multiple roles on one user = union of all lists.
      *
+     * StudentsViewMobile is not a job-role permission. It is a direct staff checkbox
+     * (see CrmAccess::setStudentMobileVisibility). Super Admin still sees numbers.
+     *
      * Super Admin vault (never granted here): StaffManage, SettingsManage, CasesViewAll,
      * WhatsappSettings, MetaWhatsappSettings, waive-approval UI (role check), audit/backups/setup.
      *
@@ -23,7 +26,6 @@ class StaffRolePermissions
                 CrmPermission::LeadsViewAssigned,
                 CrmPermission::LeadsCall,
                 CrmPermission::StudentsView,
-                CrmPermission::StudentsViewMobile,
                 CrmPermission::CasesView,
                 CrmPermission::CasesOpen,
                 CrmPermission::CasesAssign,
@@ -37,7 +39,6 @@ class StaffRolePermissions
                 CrmPermission::LeadsReassign,
                 CrmPermission::VisitsViewAll,
                 CrmPermission::StudentsView,
-                CrmPermission::StudentsViewMobile,
                 CrmPermission::StudentsEdit,
                 CrmPermission::StudentsImport,
                 CrmPermission::CertificatesView,
@@ -168,6 +169,7 @@ class StaffRolePermissions
                 CrmPermission::FeesWaivePenalty,
                 CrmPermission::LeadsReassign,
                 CrmPermission::ReportsExport,
+                CrmPermission::StudentsViewMobile,
             ], true),
         ));
     }

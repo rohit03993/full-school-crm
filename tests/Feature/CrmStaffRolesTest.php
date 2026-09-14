@@ -144,6 +144,7 @@ class CrmStaffRolesTest extends TestCase
         $this->assertFalse($user->canCrm(CrmPermission::AttendanceMark));
         $this->assertFalse($user->canCrm(CrmPermission::MarksImport));
         $this->assertFalse($user->canCrm(CrmPermission::WhatsappCampaigns));
+        $this->assertFalse($user->canCrm(CrmPermission::StudentsViewMobile));
         $this->assertFalse($user->canCrm(CrmPermission::SettingsManage));
     }
 
@@ -324,20 +325,45 @@ class CrmStaffRolesTest extends TestCase
         }
     }
 
-    public function test_counsellor_and_admission_can_view_student_mobile_by_default(): void
+    public function test_job_roles_do_not_grant_student_mobile_visibility(): void
     {
-        $counsellor = User::factory()->create(['is_active' => true]);
-        $counsellor->assignRole(StaffJobRole::Counsellor->value);
+        foreach (StaffJobRole::cases() as $role) {
+            $user = User::factory()->create(['is_active' => true]);
+            $user->assignRole($role->value);
 
-        $admission = User::factory()->create(['is_active' => true]);
-        $admission->assignRole(StaffJobRole::AdmissionOfficer->value);
+            $this->assertFalse(
+                $user->canCrm(CrmPermission::StudentsViewMobile),
+                "{$role->value} should not see student mobiles without the staff checkbox",
+            );
+            $this->assertSame('Hidden', \App\Support\CrmAccess::studentMobileLabel($user, '9876543210'));
+        }
+    }
 
-        $this->assertTrue($counsellor->canCrm(CrmPermission::StudentsViewMobile));
-        $this->assertTrue(\App\Support\CrmAccess::canViewStudentMobile($counsellor));
-        $this->assertSame('9876543210', \App\Support\CrmAccess::studentMobileLabel($counsellor, '9876543210'));
+    public function test_direct_student_mobile_permission_survives_role_sync(): void
+    {
+        $teacher = User::factory()->create(['is_active' => true]);
+        $teacher->assignRole(StaffJobRole::Teacher->value);
 
-        $this->assertTrue($admission->canCrm(CrmPermission::StudentsViewMobile));
-        $this->assertTrue(\App\Support\CrmAccess::canViewStudentMobile($admission));
+        \App\Support\CrmAccess::setStudentMobileVisibility($teacher, true);
+        $teacher = $teacher->fresh();
+
+        $this->assertTrue($teacher->canCrm(CrmPermission::StudentsViewMobile));
+        $this->assertSame('9876543210', \App\Support\CrmAccess::studentMobileLabel($teacher, '9876543210'));
+
+        app(CrmPermissionSyncService::class)->sync();
+        $teacher = $teacher->fresh();
+
+        $this->assertTrue(
+            $teacher->canCrm(CrmPermission::StudentsViewMobile),
+            'Role sync must not remove the staff mobile checkbox',
+        );
+
+        \App\Support\CrmAccess::setStudentMobileVisibility($teacher, false);
+        $teacher = $teacher->fresh();
+
+        $this->assertFalse($teacher->canCrm(CrmPermission::StudentsViewMobile));
+        $this->assertSame('Hidden', \App\Support\CrmAccess::studentMobileLabel($teacher, '9876543210'));
+        $this->assertTrue($teacher->canCrm(CrmPermission::AttendanceMark));
     }
 
     public function test_teacher_accounts_and_whatsapp_roles_cannot_view_student_mobile_by_default(): void

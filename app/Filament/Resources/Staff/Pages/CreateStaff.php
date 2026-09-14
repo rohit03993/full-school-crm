@@ -7,6 +7,7 @@ use App\Enums\StaffJobRole;
 use App\Filament\Concerns\ShowsCrmPageHint;
 use App\Filament\Resources\Staff\StaffResource;
 use App\Services\StaffEmployeeCodeService;
+use App\Support\CrmAccess;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateStaff extends CreateRecord
@@ -25,10 +26,15 @@ class CreateStaff extends CreateRecord
      */
     protected array $rolesToSync = [];
 
+    protected bool $canViewStudentMobile = false;
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $this->rolesToSync = $this->resolveRolesToSync($data);
-        unset($data['job_roles'], $data['is_super_admin']);
+        $this->canViewStudentMobile = ! empty($data['is_super_admin'])
+            ? false
+            : (bool) ($data['can_view_student_mobile'] ?? false);
+        unset($data['job_roles'], $data['is_super_admin'], $data['can_view_student_mobile']);
         $data['email'] = null;
 
         return $data;
@@ -37,6 +43,10 @@ class CreateStaff extends CreateRecord
     protected function afterCreate(): void
     {
         $this->record->syncRoles($this->rolesToSync);
+
+        if (! $this->record->hasRole(RoleName::SuperAdmin->value)) {
+            CrmAccess::setStudentMobileVisibility($this->record, $this->canViewStudentMobile);
+        }
 
         if (! $this->record->staffProfile()->exists()) {
             $this->record->staffProfile()->create([]);

@@ -50,10 +50,43 @@ class CrmAccess
 
     /**
      * See student/parent mobile numbers and use Dial / tel: / call-bar.
+     * Super Admin always can. Other staff need the direct staff checkbox, not a job role.
      */
     public static function canViewStudentMobile(?User $user): bool
     {
         return self::can($user, CrmPermission::StudentsViewMobile);
+    }
+
+    /**
+     * Direct grant only. Job roles do not include this permission.
+     */
+    public static function hasDirectStudentMobileVisibility(User $user): bool
+    {
+        return $user->getDirectPermissions()
+            ->contains('name', CrmPermission::StudentsViewMobile->value);
+    }
+
+    /**
+     * Turn the staff "see student mobile" checkbox on or off.
+     * Stored on the user, so role sync does not add or remove it.
+     */
+    public static function setStudentMobileVisibility(User $user, bool $allowed): void
+    {
+        $name = CrmPermission::StudentsViewMobile->value;
+
+        \Spatie\Permission\Models\Permission::findOrCreate($name, 'web');
+
+        if ($allowed) {
+            if (! $user->hasDirectPermission($name)) {
+                $user->givePermissionTo($name);
+            }
+
+            return;
+        }
+
+        if ($user->hasDirectPermission($name)) {
+            $user->revokePermissionTo($name);
+        }
     }
 
     /**

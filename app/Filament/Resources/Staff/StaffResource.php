@@ -141,6 +141,11 @@ class StaffResource extends Resource
                         ->columns(1)
                         ->disabled(fn (callable $get): bool => (bool) $get('is_super_admin'))
                         ->helperText('Select one or more roles. Combine Accountant + Fee adjuster when someone should both collect fees and change discounts/structure.'),
+                    Toggle::make('can_view_student_mobile')
+                        ->label('Can see student mobile numbers')
+                        ->default(false)
+                        ->disabled(fn (callable $get): bool => (bool) $get('is_super_admin'))
+                        ->helperText('Separate from job role. On = full numbers and Call. Off = Hidden. Super Admin always sees numbers.'),
                 ]),
             Section::make('Staff Profile')
                 ->columns(2)

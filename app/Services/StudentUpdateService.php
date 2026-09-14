@@ -22,10 +22,16 @@ class StudentUpdateService
     public function update(Student $student, array $data, ?User $staff = null): Student
     {
         return DB::transaction(function () use ($student, $data, $staff): Student {
+            // Hidden mobile fields are omitted from the form. Keep the saved numbers
+            // so staff without "see mobile" cannot wipe them while editing other details.
             $phones = $this->mobiles->validateForUpdate(
                 $student,
-                (string) ($data['mobile'] ?? $student->mobile),
-                $data['alternate_mobile'] ?? null,
+                array_key_exists('mobile', $data)
+                    ? (string) ($data['mobile'] ?? '')
+                    : (string) $student->mobile,
+                array_key_exists('alternate_mobile', $data)
+                    ? ($data['alternate_mobile'] ?? null)
+                    : $student->alternate_mobile,
                 $staff,
             );
 
