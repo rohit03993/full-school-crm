@@ -7,6 +7,7 @@ use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\CrmCacheInvalidator;
+use App\Support\PunchWhatsAppOutcome;
 use Illuminate\Support\Facades\DB;
 
 class PunchAttendanceProcessor
@@ -67,6 +68,7 @@ class PunchAttendanceProcessor
         string $time,
         string $state,
         User $staff,
+        bool $notifyParents = true,
     ): array {
         AttendanceManualPunch::query()->create([
             'enrollment_number' => $this->logs->normalizeRoll($enrollmentNumber),
@@ -97,7 +99,7 @@ class PunchAttendanceProcessor
             DB::table($this->logs->punchTable())->insert($payload);
         }
 
-        return $this->applyPunchEffects($student, $enrollmentNumber, $date, $time, $state, $staff);
+        return $this->applyPunchEffects($student, $enrollmentNumber, $date, $time, $state, $staff, $notifyParents);
     }
 
     /**
@@ -216,6 +218,7 @@ class PunchAttendanceProcessor
         string $time,
         string $state,
         ?User $staff = null,
+        bool $notifyParents = true,
     ): array {
         $synced = false;
 
@@ -227,13 +230,15 @@ class PunchAttendanceProcessor
             $synced = true;
         }
 
-        $whatsapp = $this->whatsapp->outcomeForPunch($student, $roll, $date, $time, $state, $staff);
+        $whatsapp = $notifyParents
+            ? $this->whatsapp->outcomeForPunch($student, $roll, $date, $time, $state, $staff)
+            : PunchWhatsAppOutcome::skipped('Parent message not sent.');
 
         if ($synced) {
             CrmCacheInvalidator::afterAttendanceChange();
         }
 
-        if ($synced && in_array($state, ['IN', 'OUT'], true)) {
+        if ($synced && $notifyParents && in_array($state, ['IN', 'OUT'], true)) {
             try {
                 app(\App\Services\WebPushService::class)->notifyAttendancePunch($student, $state, $time);
             } catch (\Throwable $exception) {

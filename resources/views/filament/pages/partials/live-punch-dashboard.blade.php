@@ -294,4 +294,6 @@
             @endforeach
         </div>
     @endif
+
+    @include('filament.pages.partials.manual-present-confirm')
 </div>

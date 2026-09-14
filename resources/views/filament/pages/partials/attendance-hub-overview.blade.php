@@ -78,7 +78,7 @@
         <div class="crm-att-hub-classes overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
             <div class="border-b border-gray-100 px-3 py-2.5 dark:border-white/10 sm:px-4 sm:py-3">
                 <h3 class="text-sm font-bold text-gray-950 dark:text-white">Class-wise (students)</h3>
-                <p class="text-xs text-gray-500">Tap Present, Absent, or Leave to see names. From Absent you can mark Present (manual IN) or Leave.</p>
+                <p class="text-xs text-gray-500">Tap Present, Absent, or Leave to see names. From Absent you can mark Present or Leave. Mark present asks for the time and whether to message the parent.</p>
             </div>
             <div class="overflow-x-auto">
                 <table class="crm-att-hub-classes__table min-w-full text-left text-sm">
@@ -178,8 +178,7 @@
                                             <div class="flex shrink-0 flex-col items-end gap-1.5">
                                                 <button
                                                     type="button"
-                                                    wire:click="markHubPresent({{ $student['id'] }})"
-                                                    wire:loading.attr="disabled"
+                                                    wire:click="startHubPresent({{ $student['id'] }})"
                                                     class="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30"
                                                 >Mark present</button>
                                                 <button
@@ -190,6 +189,34 @@
                                             </div>
                                         @endif
                                     </div>
+
+                                    @if ($presentStudentId === $student['id'])
+                                        <div class="mt-3 space-y-2 rounded-xl bg-gray-50 p-3 dark:bg-white/5">
+                                            <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Arrival time</label>
+                                            <input
+                                                type="time"
+                                                wire:model.live="presentTime"
+                                                class="fi-crm-input block w-full text-sm"
+                                            />
+                                            <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
+                                                <input type="checkbox" wire:model.live="presentNotify" class="mt-0.5 rounded border-gray-300" />
+                                                <span>Send parent message for this time</span>
+                                            </label>
+                                            <div class="flex gap-2">
+                                                <button
+                                                    type="button"
+                                                    wire:click="confirmHubPresent"
+                                                    wire:loading.attr="disabled"
+                                                    class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                                                >Confirm present</button>
+                                                <button
+                                                    type="button"
+                                                    wire:click="cancelHubPresent"
+                                                    class="rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-white/10"
+                                                >Cancel</button>
+                                            </div>
+                                        </div>
+                                    @endif
 
                                     @if ($leaveStudentId === $student['id'])
                                         <div class="mt-3 space-y-2 rounded-xl bg-gray-50 p-3 dark:bg-white/5">

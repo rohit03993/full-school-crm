@@ -84,13 +84,15 @@
                                 <div class="flex shrink-0 flex-col gap-1">
                                     <a href="{{ $row['profile_url'] }}" class="text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400">Profile</a>
                                     @if (filled($row['roll'] ?? null))
-                                        <button
-                                            type="button"
-                                            wire:click="markManualPunch('{{ $row['roll'] }}', 'IN')"
-                                            class="text-left text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
-                                        >
-                                            Mark IN
-                                        </button>
+                                        @if (filled($row['student_id'] ?? null))
+                                            <button
+                                                type="button"
+                                                wire:click="startPresentConfirm({{ (int) $row['student_id'] }})"
+                                                class="text-left text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
+                                            >
+                                                Mark IN
+                                            </button>
+                                        @endif
                                     @endif
                                 </div>
                             </div>

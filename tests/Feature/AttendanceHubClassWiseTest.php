@@ -217,7 +217,22 @@ class AttendanceHubClassWiseTest extends TestCase
         Livewire::test(AttendanceHubPage::class)
             ->set('overviewDate', '2026-09-11')
             ->call('openClassDrill', $batch->id, 'absent')
-            ->call('markHubPresent', $unmarked->id);
+            ->call('startHubPresent', $unmarked->id)
+            ->assertSet('presentStudentId', $unmarked->id)
+            ->assertSee('Send parent message for this time');
+
+        $this->assertNull(
+            Attendance::query()->where('student_id', $unmarked->id)->first(),
+        );
+
+        Livewire::test(AttendanceHubPage::class)
+            ->set('overviewDate', '2026-09-11')
+            ->call('openClassDrill', $batch->id, 'absent')
+            ->call('startHubPresent', $unmarked->id)
+            ->set('presentTime', '08:15')
+            ->set('presentNotify', false)
+            ->call('confirmHubPresent')
+            ->assertSet('presentStudentId', null);
 
         $row = Attendance::query()
             ->where('student_id', $unmarked->id)
@@ -227,7 +242,7 @@ class AttendanceHubClassWiseTest extends TestCase
         $this->assertNotNull($row);
         $this->assertSame(AttendanceStatus::Present, $row->status);
         $this->assertSame('manual', $row->punch_source);
-        $this->assertNotNull($row->checked_in_at);
+        $this->assertSame('08:15:00', $row->checked_in_at?->format('H:i:s'));
     }
 
     protected function actingAsAdmin(): User

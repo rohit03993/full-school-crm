@@ -50,6 +50,12 @@ class AttendanceHubPage extends Page
 
     public ?int $leaveStudentId = null;
 
+    public ?int $presentStudentId = null;
+
+    public string $presentTime = '';
+
+    public bool $presentNotify = true;
+
     public string $leaveReasonTag = '';
 
     public string $leaveReasonCustom = '';
@@ -100,6 +106,7 @@ class AttendanceHubPage extends Page
         $this->classDrillBatchId = $batchId;
         $this->classDrillBucket = $bucket;
         $this->leaveStudentId = null;
+        $this->cancelHubPresent();
         $this->leaveReasonTag = '';
         $this->leaveReasonCustom = '';
     }
@@ -109,6 +116,7 @@ class AttendanceHubPage extends Page
         $this->classDrillBatchId = null;
         $this->classDrillBucket = null;
         $this->leaveStudentId = null;
+        $this->cancelHubPresent();
         $this->leaveReasonTag = '';
         $this->leaveReasonCustom = '';
     }
@@ -130,6 +138,7 @@ class AttendanceHubPage extends Page
 
     public function startLeaveMark(int $studentId): void
     {
+        $this->cancelHubPresent();
         $this->leaveStudentId = $studentId;
         $this->leaveReasonTag = AttendanceLeaveReasons::tags()[0] ?? 'Personal work';
         $this->leaveReasonCustom = '';
@@ -142,23 +151,45 @@ class AttendanceHubPage extends Page
         $this->leaveReasonCustom = '';
     }
 
-    public function markHubPresent(int $studentId): void
+    public function startHubPresent(int $studentId): void
     {
-        $user = Auth::user();
-        if (! $user || $this->classDrillBatchId === null || $this->classDrillBucket !== 'absent') {
+        if ($this->classDrillBatchId === null || $this->classDrillBucket !== 'absent') {
             return;
         }
 
-        $student = Student::query()->find($studentId);
+        $this->cancelLeaveMark();
+        $this->presentStudentId = $studentId;
+        $this->presentTime = now()->format('H:i');
+        $this->presentNotify = true;
+    }
+
+    public function cancelHubPresent(): void
+    {
+        $this->presentStudentId = null;
+        $this->presentTime = '';
+        $this->presentNotify = true;
+    }
+
+    public function confirmHubPresent(): void
+    {
+        $user = Auth::user();
+        if (! $user || $this->classDrillBatchId === null || $this->classDrillBucket !== 'absent' || $this->presentStudentId === null) {
+            return;
+        }
+
+        $student = Student::query()->find($this->presentStudentId);
         if (! $student) {
             return;
         }
 
-        // Same path as Students → manual batch IN (WhatsApp / SMS automations included).
+        $notifyParents = $this->presentNotify;
+
         $result = app(ManualBatchAttendanceService::class)->manualIn(
             $student,
             $this->resolvedDate(),
             $user,
+            $this->presentTime,
+            $notifyParents,
         );
 
         if (! $result['ok']) {
@@ -171,6 +202,8 @@ class AttendanceHubPage extends Page
             return;
         }
 
+        $this->cancelHubPresent();
+
         $body = $student->name.': '.$result['message'];
         if ($whatsapp = $result['whatsapp'] ?? null) {
             $body .= ' '.$whatsapp['message'];
@@ -181,7 +214,7 @@ class AttendanceHubPage extends Page
             ->body($body)
             ->duration(10000);
 
-        if (($result['whatsapp']['queued'] ?? false) === true) {
+        if (! $notifyParents || ($result['whatsapp']['queued'] ?? false) === true) {
             $notification->success();
         } else {
             $notification->warning();
@@ -299,6 +332,7 @@ class AttendanceHubPage extends Page
                     'classDrill' => $classDrill,
                     'overviewList' => $overviewList,
                     'leaveStudentId' => $this->leaveStudentId,
+                    'presentStudentId' => $this->presentStudentId,
                     'leaveReasonTag' => $this->leaveReasonTag,
                     'leaveReasonCustom' => $this->leaveReasonCustom,
                     'leaveTags' => AttendanceLeaveReasons::tags(),

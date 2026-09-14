@@ -144,6 +144,27 @@ class ManualBatchAttendanceTest extends TestCase
         $this->assertStringContainsString('Not inside', $result['message']);
     }
 
+    public function test_manual_in_uses_chosen_time_and_can_skip_parent_message(): void
+    {
+        $this->travelTo('2026-06-20 10:00:00');
+
+        [$student, , $staff] = $this->createEnrolledStudent('ROLL-TIME');
+        $service = app(ManualBatchAttendanceService::class);
+
+        $future = $service->manualIn($student, '2026-06-20', $staff, '11:00', false);
+        $this->assertFalse($future['ok']);
+        $this->assertStringContainsString('later than now', $future['message']);
+
+        $result = $service->manualIn($student, '2026-06-20', $staff, '08:15', false);
+
+        $this->assertTrue($result['ok']);
+        $this->assertFalse($result['whatsapp']['queued']);
+        $this->assertSame('Parent message not sent.', $result['whatsapp']['message']);
+
+        $attendance = Attendance::query()->first();
+        $this->assertSame('08:15:00', $attendance?->checked_in_at?->format('H:i:s'));
+    }
+
     public function test_manual_in_rejects_backdated_date(): void
     {
         $this->travelTo('2026-06-20 10:00:00');

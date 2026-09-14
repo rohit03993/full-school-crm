@@ -109,13 +109,13 @@
             @if ($absent > 0)
                 <button
                     type="button"
-                    wire:click="checkInAllStudents"
+                    wire:click="startBulkManualIn"
                     wire:loading.attr="disabled"
-                    wire:target="checkInAllStudents"
+                    wire:target="confirmManualIn"
                     class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-60"
                 >
-                    <span wire:loading.remove wire:target="checkInAllStudents">Check in remaining ({{ $absent }})</span>
-                    <span wire:loading wire:target="checkInAllStudents">Checking in…</span>
+                    <span wire:loading.remove wire:target="confirmManualIn">Check in remaining ({{ $absent }})</span>
+                    <span wire:loading wire:target="confirmManualIn">Checking in…</span>
                 </button>
             @endif
         </div>
@@ -486,4 +486,6 @@
             </div>
         </div>
     @endif
+
+    @include('filament.pages.partials.manual-present-confirm')
 </div>

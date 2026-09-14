@@ -131,6 +131,20 @@ class AttendancePage extends Page
 
     public string $leaveCustomReason = '';
 
+    public bool $showPresentModal = false;
+
+    public ?int $presentStudentId = null;
+
+    public string $presentStudentName = '';
+
+    public string $presentTime = '';
+
+    public bool $presentNotify = true;
+
+    public bool $presentBulk = false;
+
+    public int $presentBulkCount = 0;
+
     /**
      * @var Collection<int, BatchStudent>
      */
@@ -343,6 +357,17 @@ class AttendancePage extends Page
         $failed = 0;
         $whatsappQueued = 0;
 
+        $resolvedTime = $manualBatch->normalizeManualInTime($this->presentTime);
+        if (! $resolvedTime['ok']) {
+            Notification::make()
+                ->title('Cannot check in')
+                ->body($resolvedTime['message'])
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         foreach ($this->roster as $row) {
             $student = $row->student;
 
@@ -359,7 +384,13 @@ class AttendancePage extends Page
                 continue;
             }
 
-            $result = $manualBatch->manualIn($student, $date, Auth::user());
+            $result = $manualBatch->manualIn(
+                $student,
+                $date,
+                Auth::user(),
+                $resolvedTime['time'],
+                $this->presentNotify,
+            );
 
             if ($result['ok']) {
                 $checkedIn++;
@@ -400,6 +431,8 @@ class AttendancePage extends Page
             ->body($body)
             ->success()
             ->send();
+
+        $this->closePresentModal();
     }
 
     public function markAllPresent(): void
@@ -469,11 +502,8 @@ class AttendancePage extends Page
         $this->loadRoster();
     }
 
-    public function markManualInForStudent(
-        ManualBatchAttendanceService $manualBatch,
-        int $studentId,
-    ): void {
-        $date = $this->filters['date'] ?? now()->toDateString();
+    public function markManualInForStudent(int $studentId): void
+    {
         $student = Student::query()->find($studentId);
 
         if (! $student) {
@@ -482,7 +512,82 @@ class AttendancePage extends Page
             return;
         }
 
-        $result = $manualBatch->manualIn($student, $date, Auth::user());
+        if (! ($this->attendanceSnapshot[$studentId]['can_in'] ?? false)) {
+            Notification::make()
+                ->title('Cannot check in')
+                ->body('Already inside. Mark OUT first.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->startPresentConfirm($studentId);
+    }
+
+    public function startPresentConfirm(int $studentId): void
+    {
+        $student = Student::query()->find($studentId);
+
+        if (! $student) {
+            Notification::make()->title('Student not found')->danger()->send();
+
+            return;
+        }
+
+        $this->closeLeaveModal();
+        $this->presentStudentId = $studentId;
+        $this->presentStudentName = $student->name;
+        $this->presentTime = now()->format('H:i');
+        $this->presentNotify = true;
+        $this->presentBulk = false;
+        $this->presentBulkCount = 0;
+        $this->showPresentModal = true;
+    }
+
+    public function startBulkManualIn(): void
+    {
+        $this->closeLeaveModal();
+        $this->presentStudentId = null;
+        $this->presentStudentName = '';
+        $this->presentTime = now()->format('H:i');
+        $this->presentNotify = true;
+        $this->presentBulk = true;
+        $this->presentBulkCount = $this->remainingCheckInCount();
+        $this->showPresentModal = true;
+    }
+
+    public function closePresentModal(): void
+    {
+        $this->showPresentModal = false;
+        $this->presentStudentId = null;
+        $this->presentStudentName = '';
+        $this->presentTime = '';
+        $this->presentNotify = true;
+        $this->presentBulk = false;
+        $this->presentBulkCount = 0;
+    }
+
+    public function confirmManualIn(ManualBatchAttendanceService $manualBatch): void
+    {
+        if ($this->presentBulk) {
+            $this->checkInAllStudents($manualBatch);
+
+            return;
+        }
+
+        $date = $this->filters['date'] ?? now()->toDateString();
+        $student = $this->presentStudentId ? Student::query()->find($this->presentStudentId) : null;
+
+        if (! $student) {
+            Notification::make()->title('Student not found')->danger()->send();
+            $this->closePresentModal();
+
+            return;
+        }
+
+        $notifyParents = $this->presentNotify;
+        $result = $manualBatch->manualIn($student, $date, Auth::user(), $this->presentTime, $notifyParents);
 
         if (! $result['ok']) {
             Notification::make()
@@ -494,9 +599,35 @@ class AttendancePage extends Page
             return;
         }
 
-        $this->marks[$studentId] = AttendanceStatus::Present->value;
+        $this->marks[$student->id] = AttendanceStatus::Present->value;
         $this->loadRoster();
-        $this->notifyManualPunchResult('Check-in (IN) saved', $student->name, $result);
+        $this->closePresentModal();
+        $this->notifyManualPunchResult('Check-in (IN) saved', $student->name, $result, $notifyParents);
+    }
+
+    protected function remainingCheckInCount(): int
+    {
+        $count = 0;
+
+        foreach ($this->roster as $row) {
+            $student = $row->student;
+
+            if (! $student) {
+                continue;
+            }
+
+            if (! ($this->attendanceSnapshot[$student->id]['can_in'] ?? true)) {
+                continue;
+            }
+
+            if (($this->attendanceSnapshot[$student->id]['visit_count'] ?? 0) > 0) {
+                continue;
+            }
+
+            $count++;
+        }
+
+        return $count;
     }
 
     public function markManualOutForStudent(
@@ -684,7 +815,7 @@ class AttendancePage extends Page
     /**
      * @param  array{ok: bool, message: string, whatsapp: array{queued: bool, message: string}|null}  $result
      */
-    private function notifyManualPunchResult(string $title, string $studentName, array $result): void
+    private function notifyManualPunchResult(string $title, string $studentName, array $result, bool $notifyParents = true): void
     {
         $body = "{$studentName}: {$result['message']}";
 
@@ -697,7 +828,7 @@ class AttendancePage extends Page
             ->body($body)
             ->duration(10000);
 
-        if (($result['whatsapp']['queued'] ?? false) === true) {
+        if (! $notifyParents || ($result['whatsapp']['queued'] ?? false) === true) {
             $notification->success()->send();
 
             return;

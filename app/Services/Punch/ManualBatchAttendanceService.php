@@ -11,6 +11,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\AttendanceService;
 use App\Support\CrmCacheInvalidator;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -29,10 +30,19 @@ class ManualBatchAttendanceService
      *     whatsapp: array{queued: bool, message: string}|null
      * }
      */
-    public function manualIn(Student $student, string $date, User $staff): array
+    public function manualIn(Student $student, string $date, User $staff, ?string $time = null, bool $notifyParents = true): array
     {
         if ($blocked = $this->manualDateBlockedResult($date)) {
             return $blocked;
+        }
+
+        $resolvedTime = $this->normalizeManualInTime($time);
+        if (! $resolvedTime['ok']) {
+            return [
+                'ok' => false,
+                'message' => $resolvedTime['message'],
+                'whatsapp' => null,
+            ];
         }
 
         $roll = $this->rollForStudent($student);
@@ -55,14 +65,40 @@ class ManualBatchAttendanceService
             ];
         }
 
-        $time = now()->format('H:i:s');
-        $result = $this->processor->handleManualPunch($student, $roll, $date, $time, 'IN', $staff);
+        $time = $resolvedTime['time'];
+        $result = $this->processor->handleManualPunch($student, $roll, $date, $time, 'IN', $staff, $notifyParents);
 
         return [
             'ok' => true,
             'message' => "Check-in (IN) saved at {$time}.",
             'whatsapp' => $result['whatsapp'],
         ];
+    }
+
+    /**
+     * Arrival time for a manual IN. Empty means now. A later time is rejected.
+     *
+     * @return array{ok: true, time: string}|array{ok: false, message: string}
+     */
+    public function normalizeManualInTime(?string $time): array
+    {
+        $raw = trim((string) $time);
+
+        if ($raw === '') {
+            return ['ok' => true, 'time' => now()->format('H:i:s')];
+        }
+
+        if (! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/', $raw)) {
+            return ['ok' => false, 'message' => 'Enter a valid arrival time.'];
+        }
+
+        $normalized = strlen($raw) === 5 ? $raw.':00' : $raw;
+
+        if (Carbon::parse(now()->toDateString().' '.$normalized)->greaterThan(now())) {
+            return ['ok' => false, 'message' => 'Arrival time cannot be later than now.'];
+        }
+
+        return ['ok' => true, 'time' => $normalized];
     }
 
     /**
