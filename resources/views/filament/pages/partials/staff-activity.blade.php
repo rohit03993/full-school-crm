@@ -12,14 +12,14 @@
                     <button
                         type="button"
                         wire:click="setView('counts')"
-                        @class(['crm-seg__btn', 'crm-seg__btn--active' => $view === 'counts'])
+                        @class(['crm-seg__btn', 'crm-seg__btn--active' => $mode === 'counts'])
                     >
                         Counts
                     </button>
                     <button
                         type="button"
                         wire:click="setView('timeline')"
-                        @class(['crm-seg__btn', 'crm-seg__btn--active' => $view === 'timeline'])
+                        @class(['crm-seg__btn', 'crm-seg__btn--active' => $mode === 'timeline'])
                     >
                         Timeline
                     </button>
@@ -39,7 +39,7 @@
         </div>
     </div>
 
-    @if ($view === 'timeline')
+    @if ($mode === 'timeline')
         @php
             $items = collect($timeline['items'] ?? []);
             $grouped = $items->groupBy('occurred_date');

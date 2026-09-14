@@ -28,7 +28,7 @@ class StaffActivityPage extends Page
 
     public string $range = 'today';
 
-    public string $view = 'counts';
+    public string $mode = 'counts';
 
     public int $timelineLimit = StaffActivityTimelineService::PAGE;
 
@@ -87,7 +87,7 @@ class StaffActivityPage extends Page
 
     public function setView(string $view): void
     {
-        $this->view = $view === 'timeline' ? 'timeline' : 'counts';
+        $this->mode = $view === 'timeline' ? 'timeline' : 'counts';
     }
 
     public function loadMoreTimeline(): void
@@ -121,8 +121,8 @@ class StaffActivityPage extends Page
             'ranges' => StaffActivityRange::cases(),
             'rangeLabel' => $range->label(),
             'periodLabel' => $this->periodLabel($range),
-            'view' => $this->view,
-            'tiles' => $subject && $this->view === 'counts'
+            'mode' => $this->mode,
+            'tiles' => $subject && $this->mode === 'counts'
                 ? collect(app(StaffActivityService::class)->tiles($subject, $range))
                     ->map(fn (array $tile): array => [
                         ...$tile,
@@ -134,7 +134,7 @@ class StaffActivityPage extends Page
                     ])
                     ->all()
                 : [],
-            'timeline' => $subject && $this->view === 'timeline'
+            'timeline' => $subject && $this->mode === 'timeline'
                 ? app(StaffActivityTimelineService::class)->forStaff($subject, $range, $this->timelineLimit)
                 : ['items' => [], 'has_more' => false],
         ];
