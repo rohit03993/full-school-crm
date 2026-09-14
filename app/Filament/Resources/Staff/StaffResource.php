@@ -6,6 +6,7 @@ use App\Enums\CrmPermission;
 use App\Enums\RoleName;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Enums\StaffJobRole;
+use App\Filament\Pages\BulkStaffImportPage;
 use App\Filament\Pages\StaffActivityPage;
 use App\Filament\Resources\Staff\Pages\CreateStaff;
 use App\Filament\Resources\Staff\Pages\EditStaff;
