@@ -116,6 +116,7 @@ class AttendanceHubClassWiseTest extends TestCase
             'attendance_date' => '2026-09-11',
             'status' => AttendanceStatus::Present,
             'punch_source' => 'biometric',
+            'marked_by_user_id' => $staff->id,
         ]);
         Attendance::query()->create([
             'batch_id' => $batch->id,
