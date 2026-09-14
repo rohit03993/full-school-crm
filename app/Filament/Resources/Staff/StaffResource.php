@@ -98,86 +98,91 @@ class StaffResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->components([
-            Section::make('Account')
-                ->columns(2)
-                ->schema([
-                    TextInput::make('name')
-                        ->required()
-                        ->maxLength(255),
-                    TextInput::make('password')
-                        ->password()
-                        ->revealable()
-                        ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? Hash::make($state) : null)
-                        ->dehydrated(fn (?string $state): bool => filled($state))
-                        ->required(fn (string $operation): bool => $operation === 'create')
-                        ->maxLength(255),
-                    TextInput::make('mobile')
-                        ->tel()
-                        ->required()
-                        ->maxLength(10)
-                        ->rule('regex:/^[6-9]\d{9}$/')
-                        ->unique(ignoreRecord: true)
-                        ->helperText('Staff sign in at /admin with this mobile and password.'),
-                    Toggle::make('is_active')
-                        ->label('Active')
-                        ->default(true)
-                        ->helperText('Turn off to deactivate. The account and history stay; they cannot log in. Staff are not deleted from this screen.'),
-                ]),
-            Section::make('Access & roles')
-                ->description('Tick every function this person should have. Permissions from all selected roles are combined — e.g. Accountant + Fee adjuster can collect and change fee plans.')
-                ->schema([
-                    Toggle::make('is_super_admin')
-                        ->label('Super Admin (full access)')
-                        ->helperText('Owners only — settings, staff, reports, WhatsApp config, and all day-to-day work.')
-                        ->default(false)
-                        ->live(),
-                    CheckboxList::make('job_roles')
-                        ->label('Job roles')
-                        ->options(StaffJobRole::options())
-                        ->descriptions(collect(StaffJobRole::cases())
-                            ->mapWithKeys(fn (StaffJobRole $role): array => [$role->value => $role->description()])
-                            ->all())
-                        ->columns(1)
-                        ->disabled(fn (callable $get): bool => (bool) $get('is_super_admin'))
-                        ->helperText('Select one or more roles. Combine Accountant + Fee adjuster when someone should both collect fees and change discounts/structure.'),
-                    Toggle::make('can_view_student_mobile')
-                        ->label('Can see student mobile numbers')
-                        ->default(false)
-                        ->disabled(fn (callable $get): bool => (bool) $get('is_super_admin'))
-                        ->helperText('Separate from job role. On = full numbers and Call. Off = Hidden. Super Admin always sees numbers.'),
-                ]),
-            Section::make('Staff Profile')
-                ->columns(2)
-                ->relationship('staffProfile')
-                ->schema([
-                    TextInput::make('designation')
-                        ->maxLength(100),
-                    TextInput::make('employee_code')
-                        ->label('Staff ID')
-                        ->helperText('Device PIN / Face ID. Leave blank to auto-assign 1001, 1002… Existing IDs (e.g. STF012) are kept. Must not match a student roll.')
-                        ->placeholder('Auto (1001…)')
-                        ->maxLength(50)
-                        ->unique(ignoreRecord: true)
-                        ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? strtoupper(trim($state)) : null)
-                        ->rule(function (): \Closure {
-                            return function (string $attribute, mixed $value, \Closure $fail): void {
-                                if (! filled($value)) {
-                                    return;
-                                }
+        return $schema
+            ->columns(1)
+            ->components([
+                Section::make('Account')
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('name')
+                            ->required()
+                            ->maxLength(255),
+                        TextInput::make('password')
+                            ->password()
+                            ->revealable()
+                            ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? Hash::make($state) : null)
+                            ->dehydrated(fn (?string $state): bool => filled($state))
+                            ->required(fn (string $operation): bool => $operation === 'create')
+                            ->maxLength(255),
+                        TextInput::make('mobile')
+                            ->tel()
+                            ->required()
+                            ->maxLength(10)
+                            ->rule('regex:/^[6-9]\d{9}$/')
+                            ->unique(ignoreRecord: true)
+                            ->helperText('Staff sign in at /admin with this mobile and password.'),
+                        Toggle::make('is_active')
+                            ->label('Active')
+                            ->default(true)
+                            ->helperText('Off = they cannot log in. The account and history stay.'),
+                    ]),
+                Section::make('Staff Profile')
+                    ->columns(['default' => 1, 'md' => 3])
+                    ->relationship('staffProfile')
+                    ->schema([
+                        TextInput::make('designation')
+                            ->maxLength(100),
+                        TextInput::make('employee_code')
+                            ->label('Staff ID')
+                            ->helperText('Device PIN / Face ID. Leave blank to auto-assign 1001, 1002… Existing IDs (e.g. STF012) are kept. Must not match a student roll.')
+                            ->placeholder('Auto (1001…)')
+                            ->maxLength(50)
+                            ->unique(ignoreRecord: true)
+                            ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? strtoupper(trim($state)) : null)
+                            ->rule(function (): \Closure {
+                                return function (string $attribute, mixed $value, \Closure $fail): void {
+                                    if (! filled($value)) {
+                                        return;
+                                    }
 
-                                if (BiometricPinCollision::staffCodeCollidesWithStudentRoll((string) $value)) {
-                                    $fail('This Staff ID matches a student roll number. Choose a different ID.');
-                                }
-                            };
-                        }),
-                    TextInput::make('mobile')
-                        ->label('Work Mobile')
-                        ->tel()
-                        ->maxLength(10)
-                        ->rules(['nullable', 'regex:/^[6-9]\d{9}$/']),
-                ]),
-        ]);
+                                    if (BiometricPinCollision::staffCodeCollidesWithStudentRoll((string) $value)) {
+                                        $fail('This Staff ID matches a student roll number. Choose a different ID.');
+                                    }
+                                };
+                            }),
+                        TextInput::make('mobile')
+                            ->label('Work Mobile')
+                            ->tel()
+                            ->maxLength(10)
+                            ->rules(['nullable', 'regex:/^[6-9]\d{9}$/']),
+                    ]),
+                Section::make('Access & roles')
+                    ->description('Tick every job this person does. Roles combine — Accountant + Fee adjuster can collect fees and change fee plans.')
+                    ->schema([
+                        Toggle::make('is_super_admin')
+                            ->label('Super Admin (full access)')
+                            ->helperText('Owners only. They already see every number and every screen.')
+                            ->default(false)
+                            ->live(),
+                        CheckboxList::make('job_roles')
+                            ->label('Job roles')
+                            ->options(StaffJobRole::options())
+                            ->descriptions(collect(StaffJobRole::cases())
+                                ->mapWithKeys(fn (StaffJobRole $role): array => [$role->value => $role->description()])
+                                ->all())
+                            ->columns(['default' => 1, 'md' => 2])
+                            ->disabled(fn (callable $get): bool => (bool) $get('is_super_admin')),
+                    ]),
+                Section::make('Student numbers')
+                    ->description('Not a job role. Super Admin always sees numbers.')
+                    ->schema([
+                        Toggle::make('can_view_student_mobile')
+                            ->label('Can see student mobile numbers')
+                            ->default(false)
+                            ->disabled(fn (callable $get): bool => (bool) $get('is_super_admin'))
+                            ->helperText('On = full numbers and Call. Off = Hidden.'),
+                    ]),
+            ]);
     }
 
     public static function table(Table $table): Table
