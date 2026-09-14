@@ -32,6 +32,11 @@ final class CrmMenuLabels
         return 'Dashboard';
     }
 
+    public static function myActivity(): string
+    {
+        return 'My activity';
+    }
+
     public static function myMeetings(): string
     {
         return 'My work';

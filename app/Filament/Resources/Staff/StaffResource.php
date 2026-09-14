@@ -6,7 +6,7 @@ use App\Enums\CrmPermission;
 use App\Enums\RoleName;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Enums\StaffJobRole;
-use App\Filament\Pages\BulkStaffImportPage;
+use App\Filament\Pages\StaffActivityPage;
 use App\Filament\Resources\Staff\Pages\CreateStaff;
 use App\Filament\Resources\Staff\Pages\EditStaff;
 use App\Filament\Resources\Staff\Pages\ListStaff;
@@ -191,7 +191,9 @@ class StaffResource extends Resource
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->url(fn (User $record): string => StaffActivityPage::urlFor($record))
+                    ->color('primary'),
                 TextColumn::make('mobile')
                     ->label('Mobile')
                     ->searchable()
@@ -245,7 +247,12 @@ class StaffResource extends Resource
                 TernaryFilter::make('is_active')
                     ->label('Active'),
             ])
+            ->recordUrl(fn (User $record): string => StaffActivityPage::urlFor($record))
             ->recordActions([
+                Action::make('edit')
+                    ->label('Edit')
+                    ->icon(Heroicon::OutlinedPencilSquare)
+                    ->url(fn (User $record): string => static::getUrl('edit', ['record' => $record])),
                 Action::make('syncFaceVerify')
                     ->label('Sync to Face API')
                     ->icon(Heroicon::OutlinedArrowPath)
