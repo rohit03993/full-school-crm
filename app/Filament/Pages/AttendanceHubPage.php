@@ -42,8 +42,11 @@ class AttendanceHubPage extends Page
 
     public ?int $classDrillBatchId = null;
 
-    /** @var 'present'|'absent'|null */
+    /** @var 'present'|'absent'|'leave'|null */
     public ?string $classDrillBucket = null;
+
+    /** @var 'manual'|'leave'|null */
+    public ?string $overviewList = null;
 
     public ?int $leaveStudentId = null;
 
@@ -73,6 +76,7 @@ class AttendanceHubPage extends Page
     public function updatedOverviewDate(): void
     {
         $this->closeClassDrill();
+        $this->closeOverviewList();
         $this->resetPage();
     }
 
@@ -88,10 +92,11 @@ class AttendanceHubPage extends Page
 
     public function openClassDrill(int $batchId, string $bucket): void
     {
-        if (! in_array($bucket, ['present', 'absent'], true)) {
+        if (! in_array($bucket, ['present', 'absent', 'leave'], true)) {
             return;
         }
 
+        $this->closeOverviewList();
         $this->classDrillBatchId = $batchId;
         $this->classDrillBucket = $bucket;
         $this->leaveStudentId = null;
@@ -106,6 +111,21 @@ class AttendanceHubPage extends Page
         $this->leaveStudentId = null;
         $this->leaveReasonTag = '';
         $this->leaveReasonCustom = '';
+    }
+
+    public function openOverviewList(string $kind): void
+    {
+        if (! in_array($kind, ['manual', 'leave'], true)) {
+            return;
+        }
+
+        $this->closeClassDrill();
+        $this->overviewList = $kind;
+    }
+
+    public function closeOverviewList(): void
+    {
+        $this->overviewList = null;
     }
 
     public function startLeaveMark(int $studentId): void
@@ -125,7 +145,7 @@ class AttendanceHubPage extends Page
     public function markHubPresent(int $studentId): void
     {
         $user = Auth::user();
-        if (! $user || $this->classDrillBatchId === null) {
+        if (! $user || $this->classDrillBatchId === null || $this->classDrillBucket !== 'absent') {
             return;
         }
 
@@ -173,7 +193,7 @@ class AttendanceHubPage extends Page
     public function confirmHubLeave(): void
     {
         $user = Auth::user();
-        if (! $user || $this->classDrillBatchId === null || $this->leaveStudentId === null) {
+        if (! $user || $this->classDrillBatchId === null || $this->classDrillBucket !== 'absent' || $this->leaveStudentId === null) {
             return;
         }
 
@@ -238,6 +258,10 @@ class AttendanceHubPage extends Page
             );
         }
 
+        $overviewList = $this->overviewList
+            ? $overviewService->overviewStudentList($date, $this->overviewList)
+            : null;
+
         $cards = [];
 
         if (AttendancePage::canAccess()) {
@@ -273,6 +297,7 @@ class AttendanceHubPage extends Page
                     'feedType' => $this->feedType,
                     'cards' => $cards,
                     'classDrill' => $classDrill,
+                    'overviewList' => $overviewList,
                     'leaveStudentId' => $this->leaveStudentId,
                     'leaveReasonTag' => $this->leaveReasonTag,
                     'leaveReasonCustom' => $this->leaveReasonCustom,

@@ -82,6 +82,9 @@ class AttendanceHubClassWiseTest extends TestCase
         $this->assertSame(1, $row['leave']);
         $this->assertSame(2, $row['absent']);
         $this->assertArrayNotHasKey('unmarked', $row);
+        $this->assertSame(2, $overview['students_absent']);
+        $this->assertSame(3, $overview['students_manual_marked']);
+        $this->assertSame(0, $overview['students_auto_marked']);
 
         $presentRoster = app(AttendanceHubOverviewService::class)
             ->classBucketRoster($batch->id, '2026-09-11', 'present');
@@ -94,6 +97,75 @@ class AttendanceHubClassWiseTest extends TestCase
             collect($absentRoster['students'])->pluck('id')->all(),
         );
         $this->assertTrue(collect($absentRoster['students'])->every(fn (array $s): bool => $s['can_mark'] === true));
+
+        $leaveRoster = app(AttendanceHubOverviewService::class)
+            ->classBucketRoster($batch->id, '2026-09-11', 'leave');
+        $this->assertSame([$leave->id], collect($leaveRoster['students'])->pluck('id')->all());
+        $this->assertTrue(collect($leaveRoster['students'])->every(fn (array $s): bool => $s['can_mark'] === false));
+    }
+
+    public function test_overview_auto_marked_excludes_hand_marks_and_lists_open_names(): void
+    {
+        $this->travelTo('2026-09-11 10:00:00');
+
+        [$batch, $present, $leave, $explicitAbsent, $unmarked, $staff] = $this->seedClassWithFourStatuses();
+
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $present->id,
+            'attendance_date' => '2026-09-11',
+            'status' => AttendanceStatus::Present,
+            'punch_source' => 'biometric',
+        ]);
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $leave->id,
+            'attendance_date' => '2026-09-11',
+            'status' => AttendanceStatus::Leave,
+            'punch_source' => 'roll_call',
+            'leave_reason' => 'Sick',
+            'marked_by_user_id' => $staff->id,
+        ]);
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $explicitAbsent->id,
+            'attendance_date' => '2026-09-11',
+            'status' => AttendanceStatus::Absent,
+            'punch_source' => 'manual',
+            'marked_by_user_id' => $staff->id,
+        ]);
+
+        $service = app(AttendanceHubOverviewService::class);
+        $overview = $service->overview('2026-09-11');
+
+        $this->assertSame(2, $overview['students_absent']);
+        $this->assertSame(1, $overview['students_auto_marked']);
+        $this->assertSame(2, $overview['students_manual_marked']);
+
+        $manual = $service->overviewStudentList('2026-09-11', 'manual');
+        $this->assertEqualsCanonicalizing(
+            [$leave->id, $explicitAbsent->id],
+            collect($manual['students'])->pluck('id')->all(),
+        );
+
+        $onLeave = $service->overviewStudentList('2026-09-11', 'leave');
+        $this->assertSame([$leave->id], collect($onLeave['students'])->pluck('id')->all());
+        $this->assertSame('HUB-L', $onLeave['students'][0]['roll']);
+
+        $this->actingAsAdmin();
+
+        Livewire::test(AttendanceHubPage::class)
+            ->set('overviewDate', '2026-09-11')
+            ->call('openOverviewList', 'leave')
+            ->assertSet('overviewList', 'leave')
+            ->assertSee('Leave Student')
+            ->assertDontSee('Mark present')
+            ->call('closeOverviewList')
+            ->call('openClassDrill', $batch->id, 'leave')
+            ->assertSet('classDrillBucket', 'leave')
+            ->assertSee('Leave Student')
+            ->assertDontSee('Mark present')
+            ->assertDontSee($unmarked->name);
     }
 
     public function test_hub_can_mark_leave_from_class_drill(): void

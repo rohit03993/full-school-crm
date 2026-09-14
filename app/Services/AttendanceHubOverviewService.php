@@ -30,6 +30,7 @@ class AttendanceHubOverviewService
      *     students_absent: int,
      *     students_leave: int,
      *     students_marked: int,
+     *     students_auto_marked: int,
      *     students_manual_marked: int,
      *     students_unmarked: int,
      *     staff_expected: int,
@@ -51,7 +52,7 @@ class AttendanceHubOverviewService
             ->whereDate('attendance_date', $day)
             ->where('status', AttendanceStatus::Present)
             ->count();
-        $studentsAbsent = (int) Attendance::query()
+        $explicitAbsent = (int) Attendance::query()
             ->whereDate('attendance_date', $day)
             ->where('status', AttendanceStatus::Absent)
             ->count();
@@ -59,11 +60,15 @@ class AttendanceHubOverviewService
             ->whereDate('attendance_date', $day)
             ->where('status', AttendanceStatus::Leave)
             ->count();
-        $studentsMarked = $studentsPresent + $studentsAbsent + $studentsLeave;
+        // Same rule as each class row (expected − present − leave), then added together.
+        $classRows = $this->classRows($day);
+        $studentsAbsent = (int) array_sum(array_column($classRows, 'absent'));
+        $studentsMarked = $studentsPresent + $explicitAbsent + $studentsLeave;
         $studentsManualMarked = (int) Attendance::query()
             ->whereDate('attendance_date', $day)
             ->whereIn('punch_source', ['manual', 'roll_call'])
             ->count();
+        $studentsAutoMarked = max(0, $studentsMarked - $studentsManualMarked);
 
         $staffExpected = (int) StaffProfile::query()
             ->whereHas('user', fn ($q) => $q->where('is_active', true))
@@ -91,6 +96,7 @@ class AttendanceHubOverviewService
             'students_absent' => $studentsAbsent,
             'students_leave' => $studentsLeave,
             'students_marked' => $studentsMarked,
+            'students_auto_marked' => $studentsAutoMarked,
             'students_manual_marked' => $studentsManualMarked,
             'students_unmarked' => max(0, $studentsExpected - $studentsMarked),
             'staff_expected' => $staffExpected,
@@ -99,7 +105,7 @@ class AttendanceHubOverviewService
             'staff_leave' => $staffLeave,
             'staff_marked' => $staffMarked,
             'staff_unmarked' => max(0, $staffExpected - $staffMarked),
-            'class_rows' => $this->classRows($day),
+            'class_rows' => $classRows,
         ];
     }
 
@@ -149,9 +155,9 @@ class AttendanceHubOverviewService
     }
 
     /**
-     * Students in a class for Present / Absent drill-down on the hub.
+     * Students in a class for Present / Absent / Leave drill-down on the hub.
      *
-     * @param  'present'|'absent'  $bucket
+     * @param  'present'|'absent'|'leave'  $bucket
      * @return array{
      *     batch_id: int,
      *     batch_name: string,
@@ -163,7 +169,7 @@ class AttendanceHubOverviewService
      */
     public function classBucketRoster(int $batchId, string $date, string $bucket): ?array
     {
-        $bucket = in_array($bucket, ['present', 'absent'], true) ? $bucket : 'absent';
+        $bucket = in_array($bucket, ['present', 'absent', 'leave'], true) ? $bucket : 'absent';
         $day = Carbon::parse($date)->toDateString();
 
         $batch = Batch::query()->find($batchId);
@@ -206,6 +212,9 @@ class AttendanceHubOverviewService
             if ($bucket === 'absent' && ! $isAbsentBucket) {
                 continue;
             }
+            if ($bucket === 'leave' && ! $isLeave) {
+                continue;
+            }
 
             $statusValue = $status?->value ?? 'unmarked';
             $statusLabel = match ($statusValue) {
@@ -230,6 +239,71 @@ class AttendanceHubOverviewService
             'batch_id' => $batch->id,
             'batch_name' => ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false),
             'bucket' => $bucket,
+            'date' => $day,
+            'date_label' => Carbon::parse($day)->format('d M Y'),
+            'students' => $students,
+        ];
+    }
+
+    /**
+     * School-wide name list for the overview tile (leave, or hand-marked rows).
+     *
+     * @param  'manual'|'leave'  $kind
+     * @return array{
+     *     kind: string,
+     *     title: string,
+     *     date: string,
+     *     date_label: string,
+     *     students: list<array{id: int, name: string, roll: ?string, class: string, status_label: string}>
+     * }|null
+     */
+    public function overviewStudentList(string $date, string $kind): ?array
+    {
+        if (! in_array($kind, ['manual', 'leave'], true)) {
+            return null;
+        }
+
+        $day = Carbon::parse($date)->toDateString();
+
+        $query = Attendance::query()
+            ->whereDate('attendance_date', $day)
+            ->with(['student.activeEnrollment', 'batch.course']);
+
+        if ($kind === 'leave') {
+            $query->where('status', AttendanceStatus::Leave);
+        } else {
+            $query->whereIn('punch_source', ['manual', 'roll_call']);
+        }
+
+        $students = $query->get()
+            ->map(function (Attendance $row): ?array {
+                $student = $row->student;
+                if (! $student) {
+                    return null;
+                }
+
+                $status = $row->status instanceof AttendanceStatus
+                    ? $row->status
+                    : AttendanceStatus::tryFrom((string) $row->status);
+
+                return [
+                    'id' => $student->id,
+                    'name' => $student->name,
+                    'roll' => $student->activeEnrollment?->enrollment_number,
+                    'class' => $row->batch
+                        ? ClassSectionLabel::forBatch($row->batch, includeSession: false, includeShift: false)
+                        : '—',
+                    'status_label' => $status?->label() ?? '—',
+                ];
+            })
+            ->filter()
+            ->sortBy(fn (array $row): string => $row['class'].' '.$row['name'])
+            ->values()
+            ->all();
+
+        return [
+            'kind' => $kind,
+            'title' => $kind === 'leave' ? 'On leave' : 'Manually marked',
             'date' => $day,
             'date_label' => Carbon::parse($day)->format('d M Y'),
             'students' => $students,

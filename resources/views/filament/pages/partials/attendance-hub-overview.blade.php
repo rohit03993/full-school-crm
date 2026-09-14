@@ -41,9 +41,21 @@
                 </p>
                 <p class="mt-0.5 text-[11px] leading-snug text-gray-500">
                     Abs {{ $overview['students_absent'] }}
-                    · Leave {{ $overview['students_leave'] }}
-                    · Marked {{ $overview['students_marked'] }}
-                    · Manual {{ $overview['students_manual_marked'] }}
+                    ·
+                    <button
+                        type="button"
+                        wire:click="openOverviewList('leave')"
+                        class="font-semibold text-amber-700 underline-offset-2 hover:underline disabled:cursor-default disabled:no-underline disabled:opacity-70 dark:text-amber-300"
+                        @disabled($overview['students_leave'] < 1)
+                    >Leave {{ $overview['students_leave'] }}</button>
+                    · Auto marked {{ $overview['students_auto_marked'] }}
+                    ·
+                    <button
+                        type="button"
+                        wire:click="openOverviewList('manual')"
+                        class="font-semibold text-gray-700 underline-offset-2 hover:underline disabled:cursor-default disabled:no-underline disabled:opacity-70 dark:text-gray-300"
+                        @disabled($overview['students_manual_marked'] < 1)
+                    >Manually marked {{ $overview['students_manual_marked'] }}</button>
                 </p>
             </div>
             <div class="crm-att-hub-overview__cell px-3 py-2.5 sm:px-4 sm:py-3">
@@ -66,7 +78,7 @@
         <div class="crm-att-hub-classes overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
             <div class="border-b border-gray-100 px-3 py-2.5 dark:border-white/10 sm:px-4 sm:py-3">
                 <h3 class="text-sm font-bold text-gray-950 dark:text-white">Class-wise (students)</h3>
-                <p class="text-xs text-gray-500">Tap Present or Absent to see names. From Absent you can mark Present (manual IN) or Leave.</p>
+                <p class="text-xs text-gray-500">Tap Present, Absent, or Leave to see names. From Absent you can mark Present (manual IN) or Leave.</p>
             </div>
             <div class="overflow-x-auto">
                 <table class="crm-att-hub-classes__table min-w-full text-left text-sm">
@@ -99,7 +111,14 @@
                                         @disabled($row['absent'] < 1)
                                     >{{ $row['absent'] }}</button>
                                 </td>
-                                <td class="px-2 py-1.5 text-center text-amber-700 sm:px-3 dark:text-amber-300">{{ $row['leave'] }}</td>
+                                <td class="px-2 py-1.5 text-center sm:px-3">
+                                    <button
+                                        type="button"
+                                        wire:click="openClassDrill({{ $row['batch_id'] }}, 'leave')"
+                                        class="crm-att-hub-classes__count bg-amber-50 text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100 disabled:bg-transparent disabled:text-amber-700/70 disabled:ring-0 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30 dark:hover:bg-amber-500/20 dark:disabled:bg-transparent dark:disabled:text-amber-300/70"
+                                        @disabled($row['leave'] < 1)
+                                    >{{ $row['leave'] }}</button>
+                                </td>
                                 <td class="px-2 py-1.5 text-center text-gray-500 sm:px-3">{{ $row['expected'] }}</td>
                             </tr>
                         @endforeach
@@ -122,7 +141,7 @@
                 <div class="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/10">
                     <div class="min-w-0">
                         <p id="crm-att-hub-drill-title" class="text-sm font-bold text-gray-950 dark:text-white">
-                            {{ $classDrill['bucket'] === 'present' ? 'Present' : 'Absent' }}
+                            {{ match ($classDrill['bucket']) { 'present' => 'Present', 'leave' => 'Leave', default => 'Absent' } }}
                             · {{ $classDrill['batch_name'] }}
                         </p>
                         <p class="text-xs text-gray-500">{{ $classDrill['date_label'] }} · {{ count($classDrill['students']) }} student{{ count($classDrill['students']) === 1 ? '' : 's' }}</p>
@@ -200,6 +219,58 @@
                                             </div>
                                         </div>
                                     @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if (! empty($overviewList))
+        <div
+            class="crm-att-hub-drill fixed inset-0 z-50 flex items-end justify-center bg-gray-950/50 p-0 sm:items-center sm:p-4"
+            wire:key="overview-list-{{ $overviewList['kind'] }}"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="crm-att-hub-overview-list-title"
+        >
+            <button type="button" class="absolute inset-0 cursor-default" wire:click="closeOverviewList" aria-label="Close"></button>
+            <div class="relative flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl dark:bg-gray-900 sm:rounded-2xl">
+                <div class="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/10">
+                    <div class="min-w-0">
+                        <p id="crm-att-hub-overview-list-title" class="text-sm font-bold text-gray-950 dark:text-white">
+                            {{ $overviewList['title'] }}
+                        </p>
+                        <p class="text-xs text-gray-500">{{ $overviewList['date_label'] }} · {{ count($overviewList['students']) }} student{{ count($overviewList['students']) === 1 ? '' : 's' }}</p>
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="closeOverviewList"
+                        class="rounded-lg px-2 py-1 text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10"
+                    >Close</button>
+                </div>
+
+                <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    @if ($overviewList['students'] === [])
+                        <p class="px-4 py-10 text-center text-sm text-gray-500">No students in this list.</p>
+                    @else
+                        <ul class="divide-y divide-gray-100 dark:divide-white/10">
+                            @foreach ($overviewList['students'] as $student)
+                                <li class="px-4 py-3" wire:key="overview-list-student-{{ $overviewList['kind'] }}-{{ $student['id'] }}-{{ $loop->index }}">
+                                    <x-crm.person-name
+                                        :student-id="$student['id']"
+                                        :name="$student['name']"
+                                        class="truncate block"
+                                    />
+                                    <p class="text-xs text-gray-500">
+                                        {{ $student['class'] }}
+                                        @if ($student['roll'])
+                                            · Roll {{ $student['roll'] }}
+                                        @endif
+                                        · {{ $student['status_label'] }}
+                                    </p>
                                 </li>
                             @endforeach
                         </ul>
