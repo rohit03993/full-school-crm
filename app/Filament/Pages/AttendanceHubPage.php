@@ -50,6 +50,10 @@ class AttendanceHubPage extends Page
 
     public ?int $leaveStudentId = null;
 
+    public string $leaveFromDate = '';
+
+    public string $leaveToDate = '';
+
     public ?int $presentStudentId = null;
 
     public string $presentTime = '';
@@ -105,20 +109,16 @@ class AttendanceHubPage extends Page
         $this->closeOverviewList();
         $this->classDrillBatchId = $batchId;
         $this->classDrillBucket = $bucket;
-        $this->leaveStudentId = null;
+        $this->cancelLeaveMark();
         $this->cancelHubPresent();
-        $this->leaveReasonTag = '';
-        $this->leaveReasonCustom = '';
     }
 
     public function closeClassDrill(): void
     {
         $this->classDrillBatchId = null;
         $this->classDrillBucket = null;
-        $this->leaveStudentId = null;
+        $this->cancelLeaveMark();
         $this->cancelHubPresent();
-        $this->leaveReasonTag = '';
-        $this->leaveReasonCustom = '';
     }
 
     public function openOverviewList(string $kind): void
@@ -140,6 +140,8 @@ class AttendanceHubPage extends Page
     {
         $this->cancelHubPresent();
         $this->leaveStudentId = $studentId;
+        $this->leaveFromDate = now()->toDateString();
+        $this->leaveToDate = now()->toDateString();
         $this->leaveReasonTag = AttendanceLeaveReasons::tags()[0] ?? 'Personal work';
         $this->leaveReasonCustom = '';
     }
@@ -147,6 +149,8 @@ class AttendanceHubPage extends Page
     public function cancelLeaveMark(): void
     {
         $this->leaveStudentId = null;
+        $this->leaveFromDate = '';
+        $this->leaveToDate = '';
         $this->leaveReasonTag = '';
         $this->leaveReasonCustom = '';
     }
@@ -237,9 +241,10 @@ class AttendanceHubPage extends Page
         }
 
         $reason = AttendanceLeaveReasons::compose($this->leaveReasonTag, $this->leaveReasonCustom);
-        $result = app(ManualBatchAttendanceService::class)->markLeave(
+        $result = app(ManualBatchAttendanceService::class)->markLeaveRange(
             $student,
-            $this->resolvedDate(),
+            filled($this->leaveFromDate) ? $this->leaveFromDate : now()->toDateString(),
+            filled($this->leaveToDate) ? $this->leaveToDate : now()->toDateString(),
             $user,
             $reason,
             $batch,
@@ -332,6 +337,8 @@ class AttendanceHubPage extends Page
                     'classDrill' => $classDrill,
                     'overviewList' => $overviewList,
                     'leaveStudentId' => $this->leaveStudentId,
+                    'leaveFromDate' => $this->leaveFromDate,
+                    'leaveToDate' => $this->leaveToDate,
                     'presentStudentId' => $this->presentStudentId,
                     'leaveReasonTag' => $this->leaveReasonTag,
                     'leaveReasonCustom' => $this->leaveReasonCustom,

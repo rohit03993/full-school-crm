@@ -193,18 +193,23 @@ class AttendanceHubClassWiseTest extends TestCase
             ->assertSet('classDrillBucket', 'absent')
             ->assertSee('Leave Target')
             ->call('startLeaveMark', $leaveStudent->id)
+            ->assertSet('leaveFromDate', '2026-09-11')
+            ->assertSet('leaveToDate', '2026-09-11')
             ->set('leaveReasonTag', AttendanceLeaveReasons::tags()[0] ?? 'Personal work')
             ->set('leaveReasonCustom', '')
+            ->set('leaveToDate', '2026-09-13')
             ->call('confirmHubLeave')
             ->assertSet('leaveStudentId', null);
 
-        $leaveRow = Attendance::query()
+        $leaveDates = Attendance::query()
             ->where('student_id', $leaveStudent->id)
-            ->whereDate('attendance_date', '2026-09-11')
-            ->first();
+            ->where('status', AttendanceStatus::Leave)
+            ->orderBy('attendance_date')
+            ->pluck('attendance_date')
+            ->map(fn ($d) => \Illuminate\Support\Carbon::parse($d)->toDateString())
+            ->all();
 
-        $this->assertNotNull($leaveRow);
-        $this->assertSame(AttendanceStatus::Leave, $leaveRow->status);
+        $this->assertSame(['2026-09-11', '2026-09-12', '2026-09-13'], $leaveDates);
     }
 
     public function test_hub_can_mark_present_via_manual_in_from_absent_drill(): void

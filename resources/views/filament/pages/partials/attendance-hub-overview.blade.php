@@ -220,6 +220,27 @@
 
                                     @if ($leaveStudentId === $student['id'])
                                         <div class="mt-3 space-y-2 rounded-xl bg-gray-50 p-3 dark:bg-white/5">
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-500">From</label>
+                                                    <input
+                                                        type="date"
+                                                        wire:model.live="leaveFromDate"
+                                                        min="{{ now()->toDateString() }}"
+                                                        class="fi-crm-input mt-1 block w-full text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-500">To</label>
+                                                    <input
+                                                        type="date"
+                                                        wire:model.live="leaveToDate"
+                                                        min="{{ $leaveFromDate ?: now()->toDateString() }}"
+                                                        class="fi-crm-input mt-1 block w-full text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <p class="text-[11px] text-gray-500">Same or different days — max 14 days. Student stays on Leave for each day in this range.</p>
                                             <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Leave reason</label>
                                             <select wire:model="leaveReasonTag" class="fi-crm-input block w-full text-sm">
                                                 @foreach ($leaveTags as $tag)

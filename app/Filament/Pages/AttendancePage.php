@@ -131,6 +131,10 @@ class AttendancePage extends Page
 
     public string $leaveCustomReason = '';
 
+    public string $leaveFromDate = '';
+
+    public string $leaveToDate = '';
+
     public bool $showPresentModal = false;
 
     public ?int $presentStudentId = null;
@@ -683,6 +687,8 @@ class AttendancePage extends Page
         $this->leaveStudentName = $student->name;
         $this->leaveTag = '';
         $this->leaveCustomReason = '';
+        $this->leaveFromDate = now()->toDateString();
+        $this->leaveToDate = now()->toDateString();
 
         $existingReason = trim((string) ($this->attendanceSnapshot[$studentId]['leave_reason'] ?? ''));
         if ($existingReason !== '') {
@@ -713,6 +719,8 @@ class AttendancePage extends Page
         $this->leaveStudentName = '';
         $this->leaveTag = '';
         $this->leaveCustomReason = '';
+        $this->leaveFromDate = '';
+        $this->leaveToDate = '';
     }
 
     public function selectLeaveTag(string $tag): void
@@ -740,7 +748,6 @@ class AttendancePage extends Page
             return;
         }
 
-        $date = $this->filters['date'] ?? now()->toDateString();
         $student = Student::query()->find($this->leaveStudentId);
         $batchId = filled($this->filters['batch_id'] ?? null) ? (int) $this->filters['batch_id'] : null;
         $batch = $batchId ? Batch::query()->find($batchId) : null;
@@ -752,7 +759,14 @@ class AttendancePage extends Page
             return;
         }
 
-        $result = $manualBatch->markLeave($student, $date, Auth::user(), $reason, $batch);
+        $result = $manualBatch->markLeaveRange(
+            $student,
+            filled($this->leaveFromDate) ? $this->leaveFromDate : now()->toDateString(),
+            filled($this->leaveToDate) ? $this->leaveToDate : now()->toDateString(),
+            Auth::user(),
+            $reason,
+            $batch,
+        );
 
         if (! $result['ok']) {
             Notification::make()
@@ -770,7 +784,7 @@ class AttendancePage extends Page
 
         Notification::make()
             ->title('Marked on Leave')
-            ->body("{$student->name}: {$reason}")
+            ->body("{$student->name}: {$result['message']}")
             ->success()
             ->send();
     }

@@ -145,16 +145,29 @@ class ManualBatchAttendanceService
     }
 
     /**
-     * Mark student as Leave for the day (not Present). Requires a reason.
+     * Mark student as Leave for one day (not Present). Requires a reason.
      *
-     * @return array{ok: bool, message: string, whatsapp: null}
+     * @return array{ok: bool, message: string, whatsapp: null, saved?: int, skipped?: int}
      */
     public function markLeave(Student $student, string $date, User $staff, string $reason, ?Batch $batch = null): array
     {
-        if ($blocked = $this->manualDateBlockedResult($date)) {
-            return $blocked;
-        }
+        return $this->markLeaveRange($student, $date, $date, $staff, $reason, $batch);
+    }
 
+    /**
+     * Apply Leave for each day from $fromDate through $toDate (inclusive).
+     * Same daily Leave rows Hub / Dashboard already count. Cap: 14 days. From must be today or later.
+     *
+     * @return array{ok: bool, message: string, whatsapp: null, saved?: int, skipped?: int}
+     */
+    public function markLeaveRange(
+        Student $student,
+        string $fromDate,
+        string $toDate,
+        User $staff,
+        string $reason,
+        ?Batch $batch = null,
+    ): array {
         $reason = trim($reason);
 
         if ($reason === '') {
@@ -175,21 +188,128 @@ class ManualBatchAttendanceService
             ];
         }
 
+        try {
+            $from = Carbon::parse($fromDate)->startOfDay();
+            $to = Carbon::parse($toDate)->startOfDay();
+        } catch (\Throwable) {
+            return [
+                'ok' => false,
+                'message' => 'Enter a valid leave From and To date.',
+                'whatsapp' => null,
+            ];
+        }
+
+        $today = now()->startOfDay();
+
+        if ($from->lt($today)) {
+            return [
+                'ok' => false,
+                'message' => 'Leave can start from today only. Backdated leave is not allowed.',
+                'whatsapp' => null,
+            ];
+        }
+
+        if ($to->lt($from)) {
+            return [
+                'ok' => false,
+                'message' => 'Leave To date must be on or after the From date.',
+                'whatsapp' => null,
+            ];
+        }
+
+        $dayCount = (int) $from->diffInDays($to) + 1;
+        if ($dayCount > 14) {
+            return [
+                'ok' => false,
+                'message' => 'Leave can cover at most 14 days at a time.',
+                'whatsapp' => null,
+            ];
+        }
+
+        $saved = 0;
+        $skipped = 0;
+        $skipReasons = [];
+
+        for ($day = $from->copy(); $day->lte($to); $day->addDay()) {
+            $dayResult = $this->applyLeaveForDay(
+                $student,
+                $batch,
+                $day->toDateString(),
+                $staff,
+                $reason,
+            );
+
+            if ($dayResult['ok']) {
+                $saved++;
+            } else {
+                $skipped++;
+                if (count($skipReasons) < 3 && filled($dayResult['message'])) {
+                    $skipReasons[] = $day->format('d M').': '.$dayResult['message'];
+                }
+            }
+        }
+
+        if ($saved === 0) {
+            return [
+                'ok' => false,
+                'message' => $skipReasons !== []
+                    ? 'Could not mark leave. '.implode(' ', $skipReasons)
+                    : 'Could not mark leave for any day in this range.',
+                'whatsapp' => null,
+                'saved' => 0,
+                'skipped' => $skipped,
+            ];
+        }
+
+        CrmCacheInvalidator::afterAttendanceChange();
+
+        $fromLabel = $from->format('d M Y');
+        $toLabel = $to->format('d M Y');
+        $rangeLabel = $fromLabel === $toLabel ? $fromLabel : "{$fromLabel} → {$toLabel}";
+        $message = $saved === 1
+            ? "Marked on Leave for {$rangeLabel}."
+            : "Marked on Leave for {$saved} day(s) ({$rangeLabel}).";
+
+        if ($skipped > 0) {
+            $message .= " {$skipped} day(s) skipped";
+            if ($skipReasons !== []) {
+                $message .= ' ('.implode('; ', $skipReasons).')';
+            }
+            $message .= '.';
+        }
+
+        return [
+            'ok' => true,
+            'message' => $message,
+            'whatsapp' => null,
+            'saved' => $saved,
+            'skipped' => $skipped,
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    private function applyLeaveForDay(
+        Student $student,
+        Batch $batch,
+        string $date,
+        User $staff,
+        string $reason,
+    ): array {
         $roll = $this->rollForStudent($student);
-        if ($roll !== null) {
+        if ($roll !== null && $date === now()->toDateString()) {
             $dayRow = app(LivePunchDashboardService::class)->studentDayRow($roll, $date, $student);
             if (($dayRow['current_state'] ?? null) === 'IN') {
                 return [
                     'ok' => false,
-                    'message' => 'Student is still inside. Mark OUT first, or clear today’s IN before Leave.',
-                    'whatsapp' => null,
+                    'message' => 'still inside — mark OUT first',
                 ];
             }
             if (($dayRow['pairs'] ?? []) !== []) {
                 return [
                     'ok' => false,
-                    'message' => 'Student already has an IN punch today. Leave is only for students who did not attend.',
-                    'whatsapp' => null,
+                    'message' => 'already has an IN punch',
                 ];
             }
         }
@@ -200,11 +320,10 @@ class ManualBatchAttendanceService
             ->whereDate('attendance_date', $date)
             ->first();
 
-        if ($existing?->checked_in_at !== null) {
+        if ($existing?->checked_in_at !== null || $existing?->status === AttendanceStatus::Present) {
             return [
                 'ok' => false,
-                'message' => 'Student already has check-in today. Leave is only when they did not come.',
-                'whatsapp' => null,
+                'message' => 'already marked present',
             ];
         }
 
@@ -224,13 +343,7 @@ class ManualBatchAttendanceService
             ],
         );
 
-        CrmCacheInvalidator::afterAttendanceChange();
-
-        return [
-            'ok' => true,
-            'message' => 'Marked on Leave.',
-            'whatsapp' => null,
-        ];
+        return ['ok' => true, 'message' => ''];
     }
 
     /**

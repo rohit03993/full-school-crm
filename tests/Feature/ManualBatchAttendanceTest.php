@@ -165,6 +165,64 @@ class ManualBatchAttendanceTest extends TestCase
         $this->assertSame('08:15:00', $attendance?->checked_in_at?->format('H:i:s'));
     }
 
+    public function test_manual_leave_range_saves_each_day_and_skips_present(): void
+    {
+        $this->travelTo('2026-06-20 10:00:00');
+
+        [$student, $batch, $staff] = $this->createEnrolledStudent('ROLL-LEAVE-RANGE');
+        $service = app(ManualBatchAttendanceService::class);
+
+        $this->assertTrue($service->manualIn($student, '2026-06-20', $staff, '08:00', false)['ok']);
+
+        $result = $service->markLeaveRange(
+            $student->fresh(),
+            '2026-06-20',
+            '2026-06-22',
+            $staff,
+            'Sick',
+            $batch,
+        );
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame(2, $result['saved']);
+        $this->assertSame(1, $result['skipped']);
+
+        $this->assertSame(
+            AttendanceStatus::Present,
+            Attendance::query()->whereDate('attendance_date', '2026-06-20')->value('status'),
+        );
+        $this->assertSame(
+            AttendanceStatus::Leave,
+            Attendance::query()->whereDate('attendance_date', '2026-06-21')->value('status'),
+        );
+        $this->assertSame(
+            AttendanceStatus::Leave,
+            Attendance::query()->whereDate('attendance_date', '2026-06-22')->value('status'),
+        );
+
+        $tooLong = $service->markLeaveRange(
+            $student->fresh(),
+            '2026-06-23',
+            '2026-07-10',
+            $staff,
+            'Travel',
+            $batch,
+        );
+        $this->assertFalse($tooLong['ok']);
+        $this->assertStringContainsString('14 days', $tooLong['message']);
+
+        $past = $service->markLeaveRange(
+            $student->fresh(),
+            '2026-06-19',
+            '2026-06-19',
+            $staff,
+            'Travel',
+            $batch,
+        );
+        $this->assertFalse($past['ok']);
+        $this->assertStringContainsString('today', strtolower($past['message']));
+    }
+
     public function test_manual_in_rejects_backdated_date(): void
     {
         $this->travelTo('2026-06-20 10:00:00');

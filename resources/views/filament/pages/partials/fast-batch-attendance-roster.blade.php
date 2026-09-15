@@ -435,8 +435,30 @@
             >
                 <h3 class="text-base font-bold text-gray-950 dark:text-white">Mark Leave</h3>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                    {{ $this->leaveStudentName }} — pick a reason tag and/or type your own.
+                    {{ $this->leaveStudentName }} — choose the days and a reason. Same day twice = one day only.
                 </p>
+
+                <div class="mt-4 grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">From</label>
+                        <input
+                            type="date"
+                            wire:model.live="leaveFromDate"
+                            min="{{ now()->toDateString() }}"
+                            class="fi-crm-input mt-1 block w-full"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">To</label>
+                        <input
+                            type="date"
+                            wire:model.live="leaveToDate"
+                            min="{{ $this->leaveFromDate ?: now()->toDateString() }}"
+                            class="fi-crm-input mt-1 block w-full"
+                        />
+                    </div>
+                </div>
+                <p class="mt-1 text-[11px] text-gray-500">Max 14 days. Student stays on Leave for each day in this range.</p>
 
                 <div class="mt-4 flex flex-wrap gap-2">
                     @foreach ($leaveTags as $tag)
