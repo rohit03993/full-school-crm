@@ -226,7 +226,7 @@
                                                     <input
                                                         type="date"
                                                         wire:model.live="leaveFromDate"
-                                                        min="{{ now()->toDateString() }}"
+                                                        min="{{ now()->subDays(\App\Services\Punch\ManualBatchAttendanceService::LEAVE_BACKDATE_DAYS)->toDateString() }}"
                                                         class="fi-crm-input mt-1 block w-full text-sm"
                                                     />
                                                 </div>
@@ -240,7 +240,7 @@
                                                     />
                                                 </div>
                                             </div>
-                                            <p class="text-[11px] text-gray-500">Same or different days — max 14 days. Student stays on Leave for each day in this range.</p>
+                                            <p class="text-[11px] text-gray-500">Same or different days — max 14 days, From up to 7 days back. Student stays on Leave for each day in this range.</p>
                                             <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Leave reason</label>
                                             <select wire:model="leaveReasonTag" class="fi-crm-input block w-full text-sm">
                                                 @foreach ($leaveTags as $tag)

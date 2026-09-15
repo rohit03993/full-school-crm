@@ -444,7 +444,7 @@
                         <input
                             type="date"
                             wire:model.live="leaveFromDate"
-                            min="{{ now()->toDateString() }}"
+                            min="{{ now()->subDays(\App\Services\Punch\ManualBatchAttendanceService::LEAVE_BACKDATE_DAYS)->toDateString() }}"
                             class="fi-crm-input mt-1 block w-full"
                         />
                     </div>
@@ -458,7 +458,7 @@
                         />
                     </div>
                 </div>
-                <p class="mt-1 text-[11px] text-gray-500">Max 14 days. Student stays on Leave for each day in this range.</p>
+                <p class="mt-1 text-[11px] text-gray-500">Max 14 days. From may be up to 7 days before today. Student stays on Leave for each day in this range.</p>
 
                 <div class="mt-4 flex flex-wrap gap-2">
                     @foreach ($leaveTags as $tag)

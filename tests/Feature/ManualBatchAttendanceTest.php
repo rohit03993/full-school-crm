@@ -211,16 +211,31 @@ class ManualBatchAttendanceTest extends TestCase
         $this->assertFalse($tooLong['ok']);
         $this->assertStringContainsString('14 days', $tooLong['message']);
 
-        $past = $service->markLeaveRange(
+        $pastOk = $service->markLeaveRange(
             $student->fresh(),
-            '2026-06-19',
-            '2026-06-19',
+            '2026-06-13',
+            '2026-06-13',
             $staff,
             'Travel',
             $batch,
         );
-        $this->assertFalse($past['ok']);
-        $this->assertStringContainsString('today', strtolower($past['message']));
+        $this->assertTrue($pastOk['ok']);
+        $this->assertSame(1, $pastOk['saved']);
+        $this->assertSame(
+            AttendanceStatus::Leave,
+            Attendance::query()->whereDate('attendance_date', '2026-06-13')->value('status'),
+        );
+
+        $tooFarBack = $service->markLeaveRange(
+            $student->fresh(),
+            '2026-06-12',
+            '2026-06-12',
+            $staff,
+            'Travel',
+            $batch,
+        );
+        $this->assertFalse($tooFarBack['ok']);
+        $this->assertStringContainsString('7 days', $tooFarBack['message']);
     }
 
     public function test_manual_in_rejects_backdated_date(): void

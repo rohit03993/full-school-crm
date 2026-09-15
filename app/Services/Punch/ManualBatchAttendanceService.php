@@ -17,6 +17,11 @@ use Illuminate\Validation\ValidationException;
 
 class ManualBatchAttendanceService
 {
+    public const LEAVE_RANGE_MAX_DAYS = 14;
+
+    /** How many days before today a leave From date may start. */
+    public const LEAVE_BACKDATE_DAYS = 7;
+
     public function __construct(
         protected PunchAttendanceProcessor $processor,
         protected PunchLogService $logs,
@@ -156,7 +161,8 @@ class ManualBatchAttendanceService
 
     /**
      * Apply Leave for each day from $fromDate through $toDate (inclusive).
-     * Same daily Leave rows Hub / Dashboard already count. Cap: 14 days. From must be today or later.
+     * Same daily Leave rows Hub / Dashboard already count.
+     * Cap: 14 days. From may be up to 7 days before today (Present days are skipped).
      *
      * @return array{ok: bool, message: string, whatsapp: null, saved?: int, skipped?: int}
      */
@@ -200,11 +206,12 @@ class ManualBatchAttendanceService
         }
 
         $today = now()->startOfDay();
+        $earliest = $today->copy()->subDays(self::LEAVE_BACKDATE_DAYS);
 
-        if ($from->lt($today)) {
+        if ($from->lt($earliest)) {
             return [
                 'ok' => false,
-                'message' => 'Leave can start from today only. Backdated leave is not allowed.',
+                'message' => 'Leave can start at most '.self::LEAVE_BACKDATE_DAYS.' days before today.',
                 'whatsapp' => null,
             ];
         }
@@ -218,10 +225,10 @@ class ManualBatchAttendanceService
         }
 
         $dayCount = (int) $from->diffInDays($to) + 1;
-        if ($dayCount > 14) {
+        if ($dayCount > self::LEAVE_RANGE_MAX_DAYS) {
             return [
                 'ok' => false,
-                'message' => 'Leave can cover at most 14 days at a time.',
+                'message' => 'Leave can cover at most '.self::LEAVE_RANGE_MAX_DAYS.' days at a time.',
                 'whatsapp' => null,
             ];
         }
