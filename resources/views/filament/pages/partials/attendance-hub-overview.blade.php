@@ -173,6 +173,39 @@
                                                 @endif
                                                 {{ $student['status_label'] }}
                                             </p>
+                                            @if (($classDrill['bucket'] ?? '') === 'absent')
+                                                <div class="mt-0.5 text-[11px] leading-snug">
+                                                    @if (($student['attendance_calls'] ?? []) === [])
+                                                        <p class="text-gray-500 dark:text-gray-400">No attendance call made yet</p>
+                                                    @else
+                                                        <ul class="space-y-0.5">
+                                                            @foreach ($student['attendance_calls'] as $call)
+                                                                <li>
+                                                                    <p class="text-sky-800 dark:text-sky-200">
+                                                                        <span class="font-semibold">Attendance call</span>
+                                                                        · {{ $call['at'] }}
+                                                                        · {{ $call['staff'] }}
+                                                                        · {{ $call['status'] }}
+                                                                    </p>
+                                                                    @if (filled($call['who'] ?? null) || filled($call['notes'] ?? null))
+                                                                        <p class="text-gray-500 dark:text-gray-400">
+                                                                            @if (filled($call['who'] ?? null))
+                                                                                Spoke to: {{ $call['who'] }}
+                                                                            @endif
+                                                                            @if (filled($call['who'] ?? null) && filled($call['notes'] ?? null))
+                                                                                ·
+                                                                            @endif
+                                                                            @if (filled($call['notes'] ?? null))
+                                                                                {{ $call['notes'] }}
+                                                                            @endif
+                                                                        </p>
+                                                                    @endif
+                                                                </li>
+                                                            @endforeach
+                                                        </ul>
+                                                    @endif
+                                                </div>
+                                            @endif
                                         </div>
                                         @if ($student['can_mark'])
                                             <div class="flex shrink-0 flex-col items-end gap-1.5">
@@ -189,40 +222,6 @@
                                             </div>
                                         @endif
                                     </div>
-
-                                    @if (($classDrill['bucket'] ?? '') === 'absent')
-                                        <div class="mt-1.5 rounded-lg px-2 py-1 text-[11px] leading-snug text-sky-950 ring-1 ring-sky-100 dark:text-sky-100 dark:ring-sky-500/25">
-                                            @if (($student['attendance_calls'] ?? []) === [])
-                                                <p class="text-sky-800/80 dark:text-sky-200/80">No attendance call made yet</p>
-                                            @else
-                                                <ul class="space-y-1">
-                                                    @foreach ($student['attendance_calls'] as $call)
-                                                        <li>
-                                                            <p>
-                                                                <span class="font-semibold text-sky-700 dark:text-sky-300">Attendance call</span>
-                                                                · {{ $call['at'] }}
-                                                                · {{ $call['staff'] }}
-                                                                · {{ $call['status'] }}
-                                                            </p>
-                                                            @if (filled($call['who'] ?? null) || filled($call['notes'] ?? null))
-                                                                <p class="mt-0.5 text-sky-900/75 dark:text-sky-100/75">
-                                                                    @if (filled($call['who'] ?? null))
-                                                                        Spoke to: {{ $call['who'] }}
-                                                                    @endif
-                                                                    @if (filled($call['who'] ?? null) && filled($call['notes'] ?? null))
-                                                                        ·
-                                                                    @endif
-                                                                    @if (filled($call['notes'] ?? null))
-                                                                        {{ $call['notes'] }}
-                                                                    @endif
-                                                                </p>
-                                                            @endif
-                                                        </li>
-                                                    @endforeach
-                                                </ul>
-                                            @endif
-                                        </div>
-                                    @endif
 
                                     @if ($presentStudentId === $student['id'])
                                         <div class="mt-3 space-y-2 rounded-xl bg-gray-50 p-3 dark:bg-white/5">
