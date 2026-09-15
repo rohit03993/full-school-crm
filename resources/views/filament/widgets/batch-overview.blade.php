@@ -13,7 +13,7 @@
                     {{ $isToday ? 'Today' : $overview['date_label'] }} by {{ strtolower($batchLabel) }}
                 </h3>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Students and attendance — {{ $overview['date_label'] }}
+                    Same counts as Attendance — {{ $overview['date_label'] }}
                 </p>
             </div>
             @if ($attendanceUrl)
@@ -50,7 +50,7 @@
                 @foreach ($overview['rows'] as $row)
                     <div class="rounded-xl bg-gray-50 p-3 ring-1 ring-gray-950/5 dark:bg-white/5 dark:ring-white/10">
                         <p class="text-sm font-semibold text-gray-950 dark:text-white">{{ $row['label'] }}</p>
-                        <div class="mt-2 grid grid-cols-3 gap-2 text-xs">
+                        <div class="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
                             <div>
                                 <p class="font-semibold uppercase tracking-wide text-gray-500">Students</p>
                                 <p class="mt-0.5 text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $row['students'] }}</p>
@@ -63,6 +63,10 @@
                                 <p class="font-semibold uppercase tracking-wide text-gray-500">Absent</p>
                                 <p class="mt-0.5 text-sm font-semibold text-red-700 dark:text-red-400">{{ $row['absent_today'] }}</p>
                             </div>
+                            <div>
+                                <p class="font-semibold uppercase tracking-wide text-gray-500">Leave</p>
+                                <p class="mt-0.5 text-sm font-semibold text-amber-700 dark:text-amber-300">{{ $row['leave_today'] }}</p>
+                            </div>
                         </div>
                     </div>
                 @endforeach
@@ -73,6 +77,7 @@
                         <span>{{ $totals['students'] }} students</span>
                         <span class="text-emerald-700 dark:text-emerald-400">{{ $totals['present_today'] }} present</span>
                         <span class="text-red-700 dark:text-red-400">{{ $totals['absent_today'] }} absent</span>
+                        <span class="text-amber-700 dark:text-amber-300">{{ $totals['leave_today'] }} leave</span>
                     </div>
                 </div>
             </div>
@@ -86,6 +91,7 @@
                             <th class="px-4 py-2.5 text-center">Students</th>
                             <th class="px-4 py-2.5 text-center">Present</th>
                             <th class="px-4 py-2.5 text-center">Absent</th>
+                            <th class="px-4 py-2.5 text-center">Leave</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-white/10">
@@ -97,6 +103,7 @@
                                     <span class="font-semibold text-emerald-700 dark:text-emerald-400">{{ $row['present_today'] }}</span>
                                 </td>
                                 <td class="px-4 py-2.5 text-center text-red-700 dark:text-red-400">{{ $row['absent_today'] }}</td>
+                                <td class="px-4 py-2.5 text-center text-amber-700 dark:text-amber-300">{{ $row['leave_today'] }}</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -106,6 +113,7 @@
                             <td class="px-4 py-2.5 text-center">{{ $totals['students'] }}</td>
                             <td class="px-4 py-2.5 text-center text-emerald-700 dark:text-emerald-400">{{ $totals['present_today'] }}</td>
                             <td class="px-4 py-2.5 text-center text-red-700 dark:text-red-400">{{ $totals['absent_today'] }}</td>
+                            <td class="px-4 py-2.5 text-center text-amber-700 dark:text-amber-300">{{ $totals['leave_today'] }}</td>
                         </tr>
                     </tfoot>
                 </table>

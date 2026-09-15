@@ -218,8 +218,9 @@ class CrmDashboardService
                 $students = $batchStudentIds->count();
                 $markedRows = $attendanceByBatch->get($batch->id, collect());
                 $present = $markedRows->where('status', AttendanceStatus::Present)->count();
-                $absent = $markedRows->where('status', AttendanceStatus::Absent)->count();
                 $leave = $markedRows->where('status', AttendanceStatus::Leave)->count();
+                // Same rule as Attendance Hub: not present and not leave (saved absent + still unmarked).
+                $absent = max(0, $students - $present - $leave);
                 $marked = $markedRows->count();
 
                 $rows[] = [

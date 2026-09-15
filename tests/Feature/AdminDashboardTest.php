@@ -147,8 +147,70 @@ class AdminDashboardTest extends TestCase
 
         $this->assertSame(1, $overview['totals']['present_today']);
         $this->assertSame(1, $overview['totals']['marked_today']);
+        $this->assertSame(0, $overview['totals']['absent_today']);
         $this->assertArrayNotHasKey('not_marked_today', $overview['totals']);
         $this->assertArrayNotHasKey('pending_fees', $overview['totals']);
+    }
+
+    public function test_batch_overview_absent_matches_attendance_hub_rule(): void
+    {
+        $session = $this->createSession();
+        $course = $this->createCourse();
+        $batch = $this->createBatchForCourse($course, [
+            'name' => 'Hub Rule Batch',
+            'academic_session_id' => $session->id,
+        ]);
+
+        $admin = $this->actingAsSuperAdmin();
+
+        $present = Student::query()->create([
+            'name' => 'Present One',
+            'mobile' => '9800000021',
+            'status' => StudentStatus::Enrolled,
+        ]);
+        $leave = Student::query()->create([
+            'name' => 'Leave One',
+            'mobile' => '9800000022',
+            'status' => StudentStatus::Enrolled,
+        ]);
+        $unmarked = Student::query()->create([
+            'name' => 'Unmarked One',
+            'mobile' => '9800000023',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        foreach ([$present, $leave, $unmarked] as $student) {
+            BatchStudent::query()->create([
+                'batch_id' => $batch->id,
+                'student_id' => $student->id,
+                'assigned_at' => now(),
+                'assigned_by_user_id' => $admin->id,
+                'is_active' => true,
+            ]);
+        }
+
+        app(AttendanceService::class)->saveBatchAttendance(
+            $batch,
+            today()->toDateString(),
+            [
+                $present->id => AttendanceStatus::Present->value,
+                $leave->id => AttendanceStatus::Leave->value,
+            ],
+            $admin,
+        );
+
+        $row = collect(app(CrmDashboardService::class)->batchOverview()['rows'])
+            ->firstWhere('id', $batch->id);
+
+        $this->assertNotNull($row);
+        $this->assertSame(3, $row['students']);
+        $this->assertSame(1, $row['present_today']);
+        $this->assertSame(1, $row['leave_today']);
+        $this->assertSame(1, $row['absent_today']);
+
+        Livewire::test(BatchOverviewWidget::class)
+            ->assertSuccessful()
+            ->assertSee('Leave');
     }
 
     public function test_batch_overview_hides_not_marked_and_pending_fees(): void
