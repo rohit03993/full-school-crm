@@ -191,24 +191,31 @@
                                     </div>
 
                                     @if (($classDrill['bucket'] ?? '') === 'absent')
-                                        <div class="mt-2 rounded-xl bg-sky-50/80 px-3 py-2 text-xs text-sky-950 ring-1 ring-sky-100 dark:bg-sky-500/10 dark:text-sky-100 dark:ring-sky-500/20">
-                                            <p class="font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Attendance call</p>
+                                        <div class="mt-1.5 rounded-lg px-2 py-1 text-[11px] leading-snug text-sky-950 ring-1 ring-sky-100 dark:text-sky-100 dark:ring-sky-500/25">
                                             @if (($student['attendance_calls'] ?? []) === [])
-                                                <p class="mt-1 text-sky-800/80 dark:text-sky-200/80">No attendance call made yet</p>
+                                                <p class="text-sky-800/80 dark:text-sky-200/80">No attendance call made yet</p>
                                             @else
-                                                <ul class="mt-1.5 space-y-2">
+                                                <ul class="space-y-1">
                                                     @foreach ($student['attendance_calls'] as $call)
-                                                        <li class="border-t border-sky-100 pt-2 first:border-0 first:pt-0 dark:border-sky-500/20">
-                                                            <p class="font-medium">
-                                                                {{ $call['at'] }}
+                                                        <li>
+                                                            <p>
+                                                                <span class="font-semibold text-sky-700 dark:text-sky-300">Attendance call</span>
+                                                                · {{ $call['at'] }}
                                                                 · {{ $call['staff'] }}
                                                                 · {{ $call['status'] }}
                                                             </p>
-                                                            @if (filled($call['who'] ?? null))
-                                                                <p class="mt-0.5 text-sky-900/80 dark:text-sky-100/80">Spoke to: {{ $call['who'] }}</p>
-                                                            @endif
-                                                            @if (filled($call['notes'] ?? null))
-                                                                <p class="mt-0.5 text-sky-900/80 dark:text-sky-100/80">{{ $call['notes'] }}</p>
+                                                            @if (filled($call['who'] ?? null) || filled($call['notes'] ?? null))
+                                                                <p class="mt-0.5 text-sky-900/75 dark:text-sky-100/75">
+                                                                    @if (filled($call['who'] ?? null))
+                                                                        Spoke to: {{ $call['who'] }}
+                                                                    @endif
+                                                                    @if (filled($call['who'] ?? null) && filled($call['notes'] ?? null))
+                                                                        ·
+                                                                    @endif
+                                                                    @if (filled($call['notes'] ?? null))
+                                                                        {{ $call['notes'] }}
+                                                                    @endif
+                                                                </p>
                                                             @endif
                                                         </li>
                                                     @endforeach
