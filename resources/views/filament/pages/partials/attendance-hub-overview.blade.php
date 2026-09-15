@@ -190,6 +190,33 @@
                                         @endif
                                     </div>
 
+                                    @if (($classDrill['bucket'] ?? '') === 'absent')
+                                        <div class="mt-2 rounded-xl bg-sky-50/80 px-3 py-2 text-xs text-sky-950 ring-1 ring-sky-100 dark:bg-sky-500/10 dark:text-sky-100 dark:ring-sky-500/20">
+                                            <p class="font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Attendance call</p>
+                                            @if (($student['attendance_calls'] ?? []) === [])
+                                                <p class="mt-1 text-sky-800/80 dark:text-sky-200/80">No attendance call made yet</p>
+                                            @else
+                                                <ul class="mt-1.5 space-y-2">
+                                                    @foreach ($student['attendance_calls'] as $call)
+                                                        <li class="border-t border-sky-100 pt-2 first:border-0 first:pt-0 dark:border-sky-500/20">
+                                                            <p class="font-medium">
+                                                                {{ $call['at'] }}
+                                                                · {{ $call['staff'] }}
+                                                                · {{ $call['status'] }}
+                                                            </p>
+                                                            @if (filled($call['who'] ?? null))
+                                                                <p class="mt-0.5 text-sky-900/80 dark:text-sky-100/80">Spoke to: {{ $call['who'] }}</p>
+                                                            @endif
+                                                            @if (filled($call['notes'] ?? null))
+                                                                <p class="mt-0.5 text-sky-900/80 dark:text-sky-100/80">{{ $call['notes'] }}</p>
+                                                            @endif
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            @endif
+                                        </div>
+                                    @endif
+
                                     @if ($presentStudentId === $student['id'])
                                         <div class="mt-3 space-y-2 rounded-xl bg-gray-50 p-3 dark:bg-white/5">
                                             <label class="block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Arrival time</label>

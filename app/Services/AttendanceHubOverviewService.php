@@ -3,12 +3,14 @@
 namespace App\Services;
 
 use App\Enums\AttendanceStatus;
+use App\Enums\EnrolledCallPurpose;
 use App\Models\Attendance;
 use App\Models\AttendancePunchWhatsappLog;
 use App\Models\Batch;
 use App\Models\BatchStudent;
 use App\Models\StaffAttendance;
 use App\Models\StaffProfile;
+use App\Models\StudentCall;
 use App\Support\AttendanceSourceLabel;
 use App\Support\ClassSectionLabel;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -164,7 +166,21 @@ class AttendanceHubOverviewService
      *     bucket: string,
      *     date: string,
      *     date_label: string,
-     *     students: list<array{id: int, name: string, roll: ?string, status: string, status_label: string, can_mark: bool}>
+     *     students: list<array{
+     *         id: int,
+     *         name: string,
+     *         roll: ?string,
+     *         status: string,
+     *         status_label: string,
+     *         can_mark: bool,
+     *         attendance_calls: list<array{
+     *             at: string,
+     *             staff: string,
+     *             status: string,
+     *             who: ?string,
+     *             notes: ?string
+     *         }>
+     *     }>
      * }|null
      */
     public function classBucketRoster(int $batchId, string $date, string $bucket): ?array
@@ -230,10 +246,23 @@ class AttendanceHubOverviewService
                 'status' => $statusValue === '' ? 'unmarked' : $statusValue,
                 'status_label' => $statusLabel,
                 'can_mark' => $bucket === 'absent',
+                'attendance_calls' => [],
             ];
         }
 
         usort($students, fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+
+        if ($bucket === 'absent' && $students !== []) {
+            $callsByStudent = $this->attendanceCallsByStudent(
+                array_column($students, 'id'),
+                $day,
+            );
+
+            foreach ($students as &$studentRow) {
+                $studentRow['attendance_calls'] = $callsByStudent[(int) $studentRow['id']] ?? [];
+            }
+            unset($studentRow);
+        }
 
         return [
             'batch_id' => $batch->id,
@@ -243,6 +272,48 @@ class AttendanceHubOverviewService
             'date_label' => Carbon::parse($day)->format('d M Y'),
             'students' => $students,
         ];
+    }
+
+    /**
+     * Attendance-purpose calls for the hub date only (fee / other purposes excluded).
+     *
+     * @param  list<int>  $studentIds
+     * @return array<int, list<array{at: string, staff: string, status: string, who: ?string, notes: ?string}>>
+     */
+    protected function attendanceCallsByStudent(array $studentIds, string $day): array
+    {
+        $studentIds = array_values(array_unique(array_map('intval', $studentIds)));
+        if ($studentIds === [] || ! Schema::hasTable('student_calls')) {
+            return [];
+        }
+
+        $calls = StudentCall::query()
+            ->whereIn('student_id', $studentIds)
+            ->whereDate('called_at', $day)
+            ->where(function ($query): void {
+                $query->where('call_purpose', EnrolledCallPurpose::Attendance->value)
+                    ->orWhereJsonContains('tags', EnrolledCallPurpose::Attendance->value);
+            })
+            ->with('staff:id,name')
+            ->orderByDesc('called_at')
+            ->orderByDesc('id')
+            ->get();
+
+        $map = [];
+
+        foreach ($calls as $call) {
+            $studentId = (int) $call->student_id;
+            $map[$studentId] ??= [];
+            $map[$studentId][] = [
+                'at' => $call->called_at?->format('h:i A') ?? '—',
+                'staff' => $call->staff?->name ?? '—',
+                'status' => $call->call_status?->label() ?? '—',
+                'who' => $call->who_answered?->label(),
+                'notes' => filled($call->call_notes) ? trim((string) $call->call_notes) : null,
+            ];
+        }
+
+        return $map;
     }
 
     /**

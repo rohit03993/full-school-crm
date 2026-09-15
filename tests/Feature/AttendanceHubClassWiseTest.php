@@ -5,12 +5,16 @@ namespace Tests\Feature;
 use App\Enums\AdmissionStatus;
 use App\Enums\AttendanceStatus;
 use App\Enums\BatchStatus;
+use App\Enums\CallDirection;
+use App\Enums\CallStatus;
 use App\Enums\CourseStatus;
+use App\Enums\EnrolledCallPurpose;
 use App\Enums\EnrollmentStatus;
 use App\Enums\Gender;
 use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
+use App\Enums\WhoAnswered;
 use App\Filament\Pages\AttendanceHubPage;
 use App\Models\AcademicSession;
 use App\Models\Admission;
@@ -21,6 +25,7 @@ use App\Models\Course;
 use App\Models\Enquiry;
 use App\Models\Enrollment;
 use App\Models\Student;
+use App\Models\StudentCall;
 use App\Models\User;
 use App\Services\AttendanceHubOverviewService;
 use App\Support\AttendanceLeaveReasons;
@@ -102,6 +107,62 @@ class AttendanceHubClassWiseTest extends TestCase
             ->classBucketRoster($batch->id, '2026-09-11', 'leave');
         $this->assertSame([$leave->id], collect($leaveRoster['students'])->pluck('id')->all());
         $this->assertTrue(collect($leaveRoster['students'])->every(fn (array $s): bool => $s['can_mark'] === false));
+    }
+
+    public function test_absent_drill_shows_only_attendance_calls_for_that_day(): void
+    {
+        $this->travelTo('2026-09-11 10:00:00');
+
+        [$batch, , , , $unmarked, $staff] = $this->seedClassWithFourStatuses();
+
+        StudentCall::query()->create([
+            'student_id' => $unmarked->id,
+            'user_id' => $staff->id,
+            'called_at' => '2026-09-11 09:15:00',
+            'call_direction' => CallDirection::Outgoing,
+            'call_status' => CallStatus::Connected,
+            'call_purpose' => EnrolledCallPurpose::Attendance,
+            'who_answered' => WhoAnswered::Father,
+            'call_notes' => 'Will come after lunch',
+            'tags' => [EnrolledCallPurpose::Attendance->value],
+        ]);
+        StudentCall::query()->create([
+            'student_id' => $unmarked->id,
+            'user_id' => $staff->id,
+            'called_at' => '2026-09-11 09:40:00',
+            'call_direction' => CallDirection::Outgoing,
+            'call_status' => CallStatus::Connected,
+            'call_purpose' => EnrolledCallPurpose::FeeQuery,
+            'who_answered' => WhoAnswered::Mother,
+            'call_notes' => 'Fee reminder — ignore on hub',
+            'tags' => [EnrolledCallPurpose::FeeQuery->value],
+        ]);
+
+        $absentRoster = app(AttendanceHubOverviewService::class)
+            ->classBucketRoster($batch->id, '2026-09-11', 'absent');
+
+        $row = collect($absentRoster['students'])->firstWhere('id', $unmarked->id);
+        $this->assertNotNull($row);
+        $this->assertCount(1, $row['attendance_calls']);
+        $this->assertSame('Will come after lunch', $row['attendance_calls'][0]['notes']);
+        $this->assertSame('Father', $row['attendance_calls'][0]['who']);
+        $this->assertSame($staff->name, $row['attendance_calls'][0]['staff']);
+
+        $otherAbsent = collect($absentRoster['students'])->first(
+            fn (array $s): bool => $s['id'] !== $unmarked->id,
+        );
+        $this->assertNotNull($otherAbsent);
+        $this->assertSame([], $otherAbsent['attendance_calls']);
+
+        $this->actingAsAdmin();
+
+        Livewire::test(AttendanceHubPage::class)
+            ->set('overviewDate', '2026-09-11')
+            ->call('openClassDrill', $batch->id, 'absent')
+            ->assertSee('Will come after lunch')
+            ->assertSee('Spoke to: Father')
+            ->assertSee('No attendance call made yet')
+            ->assertDontSee('Fee reminder — ignore on hub');
     }
 
     public function test_overview_auto_marked_excludes_hand_marks_and_lists_open_names(): void
