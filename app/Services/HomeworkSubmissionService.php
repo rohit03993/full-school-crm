@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Enums\HomeworkAssignmentStatus;
 use App\Enums\HomeworkContentType;
 use App\Enums\LicenseFeature;
-use App\Enums\RoleName;
 use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
 use App\Models\CourseSubject;
@@ -88,7 +87,7 @@ class HomeworkSubmissionService
 
     public function canSubmit(User $user): bool
     {
-        if ($user->hasRole(RoleName::SuperAdmin->value)) {
+        if ($this->scope->userCanManageHomeworkDesk($user)) {
             return true;
         }
 
@@ -152,7 +151,7 @@ class HomeworkSubmissionService
             ]);
         }
 
-        if (! $asAdmin && ! $user->hasRole(RoleName::SuperAdmin->value)) {
+        if (! $asAdmin && ! $this->scope->userCanManageHomeworkDesk($user)) {
             $allowed = array_keys($this->scope->subjectOptionsForBatch($user, $batchId));
 
             if (! in_array($subjectId, array_map('intval', $allowed), true)) {
@@ -275,7 +274,7 @@ class HomeworkSubmissionService
     {
         $assignment = HomeworkAssignment::query()->findOrFail($assignmentId);
 
-        if (! $asAdmin && ! $user->hasRole(RoleName::SuperAdmin->value)) {
+        if (! $asAdmin && ! $this->scope->userCanManageHomeworkDesk($user)) {
             if (! $this->scope->userCanAccessBatch($user, (int) $assignment->batch_id)) {
                 throw ValidationException::withMessages([
                     'delete' => 'You cannot remove homework for this class.',
@@ -306,7 +305,8 @@ class HomeworkSubmissionService
      *         title: ?string,
      *         has_file: bool,
      *         public_url: ?string,
-     *         teacher: ?string
+     *         teacher: ?string,
+     *         sent_by: ?string
      *     }>,
      *     summary: array{total: int, submitted: int, approved: int, sent: int, missing: int}
      * }
@@ -320,7 +320,7 @@ class HomeworkSubmissionService
             ->where('batch_id', $batchId)
             ->whereNotNull('course_subject_id')
             ->whereDate('homework_date', $date)
-            ->with(['courseSubject', 'submittedBy', 'approvedBy'])
+            ->with(['courseSubject', 'submittedBy', 'approvedBy', 'createdBy', 'combinedSentBy'])
             ->get()
             ->keyBy('course_subject_id');
 
@@ -356,6 +356,7 @@ class HomeworkSubmissionService
                 'has_file' => (bool) $assignment?->hasFile(),
                 'public_url' => $assignment ? $assignment->publicUrl() : null,
                 'teacher' => $assignment?->submittedBy?->name ?? $assignment?->createdBy?->name,
+                'sent_by' => $assignment?->combinedSentBy?->name,
             ];
         }
 
@@ -386,7 +387,7 @@ class HomeworkSubmissionService
             ->whereDate('homework_date', $date)
             ->with(['courseSubject', 'approvedBy']);
 
-        if (! $user->hasRole(RoleName::SuperAdmin->value)) {
+        if (! $this->scope->userCanManageHomeworkDesk($user)) {
             $subjectIds = array_map('intval', array_keys($this->scope->subjectOptionsForBatch($user, $batchId)));
 
             if ($subjectIds === []) {
@@ -450,7 +451,7 @@ class HomeworkSubmissionService
 
         $dateLabel = $batch->displayLabel().' · '.Carbon::parse($date)->format('d M Y');
 
-        $result = $this->whatsapp->notifyCombined($batch, $dateLabel, $assignments, $templateName);
+        $result = $this->whatsapp->notifyCombined($batch, $dateLabel, $assignments, $templateName, $admin);
 
         if ($result['sent'] > 0) {
             HomeworkAssignment::query()
@@ -458,6 +459,7 @@ class HomeworkSubmissionService
                 ->update([
                     'status' => HomeworkAssignmentStatus::Sent->value,
                     'combined_sent_at' => now(),
+                    'combined_sent_by_user_id' => $admin->id,
                     'whatsapp_sent_count' => $result['sent'],
                     'whatsapp_failed_count' => $result['failed'],
                 ]);

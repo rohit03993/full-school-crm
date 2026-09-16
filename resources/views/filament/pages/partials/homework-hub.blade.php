@@ -6,9 +6,9 @@
             </h2>
             <p class="text-sm text-gray-600 dark:text-gray-300">
                 @if ($canManage)
-                    Review teacher submissions, approve the ready subjects, and send one combined message to parents.
+                    Review teacher submissions, approve the ready subjects, and send one combined message to parents. Super Admin does not need to repeat this.
                 @else
-                    Add homework only for the classes and subjects assigned to you. Admin will review and send it.
+                    Add homework only for the classes and subjects assigned to you. Academic coordinator or Super Admin will review and send it.
                 @endif
             </p>
         </div>
@@ -92,7 +92,7 @@
 
     <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
         <strong class="text-gray-900 dark:text-white">Daily flow:</strong>
-        Teacher submits by subject → admin reviews and approves → one combined WhatsApp goes to parents.
+        Teacher submits by subject → academic coordinator (or Super Admin) reviews and sends one combined WhatsApp to parents.
         Subjects with no homework are not shown in the message.
     </div>
 </div>

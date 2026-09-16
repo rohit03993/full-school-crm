@@ -104,7 +104,8 @@
                     <tr>
                         <th class="px-4 py-2.5">Subject</th>
                         <th class="px-4 py-2.5">Homework</th>
-                        <th class="px-4 py-2.5">Teacher</th>
+                        <th class="px-4 py-2.5">Added by</th>
+                        <th class="px-4 py-2.5">Sent by</th>
                         <th class="px-4 py-2.5">Status</th>
                         <th class="px-4 py-2.5 text-right">Actions</th>
                     </tr>
@@ -129,6 +130,7 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ $row['teacher'] ?? '—' }}</td>
+                            <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ $row['sent_by'] ?? '—' }}</td>
                             <td class="px-4 py-3">
                                 @if ($row['status_key'])
                                     <span @class([

@@ -30,6 +30,7 @@ class HomeworkAssignment extends Model
         'submitted_at',
         'approved_at',
         'combined_sent_at',
+        'combined_sent_by_user_id',
         'whatsapp_sent_count',
         'whatsapp_failed_count',
     ];
@@ -101,6 +102,11 @@ class HomeworkAssignment extends Model
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by_user_id');
+    }
+
+    public function combinedSentBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'combined_sent_by_user_id');
     }
 
     public function views(): HasMany

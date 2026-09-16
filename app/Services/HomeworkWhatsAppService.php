@@ -3,11 +3,13 @@
 namespace App\Services;
 
 use App\Enums\WhatsAppMessageSource;
+use App\Enums\WhatsAppSendActor;
 use App\Models\Batch;
 use App\Models\HomeworkAssignment;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Models\User;
 use App\Support\CombinedHomeworkWhatsAppTemplate;
 use App\Support\HomeworkShareWhatsAppTemplate;
 use Illuminate\Support\Collection;
@@ -125,6 +127,7 @@ class HomeworkWhatsAppService
         string $dateLabel,
         Collection $assignments,
         ?string $templateName = null,
+        ?User $sentBy = null,
     ): array {
         $empty = [
             'sent' => 0,
@@ -220,7 +223,10 @@ class HomeworkWhatsAppService
                     logContext: [
                         'student_id' => $student->id,
                         'message_source' => WhatsAppMessageSource::Homework->value,
-                        'send_actor' => \App\Enums\WhatsAppSendActor::Automatic->value,
+                        'send_actor' => $sentBy
+                            ? WhatsAppSendActor::Staff->value
+                            : WhatsAppSendActor::Automatic->value,
+                        'sent_by_user_id' => $sentBy?->id,
                     ],
                 );
             } catch (Throwable $exception) {

@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\CrmPermission;
 use App\Enums\HomeworkCheckNotifyStatus;
 use App\Enums\HomeworkCheckStatus;
 use App\Enums\LicenseFeature;
-use App\Enums\RoleName;
 use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
 use App\Models\BatchStudent;
@@ -14,6 +14,7 @@ use App\Models\HomeworkAssignment;
 use App\Models\HomeworkCheck;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -29,9 +30,14 @@ class HomeworkCheckService
     /**
      * @return array<int, string>
      */
+    public function userCanManageHomeworkDesk(User $user): bool
+    {
+        return CrmAccess::can($user, CrmPermission::HomeworkManage);
+    }
+
     public function batchOptionsFor(User $user): array
     {
-        if ($user->hasRole(RoleName::SuperAdmin->value)) {
+        if ($this->userCanManageHomeworkDesk($user)) {
             return Batch::query()
                 ->with(['course', 'academicSession'])
                 ->orderBy('name')
@@ -61,7 +67,7 @@ class HomeworkCheckService
 
     public function userCanAccessBatch(User $user, int $batchId): bool
     {
-        if ($user->hasRole(RoleName::SuperAdmin->value)) {
+        if ($this->userCanManageHomeworkDesk($user)) {
             return Batch::query()->whereKey($batchId)->exists();
         }
 
@@ -117,7 +123,7 @@ class HomeworkCheckService
 
         $subjects = $batch->activeSubjects()->get();
 
-        if (! $user->hasRole(RoleName::SuperAdmin->value)) {
+        if (! $this->userCanManageHomeworkDesk($user)) {
             $assignedSubjectIds = BatchStaffAssignment::query()
                 ->where('user_id', $user->id)
                 ->where('batch_id', $batchId)

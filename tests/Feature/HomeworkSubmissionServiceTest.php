@@ -7,8 +7,10 @@ use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\HomeworkAssignmentStatus;
 use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
 use App\Enums\WhatsAppMessageSource;
+use App\Enums\WhatsAppSendActor;
 use App\Filament\Pages\HomeworkCheckPage;
 use App\Filament\Pages\HomeworkPage;
 use App\Filament\Pages\HomeworkReviewPage;
@@ -26,6 +28,7 @@ use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\CrmPermissionSyncService;
 use App\Services\HomeworkSubmissionService;
 use App\Services\MetaWhatsAppCostEstimator;
 use App\Support\CombinedHomeworkWhatsAppTemplate;
@@ -162,6 +165,37 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame(HomeworkAssignmentStatus::Approved, $assignment->status);
         $this->assertNotNull($assignment->published_at);
         $this->assertNotNull($assignment->approved_at);
+        $this->assertSame($data['admin']->id, $assignment->created_by_user_id);
+        $this->assertSame($data['admin']->id, $assignment->approved_by_user_id);
+    }
+
+    public function test_academic_coordinator_uses_the_same_review_desk_without_class_assignment(): void
+    {
+        $data = $this->seedClass();
+        app(CrmPermissionSyncService::class)->sync();
+
+        $coordinator = User::factory()->create(['is_active' => true, 'name' => 'Khushi Coordinator']);
+        $coordinator->syncRoles([RoleName::Staff->value, StaffJobRole::AcademicCoordinator->value]);
+
+        $this->actingAs($coordinator);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->assertTrue(HomeworkReviewPage::canAccess());
+        $this->assertTrue(HomeworkPage::canAccess());
+
+        $service = app(HomeworkSubmissionService::class);
+        $assignment = $service->submit($coordinator, [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['physics']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Physics',
+            'description' => 'Chapter 3 numericals',
+        ], asAdmin: true);
+
+        $this->assertSame(HomeworkAssignmentStatus::Approved, $assignment->status);
+        $this->assertSame($coordinator->id, $assignment->created_by_user_id);
+        $this->assertSame($coordinator->id, $assignment->submitted_by_user_id);
+        $this->assertSame($coordinator->id, $assignment->approved_by_user_id);
     }
 
     public function test_board_lists_every_subject_with_status(): void
@@ -242,6 +276,18 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame(
             HomeworkAssignmentStatus::Sent,
             HomeworkAssignment::query()->find($maths->id)->status,
+        );
+        $this->assertSame(
+            $data['admin']->id,
+            HomeworkAssignment::query()->find($maths->id)->combined_sent_by_user_id,
+        );
+        $this->assertSame(
+            WhatsAppSendActor::Staff,
+            MetaWhatsAppMessage::query()->firstOrFail()->send_actor,
+        );
+        $this->assertSame(
+            $data['admin']->id,
+            MetaWhatsAppMessage::query()->firstOrFail()->sent_by_user_id,
         );
         $this->assertSame(
             HomeworkAssignmentStatus::Submitted,

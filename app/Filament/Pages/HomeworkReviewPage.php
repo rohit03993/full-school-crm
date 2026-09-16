@@ -64,7 +64,7 @@ class HomeworkReviewPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Review each subject for the class/date. Approve what teachers submitted (or add a subject yourself), then send ONE combined WhatsApp to parents — only subjects with homework are included.';
+        return 'Review each subject for the class/date. Approve what teachers submitted (or add a subject yourself), then send ONE combined WhatsApp to parents — only subjects with homework are included. The staff who add and send are stored on the homework record.';
     }
 
     public function mount(): void
@@ -114,8 +114,8 @@ class HomeworkReviewPage extends Page
                         ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
                 ])
                 ->columns(2),
-            Section::make('Add / edit a subject (admin)')
-                ->description('Use this if a teacher is absent — you can create or replace any subject\'s homework. Saved here it is approved immediately.')
+            Section::make('Add / edit a subject')
+                ->description('Use this if a teacher is absent — you can create or replace any subject\'s homework. Saved here it is approved immediately and ready to send.')
                 ->collapsed()
                 ->schema([
                     Select::make('course_subject_id')
