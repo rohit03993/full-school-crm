@@ -33,7 +33,7 @@
                 <h3 class="text-sm font-bold text-gray-950 dark:text-white">{{ $selected->name }}</h3>
                 <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                     @if ($selected->supportsScoring())
-                        Marks and test history for this student
+                        Class exams for this section. Marks show if the student appeared; otherwise the paper is listed blank.
                     @else
                         Attendance records for this activity type
                     @endif
@@ -44,6 +44,7 @@
                     'activityType' => $selected,
                     'loaded' => $isLoaded,
                     'records' => $selectedRecords,
+                    'student' => $student ?? null,
                 ])
             </div>
         </div>

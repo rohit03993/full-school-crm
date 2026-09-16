@@ -11,15 +11,21 @@ use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
 use App\Filament\Resources\ActivityTypes\ActivityTypeResource;
 use App\Models\ActivityType;
 use App\Models\Batch;
+use App\Services\ExamTestGroupService;
 use App\Services\ResultDeclarationService;
 use App\Support\CrmMenuLabels;
+use App\Support\CrmPagination;
 use App\Support\ExamTestGroupMatrix;
 use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema as DbSchema;
+use Illuminate\Validation\ValidationException;
 
 class ListActivitySessions extends ListRecords
 {
@@ -43,6 +49,55 @@ class ListActivitySessions extends ListRecords
 
     public ?int $activityTypeFilter = null;
 
+    public int $examPage = 1;
+
+    public function updatedBatchFilter(): void
+    {
+        $this->examPage = 1;
+    }
+
+    public function updatedActivityTypeFilter(): void
+    {
+        $this->examPage = 1;
+    }
+
+    public function gotoExamPage(int $page): void
+    {
+        $this->examPage = max(1, $page);
+    }
+
+    public function deleteExam(string $groupKey): void
+    {
+        $user = Auth::user();
+        $service = app(ExamTestGroupService::class);
+
+        if (! $user || ! $service->userCanManage($user)) {
+            Notification::make()
+                ->title('Not allowed')
+                ->body('You do not have permission to delete exams.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $service->deleteGroup($user, $groupKey);
+
+            Notification::make()
+                ->title('Exam deleted')
+                ->body('This test and its marks were removed. Other exams were not changed.')
+                ->success()
+                ->send();
+        } catch (ValidationException $exception) {
+            Notification::make()
+                ->title('Exam not deleted')
+                ->body(collect($exception->errors())->flatten()->first() ?: 'This exam cannot be deleted.')
+                ->danger()
+                ->send();
+        }
+    }
+
     public function getBreadcrumb(): ?string
     {
         return null;
@@ -57,16 +112,47 @@ class ListActivitySessions extends ListRecords
         }
 
         $matrix = ExamTestGroupMatrix::build($this->batchFilter, $this->activityTypeFilter);
+        $allRows = $matrix['rows'] ?? [];
+        $perPage = CrmPagination::PER_PAGE;
+        $lastPage = max(1, (int) ceil(count($allRows) / $perPage));
+
+        if ($this->examPage > $lastPage) {
+            $this->examPage = $lastPage;
+        }
+
+        $exams = new LengthAwarePaginator(
+            array_slice($allRows, ($this->examPage - 1) * $perPage, $perPage),
+            count($allRows),
+            $perPage,
+            $this->examPage,
+            ['path' => request()->url(), 'pageName' => 'examPage'],
+        );
+
+        $pageRows = $exams->items();
+        $groupKeys = collect($pageRows)
+            ->pluck('group_key')
+            ->filter()
+            ->map(fn (mixed $key): string => (string) $key)
+            ->values()
+            ->all();
+
+        $deleteEligibility = app(ExamTestGroupService::class)->deleteEligibility($groupKeys);
+        $canDeleteExams = Auth::user()
+            ? app(ExamTestGroupService::class)->userCanManage(Auth::user())
+            : false;
 
         return $schema->components([
             View::make('filament.resources.activity-sessions.exam-test-groups-list')
                 ->viewData(fn (): array => [
                     'matrix' => $matrix,
+                    'exams' => $exams,
+                    'canDeleteExams' => $canDeleteExams,
+                    'deleteEligibility' => $deleteEligibility,
                     'batchOptions' => Batch::query()->orderBy('name')->pluck('name', 'id')->all(),
                     'activityTypeOptions' => ActivityType::scoringOptions(),
                     'importMarksUrl' => BulkActivityMarksImportPage::getUrl(),
                     'reviewPageBaseUrl' => TestMarksReviewPage::getUrl(),
-                    'declarationStatuses' => collect($matrix['rows'] ?? [])
+                    'declarationStatuses' => collect($pageRows)
                         ->mapWithKeys(fn (array $row): array => [
                             (string) ($row['group_key'] ?? '') => ResultDeclarationService::statusMetaForGroupKey((string) ($row['group_key'] ?? '')),
                         ])

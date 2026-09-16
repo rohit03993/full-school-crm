@@ -4,6 +4,9 @@ namespace App\Support;
 
 use App\Models\ActivityAttendance;
 use App\Models\ActivitySession;
+use App\Models\ActivityType;
+use App\Models\Student;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -105,6 +108,153 @@ class StudentExamMarksMatrix
                     'total' => [
                         'marks' => $hasMarks ? $totalMarks : null,
                         'max' => $totalMax > 0 ? $totalMax : null,
+                        'percentage' => $percentage,
+                        'display' => self::formatTotal($totalMarks, $totalMax, $percentage, $hasMarks),
+                    ],
+                ];
+            })
+            ->all();
+
+        return [
+            'subjects' => $subjects,
+            'rows' => $rows,
+        ];
+    }
+
+    /**
+     * Class exams for this student: every test on their section, marks if they appeared, blank if not.
+     *
+     * @return array{
+     *     subjects: list<string>,
+     *     rows: list<array<string, mixed>>
+     * }
+     */
+    public static function forStudent(Student $student, ?int $activityTypeId = null): array
+    {
+        $student->loadMissing('activeBatchStudent');
+
+        $batchId = $student->activeBatchStudent?->batch_id;
+
+        if (! $batchId) {
+            return [
+                'subjects' => [],
+                'rows' => [],
+            ];
+        }
+
+        $query = ActivitySession::query()
+            ->with('batch')
+            ->where('batch_id', $batchId)
+            ->where('session_date', '>=', Carbon::now()->subMonths(ExamTestGroupMatrix::RECENT_MONTHS)->toDateString())
+            ->orderByDesc('session_date')
+            ->orderByDesc('id');
+
+        $scoringTypeIds = ActivityType::scoringTypeIds();
+
+        if ($activityTypeId) {
+            $query->where('activity_type_id', $activityTypeId);
+        } elseif ($scoringTypeIds !== []) {
+            $query->whereIn('activity_type_id', $scoringTypeIds);
+        }
+
+        $sessions = $query->get();
+
+        if ($sessions->isEmpty()) {
+            return [
+                'subjects' => [],
+                'rows' => [],
+            ];
+        }
+
+        $attendances = ActivityAttendance::query()
+            ->where('student_id', $student->id)
+            ->where('attendable_type', (new ActivitySession)->getMorphClass())
+            ->whereIn('attendable_id', $sessions->pluck('id')->all())
+            ->get()
+            ->keyBy('attendable_id');
+
+        /** @var array<string, array<string, mixed>> $grouped */
+        $grouped = [];
+        /** @var array<string, true> $subjectSet */
+        $subjectSet = [];
+
+        foreach ($sessions as $session) {
+            $subject = self::subjectForSession($session);
+            $subjectSet[$subject] = true;
+            $groupKey = self::groupKeyForSession($session);
+
+            if (! isset($grouped[$groupKey])) {
+                $grouped[$groupKey] = [
+                    'label' => self::testLabelForSession($session),
+                    'date' => $session->session_date,
+                    'batch' => $session->batch?->name,
+                    'sort_date' => $session->session_date?->format('Y-m-d') ?? '',
+                    'exam_subjects' => [],
+                    'scores' => [],
+                ];
+            }
+
+            $maxMarks = filled($session->metadataValue('max_marks'))
+                ? (float) $session->metadataValue('max_marks')
+                : null;
+            $record = $attendances->get($session->id);
+            $marks = $record?->marks_obtained !== null ? (float) $record->marks_obtained : null;
+            $grade = $record?->grade;
+
+            $grouped[$groupKey]['exam_subjects'][$subject] = true;
+            $grouped[$groupKey]['scores'][$subject] = [
+                'marks' => $marks,
+                'max' => $maxMarks,
+                'appeared' => $marks !== null,
+                'display' => $marks !== null
+                    ? self::formatMarks($marks, $maxMarks, $grade)
+                    : '',
+            ];
+        }
+
+        $subjects = array_keys($subjectSet);
+        usort($subjects, fn (string $a, string $b): int => strnatcasecmp($a, $b));
+
+        $rows = collect($grouped)
+            ->sortByDesc('sort_date')
+            ->values()
+            ->map(function (array $row): array {
+                $examSubjects = array_keys($row['exam_subjects']);
+                usort($examSubjects, fn (string $a, string $b): int => strnatcasecmp($a, $b));
+
+                $scores = [];
+                $totalMarks = 0.0;
+                $totalMax = 0.0;
+                $hasMarks = false;
+
+                foreach ($examSubjects as $subject) {
+                    $cell = $row['scores'][$subject];
+                    $scores[$subject] = $cell;
+
+                    if ($cell['marks'] !== null) {
+                        $hasMarks = true;
+                        $totalMarks += (float) $cell['marks'];
+
+                        if ($cell['max'] !== null && (float) $cell['max'] > 0) {
+                            $totalMax += (float) $cell['max'];
+                        }
+                    }
+                }
+
+                $percentage = $hasMarks && $totalMax > 0
+                    ? round(($totalMarks / $totalMax) * 100, 2)
+                    : null;
+
+                return [
+                    'label' => $row['label'],
+                    'date' => $row['date'],
+                    'batch' => $row['batch'],
+                    'exam_subjects' => $examSubjects,
+                    'appeared' => $hasMarks,
+                    'scores' => $scores,
+                    'total' => [
+                        'marks' => $hasMarks ? $totalMarks : null,
+                        'max' => $hasMarks && $totalMax > 0 ? $totalMax : null,
                         'percentage' => $percentage,
                         'display' => self::formatTotal($totalMarks, $totalMax, $percentage, $hasMarks),
                     ],

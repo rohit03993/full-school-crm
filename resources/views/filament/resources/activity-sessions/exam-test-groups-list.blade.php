@@ -62,14 +62,14 @@
         </div>
     </div>
 
-    @if (($matrix['rows'] ?? []) === [])
+    @if ($exams->total() === 0)
         <div class="rounded-xl bg-gray-50 px-4 py-10 text-center text-sm text-gray-600 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10">
             <p class="font-semibold text-gray-950 dark:text-white">No tests yet</p>
             <p class="mt-2">Use <strong>Upload marks (Excel)</strong> in the page header — enter the test name there and upload your sheet.</p>
         </div>
     @else
         <div class="space-y-2 md:hidden">
-            @foreach ($matrix['rows'] as $row)
+            @foreach ($exams as $row)
                 @php
                     $status = $declarationStatuses[$row['group_key'] ?? ''] ?? ['label' => '—', 'color' => 'gray'];
                     $badgeClass = match ($status['color'] ?? 'gray') {
@@ -121,6 +121,16 @@
                             <a href="{{ \App\Filament\Pages\BulkActivityMarksImportPage::urlForTest($row['label'], $row['activity_type_id'] ?? null, $row['batch_id'] ?? null, $row['date']?->format('Y-m-d')) }}" class="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-500">
                                 Upload marks
                             </a>
+                            @if (($canDeleteExams ?? false) && ($deleteEligibility[$row['group_key'] ?? '']['allowed'] ?? false))
+                                <button
+                                    type="button"
+                                    wire:click="deleteExam({{ \Illuminate\Support\Js::from($row['group_key']) }})"
+                                    wire:confirm="Delete this exam and its marks? Parents have not been messaged. This cannot be undone."
+                                    class="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-500/30 dark:text-red-300"
+                                >
+                                    Delete
+                                </button>
+                            @endif
                         @endif
                     </div>
                 </div>
@@ -142,7 +152,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-white/10">
-                    @foreach ($matrix['rows'] as $row)
+                    @foreach ($exams as $row)
                         <tr class="bg-white dark:bg-gray-900">
                             <td class="sticky left-0 z-10 bg-white px-4 py-2.5 font-medium text-gray-950 dark:bg-gray-900 dark:text-white">
                                 {{ $row['label'] }}
@@ -206,6 +216,16 @@
                                         >
                                             Upload marks
                                         </a>
+                                        @if (($canDeleteExams ?? false) && ($deleteEligibility[$row['group_key'] ?? '']['allowed'] ?? false))
+                                            <button
+                                                type="button"
+                                                wire:click="deleteExam({{ \Illuminate\Support\Js::from($row['group_key']) }})"
+                                                wire:confirm="Delete this exam and its marks? Parents have not been messaged. This cannot be undone."
+                                                class="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-500/30 dark:text-red-300"
+                                            >
+                                                Delete
+                                            </button>
+                                        @endif
                                     @endif
                                 </div>
                             </td>
@@ -214,5 +234,32 @@
                 </tbody>
             </table>
         </div>
+
+        @if ($exams->hasPages())
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                    Showing {{ $exams->firstItem() }}–{{ $exams->lastItem() }} of {{ $exams->total() }} exams
+                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        wire:click="gotoExamPage({{ $exams->currentPage() - 1 }})"
+                        @disabled($exams->onFirstPage())
+                        class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-gray-300"
+                    >
+                        Previous
+                    </button>
+                    <span class="text-xs text-gray-500">Page {{ $exams->currentPage() }} of {{ $exams->lastPage() }}</span>
+                    <button
+                        type="button"
+                        wire:click="gotoExamPage({{ $exams->currentPage() + 1 }})"
+                        @disabled(! $exams->hasMorePages())
+                        class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:text-gray-300"
+                    >
+                        Next
+                    </button>
+                </div>
+            </div>
+        @endif
     @endif
 </div>

@@ -3633,6 +3633,7 @@ class StudentProfilePage extends Page
                                     'selectedSlug' => $this->activitySubTab,
                                     'loaded' => $this->activityTabLoaded,
                                     'records' => $this->activityRecords,
+                                    'student' => $this->record,
                                 ]),
                         ]),
                 ]),
