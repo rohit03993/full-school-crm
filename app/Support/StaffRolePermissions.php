@@ -60,6 +60,7 @@ class StaffRolePermissions
                 CrmPermission::ReportsView,
                 CrmPermission::ReportsExport,
                 CrmPermission::CasesView,
+                CrmPermission::CasesOpen,
                 CrmPermission::CasesAssign,
                 CrmPermission::CasesClose,
             ],

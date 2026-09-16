@@ -8,8 +8,8 @@
             <form wire:submit="submitOpenCase" class="space-y-3 rounded-2xl border border-primary-200 bg-primary-50/50 p-4 shadow-sm ring-1 ring-primary-200/60 dark:border-primary-500/20 dark:bg-primary-500/5 dark:ring-primary-500/20">
                 <div class="flex items-start justify-between gap-3">
                     <div>
-                        <p class="text-sm font-semibold text-gray-950 dark:text-white">Open case (admin)</p>
-                        <p class="mt-0.5 text-xs text-gray-600 dark:text-gray-300">Create a support case and assign it to staff. Only Super Admin can use this.</p>
+                        <p class="text-sm font-semibold text-gray-950 dark:text-white">Open case</p>
+                        <p class="mt-0.5 text-xs text-gray-600 dark:text-gray-300">Create a support case. Assign it to yourself or another staff member.</p>
                     </div>
                     <button type="button" wire:click="cancelOpenCaseForm" class="text-xs font-semibold text-gray-500">Cancel</button>
                 </div>
@@ -45,7 +45,7 @@
 
                 <div>
                     <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Handoff note</label>
-                    <textarea wire:model="openCaseHandoffNote" rows="2" required class="fi-crm-input mt-1 block w-full" placeholder="What should the assignee do?"></textarea>
+                    <textarea wire:model="openCaseHandoffNote" rows="2" class="fi-crm-input mt-1 block w-full" placeholder="What should the assignee do? Required if you assign someone else."></textarea>
                 </div>
 
                 <button type="submit" class="inline-flex rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500">
@@ -72,9 +72,9 @@
             <p class="text-base font-semibold text-gray-950 dark:text-white">No cases yet</p>
             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                 @if ($canOpenCaseAsAdmin ?? false)
-                    Use <strong>Open case</strong> above to assign follow-up work to staff, or staff can open a case when closing a campus meeting.
+                    Use <strong>Open case</strong> above to start follow-up work, or assign it to another staff member.
                 @else
-                    When a campus visit cannot be resolved on the spot, staff can open a case from the close-meeting flow.
+                    You can view cases here. Ask a colleague with case access if one needs to be opened.
                 @endif
             </p>
         </div>

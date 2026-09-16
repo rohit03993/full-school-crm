@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\AdmissionStatus;
 use App\Enums\CampusVisitPurpose;
+use App\Enums\CrmPermission;
 use App\Enums\EnrollmentStatus;
 use App\Enums\LeadSource;
 use App\Enums\RoleName;
@@ -17,6 +18,7 @@ use App\Models\Student;
 use App\Models\StudentCase;
 use App\Models\User;
 use App\Services\CallLogService;
+use App\Services\CrmPermissionSyncService;
 use App\Services\EnquiryService;
 use App\Services\StudentCaseService;
 use App\Services\VisitMeetingAssignmentService;
@@ -186,15 +188,20 @@ class StudentCaseServiceTest extends TestCase
         $this->assertSame($director->id, $updated->current_assignee_user_id);
     }
 
-    public function test_super_admin_can_open_case_from_profile_rules(): void
+    public function test_staff_with_cases_open_can_open_case_from_profile(): void
     {
         [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
         $admin = User::factory()->create(['is_active' => true]);
         $admin->assignRole(RoleName::SuperAdmin->value);
+        app(CrmPermissionSyncService::class)->sync();
         $service = app(StudentCaseService::class);
 
         $this->assertTrue($service->canOpenAsAdmin($admin, $student));
-        $this->assertFalse($service->canOpenAsAdmin($counsellor, $student));
+        $this->assertTrue($service->canOpenAsAdmin($counsellor, $student));
+        $this->assertTrue($service->canOpenAsAdmin($accountant, $student));
+
+        $outsider = User::factory()->create(['is_active' => true]);
+        $this->assertFalse($service->canOpenAsAdmin($outsider, $student));
 
         $case = $service->open(
             $student->fresh(['activeEnrollment']),
@@ -202,12 +209,12 @@ class StudentCaseServiceTest extends TestCase
             'Fee waiver request',
             'Parent asked for discount.',
             $accountant,
-            $admin,
+            $counsellor,
             'Please review fee structure with parent.',
         );
 
         $this->assertSame($accountant->id, $case->current_assignee_user_id);
-        $this->assertSame($admin->id, $case->opened_by_user_id);
+        $this->assertSame($counsellor->id, $case->opened_by_user_id);
     }
 
     public function test_close_case_records_closing_note(): void

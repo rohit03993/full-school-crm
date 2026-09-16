@@ -476,7 +476,7 @@ class StudentCaseService
 
     public function canOpenAsAdmin(?User $viewer, Student $student): bool
     {
-        return $this->isSuperAdmin($viewer)
+        return CrmAccess::can($viewer, CrmPermission::CasesOpen)
             && $student->activeEnrollment()->exists();
     }
 

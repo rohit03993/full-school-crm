@@ -773,7 +773,7 @@ class StudentProfilePage extends Page
         if (! $cases->canOpenAsAdmin(Auth::user(), $this->record)) {
             Notification::make()
                 ->title('Not allowed')
-                ->body('Only Super Admin can open a case from the student profile.')
+                ->body('You do not have permission to open a case.')
                 ->warning()
                 ->send();
 
@@ -783,7 +783,7 @@ class StudentProfilePage extends Page
         $this->openCaseType = CampusVisitPurpose::General->value;
         $this->openCaseTitle = '';
         $this->openCaseSummary = '';
-        $this->openCaseAssigneeId = null;
+        $this->openCaseAssigneeId = Auth::id();
         $this->openCaseHandoffNote = '';
         $this->showOpenCaseForm = true;
     }
@@ -798,7 +798,7 @@ class StudentProfilePage extends Page
         if (! $cases->canOpenAsAdmin(Auth::user(), $this->record)) {
             Notification::make()
                 ->title('Not allowed')
-                ->body('Only Super Admin can open a case from the student profile.')
+                ->body('You do not have permission to open a case.')
                 ->warning()
                 ->send();
 

@@ -90,6 +90,7 @@ class CrmStaffRolesTest extends TestCase
 
         $this->assertTrue($user->canCrm(CrmPermission::FeesCollect));
         $this->assertTrue($user->canCrm(CrmPermission::ReportsExport));
+        $this->assertTrue($user->canCrm(CrmPermission::CasesOpen));
         $this->assertTrue($user->can('create', \App\Models\Payment::class));
         $this->assertFalse($user->canCrm(CrmPermission::FeesAdjustStructure));
     }
@@ -307,6 +308,10 @@ class CrmStaffRolesTest extends TestCase
             $this->assertTrue(
                 $user->canCrm(CrmPermission::CasesView),
                 "{$role->value} should view own cases",
+            );
+            $this->assertTrue(
+                $user->canCrm(CrmPermission::CasesOpen),
+                "{$role->value} should open cases",
             );
             $this->assertTrue(
                 \App\Filament\Pages\MyMeetingsPage::canAccess(),
