@@ -29,6 +29,7 @@ class ActivityMarksBulkImportService
      * @param  list<list<string|null>>  $rows
      * @param  array{roll_column: int|null, subject_columns: list<int>}  $mapping
      * @param  array<int, float|int|string>  $subjectMaxMarksByColumn
+     * @param  array<int, string>  $subjectLabelsByColumn
      * @return array{
      *     rows: list<array<string, mixed>>,
      *     subjects: list<string>,
@@ -46,13 +47,15 @@ class ActivityMarksBulkImportService
         ?int $batchId = null,
         float $defaultMaxMarks = 100,
         array $subjectMaxMarksByColumn = [],
+        array $subjectLabelsByColumn = [],
     ): array {
-        $subjectLabels = $this->subjectLabels($headers, $mapping['subject_columns'] ?? []);
+        $subjectLabels = $this->subjectLabels($headers, $mapping['subject_columns'] ?? [], $subjectLabelsByColumn);
         $subjectMaxMarks = $this->resolvedSubjectMaxMarks(
             $headers,
             $mapping['subject_columns'] ?? [],
             $subjectMaxMarksByColumn,
             $defaultMaxMarks,
+            $subjectLabels,
         );
         $subjects = array_values(array_unique($subjectLabels));
         $seenRolls = [];
@@ -294,14 +297,18 @@ class ActivityMarksBulkImportService
 
     /**
      * @param  list<int>  $subjectColumnIndexes
+     * @param  array<int|string, string>  $subjectLabelsByColumn
      * @return array<int, string>
      */
-    protected function subjectLabels(array $headers, array $subjectColumnIndexes): array
+    protected function subjectLabels(array $headers, array $subjectColumnIndexes, array $subjectLabelsByColumn = []): array
     {
         $labels = [];
 
         foreach ($subjectColumnIndexes as $index) {
-            $labels[$index] = ExamSubjectCatalog::resolveLabel($headers[$index] ?? null);
+            $override = trim((string) ($subjectLabelsByColumn[$index] ?? $subjectLabelsByColumn[(string) $index] ?? ''));
+            $labels[$index] = $override !== ''
+                ? ExamSubjectCatalog::canonicalDisplayName($override)
+                : ExamSubjectCatalog::resolveLabel($headers[$index] ?? null);
         }
 
         return $labels;
@@ -310,6 +317,7 @@ class ActivityMarksBulkImportService
     /**
      * @param  list<int>  $subjectColumnIndexes
      * @param  array<int, float|int|string>  $subjectMaxMarksByColumn
+     * @param  array<int, string>  $subjectLabels
      * @return array<string, float>
      */
     protected function resolvedSubjectMaxMarks(
@@ -317,17 +325,18 @@ class ActivityMarksBulkImportService
         array $subjectColumnIndexes,
         array $subjectMaxMarksByColumn,
         float $defaultMaxMarks,
+        array $subjectLabels = [],
     ): array {
         $resolved = [];
 
         foreach ($subjectColumnIndexes as $columnIndex) {
-            $label = ExamSubjectCatalog::resolveLabel($headers[$columnIndex] ?? null);
+            $label = $subjectLabels[$columnIndex] ?? ExamSubjectCatalog::resolveLabel($headers[$columnIndex] ?? null);
             $rawMax = $subjectMaxMarksByColumn[$columnIndex]
                 ?? $subjectMaxMarksByColumn[(string) $columnIndex]
                 ?? null;
             $resolved[$label] = $rawMax !== null && $rawMax !== ''
                 ? (float) $rawMax
-                : ExamSubjectCatalog::defaultMaxForHeader($headers[$columnIndex] ?? null, $defaultMaxMarks);
+                : $defaultMaxMarks;
         }
 
         return $resolved;
@@ -371,32 +380,61 @@ class ActivityMarksBulkImportService
         float $defaultMaxMarks,
         User $staff,
     ): array {
-        $existing = ActivitySession::query()
-            ->where('activity_type_id', $activityType->id)
-            ->where('batch_id', $batchId)
-            ->whereDate('session_date', $sessionDate)
-            ->where('metadata->test_key', $testKey)
-            ->where('metadata->subject', $subject)
-            ->first();
+        $canonicalSubject = ExamSubjectCatalog::canonicalDisplayName($subject);
+        $existing = $this->findExistingSession($activityType, $batchId, $sessionDate, $testKey, $canonicalSubject);
 
         if ($existing) {
+            $metadata = is_array($existing->metadata) ? $existing->metadata : [];
+            $metadata['subject'] = $canonicalSubject;
+            $metadata['max_marks'] = $defaultMaxMarks;
+            $existing->metadata = $metadata;
+            $existing->save();
+
             return [$existing, false];
         }
 
         $session = ActivitySession::query()->create([
             'activity_type_id' => $activityType->id,
-            'title' => "{$testName} — {$subject}",
+            'title' => "{$testName} — {$canonicalSubject}",
             'session_date' => $sessionDate,
             'batch_id' => $batchId,
             'metadata' => [
                 'test_key' => $testKey,
                 'test_name' => $testName,
-                'subject' => $subject,
+                'subject' => $canonicalSubject,
                 'max_marks' => $defaultMaxMarks,
             ],
             'created_by_user_id' => $staff->id,
         ]);
 
         return [$session, true];
+    }
+
+    protected function findExistingSession(
+        ActivityType $activityType,
+        int $batchId,
+        string $sessionDate,
+        string $testKey,
+        string $subject,
+    ): ?ActivitySession {
+        $names = ExamSubjectCatalog::matchingStoredNames($subject);
+
+        return ActivitySession::query()
+            ->where('activity_type_id', $activityType->id)
+            ->where('batch_id', $batchId)
+            ->whereDate('session_date', $sessionDate)
+            ->where('metadata->test_key', $testKey)
+            ->where(function ($query) use ($names): void {
+                foreach ($names as $index => $name) {
+                    if ($index === 0) {
+                        $query->where('metadata->subject', $name);
+
+                        continue;
+                    }
+
+                    $query->orWhere('metadata->subject', $name);
+                }
+            })
+            ->first();
     }
 }

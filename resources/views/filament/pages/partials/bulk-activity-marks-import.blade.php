@@ -68,7 +68,10 @@
 
                 <x-crm.text-input label="Test date" model="sessionDate" type="date" />
 
-                <x-crm.text-input label="Default max marks (fallback)" model="defaultMaxMarks" type="number" />
+                <div>
+                    <x-crm.text-input label="Starting out of" model="defaultMaxMarks" type="number" />
+                    <p class="mt-1 text-xs text-gray-500">Starting value only. On the next step you set 180, 100, 50, or any number per subject for this test.</p>
+                </div>
 
                 <x-crm.select-input label="Academic session (optional filter)" for="marks-session" wire:model="academicSessionId" class="lg:col-span-2">
                     <option value="">All active enrollments</option>
@@ -117,7 +120,12 @@
         <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
             <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
                 <h2 class="text-lg font-bold">Map columns</h2>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Confirm roll number column and subject columns from your sheet.</p>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    Tick mark columns. Short headers are suggested for you — <strong>P</strong> Physics,
+                    <strong>C</strong> Chemistry, <strong>M</strong> Maths, <strong>B</strong> Biology,
+                    <strong>Z</strong> Zoology. Change the name if this file uses a different subject
+                    (for example P as Physical Education). Totals apply to <strong>this test only</strong>.
+                </p>
             </div>
 
             <div class="grid gap-5 p-4 sm:p-6">
@@ -128,52 +136,74 @@
                     @endforeach
                 </x-crm.select-input>
 
-                <div>
-                    <p class="text-sm font-semibold text-gray-950 dark:text-white">Subject columns</p>
-                    <p class="mt-1 text-xs text-gray-500">Check mark columns and set max marks per subject (Physics 350, Chemistry 200, Maths 500, etc.).</p>
-                    <div class="mt-3 grid gap-3">
-                        @foreach ($fileHeaders as $index => $header)
-                            @if ($index === ($columnMapping['roll_column'] ?? null))
-                                @continue
-                            @endif
+                <div class="overflow-x-auto rounded-xl ring-1 ring-gray-200 dark:ring-white/10">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
+                            <tr>
+                                <th class="px-3 py-2.5">Use</th>
+                                <th class="px-3 py-2.5">Excel column</th>
+                                <th class="px-3 py-2.5">Subject name</th>
+                                <th class="px-3 py-2.5">Out of (this test)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-white/10">
                             @php
-                                $isSubject = in_array($index, $columnMapping['subject_columns'] ?? [], true);
-                                $resolvedSubject = \App\Support\ExamSubjectCatalog::resolveLabel($header);
+                                $selectedColumns = array_map('intval', $columnMapping['subject_columns'] ?? []);
                             @endphp
-                            <div @class([
-                                'rounded-lg border px-3 py-3 dark:border-white/10',
-                                'border-primary-200 bg-primary-50/40 dark:border-primary-500/30 dark:bg-primary-500/5' => $isSubject,
-                                'border-gray-200' => ! $isSubject,
-                            ])>
-                                <label class="flex items-start gap-3">
-                                    <input
-                                        type="checkbox"
-                                        value="{{ $index }}"
-                                        wire:model.live="columnMapping.subject_columns"
-                                        class="mt-1 rounded border-gray-300 text-primary-600"
-                                    >
-                                    <span class="min-w-0 flex-1">
-                                        <span class="block text-sm font-semibold text-gray-950 dark:text-white">{{ $header ?: 'Column '.($index + 1) }}</span>
-                                        @if ($resolvedSubject !== ($header ?: ''))
-                                            <span class="mt-0.5 block text-xs text-gray-500">CRM subject: {{ $resolvedSubject }}</span>
-                                        @endif
-                                    </span>
-                                </label>
-                                @if ($isSubject)
-                                    <div class="mt-3 pl-7">
-                                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400">Max marks for {{ $resolvedSubject }}</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            max="9999"
-                                            wire:model.live="subjectMaxMarks.{{ $index }}"
-                                            class="mt-1 w-full max-w-[10rem] rounded-lg border-gray-300 text-sm dark:border-white/10 dark:bg-gray-900"
-                                        >
-                                    </div>
+                            @foreach ($fileHeaders as $index => $header)
+                                @if (filled($columnMapping['roll_column'] ?? null) && (int) $index === (int) $columnMapping['roll_column'])
+                                    @continue
                                 @endif
-                            </div>
-                        @endforeach
-                    </div>
+                                @php
+                                    $isSubject = in_array((int) $index, $selectedColumns, true);
+                                    $suggested = \App\Support\ExamSubjectCatalog::resolveLabel($header);
+                                @endphp
+                                <tr @class([
+                                    'bg-primary-50/40 dark:bg-primary-500/5' => $isSubject,
+                                    'bg-white dark:bg-gray-900' => ! $isSubject,
+                                ])>
+                                    <td class="px-3 py-2.5 align-top">
+                                        <input
+                                            type="checkbox"
+                                            value="{{ $index }}"
+                                            wire:model.live="columnMapping.subject_columns"
+                                            class="rounded border-gray-300 text-primary-600"
+                                        >
+                                    </td>
+                                    <td class="px-3 py-2.5 align-top">
+                                        <p class="font-semibold text-gray-950 dark:text-white">{{ $header ?: 'Column '.($index + 1) }}</p>
+                                        @if ($suggested !== ($header ?: '') && $suggested !== 'Subject')
+                                            <p class="mt-0.5 text-xs text-gray-500">Suggested: {{ $suggested }}</p>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2.5 align-top">
+                                        @if ($isSubject)
+                                            <input
+                                                type="text"
+                                                wire:model.blur="subjectLabels.{{ $index }}"
+                                                class="w-full min-w-[10rem] rounded-lg border-gray-300 text-sm dark:border-white/10 dark:bg-gray-900"
+                                            >
+                                        @else
+                                            <span class="text-gray-400">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2.5 align-top">
+                                        @if ($isSubject)
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="9999"
+                                                wire:model.live="subjectMaxMarks.{{ $index }}"
+                                                class="w-28 rounded-lg border-gray-300 text-sm dark:border-white/10 dark:bg-gray-900"
+                                            >
+                                        @else
+                                            <span class="text-gray-400">—</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -192,8 +222,8 @@
                     {{ $previewPayload['ready_count'] ?? 0 }} ready,
                     {{ $previewPayload['error_count'] ?? 0 }} with errors.
                     @if (($previewPayload['subject_max_marks'] ?? []) !== [])
-                        Max marks:
-                        {{ collect($previewPayload['subject_max_marks'])->map(fn ($max, $subject) => $subject.' '.$max)->join(' · ') }}.
+                        This test:
+                        {{ collect($previewPayload['subject_max_marks'])->map(fn ($max, $subject) => $subject.' out of '.$max)->join(' · ') }}.
                     @endif
                     @if (($previewPayload['batches'] ?? []) !== [])
                         Batches: {{ collect($previewPayload['batches'])->map(fn ($b) => $b['name'].' ('.$b['count'].')')->join(', ') }}.
@@ -209,6 +239,9 @@
                             <th class="px-4 py-2 text-left font-semibold">Roll</th>
                             <th class="px-4 py-2 text-left font-semibold">Student</th>
                             <th class="px-4 py-2 text-left font-semibold">Batch</th>
+                            @foreach ($previewPayload['subjects'] ?? [] as $subject)
+                                <th class="px-4 py-2 text-left font-semibold">{{ $subject }}</th>
+                            @endforeach
                             <th class="px-4 py-2 text-left font-semibold">Status</th>
                         </tr>
                     </thead>
@@ -219,6 +252,19 @@
                                 <td class="px-4 py-2 font-mono">{{ $row['roll_number'] }}</td>
                                 <td class="px-4 py-2">{{ $row['student_name'] ?? '—' }}</td>
                                 <td class="px-4 py-2">{{ $row['batch_name'] ?? '—' }}</td>
+                                @foreach ($previewPayload['subjects'] ?? [] as $subject)
+                                    @php
+                                        $mark = $row['subject_marks'][$subject] ?? null;
+                                        $max = $previewPayload['subject_max_marks'][$subject] ?? null;
+                                    @endphp
+                                    <td class="px-4 py-2 font-mono text-xs">
+                                        @if ($mark !== null)
+                                            {{ rtrim(rtrim(number_format((float) $mark, 2), '0'), '.') }}@if ($max) / {{ rtrim(rtrim(number_format((float) $max, 2), '0'), '.') }}@endif
+                                        @else
+                                            <span class="text-gray-400">Absent</span>
+                                        @endif
+                                    </td>
+                                @endforeach
                                 <td class="px-4 py-2">
                                     @if (($row['status'] ?? '') === 'ready')
                                         <span class="text-emerald-600">Ready</span>

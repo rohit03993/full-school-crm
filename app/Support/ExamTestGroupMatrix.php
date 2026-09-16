@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\ActivitySession;
 use App\Models\ActivityType;
+use App\Models\BatchStudent;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
@@ -25,6 +26,8 @@ class ExamTestGroupMatrix
      *         tracks_marks: bool,
      *         session_id: ?int,
      *         present_count: int,
+     *         student_count: int,
+     *         subject_names: list<string>,
      *         subjects: array<string, array{marks_count: int, session_id: int, max_marks: mixed, present_count: int}>
      *     }>
      * }
@@ -85,11 +88,26 @@ class ExamTestGroupMatrix
                 ];
             }
 
+            $existingSubject = $grouped[$groupKey]['subjects'][$subject] ?? null;
+            $marksCount = (int) $session->marks_count;
+            $presentCount = (int) $session->present_count;
+
+            if ($existingSubject !== null) {
+                $marksCount = max((int) $existingSubject['marks_count'], $marksCount);
+                $presentCount = max((int) $existingSubject['present_count'], $presentCount);
+            }
+
+            $useThisSession = $existingSubject === null
+                || $marksCount > (int) $existingSubject['marks_count']
+                || ! filled($existingSubject['max_marks']);
+
             $grouped[$groupKey]['subjects'][$subject] = [
-                'marks_count' => (int) $session->marks_count,
-                'session_id' => $session->id,
-                'max_marks' => $session->metadataValue('max_marks'),
-                'present_count' => (int) $session->present_count,
+                'marks_count' => $marksCount,
+                'session_id' => $useThisSession ? $session->id : $existingSubject['session_id'],
+                'max_marks' => $useThisSession
+                    ? $session->metadataValue('max_marks')
+                    : $existingSubject['max_marks'],
+                'present_count' => $presentCount,
             ];
 
             if (! $grouped[$groupKey]['tracks_marks']) {
@@ -106,19 +124,13 @@ class ExamTestGroupMatrix
         $rows = collect($grouped)
             ->sortByDesc('sort_date')
             ->values()
-            ->map(function (array $row) use ($subjects): array {
-                $subjectCells = [];
-
-                foreach ($subjects as $subject) {
-                    $subjectCells[$subject] = $row['subjects'][$subject] ?? [
-                        'marks_count' => 0,
-                        'session_id' => null,
-                        'max_marks' => null,
-                        'present_count' => 0,
-                    ];
-                }
+            ->map(function (array $row): array {
+                $subjectCells = $row['subjects'];
+                uksort($subjectCells, fn (string $a, string $b): int => strnatcasecmp($a, $b));
 
                 $row['subjects'] = $subjectCells;
+                $row['subject_names'] = array_keys($subjectCells);
+                $row['student_count'] = (int) collect($subjectCells)->max('marks_count');
                 $row['session_id'] ??= collect($subjectCells)
                     ->pluck('session_id')
                     ->filter()
@@ -176,6 +188,29 @@ class ExamTestGroupMatrix
         /** @var array<int, array{student_id: int, roll_number: string, student_name: string, scores: array<string, string>}> $studentRows */
         $studentRows = [];
 
+        if ($first->batch_id) {
+            $batchStudents = BatchStudent::query()
+                ->where('batch_id', $first->batch_id)
+                ->where('is_active', true)
+                ->with(['student.activeEnrollment'])
+                ->get();
+
+            foreach ($batchStudents as $batchStudent) {
+                $student = $batchStudent->student;
+
+                if (! $student) {
+                    continue;
+                }
+
+                $studentRows[$student->id] = [
+                    'student_id' => $student->id,
+                    'roll_number' => (string) ($student->activeEnrollment?->enrollment_number ?? "\u{2014}"),
+                    'student_name' => (string) $student->name,
+                    'scores' => [],
+                ];
+            }
+        }
+
         foreach ($sessions as $session) {
             $subject = StudentExamMarksMatrix::subjectForSession($session);
             $subjects[$subject] = true;
@@ -202,11 +237,18 @@ class ExamTestGroupMatrix
                     ? (float) $session->metadataValue('max_marks')
                     : null;
 
-                $studentRows[$studentId]['scores'][$subject] = StudentExamMarksMatrix::formatMarks(
+                $display = StudentExamMarksMatrix::formatMarks(
                     $attendance->marks_obtained !== null ? (float) $attendance->marks_obtained : null,
                     $maxMarks,
                     $attendance->grade,
+                    'Absent',
                 );
+
+                $existing = $studentRows[$studentId]['scores'][$subject] ?? null;
+
+                if ($existing === null || $existing === 'Absent' || $attendance->marks_obtained !== null) {
+                    $studentRows[$studentId]['scores'][$subject] = $display;
+                }
             }
         }
 
@@ -218,7 +260,7 @@ class ExamTestGroupMatrix
             ->values()
             ->map(function (array $row) use ($subjectList): array {
                 foreach ($subjectList as $subject) {
-                    $row['scores'][$subject] = $row['scores'][$subject] ?? "\u{2014}";
+                    $row['scores'][$subject] = $row['scores'][$subject] ?? 'Absent';
                 }
 
                 return $row;

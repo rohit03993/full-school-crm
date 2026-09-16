@@ -93,28 +93,25 @@
                             </span>
                         @endif
                     </div>
-                    @if (! empty($matrix['subjects']))
-                        <dl class="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3 dark:border-white/10">
-                            @foreach ($matrix['subjects'] as $subject)
-                                @php
-                                    $cell = $row['subjects'][$subject] ?? null;
-                                    $count = (int) ($cell['marks_count'] ?? 0);
-                                    $present = (int) ($cell['present_count'] ?? 0);
-                                @endphp
-                                <div class="rounded-lg bg-gray-50 px-2.5 py-2 dark:bg-white/5">
-                                    <dt class="truncate text-[10px] font-semibold uppercase text-gray-500">{{ $subject }}</dt>
-                                    <dd class="mt-0.5 text-xs font-medium text-gray-700 dark:text-gray-300">
-                                        @if (! ($row['tracks_marks'] ?? true))
-                                            {{ $present > 0 ? $present.' present' : '—' }}
-                                        @elseif ($count > 0)
-                                            {{ $count }} scored
-                                        @else
-                                            —
-                                        @endif
-                                    </dd>
-                                </div>
-                            @endforeach
-                        </dl>
+                    @php
+                        $subjectNames = $row['subject_names'] ?? array_keys(array_filter(
+                            $row['subjects'] ?? [],
+                            fn (array $cell): bool => (int) ($cell['session_id'] ?? 0) > 0 || (int) ($cell['marks_count'] ?? 0) > 0,
+                        ));
+                        $studentCount = (int) ($row['student_count'] ?? 0);
+                    @endphp
+                    @if ($subjectNames !== [])
+                        <div class="mt-3 border-t border-gray-100 pt-3 dark:border-white/10">
+                            <p class="text-[10px] font-semibold uppercase text-gray-500">This paper</p>
+                            <p class="mt-1 text-xs text-gray-700 dark:text-gray-300">{{ implode(' · ', $subjectNames) }}</p>
+                            <p class="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                                @if ($studentCount > 0)
+                                    {{ $studentCount }} {{ $studentCount === 1 ? 'student' : 'students' }}
+                                @else
+                                    No marks yet
+                                @endif
+                            </p>
+                        </div>
                     @endif
                     <div class="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3 dark:border-white/10">
                         @if ($row['tracks_marks'] ?? true)
@@ -139,9 +136,8 @@
                         <th class="px-4 py-2.5">Batch</th>
                         <th class="px-4 py-2.5">Date</th>
                         <th class="px-4 py-2.5">Result</th>
-                        @foreach ($matrix['subjects'] as $subject)
-                            <th class="px-4 py-2.5 text-center">{{ $subject }}</th>
-                        @endforeach
+                        <th class="px-4 py-2.5">This paper</th>
+                        <th class="px-4 py-2.5">Students</th>
                         <th class="px-4 py-2.5 text-right">Actions</th>
                     </tr>
                 </thead>
@@ -174,30 +170,22 @@
                                     <span class="text-gray-400">—</span>
                                 @endif
                             </td>
-                            @foreach ($matrix['subjects'] as $subject)
-                                @php
-                                    $cell = $row['subjects'][$subject] ?? null;
-                                    $count = (int) ($cell['marks_count'] ?? 0);
-                                    $present = (int) ($cell['present_count'] ?? 0);
-                                @endphp
-                                <td class="px-4 py-2.5 text-center text-xs">
-                                    @if (! ($row['tracks_marks'] ?? true))
-                                        @if ($present > 0)
-                                            <span class="inline-flex rounded-full bg-sky-50 px-2 py-0.5 font-medium text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
-                                                {{ $present }} present
-                                            </span>
-                                        @else
-                                            <span class="text-gray-400">—</span>
-                                        @endif
-                                    @elseif ($count > 0)
-                                        <span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                            {{ $count }} scored
-                                        </span>
-                                    @else
-                                        <span class="text-gray-400">—</span>
-                                    @endif
-                                </td>
-                            @endforeach
+                            @php
+                                $subjectNames = $row['subject_names'] ?? array_keys($row['subjects'] ?? []);
+                                $studentCount = (int) ($row['student_count'] ?? 0);
+                            @endphp
+                            <td class="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300">
+                                {{ $subjectNames !== [] ? implode(' · ', $subjectNames) : '—' }}
+                            </td>
+                            <td class="px-4 py-2.5 text-xs">
+                                @if ($studentCount > 0)
+                                    <span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                        {{ $studentCount }} {{ $studentCount === 1 ? 'student' : 'students' }}
+                                    </span>
+                                @else
+                                    <span class="text-gray-400">No marks yet</span>
+                                @endif
+                            </td>
                             <td class="whitespace-nowrap px-4 py-2.5 text-right">
                                 <div class="flex flex-wrap justify-end gap-2">
                                     @if ($row['tracks_marks'] ?? true)

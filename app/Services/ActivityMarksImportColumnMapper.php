@@ -69,7 +69,7 @@ class ActivityMarksImportColumnMapper
 
     protected function normalizeHeader(string $header): string
     {
-        return strtolower(preg_replace('/[^a-z0-9]+/i', ' ', trim($header)) ?? trim($header));
+        return strtolower(trim(preg_replace('/[^a-z0-9]+/i', ' ', trim($header)) ?? trim($header)));
     }
 
     protected function looksLikeRollColumn(string $normalized): bool

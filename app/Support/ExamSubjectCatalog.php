@@ -5,19 +5,21 @@ namespace App\Support;
 class ExamSubjectCatalog
 {
     /**
+     * Suggested names for common Excel headers. Totals are per test, not locked here.
+     *
      * @return array<string, array{name: string, default_max: int}>
      */
     public static function subjects(): array
     {
         return [
-            'physics' => ['name' => 'Physics', 'default_max' => 350],
-            'chemistry' => ['name' => 'Chemistry', 'default_max' => 200],
-            'mathematics' => ['name' => 'Mathematics', 'default_max' => 500],
-            'maths' => ['name' => 'Mathematics', 'default_max' => 500],
-            'biology' => ['name' => 'Biology', 'default_max' => 200],
+            'physics' => ['name' => 'Physics', 'default_max' => 100],
+            'chemistry' => ['name' => 'Chemistry', 'default_max' => 100],
+            'maths' => ['name' => 'Maths', 'default_max' => 100],
+            'biology' => ['name' => 'Biology', 'default_max' => 100],
             'english' => ['name' => 'English', 'default_max' => 100],
-            'botany' => ['name' => 'Botany', 'default_max' => 200],
-            'zoology' => ['name' => 'Zoology', 'default_max' => 200],
+            'botany' => ['name' => 'Botany', 'default_max' => 100],
+            'zoology' => ['name' => 'Zoology', 'default_max' => 100],
+            'physical_education' => ['name' => 'Physical Education', 'default_max' => 100],
         ];
     }
 
@@ -33,10 +35,10 @@ class ExamSubjectCatalog
             'c' => 'chemistry',
             'chem' => 'chemistry',
             'chemistry' => 'chemistry',
-            'm' => 'mathematics',
-            'math' => 'mathematics',
-            'maths' => 'mathematics',
-            'mathematics' => 'mathematics',
+            'm' => 'maths',
+            'math' => 'maths',
+            'maths' => 'maths',
+            'mathematics' => 'maths',
             'b' => 'biology',
             'bio' => 'biology',
             'biology' => 'biology',
@@ -45,8 +47,12 @@ class ExamSubjectCatalog
             'english' => 'english',
             'bot' => 'botany',
             'botany' => 'botany',
+            'z' => 'zoology',
             'zoo' => 'zoology',
             'zoology' => 'zoology',
+            'pe' => 'physical_education',
+            'physed' => 'physical_education',
+            'physicaleducation' => 'physical_education',
         ];
     }
 
@@ -58,24 +64,62 @@ class ExamSubjectCatalog
             return 'Subject';
         }
 
-        $key = self::aliases()[self::normalizeKey($header)] ?? null;
+        return self::canonicalDisplayName($header);
+    }
+
+    public static function canonicalDisplayName(?string $name): string
+    {
+        $name = trim((string) $name);
+
+        if ($name === '') {
+            return 'Subject';
+        }
+
+        $key = self::aliases()[self::normalizeKey($name)] ?? null;
 
         if ($key !== null) {
             return self::subjects()[$key]['name'];
         }
 
-        return $header;
+        return $name;
+    }
+
+    /**
+     * Names that should be treated as the same subject when matching stored sheets.
+     *
+     * @return list<string>
+     */
+    public static function matchingStoredNames(string $name): array
+    {
+        $canonical = self::canonicalDisplayName($name);
+        $key = self::aliases()[self::normalizeKey($name)]
+            ?? self::aliases()[self::normalizeKey($canonical)]
+            ?? null;
+
+        $names = [$name, $canonical];
+
+        if ($key !== null) {
+            $names[] = self::subjects()[$key]['name'];
+
+            foreach (self::aliases() as $alias => $aliasKey) {
+                if ($aliasKey !== $key) {
+                    continue;
+                }
+
+                $names[] = $alias;
+                $names[] = ucfirst($alias);
+            }
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(static fn (string $value): string => trim($value), $names),
+            static fn (string $value): bool => $value !== '',
+        )));
     }
 
     public static function defaultMaxForHeader(?string $header, float $fallback = 100): float
     {
-        $key = self::aliases()[self::normalizeKey($header)] ?? null;
-
-        if ($key === null) {
-            return $fallback;
-        }
-
-        return (float) self::subjects()[$key]['default_max'];
+        return $fallback;
     }
 
     /**

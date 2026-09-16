@@ -13,7 +13,7 @@ class ActivityMarksImportTemplateExport implements FromArray, ShouldAutoSize, Wi
         return [
             'Roll Number',
             'Student Name',
-            'Mathematics',
+            'Maths',
             'Physics',
             'Chemistry',
         ];

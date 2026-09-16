@@ -108,6 +108,11 @@ class BulkActivityMarksImportPage extends Page
     ];
 
     /**
+     * @var array<int, string>
+     */
+    public array $subjectLabels = [];
+
+    /**
      * @var array<int, float|int|string>
      */
     public array $subjectMaxMarks = [];
@@ -238,7 +243,7 @@ class BulkActivityMarksImportPage extends Page
         $this->fileHeaders = $parsed['headers'];
         $this->fileRows = $parsed['rows'];
         $this->columnMapping = $mapper->guess($this->fileHeaders);
-        $this->syncSubjectMaxMarksFromMapping();
+        $this->syncSubjectMappingFromFile();
         $this->previewPayload = null;
         $this->importResult = null;
         $this->importError = null;
@@ -268,6 +273,7 @@ class BulkActivityMarksImportPage extends Page
             $this->limitToBatch ? $this->batchId : null,
             $this->defaultMaxMarks,
             $this->subjectMaxMarks,
+            $this->subjectLabels,
         );
 
         $this->step = 3;
@@ -401,6 +407,7 @@ class BulkActivityMarksImportPage extends Page
             'fileRows',
             'columnMapping',
             'subjectMaxMarks',
+            'subjectLabels',
             'previewPayload',
             'importResult',
             'importError',
@@ -423,14 +430,36 @@ class BulkActivityMarksImportPage extends Page
 
     public function updatedColumnMapping(): void
     {
+        $this->syncSubjectMappingFromFile();
+    }
+
+    protected function syncSubjectMappingFromFile(): void
+    {
+        $this->syncSubjectLabelsFromMapping();
         $this->syncSubjectMaxMarksFromMapping();
+    }
+
+    protected function syncSubjectLabelsFromMapping(): void
+    {
+        $activeColumns = array_map('intval', $this->columnMapping['subject_columns'] ?? []);
+        $labels = [];
+
+        foreach ($activeColumns as $columnIndex) {
+            $existing = trim((string) ($this->subjectLabels[$columnIndex] ?? $this->subjectLabels[(string) $columnIndex] ?? ''));
+            $labels[$columnIndex] = $existing !== ''
+                ? $existing
+                : ExamSubjectCatalog::resolveLabel($this->fileHeaders[$columnIndex] ?? null);
+        }
+
+        $this->subjectLabels = $labels;
     }
 
     protected function syncSubjectMaxMarksFromMapping(): void
     {
+        $activeColumns = array_map('intval', $this->columnMapping['subject_columns'] ?? []);
         $defaults = ExamSubjectCatalog::defaultMaxMarksForColumns(
             $this->fileHeaders,
-            $this->columnMapping['subject_columns'] ?? [],
+            $activeColumns,
             $this->defaultMaxMarks,
         );
 
@@ -441,7 +470,7 @@ class BulkActivityMarksImportPage extends Page
             }
         }
 
-        $activeColumns = $this->columnMapping['subject_columns'] ?? [];
+        $activeColumns = array_map('intval', $this->columnMapping['subject_columns'] ?? []);
 
         $this->subjectMaxMarks = collect($this->subjectMaxMarks)
             ->filter(fn (mixed $value, int|string $key): bool => in_array((int) $key, $activeColumns, true))
@@ -516,6 +545,7 @@ class BulkActivityMarksImportPage extends Page
                     'fileHeaders' => $this->fileHeaders,
                     'columnMapping' => $this->columnMapping,
                     'subjectMaxMarks' => $this->subjectMaxMarks,
+                    'subjectLabels' => $this->subjectLabels,
                     'previewPayload' => $this->previewPayload,
                     'importResult' => $this->importResult,
                     'uploadFileName' => $this->uploadFile?->getClientOriginalName(),

@@ -118,7 +118,7 @@ class StudentExamMarksMatrix
         ];
     }
 
-    public static function subjectForSession(ActivitySession $session): string
+    public static function rawSubjectForSession(ActivitySession $session): string
     {
         $subject = trim((string) ($session->metadataValue('subject') ?? ''));
 
@@ -135,6 +135,11 @@ class StudentExamMarksMatrix
         return 'Subject';
     }
 
+    public static function subjectForSession(ActivitySession $session): string
+    {
+        return ExamSubjectCatalog::canonicalDisplayName(self::rawSubjectForSession($session));
+    }
+
     public static function testLabelForSession(ActivitySession $session): string
     {
         $testName = trim((string) ($session->metadataValue('test_name') ?? ''));
@@ -144,11 +149,14 @@ class StudentExamMarksMatrix
         }
 
         $title = trim($session->title);
-        $subject = self::subjectForSession($session);
-        $suffix = ' — '.$subject;
+        $raw = self::rawSubjectForSession($session);
 
-        if ($subject !== 'Subject' && str_ends_with($title, $suffix)) {
-            return trim(Str::beforeLast($title, $suffix));
+        foreach (array_unique([$raw, ExamSubjectCatalog::canonicalDisplayName($raw)]) as $subject) {
+            $suffix = ' — '.$subject;
+
+            if ($subject !== 'Subject' && str_ends_with($title, $suffix)) {
+                return trim(Str::beforeLast($title, $suffix));
+            }
         }
 
         return $title;
@@ -170,7 +178,7 @@ class StudentExamMarksMatrix
         ]);
     }
 
-    public static function formatMarks(?float $marks, ?float $maxMarks, ?string $grade): string
+    public static function formatMarks(?float $marks, ?float $maxMarks, ?string $grade, string $empty = '—'): string
     {
         if ($marks !== null) {
             $formatted = rtrim(rtrim(number_format($marks, 2), '0'), '.');
@@ -184,7 +192,7 @@ class StudentExamMarksMatrix
             return $formatted;
         }
 
-        return filled($grade) ? $grade : '—';
+        return filled($grade) ? $grade : $empty;
     }
 
     public static function percentage(?float $marks, ?float $maxMarks): ?float

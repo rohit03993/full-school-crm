@@ -183,7 +183,7 @@ class ActivityMarksBulkImportServiceTest extends TestCase
 
         $summaries = app(ActivityMarksWhatsAppService::class)->buildStudentMarksSummaries($result['test_key']);
 
-        $this->assertStringContainsString('Mathematics: 45/50', $summaries[$student->id]);
+        $this->assertStringContainsString('Maths: 45/50', $summaries[$student->id]);
         $this->assertStringContainsString('Physics: 38/50', $summaries[$student->id]);
 
         $template = WhatsAppTemplate::query()->create([
@@ -216,7 +216,7 @@ class ActivityMarksBulkImportServiceTest extends TestCase
         );
 
         $this->assertSame('Half Yearly', $params[2]);
-        $this->assertStringContainsString('Mathematics: 45/50', $params[3]);
+        $this->assertStringContainsString('Maths: 45/50', $params[3]);
     }
 
     protected function createStaffUser(): User
@@ -323,8 +323,113 @@ class ActivityMarksBulkImportServiceTest extends TestCase
         );
 
         $this->assertSame(1, $preview['ready_count']);
-        $this->assertSame(['Physics', 'Chemistry', 'Mathematics'], $preview['subjects']);
+        $this->assertSame(['Physics', 'Chemistry', 'Maths'], $preview['subjects']);
         $this->assertSame(100.0, $preview['subject_max_marks']['Physics']);
         $this->assertSame(76.0, $preview['rows'][0]['subject_marks']['Physics']);
+    }
+
+    public function test_z_column_is_suggested_as_zoology_and_can_be_renamed(): void
+    {
+        $staff = $this->createStaffUser();
+        $student = $this->createEnrolledStudent($staff, '501', '9876543501');
+        $course = Course::query()->firstOrFail();
+        $batch = Batch::query()->create([
+            'name' => 'NEET A',
+            'course_id' => $course->id,
+            'trainer_user_id' => $staff->id,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-12-31',
+            'status' => BatchStatus::Active,
+        ]);
+        app(BatchService::class)->assign($student, $batch, $staff);
+
+        $preview = app(ActivityMarksBulkImportService::class)->buildPreview(
+            ['Roll No', 'P', 'C', 'Z'],
+            [['501', '80', '70', '60']],
+            ['roll_column' => 0, 'subject_columns' => [1, 2, 3]],
+            null,
+            null,
+            100,
+            [1 => 180, 2 => 180, 3 => 180],
+        );
+
+        $this->assertSame(['Physics', 'Chemistry', 'Zoology'], $preview['subjects']);
+        $this->assertSame(180.0, $preview['subject_max_marks']['Physics']);
+        $this->assertSame(1, $preview['ready_count']);
+
+        $renamed = app(ActivityMarksBulkImportService::class)->buildPreview(
+            ['Roll No', 'P'],
+            [['501', '40']],
+            ['roll_column' => 0, 'subject_columns' => [1]],
+            null,
+            null,
+            100,
+            [1 => 50],
+            [1 => 'Physical Education'],
+        );
+
+        $this->assertSame(['Physical Education'], $renamed['subjects']);
+        $this->assertSame(40.0, $renamed['rows'][0]['subject_marks']['Physical Education']);
+    }
+
+    public function test_reimport_updates_max_marks_for_that_test_only(): void
+    {
+        $staff = $this->createStaffUser();
+        $student = $this->createEnrolledStudent($staff, '601', '9876543602');
+        $course = Course::query()->firstOrFail();
+        $batch = Batch::query()->create([
+            'name' => 'JEE A',
+            'course_id' => $course->id,
+            'trainer_user_id' => $staff->id,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-12-31',
+            'status' => BatchStatus::Active,
+        ]);
+        app(BatchService::class)->assign($student, $batch, $staff);
+
+        $activityType = ActivityType::query()->create([
+            'name' => 'Exam',
+            'field_schema' => [
+                ['key' => 'subject', 'label' => 'Subject', 'type' => 'text'],
+                ['key' => 'max_marks', 'label' => 'Max Marks', 'type' => 'number'],
+            ],
+            'is_enabled' => true,
+        ]);
+
+        $import = app(ActivityMarksBulkImportService::class);
+        $first = $import->buildPreview(
+            ['Roll No', 'M'],
+            [['601', '90']],
+            ['roll_column' => 0, 'subject_columns' => [1]],
+            null,
+            null,
+            100,
+            [1 => 100],
+        );
+        $import->import($staff, $activityType, 'Weekly Test', '2026-09-16', 100, $first['rows'], $first['subject_max_marks']);
+
+        $second = $import->buildPreview(
+            ['Roll No', 'M'],
+            [['601', '150']],
+            ['roll_column' => 0, 'subject_columns' => [1]],
+            null,
+            null,
+            100,
+            [1 => 180],
+        );
+        $this->assertSame(1, $second['ready_count']);
+        $result = $import->import($staff, $activityType, 'Weekly Test', '2026-09-16', 100, $second['rows'], $second['subject_max_marks']);
+
+        $session = ActivitySession::query()
+            ->where('metadata->test_key', $result['test_key'])
+            ->where('metadata->subject', 'Maths')
+            ->firstOrFail();
+
+        $this->assertSame(180.0, (float) $session->metadataValue('max_marks'));
+        $this->assertDatabaseHas('activity_attendances', [
+            'student_id' => $student->id,
+            'attendable_id' => $session->id,
+            'marks_obtained' => 150,
+        ]);
     }
 }

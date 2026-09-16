@@ -464,9 +464,9 @@ class ResultDeclarationService
                 continue;
             }
 
-            $subject = (string) ($session->metadataValue('subject') ?? '');
+            $subject = StudentExamMarksMatrix::subjectForSession($session);
 
-            if ($subject !== '' && filled($record->remarks)) {
+            if ($subject !== 'Subject' && filled($record->remarks)) {
                 $subjectRemarks[$subject] = (string) $record->remarks;
             }
         }

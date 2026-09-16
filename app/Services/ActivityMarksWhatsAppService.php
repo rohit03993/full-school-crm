@@ -8,6 +8,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppTemplate;
+use App\Support\StudentExamMarksMatrix;
 use Illuminate\Support\Collection;
 
 class ActivityMarksWhatsAppService
@@ -57,7 +58,7 @@ class ActivityMarksWhatsAppService
             $session->id => (float) ($session->metadataValue('max_marks') ?? 0),
         ]);
         $subjectBySession = $sessions->mapWithKeys(fn (ActivitySession $session): array => [
-            $session->id => (string) ($session->metadataValue('subject') ?? 'Subject'),
+            $session->id => StudentExamMarksMatrix::subjectForSession($session),
         ]);
 
         $attendances = ActivityAttendance::query()

@@ -154,7 +154,7 @@
         @if ($marksAreLocked ?? false)
             · <strong class="text-sky-700 dark:text-sky-300">Marks locked</strong> — upload and manual entry disabled
         @else
-            · Use <strong>Upload marks</strong> or mark entry to change scores
+            · Use <strong>Upload marks</strong> or mark entry to change scores. Empty cells show as <strong>Absent</strong>.
         @endif
     </div>
 
@@ -179,7 +179,7 @@
                     @foreach ($markSheet['subjects'] as $subject)
                         <div class="rounded-lg bg-gray-50 px-2.5 py-2 dark:bg-white/5">
                             <dt class="truncate text-[10px] font-semibold uppercase text-gray-500">{{ $subject }}</dt>
-                            <dd class="mt-0.5 text-sm font-semibold text-gray-800 dark:text-gray-200">{{ $row['scores'][$subject] ?? '—' }}</dd>
+                            <dd class="mt-0.5 text-sm font-semibold {{ ($row['scores'][$subject] ?? '') === 'Absent' ? 'text-gray-400' : 'text-gray-800 dark:text-gray-200' }}">{{ $row['scores'][$subject] ?? 'Absent' }}</dd>
                         </div>
                     @endforeach
                 </dl>
@@ -224,8 +224,12 @@
                         </td>
                         <td class="px-4 py-2.5 font-medium text-gray-950 dark:text-white">{{ $row['student_name'] }}</td>
                         @foreach ($markSheet['subjects'] as $subject)
-                            <td class="px-4 py-2.5 text-center text-gray-800 dark:text-gray-200">
-                                {{ $row['scores'][$subject] ?? '—' }}
+                            <td @class([
+                                'px-4 py-2.5 text-center',
+                                'text-gray-400' => ($row['scores'][$subject] ?? '') === 'Absent',
+                                'text-gray-800 dark:text-gray-200' => ($row['scores'][$subject] ?? '') !== 'Absent',
+                            ])>
+                                {{ $row['scores'][$subject] ?? 'Absent' }}
                             </td>
                         @endforeach
                         @if (in_array($status['status'] ?? 'none', ['published', 'issued'], true))

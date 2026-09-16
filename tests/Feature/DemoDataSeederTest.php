@@ -36,7 +36,7 @@ class DemoDataSeederTest extends TestCase
         $matrix = StudentExamMarksMatrix::fromRecords($records);
 
         $this->assertGreaterThanOrEqual(2, count($matrix['rows']));
-        $this->assertContains('Mathematics', $matrix['subjects']);
+        $this->assertContains('Maths', $matrix['subjects']);
         $this->assertContains('Biology', $matrix['subjects']);
 
         $juneSessions = ActivitySession::query()
