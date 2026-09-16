@@ -143,6 +143,48 @@ class StudentActivityTimelineTest extends TestCase
         $this->assertNotContains('fee', $types);
     }
 
+    public function test_timeline_shows_staff_name_for_manual_punch_and_biometric_for_machine_punch(): void
+    {
+        [$staff, $student, $feeStructure, $batch] = $this->seedStudentWithStaff();
+        $aneeta = User::factory()->create(['is_active' => true, 'name' => 'Aneeta Mam']);
+
+        Attendance::query()->create([
+            'student_id' => $student->id,
+            'batch_id' => $batch->id,
+            'attendance_date' => now()->toDateString(),
+            'status' => AttendanceStatus::Present,
+            'checked_in_at' => now()->setTime(14, 39),
+            'punch_source' => 'manual',
+            'marked_by_user_id' => $aneeta->id,
+        ]);
+
+        Attendance::query()->create([
+            'student_id' => $student->id,
+            'batch_id' => $batch->id,
+            'attendance_date' => now()->subDay()->toDateString(),
+            'status' => AttendanceStatus::Present,
+            'checked_in_at' => now()->subDay()->setTime(13, 9),
+            'checked_out_at' => now()->subDay()->setTime(19, 2),
+            'punch_source' => 'biometric',
+            'marked_by_user_id' => $staff->id,
+        ]);
+
+        $result = app(StudentActivityTimelineService::class)->forStudent($student, $staff, 40);
+        $items = collect($result['items']);
+
+        $manualIn = $items->first(
+            fn (array $i): bool => str_starts_with((string) $i['id'], 'att-in-') && ($i['detail'] ?? null) === 'Source: manual'
+        );
+        $biometricOut = $items->first(
+            fn (array $i): bool => str_starts_with((string) $i['id'], 'att-out-')
+        );
+
+        $this->assertSame('Aneeta Mam', $manualIn['staff_name']);
+        $this->assertSame('biometric', $biometricOut['staff_name']);
+        $this->assertSame('Source: biometric', $biometricOut['detail']);
+        $this->assertNotSame($staff->name, $biometricOut['staff_name']);
+    }
+
     /**
      * @return array{0: User, 1: Student, 2: FeeStructure, 3: Batch}
      */

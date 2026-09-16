@@ -19,6 +19,7 @@ use App\Models\StudentCase;
 use App\Models\StudentCertificate;
 use App\Models\User;
 use App\Models\Visit;
+use App\Support\AttendanceSourceLabel;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Support\FeeReminderWhatsAppTemplate;
@@ -433,7 +434,7 @@ class StudentActivityTimelineService
                     title: 'Punch IN · '.($record->status?->label() ?? 'Present'),
                     summary: $record->leave_reason,
                     detail: $record->punch_source ? 'Source: '.$record->punch_source : null,
-                    staffName: $record->markedBy?->name,
+                    staffName: $this->attendanceActorLabel($record),
                     at: $record->checked_in_at,
                     tab: 'attendance',
                 );
@@ -447,7 +448,7 @@ class StudentActivityTimelineService
                     title: 'Punch OUT',
                     summary: null,
                     detail: $record->punch_source ? 'Source: '.$record->punch_source : null,
-                    staffName: $record->markedBy?->name,
+                    staffName: $this->attendanceActorLabel($record),
                     at: $record->checked_out_at,
                     tab: 'attendance',
                 );
@@ -461,7 +462,7 @@ class StudentActivityTimelineService
                     title: 'Attendance · '.($record->status?->label() ?? 'Marked'),
                     summary: $record->leave_reason,
                     detail: null,
-                    staffName: $record->markedBy?->name,
+                    staffName: $this->attendanceActorLabel($record),
                     at: Carbon::parse($record->attendance_date)->setTime(12, 0),
                     tab: 'attendance',
                 );
@@ -723,5 +724,18 @@ class StudentActivityTimelineService
             'occurred_at' => $at,
             'tab' => $tab,
         ];
+    }
+
+    protected function attendanceActorLabel(Attendance $record): ?string
+    {
+        if (AttendanceSourceLabel::isManual($record->punch_source)) {
+            return $record->markedBy?->name;
+        }
+
+        if (filled($record->punch_source)) {
+            return 'biometric';
+        }
+
+        return $record->markedBy?->name;
     }
 }
