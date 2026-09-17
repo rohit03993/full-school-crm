@@ -152,6 +152,8 @@ class BulkActivityMarksImportPage extends Page
             $this->batchId = $batchId;
             $this->limitToBatch = true;
         }
+
+        $this->whatsappTemplateId = app(ActivityMarksWhatsAppService::class)->defaultTemplate()?->id;
     }
 
     /**
@@ -352,9 +354,17 @@ class BulkActivityMarksImportPage extends Page
             return;
         }
 
-        $this->validate([
-            'whatsappTemplateId' => 'required|exists:whatsapp_templates,id',
-        ]);
+        $templateId = $marksWhatsApp->resolveTemplateId($this->whatsappTemplateId);
+
+        if ($templateId === null) {
+            Notification::make()
+                ->title('Exam marks template not set')
+                ->body('Pick test_marks on WhatsApp → Automations → Exam marks, then try again.')
+                ->warning()
+                ->send();
+
+            return;
+        }
 
         if (! is_array($this->importResult) || blank($this->importResult['test_key'] ?? null)) {
             Notification::make()
@@ -369,7 +379,7 @@ class BulkActivityMarksImportPage extends Page
         try {
             $campaign = $marksWhatsApp->queueMarksCampaign(
                 Auth::user(),
-                (int) $this->whatsappTemplateId,
+                $templateId,
                 (string) $this->importResult['test_key'],
                 (string) $this->importResult['test_name'],
                 (string) $this->importResult['session_date'],
@@ -542,6 +552,10 @@ class BulkActivityMarksImportPage extends Page
                     'activityTypeOptions' => $this->activityTypeOptions(),
                     'batchOptions' => $this->batchOptions(),
                     'whatsappTemplateOptions' => $this->whatsappTemplateOptions(),
+                    'defaultMarksTemplateName' => app(ActivityMarksWhatsAppService::class)->defaultTemplateName(),
+                    'examMarksAutomationsUrl' => ManageWhatsAppSettings::getUrl(['automation' => 'exam-marks']),
+                    'canSendWhatsApp' => FeatureGate::enabled(LicenseFeature::WhatsApp)
+                        && CrmAccess::can(Auth::user(), CrmPermission::WhatsappCampaigns),
                     'fileHeaders' => $this->fileHeaders,
                     'columnMapping' => $this->columnMapping,
                     'subjectMaxMarks' => $this->subjectMaxMarks,

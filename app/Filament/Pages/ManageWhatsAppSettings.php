@@ -104,6 +104,7 @@ class ManageWhatsAppSettings extends Page
                     .'<strong>Student attendance</strong> = student IN/OUT, WhatsApp to parents. '
                     .'<strong>Staff attendance</strong> = staff punch, WhatsApp to the staff phone. '
                     .'<strong>Homework</strong> = share templates (staff click Send) and optional Not Done alerts. '
+                    .'<strong>Exam marks</strong> = default test-result template (staff click Send on the mark sheet). '
                     .'Pick an approved template on each tab. <strong>Save settings</strong> stores every tab at once, but you stay on the tab you are editing.'
                     .'</p>'
                 ))
@@ -332,6 +333,27 @@ class ManageWhatsAppSettings extends Page
                         ->native(false)
                         ->placeholder('Choose template…')
                         ->helperText('Template homework_not_done (5 params). Map student.name, homework.class_section, homework.subject, homework.topic, institute.name.'),
+                ])
+                ->columns(2),
+                        ]),
+                    Tab::make('Exam marks')
+                        ->icon(Heroicon::OutlinedClipboardDocumentCheck)
+                        ->schema([
+            Section::make('Parents — exam marks')
+                ->description('Pick the approved test_marks template here once. Staff still click Queue WhatsApp on the mark sheet — publish and PDF do not send messages.')
+                ->schema([
+                    Placeholder::make('exam_marks_template_guide')
+                        ->hiddenLabel()
+                        ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderExamMarksTemplateGuide())
+                        ->columnSpanFull(),
+                    Select::make('activity_marks_live_campaign_id')
+                        ->label('Exam marks template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForMarks())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->placeholder('Choose template…')
+                        ->helperText('Use test_marks. Map {{name}} student.name, {{roll_number}} Roll No., {{test}} Test / exam name, {{all_subject_marks}} All subject marks (combined).'),
                 ])
                 ->columns(2),
                         ]),

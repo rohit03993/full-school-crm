@@ -54,6 +54,7 @@ class WhatsAppAutomationsPageTest extends TestCase
             ->assertSee('Staff attendance')
             ->assertSee('Fee reminders')
             ->assertSee('Homework not done')
+            ->assertSee('Exam marks')
             ->assertSee('WhatsApp to parents')
             ->assertDontSee('Parents attendance');
     }

@@ -21,7 +21,7 @@ class CrmHint
         'setup.site_content' => 'Controls the public website: logo, phone number, homepage text, and gallery. Changes go live immediately after Save.',
         'setup.institute_settings' => 'Receipt and ID card PDF branding. Institute name and phone come from Website → Site Content — set logo here for printed documents.',
         'setup.meta_whatsapp' => 'Each school stores its own Meta WhatsApp credentials in this CRM. When enabled, all sends route through Meta Cloud API.',
-        'setup.whatsapp' => 'Student attendance tab = student IN/OUT, WhatsApp to parents. Staff attendance tab = staff punch, WhatsApp to the staff phone. Live API campaigns are only for external POST / API key.',
+        'setup.whatsapp' => 'Student attendance tab = student IN/OUT, WhatsApp to parents. Staff attendance tab = staff punch, WhatsApp to the staff phone. Exam marks tab = default test_marks template (staff click Send on the mark sheet). Live API campaigns are only for external POST / API key.',
         'whatsapp.live_campaigns' => 'Live API campaigns — like AiSensy campaignName. Go live to use in automations, bulk sends, and external POST triggers.',
         'whatsapp.live_campaigns.create' => 'Pick an approved template and a unique campaign name. After saving, open the campaign and click Go live.',
         'meta_whatsapp.messages' => 'Outbound sends and parent replies logged via Meta webhooks. Delivery status updates appear here.',

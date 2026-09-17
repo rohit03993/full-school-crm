@@ -14,6 +14,7 @@ use App\Support\FeeReminderWhatsAppTemplate;
 use App\Support\HomeworkNotDoneWhatsAppTemplate;
 use App\Support\HomeworkShareWhatsAppTemplate;
 use App\Support\StaffPunchWhatsAppTemplate;
+use App\Support\TestMarksWhatsAppTemplate;
 use Illuminate\Support\HtmlString;
 
 class WhatsAppSettingsService
@@ -45,6 +46,7 @@ class WhatsAppSettingsService
             'homework_share_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_share_live_campaign_id'), 4),
             'homework_not_done_autosend_enabled' => (bool) Setting::getValue('whatsapp.homework_not_done_autosend_enabled', false),
             'homework_not_done_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_not_done_live_campaign_id'), 5),
+            'activity_marks_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.activity_marks_live_campaign_id')),
             'attendance_autosend_enabled' => (bool) Setting::getValue('whatsapp.attendance_autosend_enabled', false),
             'attendance_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.attendance_autosend_live_campaign_id')),
             'punch_autosend_enabled' => (bool) Setting::getValue('whatsapp.punch_autosend_enabled', true),
@@ -109,6 +111,12 @@ class WhatsAppSettingsService
                 'enabled' => (bool) Setting::getValue('whatsapp.homework_not_done_autosend_enabled', false),
             ],
             [
+                'key' => 'exam_marks',
+                'label' => 'Exam marks',
+                'hint' => 'Template on Automations → Exam marks — staff click Send on the mark sheet',
+                'enabled' => filled($this->resolveConfiguredTemplateName(Setting::getValue('whatsapp.activity_marks_live_campaign_id'))),
+            ],
+            [
                 'key' => 'postcall',
                 'label' => 'After a logged call',
                 'hint' => 'Leads / follow-up after an outgoing call',
@@ -150,7 +158,7 @@ class WhatsAppSettingsService
             .'</div>'
             .'<table class="w-full text-sm"><tbody>'.$rows.'</tbody></table>'
             .'<p class="border-t border-gray-200 px-3 py-2 text-xs text-gray-500 dark:border-white/10 dark:text-gray-400">'
-            .'Share homework is configured on Automations → Homework; staff still click Send on Homework Review. Exam marks and bulk campaigns are manual only.'
+            .'Share homework and exam marks are configured on Automations; staff still click Send on Homework Review or the mark sheet. Bulk campaigns are manual only.'
             .'</p></div>'
         );
     }
@@ -269,6 +277,17 @@ class WhatsAppSettingsService
             $this->encodeAutomationTemplateId($data['homework_not_done_live_campaign_id'] ?? null),
             'whatsapp',
         );
+        Setting::setValue(
+            'whatsapp.activity_marks_live_campaign_id',
+            $this->encodeAutomationTemplateId($data['activity_marks_live_campaign_id'] ?? null),
+            'whatsapp',
+        );
+        $marksName = $this->resolveConfiguredTemplateName(
+            $this->encodeAutomationTemplateId($data['activity_marks_live_campaign_id'] ?? null),
+        );
+        if (filled($marksName)) {
+            Setting::setValue('whatsapp.activity_marks_template_name', $marksName, 'whatsapp');
+        }
         Setting::setValue(
             'whatsapp.attendance_autosend_enabled',
             ! empty($data['attendance_autosend_enabled']) ? '1' : '0',
@@ -446,6 +465,7 @@ class WhatsAppSettingsService
             'punch_manual_out_autosend_live_campaign_id',
             'staff_punch_in_autosend_live_campaign_id',
             'staff_punch_out_autosend_live_campaign_id',
+            'activity_marks_live_campaign_id',
         ] as $key) {
             $data[$key] = $this->sanitizeSelectedTemplateId($data[$key] ?? null);
         }
@@ -572,7 +592,7 @@ class WhatsAppSettingsService
                 .e(CrmNavigation::whatsAppMenu('Templates'))
                 .', submit to Meta, then pick them here). '
                 .e(CrmNavigation::whatsAppMenu('Live campaigns'))
-                .' is only needed for the external API key / campaignName POST — not for attendance, fees, or homework automations.</p>'
+                .' is only needed for the external API key / campaignName POST — not for attendance, fees, homework, or exam marks.</p>'
             );
         }
 
@@ -711,6 +731,61 @@ class WhatsAppSettingsService
             .'<tr><th class="px-4 py-2">Var</th><th class="px-4 py-2">Meaning</th><th class="px-4 py-2">CRM map</th><th class="px-4 py-2">Meta sample</th></tr></thead>'
             .'<tbody class="divide-y divide-sky-100 dark:divide-sky-500/10">'.$mappingRows.'</tbody></table></div></div>'
         );
+    }
+
+    public function renderExamMarksTemplateGuide(): HtmlString
+    {
+        $reviewUrl = e(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::getUrl('index'));
+        $body = e(TestMarksWhatsAppTemplate::BODY);
+
+        $mappingRows = '';
+        $index = 0;
+        foreach (TestMarksWhatsAppTemplate::variables() as $placeholder => $variable) {
+            $mappingRows .= '<tr class="'.($index % 2 === 0 ? 'bg-white/40 dark:bg-transparent' : '').'">'
+                .'<td class="px-4 py-2 font-mono text-xs">{{'.$placeholder.'}}</td>'
+                .'<td class="px-4 py-2">'.e($variable['label']).'</td>'
+                .'<td class="px-4 py-2 font-mono text-xs">'.e($variable['crm_source']).'</td>'
+                .'<td class="px-4 py-2 text-gray-500">'.e($variable['example']).'</td>'
+                .'</tr>';
+            $index++;
+        }
+
+        return new HtmlString(
+            '<div class="overflow-hidden rounded-xl border border-amber-200/60 bg-amber-50/40 dark:border-amber-500/20 dark:bg-amber-500/5">'
+            .'<div class="border-b border-amber-200/60 px-4 py-3 dark:border-amber-500/20">'
+            .'<p class="text-sm font-bold text-gray-950 dark:text-white">Exam marks — pick the template once</p>'
+            .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
+            .'Not automatic — publishing results or generating PDFs does <strong>not</strong> message parents. '
+            .'Staff open the mark sheet (or finish Excel import) and click <strong>Queue WhatsApp</strong>. '
+            .'Map <code class="text-xs">'.e(TestMarksWhatsAppTemplate::NAME).'</code> variables on WhatsApp → Templates, then pick it below. '
+            .'Open a sheet from <a href="'.$reviewUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Exam results</a>.</p></div>'
+            .'<div class="px-4 py-3"><p class="text-xs font-bold text-gray-950 dark:text-white"><code>'.e(TestMarksWhatsAppTemplate::NAME).'</code> (named placeholders)</p>'
+            .'<pre class="mt-2 whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.$body.'</pre></div>'
+            .'<div class="overflow-x-auto border-t border-amber-200/60 dark:border-amber-500/20">'
+            .'<table class="w-full min-w-[36rem] text-left text-sm">'
+            .'<thead class="bg-white/60 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-black/20 dark:text-gray-400">'
+            .'<tr><th class="px-4 py-2">Placeholder</th><th class="px-4 py-2">Meaning</th><th class="px-4 py-2">CRM map</th><th class="px-4 py-2">Example</th></tr></thead>'
+            .'<tbody class="divide-y divide-amber-100 dark:divide-amber-500/10">'.$mappingRows.'</tbody></table></div></div>'
+        );
+    }
+
+    /**
+     * Active templates for exam marks. Marks-named templates are listed first so
+     * `test_marks` is easy to pick even if param_count was saved incorrectly.
+     *
+     * @return array<int, string>
+     */
+    public function templateOptionsForMarks(): array
+    {
+        $templates = WhatsAppTemplate::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return $templates
+            ->sortBy(fn (WhatsAppTemplate $template): string => TestMarksWhatsAppTemplate::looksLikeName((string) $template->name) ? '0'.$template->name : '1'.$template->name)
+            ->mapWithKeys(fn (WhatsAppTemplate $template): array => [$template->id => $template->name])
+            ->all();
     }
 
     public function renderStaffPunchAutomationGuide(): HtmlString

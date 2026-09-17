@@ -1,0 +1,40 @@
+@if ($canSendWhatsApp ?? false)
+    <div class="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+        <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
+            <h3 class="text-base font-bold text-gray-950 dark:text-white">Send marks via WhatsApp</h3>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                Queues the Automations exam-marks template to every student with marks and a mobile number. Publish and PDF do not send this.
+            </p>
+        </div>
+
+        <div class="grid gap-4 p-4 sm:p-6">
+            @if (filled($defaultMarksTemplateName ?? null))
+                <p class="text-sm text-gray-600 dark:text-gray-300">
+                    Template: <strong>{{ $defaultMarksTemplateName }}</strong>
+                    @if (filled($examMarksAutomationsUrl ?? null))
+                        —
+                        <a href="{{ $examMarksAutomationsUrl }}" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Change on Automations → Exam marks</a>
+                    @endif
+                </p>
+            @else
+                <p class="text-sm text-danger-700 dark:text-danger-300">
+                    No exam-marks template is set.
+                    @if (filled($examMarksAutomationsUrl ?? null))
+                        <a href="{{ $examMarksAutomationsUrl }}" class="font-semibold underline">Pick test_marks on Automations → Exam marks</a>
+                        , or choose one below.
+                    @endif
+                </p>
+                <x-crm.select-input label="WhatsApp template" for="{{ $whatsappTemplateInputId ?? 'wa-template' }}" wire:model="whatsappTemplateId">
+                    <option value="">Select template…</option>
+                    @foreach ($whatsappTemplateOptions as $id => $label)
+                        <option value="{{ $id }}">{{ $label }}</option>
+                    @endforeach
+                </x-crm.select-input>
+            @endif
+
+            <button type="button" wire:click="queueWhatsAppCampaign" class="justify-self-start rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500">
+                Queue WhatsApp to all students with marks
+            </button>
+        </div>
+    </div>
+@endif

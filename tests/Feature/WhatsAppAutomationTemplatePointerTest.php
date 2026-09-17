@@ -147,6 +147,28 @@ class WhatsAppAutomationTemplatePointerTest extends TestCase
         $this->assertSame('homework_api', Setting::getValue('whatsapp.homework_template_name'));
     }
 
+    public function test_save_stores_exam_marks_template_prefix(): void
+    {
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'test_marks',
+            'param_count' => 4,
+            'is_active' => true,
+        ]);
+
+        $settings = app(WhatsAppSettingsService::class);
+        $settings->save([
+            'activity_marks_live_campaign_id' => $template->id,
+        ]);
+
+        Setting::flushValueCache();
+
+        $this->assertSame('template:'.$template->id, Setting::getValue('whatsapp.activity_marks_live_campaign_id'));
+        $this->assertSame('test_marks', Setting::getValue('whatsapp.activity_marks_template_name'));
+        $this->assertSame($template->id, $settings->resolveAutomationTemplate(
+            Setting::getValue('whatsapp.activity_marks_live_campaign_id'),
+        )?->id);
+    }
+
     public function test_fee_reminder_guide_renders_without_undefined_class_variable(): void
     {
         $html = (string) app(WhatsAppSettingsService::class)->renderFeeReminderTemplateGuide();
@@ -154,5 +176,23 @@ class WhatsAppAutomationTemplatePointerTest extends TestCase
         $this->assertStringContainsString('fee_reminder', $html);
         $this->assertStringContainsString('also works', $html);
         $this->assertStringNotContainsString('$FeeReminderWhatsAppTemplate', $html);
+    }
+
+    public function test_exam_marks_options_list_test_marks_ahead_of_attendance(): void
+    {
+        $attendance = WhatsAppTemplate::query()->create([
+            'name' => 'parent_attendance_auto_in',
+            'param_count' => 4,
+            'is_active' => true,
+        ]);
+        $marks = WhatsAppTemplate::query()->create([
+            'name' => 'test_marks',
+            'param_count' => 1,
+            'is_active' => true,
+        ]);
+
+        $options = app(WhatsAppSettingsService::class)->templateOptionsForMarks();
+
+        $this->assertSame([$marks->id, $attendance->id], array_keys($options));
     }
 }

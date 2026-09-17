@@ -105,7 +105,7 @@ class WhatsAppHubPage extends Page
         if (ManageWhatsAppSettings::canAccess()) {
             $cards[] = [
                 'title' => CrmMenuLabels::whatsAppAutomations(),
-                'description' => 'Attendance, staff punch, and homework not-done automations.',
+                'description' => 'Attendance, homework, exam marks, and fee-reminder templates.',
                 'url' => ManageWhatsAppSettings::getUrl(),
             ];
         }

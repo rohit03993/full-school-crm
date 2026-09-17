@@ -66,6 +66,8 @@ class TestMarksReviewPage extends Page
             $declaration = app(ResultDeclarationService::class)->findForGroupKey((string) $this->groupKey);
             $this->principalRemarks = $declaration?->remarks;
         }
+
+        $this->whatsappTemplateId = app(ActivityMarksWhatsAppService::class)->defaultTemplate()?->id;
     }
 
     public function getTitle(): string
@@ -375,9 +377,19 @@ class TestMarksReviewPage extends Page
         abort_unless(FeatureGate::enabled(LicenseFeature::WhatsApp), 403);
         abort_unless(CrmAccess::can(Auth::user(), CrmPermission::WhatsappCampaigns), 403);
 
-        $this->validate([
-            'whatsappTemplateId' => 'required|exists:whatsapp_templates,id',
-        ]);
+        $templateId = $marksWhatsApp->resolveTemplateId($this->whatsappTemplateId);
+
+        if ($templateId === null) {
+            Notification::make()
+                ->title('Exam marks template not set')
+                ->body('Pick test_marks on WhatsApp → Automations → Exam marks, then try again.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->whatsappTemplateId = $templateId;
 
         if (! is_array($this->markSheet) || blank($this->groupKey)) {
             Notification::make()
@@ -452,6 +464,8 @@ class TestMarksReviewPage extends Page
                     'markSheet' => $this->markSheet,
                     'groupKey' => $this->groupKey,
                     'whatsappTemplateOptions' => $this->whatsappTemplateOptions(),
+                    'defaultMarksTemplateName' => app(ActivityMarksWhatsAppService::class)->defaultTemplateName(),
+                    'examMarksAutomationsUrl' => ManageWhatsAppSettings::getUrl(['automation' => 'exam-marks']),
                     'canSendWhatsApp' => FeatureGate::enabled(LicenseFeature::WhatsApp)
                         && CrmAccess::can(Auth::user(), CrmPermission::WhatsappCampaigns),
                     'resultStatus' => $this->resultStatus(),

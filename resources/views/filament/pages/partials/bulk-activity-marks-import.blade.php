@@ -309,31 +309,13 @@
                 @endif
             </div>
 
-            <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-                <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
-                    <h3 class="text-base font-bold text-gray-950 dark:text-white">Send marks via WhatsApp</h3>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Uses a pre-approved template. Map template variables to
-                        <code class="text-xs">student.name</code>,
-                        <code class="text-xs">student.enrollment_number</code>,
-                        <code class="text-xs">activity.test_name</code>,
-                        <code class="text-xs">activity.marks_summary</code>, etc.
-                    </p>
-                </div>
-
-                <div class="grid gap-4 p-4 sm:p-6">
-                    <x-crm.select-input label="WhatsApp template" for="wa-template" wire:model="whatsappTemplateId">
-                        <option value="">Select template…</option>
-                        @foreach ($whatsappTemplateOptions as $id => $label)
-                            <option value="{{ $id }}">{{ $label }}</option>
-                        @endforeach
-                    </x-crm.select-input>
-
-                    <button type="button" wire:click="queueWhatsAppCampaign" class="justify-self-start rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500">
-                        Queue WhatsApp to all students with marks
-                    </button>
-                </div>
-            </div>
+            @include('filament.pages.partials.exam-marks-whatsapp-send', [
+                'canSendWhatsApp' => $canSendWhatsApp ?? false,
+                'defaultMarksTemplateName' => $defaultMarksTemplateName ?? null,
+                'examMarksAutomationsUrl' => $examMarksAutomationsUrl ?? null,
+                'whatsappTemplateOptions' => $whatsappTemplateOptions ?? [],
+                'whatsappTemplateInputId' => 'wa-template',
+            ])
 
             <div class="flex justify-start">
                 <button type="button" wire:click="startOver" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10">

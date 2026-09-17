@@ -4,17 +4,20 @@ namespace App\Services;
 
 use App\Models\ActivityAttendance;
 use App\Models\ActivitySession;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppTemplate;
 use App\Support\StudentExamMarksMatrix;
+use App\Support\TestMarksWhatsAppTemplate;
 use Illuminate\Support\Collection;
 
 class ActivityMarksWhatsAppService
 {
     public function __construct(
         protected WhatsAppCampaignService $campaigns,
+        protected WhatsAppSettingsService $settings,
     ) {}
 
     public function sessionsForMarksKey(string $marksKey): Collection
@@ -172,5 +175,61 @@ class ActivityMarksWhatsAppService
         );
 
         return $this->campaigns->queueCampaign($campaign, $creator);
+    }
+
+    public function defaultTemplate(): ?WhatsAppTemplate
+    {
+        $fromAutomation = $this->settings->resolveAutomationTemplate(
+            (string) Setting::getValue('whatsapp.activity_marks_live_campaign_id', ''),
+        );
+
+        if ($fromAutomation) {
+            return $fromAutomation;
+        }
+
+        $preferred = array_values(array_unique(array_filter([
+            (string) Setting::getValue('whatsapp.activity_marks_template_name', ''),
+            ...TestMarksWhatsAppTemplate::ALIASES,
+        ])));
+
+        foreach ($preferred as $name) {
+            $match = WhatsAppTemplate::query()
+                ->where('name', $name)
+                ->where('is_active', true)
+                ->first();
+
+            if ($match) {
+                return $match;
+            }
+        }
+
+        return WhatsAppTemplate::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->first(fn (WhatsAppTemplate $template): bool => TestMarksWhatsAppTemplate::looksLikeName((string) $template->name));
+    }
+
+    public function defaultTemplateName(): ?string
+    {
+        $name = $this->defaultTemplate()?->name;
+
+        return filled($name) ? (string) $name : null;
+    }
+
+    public function resolveTemplateId(?int $explicitTemplateId = null): ?int
+    {
+        if ($explicitTemplateId !== null && $explicitTemplateId > 0) {
+            $explicit = WhatsAppTemplate::query()
+                ->whereKey($explicitTemplateId)
+                ->where('is_active', true)
+                ->first();
+
+            if ($explicit) {
+                return $explicit->id;
+            }
+        }
+
+        return $this->defaultTemplate()?->id;
     }
 }
