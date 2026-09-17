@@ -92,6 +92,7 @@ class MetaWhatsAppTemplateBuilderTest extends TestCase
             \App\Support\HomeworkNotDoneWhatsAppTemplate::BODY,
             \App\Support\HomeworkShareWhatsAppTemplate::BODY,
             \App\Support\CombinedHomeworkWhatsAppTemplate::BODY,
+            \App\Support\TestMarksWhatsAppTemplate::BODY,
         ] as $body) {
             MetaWhatsAppTemplateBuilder::assertBodyVariablesNotAtEdges($body);
             $this->addToAssertionCount(1);

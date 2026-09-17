@@ -152,6 +152,26 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
         $this->assertSame('4821', $rows[0]['example']);
     }
 
+    public function test_test_marks_preset_name_uses_marks_sample_labels(): void
+    {
+        $this->assertTrue(\App\Support\TestMarksWhatsAppTemplate::looksLikeName('test_marks'));
+        $this->assertTrue(\App\Support\TestMarksWhatsAppTemplate::looksLikeName('exam_marks'));
+        $this->assertFalse(\App\Support\TestMarksWhatsAppTemplate::looksLikeName('remarks'));
+
+        $rows = MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
+            \App\Support\TestMarksWhatsAppTemplate::BODY,
+            [],
+            'test_marks',
+        );
+
+        $this->assertCount(4, $rows);
+        $this->assertSame('Student name', $rows[0]['label']);
+        $this->assertSame('Roll No.', $rows[1]['label']);
+        $this->assertSame('Test / exam name', $rows[2]['label']);
+        $this->assertSame('All subject marks (combined)', $rows[3]['label']);
+        $this->assertStringContainsString('Chemistry:', $rows[3]['example']);
+    }
+
     public function test_rows_to_examples_csv_in_order(): void
     {
         $csv = MetaWhatsAppTemplateVariableHelper::rowsToExamplesCsv([

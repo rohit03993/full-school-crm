@@ -353,7 +353,7 @@ class ManageWhatsAppSettings extends Page
                         ->nullable()
                         ->native(false)
                         ->placeholder('Choose template…')
-                        ->helperText('Use test_marks. Map {{name}} student.name, {{roll_number}} Roll No., {{test}} Test / exam name, {{all_subject_marks}} All subject marks (combined).'),
+                        ->helperText('Use test_marks. Map {{1}} Student name, {{2}} Roll No., {{3}} Test / exam name, {{4}} All subject marks (combined).'),
                 ])
                 ->columns(2),
                         ]),

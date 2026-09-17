@@ -74,6 +74,11 @@ class MetaWhatsAppTemplateVariableHelper
             return HomeworkShareWhatsAppTemplate::variables();
         }
 
+        if (TestMarksWhatsAppTemplate::looksLikeName($name)
+            || str_contains($body, 'test result for your ward')) {
+            return TestMarksWhatsAppTemplate::variables();
+        }
+
         if (StudentPunchWhatsAppTemplate::looksLikeName($name)
             || str_contains($body, 'your ward')
             || str_contains($body, 'has checked in at')

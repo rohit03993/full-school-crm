@@ -61,8 +61,8 @@ class ActivityMarksWhatsAppDefaultTemplateTest extends TestCase
         $html = (string) app(WhatsAppSettingsService::class)->renderExamMarksTemplateGuide();
 
         $this->assertStringContainsString('test_marks', $html);
-        $this->assertStringContainsString('{{name}}', $html);
-        $this->assertStringContainsString('{{all_subject_marks}}', $html);
+        $this->assertStringContainsString('{{1}}', $html);
+        $this->assertStringContainsString('{{4}}', $html);
         $this->assertStringContainsString('activity.marks_summary', $html);
         $this->assertStringNotContainsString('$TestMarksWhatsAppTemplate', $html);
     }
