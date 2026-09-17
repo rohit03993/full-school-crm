@@ -173,6 +173,7 @@ class AttendanceHubOverviewService
      *         status: string,
      *         status_label: string,
      *         can_mark: bool,
+     *         leave_reason: ?string,
      *         attendance_calls: list<array{
      *             at: string,
      *             staff: string,
@@ -248,6 +249,9 @@ class AttendanceHubOverviewService
                 'status_label' => $statusLabel,
                 'can_mark' => $bucket === 'absent',
                 'attendance_calls' => [],
+                'leave_reason' => $status === AttendanceStatus::Leave
+                    ? (filled($row?->leave_reason) ? trim((string) $row->leave_reason) : null)
+                    : null,
             ];
         }
 
@@ -367,6 +371,9 @@ class AttendanceHubOverviewService
                         ? ClassSectionLabel::forBatch($row->batch, includeSession: false, includeShift: false)
                         : '—',
                     'status_label' => $status?->label() ?? '—',
+                    'leave_reason' => $status === AttendanceStatus::Leave
+                        ? (filled($row->leave_reason) ? trim((string) $row->leave_reason) : null)
+                        : null,
                 ];
             })
             ->filter()

@@ -173,6 +173,16 @@
                                                 @endif
                                                 {{ $student['status_label'] }}
                                             </p>
+                                            @if (($classDrill['bucket'] ?? '') === 'leave')
+                                                <p class="mt-0.5 text-[11px] leading-snug text-sky-800 dark:text-sky-200">
+                                                    @if (filled($student['leave_reason'] ?? null))
+                                                        <span class="font-semibold">Reason</span>
+                                                        · {{ $student['leave_reason'] }}
+                                                    @else
+                                                        No leave reason recorded
+                                                    @endif
+                                                </p>
+                                            @endif
                                             @if (($classDrill['bucket'] ?? '') === 'absent')
                                                 <div class="mt-0.5 text-[11px] leading-snug">
                                                     @if (($student['attendance_calls'] ?? []) === [])
@@ -356,6 +366,16 @@
                                         @endif
                                         · {{ $student['status_label'] }}
                                     </p>
+                                    @if (($overviewList['kind'] ?? '') === 'leave')
+                                        <p class="mt-0.5 text-[11px] leading-snug text-sky-800 dark:text-sky-200">
+                                            @if (filled($student['leave_reason'] ?? null))
+                                                <span class="font-semibold">Reason</span>
+                                                · {{ $student['leave_reason'] }}
+                                            @else
+                                                No leave reason recorded
+                                            @endif
+                                        </p>
+                                    @endif
                                 </li>
                             @endforeach
                         </ul>

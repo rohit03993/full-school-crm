@@ -107,6 +107,7 @@ class AttendanceHubClassWiseTest extends TestCase
             ->classBucketRoster($batch->id, '2026-09-11', 'leave');
         $this->assertSame([$leave->id], collect($leaveRoster['students'])->pluck('id')->all());
         $this->assertTrue(collect($leaveRoster['students'])->every(fn (array $s): bool => $s['can_mark'] === false));
+        $this->assertSame('Sick', $leaveRoster['students'][0]['leave_reason']);
     }
 
     public function test_absent_drill_shows_only_attendance_calls_for_that_day(): void
@@ -247,6 +248,7 @@ class AttendanceHubClassWiseTest extends TestCase
         $onLeave = $service->overviewStudentList('2026-09-11', 'leave');
         $this->assertSame([$leave->id], collect($onLeave['students'])->pluck('id')->all());
         $this->assertSame('HUB-L', $onLeave['students'][0]['roll']);
+        $this->assertSame('Sick', $onLeave['students'][0]['leave_reason']);
 
         $this->actingAsAdmin();
 
@@ -255,12 +257,14 @@ class AttendanceHubClassWiseTest extends TestCase
             ->call('openOverviewList', 'leave')
             ->assertSet('overviewList', 'leave')
             ->assertSee('Leave Student')
-            ->assertDontSee('Mark present')
+            ->assertSee('Sick')
+            ->assertDontSeeHtml('>Mark present</button>')
             ->call('closeOverviewList')
             ->call('openClassDrill', $batch->id, 'leave')
             ->assertSet('classDrillBucket', 'leave')
             ->assertSee('Leave Student')
-            ->assertDontSee('Mark present')
+            ->assertSee('Sick')
+            ->assertDontSeeHtml('>Mark present</button>')
             ->assertDontSee($unmarked->name);
     }
 
