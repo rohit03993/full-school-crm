@@ -6,12 +6,12 @@ use App\Enums\BatchStatus;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
-use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Models\Batch;
 use App\Services\ParentFeeNoticeService;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
+use App\Support\WhatsAppSendUi;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -236,8 +236,8 @@ class ParentFeeNoticesPage extends Page
             ->success()
             ->send();
 
-        if (WhatsAppCampaignResource::canAccess()) {
-            $this->redirect(WhatsAppCampaignResource::getUrl('view', ['record' => $result['campaign_id']]));
+        if ($url = WhatsAppSendUi::campaignViewUrl($result['campaign_id'] ?? null)) {
+            $this->redirect($url);
         }
     }
 
@@ -328,6 +328,7 @@ class ParentFeeNoticesPage extends Page
                             ->label('Send WhatsApp notices')
                             ->icon(Heroicon::OutlinedPaperAirplane)
                             ->color('primary')
+                            ->extraAttributes(WhatsAppSendUi::loadingAttributes())
                             ->requiresConfirmation()
                             ->modalHeading('Send parent fee notices?')
                             ->modalDescription('Each selected parent will get a WhatsApp with the amount and due date you entered. This does not change fee balances in CRM.')

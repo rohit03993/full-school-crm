@@ -171,7 +171,7 @@
                                         class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--template"
                                     >
                                         <span wire:loading.remove wire:target="sendWhatsAppMessage">Send template</span>
-                                        <span wire:loading wire:target="sendWhatsAppMessage">Sending…</span>
+                                        <span wire:loading wire:target="sendWhatsAppMessage">Queuing… opening send progress</span>
                                     </button>
                                 @endif
                             </div>

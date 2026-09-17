@@ -45,6 +45,9 @@
                     'loaded' => $isLoaded,
                     'records' => $selectedRecords,
                     'student' => $student ?? null,
+                    'canEditExamMarks' => $canEditExamMarks ?? false,
+                    'examMarksEditGroupKey' => $examMarksEditGroupKey ?? null,
+                    'examMarksDraft' => $examMarksDraft ?? [],
                 ])
             </div>
         </div>

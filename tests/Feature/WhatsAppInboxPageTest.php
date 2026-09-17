@@ -6,10 +6,12 @@ use App\Enums\MetaWhatsAppMessageDirection;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Filament\Pages\WhatsAppInboxPage;
+use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\Setting;
+use App\Models\WhatsAppCampaign;
 use App\Services\MetaWhatsAppMediaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
@@ -161,7 +163,7 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertDontSee('Unknown contact')
             ->call('selectConversation', '918109432345')
             ->assertSee('Rohit Pal')
-            ->assertSee('Staff contact')
+            ->assertSee('Staff')
             ->assertSet('metaSessionOpen', true)
             ->assertSee('Type a message')
             ->assertSee('wire:model="metaReplyAttachment"', false)
@@ -214,9 +216,9 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertSet('metaSessionOpen', true)
             ->assertSee('Amit Verma')
             ->assertSee('Type a message')
-            ->assertSee('Open lead profile')
+            ->assertSee('Profile')
             ->assertSee('wire:model="metaReplyAttachment"', false)
-            ->assertSee('24h window open')
+            ->assertSee('24h open')
             ->assertStatus(200);
     }
 
@@ -434,7 +436,7 @@ class WhatsAppInboxPageTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(WhatsAppInboxPage::class)
+        $component = Livewire::test(WhatsAppInboxPage::class)
             ->call('selectConversation', '918109462946', $student->id)
             ->set('sendWhatsAppTemplateId', $template->id)
             ->set('sendWhatsAppTemplateParams', [
@@ -443,7 +445,11 @@ class WhatsAppInboxPageTest extends TestCase
                 2 => '12:06',
                 3 => '07 Jul 2026',
             ])
-            ->call('sendWhatsAppMessage')
-            ->assertStatus(200);
+            ->call('sendWhatsAppMessage');
+
+        $campaign = WhatsAppCampaign::query()->latest('id')->first();
+
+        $this->assertNotNull($campaign);
+        $component->assertRedirect(WhatsAppCampaignResource::getUrl('view', ['record' => $campaign]));
     }
 }

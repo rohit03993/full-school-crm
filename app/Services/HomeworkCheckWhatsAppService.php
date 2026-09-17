@@ -19,19 +19,20 @@ class HomeworkCheckWhatsAppService
     ) {}
 
     /**
-     * @return array{queued: bool, message: string}
+     * @return array{queued: bool, message: string, campaign_id: int|null}
      */
-    public function notifyNotDone(HomeworkCheck $check, User $teacher): array
+    public function notifyNotDone(HomeworkCheck $check, User $teacher, bool $wait = true): array
     {
         try {
             if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
-                return ['queued' => false, 'message' => 'WhatsApp is not enabled on your licence.'];
+                return ['queued' => false, 'message' => 'WhatsApp is not enabled on your licence.', 'campaign_id' => null];
             }
 
             if (! Setting::getValue('whatsapp.homework_not_done_autosend_enabled')) {
                 return [
                     'queued' => false,
                     'message' => 'Turn on Homework not done WhatsApp in '.CrmNavigation::whatsAppMenu('Automations').'.',
+                    'campaign_id' => null,
                 ];
             }
 
@@ -43,6 +44,7 @@ class HomeworkCheckWhatsAppService
                 return [
                     'queued' => false,
                     'message' => 'No Homework not done live campaign/template selected in Automations.',
+                    'campaign_id' => null,
                 ];
             }
 
@@ -50,7 +52,7 @@ class HomeworkCheckWhatsAppService
             $mobile = trim((string) ($check->parent_mobile ?: $student?->mobile));
 
             if ($mobile === '') {
-                return ['queued' => false, 'message' => 'Student has no parent mobile number on file.'];
+                return ['queued' => false, 'message' => 'Student has no parent mobile number on file.', 'campaign_id' => null];
             }
 
             $batch = $check->batch?->loadMissing('course');
@@ -71,24 +73,26 @@ class HomeworkCheckWhatsAppService
                 ],
             ], $teacher);
 
-            $campaign = $this->campaigns->queueCampaign($campaign, $teacher);
-            $recipient = $campaign->recipients()->first();
+            $campaign = $this->campaigns->queueCampaign($campaign, $teacher, $wait);
+            $recipient = $wait ? $campaign->recipients()->first() : null;
 
             if ($recipient?->status === WhatsAppRecipientStatus::Failed) {
                 return [
                     'queued' => false,
                     'message' => 'WhatsApp send failed for this student.',
+                    'campaign_id' => $campaign->id,
                 ];
             }
 
             return [
                 'queued' => true,
                 'message' => 'WhatsApp queued to parent.',
+                'campaign_id' => $campaign->id,
             ];
         } catch (\Throwable $exception) {
             Log::warning('Homework not-done WhatsApp failed: '.$exception->getMessage());
 
-            return ['queued' => false, 'message' => $exception->getMessage()];
+            return ['queued' => false, 'message' => $exception->getMessage(), 'campaign_id' => null];
         }
     }
 }

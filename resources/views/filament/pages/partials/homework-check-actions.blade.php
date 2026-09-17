@@ -189,9 +189,10 @@
                                                 wire:click="resendWhatsApp({{ $student['check_id'] }})"
                                                 wire:loading.attr="disabled"
                                                 wire:target="resendWhatsApp({{ $student['check_id'] }})"
-                                                class="ml-1 font-semibold text-primary-600 hover:underline dark:text-primary-400"
+                                                class="ml-1 font-semibold text-primary-600 hover:underline dark:text-primary-400 disabled:cursor-wait disabled:opacity-70"
                                             >
-                                                Resend
+                                                <span wire:loading.remove wire:target="resendWhatsApp({{ $student['check_id'] }})">Resend</span>
+                                                <span wire:loading wire:target="resendWhatsApp({{ $student['check_id'] }})">Queuing…</span>
                                             </button>
                                         @endif
                                     @else
@@ -269,9 +270,10 @@
                                             wire:click="resendWhatsApp({{ $row->id }})"
                                             wire:loading.attr="disabled"
                                             wire:target="resendWhatsApp({{ $row->id }})"
-                                            class="min-h-10 text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400 touch-manipulation"
+                                            class="min-h-10 text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400 touch-manipulation disabled:cursor-wait disabled:opacity-70"
                                         >
-                                            Resend
+                                            <span wire:loading.remove wire:target="resendWhatsApp({{ $row->id }})">Resend</span>
+                                            <span wire:loading wire:target="resendWhatsApp({{ $row->id }})">Queuing…</span>
                                         </button>
                                     @endif
                                 </td>

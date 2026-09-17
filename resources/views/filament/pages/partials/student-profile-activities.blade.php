@@ -11,6 +11,9 @@
     @else
         @include('filament.pages.partials.student-profile-exam-marks-matrix', [
             'matrix' => $matrix,
+            'canEditExamMarks' => $canEditExamMarks ?? false,
+            'examMarksEditGroupKey' => $examMarksEditGroupKey ?? null,
+            'examMarksDraft' => $examMarksDraft ?? [],
         ])
     @endif
 @elseif (! $loaded)

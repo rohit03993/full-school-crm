@@ -5,6 +5,7 @@ namespace App\Filament\Resources\WhatsAppCampaigns\Pages;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Services\WhatsAppCampaignService;
+use App\Support\WhatsAppSendUi;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -72,16 +73,18 @@ class ViewWhatsAppCampaign extends ViewRecord
             Action::make('sendNow')
                 ->label('Send / resume')
                 ->icon('heroicon-o-paper-airplane')
-                ->visible(fn (): bool => ! in_array($this->record->status, [
-                    WhatsAppCampaignStatus::Completed,
+                ->extraAttributes(WhatsAppSendUi::loadingAttributes())
+                ->visible(fn (): bool => in_array($this->record->status, [
+                    WhatsAppCampaignStatus::Draft,
+                    WhatsAppCampaignStatus::Paused,
                 ], true))
                 ->action(function (): void {
                     try {
-                        app(WhatsAppCampaignService::class)->queueCampaign($this->record, Auth::user());
+                        app(WhatsAppCampaignService::class)->queueCampaign($this->record, Auth::user(), wait: false);
 
                         Notification::make()
-                            ->title('Campaign queued')
-                            ->body('Messages are being sent in batches. Check progress on this page.')
+                            ->title('Sending started')
+                            ->body('Watch the counter on this page. Do not click Send again.')
                             ->success()
                             ->send();
                     } catch (\RuntimeException $exception) {

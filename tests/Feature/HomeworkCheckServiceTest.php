@@ -8,6 +8,7 @@ use App\Enums\CourseStatus;
 use App\Enums\HomeworkCheckNotifyStatus;
 use App\Enums\HomeworkCheckStatus;
 use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
 use App\Enums\WhatsAppLiveCampaignStatus;
 use App\Filament\Pages\HomeworkCheckPage;
@@ -126,7 +127,7 @@ class HomeworkCheckServiceTest extends TestCase
     {
         [, $batch, $student, $subject] = $this->seedClass();
         $otherTeacher = User::factory()->create(['is_active' => true]);
-        $otherTeacher->assignRole(RoleName::Staff->value);
+        $otherTeacher->assignRole(StaffJobRole::Teacher->value);
 
         $this->expectException(\Illuminate\Validation\ValidationException::class);
 
@@ -299,6 +300,7 @@ class HomeworkCheckServiceTest extends TestCase
 
         $this->assertTrue($resent['queued'], $resent['message']);
         $this->assertSame(HomeworkCheckNotifyStatus::Sent, $resent['check']->notify_status);
+        $this->assertNotNull($resent['campaign_id']);
     }
 
     public function test_homework_check_page_is_accessible_with_permission(): void

@@ -132,6 +132,44 @@ class ExamTestGroupServiceTest extends TestCase
         $this->assertNull($absentMatrix['rows'][0]['scores']['Physics']['marks']);
         $this->assertSame(180.0, $absentMatrix['rows'][0]['scores']['Physics']['max']);
         $this->assertSame('', $absentMatrix['rows'][0]['scores']['Physics']['display']);
+        $this->assertSame('class-test', $absentMatrix['rows'][0]['group_key']);
+    }
+
+    public function test_profile_writer_saves_one_student_without_changing_classmates(): void
+    {
+        [$staff, $batch, $type] = $this->examContext();
+        $session = $this->createTestSession($type, $batch, $staff, 'class-test', 'Class Test', 'Physics', 180);
+
+        $appeared = $this->createBatchStudent($batch, $staff, '9876500011', 'Appeared Student');
+        $absent = $this->createBatchStudent($batch, $staff, '9876500012', 'Late Student');
+
+        ActivityAttendance::query()->create([
+            'attendable_type' => $session->getMorphClass(),
+            'attendable_id' => $session->id,
+            'student_id' => $appeared->id,
+            'is_present' => true,
+            'marks_obtained' => 77,
+            'marked_by_user_id' => $staff->id,
+        ]);
+
+        $saved = app(\App\Services\StudentExamMarksWriter::class)->saveForStudent(
+            $absent->fresh(),
+            'class-test',
+            ['Physics' => 91],
+            $staff,
+        );
+
+        $this->assertGreaterThan(0, $saved);
+        $this->assertDatabaseHas('activity_attendances', [
+            'attendable_id' => $session->id,
+            'student_id' => $absent->id,
+            'marks_obtained' => 91,
+        ]);
+        $this->assertDatabaseHas('activity_attendances', [
+            'attendable_id' => $session->id,
+            'student_id' => $appeared->id,
+            'marks_obtained' => 77,
+        ]);
     }
 
     public function test_student_profile_keeps_maths_marks_when_a_twin_empty_sheet_exists(): void

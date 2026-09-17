@@ -374,7 +374,7 @@ class HomeworkCheckService
     }
 
     /**
-     * @return array{queued: bool, message: string, check: HomeworkCheck}
+     * @return array{queued: bool, message: string, check: HomeworkCheck, campaign_id: int|null}
      */
     public function resendWhatsApp(User $teacher, int $checkId): array
     {
@@ -406,7 +406,7 @@ class HomeworkCheckService
             'notified_at' => null,
         ]);
 
-        $outcome = $this->whatsapp->notifyNotDone($check->fresh(['student', 'batch.course']), $teacher);
+        $outcome = $this->whatsapp->notifyNotDone($check->fresh(['student', 'batch.course']), $teacher, wait: false);
 
         $check->update([
             'notify_status' => $outcome['queued']
@@ -419,6 +419,7 @@ class HomeworkCheckService
             'queued' => $outcome['queued'],
             'message' => $outcome['message'],
             'check' => $check->fresh(),
+            'campaign_id' => $outcome['campaign_id'] ?? null,
         ];
     }
 

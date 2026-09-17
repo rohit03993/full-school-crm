@@ -9,7 +9,6 @@ use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Exports\ActivityMarksImportTemplateExport;
 use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
-use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Models\AcademicSession;
 use App\Models\ActivityType;
 use App\Models\Batch;
@@ -22,6 +21,7 @@ use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\EduExamLabels;
 use App\Support\ExamSubjectCatalog;
+use App\Support\WhatsAppSendUi;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -386,13 +386,15 @@ class BulkActivityMarksImportPage extends Page
             );
 
             Notification::make()
-                ->title('WhatsApp campaign queued')
-                ->body($campaign->total_recipients.' parent/student message(s) queued.')
+                ->title('WhatsApp queued')
+                ->body('Opening send progress. Keep this tab open — do not click Send again.')
                 ->success()
-                ->duration(10000)
+                ->duration(8000)
                 ->send();
 
-            $this->redirect(WhatsAppCampaignResource::getUrl('view', ['record' => $campaign]));
+            if ($url = WhatsAppSendUi::campaignViewUrl($campaign->id)) {
+                $this->redirect($url);
+            }
         } catch (\Throwable $exception) {
             report($exception);
 

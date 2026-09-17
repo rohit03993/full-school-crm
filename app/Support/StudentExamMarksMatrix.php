@@ -188,11 +188,13 @@ class StudentExamMarksMatrix
 
             if (! isset($grouped[$groupKey])) {
                 $grouped[$groupKey] = [
+                    'group_key' => $groupKey,
                     'label' => self::testLabelForSession($session),
                     'date' => $session->session_date,
                     'batch' => $session->batch?->name,
                     'sort_date' => $session->session_date?->format('Y-m-d') ?? '',
                     'exam_subjects' => [],
+                    'session_ids' => [],
                     'scores' => [],
                 ];
             }
@@ -205,6 +207,7 @@ class StudentExamMarksMatrix
             $grade = $record?->grade;
 
             $grouped[$groupKey]['exam_subjects'][$subject] = true;
+            $grouped[$groupKey]['session_ids'][$subject] = $session->id;
             $grouped[$groupKey]['scores'][$subject] = self::preferSubjectScore(
                 $grouped[$groupKey]['scores'][$subject] ?? null,
                 [
@@ -252,11 +255,13 @@ class StudentExamMarksMatrix
                     : null;
 
                 return [
+                    'group_key' => $row['group_key'],
                     'label' => $row['label'],
                     'date' => $row['date'],
                     'batch' => $row['batch'],
                     'exam_subjects' => $examSubjects,
                     'appeared' => $hasMarks,
+                    'marks_locked' => PublishedResultsGate::marksAreLocked((string) $row['group_key']),
                     'scores' => $scores,
                     'total' => [
                         'marks' => $hasMarks ? $totalMarks : null,

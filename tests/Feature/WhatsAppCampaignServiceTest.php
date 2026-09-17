@@ -10,6 +10,8 @@ use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Enums\WhatsAppAudienceType;
+use App\Enums\WhatsAppCampaignStatus;
+use App\Jobs\RunWhatsAppCampaignJob;
 use App\Models\AcademicSession;
 use App\Models\Admission;
 use App\Models\Batch;
@@ -23,6 +25,8 @@ use App\Models\User;
 use App\Models\WhatsAppTemplate;
 use App\Services\WhatsAppCampaignService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Queue;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -187,6 +191,33 @@ class WhatsAppCampaignServiceTest extends TestCase
         ], $admin);
 
         $this->assertSame(['Rohit', '20 Jun 2026'], $campaign->campaignVariable('_manual'));
+    }
+
+    public function test_queue_without_wait_dispatches_job_instead_of_sending_inline(): void
+    {
+        Queue::fake();
+
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-test-token'), 'meta_whatsapp');
+        Setting::flushValueCache();
+
+        $admin = $this->createSuperAdmin();
+        [$course, $batch] = $this->createCourseWithBatches($admin);
+        $this->createEnrolledStudent('Queued Student', '9876500501', '1101', $course, $batch);
+
+        $campaign = app(WhatsAppCampaignService::class)->createCampaign([
+            'name' => 'Staff send progress test',
+            'whatsapp_template_id' => $this->createTemplate()->id,
+            'audience_type' => WhatsAppAudienceType::Batch->value,
+            'course_id' => $course->id,
+            'batch_id' => $batch->id,
+        ], $admin);
+
+        $queued = app(WhatsAppCampaignService::class)->queueCampaign($campaign, $admin, wait: false);
+
+        $this->assertSame(WhatsAppCampaignStatus::Queued, $queued->status);
+        Queue::assertPushed(RunWhatsAppCampaignJob::class, fn (RunWhatsAppCampaignJob $job): bool => $job->campaignId === $campaign->id);
     }
 
     protected function createSuperAdmin(): User

@@ -83,7 +83,7 @@ class CreateWhatsAppCampaign extends CreateRecord
         }
 
         try {
-            app(WhatsAppCampaignService::class)->queueCampaign($this->record, Auth::user());
+            app(WhatsAppCampaignService::class)->queueCampaign($this->record, Auth::user(), wait: false);
         } catch (\RuntimeException $exception) {
             Notification::make()
                 ->title('Campaign saved but not sent')

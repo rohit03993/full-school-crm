@@ -5,6 +5,7 @@ namespace App\Filament\Resources\HomeworkAssignments\Pages;
 use App\Filament\Resources\HomeworkAssignments\HomeworkAssignmentResource;
 use App\Services\HomeworkWhatsAppService;
 use App\Support\CrmAccess;
+use App\Support\WhatsAppSendUi;
 use App\Enums\CrmPermission;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -23,6 +24,7 @@ class ViewHomeworkAssignment extends ViewRecord
                 ->label('Resend WhatsApp')
                 ->icon('heroicon-o-chat-bubble-left-right')
                 ->color('primary')
+                ->extraAttributes(WhatsAppSendUi::loadingAttributes())
                 ->visible(fn (): bool => CrmAccess::can(Auth::user(), CrmPermission::HomeworkManage))
                 ->form([
                     Select::make('whatsapp_template_name')

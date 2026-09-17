@@ -16,6 +16,7 @@ use App\Support\CrmHint;
 use App\Support\ExamTestGroupMatrix;
 use App\Support\PublishedResultsGate;
 use App\Support\ResultAuditTrail;
+use App\Support\WhatsAppSendUi;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -426,11 +427,15 @@ class TestMarksReviewPage extends Page
             );
 
             Notification::make()
-                ->title('WhatsApp campaign queued')
-                ->body("{$campaign->total_recipients} student(s) will receive marks for {$this->markSheet['test_label']}.")
+                ->title('WhatsApp queued')
+                ->body("Opening send progress for {$campaign->total_recipients} student(s). Keep this tab open — do not click Send again.")
                 ->success()
-                ->duration(10000)
+                ->duration(8000)
                 ->send();
+
+            if ($url = WhatsAppSendUi::campaignViewUrl($campaign->id)) {
+                $this->redirect($url);
+            }
         } catch (\Throwable $exception) {
             report($exception);
 

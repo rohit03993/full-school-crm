@@ -78,7 +78,7 @@ class WhatsAppCampaignService
         return $this->audienceStudents($data, $audienceType)->count();
     }
 
-    public function queueCampaign(WhatsAppCampaign $campaign, User $sender): WhatsAppCampaign
+    public function queueCampaign(WhatsAppCampaign $campaign, User $sender, bool $wait = true): WhatsAppCampaign
     {
         $dispatch = app(WhatsAppDispatchService::class);
 
@@ -100,7 +100,11 @@ class WhatsAppCampaignService
             'shot_at' => now(),
         ]);
 
-        $this->runCampaignNow($campaign);
+        if ($wait) {
+            $this->runCampaignNow($campaign);
+        } else {
+            RunWhatsAppCampaignJob::dispatch($campaign->id);
+        }
 
         return $campaign->fresh();
     }
@@ -143,7 +147,7 @@ class WhatsAppCampaignService
         }
     }
 
-    public function sendSingle(Student $student, WhatsAppTemplate $template, User $sender, array $manualParams = []): WhatsAppCampaignRecipient
+    public function sendSingle(Student $student, WhatsAppTemplate $template, User $sender, array $manualParams = [], bool $wait = true): WhatsAppCampaignRecipient
     {
         $dispatch = app(WhatsAppDispatchService::class);
 
@@ -175,7 +179,11 @@ class WhatsAppCampaignService
             'status' => WhatsAppRecipientStatus::Pending,
         ]);
 
-        $this->runCampaignNow($campaign);
+        if ($wait) {
+            $this->runCampaignNow($campaign);
+        } else {
+            RunWhatsAppCampaignJob::dispatch($campaign->id);
+        }
 
         return $recipient->fresh() ?? $recipient;
     }

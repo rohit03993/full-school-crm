@@ -42,7 +42,7 @@ class ActivityMarksWhatsAppService
                 ->where('metadata->test_name', $testLabel);
         }
 
-        return $query->get(['id', 'metadata']);
+        return $query->get();
     }
 
     /**
@@ -174,7 +174,7 @@ class ActivityMarksWhatsAppService
             $sessionDate,
         );
 
-        return $this->campaigns->queueCampaign($campaign, $creator);
+        return $this->campaigns->queueCampaign($campaign, $creator, wait: false);
     }
 
     public function defaultTemplate(): ?WhatsAppTemplate

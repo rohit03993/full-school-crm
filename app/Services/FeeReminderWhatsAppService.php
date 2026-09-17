@@ -182,7 +182,7 @@ class FeeReminderWhatsAppService
             ],
         ], $staff);
 
-        $this->campaigns->queueCampaign($campaign, $staff);
+        $this->campaigns->queueCampaign($campaign, $staff, wait: false);
         $this->writeLogs($campaign, collect([$row]), FeeReminderStage::Manual);
 
         return ['queued' => 1, 'skipped' => 0, 'campaign_id' => $campaign->id];

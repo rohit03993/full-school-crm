@@ -13,6 +13,7 @@ use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\CrmNotification;
+use App\Support\WhatsAppSendUi;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -479,6 +480,7 @@ class ManageMetaWhatsAppSettings extends Page
                         ->label('Send test message')
                         ->icon('heroicon-o-paper-airplane')
                         ->color('gray')
+                        ->extraAttributes(WhatsAppSendUi::loadingAttributes())
                         ->action('sendTestMessage'),
                     Action::make('save')
                         ->label('Save settings')

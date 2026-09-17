@@ -32,8 +32,15 @@
                 </x-crm.select-input>
             @endif
 
-            <button type="button" wire:click="queueWhatsAppCampaign" class="justify-self-start rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500">
-                Queue WhatsApp to all students with marks
+            <button
+                type="button"
+                wire:click="queueWhatsAppCampaign"
+                wire:loading.attr="disabled"
+                wire:target="queueWhatsAppCampaign"
+                class="justify-self-start rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70"
+            >
+                <span wire:loading.remove wire:target="queueWhatsAppCampaign">Queue WhatsApp to all students with marks</span>
+                <span wire:loading wire:target="queueWhatsAppCampaign">Queuing… opening send progress</span>
             </button>
         </div>
     </div>

@@ -14,9 +14,10 @@ use App\Enums\DocumentType;
 use App\Enums\FeeMiscChargeAdjustmentType;
 use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
-use App\Enums\WhatsAppRecipientStatus;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
+use App\Support\StudentExamMarksMatrix;
+use App\Support\WhatsAppSendUi;
 use App\Support\CrmPagination;
 use App\Models\Attendance;
 use App\Models\Batch;
@@ -72,6 +73,7 @@ use App\Services\PenaltyCalculationService;
 use App\Services\ReceiptService;
 use App\Services\StorageCleanupService;
 use App\Services\StudentCaseService;
+use App\Services\StudentExamMarksWriter;
 use App\Services\CertificateService;
 use App\Services\StudentCounterService;
 use App\Services\StudentProfileDeleteService;
@@ -310,6 +312,11 @@ class StudentProfilePage extends Page
     public ?string $sendWhatsAppTemplatePreview = null;
 
     public ?string $sendWhatsAppSelectedTemplateName = null;
+
+    public ?string $examMarksEditGroupKey = null;
+
+    /** @var array<string, mixed> */
+    public array $examMarksDraft = [];
 
   /**
      * @var Collection<int, Document>
@@ -687,6 +694,112 @@ class StudentProfilePage extends Page
         if ($type) {
             $this->loadActivityTab($type->id);
         }
+    }
+
+    public function startExamMarksEdit(string $groupKey): void
+    {
+        abort_unless($this->canEditExamMarks(), 403);
+
+        $row = $this->examMarksRow($groupKey);
+
+        if (! $row) {
+            Notification::make()->title('Exam not found')->warning()->send();
+
+            return;
+        }
+
+        if ($row['marks_locked'] ?? false) {
+            Notification::make()
+                ->title('Marks are locked')
+                ->body('Unlock this exam on Exam results → View sheet before editing.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $draft = [];
+
+        foreach ($row['exam_subjects'] as $subject) {
+            $marks = $row['scores'][$subject]['marks'] ?? null;
+            $draft[$subject] = $marks === null ? '' : (string) $marks;
+        }
+
+        $this->examMarksEditGroupKey = $groupKey;
+        $this->examMarksDraft = $draft;
+    }
+
+    public function cancelExamMarksEdit(): void
+    {
+        $this->examMarksEditGroupKey = null;
+        $this->examMarksDraft = [];
+    }
+
+    public function saveExamMarks(StudentExamMarksWriter $writer): void
+    {
+        abort_unless($this->canEditExamMarks(), 403);
+
+        $groupKey = (string) ($this->examMarksEditGroupKey ?? '');
+
+        if ($groupKey === '') {
+            Notification::make()->title('Choose an exam to edit')->warning()->send();
+
+            return;
+        }
+
+        try {
+            $saved = $writer->saveForStudent(
+                $this->record,
+                $groupKey,
+                $this->examMarksDraft,
+                Auth::user(),
+            );
+        } catch (ValidationException $exception) {
+            Notification::make()
+                ->title('Could not save marks')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Check the scores and try again.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->cancelExamMarksEdit();
+        $this->activityTabLoaded = [];
+        $this->ensureActivitySubTabSelected();
+
+        Notification::make()
+            ->title($saved > 0 ? 'Marks saved' : 'No papers changed')
+            ->body('Only this student’s scores were updated. Other students are unchanged.')
+            ->success()
+            ->send();
+    }
+
+    protected function canEditExamMarks(): bool
+    {
+        return $this->licensed(LicenseFeature::Marks)
+            && $this->userCan(CrmPermission::MarksImport);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function examMarksRow(string $groupKey): ?array
+    {
+        $types = $this->enabledActivityTypes();
+        $type = $types->firstWhere('slug', $this->activitySubTab) ?? $types->first();
+
+        if (! $type || ! $type->supportsScoring()) {
+            return null;
+        }
+
+        foreach (StudentExamMarksMatrix::forStudent($this->record, $type->id)['rows'] as $row) {
+            if ((string) ($row['group_key'] ?? '') === $groupKey) {
+                return $row;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -1332,29 +1445,25 @@ class StudentProfilePage extends Page
             $template,
             Auth::user(),
             $this->sendWhatsAppTemplateParams,
+            wait: false,
         );
+
+        Notification::make()
+            ->title('WhatsApp queued')
+            ->body('Opening send progress. Do not click Send again.')
+            ->success()
+            ->send();
+
+        if ($url = WhatsAppSendUi::campaignViewUrl($recipient->whatsapp_campaign_id)) {
+            $this->redirect($url);
+
+            return;
+        }
 
         $this->messagesTabLoaded = false;
         $this->loadMessagesTab();
         $this->sendWhatsAppTemplateId = null;
         $this->refreshWhatsAppTemplateComposer();
-
-        if ($recipient->status === WhatsAppRecipientStatus::Failed) {
-            Notification::make()
-                ->title('WhatsApp failed')
-                ->body($recipient->error_message ?: 'Meta rejected the message. Check Delivery log on the campaign page.')
-                ->danger()
-                ->persistent()
-                ->send();
-
-            return;
-        }
-
-        Notification::make()
-            ->title('WhatsApp sent')
-            ->body('Message delivered to '.CrmAccess::studentMobileLabel(Auth::user(), $this->record->mobile).'.')
-            ->success()
-            ->send();
     }
 
     public function loadAdmissionTab(): void
@@ -2546,6 +2655,7 @@ class StudentProfilePage extends Page
                 ->button()
                 ->color('warning')
                 ->outlined()
+                ->extraAttributes(WhatsAppSendUi::loadingAttributes())
                 ->modalHeading('Send fee reminder on WhatsApp?')
                 ->modalDescription(function (): string {
                     $preview = app(FeeReminderWhatsAppService::class)->previewForStudent($this->record);
@@ -2579,9 +2689,13 @@ class StudentProfilePage extends Page
 
                     Notification::make()
                         ->title('Fee reminder queued')
-                        ->body('WhatsApp will go to the parent mobile. Queued: '.$result['queued'])
+                        ->body('Opening send progress. Do not click Send again.')
                         ->success()
                         ->send();
+
+                    if ($url = WhatsAppSendUi::campaignViewUrl($result['campaign_id'] ?? null)) {
+                        $this->redirect($url);
+                    }
                 })
                 ->visible(fn (): bool => $this->profileTab === 'fees'
                     && $this->licensed(LicenseFeature::WhatsApp)
@@ -3634,6 +3748,9 @@ class StudentProfilePage extends Page
                                     'loaded' => $this->activityTabLoaded,
                                     'records' => $this->activityRecords,
                                     'student' => $this->record,
+                                    'canEditExamMarks' => $this->canEditExamMarks(),
+                                    'examMarksEditGroupKey' => $this->examMarksEditGroupKey,
+                                    'examMarksDraft' => $this->examMarksDraft,
                                 ]),
                         ]),
                 ]),

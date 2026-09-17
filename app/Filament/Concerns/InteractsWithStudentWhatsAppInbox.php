@@ -4,7 +4,6 @@ namespace App\Filament\Concerns;
 
 use App\Enums\LicenseFeature;
 use App\Enums\WhatsAppMessageSource;
-use App\Enums\WhatsAppRecipientStatus;
 use App\Models\Student;
 use App\Services\MetaWhatsAppInboxService;
 use App\Support\StudentWhatsAppTemplateComposer;
@@ -14,6 +13,7 @@ use App\Services\WhatsAppProviderResolver;
 use App\Services\WhatsAppTemplateCatalog;
 use App\Support\FeatureGate;
 use App\Support\StudentWhatsAppThreadItem;
+use App\Support\WhatsAppSendUi;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -427,28 +427,24 @@ trait InteractsWithStudentWhatsAppInbox
             $template,
             Auth::user(),
             $this->sendWhatsAppTemplateParams,
+            wait: false,
         );
 
-        $this->resetMessagesTab();
-        $this->loadMessagesTab();
-        $this->afterWhatsAppMessageSent();
+        Notification::make()
+            ->title('WhatsApp queued')
+            ->body('Opening send progress. Do not click Send again.')
+            ->success()
+            ->send();
 
-        if ($recipient->status === WhatsAppRecipientStatus::Failed) {
-            Notification::make()
-                ->title('WhatsApp failed')
-                ->body($recipient->error_message ?: 'Meta rejected the message. Check Delivery log on the campaign page.')
-                ->danger()
-                ->persistent()
-                ->send();
+        if ($url = WhatsAppSendUi::campaignViewUrl($recipient->whatsapp_campaign_id)) {
+            $this->redirect($url);
 
             return;
         }
 
-        Notification::make()
-            ->title('WhatsApp sent')
-            ->body('Message delivered to '.\App\Support\CrmAccess::studentMobileLabel(auth()->user(), $student->mobile).'.')
-            ->success()
-            ->send();
+        $this->resetMessagesTab();
+        $this->loadMessagesTab();
+        $this->afterWhatsAppMessageSent();
     }
 
     protected function afterWhatsAppMessageSent(): void

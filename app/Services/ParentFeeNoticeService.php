@@ -125,7 +125,7 @@ class ParentFeeNoticeService
             ],
         ], $staff);
 
-        $this->campaigns->queueCampaign($campaign, $staff);
+        $this->campaigns->queueCampaign($campaign, $staff, wait: false);
         $campaign->load('recipients');
 
         $now = now();

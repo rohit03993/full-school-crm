@@ -8,6 +8,7 @@ use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Services\HomeworkCheckService;
 use App\Support\CrmNavigation;
+use App\Support\WhatsAppSendUi;
 use Carbon\Carbon;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -326,10 +327,14 @@ class HomeworkCheckPage extends Page
 
         if ($result['queued']) {
             Notification::make()
-                ->title('WhatsApp resent')
-                ->body($result['message'])
+                ->title('WhatsApp queued')
+                ->body('Opening send progress. Do not click Resend again.')
                 ->success()
                 ->send();
+
+            if ($url = WhatsAppSendUi::campaignViewUrl($result['campaign_id'] ?? null)) {
+                $this->redirect($url);
+            }
 
             return;
         }
