@@ -165,6 +165,40 @@ class AttendanceHubClassWiseTest extends TestCase
             ->assertDontSee('Fee reminder — ignore on hub');
     }
 
+    public function test_absent_drill_shows_not_connected_attendance_call(): void
+    {
+        $this->travelTo('2026-09-11 10:00:00');
+
+        [$batch, , , , $unmarked, $staff] = $this->seedClassWithFourStatuses();
+
+        StudentCall::query()->create([
+            'student_id' => $unmarked->id,
+            'user_id' => $staff->id,
+            'called_at' => '2026-09-11 09:20:00',
+            'call_direction' => CallDirection::Outgoing,
+            'call_status' => CallStatus::NoAnswer,
+            'call_purpose' => EnrolledCallPurpose::Attendance,
+            'tags' => [EnrolledCallPurpose::Attendance->value],
+        ]);
+
+        $absentRoster = app(AttendanceHubOverviewService::class)
+            ->classBucketRoster($batch->id, '2026-09-11', 'absent');
+
+        $row = collect($absentRoster['students'])->firstWhere('id', $unmarked->id);
+        $this->assertNotNull($row);
+        $this->assertCount(1, $row['attendance_calls']);
+        $this->assertFalse($row['attendance_calls'][0]['connected']);
+        $this->assertSame('No Answer', $row['attendance_calls'][0]['status']);
+
+        $this->actingAsAdmin();
+
+        Livewire::test(AttendanceHubPage::class)
+            ->set('overviewDate', '2026-09-11')
+            ->call('openClassDrill', $batch->id, 'absent')
+            ->assertSee('Call made, not connected')
+            ->assertSee('No Answer');
+    }
+
     public function test_overview_auto_marked_excludes_hand_marks_and_lists_open_names(): void
     {
         $this->travelTo('2026-09-11 10:00:00');

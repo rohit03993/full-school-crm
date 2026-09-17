@@ -93,17 +93,19 @@
                                 @endforeach
                             </x-crm.select>
                         </div>
-                    @elseif ($isEnrolledCall)
-                        <div>
-                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Call purpose / outcome</label>
-                            <x-crm.select wire:model="logCallForm.call_purpose" class="mt-2" required>
-                                <option value="">Select…</option>
-                                @foreach (EnrolledCallPurpose::options() as $value => $label)
-                                    <option value="{{ $value }}">{{ $label }}</option>
-                                @endforeach
-                            </x-crm.select>
-                        </div>
                     @endif
+                @endif
+
+                @if ($isEnrolledCall)
+                    <div>
+                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Call purpose / outcome</label>
+                        <x-crm.select wire:model="logCallForm.call_purpose" class="mt-2" required>
+                            <option value="">Select…</option>
+                            @foreach (EnrolledCallPurpose::options() as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </x-crm.select>
+                    </div>
                 @endif
 
                 <div>

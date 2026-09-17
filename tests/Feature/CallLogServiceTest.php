@@ -22,6 +22,7 @@ use App\Services\CallLogService;
 use App\Services\EnquiryService;
 use App\Services\StudentCaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -122,6 +123,36 @@ class CallLogServiceTest extends TestCase
         $this->assertSame(EnrolledCallPurpose::CallbackNeeded, $call->call_purpose);
         $this->assertNull($call->next_followup_at);
         $this->assertNull($student->next_call_followup_at);
+    }
+
+    public function test_enrolled_not_connected_call_requires_and_saves_purpose(): void
+    {
+        $staff = $this->createStaffUser();
+        [$student] = $this->createEnrolledStudentWithEnquiry($staff);
+
+        $this->expectException(ValidationException::class);
+
+        app(CallLogService::class)->logForEnrolledStudent($student->fresh(['activeEnrollment']), $staff, [
+            'call_connected' => false,
+            'call_status' => CallStatus::NoAnswer->value,
+        ]);
+    }
+
+    public function test_enrolled_not_connected_attendance_purpose_is_saved(): void
+    {
+        $staff = $this->createStaffUser();
+        [$student] = $this->createEnrolledStudentWithEnquiry($staff);
+
+        $call = app(CallLogService::class)->logForEnrolledStudent($student->fresh(['activeEnrollment']), $staff, [
+            'call_connected' => false,
+            'call_status' => CallStatus::NoAnswer->value,
+            'call_purpose' => EnrolledCallPurpose::Attendance->value,
+        ]);
+
+        $this->assertSame(CallStatus::NoAnswer, $call->call_status);
+        $this->assertSame(EnrolledCallPurpose::Attendance, $call->call_purpose);
+        $this->assertSame([EnrolledCallPurpose::Attendance->value], $call->tags);
+        $this->assertNull($call->who_answered);
     }
 
     public function test_case_call_still_skips_lead_pipeline(): void

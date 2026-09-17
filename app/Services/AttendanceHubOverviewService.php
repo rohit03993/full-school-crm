@@ -177,6 +177,7 @@ class AttendanceHubOverviewService
      *             at: string,
      *             staff: string,
      *             status: string,
+     *             connected: bool,
      *             who: ?string,
      *             notes: ?string
      *         }>
@@ -278,7 +279,7 @@ class AttendanceHubOverviewService
      * Attendance-purpose calls for the hub date only (fee / other purposes excluded).
      *
      * @param  list<int>  $studentIds
-     * @return array<int, list<array{at: string, staff: string, status: string, who: ?string, notes: ?string}>>
+     * @return array<int, list<array{at: string, staff: string, status: string, connected: bool, who: ?string, notes: ?string}>>
      */
     protected function attendanceCallsByStudent(array $studentIds, string $day): array
     {
@@ -308,6 +309,7 @@ class AttendanceHubOverviewService
                 'at' => $call->called_at?->format('h:i A') ?? '—',
                 'staff' => $call->staff?->name ?? '—',
                 'status' => $call->call_status?->label() ?? '—',
+                'connected' => $call->call_status?->isConnected() ?? false,
                 'who' => $call->who_answered?->label(),
                 'notes' => filled($call->call_notes) ? trim((string) $call->call_notes) : null,
             ];

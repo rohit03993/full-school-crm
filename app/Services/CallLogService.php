@@ -91,11 +91,11 @@ class CallLogService
             'call_direction' => 'nullable|in:outgoing,incoming',
             'duration_minutes' => 'nullable|integer|min:0|max:600',
             'duration_seconds' => 'nullable|integer|min:0|max:59',
+            'call_purpose' => 'required|in:'.implode(',', array_column(EnrolledCallPurpose::cases(), 'value')),
         ];
 
         if ($connected) {
             $rules['who_answered'] = 'required|in:'.implode(',', array_keys(WhoAnswered::options()));
-            $rules['call_purpose'] = 'required|in:'.implode(',', array_column(EnrolledCallPurpose::cases(), 'value'));
             $rules['call_notes'] = 'required|string|min:10|max:2000';
         } else {
             $rules['call_status'] = 'required|in:'.implode(',', array_column(CallStatus::cases(), 'value'));
@@ -112,9 +112,7 @@ class CallLogService
             ? CallStatus::Connected
             : CallStatus::from($validated['call_status']);
 
-        $purpose = $connected
-            ? EnrolledCallPurpose::from($validated['call_purpose'])
-            : null;
+        $purpose = EnrolledCallPurpose::from($validated['call_purpose']);
 
         // Purpose is the tag — no separate quick-tag selection for enrolled service calls.
         $tags = $purpose !== null ? [$purpose->value] : [];

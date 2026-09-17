@@ -182,7 +182,11 @@
                                                             @foreach ($student['attendance_calls'] as $call)
                                                                 <li>
                                                                     <p class="text-sky-800 dark:text-sky-200">
-                                                                        <span class="font-semibold">Attendance call</span>
+                                                                        @if ($call['connected'] ?? false)
+                                                                            <span class="font-semibold">Attendance call</span>
+                                                                        @else
+                                                                            <span class="font-semibold">Call made, not connected</span>
+                                                                        @endif
                                                                         · {{ $call['at'] }}
                                                                         · {{ $call['staff'] }}
                                                                         · {{ $call['status'] }}
