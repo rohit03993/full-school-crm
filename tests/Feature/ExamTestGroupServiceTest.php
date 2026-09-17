@@ -134,6 +134,42 @@ class ExamTestGroupServiceTest extends TestCase
         $this->assertSame('', $absentMatrix['rows'][0]['scores']['Physics']['display']);
     }
 
+    public function test_student_profile_keeps_maths_marks_when_a_twin_empty_sheet_exists(): void
+    {
+        [$staff, $batch, $type] = $this->examContext();
+        $student = $this->createBatchStudent($batch, $staff, '9876500003', 'Rishit Gupta');
+
+        $mathematics = $this->createTestSession($type, $batch, $staff, 'jee-a-test', '11TH JEE BATCH (A) TEST', 'Mathematics', 100);
+        $this->createTestSession($type, $batch, $staff, 'jee-a-test', '11TH JEE BATCH (A) TEST', 'Maths', 100);
+        $chemistry = $this->createTestSession($type, $batch, $staff, 'jee-a-test', '11TH JEE BATCH (A) TEST', 'Chemistry', 100);
+        $physics = $this->createTestSession($type, $batch, $staff, 'jee-a-test', '11TH JEE BATCH (A) TEST', 'Physics', 100);
+
+        foreach ([
+            [$mathematics, 48],
+            [$chemistry, 76],
+            [$physics, 65],
+        ] as [$session, $marks]) {
+            ActivityAttendance::query()->create([
+                'attendable_type' => $session->getMorphClass(),
+                'attendable_id' => $session->id,
+                'student_id' => $student->id,
+                'is_present' => true,
+                'marks_obtained' => $marks,
+                'marked_by_user_id' => $staff->id,
+            ]);
+        }
+
+        $row = StudentExamMarksMatrix::forStudent($student->fresh(), $type->id)['rows'][0];
+
+        $this->assertSame(48.0, $row['scores']['Maths']['marks']);
+        $this->assertSame(76.0, $row['scores']['Chemistry']['marks']);
+        $this->assertSame(65.0, $row['scores']['Physics']['marks']);
+        $this->assertSame(189.0, $row['total']['marks']);
+        $this->assertSame(300.0, $row['total']['max']);
+        $this->assertSame(63.0, $row['total']['percentage']);
+        $this->assertArrayNotHasKey('Mathematics', $row['scores']);
+    }
+
     /**
      * @return array{0: User, 1: Batch, 2: ActivityType}
      */

@@ -59,11 +59,14 @@ class StudentExamMarksMatrix
 
             $marks = $record->marks_obtained !== null ? (float) $record->marks_obtained : null;
 
-            $grouped[$groupKey]['scores'][$subject] = [
-                'marks' => $marks,
-                'max' => $maxMarks,
-                'display' => self::formatMarks($marks, $maxMarks, $record->grade),
-            ];
+            $grouped[$groupKey]['scores'][$subject] = self::preferSubjectScore(
+                $grouped[$groupKey]['scores'][$subject] ?? null,
+                [
+                    'marks' => $marks,
+                    'max' => $maxMarks,
+                    'display' => self::formatMarks($marks, $maxMarks, $record->grade),
+                ],
+            );
         }
 
         $subjects = array_keys($subjectSet);
@@ -89,10 +92,10 @@ class StudentExamMarksMatrix
                     if ($cell['marks'] !== null) {
                         $hasMarks = true;
                         $totalMarks += (float) $cell['marks'];
-                    }
 
-                    if ($cell['max'] !== null && (float) $cell['max'] > 0) {
-                        $totalMax += (float) $cell['max'];
+                        if ($cell['max'] !== null && (float) $cell['max'] > 0) {
+                            $totalMax += (float) $cell['max'];
+                        }
                     }
                 }
 
@@ -202,14 +205,17 @@ class StudentExamMarksMatrix
             $grade = $record?->grade;
 
             $grouped[$groupKey]['exam_subjects'][$subject] = true;
-            $grouped[$groupKey]['scores'][$subject] = [
-                'marks' => $marks,
-                'max' => $maxMarks,
-                'appeared' => $marks !== null,
-                'display' => $marks !== null
-                    ? self::formatMarks($marks, $maxMarks, $grade)
-                    : '',
-            ];
+            $grouped[$groupKey]['scores'][$subject] = self::preferSubjectScore(
+                $grouped[$groupKey]['scores'][$subject] ?? null,
+                [
+                    'marks' => $marks,
+                    'max' => $maxMarks,
+                    'appeared' => $marks !== null,
+                    'display' => $marks !== null
+                        ? self::formatMarks($marks, $maxMarks, $grade)
+                        : '',
+                ],
+            );
         }
 
         $subjects = array_keys($subjectSet);
@@ -326,6 +332,38 @@ class StudentExamMarksMatrix
             $session->session_date?->format('Y-m-d') ?? '',
             self::testLabelForSession($session),
         ]);
+    }
+
+    /**
+     * When Maths and Mathematics (or other aliases) are stored as two sheets,
+     * keep the score that actually has marks. Never overwrite a real mark with blank.
+     *
+     * @param  array{marks: ?float, max: ?float, display: string, appeared?: bool}|null  $existing
+     * @param  array{marks: ?float, max: ?float, display: string, appeared?: bool}  $incoming
+     * @return array{marks: ?float, max: ?float, display: string, appeared?: bool}
+     */
+    public static function preferSubjectScore(?array $existing, array $incoming): array
+    {
+        if ($existing === null) {
+            return $incoming;
+        }
+
+        $existingHasMarks = $existing['marks'] !== null;
+        $incomingHasMarks = $incoming['marks'] !== null;
+
+        if ($incomingHasMarks && ! $existingHasMarks) {
+            return $incoming;
+        }
+
+        if ($existingHasMarks && ! $incomingHasMarks) {
+            return $existing;
+        }
+
+        if (! $existingHasMarks && ! $incomingHasMarks && ! filled($existing['max'] ?? null) && filled($incoming['max'] ?? null)) {
+            return $incoming;
+        }
+
+        return $existing;
     }
 
     public static function formatMarks(?float $marks, ?float $maxMarks, ?string $grade, string $empty = '—'): string
