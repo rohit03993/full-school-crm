@@ -376,7 +376,7 @@ class TestMarksReviewPage extends Page
     public function queueWhatsAppCampaign(ActivityMarksWhatsAppService $marksWhatsApp): void
     {
         abort_unless(FeatureGate::enabled(LicenseFeature::WhatsApp), 403);
-        abort_unless(CrmAccess::can(Auth::user(), CrmPermission::WhatsappCampaigns), 403);
+        abort_unless(CrmAccess::canSendExamMarksWhatsApp(Auth::user()), 403);
 
         $templateId = $marksWhatsApp->resolveTemplateId($this->whatsappTemplateId);
 
@@ -472,7 +472,7 @@ class TestMarksReviewPage extends Page
                     'defaultMarksTemplateName' => app(ActivityMarksWhatsAppService::class)->defaultTemplateName(),
                     'examMarksAutomationsUrl' => ManageWhatsAppSettings::getUrl(['automation' => 'exam-marks']),
                     'canSendWhatsApp' => FeatureGate::enabled(LicenseFeature::WhatsApp)
-                        && CrmAccess::can(Auth::user(), CrmPermission::WhatsappCampaigns),
+                        && CrmAccess::canSendExamMarksWhatsApp(Auth::user()),
                     'resultStatus' => $this->resultStatus(),
                     'canPublish' => FeatureGate::enabled(LicenseFeature::Results)
                         && CrmAccess::can(Auth::user(), CrmPermission::MarksPublish)

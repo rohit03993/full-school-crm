@@ -36,6 +36,19 @@ class CrmAccess
     }
 
     /**
+     * Queue exam-marks WhatsApp from the mark sheet. Coordinators publish marks;
+     * messaging staff already have bulk campaigns. Teachers who only enter marks cannot send.
+     */
+    public static function canSendExamMarksWhatsApp(?User $user): bool
+    {
+        return self::canAny(
+            $user,
+            CrmPermission::MarksPublish,
+            CrmPermission::WhatsappCampaigns,
+        );
+    }
+
+    /**
      * Super Admin, accountant (collect / finance stats), or anyone with fee-structure access.
      */
     public static function canViewFees(?User $user): bool

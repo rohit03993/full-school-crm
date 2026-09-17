@@ -345,9 +345,10 @@ class BulkActivityMarksImportPage extends Page
 
     public function queueWhatsAppCampaign(ActivityMarksWhatsAppService $marksWhatsApp): void
     {
-        if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
+        if (! FeatureGate::enabled(LicenseFeature::WhatsApp)
+            || ! CrmAccess::canSendExamMarksWhatsApp(Auth::user())) {
             Notification::make()
-                ->title('WhatsApp module is not enabled')
+                ->title('You cannot send exam marks on WhatsApp')
                 ->warning()
                 ->send();
 
@@ -557,7 +558,7 @@ class BulkActivityMarksImportPage extends Page
                     'defaultMarksTemplateName' => app(ActivityMarksWhatsAppService::class)->defaultTemplateName(),
                     'examMarksAutomationsUrl' => ManageWhatsAppSettings::getUrl(['automation' => 'exam-marks']),
                     'canSendWhatsApp' => FeatureGate::enabled(LicenseFeature::WhatsApp)
-                        && CrmAccess::can(Auth::user(), CrmPermission::WhatsappCampaigns),
+                        && CrmAccess::canSendExamMarksWhatsApp(Auth::user()),
                     'fileHeaders' => $this->fileHeaders,
                     'columnMapping' => $this->columnMapping,
                     'subjectMaxMarks' => $this->subjectMaxMarks,

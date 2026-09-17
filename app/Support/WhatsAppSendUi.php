@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
+use App\Models\WhatsAppCampaign;
 
 class WhatsAppSendUi
 {
@@ -21,10 +22,16 @@ class WhatsAppSendUi
 
     public static function campaignViewUrl(int|string|null $campaignId): ?string
     {
-        if (blank($campaignId) || ! WhatsAppCampaignResource::canAccess()) {
+        if (blank($campaignId)) {
             return null;
         }
 
-        return WhatsAppCampaignResource::getUrl('view', ['record' => $campaignId]);
+        $campaign = WhatsAppCampaign::query()->find($campaignId);
+
+        if ($campaign === null || ! WhatsAppCampaignResource::canView($campaign)) {
+            return null;
+        }
+
+        return WhatsAppCampaignResource::getUrl('view', ['record' => $campaign]);
     }
 }

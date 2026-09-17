@@ -35,6 +35,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
 use UnitEnum;
@@ -51,6 +52,19 @@ class WhatsAppCampaignResource extends Resource
     protected static function requiredLicenseFeature(): ?LicenseFeature
     {
         return LicenseFeature::WhatsApp;
+    }
+
+    public static function canView(Model $record): bool
+    {
+        if (static::canAccess()) {
+            return true;
+        }
+
+        $user = Auth::user();
+
+        return $user !== null
+            && $record instanceof WhatsAppCampaign
+            && (int) $record->created_by === (int) $user->id;
     }
 
     public static function shouldRegisterNavigation(): bool

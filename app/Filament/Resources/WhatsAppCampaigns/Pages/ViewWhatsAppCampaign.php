@@ -4,6 +4,7 @@ namespace App\Filament\Resources\WhatsAppCampaigns\Pages;
 
 use App\Enums\WhatsAppCampaignStatus;
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
+use App\Models\WhatsAppCampaign;
 use App\Services\WhatsAppCampaignService;
 use App\Support\WhatsAppSendUi;
 use Filament\Actions\Action;
@@ -15,6 +16,21 @@ use Livewire\Attributes\Computed;
 class ViewWhatsAppCampaign extends ViewRecord
 {
     protected static string $resource = WhatsAppCampaignResource::class;
+
+    public static function canAccess(array $parameters = []): bool
+    {
+        $record = $parameters['record'] ?? null;
+
+        if (! $record instanceof WhatsAppCampaign && filled($record)) {
+            $record = WhatsAppCampaign::query()->find($record);
+        }
+
+        if ($record instanceof WhatsAppCampaign) {
+            return WhatsAppCampaignResource::canView($record);
+        }
+
+        return WhatsAppCampaignResource::canAccess();
+    }
 
     public function hasCombinedRelationManagerTabsWithContent(): bool
     {

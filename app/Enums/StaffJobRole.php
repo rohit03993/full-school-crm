@@ -43,7 +43,7 @@ enum StaffJobRole: string
             self::AdmissionOfficer => 'Enquiries, admissions, student edits, imports',
             self::Accountant => 'Collect fees, receipts, fee reports (including download)',
             self::FeeAdjuster => 'Adjust fee plan, discounts, installments; request waive/discount (admin approves)',
-            self::AcademicCoordinator => 'Courses, batches, exams, attendance, marks upload & publish, homework',
+            self::AcademicCoordinator => 'Courses, batches, exams, attendance, marks upload, publish, send marks to parents, homework',
             self::Teacher => 'Own classes only: attendance, homework submit, marks entry (no publish or setup)',
             self::WhatsappInbox => 'Read parent replies and send follow-up messages',
             self::WhatsappBulkCampaigns => 'Send approved templates to a class or course',

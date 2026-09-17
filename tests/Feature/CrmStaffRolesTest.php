@@ -5,8 +5,14 @@ namespace Tests\Feature;
 use App\Enums\CrmPermission;
 use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
+use App\Enums\WhatsAppCampaignStatus;
+use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Models\User;
+use App\Models\WhatsAppCampaign;
+use App\Models\WhatsAppTemplate;
 use App\Services\CrmPermissionSyncService;
+use App\Support\CrmAccess;
+use App\Support\WhatsAppSendUi;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -189,11 +195,46 @@ class CrmStaffRolesTest extends TestCase
         $this->assertTrue($user->canCrm(CrmPermission::MarksPublish));
         $this->assertTrue($user->canCrm(CrmPermission::AcademicsManage));
         $this->assertTrue($user->canCrm(CrmPermission::HomeworkManage));
+        $this->assertTrue(\App\Support\CrmAccess::canSendExamMarksWhatsApp($user));
         $this->assertFalse($user->canCrm(CrmPermission::WhatsappCampaigns));
         $this->assertTrue(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::canAccess());
         $this->assertTrue(\App\Filament\Pages\CreateExamWindowPage::canAccess());
         $this->assertTrue(\App\Filament\Pages\HomeworkReviewPage::canAccess());
         $this->assertFalse(\App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource::canAccess());
+    }
+
+    public function test_academic_coordinator_can_open_send_progress_for_their_marks_campaign(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole(StaffJobRole::AcademicCoordinator->value);
+        $this->actingAs($user);
+
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'test_marks',
+            'param_count' => 4,
+            'is_active' => true,
+        ]);
+
+        $own = WhatsAppCampaign::query()->create([
+            'whatsapp_template_id' => $template->id,
+            'name' => 'Exam marks',
+            'status' => WhatsAppCampaignStatus::Queued,
+            'total_recipients' => 1,
+            'created_by' => $user->id,
+        ]);
+
+        $other = WhatsAppCampaign::query()->create([
+            'whatsapp_template_id' => $template->id,
+            'name' => 'Other staff send',
+            'status' => WhatsAppCampaignStatus::Queued,
+            'total_recipients' => 1,
+            'created_by' => User::factory()->create(['is_active' => true])->id,
+        ]);
+
+        $this->assertTrue(WhatsAppCampaignResource::canView($own));
+        $this->assertFalse(WhatsAppCampaignResource::canView($other));
+        $this->assertNotNull(WhatsAppSendUi::campaignViewUrl($own->id));
+        $this->assertNull(WhatsAppSendUi::campaignViewUrl($other->id));
     }
 
     public function test_teacher_can_enter_marks_but_not_publish_or_manage_academics(): void
@@ -209,6 +250,7 @@ class CrmStaffRolesTest extends TestCase
         $this->assertFalse($user->canCrm(CrmPermission::MarksPublish));
         $this->assertFalse($user->canCrm(CrmPermission::AcademicsManage));
         $this->assertFalse($user->canCrm(CrmPermission::HomeworkManage));
+        $this->assertFalse(\App\Support\CrmAccess::canSendExamMarksWhatsApp($user));
         $this->assertFalse(\App\Filament\Pages\CreateExamWindowPage::canAccess());
         $this->assertTrue(\App\Filament\Pages\AttendancePage::canAccess());
     }
