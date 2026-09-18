@@ -33,6 +33,7 @@ class StudentProfileHeaderDeskTest extends TestCase
         Livewire::test(StudentProfilePage::class, ['record' => $student])
             ->assertSuccessful()
             ->assertDontSee('Back to Search')
+            ->assertSeeHtml('fi-student-profile-desk-actions')
             ->assertSee('Add Payment')
             ->assertSee('More')
             ->assertSee('Fees due')
@@ -55,6 +56,7 @@ class StudentProfileHeaderDeskTest extends TestCase
             ->assertSuccessful()
             ->assertDontSee('Back to Search')
             ->assertSee('Add Visit')
+            ->assertSeeHtml('fi-student-profile-desk-actions')
             ->assertSee('More')
             ->assertActionVisible('addVisit')
             ->assertActionVisible('editStudent');

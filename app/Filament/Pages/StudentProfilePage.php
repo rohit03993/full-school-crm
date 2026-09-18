@@ -2675,6 +2675,55 @@ class StudentProfilePage extends Page
     }
 
     /**
+     * Compact in-card actions. Header actions stay registered so Filament modals still mount.
+     *
+     * @return array{primary: list<array{name: string, label: string, tone: string}>, more: list<array{name: string, label: string, danger: bool}>}
+     */
+    public function studentProfileDeskToolbar(): array
+    {
+        $primary = [];
+        $more = [];
+
+        foreach ($this->getHeaderActions() as $action) {
+            if ($action instanceof ActionGroup) {
+                foreach ($action->getFlatActions() as $child) {
+                    if ($child->isHidden()) {
+                        continue;
+                    }
+
+                    $more[] = [
+                        'name' => $child->getName(),
+                        'label' => (string) $child->getLabel(),
+                        'danger' => $child->getName() === 'deleteStudent',
+                    ];
+                }
+
+                continue;
+            }
+
+            if ($action->isHidden()) {
+                continue;
+            }
+
+            $name = $action->getName();
+            $primary[] = [
+                'name' => $name,
+                'label' => (string) $action->getLabel(),
+                'tone' => match ($name) {
+                    'addPayment' => 'success',
+                    'addVisit', 'convertToAdmission' => 'primary',
+                    default => 'gray',
+                },
+            ];
+        }
+
+        return [
+            'primary' => $primary,
+            'more' => $more,
+        ];
+    }
+
+    /**
      * @return list<Action>
      */
     protected function studentProfileHeaderActionDefinitions(): array

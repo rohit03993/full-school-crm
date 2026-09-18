@@ -23,10 +23,10 @@
     ];
 @endphp
 
-<div class="fi-student-profile-dossier overflow-hidden rounded-xl bg-white shadow-md ring-1 ring-gray-950/5 sm:rounded-2xl dark:bg-gray-900 dark:ring-white/10">
+<div class="fi-student-profile-dossier overflow-visible rounded-xl bg-white shadow-md ring-1 ring-gray-950/5 sm:rounded-2xl dark:bg-gray-900 dark:ring-white/10">
     {{-- Identity row — larger photo + readable name on phones --}}
-    <div class="relative overflow-hidden border-b border-gray-100 dark:border-white/10">
-        <div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary-500/[0.07] via-transparent to-emerald-500/[0.05] dark:from-primary-500/10 dark:to-emerald-500/5"></div>
+    <div class="relative overflow-visible border-b border-gray-100 dark:border-white/10">
+        <div class="pointer-events-none absolute inset-0 rounded-t-xl bg-gradient-to-br from-primary-500/[0.07] via-transparent to-emerald-500/[0.05] dark:from-primary-500/10 dark:to-emerald-500/5 sm:rounded-t-2xl"></div>
 
         <div class="relative flex flex-row items-start gap-3 p-3 sm:gap-4 sm:p-5 lg:gap-5">
             {{-- Photo --}}
@@ -91,10 +91,15 @@
                     </div>
                 </div>
 
-                <h2 class="mt-1.5 line-clamp-2 text-xl font-bold leading-tight tracking-tight text-gray-950 sm:mt-2 sm:text-2xl dark:text-white">{{ $record->name }}</h2>
-                <p class="mt-1 line-clamp-2 text-sm leading-snug text-gray-600 dark:text-gray-400">
-                    {{ $course?->name ?? '—' }}@if ($course?->duration_label)<span class="text-gray-400"> · </span>{{ $course->duration_label }}@endif
-                </p>
+                <div class="mt-1.5 flex flex-wrap items-start justify-between gap-2 sm:mt-2 sm:gap-3">
+                    <div class="min-w-0 flex-1">
+                        <h2 class="line-clamp-2 text-xl font-bold leading-tight tracking-tight text-gray-950 dark:text-white">{{ $record->name }}</h2>
+                        <p class="mt-1 line-clamp-2 text-sm leading-snug text-gray-600 dark:text-gray-400">
+                            {{ $course?->name ?? '—' }}@if ($course?->duration_label)<span class="text-gray-400"> · </span>{{ $course->duration_label }}@endif
+                        </p>
+                    </div>
+                    @include('filament.pages.partials.student-profile-desk-actions')
+                </div>
 
                 {{-- Mobile: contact + call inline (desktop uses Contact card below) --}}
                 <div class="mt-2 flex flex-wrap items-center gap-2 sm:hidden">

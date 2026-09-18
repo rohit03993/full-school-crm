@@ -22,11 +22,14 @@
             ->all();
     @endphp
 
-    <div class="fi-student-profile-shell overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+    <div class="fi-student-profile-shell overflow-visible rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
         <div class="px-3 py-3 sm:px-6 sm:py-5">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <div class="min-w-0 flex-1">
-                    <h2 class="truncate text-base font-bold text-gray-950 sm:text-xl dark:text-white">{{ $record->name }}</h2>
+                    <div class="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
+                        <h2 class="min-w-0 flex-1 truncate text-base font-bold text-gray-950 sm:text-xl dark:text-white">{{ $record->name }}</h2>
+                        @include('filament.pages.partials.student-profile-desk-actions')
+                    </div>
                     <div class="mt-1 flex items-center gap-2">
                         <x-crm.student-mobile :mobile="$record->mobile" class="text-base font-semibold text-primary-600 dark:text-primary-400" />
                         @include('filament.pages.partials.student-call-button', ['record' => $record, 'hideOnMobile' => true])
