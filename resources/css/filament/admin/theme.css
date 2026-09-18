@@ -1289,9 +1289,13 @@
         @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10;
     }
 
-    /* Student profile — name lives on the card; Back sits tight above it */
+    /* Student profile — page-level Back is hidden; the in-card Back has no gap. */
     .fi-page:has(.fi-student-profile-shell) > .fi-crm-back {
-        @apply pt-1 pb-0 sm:pt-2 sm:pb-0;
+        @apply hidden;
+    }
+
+    .fi-student-profile-inpage-back .fi-crm-back {
+        @apply pt-1 pb-1 sm:pt-2 sm:pb-2;
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-page-header-main-ctn,
@@ -2713,6 +2717,7 @@ body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn {
 body.fi-body:has(.fi-student-profile-shell) .fi-page-header-main-ctn,
 body.fi-body:has(.fi-student-profile-page) .fi-page-header-main-ctn {
     padding-top: 0 !important;
+    padding-block-start: 0 !important;
     margin-top: 0 !important;
     gap: 0 !important;
     row-gap: 0 !important;
@@ -2728,9 +2733,7 @@ body.fi-body:has(.fi-student-profile-page) .fi-page-content {
 
 .fi-page:has(.fi-student-profile-shell) > .fi-crm-back,
 .fi-page:has(.fi-student-profile-page) > .fi-crm-back {
-    padding-top: 0.25rem !important;
-    padding-bottom: 0 !important;
-    margin-bottom: 0 !important;
+    display: none !important;
 }
 
 /*
@@ -2779,12 +2782,25 @@ body.fi-body:has(.fi-student-profile-page) .fi-page-content {
         overflow: hidden !important;
     }
 
+    body.fi-body:has(.fi-student-profile-shell) .fi-page-header-main-ctn,
+    body.fi-body:has(.fi-student-profile-page) .fi-page-header-main-ctn,
+    body.fi-body:has(.fi-student-profile-shell) .fi-page-main,
+    body.fi-body:has(.fi-student-profile-page) .fi-page-main,
+    body.fi-body:has(.fi-student-profile-shell) .fi-page-content,
+    body.fi-body:has(.fi-student-profile-page) .fi-page-content {
+        padding: 0 !important;
+        margin-top: 0 !important;
+    }
+
     body.fi-body:has(.fi-student-profile-shell) > .fi-crm-back,
     body.fi-body:has(.fi-student-profile-page) > .fi-crm-back {
-        padding-top: 0.25rem !important;
-        padding-bottom: 0 !important;
-        padding-left: 0.75rem !important;
-        padding-right: 0.75rem !important;
+        display: none !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-inpage-back .fi-crm-back,
+    body.fi-body:has(.fi-student-profile-page) .fi-student-profile-inpage-back .fi-crm-back {
+        padding: 0.35rem 0.75rem 0.25rem !important;
+        margin: 0 !important;
     }
 
     body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-shell,

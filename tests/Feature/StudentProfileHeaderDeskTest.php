@@ -34,6 +34,7 @@ class StudentProfileHeaderDeskTest extends TestCase
             ->assertSuccessful()
             ->assertDontSee('Back to Search')
             ->assertDontSeeHtml('fi-header-heading')
+            ->assertSeeHtml('fi-student-profile-inpage-back')
             ->assertSeeHtml('fi-student-profile-desk-actions')
             ->assertSee('Add Payment');
 
