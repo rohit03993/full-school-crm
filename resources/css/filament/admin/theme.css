@@ -17,6 +17,7 @@
        dropdown can sit under that field instead of stretching across the page. */
     .fi-topbar-ctn {
         overflow: visible;
+        z-index: 30;
     }
 
     .fi-topbar .fi-global-search-ctn {
@@ -42,14 +43,19 @@
     }
 
     .fi-topbar .fi-global-search-results-ctn {
+        position: absolute !important;
+        transform: none !important;
         inset: auto !important;
         top: calc(100% + 0.5rem) !important;
         right: 0 !important;
         left: auto !important;
         width: 22rem !important;
         max-width: min(22rem, calc(100vw - 1.25rem)) !important;
-        z-index: 80;
+        z-index: 40;
         max-height: min(24rem, calc(100vh - 5.5rem));
+        overflow: auto;
+        background: #fff;
+        box-shadow: 0 10px 25px rgb(17 24 39 / 0.12);
     }
 
     .fi-global-search-result-group-header {
@@ -242,13 +248,10 @@
         @apply text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400;
     }
 
-    /* Select panels are absolutely positioned inside this card, and the hero and
-       widgets below are positioned too — without a stacking context of its own
-       the toolbar's open dropdown gets painted over by them.
-       Keep below Filament's mobile sidebar/overlay (z-30) so the open menu is not
-       covered by this filter card; on lg the sidebar is z-20 so z-30 is fine. */
+    /* Filter selects need a stacking context above the hero, but must stay
+       below the top-bar search (z-30). z-30 here covered the people results. */
     .crm-dash-filters {
-        @apply relative z-20 lg:z-30;
+        @apply relative z-10;
     }
 
     .crm-dash-filters .fi-section,
