@@ -38,27 +38,23 @@ class AdminDashboardTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_super_admin_sees_dashboard_with_filters(): void
+    public function test_super_admin_sees_dashboard_without_a_filter_bar(): void
     {
-        $session = $this->createSession();
+        $this->createSession();
         $this->actingAsSuperAdmin();
 
         Livewire::test(Dashboard::class)
             ->assertSuccessful()
             ->assertDontSee('Set the session and period once')
-            ->assertSee('crm-dash-filters__toggle', false)
-            ->assertSee('This month')
+            ->assertDontSee('crm-dash-filters')
+            ->assertDontSee('Batch / Section')
             ->assertDontSee('Fee collection trend')
             ->assertDontSee('Where leads came from')
             ->assertDontSee('Hide analytics')
             ->assertDontSee('Today by batch')
             ->assertDontSee('Recent Leads')
             ->assertDontSee('Pending Admissions')
-            ->assertDontSee('Search Student')
-            ->assertSchemaStateSet([
-                'academic_session_id' => $session->id,
-                'range' => DashboardFilters::RANGE_MONTH,
-            ], 'filtersForm');
+            ->assertDontSee('Search Student');
     }
 
     public function test_owner_stat_widgets_follow_the_selected_period(): void
@@ -318,7 +314,7 @@ class AdminDashboardTest extends TestCase
 
         Livewire::test(Dashboard::class)
             ->assertSuccessful()
-            ->assertSee('crm-dash-filters', false)
+            ->assertDontSee('crm-dash-filters')
             ->assertSee('Today');
     }
 
