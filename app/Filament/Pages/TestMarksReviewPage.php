@@ -5,6 +5,8 @@ namespace App\Filament\Pages;
 use App\Filament\Pages\BulkActivityMarksImportPage;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
+use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Models\StudentMarksheet;
@@ -85,7 +87,13 @@ class TestMarksReviewPage extends Page
 
     public function getTitle(): string
     {
-        return $this->markSheet['test_label'] ?? static::$title;
+        if (! is_array($this->markSheet)) {
+            return static::$title;
+        }
+
+        return filled($this->markSheet['test_label'] ?? null)
+            ? (string) $this->markSheet['test_label']
+            : static::$title;
     }
 
     public function getSubheading(): ?string
@@ -147,7 +155,7 @@ class TestMarksReviewPage extends Page
                 ->label('Edit marks')
                 ->icon(Heroicon::OutlinedPencilSquare)
                 ->color('primary')
-                ->action(function (): void {
+                ->action(function () {
                     $this->startBulkEdit();
                 });
         }
@@ -174,7 +182,21 @@ class TestMarksReviewPage extends Page
 
     public function userCanBulkEditMarks(): bool
     {
-        return CrmAccess::can(Auth::user(), CrmPermission::AcademicsManage);
+        $user = Auth::user();
+
+        if (! $user?->is_active) {
+            return false;
+        }
+
+        if ($user->hasRole(RoleName::SuperAdmin->value)) {
+            return true;
+        }
+
+        if (in_array(StaffJobRole::AcademicCoordinator->value, CrmAccess::jobRoleNamesFor($user), true)) {
+            return true;
+        }
+
+        return CrmAccess::can($user, CrmPermission::AcademicsManage);
     }
 
     public function startBulkEdit(): void

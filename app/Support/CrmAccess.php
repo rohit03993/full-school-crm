@@ -21,7 +21,11 @@ class CrmAccess
             return true;
         }
 
-        return $user->hasPermissionTo($permission);
+        try {
+            return $user->hasPermissionTo($permission);
+        } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist) {
+            return false;
+        }
     }
 
     public static function canAny(?User $user, CrmPermission|string ...$permissions): bool
