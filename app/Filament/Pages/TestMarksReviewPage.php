@@ -31,6 +31,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 
 class TestMarksReviewPage extends Page
 {
@@ -48,11 +49,6 @@ class TestMarksReviewPage extends Page
     }
 
     public ?string $groupKey = null;
-
-    /**
-     * @var array<string, mixed>|null
-     */
-    public ?array $markSheet = null;
 
     public ?int $whatsappTemplateId = null;
 
@@ -77,7 +73,6 @@ class TestMarksReviewPage extends Page
         $this->groupKey = request()->query('group');
 
         if (filled($this->groupKey)) {
-            $this->markSheet = ExamTestGroupMatrix::markSheetForGroup($this->groupKey);
             $declaration = app(ResultDeclarationService::class)->findForGroupKey((string) $this->groupKey);
             $this->principalRemarks = $declaration?->remarks;
         }
@@ -85,15 +80,33 @@ class TestMarksReviewPage extends Page
         $this->whatsappTemplateId = app(ActivityMarksWhatsAppService::class)->defaultTemplate()?->id;
     }
 
-    public function getTitle(): string
+    /**
+     * Not a Livewire public property — nested Carbon/cells cannot be snapshotted.
+     *
+     * @return array<string, mixed>|null
+     */
+    #[Computed]
+    public function markSheet(): ?array
     {
-        if (! is_array($this->markSheet)) {
-            return static::$title;
+        if (! filled($this->groupKey)) {
+            return null;
         }
 
-        return filled($this->markSheet['test_label'] ?? null)
-            ? (string) $this->markSheet['test_label']
-            : static::$title;
+        return ExamTestGroupMatrix::markSheetForGroup((string) $this->groupKey);
+    }
+
+    public function getTitle(): string
+    {
+        $fallback = (string) (static::$title ?? 'Exam mark sheet');
+        $sheet = $this->markSheet;
+
+        if (! is_array($sheet)) {
+            return $fallback;
+        }
+
+        return filled($sheet['test_label'] ?? null)
+            ? (string) $sheet['test_label']
+            : $fallback;
     }
 
     public function getSubheading(): ?string
@@ -122,9 +135,11 @@ class TestMarksReviewPage extends Page
                         ->required()
                         ->maxLength(255),
                 ])
-                ->fillForm(fn (): array => [
-                    'name' => (string) ($this->markSheet['test_label'] ?? ''),
-                ])
+                ->fillForm(function (): array {
+                    $sheet = $this->markSheet;
+
+                    return ['name' => (string) ($sheet['test_label'] ?? '')];
+                })
                 ->action(function (array $data): void {
                     abort_unless(Auth::user() && app(ExamTestGroupService::class)->userCanManage(Auth::user()), 403);
 
@@ -134,7 +149,7 @@ class TestMarksReviewPage extends Page
                             (string) $this->groupKey,
                             (string) ($data['name'] ?? ''),
                         );
-                        $this->markSheet = ExamTestGroupMatrix::markSheetForGroup((string) $this->groupKey);
+                        unset($this->markSheet);
                         Notification::make()
                             ->title('Exam renamed')
                             ->body('Marks were not changed.')
@@ -164,13 +179,17 @@ class TestMarksReviewPage extends Page
             $actions[] = Action::make('uploadMarks')
                 ->label('Update Excel')
                 ->icon(Heroicon::OutlinedArrowUpTray)
-                ->url(fn (): string => BulkActivityMarksImportPage::urlForTest(
-                    (string) ($this->markSheet['test_label'] ?? ''),
-                    isset($this->markSheet['activity_type_id']) ? (int) $this->markSheet['activity_type_id'] : null,
-                    isset($this->markSheet['batch_id']) ? (int) $this->markSheet['batch_id'] : null,
-                    $this->markSheetDateForUrl(),
-                    $this->groupKey,
-                ));
+                ->url(function (): string {
+                    $sheet = $this->markSheet;
+
+                    return BulkActivityMarksImportPage::urlForTest(
+                        (string) ($sheet['test_label'] ?? ''),
+                        isset($sheet['activity_type_id']) ? (int) $sheet['activity_type_id'] : null,
+                        isset($sheet['batch_id']) ? (int) $sheet['batch_id'] : null,
+                        $this->markSheetDateForUrl(),
+                        $this->groupKey,
+                    );
+                });
         }
 
         $actions[] = Action::make('back')
@@ -182,21 +201,25 @@ class TestMarksReviewPage extends Page
 
     public function userCanBulkEditMarks(): bool
     {
-        $user = Auth::user();
+        try {
+            $user = Auth::user();
 
-        if (! $user?->is_active) {
+            if (! $user?->is_active) {
+                return false;
+            }
+
+            if ($user->hasRole(RoleName::SuperAdmin->value)) {
+                return true;
+            }
+
+            if (in_array(StaffJobRole::AcademicCoordinator->value, CrmAccess::jobRoleNamesFor($user), true)) {
+                return true;
+            }
+
+            return CrmAccess::can($user, CrmPermission::AcademicsManage);
+        } catch (\Throwable) {
             return false;
         }
-
-        if ($user->hasRole(RoleName::SuperAdmin->value)) {
-            return true;
-        }
-
-        if (in_array(StaffJobRole::AcademicCoordinator->value, CrmAccess::jobRoleNamesFor($user), true)) {
-            return true;
-        }
-
-        return CrmAccess::can($user, CrmPermission::AcademicsManage);
     }
 
     protected function markSheetDateForUrl(): ?string
@@ -291,7 +314,7 @@ class TestMarksReviewPage extends Page
             return;
         }
 
-        $this->markSheet = ExamTestGroupMatrix::markSheetForGroup((string) $this->groupKey);
+        unset($this->markSheet);
         $this->cancelBulkEdit();
 
         Notification::make()
