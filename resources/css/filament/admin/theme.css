@@ -2967,3 +2967,23 @@ body.fi-body:has(.fi-student-profile-page) .fi-page-content {
         }
     }
 }
+
+/*
+ * Menus must sit on top of cards/tables. Custom ⋯ menus teleport to body;
+ * Filament dropdowns need a z-index above overflow-hidden wrappers.
+ */
+.crm-overflow-menu {
+    z-index: 80;
+}
+
+.fi-dropdown-panel,
+.fi-dropdown,
+.fi-fo-select-panel {
+    z-index: 80 !important;
+}
+
+.fi-ta-actions,
+.fi-ac,
+.fi-dropdown-trigger {
+    overflow: visible !important;
+}

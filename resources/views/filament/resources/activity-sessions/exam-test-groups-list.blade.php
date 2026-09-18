@@ -28,7 +28,7 @@
         </div>
     @endif
 
-    <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+    <div class="rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
         <div class="flex justify-end border-b border-gray-100 px-4 py-3 dark:border-white/10 sm:px-5">
             <div class="grid w-full grid-cols-2 gap-2 sm:max-w-md">
                 <x-crm.select-input label="Batch" for="batch-filter" wire:model.live="batchFilter">
@@ -115,7 +115,7 @@
                 @endforeach
             </div>
 
-            <div class="hidden md:block">
+            <div class="hidden overflow-x-auto md:block">
                 <table class="w-full min-w-[40rem] text-left text-sm">
                     <thead class="bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
                         <tr>
