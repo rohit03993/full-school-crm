@@ -45,6 +45,9 @@ class AdminDashboardTest extends TestCase
 
         Livewire::test(Dashboard::class)
             ->assertSuccessful()
+            ->assertDontSee('Set the session and period once')
+            ->assertSee('crm-dash-filters__toggle', false)
+            ->assertSee('This month')
             ->assertSchemaStateSet([
                 'academic_session_id' => $session->id,
                 'range' => DashboardFilters::RANGE_MONTH,
@@ -305,6 +308,11 @@ class AdminDashboardTest extends TestCase
             ->assertSuccessful()
             ->assertDontSee('Your calling workspace')
             ->assertDontSee('All Leads');
+
+        Livewire::test(Dashboard::class)
+            ->assertSuccessful()
+            ->assertSee('crm-dash-filters', false)
+            ->assertSee('Today');
     }
 
     public function test_hero_quick_actions_are_all_openable_by_the_viewer(): void

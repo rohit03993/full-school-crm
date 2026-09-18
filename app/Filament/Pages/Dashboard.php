@@ -18,7 +18,6 @@ use App\Filament\Widgets\PendingAdmissionsWidget;
 use App\Filament\Widgets\RecentEnquiriesWidget;
 use App\Models\AcademicSession;
 use App\Models\Batch;
-use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\DashboardFilters;
 use App\Support\InstituteProfile;
@@ -31,6 +30,7 @@ use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -56,7 +56,7 @@ class Dashboard extends BaseDashboard
 
     public function getSubheading(): string|Htmlable|null
     {
-        return CrmHint::text('dashboard');
+        return null;
     }
 
     /**
@@ -78,7 +78,11 @@ class Dashboard extends BaseDashboard
     {
         return $schema->components([
             Section::make()
-                ->extraAttributes(['class' => 'crm-dash-filters'])
+                ->extraAttributes([
+                    'class' => 'crm-dash-filters',
+                    'x-data' => '{ expanded: false }',
+                    'x-bind:class' => '{ \'is-expanded\': expanded }',
+                ])
                 ->columnSpanFull()
                 ->columns(1)
                 ->schema([
@@ -96,7 +100,14 @@ class Dashboard extends BaseDashboard
                         ->inline()
                         ->grouped()
                         ->live(),
+                    View::make('filament.pages.partials.dashboard-filter-summary')
+                        ->extraAttributes(['class' => 'crm-dash-filters__toggle-wrap'])
+                        ->viewData(fn (): array => [
+                            'summary' => $this->dashboardFilterSummary(),
+                            'isCustom' => (($this->filters ?? [])['range'] ?? DashboardFilters::RANGE_MONTH) === DashboardFilters::RANGE_CUSTOM,
+                        ]),
                     Grid::make(['default' => 1, 'sm' => 2, 'lg' => 4])
+                        ->extraAttributes(['class' => 'crm-dash-filters__more'])
                         ->schema([
                             Select::make('academic_session_id')
                                 ->label('Session')
@@ -156,8 +167,28 @@ class Dashboard extends BaseDashboard
                 ->icon(Heroicon::OutlinedMagnifyingGlass)
                 ->url(StudentSearchPage::getUrl())
                 ->color('primary')
+                ->extraAttributes(['class' => 'crm-dash-search'])
                 ->visible(fn (): bool => StudentSearchPage::canAccess()),
         ];
+    }
+
+    public function dashboardFilterSummary(): string
+    {
+        $filters = DashboardFilters::fromArray($this->filters ?? []);
+        $parts = [$filters->rangeName()];
+
+        if ($filters->sessionId) {
+            $session = AcademicSession::query()->find($filters->sessionId);
+            if ($session) {
+                $parts[] = $session->code ?: $session->name;
+            }
+        }
+
+        if ($filters->courseId || $filters->batchId) {
+            $parts[] = 'Filtered';
+        }
+
+        return implode(' · ', $parts);
     }
 
     /**
