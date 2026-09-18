@@ -39,7 +39,7 @@
 
         @if (($marksAreLocked ?? false) && in_array($status['status'] ?? 'none', ['published', 'issued'], true))
             <div class="flex flex-wrap items-center justify-between gap-2 border-t border-sky-100 bg-sky-50/70 px-4 py-2 text-xs text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200 sm:px-5">
-                <p>Marks locked — teachers cannot edit until unlocked.</p>
+                <p>Marks locked — unlock before editing this grid.</p>
                 @if ($canManagePublish ?? false)
                     <div class="flex flex-wrap gap-2">
                         <button type="button" wire:click="unlockMarks" wire:confirm="Unlock marks so teachers can edit? Re-publish after corrections." class="rounded-md bg-sky-600 px-2.5 py-1 font-semibold text-white hover:bg-sky-500">
@@ -116,14 +116,42 @@
         @endif
     </div>
 
-    <div class="mb-3 text-xs text-gray-500 dark:text-gray-400">
-        {{ $markSheet['batch'] ?? '—' }} · {{ $markSheet['date']?->format('d M Y') ?? '—' }}
-        @if ($marksAreLocked ?? false)
-            · Marks locked
-        @else
-            · Read-only grid — Update Excel for many students, or Edit marks on a student profile for one
-        @endif
+    @php
+        $editing = ($editingMarks ?? false) && ($canBulkEditMarks ?? false);
+        $formatMax = function ($max): string {
+            if ($max === null) {
+                return '';
+            }
+
+            return rtrim(rtrim(number_format((float) $max, 2), '0'), '.');
+        };
+    @endphp
+
+    <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+        <p>
+            {{ $markSheet['batch'] ?? '—' }} · {{ $markSheet['date']?->format('d M Y') ?? '—' }}
+            @if ($marksAreLocked ?? false)
+                · Marks locked
+            @elseif ($editing)
+                · Empty cell = Absent
+            @elseif ($canBulkEditMarks ?? false)
+                · Edit marks to change scores on this grid
+            @endif
+        </p>
     </div>
+
+    @if ($editing)
+        <div class="sticky bottom-3 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-primary-200 bg-white p-3 shadow-lg dark:border-primary-500/30 dark:bg-gray-900">
+            <button type="button" wire:click="saveBulkMarks" wire:loading.attr="disabled" wire:target="saveBulkMarks" class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70">
+                <span wire:loading.remove wire:target="saveBulkMarks">Save marks</span>
+                <span wire:loading wire:target="saveBulkMarks">Saving…</span>
+            </button>
+            <button type="button" wire:click="cancelBulkEdit" wire:loading.attr="disabled" wire:target="saveBulkMarks" class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300">
+                Cancel
+            </button>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Empty = Absent. Negative marks allowed down to −max.</p>
+        </div>
+    @endif
 
     <div class="mb-4 space-y-2 lg:hidden">
         <p class="text-xs text-gray-500 dark:text-gray-400">One card per student — subject scores below the name.</p>
@@ -144,9 +172,26 @@
                 </div>
                 <dl class="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3 dark:border-white/10">
                     @foreach ($markSheet['subjects'] as $subject)
+                        @php
+                            $cell = $row['cells'][$subject] ?? null;
+                            $display = $row['scores'][$subject] ?? 'Absent';
+                        @endphp
                         <div class="rounded-lg bg-gray-50 px-2.5 py-2 dark:bg-white/5">
                             <dt class="truncate text-[10px] font-semibold uppercase text-gray-500">{{ $subject }}</dt>
-                            <dd class="mt-0.5 text-sm font-semibold {{ ($row['scores'][$subject] ?? '') === 'Absent' ? 'text-gray-400' : 'text-gray-800 dark:text-gray-200' }}">{{ $row['scores'][$subject] ?? 'Absent' }}</dd>
+                            <dd class="mt-0.5 text-sm font-semibold {{ $display === 'Absent' ? 'text-gray-400' : 'text-gray-800 dark:text-gray-200' }}">
+                                @if ($editing)
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        @if (($cell['max'] ?? null) !== null) min="{{ \App\Support\StudentExamMarksMatrix::obtainedFloor((float) $cell['max']) }}" max="{{ $cell['max'] }}" @endif
+                                        wire:model="marksDraft.{{ $row['student_id'] }}.{{ $subject }}"
+                                        class="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm font-semibold dark:border-white/10 dark:bg-gray-950"
+                                        placeholder="{{ ($cell['max'] ?? null) !== null ? '/ '.$formatMax($cell['max']) : 'Marks' }}"
+                                    >
+                                @else
+                                    {{ $display }}
+                                @endif
+                            </dd>
                         </div>
                     @endforeach
                 </dl>
@@ -191,12 +236,27 @@
                         </td>
                         <td class="px-4 py-2.5 font-medium text-gray-950 dark:text-white">{{ $row['student_name'] }}</td>
                         @foreach ($markSheet['subjects'] as $subject)
+                            @php
+                                $cell = $row['cells'][$subject] ?? null;
+                                $display = $row['scores'][$subject] ?? 'Absent';
+                            @endphp
                             <td @class([
-                                'px-4 py-2.5 text-center',
-                                'text-gray-400' => ($row['scores'][$subject] ?? '') === 'Absent',
-                                'text-gray-800 dark:text-gray-200' => ($row['scores'][$subject] ?? '') !== 'Absent',
+                                'px-2 py-1.5 text-center',
+                                'text-gray-400' => ! $editing && $display === 'Absent',
+                                'text-gray-800 dark:text-gray-200' => $editing || $display !== 'Absent',
                             ])>
-                                {{ $row['scores'][$subject] ?? 'Absent' }}
+                                @if ($editing)
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        @if (($cell['max'] ?? null) !== null) min="{{ \App\Support\StudentExamMarksMatrix::obtainedFloor((float) $cell['max']) }}" max="{{ $cell['max'] }}" @endif
+                                        wire:model="marksDraft.{{ $row['student_id'] }}.{{ $subject }}"
+                                        class="mx-auto w-[4.5rem] rounded-md border border-gray-200 bg-white px-1.5 py-1 text-center text-sm dark:border-white/10 dark:bg-gray-950"
+                                        placeholder="{{ ($cell['max'] ?? null) !== null ? '/ '.$formatMax($cell['max']) : '' }}"
+                                    >
+                                @else
+                                    {{ $display }}
+                                @endif
                             </td>
                         @endforeach
                         @if (in_array($status['status'] ?? 'none', ['published', 'issued'], true))

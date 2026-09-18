@@ -174,6 +174,56 @@ class ExamTestGroupServiceTest extends TestCase
         ]);
     }
 
+    public function test_class_grid_writer_updates_many_students_on_the_same_exam(): void
+    {
+        [$staff, $batch, $type] = $this->examContext();
+        $physics = $this->createTestSession($type, $batch, $staff, 'grid-test', 'Grid Test', 'Physics', 100);
+        $maths = $this->createTestSession($type, $batch, $staff, 'grid-test', 'Grid Test', 'Maths', 100);
+        $keep = $this->createBatchStudent($batch, $staff, '9876500081', 'Keep Student');
+        $change = $this->createBatchStudent($batch, $staff, '9876500082', 'Change Student');
+
+        foreach ([$keep, $change] as $student) {
+            app(ActivityAttendanceService::class)->saveMarks(
+                $physics,
+                [$student->id => true],
+                $staff,
+                [$student->id => ['marks_obtained' => 40]],
+            );
+        }
+
+        $saved = app(\App\Services\StudentExamMarksWriter::class)->saveForGroup(
+            'grid-test',
+            [
+                $keep->id => ['Physics' => 40, 'Maths' => ''],
+                $change->id => ['Physics' => 91, 'Maths' => 88],
+            ],
+            $staff,
+        );
+
+        $this->assertGreaterThan(0, $saved);
+        $this->assertDatabaseHas('activity_attendances', [
+            'attendable_id' => $physics->id,
+            'student_id' => $keep->id,
+            'marks_obtained' => 40,
+        ]);
+        $this->assertDatabaseHas('activity_attendances', [
+            'attendable_id' => $physics->id,
+            'student_id' => $change->id,
+            'marks_obtained' => 91,
+        ]);
+        $this->assertDatabaseHas('activity_attendances', [
+            'attendable_id' => $maths->id,
+            'student_id' => $change->id,
+            'marks_obtained' => 88,
+        ]);
+        $this->assertDatabaseHas('activity_attendances', [
+            'attendable_id' => $maths->id,
+            'student_id' => $keep->id,
+            'is_present' => 0,
+            'marks_obtained' => null,
+        ]);
+    }
+
     public function test_student_profile_keeps_maths_marks_when_a_twin_empty_sheet_exists(): void
     {
         [$staff, $batch, $type] = $this->examContext();

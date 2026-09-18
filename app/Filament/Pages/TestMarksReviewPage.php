@@ -13,6 +13,7 @@ use App\Services\ActivityMarksWhatsAppService;
 use App\Services\ExamTestGroupService;
 use App\Services\ExamWindowService;
 use App\Services\ResultDeclarationService;
+use App\Services\StudentExamMarksWriter;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\ExamTestGroupMatrix;
@@ -59,6 +60,13 @@ class TestMarksReviewPage extends Page
 
     public ?string $principalRemarks = null;
 
+    public bool $editingMarks = false;
+
+    /**
+     * @var array<int|string, array<string, string>>
+     */
+    public array $marksDraft = [];
+
     public function mount(): void
     {
         $this->declarationDate = now()->toDateString();
@@ -82,6 +90,12 @@ class TestMarksReviewPage extends Page
 
     public function getSubheading(): ?string
     {
+        if ($this->userCanBulkEditMarks()) {
+            return $this->marksAreLocked()
+                ? 'Marks are locked. Unlock above before editing this grid.'
+                : 'Edit marks on this grid. Empty cell = Absent. Update Excel is for a full class file.';
+        }
+
         return CrmHint::text('activity.marks.review');
     }
 
@@ -128,6 +142,16 @@ class TestMarksReviewPage extends Page
                 });
         }
 
+        if ($this->userCanBulkEditMarks() && is_array($this->markSheet) && ! $this->marksAreLocked() && ! $this->editingMarks) {
+            $actions[] = Action::make('editMarks')
+                ->label('Edit marks')
+                ->icon(Heroicon::OutlinedPencilSquare)
+                ->color('primary')
+                ->action(function (): void {
+                    $this->startBulkEdit();
+                });
+        }
+
         if (is_array($this->markSheet) && ! $this->marksAreLocked()) {
             $actions[] = Action::make('uploadMarks')
                 ->label('Update Excel')
@@ -146,6 +170,102 @@ class TestMarksReviewPage extends Page
             ->url(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::getUrl('index'));
 
         return $actions;
+    }
+
+    public function userCanBulkEditMarks(): bool
+    {
+        return CrmAccess::can(Auth::user(), CrmPermission::AcademicsManage);
+    }
+
+    public function startBulkEdit(): void
+    {
+        abort_unless($this->userCanBulkEditMarks(), 403);
+
+        if (! is_array($this->markSheet) || blank($this->groupKey)) {
+            Notification::make()->title('Exam not found')->warning()->send();
+
+            return;
+        }
+
+        if ($this->marksAreLocked()) {
+            Notification::make()
+                ->title('Marks are locked')
+                ->body('Unlock this exam before editing the grid.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $draft = [];
+
+        foreach ($this->markSheet['rows'] as $row) {
+            $studentId = (int) ($row['student_id'] ?? 0);
+
+            if ($studentId < 1) {
+                continue;
+            }
+
+            foreach ($this->markSheet['subjects'] as $subject) {
+                $marks = $row['cells'][$subject]['marks'] ?? null;
+                $draft[$studentId][$subject] = $marks === null ? '' : (string) $marks;
+            }
+        }
+
+        $this->marksDraft = $draft;
+        $this->editingMarks = true;
+    }
+
+    public function cancelBulkEdit(): void
+    {
+        $this->editingMarks = false;
+        $this->marksDraft = [];
+    }
+
+    public function saveBulkMarks(StudentExamMarksWriter $writer): void
+    {
+        abort_unless($this->userCanBulkEditMarks(), 403);
+
+        if (! $this->editingMarks || blank($this->groupKey)) {
+            Notification::make()->title('Nothing to save')->warning()->send();
+
+            return;
+        }
+
+        if ($this->marksAreLocked()) {
+            Notification::make()
+                ->title('Marks are locked')
+                ->body('Unlock this exam before editing the grid.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $saved = $writer->saveForGroup(
+                (string) $this->groupKey,
+                $this->marksDraft,
+                Auth::user(),
+            );
+        } catch (ValidationException $exception) {
+            Notification::make()
+                ->title('Could not save marks')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Check the scores and try again.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->markSheet = ExamTestGroupMatrix::markSheetForGroup((string) $this->groupKey);
+        $this->cancelBulkEdit();
+
+        Notification::make()
+            ->title($saved > 0 ? 'Marks saved' : 'No scores changed')
+            ->body('This class grid was updated. Teachers still enter their own papers from Subject progress.')
+            ->success()
+            ->send();
     }
 
     public function publishResults(ResultDeclarationService $declarations): void
@@ -526,6 +646,8 @@ class TestMarksReviewPage extends Page
                         && CrmAccess::can(Auth::user(), CrmPermission::MarksPublish),
                     'canManagePublish' => CrmAccess::can(Auth::user(), CrmPermission::MarksPublish),
                     'marksAreLocked' => $this->marksAreLocked(),
+                    'canBulkEditMarks' => $this->userCanBulkEditMarks(),
+                    'editingMarks' => $this->editingMarks,
                     'auditTrailEntries' => $this->auditTrailEntries(),
                     'studentMarksheets' => $this->studentMarksheetsByStudentId(),
                 ]),

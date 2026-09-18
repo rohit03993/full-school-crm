@@ -154,7 +154,14 @@ class ExamTestGroupMatrix
      *     batch: ?string,
      *     date: ?\Illuminate\Support\Carbon,
      *     subjects: list<string>,
-     *     rows: list<array{student_id: int, roll_number: string, student_name: string, scores: array<string, string>}>
+     *     subject_max: array<string, float|null>,
+     *     rows: list<array{
+     *         student_id: int,
+     *         roll_number: string,
+     *         student_name: string,
+     *         scores: array<string, string>,
+     *         cells: array<string, array{marks: ?float, max: ?float, display: string}>
+     *     }>
      * }|null
      */
     public static function markSheetForGroup(string $groupKey): ?array
@@ -185,7 +192,9 @@ class ExamTestGroupMatrix
 
         $first = $sessions->first();
         $subjects = [];
-        /** @var array<int, array{student_id: int, roll_number: string, student_name: string, scores: array<string, string>}> $studentRows */
+        /** @var array<string, float|null> $subjectMax */
+        $subjectMax = [];
+        /** @var array<int, array{student_id: int, roll_number: string, student_name: string, scores: array<string, string>, cells: array<string, array{marks: ?float, max: ?float, display: string}>}> $studentRows */
         $studentRows = [];
 
         if ($first->batch_id) {
@@ -207,6 +216,7 @@ class ExamTestGroupMatrix
                     'roll_number' => (string) ($student->activeEnrollment?->enrollment_number ?? "\u{2014}"),
                     'student_name' => (string) $student->name,
                     'scores' => [],
+                    'cells' => [],
                 ];
             }
         }
@@ -214,6 +224,13 @@ class ExamTestGroupMatrix
         foreach ($sessions as $session) {
             $subject = StudentExamMarksMatrix::subjectForSession($session);
             $subjects[$subject] = true;
+            $sessionMax = filled($session->metadataValue('max_marks'))
+                ? (float) $session->metadataValue('max_marks')
+                : null;
+
+            if (! array_key_exists($subject, $subjectMax) || ($subjectMax[$subject] === null && $sessionMax !== null)) {
+                $subjectMax[$subject] = $sessionMax;
+            }
 
             foreach ($session->activityAttendances as $attendance) {
                 $student = $attendance->student;
@@ -230,23 +247,26 @@ class ExamTestGroupMatrix
                         'roll_number' => (string) ($student->activeEnrollment?->enrollment_number ?? "\u{2014}"),
                         'student_name' => (string) $student->name,
                         'scores' => [],
+                        'cells' => [],
                     ];
                 }
 
-                $maxMarks = filled($session->metadataValue('max_marks'))
-                    ? (float) $session->metadataValue('max_marks')
-                    : null;
-
+                $maxMarks = $sessionMax;
+                $marks = $attendance->marks_obtained !== null ? (float) $attendance->marks_obtained : null;
                 $display = StudentExamMarksMatrix::formatMarks(
-                    $attendance->marks_obtained !== null ? (float) $attendance->marks_obtained : null,
+                    $marks,
                     $maxMarks,
                     $attendance->grade,
                     'Absent',
                 );
+                $existingCell = $studentRows[$studentId]['cells'][$subject] ?? null;
 
-                $existing = $studentRows[$studentId]['scores'][$subject] ?? null;
-
-                if ($existing === null || $existing === 'Absent' || $attendance->marks_obtained !== null) {
+                if ($existingCell === null || (($existingCell['marks'] ?? null) === null && $marks !== null)) {
+                    $studentRows[$studentId]['cells'][$subject] = [
+                        'marks' => $marks,
+                        'max' => $maxMarks,
+                        'display' => $display,
+                    ];
                     $studentRows[$studentId]['scores'][$subject] = $display;
                 }
             }
@@ -258,9 +278,14 @@ class ExamTestGroupMatrix
         $rows = collect($studentRows)
             ->sortBy('roll_number')
             ->values()
-            ->map(function (array $row) use ($subjectList): array {
+            ->map(function (array $row) use ($subjectList, $subjectMax): array {
                 foreach ($subjectList as $subject) {
-                    $row['scores'][$subject] = $row['scores'][$subject] ?? 'Absent';
+                    $row['cells'][$subject] ??= [
+                        'marks' => null,
+                        'max' => $subjectMax[$subject] ?? null,
+                        'display' => 'Absent',
+                    ];
+                    $row['scores'][$subject] = $row['cells'][$subject]['display'];
                 }
 
                 return $row;
@@ -274,6 +299,7 @@ class ExamTestGroupMatrix
             'activity_type_id' => $first->activity_type_id,
             'date' => $first->session_date,
             'subjects' => $subjectList,
+            'subject_max' => $subjectMax,
             'rows' => $rows,
         ];
     }
