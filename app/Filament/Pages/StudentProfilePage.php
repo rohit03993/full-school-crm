@@ -502,6 +502,11 @@ class StudentProfilePage extends Page
         return '';
     }
 
+    public function getHeader(): ?\Illuminate\Contracts\View\View
+    {
+        return view('filament.pages.partials.student-profile-no-page-header');
+    }
+
     public function getSubheading(): ?string
     {
         if ($this->record->activeEnrollment !== null) {

@@ -39,6 +39,7 @@ class StudentProfileHeaderDeskTest extends TestCase
 
         $this->assertSame('', $page->instance()->getHeading());
         $this->assertSame($student->name, $page->instance()->getTitle());
+        $this->assertNotNull($page->instance()->getHeader());
 
         $page
             ->assertSee('More')
