@@ -17,12 +17,12 @@ use App\Services\ExamWindowService;
 use App\Services\ResultDeclarationService;
 use App\Services\StudentExamMarksWriter;
 use App\Support\CrmHint;
-use App\Support\CrmMenuLabels;
 use App\Support\ExamTestGroupMatrix;
 use App\Support\PublishedResultsGate;
 use App\Support\ResultAuditTrail;
 use App\Support\WhatsAppSendUi;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -113,8 +113,8 @@ class TestMarksReviewPage extends Page
     {
         if ($this->userCanBulkEditMarks()) {
             return $this->marksAreLocked()
-                ? 'Marks are locked. Unlock above before editing this grid.'
-                : 'Edit marks on this grid. Empty cell = Absent. Update Excel is for a full class file.';
+                ? 'Marks are locked. Unlock in Results before editing.'
+                : null;
         }
 
         return CrmHint::text('activity.marks.review');
@@ -122,13 +122,12 @@ class TestMarksReviewPage extends Page
 
     protected function getHeaderActions(): array
     {
-        $actions = [];
+        $more = [];
 
         if (filled($this->groupKey) && is_array($this->markSheet)) {
-            $actions[] = Action::make('renameExam')
+            $more[] = Action::make('renameExam')
                 ->label('Rename')
                 ->icon(Heroicon::OutlinedPencilSquare)
-                ->color('gray')
                 ->form([
                     TextInput::make('name')
                         ->label('Exam name')
@@ -165,18 +164,8 @@ class TestMarksReviewPage extends Page
                 });
         }
 
-        if ($this->userCanBulkEditMarks() && is_array($this->markSheet) && ! $this->marksAreLocked() && ! $this->editingMarks) {
-            $actions[] = Action::make('editMarks')
-                ->label('Edit marks')
-                ->icon(Heroicon::OutlinedPencilSquare)
-                ->color('primary')
-                ->action(function () {
-                    $this->startBulkEdit();
-                });
-        }
-
         if (is_array($this->markSheet) && ! $this->marksAreLocked()) {
-            $actions[] = Action::make('uploadMarks')
+            $more[] = Action::make('uploadMarks')
                 ->label('Update Excel')
                 ->icon(Heroicon::OutlinedArrowUpTray)
                 ->url(function (): string {
@@ -192,9 +181,26 @@ class TestMarksReviewPage extends Page
                 });
         }
 
-        $actions[] = Action::make('back')
-            ->label('Back to '.CrmMenuLabels::examResults())
-            ->url(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::getUrl('index'));
+        $actions = [];
+
+        if ($more !== []) {
+            $actions[] = ActionGroup::make($more)
+                ->label('More')
+                ->icon(Heroicon::OutlinedEllipsisVertical)
+                ->button()
+                ->outlined()
+                ->color('gray');
+        }
+
+        if ($this->userCanBulkEditMarks() && is_array($this->markSheet) && ! $this->marksAreLocked() && ! $this->editingMarks) {
+            $actions[] = Action::make('editMarks')
+                ->label('Edit marks')
+                ->icon(Heroicon::OutlinedPencilSquare)
+                ->color('primary')
+                ->action(function () {
+                    $this->startBulkEdit();
+                });
+        }
 
         return $actions;
     }

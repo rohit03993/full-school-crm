@@ -15,22 +15,28 @@
     @endphp
 
     <div class="mb-4 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+        <div class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <h3 class="text-sm font-bold text-gray-950 dark:text-white">Results</h3>
                 <span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $statusBadge }}">{{ $status['label'] }}</span>
             </div>
             @if (($canPublish ?? false) && ! in_array($status['status'] ?? 'none', ['published', 'issued'], true))
-                <div class="flex flex-wrap items-center gap-2">
-                    <input id="declaration-date" type="date" wire:model="declarationDate" class="fi-input rounded-lg border-gray-300 py-1.5 text-sm dark:border-white/10 dark:bg-white/5" />
-                    <button type="button" wire:click="publishResults" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500">
+                <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                    <div class="flex min-w-0 items-center gap-2">
+                        <label for="declaration-date" class="shrink-0 text-[11px] font-medium text-gray-500 dark:text-gray-400">Publish date</label>
+                        <input id="declaration-date" type="date" wire:model="declarationDate" class="fi-input min-w-0 flex-1 rounded-lg border-gray-300 py-1.5 text-sm sm:w-[11rem] sm:flex-none dark:border-white/10 dark:bg-white/5" />
+                    </div>
+                    <button type="button" wire:click="publishResults" class="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-500 sm:min-h-0 sm:w-auto sm:py-1.5 sm:text-xs">
                         Publish
                     </button>
                 </div>
             @elseif (($canIssueMarksheet ?? false) && ($status['status'] ?? '') === 'published')
-                <div class="flex flex-wrap items-center gap-2">
-                    <input id="issue-date" type="date" wire:model="marksheetIssueDate" class="fi-input rounded-lg border-gray-300 py-1.5 text-sm dark:border-white/10 dark:bg-white/5" />
-                    <button type="button" wire:click="issueMarksheets" class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500">
+                <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                    <div class="flex min-w-0 items-center gap-2">
+                        <label for="issue-date" class="shrink-0 text-[11px] font-medium text-gray-500 dark:text-gray-400">Issue date</label>
+                        <input id="issue-date" type="date" wire:model="marksheetIssueDate" class="fi-input min-w-0 flex-1 rounded-lg border-gray-300 py-1.5 text-sm sm:w-[11rem] sm:flex-none dark:border-white/10 dark:bg-white/5" />
+                    </div>
+                    <button type="button" wire:click="issueMarksheets" class="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-500 sm:min-h-0 sm:w-auto sm:py-1.5 sm:text-xs">
                         Generate PDFs
                     </button>
                 </div>
@@ -123,77 +129,65 @@
         $examDateLabel = \App\Support\StudentExamMarksMatrix::formatDateLabel($markSheet['date'] ?? null);
     @endphp
 
-    <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+    <div class="mb-3 text-xs text-gray-500 dark:text-gray-400">
         <p>
-            {{ $markSheet['batch'] ?? '—' }} · {{ $examDateLabel }}
+            {{ $markSheet['batch'] ?? '—' }}
+            @if ($examDateLabel !== '—')
+                · {{ $examDateLabel }}
+            @endif
             @if ($marksAreLocked ?? false)
                 · Marks locked
             @elseif ($editing)
                 · Empty cell = Absent
-            @elseif ($canBulkEditMarks ?? false)
-                · Edit marks to change scores on this grid
             @endif
         </p>
     </div>
 
-    @if ($editing)
-        <div class="sticky bottom-3 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-primary-200 bg-white p-3 shadow-lg dark:border-primary-500/30 dark:bg-gray-900">
-            <button type="button" wire:click="saveBulkMarks" wire:loading.attr="disabled" wire:target="saveBulkMarks" class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70">
-                <span wire:loading.remove wire:target="saveBulkMarks">Save marks</span>
-                <span wire:loading wire:target="saveBulkMarks">Saving…</span>
-            </button>
-            <button type="button" wire:click="cancelBulkEdit" wire:loading.attr="disabled" wire:target="saveBulkMarks" class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300">
-                Cancel
-            </button>
-            <p class="text-xs text-gray-500 dark:text-gray-400">Empty = Absent. Negative marks allowed down to −max.</p>
-        </div>
-    @endif
-
-    <div class="mb-4 space-y-2 lg:hidden">
-        <p class="text-xs text-gray-500 dark:text-gray-400">One card per student — subject scores below the name.</p>
-                @foreach ($sheetRows as $row)
+    <div class="mb-4 space-y-3 lg:hidden">
+        @foreach ($sheetRows as $row)
             @continue(! is_array($row))
             <div class="rounded-xl bg-white p-3 ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-white/10">
-                <div class="flex items-start justify-between gap-2">
-                    <div>
-                        <p class="font-semibold text-gray-950 dark:text-white">{{ $row['student_name'] ?? '—' }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="truncate font-semibold text-gray-950 dark:text-white">{{ $row['student_name'] ?? '—' }}</p>
                         <p class="font-mono text-xs text-gray-500">{{ $row['roll_number'] ?? '—' }}</p>
                     </div>
                     @if (in_array($status['status'] ?? 'none', ['published', 'issued'], true))
                         @php
                             $sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null;
                         @endphp
-                        <div class="text-right">
+                        <div class="shrink-0 text-right">
                             <p class="text-[10px] font-semibold uppercase text-gray-500">Rank</p>
                             <p class="text-sm font-bold text-gray-800 dark:text-gray-200">{{ $sheet?->rank ?? '—' }}</p>
                         </div>
                     @endif
                 </div>
-                <dl class="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3 dark:border-white/10">
+                <div class="mt-2 divide-y divide-gray-100 dark:divide-white/10">
                     @foreach ($sheetSubjects as $subject)
                         @php
                             $cell = \App\Support\StudentExamMarksMatrix::sheetCell(is_array($row) ? $row : [], (string) $subject);
                             $display = $cell['display'];
                         @endphp
-                        <div class="rounded-lg bg-gray-50 px-2.5 py-2 dark:bg-white/5">
-                            <dt class="truncate text-[10px] font-semibold uppercase text-gray-500">{{ $subject }}</dt>
-                            <dd class="mt-0.5 text-sm font-semibold {{ $display === 'Absent' ? 'text-gray-400' : 'text-gray-800 dark:text-gray-200' }}">
+                        <div class="flex items-center justify-between gap-3 py-2">
+                            <p class="min-w-0 truncate text-xs font-medium text-gray-500">{{ $subject }}</p>
+                            <div class="shrink-0 text-right tabular-nums text-sm font-semibold {{ ! $editing && $display === 'Absent' ? 'text-gray-400' : 'text-gray-800 dark:text-gray-200' }}">
                                 @if ($editing)
                                     <input
                                         type="number"
                                         step="0.01"
+                                        inputmode="decimal"
                                         @if (($cell['max'] ?? null) !== null) min="{{ \App\Support\StudentExamMarksMatrix::obtainedFloor((float) $cell['max']) }}" max="{{ $cell['max'] }}" @endif
                                         wire:model="marksDraft.{{ $row['student_id'] }}.{{ $subject }}"
-                                        class="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm font-semibold dark:border-white/10 dark:bg-gray-950"
-                                        placeholder="{{ ($cell['max'] ?? null) !== null ? '/ '.\App\Support\StudentExamMarksMatrix::formatMaxLabel($cell['max']) : 'Marks' }}"
+                                        class="w-[5.5rem] rounded-md border border-gray-200 bg-white px-2 py-1.5 text-right text-sm font-semibold dark:border-white/10 dark:bg-gray-950"
+                                        placeholder="{{ ($cell['max'] ?? null) !== null ? \App\Support\StudentExamMarksMatrix::formatMaxLabel($cell['max']) : 'Marks' }}"
                                     >
                                 @else
                                     {{ $display }}
                                 @endif
-                            </dd>
+                            </div>
                         </div>
                     @endforeach
-                </dl>
+                </div>
                 @if (($canIssueMarksheet ?? false) && ($status['status'] ?? '') === 'issued')
                     @php
                         $sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null;
@@ -212,7 +206,7 @@
         @endforeach
     </div>
 
-    <div class="hidden overflow-x-auto rounded-xl ring-1 ring-gray-200 lg:block dark:ring-white/10">
+    <div class="hidden overflow-x-auto rounded-xl bg-white ring-1 ring-gray-200 lg:block dark:bg-gray-900 dark:ring-white/10">
         <table class="w-full min-w-[32rem] text-left text-sm">
             <thead class="bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
                 <tr>
@@ -232,8 +226,8 @@
             <tbody class="divide-y divide-gray-100 dark:divide-white/10">
                 @foreach ($sheetRows as $row)
                     @continue(! is_array($row))
-                    <tr class="bg-white dark:bg-gray-900">
-                        <td class="sticky left-0 z-10 bg-white px-4 py-2.5 font-mono text-gray-950 dark:bg-gray-900 dark:text-white">
+                    <tr class="group bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-white/5">
+                        <td class="sticky left-0 z-10 bg-white px-4 py-2.5 font-mono text-xs text-gray-600 group-hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:group-hover:bg-white/5">
                             {{ $row['roll_number'] ?? '—' }}
                         </td>
                         <td class="px-4 py-2.5 font-medium text-gray-950 dark:text-white">{{ $row['student_name'] ?? '—' }}</td>
@@ -242,7 +236,7 @@
                                 $cell = \App\Support\StudentExamMarksMatrix::sheetCell(is_array($row) ? $row : [], (string) $subject);
                                 $display = $cell['display'];
                             @endphp
-                            <td class="px-2 py-1.5 text-center {{ ! $editing && $display === 'Absent' ? 'text-gray-400' : 'text-gray-800 dark:text-gray-200' }}">
+                            <td class="px-2 py-1.5 text-center tabular-nums {{ ! $editing && $display === 'Absent' ? 'text-gray-400' : 'text-gray-800 dark:text-gray-200' }}">
                                 @if ($editing)
                                     <input
                                         type="number"
@@ -282,6 +276,19 @@
             </tbody>
         </table>
     </div>
+
+    @if ($editing)
+        <div class="sticky bottom-3 z-20 mt-3 flex flex-col gap-2 rounded-xl border border-primary-200 bg-white p-3 shadow-lg sm:flex-row sm:items-center dark:border-primary-500/30 dark:bg-gray-900">
+            <button type="button" wire:click="saveBulkMarks" wire:loading.attr="disabled" wire:target="saveBulkMarks" class="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70 sm:min-h-0 sm:w-auto sm:py-1.5 sm:text-xs">
+                <span wire:loading.remove wire:target="saveBulkMarks">Save marks</span>
+                <span wire:loading wire:target="saveBulkMarks">Saving…</span>
+            </button>
+            <button type="button" wire:click="cancelBulkEdit" wire:loading.attr="disabled" wire:target="saveBulkMarks" class="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:min-h-0 sm:w-auto sm:py-1.5 sm:text-xs dark:border-white/10 dark:text-gray-300">
+                Cancel
+            </button>
+            <p class="text-center text-xs text-gray-500 sm:text-left dark:text-gray-400">Empty = Absent. Negative marks allowed down to −max.</p>
+        </div>
+    @endif
 
     @if (! empty($auditTrailEntries))
         <div class="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">

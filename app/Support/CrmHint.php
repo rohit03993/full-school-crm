@@ -80,7 +80,7 @@ class CrmHint
         'activity.types.create' => 'Create an exam category. Enable “Records marks & scores” so it appears when uploading marks.',
         'activity.types.edit' => 'Rename the exam category or adjust custom fields if needed.',
         'activity.sessions.list' => 'View sheet to review the class grid. Use ⋯ to rename, update Excel, or open subject-by-subject typing.',
-        'activity.marks.review' => 'Update Excel for a full class file, or open a student profile to change one. Unlock published results first.',
+        'activity.marks.review' => 'Update Excel for a class file, or change one student from their profile. Unlock published results first.',
         'activity.sessions.create' => 'Rare: add one subject by hand. Prefer Exams → Teachers enter marks, or Upload Excel.',
         'activity.attendance' => 'Mark Present or Absent, then enter marks for each student who appeared.',
         'activity.marks.import' => 'New exam: pick a name and date, then upload. Existing exam: only students in the file are overwritten.',
