@@ -38,6 +38,7 @@ class StudentCounterServiceTest extends TestCase
         $labels = collect($profile['items'])->pluck('label')->all();
 
         $this->assertSame(['Visits', 'Calls', 'Enquiries'], $labels);
+        $this->assertSame('visits', $profile['items'][0]['tab'] ?? null);
         $this->assertNotContains('Website', $labels);
         $this->assertNotContains('Walk-in', $labels);
         $this->assertNotContains('Attendance', $labels);

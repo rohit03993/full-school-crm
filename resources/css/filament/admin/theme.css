@@ -1313,7 +1313,7 @@
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions-ctn > .fi-ac,
     .fi-page:has(.fi-student-profile-page) .fi-header-actions-ctn > .fi-ac {
-        @apply grid w-full grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end lg:gap-1.5;
+        @apply flex w-full flex-nowrap items-stretch gap-2 lg:flex-wrap lg:justify-end lg:gap-1.5;
     }
 
     @media (min-width: 1024px) {
@@ -1325,7 +1325,17 @@
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn,
     .fi-page:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn {
-        @apply min-h-10 w-full flex-none justify-center rounded-xl px-2 text-[11px] font-semibold shadow-none sm:min-h-9 sm:w-auto sm:shrink-0 sm:px-3 sm:text-sm;
+        @apply min-h-11 flex-1 justify-center rounded-xl px-3 text-xs font-semibold shadow-none sm:min-h-9 sm:flex-none sm:px-3 sm:text-sm;
+    }
+
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-dropdown,
+    .fi-page:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-dropdown {
+        @apply shrink-0;
+    }
+
+    .fi-page:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-dropdown .fi-btn,
+    .fi-page:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-dropdown .fi-btn {
+        @apply min-w-11 flex-none px-3;
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-color-gray.fi-outlined,
@@ -2747,17 +2757,17 @@
         display: block !important;
         width: 100% !important;
         flex: none !important;
-        padding: 0.35rem 0.5rem 0.65rem !important;
+        overflow: visible !important;
+        padding: 0.35rem 0.75rem 0.65rem !important;
     }
 
     /*
-     * Equal 2-col action tiles. Filament v5 uses .fi-header-actions-ctn + .fi-outlined
-     * (not .fi-header-actions / .fi-btn-outlined) — that mismatch is why earlier CSS never stuck.
+     * Compact toolbar: primary actions + More. Avoid the old 2-col tile dump.
      */
     body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn > .fi-ac,
     body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn > .fi-ac {
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
         gap: 0.5rem !important;
         width: 100% !important;
         flex: none !important;
@@ -2768,74 +2778,70 @@
         border: 0 !important;
         background: transparent !important;
         box-shadow: none !important;
+        overflow: visible !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-student-profile-action-back,
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-student-profile-action-back {
-        display: none !important;
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-dropdown,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-dropdown {
+        flex: 0 0 auto !important;
+        position: relative !important;
     }
 
     body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-ac-btn-action,
     body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-ac-btn-action {
         display: inline-flex !important;
-        flex-direction: column !important;
+        flex-direction: row !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 0.3rem !important;
-        width: 100% !important;
+        gap: 0.35rem !important;
+        width: auto !important;
         min-width: 0 !important;
         max-width: none !important;
-        flex: none !important;
-        min-height: 3.6rem !important;
+        flex: 1 1 0 !important;
+        min-height: 2.75rem !important;
         height: auto !important;
         margin: 0 !important;
-        border-radius: 0.9rem !important;
-        padding: 0.65rem 0.45rem !important;
-        font-size: 0.6875rem !important;
+        border-radius: 9999px !important;
+        padding: 0.55rem 0.85rem !important;
+        font-size: 0.8125rem !important;
         line-height: 1.15 !important;
         font-weight: 650 !important;
-        letter-spacing: 0.01em !important;
+        letter-spacing: 0 !important;
         text-align: center !important;
-        white-space: normal !important;
+        white-space: nowrap !important;
         overflow: hidden !important;
         box-shadow: none !important;
         background-image: none !important;
     }
 
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-dropdown .fi-btn.fi-ac-btn-action,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-dropdown .fi-btn.fi-ac-btn-action {
+        flex: 0 0 auto !important;
+        min-width: 2.75rem !important;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+
     body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-ac-btn-action .fi-icon,
     body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-ac-btn-action .fi-icon {
-        width: 1.2rem !important;
-        height: 1.2rem !important;
+        width: 1.1rem !important;
+        height: 1.1rem !important;
         margin: 0 !important;
         flex-shrink: 0 !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-color-primary:not(.fi-outlined),
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-color-primary:not(.fi-outlined) {
-        background-color: rgb(255 251 235) !important;
-        border: 1px solid rgb(253 230 138) !important;
-        color: rgb(146 64 14) !important;
-    }
-
     body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-color-success:not(.fi-outlined),
     body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-color-success:not(.fi-outlined) {
-        background-color: rgb(236 253 245) !important;
-        border: 1px solid rgb(167 243 208) !important;
-        color: rgb(6 95 70) !important;
+        background-color: rgb(5 150 105) !important;
+        border: 0 !important;
+        color: #fff !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-color-warning:not(.fi-outlined),
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-color-warning:not(.fi-outlined) {
-        background-color: rgb(255 247 237) !important;
-        border: 1px solid rgb(254 215 170) !important;
-        color: rgb(154 52 18) !important;
-    }
-
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-color-danger:not(.fi-outlined),
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-color-danger:not(.fi-outlined) {
-        background-color: rgb(254 242 242) !important;
-        border: 1px solid rgb(254 202 202) !important;
-        color: rgb(153 27 27) !important;
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-color-primary:not(.fi-outlined),
+    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn .fi-btn.fi-color-primary:not(.fi-outlined) {
+        background-color: rgb(245 158 11) !important;
+        border: 0 !important;
+        color: #fff !important;
     }
 
     body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn .fi-btn.fi-outlined,

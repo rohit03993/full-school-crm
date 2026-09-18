@@ -94,6 +94,7 @@ use App\Support\FeePlanSubmissionGuard;
 use App\Support\CrmHint;
 use App\Support\InstituteProfile;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -2641,14 +2642,44 @@ class StudentProfilePage extends Page
 
     protected function getHeaderActions(): array
     {
-        return [
-            Action::make('backToSearch')
-                ->label('Back to Search')
-                ->url(StudentSearchPage::getUrl())
-                ->color('gray')
+        $isEnrolled = $this->record->activeEnrollment !== null;
+        $primaryNames = $isEnrolled
+            ? ['addPayment', 'editStudent']
+            : ['addVisit', 'convertToAdmission', 'addPayment', 'editStudent'];
+
+        $primary = [];
+        $more = [];
+
+        foreach ($this->studentProfileHeaderActionDefinitions() as $action) {
+            if (in_array($action->getName(), $primaryNames, true)) {
+                $primary[] = $action;
+
+                continue;
+            }
+
+            $more[] = $action;
+        }
+
+        if ($more !== []) {
+            $primary[] = ActionGroup::make($more)
+                ->label('More')
+                ->icon('heroicon-o-ellipsis-horizontal')
                 ->button()
                 ->outlined()
-                ->extraAttributes(['class' => 'fi-student-profile-action-back']),
+                ->color('gray')
+                ->dropdownPlacement('bottom-end')
+                ->extraAttributes(['class' => 'fi-student-profile-more']);
+        }
+
+        return $primary;
+    }
+
+    /**
+     * @return list<Action>
+     */
+    protected function studentProfileHeaderActionDefinitions(): array
+    {
+        return [
             Action::make('sendFeeReminder')
                 ->label('Send fee reminder')
                 ->icon('heroicon-o-chat-bubble-left-ellipsis')
@@ -3223,7 +3254,7 @@ class StudentProfilePage extends Page
                     && $this->userCan(CrmPermission::FeesAdjustStructure)
                     && $this->record->activeEnrollment?->feeStructure !== null),
             Action::make('editStudent')
-                ->label('Edit Details')
+                ->label('Edit')
                 ->icon('heroicon-o-pencil-square')
                 ->button()
                 ->color('gray')

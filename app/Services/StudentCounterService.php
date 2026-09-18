@@ -28,7 +28,7 @@ class StudentCounterService
     /**
      * @return array{
      *     phase: ProfilePhase,
-     *     items: array<int, array{label: string, value: int|float|string|null}>,
+     *     items: array<int, array{label: string, value: int|float|string|null, tab?: string, alert?: bool}>,
      *     recent_activity: Collection<int, array{
      *         type: string,
      *         label: string,
@@ -280,14 +280,13 @@ class StudentCounterService
     }
 
     /**
-     * @param  array{website_count: int, walk_in_count: int, meeting_for_counts: array<string, int>}  $leadSources
-     * @return array<int, array{label: string, value: int|float|string|null}>
+     * @return array<int, array{label: string, value: int|float|string|null, tab?: string, alert?: bool}>
      */
     protected function leadCounters(Student $student, array $leadSources): array
     {
         return [
-            ['label' => 'Visits', 'value' => $this->inPersonVisitCount($student)],
-            ['label' => 'Calls', 'value' => $this->telecallingCallCount($student)],
+            ['label' => 'Visits', 'value' => $this->inPersonVisitCount($student), 'tab' => 'visits'],
+            ['label' => 'Calls', 'value' => $this->telecallingCallCount($student), 'tab' => 'calls'],
             ['label' => 'Enquiries', 'value' => $student->enquiries()->count()],
         ];
     }
@@ -301,28 +300,18 @@ class StudentCounterService
         $admission = $this->latestAdmission($student);
 
         return [
-            ['label' => 'Visits', 'value' => $this->inPersonVisitCount($student)],
-            ['label' => 'Calls', 'value' => $this->telecallingCallCount($student)],
-            ['label' => 'Admission', 'value' => $admission?->status?->label() ?? '—'],
+            ['label' => 'Visits', 'value' => $this->inPersonVisitCount($student), 'tab' => 'visits'],
+            ['label' => 'Calls', 'value' => $this->telecallingCallCount($student), 'tab' => 'calls'],
+            ['label' => 'Admission', 'value' => $admission?->status?->label() ?? '—', 'tab' => 'documents'],
         ];
     }
 
     /**
-     * @return array<int, array{label: string, value: int|float|string|null}>
+     * @return array<int, array{label: string, value: int|float|string|null, tab?: string, alert?: bool}>
      */
     protected function enrolledCounters(Student $student): array
     {
-        $enrollment = $student->activeEnrollment;
-        $fees = $enrollment?->feeStructure;
-        $batchName = $student->activeBatchStudent?->batch?->name;
-
-        return [
-            ['label' => 'Enrolled', 'value' => $enrollment?->enrolled_at?->format('d M Y') ?? '—'],
-            ['label' => 'Batch', 'value' => $batchName ?? 'Not assigned'],
-            ['label' => 'Paid', 'value' => $fees ? '₹'.number_format((float) $fees->paid_amount, 2) : '—'],
-            ['label' => 'Pending', 'value' => $fees ? '₹'.number_format((float) $fees->pending_amount, 2) : '—'],
-            ['label' => 'Visits', 'value' => $this->inPersonVisitCount($student)],
-        ];
+        return $this->activeStudentCounters($student);
     }
 
     protected function inPersonVisitCount(Student $student): int
@@ -371,22 +360,42 @@ class StudentCounterService
     }
 
     /**
-     * @return array<int, array{label: string, value: int|float|string|null}>
+     * @return array<int, array{label: string, value: int|float|string|null, tab?: string, alert?: bool}>
      */
     protected function activeStudentCounters(Student $student): array
     {
         $percentage = $this->attendance->percentageForStudent($student);
+        $attendanceValue = $percentage !== null ? "{$percentage}%" : '—';
 
         $counters = [
-            ['label' => 'Batch', 'value' => $student->activeBatchStudent?->batch?->name ?? '—'],
-            ['label' => 'Attendance', 'value' => $percentage !== null ? "{$percentage}%" : '—'],
+            [
+                'label' => 'Attendance',
+                'value' => $attendanceValue,
+                'tab' => FeatureGate::enabled(LicenseFeature::Attendance) ? 'attendance' : null,
+                'alert' => $percentage !== null && $percentage < 75,
+            ],
         ];
+
+        if (FeatureGate::enabled(LicenseFeature::Fees)) {
+            $fees = $student->activeEnrollment?->feeStructure;
+            $pending = $fees ? (float) $fees->totalCollectiblePending() : 0.0;
+            $counters[] = [
+                'label' => 'Fees due',
+                'value' => $fees
+                    ? ($pending > 0 ? '₹'.number_format($pending, 0) : 'Paid')
+                    : '—',
+                'tab' => 'fees',
+                'alert' => $pending > 0,
+            ];
+        }
 
         if (FeatureGate::enabled(LicenseFeature::Homework)) {
             $notDoneWeek = $this->homeworkChecks->notDoneCountThisWeek((int) $student->id);
             $counters[] = [
                 'label' => 'HW Not Done (week)',
                 'value' => $notDoneWeek,
+                'tab' => $student->activeBatchStudent ? 'homework' : null,
+                'alert' => $notDoneWeek > 0,
             ];
         }
 
@@ -395,6 +404,7 @@ class StudentCounterService
                 $counters[] = [
                     'label' => $type->name,
                     'value' => $this->activityAttendance->presentCountForStudent($student, $type),
+                    'tab' => FeatureGate::enabled(LicenseFeature::Marks) ? 'activities' : null,
                 ];
 
                 continue;
@@ -407,6 +417,7 @@ class StudentCounterService
                 'value' => $summary['total'] > 0
                     ? "{$summary['present']}/{$summary['total']} present"
                     : 0,
+                'tab' => FeatureGate::enabled(LicenseFeature::Marks) ? 'activities' : null,
             ];
         }
 

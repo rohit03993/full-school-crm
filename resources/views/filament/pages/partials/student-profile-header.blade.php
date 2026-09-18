@@ -99,12 +99,18 @@
             'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6' => $columnCount >= 5,
         ])>
             @foreach ($items as $counter)
+                @php
+                    $tab = filled($counter['tab'] ?? null) ? (string) $counter['tab'] : null;
+                @endphp
                 <div @class([
                     'rounded-xl px-3 py-2.5',
                     'bg-emerald-500/10 ring-1 ring-emerald-500/15 dark:bg-emerald-500/5' => $counter['label'] === 'Website',
                     'bg-sky-500/10 ring-1 ring-sky-500/15 dark:bg-sky-500/5' => $counter['label'] === 'Walk-in',
                     'bg-gray-50 dark:bg-white/5' => ! in_array($counter['label'], $highlightLabels, true),
-                ])>
+                    'cursor-pointer transition hover:bg-gray-100 dark:hover:bg-white/10' => $tab !== null,
+                ])
+                    @if ($tab) wire:click="openActivityTimelineTab(@js($tab))" role="button" tabindex="0" @endif
+                >
                     <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs dark:text-gray-400">{{ $counter['label'] }}</p>
                     <p @class([
                         'mt-0.5 truncate text-base font-bold sm:text-lg',
