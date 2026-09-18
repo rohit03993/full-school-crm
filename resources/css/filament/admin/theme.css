@@ -1289,23 +1289,24 @@
         @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10;
     }
 
-    /* Student profile — no empty Filament header; card sits under Back */
+    /* Student profile — name lives on the card; Back sits on the card */
     .fi-page:has(.fi-student-profile-shell) > .fi-crm-back {
-        @apply pt-1 pb-2 sm:pt-2 sm:pb-3;
+        @apply pt-1 pb-1 sm:pt-2 sm:pb-2;
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-page-header,
-    .fi-page:has(.fi-student-profile-page) .fi-page-header {
-        @apply mb-0 hidden;
-    }
-
-    .fi-page:has(.fi-student-profile-shell) .fi-page-header-main-ctn {
-        @apply pt-0;
-    }
-
+    .fi-page:has(.fi-student-profile-page) .fi-page-header,
+    .fi-page:has(.fi-student-profile-shell) .fi-page-header-main-ctn,
+    .fi-page:has(.fi-student-profile-page) .fi-page-header-main-ctn,
+    .fi-page:has(.fi-student-profile-shell) > .fi-header,
+    .fi-page:has(.fi-student-profile-page) > .fi-header,
+    .fi-page:has(.fi-student-profile-shell) .fi-header-heading,
+    .fi-page:has(.fi-student-profile-page) .fi-header-heading,
+    .fi-page:has(.fi-student-profile-shell) .fi-header-subheading,
+    .fi-page:has(.fi-student-profile-page) .fi-header-subheading,
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions-ctn,
     .fi-page:has(.fi-student-profile-page) .fi-header-actions-ctn {
-        @apply hidden;
+        @apply mb-0 hidden;
     }
 
     .fi-student-profile-shell {
@@ -2681,11 +2682,20 @@
 }
 
 /*
- * Student profile: drop the empty Filament page header on all breakpoints
- * so the identity card sits directly under Back.
+ * Student profile: the Filament H1 is a sibling of Back (class fi-header),
+ * not always inside .fi-page-header. Hide every header chrome so the card
+ * sits directly under Back.
  */
 body.fi-body:has(.fi-student-profile-shell) .fi-page-header,
-body.fi-body:has(.fi-student-profile-page) .fi-page-header {
+body.fi-body:has(.fi-student-profile-page) .fi-page-header,
+body.fi-body:has(.fi-student-profile-shell) .fi-page-header-main-ctn,
+body.fi-body:has(.fi-student-profile-page) .fi-page-header-main-ctn,
+body.fi-body:has(.fi-student-profile-shell) .fi-page > .fi-header,
+body.fi-body:has(.fi-student-profile-page) .fi-page > .fi-header,
+body.fi-body:has(.fi-student-profile-shell) .fi-header-heading,
+body.fi-body:has(.fi-student-profile-page) .fi-header-heading,
+body.fi-body:has(.fi-student-profile-shell) .fi-header-subheading,
+body.fi-body:has(.fi-student-profile-page) .fi-header-subheading {
     display: none !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -2697,8 +2707,8 @@ body.fi-body:has(.fi-student-profile-page) .fi-page-header {
 body.fi-body:has(.fi-student-profile-shell) > .fi-page > .fi-crm-back,
 body.fi-body:has(.fi-student-profile-page) > .fi-page > .fi-crm-back,
 .fi-page:has(.fi-student-profile-shell) > .fi-crm-back {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.75rem !important;
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.5rem !important;
 }
 
 /*
@@ -2709,8 +2719,6 @@ body.fi-body:has(.fi-student-profile-page) > .fi-page > .fi-crm-back,
     body.fi-body:has(.fi-student-profile-shell) .fi-main-ctn,
     body.fi-body:has(.fi-student-profile-shell) .fi-main,
     body.fi-body:has(.fi-student-profile-shell) .fi-page,
-    body.fi-body:has(.fi-student-profile-shell) .fi-page-header,
-    body.fi-body:has(.fi-student-profile-shell) .fi-page-header-main-ctn,
     body.fi-body:has(.fi-student-profile-shell) .fi-page-main,
     body.fi-body:has(.fi-student-profile-shell) .fi-page-content,
     body.fi-body:has(.fi-student-profile-shell) .fi-section,
@@ -2718,8 +2726,6 @@ body.fi-body:has(.fi-student-profile-page) > .fi-page > .fi-crm-back,
     body.fi-body:has(.fi-student-profile-page) .fi-main-ctn,
     body.fi-body:has(.fi-student-profile-page) .fi-main,
     body.fi-body:has(.fi-student-profile-page) .fi-page,
-    body.fi-body:has(.fi-student-profile-page) .fi-page-header,
-    body.fi-body:has(.fi-student-profile-page) .fi-page-header-main-ctn,
     body.fi-body:has(.fi-student-profile-page) .fi-page-main,
     body.fi-body:has(.fi-student-profile-page) .fi-page-content,
     body.fi-body:has(.fi-student-profile-page) .fi-section,
@@ -2739,7 +2745,11 @@ body.fi-body:has(.fi-student-profile-page) > .fi-page > .fi-crm-back,
     }
 
     body.fi-body:has(.fi-student-profile-shell) .fi-page-header,
-    body.fi-body:has(.fi-student-profile-page) .fi-page-header {
+    body.fi-body:has(.fi-student-profile-page) .fi-page-header,
+    body.fi-body:has(.fi-student-profile-shell) .fi-page > .fi-header,
+    body.fi-body:has(.fi-student-profile-page) .fi-page > .fi-header,
+    body.fi-body:has(.fi-student-profile-shell) .fi-header-heading,
+    body.fi-body:has(.fi-student-profile-page) .fi-header-heading {
         display: none !important;
         margin: 0 !important;
         padding: 0 !important;

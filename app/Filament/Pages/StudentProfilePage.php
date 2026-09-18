@@ -499,7 +499,7 @@ class StudentProfilePage extends Page
 
     public function getHeading(): string
     {
-        return $this->record->name;
+        return '';
     }
 
     public function getSubheading(): ?string

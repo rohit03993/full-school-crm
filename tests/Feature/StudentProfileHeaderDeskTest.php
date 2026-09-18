@@ -30,11 +30,17 @@ class StudentProfileHeaderDeskTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(StudentProfilePage::class, ['record' => $student])
+        $page = Livewire::test(StudentProfilePage::class, ['record' => $student])
             ->assertSuccessful()
             ->assertDontSee('Back to Search')
+            ->assertDontSeeHtml('fi-header-heading')
             ->assertSeeHtml('fi-student-profile-desk-actions')
-            ->assertSee('Add Payment')
+            ->assertSee('Add Payment');
+
+        $this->assertSame('', $page->instance()->getHeading());
+        $this->assertSame($student->name, $page->instance()->getTitle());
+
+        $page
             ->assertSee('More')
             ->assertSee('Fees due')
             ->assertActionVisible('addPayment')
