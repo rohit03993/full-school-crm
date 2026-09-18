@@ -11,6 +11,33 @@
 }
 
 @layer components {
+    /* ── Top-bar people search ── */
+    /* Filament makes the search flex-1, so the dropdown is positioned against most
+       of the topbar. Combined with inset-x-4 and overflow-x-clip, the "Students"
+       header and the names split apart and cover the dashboard. */
+    .fi-topbar-ctn {
+        overflow: visible;
+    }
+
+    .fi-topbar .fi-global-search {
+        @apply relative w-full max-w-xs;
+        flex-grow: 0;
+        flex-shrink: 1;
+    }
+
+    .fi-topbar .fi-global-search-results-ctn {
+        left: auto !important;
+        right: 0 !important;
+        width: min(22rem, calc(100vw - 1.25rem)) !important;
+        max-width: min(22rem, calc(100vw - 1.25rem)) !important;
+        z-index: 80;
+        max-height: min(24rem, calc(100vh - 5.5rem));
+    }
+
+    .fi-global-search-result-group-header {
+        position: static;
+    }
+
     /* ── Back to previous page (render hook on every panel page) ── */
     /* The chip takes over the page's top padding, so the heading below tightens up */
     .fi-crm-back {
