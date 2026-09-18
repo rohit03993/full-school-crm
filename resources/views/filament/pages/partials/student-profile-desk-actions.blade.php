@@ -3,23 +3,26 @@
 @endphp
 
 @if ($desk['primary'] !== [] || $desk['more'] !== [])
-    <div class="fi-student-profile-desk-actions relative z-20 flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+    <div class="fi-student-profile-desk-actions relative z-20 flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
         @foreach ($desk['primary'] as $action)
             <button
                 type="button"
                 wire:click="mountAction(@js($action['name']))"
                 @class([
-                    'inline-flex min-h-8 items-center justify-center rounded-full px-2.5 text-xs font-semibold transition sm:min-h-9 sm:px-3 sm:text-sm',
+                    'inline-flex min-h-8 flex-1 items-center justify-center rounded-lg px-2 text-[11px] font-semibold transition sm:min-h-9 sm:flex-none sm:rounded-full sm:px-3 sm:text-sm',
                     'bg-emerald-600 text-white shadow-sm hover:bg-emerald-500' => $action['tone'] === 'success',
                     'bg-amber-500 text-white shadow-sm hover:bg-amber-400' => $action['tone'] === 'primary',
                     'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15 dark:hover:bg-white/15' => $action['tone'] === 'gray',
                 ])
-            >{{ $action['label'] }}</button>
+            >
+                <span class="sm:hidden">{{ $action['short'] }}</span>
+                <span class="hidden sm:inline">{{ $action['label'] }}</span>
+            </button>
         @endforeach
 
         @if ($desk['more'] !== [])
             <div
-                class="relative"
+                class="relative flex-1 sm:flex-none"
                 x-data="{ open: false }"
                 x-on:keydown.escape.window="open = false"
                 x-on:click.outside="open = false"
@@ -27,12 +30,12 @@
                 <button
                     type="button"
                     x-on:click="open = ! open"
-                    class="inline-flex min-h-8 items-center justify-center gap-1 rounded-full bg-white px-2.5 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15 dark:hover:bg-white/15 sm:min-h-9 sm:px-3 sm:text-sm"
+                    class="inline-flex min-h-8 w-full items-center justify-center gap-0.5 rounded-lg bg-white px-2 text-[11px] font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15 dark:hover:bg-white/15 sm:min-h-9 sm:w-auto sm:rounded-full sm:px-3 sm:text-sm"
                     aria-haspopup="menu"
                     x-bind:aria-expanded="open.toString()"
                 >
                     More
-                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                    <svg class="h-3 w-3 sm:h-3.5 sm:w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                     </svg>
                 </button>

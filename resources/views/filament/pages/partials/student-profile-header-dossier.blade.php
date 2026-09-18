@@ -28,9 +28,9 @@
     <div class="relative overflow-visible border-b border-gray-100 dark:border-white/10">
         <div class="pointer-events-none absolute inset-0 rounded-t-xl bg-gradient-to-br from-primary-500/[0.07] via-transparent to-emerald-500/[0.05] dark:from-primary-500/10 dark:to-emerald-500/5 sm:rounded-t-2xl"></div>
 
-        <div class="relative flex flex-row items-start gap-3 p-3 sm:gap-4 sm:p-5 lg:gap-5">
+        <div class="fi-student-profile-identity relative grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2.5 p-3 sm:flex sm:flex-row sm:gap-4 sm:p-5 lg:gap-5">
             {{-- Photo --}}
-            <div class="shrink-0">
+            <div class="fi-student-profile-photo shrink-0">
                 @if ($photo && $photo->isImage() && $photo->fileExistsOnDisk())
                     <button
                         type="button"
@@ -42,11 +42,11 @@
                         <img
                             src="{{ $photo->previewUrl() }}"
                             alt="{{ $record->name }}"
-                            class="h-20 w-20 object-cover transition duration-300 group-hover:scale-105 sm:h-28 sm:w-[5.5rem]"
+                            class="h-28 w-28 object-cover transition duration-300 group-hover:scale-105 sm:h-36 sm:w-36"
                         />
                     </button>
                 @else
-                    <div class="flex h-20 w-20 flex-col items-center justify-center rounded-2xl border border-dashed border-primary-200/80 bg-white/80 shadow-sm dark:border-primary-500/25 dark:bg-white/5 sm:h-28 sm:w-[5.5rem]">
+                    <div class="flex h-28 w-28 flex-col items-center justify-center rounded-2xl border border-dashed border-primary-200/80 bg-white/80 shadow-sm dark:border-primary-500/25 dark:bg-white/5 sm:h-36 sm:w-36">
                         <svg class="h-7 w-7 text-primary-300 dark:text-primary-500/50 sm:h-7 sm:w-7" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                         </svg>
@@ -56,14 +56,14 @@
             </div>
 
             {{-- Name & meta --}}
-            <div class="min-w-0 flex-1 text-left">
+            <div class="fi-student-profile-meta min-w-0 flex-1 text-left">
                 <div class="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
-                    <div class="flex min-w-0 flex-wrap items-center gap-1.5">
-                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-500/20 dark:text-emerald-300">
+                    <div class="flex min-w-0 flex-wrap items-center gap-1">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-500/20 dark:text-emerald-300 sm:px-2.5 sm:py-1 sm:text-[11px]">
                             <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                             {{ $record->status->label() }}
                         </span>
-                        <span class="rounded-md bg-gray-100 px-2 py-1 font-mono text-[11px] font-semibold text-gray-700 dark:bg-white/10 dark:text-gray-300">
+                        <span class="rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-gray-700 dark:bg-white/10 dark:text-gray-300 sm:px-2 sm:py-1 sm:text-[11px]">
                             {{ $enrollment->enrollment_number }}
                         </span>
                     </div>
@@ -91,19 +91,16 @@
                     </div>
                 </div>
 
-                <div class="mt-1.5 flex flex-wrap items-start justify-between gap-2 sm:mt-2 sm:gap-3">
-                    <div class="min-w-0 flex-1">
-                        <h2 class="line-clamp-2 text-xl font-bold leading-tight tracking-tight text-gray-950 dark:text-white">{{ $record->name }}</h2>
-                        <p class="mt-1 line-clamp-2 text-sm leading-snug text-gray-600 dark:text-gray-400">
-                            {{ $course?->name ?? '—' }}@if ($course?->duration_label)<span class="text-gray-400"> · </span>{{ $course->duration_label }}@endif
-                        </p>
-                    </div>
-                    @include('filament.pages.partials.student-profile-desk-actions')
+                <div class="mt-1 sm:mt-1.5">
+                    <h2 class="line-clamp-2 text-lg font-bold leading-tight tracking-tight text-gray-950 sm:text-xl dark:text-white">{{ $record->name }}</h2>
+                    <p class="mt-0.5 line-clamp-2 text-xs leading-snug text-gray-600 sm:mt-1 sm:text-sm dark:text-gray-400">
+                        {{ $course?->name ?? '—' }}@if ($course?->duration_label)<span class="text-gray-400"> · </span>{{ $course->duration_label }}@endif
+                    </p>
                 </div>
 
-                {{-- Mobile: contact + call inline (desktop uses Contact card below) --}}
-                <div class="mt-2 flex flex-wrap items-center gap-2 sm:hidden">
-                    <x-crm.student-mobile :mobile="$record->mobile" class="text-base font-bold tabular-nums" />
+                {{-- Mobile: contact inline (desktop uses Contact card below) --}}
+                <div class="mt-1.5 flex flex-wrap items-center gap-2 sm:hidden">
+                    <x-crm.student-mobile :mobile="$record->mobile" class="text-sm font-semibold tabular-nums" />
                 </div>
 
                 <div class="fi-student-profile-dossier-banners">
@@ -162,8 +159,8 @@
 
                 {{-- Mobile: collapsible secondary details --}}
                 @if ($hasMobileDetails)
-                    <details class="fi-student-profile-details-mobile mt-2.5 sm:hidden">
-                        <summary class="touch-manipulation text-sm font-semibold text-primary-600 dark:text-primary-400">
+                    <details class="fi-student-profile-details-mobile mt-1.5 sm:hidden">
+                        <summary class="touch-manipulation text-xs font-semibold text-primary-600 dark:text-primary-400">
                             More details
                         </summary>
                         <div class="mt-2 space-y-2">
@@ -201,11 +198,15 @@
                     @include('filament.pages.partials.student-last-call-summary', ['record' => $record])
                 </div>
             </div>
+
+            <div class="fi-student-profile-desk-actions-slot col-span-2 min-w-0 border-t border-gray-100 pt-2.5 dark:border-white/10 sm:col-auto sm:w-auto sm:border-0 sm:pt-0">
+                @include('filament.pages.partials.student-profile-desk-actions')
+            </div>
         </div>
     </div>
 
     {{-- Activity stats — tap a tile to open that tab --}}
-    <div class="bg-gray-50/80 px-3 py-2.5 dark:bg-white/[0.02] sm:px-4 sm:py-2.5">
+    <div class="bg-gray-50/80 px-3 py-2 dark:bg-white/[0.02] sm:px-4 sm:py-2.5">
         <div class="fi-student-profile-dossier-stats grid grid-cols-2 gap-2 sm:gap-2">
             @foreach ($items as $counter)
                 @php
@@ -216,7 +217,7 @@
                         && str_contains((string) $counter['value'], '%')
                         && ! $isAlert;
                     $tileClass = [
-                        'fi-student-profile-stat flex min-h-[3.5rem] w-full items-center gap-2 rounded-xl bg-white px-2.5 py-2.5 text-left shadow-sm ring-1 ring-gray-200/70 dark:bg-gray-900 dark:ring-white/10 sm:min-h-0 sm:gap-2.5 sm:px-3 sm:py-2.5',
+                        'fi-student-profile-stat flex min-h-0 w-full items-center gap-2 rounded-xl bg-white px-2 py-2 text-left shadow-sm ring-1 ring-gray-200/70 dark:bg-gray-900 dark:ring-white/10 sm:gap-2.5 sm:px-3 sm:py-2.5',
                         'ring-rose-200/90 dark:ring-rose-500/30' => $isAlert,
                         'ring-emerald-200/80 dark:ring-emerald-500/20' => $isAttendanceOk,
                         'cursor-pointer transition hover:bg-gray-50 active:scale-[0.99] dark:hover:bg-white/5' => $tab !== null,
@@ -232,7 +233,7 @@
                     <div @class($tileClass)>
                 @endif
                     <span @class([
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400',
+                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-600 dark:text-primary-400 sm:h-8 sm:w-8',
                         'bg-rose-500/10 text-rose-600 dark:text-rose-300' => $isAlert,
                     ])>
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">

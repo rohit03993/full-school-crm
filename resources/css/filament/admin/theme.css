@@ -1289,21 +1289,18 @@
         @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10;
     }
 
-    /* Student profile — back link only; actions live on the identity card */
-    .fi-page:has(.fi-student-profile-shell) .fi-page-header {
-        @apply mb-0 gap-0;
+    /* Student profile — no empty Filament header; card sits under Back */
+    .fi-page:has(.fi-student-profile-shell) > .fi-crm-back {
+        @apply pt-1 pb-2 sm:pt-2 sm:pb-3;
     }
 
-    .fi-page:has(.fi-student-profile-shell) .fi-header {
-        @apply flex-col gap-0;
+    .fi-page:has(.fi-student-profile-shell) .fi-page-header,
+    .fi-page:has(.fi-student-profile-page) .fi-page-header {
+        @apply mb-0 hidden;
     }
 
-    .fi-page:has(.fi-student-profile-shell) .fi-header-heading {
-        @apply sr-only;
-    }
-
-    .fi-page:has(.fi-student-profile-shell) .fi-header-subheading {
-        @apply hidden;
+    .fi-page:has(.fi-student-profile-shell) .fi-page-header-main-ctn {
+        @apply pt-0;
     }
 
     .fi-page:has(.fi-student-profile-shell) .fi-header-actions-ctn,
@@ -1334,7 +1331,7 @@
     }
 
     .fi-student-profile-details-mobile > summary {
-        @apply list-none cursor-pointer select-none rounded-lg px-2 py-1.5 text-primary-600 transition hover:bg-primary-500/5 dark:text-primary-400 dark:hover:bg-primary-500/10;
+        @apply list-none cursor-pointer select-none rounded-lg px-1.5 py-1 text-primary-600 transition hover:bg-primary-500/5 dark:text-primary-400 dark:hover:bg-primary-500/10;
     }
 
     .fi-student-profile-details-mobile > summary::-webkit-details-marker {
@@ -1404,9 +1401,9 @@
     }
 
     @media (max-width: 1023px) {
-        /* Call bar (~5rem) sits above bottom nav; bottom-nav spacer already clears the nav itself */
+        /* Slim call bar (~2.75rem) sits above bottom nav; nav spacer already clears the nav itself */
         .fi-body:has(.fi-student-profile-mobile-call) .fi-page {
-            padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
+            padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
         }
     }
 
@@ -2684,6 +2681,27 @@
 }
 
 /*
+ * Student profile: drop the empty Filament page header on all breakpoints
+ * so the identity card sits directly under Back.
+ */
+body.fi-body:has(.fi-student-profile-shell) .fi-page-header,
+body.fi-body:has(.fi-student-profile-page) .fi-page-header {
+    display: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+body.fi-body:has(.fi-student-profile-shell) > .fi-page > .fi-crm-back,
+body.fi-body:has(.fi-student-profile-page) > .fi-page > .fi-crm-back,
+.fi-page:has(.fi-student-profile-shell) > .fi-crm-back {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.75rem !important;
+}
+
+/*
  * Student profile mobile FULL-BLEED — unlayered so it beats Filament @layer utilities
  * (px-4 / px-6 on page chrome). Desktop (lg / 1024px+) is untouched.
  */
@@ -2720,9 +2738,19 @@
         padding-right: 0.5rem !important;
     }
 
-    body.fi-body:has(.fi-student-profile-shell) .fi-header-actions-ctn,
-    body.fi-body:has(.fi-student-profile-page) .fi-header-actions-ctn {
+    body.fi-body:has(.fi-student-profile-shell) .fi-page-header,
+    body.fi-body:has(.fi-student-profile-page) .fi-page-header {
         display: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 0 !important;
+        overflow: hidden !important;
+    }
+
+    body.fi-body:has(.fi-student-profile-shell) > .fi-crm-back,
+    body.fi-body:has(.fi-student-profile-page) > .fi-crm-back {
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.5rem !important;
     }
 
     body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-shell,
@@ -2771,8 +2799,7 @@
 
     body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-mobile-call__bar,
     body.fi-body:has(.fi-student-profile-page) .fi-student-profile-mobile-call__bar {
-        padding-left: 0 !important;
-        padding-right: 0 !important;
+        padding: 0.375rem 0.5rem !important;
     }
 
     /* Swipeable chip tabs — one row instead of a tall 3-col grid */
@@ -2810,13 +2837,13 @@
         gap: 0.4rem !important;
         min-width: max-content !important;
         max-width: none !important;
-        min-height: 2.5rem !important;
+        min-height: 2rem !important;
         white-space: nowrap !important;
         border-radius: 9999px !important;
         border: 1px solid rgb(229 231 235 / 0.95) !important;
         background: rgb(249 250 251) !important;
-        padding: 0.55rem 0.9rem !important;
-        font-size: 0.8125rem !important;
+        padding: 0.35rem 0.7rem !important;
+        font-size: 0.75rem !important;
         line-height: 1.15 !important;
         font-weight: 600 !important;
         letter-spacing: 0 !important;
@@ -2869,10 +2896,24 @@
 
     body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-dossier h2,
     body.fi-body:has(.fi-student-profile-page) .fi-student-profile-dossier h2 {
-        font-size: 1.25rem !important;
+        font-size: 1.125rem !important;
         line-height: 1.25 !important;
         overflow: visible !important;
         text-overflow: unset !important;
         white-space: normal !important;
+    }
+
+    /* Phone only: Pay / Edit / More sit under the photo so the name is not squeezed */
+    @media (max-width: 639px) {
+        body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-identity,
+        body.fi-body:has(.fi-student-profile-page) .fi-student-profile-identity {
+            display: grid !important;
+            grid-template-columns: auto minmax(0, 1fr);
+        }
+
+        body.fi-body:has(.fi-student-profile-shell) .fi-student-profile-desk-actions-slot,
+        body.fi-body:has(.fi-student-profile-page) .fi-student-profile-desk-actions-slot {
+            grid-column: 1 / -1;
+        }
     }
 }

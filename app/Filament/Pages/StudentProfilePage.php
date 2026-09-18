@@ -2677,7 +2677,7 @@ class StudentProfilePage extends Page
     /**
      * Compact in-card actions. Header actions stay registered so Filament modals still mount.
      *
-     * @return array{primary: list<array{name: string, label: string, tone: string}>, more: list<array{name: string, label: string, danger: bool}>}
+     * @return array{primary: list<array{name: string, label: string, short: string, tone: string}>, more: list<array{name: string, label: string, danger: bool}>}
      */
     public function studentProfileDeskToolbar(): array
     {
@@ -2706,9 +2706,17 @@ class StudentProfilePage extends Page
             }
 
             $name = $action->getName();
+            $label = (string) $action->getLabel();
             $primary[] = [
                 'name' => $name,
-                'label' => (string) $action->getLabel(),
+                'label' => $label,
+                'short' => match ($name) {
+                    'addPayment' => 'Pay',
+                    'editStudent' => 'Edit',
+                    'addVisit' => 'Visit',
+                    'convertToAdmission' => 'Admit',
+                    default => $label,
+                },
                 'tone' => match ($name) {
                     'addPayment' => 'success',
                     'addVisit', 'convertToAdmission' => 'primary',
