@@ -160,7 +160,9 @@
                         <p class="font-mono text-xs text-gray-500">{{ $row['roll_number'] ?? '—' }}</p>
                     </div>
                     @if (in_array($status['status'] ?? 'none', ['published', 'issued'], true))
-                        @php($sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null)
+                        @php
+                            $sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null;
+                        @endphp
                         <div class="text-right">
                             <p class="text-[10px] font-semibold uppercase text-gray-500">Rank</p>
                             <p class="text-sm font-bold text-gray-800 dark:text-gray-200">{{ $sheet?->rank ?? '—' }}</p>
@@ -193,7 +195,9 @@
                     @endforeach
                 </dl>
                 @if (($canIssueMarksheet ?? false) && ($status['status'] ?? '') === 'issued')
-                    @php($sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null)
+                    @php
+                        $sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null;
+                    @endphp
                     <div class="mt-3 border-t border-gray-100 pt-3 dark:border-white/10">
                         @if ($sheet?->hasPdf())
                             <a href="{{ route('admin.marksheets.preview', $sheet) }}" target="_blank" class="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-600 ring-1 ring-primary-200 dark:bg-primary-500/10 dark:text-primary-400">
@@ -238,11 +242,7 @@
                                 $cell = \App\Support\StudentExamMarksMatrix::sheetCell(is_array($row) ? $row : [], (string) $subject);
                                 $display = $cell['display'];
                             @endphp
-                            <td @class([
-                                'px-2 py-1.5 text-center',
-                                'text-gray-400' => ! $editing && $display === 'Absent',
-                                'text-gray-800 dark:text-gray-200' => $editing || $display !== 'Absent',
-                            ])>
+                            <td class="px-2 py-1.5 text-center {{ ! $editing && $display === 'Absent' ? 'text-gray-400' : 'text-gray-800 dark:text-gray-200' }}">
                                 @if ($editing)
                                     <input
                                         type="number"
@@ -258,13 +258,17 @@
                             </td>
                         @endforeach
                         @if (in_array($status['status'] ?? 'none', ['published', 'issued'], true))
-                            @php($sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null)
+                            @php
+                                $sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null;
+                            @endphp
                             <td class="px-4 py-2.5 text-center font-semibold text-gray-800 dark:text-gray-200">
                                 {{ $sheet?->rank ?? '—' }}
                             </td>
                         @endif
                         @if (($canIssueMarksheet ?? false) && ($status['status'] ?? '') === 'issued')
-                            @php($sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null)
+                            @php
+                                $sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null;
+                            @endphp
                             <td class="px-4 py-2.5 text-right">
                                 @if ($sheet?->hasPdf())
                                     <a href="{{ route('admin.marksheets.preview', $sheet) }}" target="_blank" class="text-xs font-semibold text-primary-600 hover:underline">View PDF</a>
