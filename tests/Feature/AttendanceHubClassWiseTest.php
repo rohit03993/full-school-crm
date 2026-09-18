@@ -124,6 +124,23 @@ class AttendanceHubClassWiseTest extends TestCase
             ->assertDontSee('Today’s overview for students and staff');
     }
 
+    public function test_staff_filter_hides_class_wise_students(): void
+    {
+        $this->travelTo('2026-09-11 10:00:00');
+        $this->seedClassWithFourStatuses();
+        $this->actingAsAdmin();
+
+        Livewire::test(AttendanceHubPage::class)
+            ->set('overviewDate', '2026-09-11')
+            ->assertSee('Class-wise (students)')
+            ->assertSee('Students present')
+            ->call('setFeedType', 'staff')
+            ->assertSet('feedType', 'staff')
+            ->assertDontSee('Class-wise (students)')
+            ->assertDontSee('Students present')
+            ->assertSee('Staff present');
+    }
+
     public function test_absent_drill_shows_only_attendance_calls_for_that_day(): void
     {
         $this->travelTo('2026-09-11 10:00:00');

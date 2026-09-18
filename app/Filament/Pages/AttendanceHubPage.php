@@ -95,6 +95,16 @@ class AttendanceHubPage extends Page
         $this->resetPage();
     }
 
+    public function setFeedType(string $type): void
+    {
+        if (! in_array($type, ['all', 'student', 'staff'], true)) {
+            return;
+        }
+
+        $this->feedType = $type;
+        $this->resetPage();
+    }
+
     public function getSubheading(): ?string
     {
         return null;

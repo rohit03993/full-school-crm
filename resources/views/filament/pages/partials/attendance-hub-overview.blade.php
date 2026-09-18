@@ -1,27 +1,25 @@
 {{-- Attendance hub: overview + class-wise + unified feed + desk cards --}}
 <div class="space-y-5">
     {{-- Totals: Students present + Staff present only --}}
-    <div class="crm-att-hub-overview overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
+    <div class="crm-att-hub-overview overflow-visible rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
         <div class="flex flex-col gap-2.5 border-b border-gray-100 px-3 py-2.5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-4">
             <div class="min-w-0">
                 <h3 class="text-sm font-bold text-gray-950 dark:text-white">Today’s overview</h3>
                 <p class="text-xs text-gray-500">manual + machine</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <label class="relative inline-flex min-h-8 cursor-pointer items-center rounded-full bg-gray-100 px-3 text-xs font-semibold text-gray-800 ring-1 ring-gray-950/10 dark:bg-white/10 dark:text-gray-100 dark:ring-white/15">
-                    <span>{{ $overview['date_label'] }}</span>
-                    <input
-                        type="date"
-                        wire:model.live="overviewDate"
-                        class="absolute inset-0 cursor-pointer opacity-0"
-                        aria-label="Overview date"
-                    />
-                </label>
+                <input
+                    type="date"
+                    wire:model.live="overviewDate"
+                    x-on:click="$el.showPicker && $el.showPicker()"
+                    aria-label="Overview date"
+                    class="h-8 w-[9.75rem] cursor-pointer rounded-full border-0 bg-gray-100 px-2.5 text-xs font-semibold text-gray-800 ring-1 ring-gray-950/10 dark:bg-white/10 dark:text-gray-100 dark:ring-white/15"
+                />
                 <div class="inline-flex rounded-full bg-gray-100 p-0.5 ring-1 ring-gray-950/10 dark:bg-white/10 dark:ring-white/15" role="group" aria-label="Who to show">
                     @foreach (['all' => 'All', 'student' => 'Students', 'staff' => 'Staff'] as $value => $label)
                         <button
                             type="button"
-                            wire:click="$set('feedType', '{{ $value }}')"
+                            wire:click="setFeedType('{{ $value }}')"
                             @class([
                                 'rounded-full px-2.5 py-1 text-xs font-semibold transition',
                                 'bg-white text-gray-950 shadow-sm dark:bg-gray-800 dark:text-white' => $feedType === $value,
@@ -32,7 +30,12 @@
                 </div>
             </div>
         </div>
-        <div class="grid grid-cols-2 divide-x divide-gray-100 dark:divide-white/10">
+        <div @class([
+            'grid divide-x divide-gray-100 dark:divide-white/10',
+            'grid-cols-2' => $feedType === 'all',
+            'grid-cols-1' => $feedType !== 'all',
+        ])>
+            @if ($feedType !== 'staff')
             <div class="crm-att-hub-overview__cell px-3 py-2.5 sm:px-4 sm:py-3">
                 <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Students present</p>
                 <p class="mt-0.5 text-xl font-bold tabular-nums text-gray-950 sm:text-2xl dark:text-white">
@@ -58,6 +61,8 @@
                     >Manually marked {{ $overview['students_manual_marked'] }}</button>
                 </p>
             </div>
+            @endif
+            @if ($feedType !== 'student')
             <div class="crm-att-hub-overview__cell px-3 py-2.5 sm:px-4 sm:py-3">
                 <p class="text-[10px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Staff present</p>
                 <p class="mt-0.5 text-xl font-bold tabular-nums text-gray-950 sm:text-2xl dark:text-white">
@@ -70,11 +75,12 @@
                     · Unmk {{ $overview['staff_unmarked'] }}
                 </p>
             </div>
+            @endif
         </div>
     </div>
 
     {{-- Class-wise --}}
-    @if (count($overview['class_rows']) > 0)
+    @if ($feedType !== 'staff' && count($overview['class_rows']) > 0)
         <div class="crm-att-hub-classes overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
             <div class="border-b border-gray-100 px-3 py-2.5 dark:border-white/10 sm:px-4 sm:py-3">
                 <h3 class="text-sm font-bold text-gray-950 dark:text-white">Class-wise (students)</h3>
@@ -389,7 +395,15 @@
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
         <div class="border-b border-gray-100 px-4 py-3 dark:border-white/10">
             <h3 class="text-sm font-bold text-gray-950 dark:text-white">Attendance log</h3>
-            <p class="text-xs text-gray-500">Students and staff together · Manual vs auto · WhatsApp on student punches</p>
+            <p class="text-xs text-gray-500">
+                @if ($feedType === 'staff')
+                    Staff · Manual vs auto
+                @elseif ($feedType === 'student')
+                    Students · Manual vs auto · WhatsApp on punches
+                @else
+                    Students and staff together · Manual vs auto · WhatsApp on student punches
+                @endif
+            </p>
         </div>
 
         @if ($feed->isEmpty())
@@ -513,6 +527,8 @@
 
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         @foreach ($cards as $card)
+            @continue($feedType === 'staff' && ($card['badge'] ?? '') === 'Students')
+            @continue($feedType === 'student' && ($card['badge'] ?? '') === 'Staff')
             <a
                 href="{{ $card['url'] }}"
                 @class([
