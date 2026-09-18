@@ -12,23 +12,41 @@
 
 @layer components {
     /* ── Top-bar people search ── */
-    /* Filament makes the search flex-1, so the dropdown is positioned against most
-       of the topbar. Combined with inset-x-4 and overflow-x-clip, the "Students"
-       header and the names split apart and cover the dashboard. */
+    /* Keep a real typed field (Filament's flex-1 input has no min width, so
+       flex-grow:0 collapsed it to the icon). Size the search itself so the
+       dropdown can sit under that field instead of stretching across the page. */
     .fi-topbar-ctn {
         overflow: visible;
     }
 
+    .fi-topbar .fi-global-search-ctn {
+        flex: 0 0 auto;
+    }
+
     .fi-topbar .fi-global-search {
-        @apply relative w-full max-w-xs;
-        flex-grow: 0;
-        flex-shrink: 1;
+        position: relative;
+        flex: 0 0 18rem;
+        width: 18rem;
+        min-width: 18rem;
+        max-width: 18rem;
+    }
+
+    .fi-topbar .fi-global-search-field,
+    .fi-topbar .fi-global-search .fi-input-wrp {
+        width: 100%;
+    }
+
+    .fi-topbar .fi-global-search .fi-input {
+        width: 100%;
+        min-width: 0;
     }
 
     .fi-topbar .fi-global-search-results-ctn {
-        left: auto !important;
+        inset: auto !important;
+        top: calc(100% + 0.5rem) !important;
         right: 0 !important;
-        width: min(22rem, calc(100vw - 1.25rem)) !important;
+        left: auto !important;
+        width: 22rem !important;
         max-width: min(22rem, calc(100vw - 1.25rem)) !important;
         z-index: 80;
         max-height: min(24rem, calc(100vh - 5.5rem));
@@ -36,6 +54,15 @@
 
     .fi-global-search-result-group-header {
         position: static;
+    }
+
+    @media (max-width: 639px) {
+        .fi-topbar .fi-global-search {
+            flex: 1 1 9rem;
+            width: auto;
+            min-width: 9rem;
+            max-width: 14rem;
+        }
     }
 
     /* ── Back to previous page (render hook on every panel page) ── */
