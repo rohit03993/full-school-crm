@@ -1,36 +1,36 @@
 {{-- Attendance hub: overview + class-wise + unified feed + desk cards --}}
 <div class="space-y-5">
-    {{-- Date + type filters --}}
-    <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-900">
-        <div class="fi-crm-form grid gap-3 sm:grid-cols-3">
-            <div>
-                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Date</label>
-                <input
-                    type="date"
-                    wire:model.live="overviewDate"
-                    class="fi-crm-input block w-full"
-                />
-            </div>
-            <div class="sm:col-span-2">
-                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Show in list</label>
-                <x-crm.select wire:model.live="feedType" class="w-full">
-                    <option value="all">Students + staff</option>
-                    <option value="student">Students only</option>
-                    <option value="staff">Staff only</option>
-                </x-crm.select>
-            </div>
-        </div>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-            Overview for <strong class="text-gray-950 dark:text-white">{{ $overview['date_label'] }}</strong>
-            — includes manual roll call and machine punches.
-        </p>
-    </div>
-
     {{-- Totals: Students present + Staff present only --}}
     <div class="crm-att-hub-overview overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
-        <div class="border-b border-gray-100 px-3 py-2 dark:border-white/10 sm:px-4 sm:py-2.5">
-            <h3 class="text-sm font-bold text-gray-950 dark:text-white">Today’s overview</h3>
-            <p class="text-xs text-gray-500">{{ $overview['date_label'] }} · manual + machine</p>
+        <div class="flex flex-col gap-2.5 border-b border-gray-100 px-3 py-2.5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+            <div class="min-w-0">
+                <h3 class="text-sm font-bold text-gray-950 dark:text-white">Today’s overview</h3>
+                <p class="text-xs text-gray-500">manual + machine</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <label class="relative inline-flex min-h-8 cursor-pointer items-center rounded-full bg-gray-100 px-3 text-xs font-semibold text-gray-800 ring-1 ring-gray-950/10 dark:bg-white/10 dark:text-gray-100 dark:ring-white/15">
+                    <span>{{ $overview['date_label'] }}</span>
+                    <input
+                        type="date"
+                        wire:model.live="overviewDate"
+                        class="absolute inset-0 cursor-pointer opacity-0"
+                        aria-label="Overview date"
+                    />
+                </label>
+                <div class="inline-flex rounded-full bg-gray-100 p-0.5 ring-1 ring-gray-950/10 dark:bg-white/10 dark:ring-white/15" role="group" aria-label="Who to show">
+                    @foreach (['all' => 'All', 'student' => 'Students', 'staff' => 'Staff'] as $value => $label)
+                        <button
+                            type="button"
+                            wire:click="$set('feedType', '{{ $value }}')"
+                            @class([
+                                'rounded-full px-2.5 py-1 text-xs font-semibold transition',
+                                'bg-white text-gray-950 shadow-sm dark:bg-gray-800 dark:text-white' => $feedType === $value,
+                                'text-gray-600 dark:text-gray-300' => $feedType !== $value,
+                            ])
+                        >{{ $label }}</button>
+                    @endforeach
+                </div>
+            </div>
         </div>
         <div class="grid grid-cols-2 divide-x divide-gray-100 dark:divide-white/10">
             <div class="crm-att-hub-overview__cell px-3 py-2.5 sm:px-4 sm:py-3">

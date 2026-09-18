@@ -110,6 +110,20 @@ class AttendanceHubClassWiseTest extends TestCase
         $this->assertSame('Sick', $leaveRoster['students'][0]['leave_reason']);
     }
 
+    public function test_hub_opens_on_todays_overview_without_a_separate_filter_card(): void
+    {
+        $this->actingAsAdmin();
+
+        Livewire::test(AttendanceHubPage::class)
+            ->assertSuccessful()
+            ->assertSee('Today’s overview')
+            ->assertSee('All')
+            ->assertSee('Students')
+            ->assertSee('Staff')
+            ->assertDontSee('Show in list')
+            ->assertDontSee('Today’s overview for students and staff');
+    }
+
     public function test_absent_drill_shows_only_attendance_calls_for_that_day(): void
     {
         $this->travelTo('2026-09-11 10:00:00');

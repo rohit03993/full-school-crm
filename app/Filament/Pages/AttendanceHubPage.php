@@ -97,7 +97,7 @@ class AttendanceHubPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Today’s overview for students and staff, then mark from live punches, manual batch, or staff desk.';
+        return null;
     }
 
     public function openClassDrill(int $batchId, string $bucket): void
