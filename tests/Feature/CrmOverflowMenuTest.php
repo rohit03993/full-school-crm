@@ -18,6 +18,8 @@ class CrmOverflowMenuTest extends TestCase
 
             $this->assertStringContainsString('x-teleport="body"', $html);
             $this->assertStringContainsString('crm-overflow-menu', $html);
+            $this->assertStringContainsString('position:fixed', $html);
+            $this->assertStringContainsString('this.place()', $html);
             $this->assertStringContainsString('Rename', $html);
             $this->assertStringContainsString('Open', $html);
         } finally {
