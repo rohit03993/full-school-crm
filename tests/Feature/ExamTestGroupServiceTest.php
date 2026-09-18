@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AdmissionStatus;
 use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
+use App\Enums\EnrollmentStatus;
 use App\Enums\Gender;
+use App\Enums\LeadSource;
 use App\Enums\ResultDeclarationStatus;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
@@ -12,9 +15,12 @@ use App\Enums\WhatsAppCampaignStatus;
 use App\Models\ActivityAttendance;
 use App\Models\ActivitySession;
 use App\Models\ActivityType;
+use App\Models\Admission;
 use App\Models\Batch;
 use App\Models\BatchStudent;
 use App\Models\Course;
+use App\Models\Enquiry;
+use App\Models\Enrollment;
 use App\Models\ResultDeclaration;
 use App\Models\Student;
 use App\Models\User;
@@ -22,6 +28,7 @@ use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppTemplate;
 use App\Services\ActivityAttendanceService;
 use App\Services\ExamTestGroupService;
+use App\Services\StudentCounterService;
 use App\Support\StudentExamMarksMatrix;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -135,6 +142,74 @@ class ExamTestGroupServiceTest extends TestCase
         $this->assertSame(180.0, $absentMatrix['rows'][0]['scores']['Physics']['max']);
         $this->assertSame('', $absentMatrix['rows'][0]['scores']['Physics']['display']);
         $this->assertSame('class-test', $absentMatrix['rows'][0]['group_key']);
+    }
+
+    public function test_profile_exam_tile_counts_appeared_tests_not_subject_papers(): void
+    {
+        [$staff, $batch, $type] = $this->examContext();
+        $student = $this->createBatchStudent($batch, $staff, '9876500091', 'Tile Student');
+
+        $enquiry = Enquiry::query()->create([
+            'student_id' => $student->id,
+            'enquiry_number' => 'CRM-ENQ-EX-TILE',
+            'course_id' => $batch->course_id,
+            'lead_source' => LeadSource::WalkIn,
+            'meeting_for' => 'school',
+            'visit_type' => 'first_visit',
+            'latest_visit_status' => 'interested',
+        ]);
+
+        $admission = Admission::query()->create([
+            'student_id' => $student->id,
+            'enquiry_id' => $enquiry->id,
+            'admission_number' => 'CRM-ADM-EX-TILE',
+            'status' => AdmissionStatus::Approved,
+        ]);
+
+        Enrollment::query()->create([
+            'student_id' => $student->id,
+            'admission_id' => $admission->id,
+            'course_id' => $batch->course_id,
+            'enrollment_number' => 'ROLL-EX-TILE',
+            'enrolled_at' => now(),
+            'status' => EnrollmentStatus::Enrolled,
+            'is_active' => true,
+        ]);
+
+        foreach (['Chemistry', 'Maths', 'Physics'] as $subject) {
+            $session = $this->createTestSession($type, $batch, $staff, 'test-one', 'Test One', $subject);
+            ActivityAttendance::query()->create([
+                'attendable_type' => $session->getMorphClass(),
+                'attendable_id' => $session->id,
+                'student_id' => $student->id,
+                'is_present' => true,
+                'marks_obtained' => 50,
+                'marked_by_user_id' => $staff->id,
+            ]);
+        }
+
+        foreach (['Chemistry', 'Maths', 'Physics'] as $subject) {
+            $session = $this->createTestSession($type, $batch, $staff, 'test-two', 'Test Two', $subject);
+            ActivityAttendance::query()->create([
+                'attendable_type' => $session->getMorphClass(),
+                'attendable_id' => $session->id,
+                'student_id' => $student->id,
+                'is_present' => true,
+                'marks_obtained' => 60,
+                'marked_by_user_id' => $staff->id,
+            ]);
+        }
+
+        $this->createTestSession($type, $batch, $staff, 'test-three', 'Test Three', 'Physics');
+
+        $student = $student->fresh(['activeBatchStudent', 'activeEnrollment']);
+
+        $this->assertSame(2, StudentExamMarksMatrix::appearedTestCountForStudent($student, $type->id));
+        $this->assertSame(6, app(ActivityAttendanceService::class)->presentCountForStudent($student, $type));
+        $this->assertSame(
+            2,
+            collect(app(StudentCounterService::class)->profile($student)['items'])->firstWhere('label', 'Exam')['value'] ?? null,
+        );
     }
 
     public function test_profile_writer_saves_one_student_without_changing_classmates(): void

@@ -15,6 +15,7 @@ use App\Models\Student;
 use App\Models\Visit;
 use App\Support\FeatureGate;
 use App\Support\MeetingForOptions;
+use App\Support\StudentExamMarksMatrix;
 use Illuminate\Support\Collection;
 
 class StudentCounterService
@@ -403,7 +404,7 @@ class StudentCounterService
             if ($type->supportsScoring()) {
                 $counters[] = [
                     'label' => $type->name,
-                    'value' => $this->activityAttendance->presentCountForStudent($student, $type),
+                    'value' => StudentExamMarksMatrix::appearedTestCountForStudent($student, $type->id),
                     'tab' => FeatureGate::enabled(LicenseFeature::Marks) ? 'activities' : null,
                 ];
 

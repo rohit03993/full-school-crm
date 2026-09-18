@@ -279,6 +279,16 @@ class StudentExamMarksMatrix
         ];
     }
 
+    /**
+     * How many class tests this student has marks for (one test, not one paper).
+     */
+    public static function appearedTestCountForStudent(Student $student, int $activityTypeId): int
+    {
+        return collect(self::forStudent($student, $activityTypeId)['rows'] ?? [])
+            ->where('appeared', true)
+            ->count();
+    }
+
     public static function rawSubjectForSession(ActivitySession $session): string
     {
         $subject = trim((string) ($session->metadataValue('subject') ?? ''));
