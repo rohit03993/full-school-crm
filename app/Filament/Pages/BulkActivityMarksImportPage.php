@@ -6,6 +6,7 @@ use App\Enums\BatchStatus;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Support\CrmAccess;
+use App\Support\CrmHint;
 use App\Support\FeatureGate;
 use App\Exports\ActivityMarksImportTemplateExport;
 use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
@@ -64,7 +65,11 @@ class BulkActivityMarksImportPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Same exam name and date updates this exam. Students in the new file get new marks; others keep theirs.';
+        if ($this->isLockedToExistingExam()) {
+            return 'This file updates the exam you opened. Students in the file get new marks; others keep theirs.';
+        }
+
+        return CrmHint::text('activity.marks.import');
     }
 
     public int $step = 1;
@@ -133,11 +138,17 @@ class BulkActivityMarksImportPage extends Page
 
     public bool $updatingExistingExam = false;
 
+    public ?string $existingTestKey = null;
+
     public function mount(): void
     {
         $this->academicSessionId = AcademicSession::current()?->id;
         $this->sessionDate = request()->query('date', now()->toDateString());
         $this->updatingExistingExam = request()->boolean('existing');
+        $existingKey = trim((string) request()->query('test_key', ''));
+        $this->existingTestKey = $existingKey !== '' && ! str_contains($existingKey, '|')
+            ? $existingKey
+            : null;
 
         if (filled(request()->query('test_name'))) {
             $this->testName = (string) request()->query('test_name');
@@ -167,6 +178,7 @@ class BulkActivityMarksImportPage extends Page
         ?int $activityTypeId = null,
         ?int $batchId = null,
         ?string $sessionDate = null,
+        ?string $existingTestKey = null,
     ): string {
         $params = array_filter([
             'test_name' => $testName,
@@ -174,6 +186,9 @@ class BulkActivityMarksImportPage extends Page
             'batch_id' => $batchId,
             'date' => $sessionDate,
             'existing' => 1,
+            'test_key' => ($existingTestKey !== null && $existingTestKey !== '' && ! str_contains($existingTestKey, '|'))
+                ? $existingTestKey
+                : null,
         ], fn (mixed $value): bool => filled($value));
 
         $base = static::getUrl();
@@ -188,6 +203,11 @@ class BulkActivityMarksImportPage extends Page
         }
 
         return CrmAccess::can(Auth::user(), CrmPermission::MarksImport);
+    }
+
+    public function isLockedToExistingExam(): bool
+    {
+        return $this->updatingExistingExam && filled($this->existingTestKey);
     }
 
     protected function getHeaderActions(): array
@@ -322,6 +342,7 @@ class BulkActivityMarksImportPage extends Page
                 $this->defaultMaxMarks,
                 $this->previewPayload['rows'],
                 $this->previewPayload['subject_max_marks'] ?? [],
+                $this->existingTestKey,
             );
 
             $this->step = 4;
@@ -604,6 +625,11 @@ class BulkActivityMarksImportPage extends Page
                     'maxRows' => StudentImportFileReader::MAX_ROWS,
                     'importError' => $this->importError,
                     'updatingExistingExam' => $this->updatingExistingExam,
+                    'lockExamIdentity' => $this->isLockedToExistingExam(),
+                    'existingTestKey' => $this->existingTestKey,
+                    'testName' => $this->testName,
+                    'sessionDate' => $this->sessionDate,
+                    'activityTypeId' => $this->activityTypeId,
                     'defaultMaxMarks' => $this->defaultMaxMarks,
                 ]),
         ]);

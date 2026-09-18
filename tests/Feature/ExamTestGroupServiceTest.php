@@ -233,6 +233,40 @@ class ExamTestGroupServiceTest extends TestCase
         $this->assertStringContainsString('-10', $row['scores']['Maths']['display']);
     }
 
+    public function test_rename_keeps_test_key_and_marks(): void
+    {
+        [$staff, $batch, $type] = $this->examContext();
+        $student = $this->createBatchStudent($batch, $staff, '9876500099', 'Rename Student');
+        $maths = $this->createTestSession($type, $batch, $staff, 'rename-key', 'Old Display Name', 'Maths');
+        $this->createTestSession($type, $batch, $staff, 'rename-key', 'Old Display Name', 'Physics');
+
+        app(ActivityAttendanceService::class)->saveMarks(
+            $maths,
+            [$student->id => true],
+            $staff,
+            [$student->id => ['marks_obtained' => 72]],
+        );
+
+        app(ExamTestGroupService::class)->renameGroup($staff, 'rename-key', 'New Display Name');
+
+        $maths->refresh();
+        $physics = ActivitySession::query()
+            ->where('metadata->test_key', 'rename-key')
+            ->where('metadata->subject', 'Physics')
+            ->firstOrFail();
+
+        $this->assertSame('rename-key', $maths->metadataValue('test_key'));
+        $this->assertSame('New Display Name', $maths->metadataValue('test_name'));
+        $this->assertSame('New Display Name', $physics->metadataValue('test_name'));
+        $this->assertSame('rename-key', $physics->metadataValue('test_key'));
+        $this->assertStringStartsWith('New Display Name —', (string) $maths->title);
+        $this->assertDatabaseHas('activity_attendances', [
+            'attendable_id' => $maths->id,
+            'student_id' => $student->id,
+            'marks_obtained' => 72,
+        ]);
+    }
+
     public function test_marks_cannot_go_below_negative_of_max(): void
     {
         [$staff, $batch, $type] = $this->examContext();

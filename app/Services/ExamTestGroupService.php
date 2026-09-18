@@ -6,11 +6,13 @@ use App\Enums\CrmPermission;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Models\ActivityAttendance;
 use App\Models\ActivitySession;
+use App\Models\ExamWindow;
 use App\Models\ResultDeclaration;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Support\CrmAccess;
 use App\Support\PublishedResultsGate;
+use App\Support\StudentExamMarksMatrix;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -139,6 +141,65 @@ class ExamTestGroupService
         });
 
         return $deleted;
+    }
+
+    public function renameGroup(User $staff, string $groupKey, string $newName): void
+    {
+        if (! $this->userCanManage($staff)) {
+            throw ValidationException::withMessages([
+                'exam' => 'You do not have permission to rename exams.',
+            ]);
+        }
+
+        $groupKey = trim($groupKey);
+        $newName = trim($newName);
+
+        if ($groupKey === '') {
+            throw ValidationException::withMessages([
+                'exam' => 'Exam not found.',
+            ]);
+        }
+
+        if ($newName === '') {
+            throw ValidationException::withMessages([
+                'name' => 'Enter an exam name.',
+            ]);
+        }
+
+        $sessions = $this->marksWhatsApp->sessionsForMarksKey($groupKey);
+
+        if ($sessions->isEmpty()) {
+            throw ValidationException::withMessages([
+                'exam' => 'Exam not found.',
+            ]);
+        }
+
+        DB::transaction(function () use ($sessions, $groupKey, $newName, $staff): void {
+            foreach ($sessions as $session) {
+                $subject = StudentExamMarksMatrix::subjectForSession($session);
+                $metadata = is_array($session->metadata) ? $session->metadata : [];
+                $metadata['test_name'] = $newName;
+                $session->metadata = $metadata;
+                $session->title = "{$newName} — {$subject}";
+                $session->save();
+            }
+
+            if (Schema::hasTable('exam_windows')) {
+                ExamWindow::query()->where('test_key', $groupKey)->update(['test_name' => $newName]);
+            }
+
+            if (Schema::hasTable('result_declarations')) {
+                ResultDeclaration::query()->where('group_key', $groupKey)->update(['test_name' => $newName]);
+            }
+
+            $this->audit->log(
+                'exam_renamed',
+                null,
+                ['group_key' => $groupKey],
+                ['group_key' => $groupKey, 'test_name' => $newName],
+                user: $staff,
+            );
+        });
     }
 
     /**

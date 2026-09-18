@@ -32,8 +32,17 @@
         >
             @if (filled($pathUrl ?? null))
                 <a href="{{ $pathUrl }}" class="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5">
-                    Enter marks
+                    Subject progress
                 </a>
+            @endif
+            @if ($canRename ?? false)
+                <button
+                    type="button"
+                    wire:click="startRename({{ \Illuminate\Support\Js::from($groupKey) }}, {{ \Illuminate\Support\Js::from($examLabel ?? '') }})"
+                    class="block w-full px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+                >
+                    Rename
+                </button>
             @endif
             <a href="{{ $excelUrl }}" class="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5">
                 {{ $excelLabel }}

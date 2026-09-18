@@ -112,6 +112,11 @@ class ExamWindowServiceTest extends TestCase
         $service->submit($window->fresh(), $lead);
         $this->assertSame(ExamWindowStatus::Submitted, $window->fresh()->status);
 
+        $submitted = $window->fresh()->load('subjects');
+        $submittedSubject = $submitted->subjects->first();
+        $this->assertTrue($service->canUserEnterSubject($admin, $submitted, $submittedSubject));
+        $this->assertFalse($service->canUserEnterSubject($subjectTeacher, $submitted, $submittedSubject));
+
         try {
             app(ResultDeclarationService::class)->publish($window->test_key, $admin);
             $this->fail('Publish should be blocked before exam approval.');
@@ -124,6 +129,9 @@ class ExamWindowServiceTest extends TestCase
 
         $declaration = app(ResultDeclarationService::class)->publish($window->test_key, $admin);
         $this->assertTrue($declaration->isPublished());
+
+        $published = $window->fresh()->load('subjects');
+        $this->assertFalse($service->canUserEnterSubject($admin, $published, $published->subjects->first()));
     }
 
     public function test_create_rejects_batch_without_subjects(): void

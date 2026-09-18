@@ -17,10 +17,8 @@
 
     @if ($updatingExistingExam ?? false)
         <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-            <p class="font-semibold">This updates the existing exam — it is not a second import</p>
-            <p class="mt-1">
-                Same name and date keep this exam. Students in the new Excel get new marks. Students missing from the file keep their old marks. The exam is not deleted.
-            </p>
+            <p class="font-semibold">Updating this exam — not a second import</p>
+            <p class="mt-1">Students in the Excel are overwritten. Students missing from the file keep their old marks.</p>
         </div>
     @endif
 
@@ -52,10 +50,17 @@
             <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <h2 class="text-lg font-bold text-gray-950 dark:text-white">Name the exam & upload Excel</h2>
-                        <p class="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-                            The <strong>exam name</strong> and <strong>date</strong> identify this exam. Upload your institute Excel (title row is OK) with <strong>Roll No</strong> and subject columns such as <strong>P, C, M</strong> or full names. Totals / rank / percent columns are ignored.
-                        </p>
+                        @if ($lockExamIdentity ?? false)
+                            <h2 class="text-lg font-bold text-gray-950 dark:text-white">Upload corrected Excel</h2>
+                            <p class="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+                                Keep <strong>Roll No</strong> and the same subject columns. Totals / rank / percent columns are ignored.
+                            </p>
+                        @else
+                            <h2 class="text-lg font-bold text-gray-950 dark:text-white">Name the exam & upload Excel</h2>
+                            <p class="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+                                The <strong>exam name</strong> and <strong>date</strong> identify this exam. Upload your institute Excel (title row is OK) with <strong>Roll No</strong> and subject columns such as <strong>P, C, M</strong> or full names. Totals / rank / percent columns are ignored.
+                            </p>
+                        @endif
                     </div>
                     <button type="button" wire:click="downloadTemplate" class="rounded-xl border border-primary-200 px-3.5 py-2 text-sm font-semibold text-primary-700 hover:bg-primary-50 dark:border-primary-500/30 dark:text-primary-300">
                         Download template
@@ -64,18 +69,32 @@
             </div>
 
             <div class="grid gap-5 p-4 sm:p-6 lg:grid-cols-2">
-                <x-crm.select-input label="Exam type" for="marks-type" wire:model="activityTypeId">
-                    <option value="">Select type…</option>
-                    @forelse ($activityTypeOptions as $id => $label)
-                        <option value="{{ $id }}">{{ $label }}</option>
-                    @empty
-                        <option value="" disabled>No exam types with marks enabled — edit Exam Types and turn on “Records marks & scores”</option>
-                    @endforelse
-                </x-crm.select-input>
+                @if ($lockExamIdentity ?? false)
+                    <div class="lg:col-span-2 rounded-xl bg-gray-50 px-4 py-3 text-sm dark:bg-white/5">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Exam</p>
+                        <p class="mt-1 font-semibold text-gray-950 dark:text-white">{{ $testName }}</p>
+                        <p class="mt-0.5 text-gray-600 dark:text-gray-400">
+                            {{ $activityTypeOptions[$activityTypeId] ?? 'Exam' }}
+                            @if (filled($sessionDate))
+                                · {{ \Illuminate\Support\Carbon::parse($sessionDate)->format('d M Y') }}
+                            @endif
+                        </p>
+                        <p class="mt-2 text-xs text-gray-500">To change the title, go back and use Rename. Date and type stay with this exam.</p>
+                    </div>
+                @else
+                    <x-crm.select-input label="Exam type" for="marks-type" wire:model="activityTypeId">
+                        <option value="">Select type…</option>
+                        @forelse ($activityTypeOptions as $id => $label)
+                            <option value="{{ $id }}">{{ $label }}</option>
+                        @empty
+                            <option value="" disabled>No exam types with marks enabled — edit Exam Types and turn on “Records marks & scores”</option>
+                        @endforelse
+                    </x-crm.select-input>
 
-                <x-crm.text-input label="Exam name" model="testName" placeholder="e.g. Unit Test March 2026" />
+                    <x-crm.text-input label="Exam name" model="testName" placeholder="e.g. Unit Test March 2026" />
 
-                <x-crm.text-input label="Exam date" model="sessionDate" type="date" />
+                    <x-crm.text-input label="Exam date" model="sessionDate" type="date" />
+                @endif
 
                 <div>
                     <x-crm.text-input label="Starting out of" model="defaultMaxMarks" type="number" />

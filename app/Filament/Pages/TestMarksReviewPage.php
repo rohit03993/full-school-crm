@@ -10,6 +10,7 @@ use App\Support\FeatureGate;
 use App\Models\StudentMarksheet;
 use App\Models\WhatsAppTemplate;
 use App\Services\ActivityMarksWhatsAppService;
+use App\Services\ExamTestGroupService;
 use App\Services\ExamWindowService;
 use App\Services\ResultDeclarationService;
 use App\Support\CrmHint;
@@ -19,12 +20,14 @@ use App\Support\PublishedResultsGate;
 use App\Support\ResultAuditTrail;
 use App\Support\WhatsAppSendUi;
 use Filament\Actions\Action;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class TestMarksReviewPage extends Page
 {
@@ -86,6 +89,45 @@ class TestMarksReviewPage extends Page
     {
         $actions = [];
 
+        if (filled($this->groupKey) && is_array($this->markSheet)) {
+            $actions[] = Action::make('renameExam')
+                ->label('Rename')
+                ->icon(Heroicon::OutlinedPencilSquare)
+                ->color('gray')
+                ->form([
+                    TextInput::make('name')
+                        ->label('Exam name')
+                        ->required()
+                        ->maxLength(255),
+                ])
+                ->fillForm(fn (): array => [
+                    'name' => (string) ($this->markSheet['test_label'] ?? ''),
+                ])
+                ->action(function (array $data): void {
+                    abort_unless(Auth::user() && app(ExamTestGroupService::class)->userCanManage(Auth::user()), 403);
+
+                    try {
+                        app(ExamTestGroupService::class)->renameGroup(
+                            Auth::user(),
+                            (string) $this->groupKey,
+                            (string) ($data['name'] ?? ''),
+                        );
+                        $this->markSheet = ExamTestGroupMatrix::markSheetForGroup((string) $this->groupKey);
+                        Notification::make()
+                            ->title('Exam renamed')
+                            ->body('Marks were not changed.')
+                            ->success()
+                            ->send();
+                    } catch (ValidationException $exception) {
+                        Notification::make()
+                            ->title('Name not saved')
+                            ->body(collect($exception->errors())->flatten()->first() ?: 'Could not rename this exam.')
+                            ->danger()
+                            ->send();
+                    }
+                });
+        }
+
         if (is_array($this->markSheet) && ! $this->marksAreLocked()) {
             $actions[] = Action::make('uploadMarks')
                 ->label('Update Excel')
@@ -95,6 +137,7 @@ class TestMarksReviewPage extends Page
                     isset($this->markSheet['activity_type_id']) ? (int) $this->markSheet['activity_type_id'] : null,
                     isset($this->markSheet['batch_id']) ? (int) $this->markSheet['batch_id'] : null,
                     $this->markSheet['date']?->format('Y-m-d') ?? null,
+                    $this->groupKey,
                 ));
         }
 

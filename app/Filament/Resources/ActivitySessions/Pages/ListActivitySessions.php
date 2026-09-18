@@ -54,6 +54,10 @@ class ListActivitySessions extends ListRecords
 
     public int $examPage = 1;
 
+    public ?string $renameGroupKey = null;
+
+    public string $renameExamName = '';
+
     public function updatedBatchFilter(): void
     {
         $this->examPage = 1;
@@ -101,9 +105,62 @@ class ListActivitySessions extends ListRecords
         }
     }
 
+    public function startRename(string $groupKey, string $currentName): void
+    {
+        if (! Auth::user() || ! app(ExamTestGroupService::class)->userCanManage(Auth::user())) {
+            Notification::make()->title('Not allowed')->warning()->send();
+
+            return;
+        }
+
+        $this->renameGroupKey = $groupKey;
+        $this->renameExamName = $currentName;
+    }
+
+    public function cancelRename(): void
+    {
+        $this->renameGroupKey = null;
+        $this->renameExamName = '';
+    }
+
+    public function saveRename(): void
+    {
+        $user = Auth::user();
+        $service = app(ExamTestGroupService::class);
+
+        if (! $user || ! $service->userCanManage($user) || blank($this->renameGroupKey)) {
+            Notification::make()->title('Not allowed')->warning()->send();
+
+            return;
+        }
+
+        try {
+            $service->renameGroup($user, (string) $this->renameGroupKey, $this->renameExamName);
+
+            Notification::make()
+                ->title('Exam renamed')
+                ->body('Marks were not changed. Only the name staff see was updated.')
+                ->success()
+                ->send();
+
+            $this->cancelRename();
+        } catch (ValidationException $exception) {
+            Notification::make()
+                ->title('Name not saved')
+                ->body(collect($exception->errors())->flatten()->first() ?: 'Could not rename this exam.')
+                ->danger()
+                ->send();
+        }
+    }
+
     public function getBreadcrumb(): ?string
     {
         return null;
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [];
     }
 
     public function content(Schema $schema): Schema
@@ -153,6 +210,9 @@ class ListActivitySessions extends ListRecords
                     'matrix' => $matrix,
                     'exams' => $exams,
                     'canDeleteExams' => $canDeleteExams,
+                    'canRenameExams' => $canDeleteExams,
+                    'renameGroupKey' => $this->renameGroupKey,
+                    'renameExamName' => $this->renameExamName,
                     'deleteEligibility' => $deleteEligibility,
                     'batchOptions' => Batch::query()->orderBy('name')->pluck('name', 'id')->all(),
                     'activityTypeOptions' => ActivityType::scoringOptions(),

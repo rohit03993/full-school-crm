@@ -16,34 +16,21 @@
     };
 @endphp
 <div class="space-y-3">
-    <div class="flex flex-wrap items-center gap-2">
-        @if (filled($createTeacherExamUrl))
-            <a href="{{ $createTeacherExamUrl }}" class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-900 dark:text-gray-200">
-                {{ CrmMenuLabels::createExam() }}
-            </a>
-        @endif
-        @if (filled($uploadExcelUrl))
-            <a href="{{ $uploadExcelUrl }}" class="inline-flex items-center rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500">
-                {{ CrmMenuLabels::uploadMarksExcel() }}
-            </a>
-        @endif
-        @if (filled($teacherExamsListUrl))
-            <a href="{{ $teacherExamsListUrl }}" class="text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400">
-                {{ CrmMenuLabels::teacherExamsInProgress() }}
-            </a>
-        @endif
-        <p class="w-full text-xs text-gray-500 dark:text-gray-400 sm:ml-auto sm:w-auto">
-            Same exam name and date updates existing marks. It does not create a second exam.
-        </p>
-    </div>
+    @if (filled($renameGroupKey ?? null))
+        <div class="rounded-2xl border border-primary-200 bg-white p-4 shadow-sm dark:border-primary-500/30 dark:bg-gray-900">
+            <p class="text-sm font-semibold text-gray-950 dark:text-white">Rename exam</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Marks stay the same. Only the title on this list and on View sheet changes.</p>
+            <input type="text" wire:model="renameExamName" class="fi-crm-input mt-3 block w-full" maxlength="255">
+            <div class="mt-3 flex flex-wrap gap-2">
+                <button type="button" wire:click="saveRename" class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500">Save name</button>
+                <button type="button" wire:click="cancelRename" class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:border-white/10 dark:text-gray-300">Cancel</button>
+            </div>
+        </div>
+    @endif
 
     <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-        <div class="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/10 sm:flex-row sm:items-end sm:justify-between sm:px-5">
-            <div>
-                <h2 class="text-base font-bold text-gray-950 dark:text-white">Exams</h2>
-                <p class="text-xs text-gray-500 dark:text-gray-400">One row per exam. Open View sheet to review and publish.</p>
-            </div>
-            <div class="grid grid-cols-2 gap-2 sm:max-w-md sm:flex-1">
+        <div class="flex justify-end border-b border-gray-100 px-4 py-3 dark:border-white/10 sm:px-5">
+            <div class="grid w-full grid-cols-2 gap-2 sm:max-w-md">
                 <x-crm.select-input label="Batch" for="batch-filter" wire:model.live="batchFilter">
                     <option value="">All batches</option>
                     @foreach ($batchOptions as $id => $label)
@@ -83,6 +70,7 @@
                             $row['activity_type_id'] ?? null,
                             $row['batch_id'] ?? null,
                             $row['date']?->format('Y-m-d'),
+                            $groupKey,
                         );
                     @endphp
                     <div class="rounded-xl bg-gray-50 p-3 ring-1 ring-gray-200 dark:bg-white/5 dark:ring-white/10">
@@ -115,6 +103,8 @@
                                     'pathUrl' => is_array($path) ? ($path['url'] ?? null) : null,
                                     'excelUrl' => $excelUrl,
                                     'excelLabel' => $studentCount > 0 ? 'Update Excel' : CrmMenuLabels::uploadMarksExcel(),
+                                    'canRename' => $canRenameExams ?? false,
+                                    'examLabel' => (string) ($row['label'] ?? ''),
                                     'canDelete' => ($canDeleteExams ?? false) && ($deleteEligibility[$groupKey]['allowed'] ?? false),
                                     'groupKey' => $groupKey,
                                     'stacked' => true,
@@ -151,6 +141,7 @@
                                     $row['activity_type_id'] ?? null,
                                     $row['batch_id'] ?? null,
                                     $row['date']?->format('Y-m-d'),
+                                    $groupKey,
                                 );
                             @endphp
                             <tr class="bg-white dark:bg-gray-900">
@@ -187,6 +178,8 @@
                                             'pathUrl' => is_array($path) ? ($path['url'] ?? null) : null,
                                             'excelUrl' => $excelUrl,
                                             'excelLabel' => $studentCount > 0 ? 'Update Excel' : CrmMenuLabels::uploadMarksExcel(),
+                                            'canRename' => $canRenameExams ?? false,
+                                            'examLabel' => (string) ($row['label'] ?? ''),
                                             'canDelete' => ($canDeleteExams ?? false) && ($deleteEligibility[$groupKey]['allowed'] ?? false),
                                             'groupKey' => $groupKey,
                                             'stacked' => false,

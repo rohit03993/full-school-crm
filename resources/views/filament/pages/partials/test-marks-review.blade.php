@@ -121,7 +121,7 @@
         @if ($marksAreLocked ?? false)
             · Marks locked
         @else
-            · Empty cells show as Absent
+            · Read-only grid — Update Excel for many students, or Edit marks on a student profile for one
         @endif
     </div>
 

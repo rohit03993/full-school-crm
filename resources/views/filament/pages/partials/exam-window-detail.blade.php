@@ -74,7 +74,7 @@
                         href="{{ $reviewUrl }}"
                         class="inline-flex items-center rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500"
                     >
-                        Publish results
+                        View sheet
                     </a>
                 @endif
             </div>
@@ -93,8 +93,8 @@
 
         <div class="rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
             <div class="border-b border-gray-200 px-4 py-3 dark:border-white/10 sm:px-5">
-                <h3 class="text-sm font-bold text-gray-950 dark:text-white">Subjects</h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Each row opens mark entry for that subject.</p>
+                <h3 class="text-sm font-bold text-gray-950 dark:text-white">Subject progress</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Open a subject to type or correct that paper. This is not the full class grid.</p>
             </div>
             <div class="divide-y divide-gray-100 dark:divide-white/10">
                 @foreach ($progress['subjects'] ?? [] as $row)
@@ -113,7 +113,7 @@
                                 @endif
                             </p>
                         </div>
-                        @if ($windowSubject && $canEnterMarks($windowSubject) && $row['activity_session_id'] && $window->status->allowsTeacherEntry())
+                        @if ($windowSubject && $canEnterMarks($windowSubject) && $row['activity_session_id'])
                             <a
                                 href="{{ $marksEntryUrl($row['activity_session_id']) }}"
                                 class="inline-flex shrink-0 items-center rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500"

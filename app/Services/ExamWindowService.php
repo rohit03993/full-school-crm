@@ -14,6 +14,7 @@ use App\Models\ExamWindow;
 use App\Models\ExamWindowSubject;
 use App\Models\User;
 use App\Support\CrmAccess;
+use App\Support\PublishedResultsGate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -333,12 +334,16 @@ class ExamWindowService
 
     public function canUserEnterSubject(User $user, ExamWindow $window, ExamWindowSubject $windowSubject): bool
     {
-        if (! $window->status->allowsTeacherEntry()) {
+        if (filled($window->test_key) && PublishedResultsGate::marksAreLocked((string) $window->test_key)) {
             return false;
         }
 
-        if ($this->isAdmin($user)) {
+        if (CrmAccess::can($user, CrmPermission::AcademicsManage)) {
             return true;
+        }
+
+        if (! $window->status->allowsTeacherEntry()) {
+            return false;
         }
 
         if (CrmAccess::can($user, CrmPermission::MarksImport)) {

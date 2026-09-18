@@ -206,12 +206,14 @@ class ActivityMarksBulkImportService
         float $defaultMaxMarks,
         array $previewRows,
         array $subjectMaxMarks = [],
+        ?string $existingTestKey = null,
     ): array {
         if (! $activityType->supportsScoring()) {
             throw new \InvalidArgumentException('Selected activity type does not support marks.');
         }
 
-        $testKey = $this->buildTestKey($testName, $sessionDate);
+        $reuseExistingKey = filled($existingTestKey);
+        $testKey = $reuseExistingKey ? trim((string) $existingTestKey) : $this->buildTestKey($testName, $sessionDate);
         PublishedResultsGate::assertMarksEditableForGroupKey($testKey);
 
         $readyRows = collect($previewRows)->where('status', 'ready')->values();
@@ -245,6 +247,7 @@ class ActivityMarksBulkImportService
                         $subject,
                         (float) ($subjectMaxMarks[$subject] ?? $defaultMaxMarks),
                         $staff,
+                        $reuseExistingKey,
                     );
 
                     if ($created) {
@@ -377,15 +380,25 @@ class ActivityMarksBulkImportService
         string $subject,
         float $defaultMaxMarks,
         User $staff,
+        bool $matchByTestKeyOnly = false,
     ): array {
         $canonicalSubject = ExamSubjectCatalog::canonicalDisplayName($subject);
-        $existing = $this->findExistingSession($activityType, $batchId, $sessionDate, $testKey, $canonicalSubject);
+        $existing = $this->findExistingSession(
+            $activityType,
+            $batchId,
+            $sessionDate,
+            $testKey,
+            $canonicalSubject,
+            $matchByTestKeyOnly,
+        );
 
         if ($existing) {
             $metadata = is_array($existing->metadata) ? $existing->metadata : [];
+            $metadata['test_name'] = $testName;
             $metadata['subject'] = $canonicalSubject;
             $metadata['max_marks'] = $defaultMaxMarks;
             $existing->metadata = $metadata;
+            $existing->title = "{$testName} — {$canonicalSubject}";
             $existing->save();
 
             return [$existing, false];
@@ -414,13 +427,13 @@ class ActivityMarksBulkImportService
         string $sessionDate,
         string $testKey,
         string $subject,
+        bool $matchByTestKeyOnly = false,
     ): ?ActivitySession {
         $names = ExamSubjectCatalog::matchingStoredNames($subject);
 
-        return ActivitySession::query()
+        $query = ActivitySession::query()
             ->where('activity_type_id', $activityType->id)
             ->where('batch_id', $batchId)
-            ->whereDate('session_date', $sessionDate)
             ->where('metadata->test_key', $testKey)
             ->where(function ($query) use ($names): void {
                 foreach ($names as $index => $name) {
@@ -432,7 +445,12 @@ class ActivityMarksBulkImportService
 
                     $query->orWhere('metadata->subject', $name);
                 }
-            })
-            ->first();
+            });
+
+        if (! $matchByTestKeyOnly) {
+            $query->whereDate('session_date', $sessionDate);
+        }
+
+        return $query->first();
     }
 }

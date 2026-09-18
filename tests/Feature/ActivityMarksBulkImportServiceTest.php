@@ -21,6 +21,7 @@ use App\Services\ActivityMarksWhatsAppService;
 use App\Services\AdmissionService;
 use App\Services\BatchService;
 use App\Services\EnquiryService;
+use App\Services\ExamTestGroupService;
 use App\Services\WhatsAppTemplateParamResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -521,5 +522,92 @@ class ActivityMarksBulkImportServiceTest extends TestCase
         $this->assertSame(0, $preview['ready_count']);
         $this->assertSame(1, $preview['error_count']);
         $this->assertStringContainsString('cannot be below', implode(' ', $preview['rows'][0]['errors'] ?? []));
+    }
+
+    public function test_existing_test_key_overwrites_only_students_in_file_after_rename(): void
+    {
+        $staff = $this->createStaffUser();
+        $keep = $this->createEnrolledStudent($staff, '801', '9876543801');
+        $change = $this->createEnrolledStudent($staff, '802', '9876543802');
+        $course = Course::query()->firstOrFail();
+
+        $batch = Batch::query()->create([
+            'name' => 'Update Key Batch',
+            'course_id' => $course->id,
+            'trainer_user_id' => $staff->id,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-12-31',
+            'status' => BatchStatus::Active,
+        ]);
+
+        app(BatchService::class)->assign($keep, $batch, $staff);
+        app(BatchService::class)->assign($change, $batch, $staff);
+
+        $activityType = ActivityType::query()->create([
+            'name' => 'Keyed Exam',
+            'field_schema' => [
+                ['key' => 'subject', 'label' => 'Subject', 'type' => 'text'],
+                ['key' => 'max_marks', 'label' => 'Max Marks', 'type' => 'number'],
+            ],
+            'is_enabled' => true,
+        ]);
+
+        $import = app(ActivityMarksBulkImportService::class);
+        $first = $import->buildPreview(
+            ['Roll Number', 'Maths'],
+            [['801', '40'], ['802', '50']],
+            ['roll_column' => 0, 'subject_columns' => [1]],
+            null,
+            null,
+            100,
+        );
+
+        $created = $import->import(
+            $staff,
+            $activityType,
+            'Original Display Name',
+            '2026-09-18',
+            100,
+            $first['rows'],
+        );
+
+        $testKey = (string) $created['test_key'];
+        app(ExamTestGroupService::class)->renameGroup($staff, $testKey, 'Renamed Display Name');
+
+        $second = $import->buildPreview(
+            ['Roll Number', 'Maths'],
+            [['802', '88']],
+            ['roll_column' => 0, 'subject_columns' => [1]],
+            null,
+            null,
+            100,
+        );
+
+        $result = $import->import(
+            $staff,
+            $activityType,
+            'Renamed Display Name',
+            '2026-09-18',
+            100,
+            $second['rows'],
+            [],
+            $testKey,
+        );
+
+        $this->assertSame($testKey, $result['test_key']);
+        $this->assertSame(1, ActivitySession::query()->where('metadata->test_key', $testKey)->count());
+
+        $session = ActivitySession::query()->where('metadata->test_key', $testKey)->firstOrFail();
+        $this->assertSame('Renamed Display Name', $session->metadataValue('test_name'));
+        $this->assertDatabaseHas('activity_attendances', [
+            'student_id' => $keep->id,
+            'attendable_id' => $session->id,
+            'marks_obtained' => 40,
+        ]);
+        $this->assertDatabaseHas('activity_attendances', [
+            'student_id' => $change->id,
+            'attendable_id' => $session->id,
+            'marks_obtained' => 88,
+        ]);
     }
 }
