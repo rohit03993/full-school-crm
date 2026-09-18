@@ -124,6 +124,17 @@ class AttendanceHubClassWiseTest extends TestCase
             ->assertDontSee('Today’s overview for students and staff');
     }
 
+    public function test_picked_date_is_shown_as_that_days_overview_not_today(): void
+    {
+        $this->travelTo('2026-09-18 10:00:00');
+        $this->actingAsAdmin();
+
+        Livewire::test(AttendanceHubPage::class)
+            ->set('overviewDate', '2026-09-11')
+            ->assertSee('Overview for 11 Sep 2026')
+            ->assertDontSee('Today’s overview');
+    }
+
     public function test_staff_filter_hides_class_wise_students(): void
     {
         $this->travelTo('2026-09-11 10:00:00');

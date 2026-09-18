@@ -4,7 +4,13 @@
     <div class="crm-att-hub-overview overflow-visible rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
         <div class="flex flex-col gap-2.5 border-b border-gray-100 px-3 py-2.5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-4">
             <div class="min-w-0">
-                <h3 class="text-sm font-bold text-gray-950 dark:text-white">Today’s overview</h3>
+                <h3 class="text-sm font-bold text-gray-950 dark:text-white">
+                    @if (($overview['date'] ?? '') === now()->toDateString())
+                        Today’s overview
+                    @else
+                        Overview for {{ $overview['date_label'] }}
+                    @endif
+                </h3>
                 <p class="text-xs text-gray-500">manual + machine</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
