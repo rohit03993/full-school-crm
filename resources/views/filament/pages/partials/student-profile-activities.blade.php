@@ -15,6 +15,12 @@
             'canSendExamMarksWhatsApp' => $canSendExamMarksWhatsApp ?? false,
             'examMarksEditGroupKey' => $examMarksEditGroupKey ?? null,
             'examMarksDraft' => $examMarksDraft ?? [],
+            'examMarksWhatsAppSends' => ($canSendExamMarksWhatsApp ?? false) && $student
+                ? app(\App\Services\ActivityMarksWhatsAppService::class)->lastSendsForStudent(
+                    $student,
+                    collect($matrix['rows'])->pluck('group_key')->filter()->values()->all(),
+                )
+                : [],
         ])
     @endif
 @elseif (! $loaded)

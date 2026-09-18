@@ -805,6 +805,16 @@ class StudentProfilePage extends Page
     }
 
     /**
+     * @param  array<string, mixed>  $arguments
+     * @return array{heading: string, submit: string, description: string}
+     */
+    protected function examMarksWhatsAppModalCopy(array $arguments): array
+    {
+        return app(ActivityMarksWhatsAppService::class)
+            ->confirmCopyForStudent($this->record, (string) ($arguments['groupKey'] ?? ''));
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     protected function examMarksRow(string $groupKey): ?array
@@ -2817,29 +2827,10 @@ class StudentProfilePage extends Page
                 ->color('success')
                 ->extraAttributes(WhatsAppSendUi::loadingAttributes())
                 ->requiresConfirmation()
-                ->modalHeading('Send this test on WhatsApp?')
-                ->modalSubmitActionLabel('Send now')
+                ->modalHeading(fn (array $arguments): string => $this->examMarksWhatsAppModalCopy($arguments)['heading'])
+                ->modalSubmitActionLabel(fn (array $arguments): string => $this->examMarksWhatsAppModalCopy($arguments)['submit'])
                 ->arguments(['groupKey' => null])
-                ->modalDescription(function (array $arguments): string {
-                    $preview = app(ActivityMarksWhatsAppService::class)
-                        ->previewForStudent($this->record, (string) ($arguments['groupKey'] ?? ''));
-
-                    if (! $preview) {
-                        return 'This student has no marks for this test. Nothing will be sent.';
-                    }
-
-                    if (blank($preview['mobile'])) {
-                        return 'Add a parent mobile number before sending.';
-                    }
-
-                    if (blank($preview['template_name'])) {
-                        return 'Pick test_marks on WhatsApp → Automations → Exam marks, then try again.';
-                    }
-
-                    $roll = filled($preview['roll']) ? $preview['roll'] : 'no roll number';
-
-                    return "To: {$preview['mobile']}\nRoll: {$roll}\nTest: {$preview['test_name']} ({$preview['test_date']})\nMarks: {$preview['marks_summary']}\nTemplate: {$preview['template_name']}\n\nOnly this student is messaged.";
-                })
+                ->modalDescription(fn (array $arguments): string => $this->examMarksWhatsAppModalCopy($arguments)['description'])
                 ->action(function (array $arguments): void {
                     abort_unless($this->canSendExamMarksWhatsApp(), 403);
 

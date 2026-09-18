@@ -11,6 +11,7 @@ use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Enums\WhatsAppCampaignStatus;
+use App\Enums\WhatsAppRecipientStatus;
 use App\Filament\Pages\StudentProfilePage;
 use App\Jobs\RunWhatsAppCampaignJob;
 use App\Models\AcademicSession;
@@ -26,6 +27,7 @@ use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
+use App\Models\WhatsAppCampaignRecipient;
 use App\Models\WhatsAppTemplate;
 use App\Services\ActivityAttendanceService;
 use App\Services\ActivityMarksWhatsAppService;
@@ -83,6 +85,7 @@ class StudentProfileExamMarksWhatsAppTest extends TestCase
         $this->assertNotNull($preview);
         $this->assertSame('9876501001', $preview['mobile']);
         $this->assertStringContainsString('Maths: 42/50', $preview['marks_summary']);
+        $this->assertNull($preview['prior_send']);
         $this->assertNotNull($service->previewForStudent($studentB, $groupKey));
         $this->assertNull($service->previewForStudent($studentA, $groupKey.'-missing'));
 
@@ -98,6 +101,9 @@ class StudentProfileExamMarksWhatsAppTest extends TestCase
         $this->assertSame(WhatsAppCampaignStatus::Queued, $queued->status);
         $this->assertSame(1, $queued->recipients()->count());
         $this->assertSame([$studentA->id], $queued->recipients()->pluck('student_id')->all());
+        $queuedPreview = $service->previewForStudent($studentA->fresh(), $groupKey);
+        $this->assertSame('queued', $queuedPreview['prior_send']['status'] ?? null);
+        $this->assertSame('profile', $queuedPreview['prior_send']['source'] ?? null);
         Queue::assertPushed(RunWhatsAppCampaignJob::class, fn (RunWhatsAppCampaignJob $job): bool => $job->campaignId === $queued->id);
     }
 
@@ -140,6 +146,56 @@ class StudentProfileExamMarksWhatsAppTest extends TestCase
             ->set('profileTab', 'activities')
             ->assertSee('Unit Test — Sept 2026')
             ->assertDontSeeHtml('confirmSendExamMarksWhatsApp');
+    }
+
+    public function test_profile_asks_to_resend_when_class_sheet_already_sent(): void
+    {
+        $this->seed(\Database\Seeders\ActivityTypeSeeder::class);
+
+        $admin = $this->createSuperAdmin();
+        [$studentA, $studentB, $groupKey] = $this->createClassWithTwoMarkedStudents($admin);
+        $template = $this->createMarksTemplate();
+
+        $campaign = WhatsAppCampaign::query()->create([
+            'whatsapp_template_id' => $template->id,
+            'name' => 'Marks · Unit Test — Sept 2026',
+            'status' => WhatsAppCampaignStatus::Completed,
+            'total_recipients' => 2,
+            'sent_count' => 1,
+            'failed_count' => 0,
+            'shot_at' => now(),
+            'finished_at' => now(),
+            'campaign_variables' => [
+                'audience_source' => 'activity_marks',
+                'test_key' => $groupKey,
+            ],
+        ]);
+
+        WhatsAppCampaignRecipient::query()->create([
+            'whatsapp_campaign_id' => $campaign->id,
+            'student_id' => $studentA->id,
+            'phone' => (string) $studentA->mobile,
+            'status' => WhatsAppRecipientStatus::Sent,
+        ]);
+
+        $preview = app(ActivityMarksWhatsAppService::class)->previewForStudent($studentA, $groupKey);
+        $this->assertSame('sent', $preview['prior_send']['status'] ?? null);
+        $this->assertSame('class_sheet', $preview['prior_send']['source'] ?? null);
+        $this->assertNull(app(ActivityMarksWhatsAppService::class)->previewForStudent($studentB, $groupKey)['prior_send']);
+
+        $copy = app(ActivityMarksWhatsAppService::class)->confirmCopyForStudent($studentA, $groupKey);
+        $this->assertSame('Already sent — send again?', $copy['heading']);
+        $this->assertSame('Resend now', $copy['submit']);
+        $this->assertStringContainsString('class mark sheet', $copy['description']);
+        $this->assertStringContainsString('already received this test', $copy['description']);
+
+        $this->actingAs($admin);
+
+        Livewire::test(StudentProfilePage::class, ['record' => $studentA])
+            ->set('profileTab', 'activities')
+            ->assertSee('Resend')
+            ->call('confirmSendExamMarksWhatsApp', $groupKey)
+            ->assertActionMounted('sendExamMarksWhatsApp');
     }
 
     /**

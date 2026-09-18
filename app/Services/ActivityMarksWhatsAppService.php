@@ -2,16 +2,20 @@
 
 namespace App\Services;
 
+use App\Enums\WhatsAppCampaignStatus;
+use App\Enums\WhatsAppRecipientStatus;
 use App\Models\ActivityAttendance;
 use App\Models\ActivitySession;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
+use App\Models\WhatsAppCampaignRecipient;
 use App\Models\WhatsAppTemplate;
 use App\Support\StudentExamMarksMatrix;
 use App\Support\TestMarksWhatsAppTemplate;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class ActivityMarksWhatsAppService
 {
@@ -112,7 +116,79 @@ class ActivityMarksWhatsAppService
     }
 
     /**
-     * @return array{mobile: string, test_name: string, test_date: string, marks_summary: string, roll: string, template_name: ?string}|null
+     * Latest class-sheet or profile send for this student and test.
+     *
+     * @return array{status: string, at: string, source: string, campaign_id: int}|null
+     */
+    public function lastSendForStudent(Student $student, string $marksKey): ?array
+    {
+        return $this->lastSendsForStudent($student, [$marksKey])[$marksKey] ?? null;
+    }
+
+    /**
+     * @param  list<string>  $marksKeys
+     * @return array<string, array{status: string, at: string, source: string, campaign_id: int}>
+     */
+    public function lastSendsForStudent(Student $student, array $marksKeys): array
+    {
+        $marksKeys = array_values(array_filter($marksKeys, fn (string $key): bool => filled($key)));
+
+        if ($marksKeys === [] || ! Schema::hasTable('whatsapp_campaign_recipients')) {
+            return [];
+        }
+
+        $recipients = WhatsAppCampaignRecipient::query()
+            ->where('student_id', $student->id)
+            ->whereIn('status', [
+                WhatsAppRecipientStatus::Sent,
+                WhatsAppRecipientStatus::Pending,
+                WhatsAppRecipientStatus::Processing,
+            ])
+            ->whereHas('campaign', function ($query): void {
+                $query
+                    ->where('campaign_variables->audience_source', 'activity_marks')
+                    ->where(function ($inner): void {
+                        $inner->whereIn('status', [
+                            WhatsAppCampaignStatus::Queued,
+                            WhatsAppCampaignStatus::Running,
+                            WhatsAppCampaignStatus::Paused,
+                            WhatsAppCampaignStatus::Completed,
+                        ])->orWhere('sent_count', '>', 0);
+                    });
+            })
+            ->with('campaign')
+            ->orderByDesc('id')
+            ->get();
+
+        $latest = [];
+
+        foreach ($recipients as $recipient) {
+            $testKey = trim((string) $recipient->campaign?->campaignVariable('test_key'));
+
+            if ($testKey === '' || ! in_array($testKey, $marksKeys, true) || isset($latest[$testKey])) {
+                continue;
+            }
+
+            $at = $recipient->updated_at
+                ?? $recipient->campaign?->shot_at
+                ?? $recipient->campaign?->finished_at
+                ?? $recipient->created_at;
+
+            $latest[$testKey] = [
+                'status' => $recipient->status === WhatsAppRecipientStatus::Sent ? 'sent' : 'queued',
+                'at' => $at?->timezone((string) config('app.timezone'))->format('d M Y, h:i A') ?? '—',
+                'source' => ((int) $recipient->campaign->campaignVariable('only_student_id')) > 0
+                    ? 'profile'
+                    : 'class_sheet',
+                'campaign_id' => (int) $recipient->whatsapp_campaign_id,
+            ];
+        }
+
+        return $latest;
+    }
+
+    /**
+     * @return array{mobile: string, test_name: string, test_date: string, marks_summary: string, roll: string, template_name: ?string, prior_send: array{status: string, at: string, source: string, campaign_id: int}|null}|null
      */
     public function previewForStudent(Student $student, string $marksKey): ?array
     {
@@ -138,6 +214,67 @@ class ActivityMarksWhatsAppService
             'marks_summary' => (string) $summary,
             'roll' => (string) ($student->activeEnrollment?->enrollment_number ?? ''),
             'template_name' => $this->defaultTemplateName(),
+            'prior_send' => $this->lastSendForStudent($student, $marksKey),
+        ];
+    }
+
+    /**
+     * @return array{heading: string, submit: string, description: string}
+     */
+    public function confirmCopyForStudent(Student $student, string $marksKey): array
+    {
+        $preview = $this->previewForStudent($student, $marksKey);
+
+        if (! $preview) {
+            return [
+                'heading' => 'Send this test on WhatsApp?',
+                'submit' => 'Send now',
+                'description' => 'This student has no marks for this test. Nothing will be sent.',
+            ];
+        }
+
+        if (blank($preview['mobile'])) {
+            return [
+                'heading' => 'Send this test on WhatsApp?',
+                'submit' => 'Send now',
+                'description' => 'Add a parent mobile number before sending.',
+            ];
+        }
+
+        if (blank($preview['template_name'])) {
+            return [
+                'heading' => 'Send this test on WhatsApp?',
+                'submit' => 'Send now',
+                'description' => 'Pick test_marks on WhatsApp → Automations → Exam marks, then try again.',
+            ];
+        }
+
+        $prior = $preview['prior_send'] ?? null;
+        $priorStatus = is_array($prior) ? (string) ($prior['status'] ?? '') : '';
+        $source = is_array($prior) ? (string) ($prior['source'] ?? '') : '';
+        $sourcePhrase = $source === 'profile'
+            ? "from this student's profile"
+            : 'from the class mark sheet (Excel / bulk send)';
+
+        $heading = match ($priorStatus) {
+            'sent' => 'Already sent — send again?',
+            'queued' => 'Already queued — send another?',
+            default => 'Send this test on WhatsApp?',
+        };
+        $submit = $priorStatus === 'sent' ? 'Resend now' : 'Send now';
+        $warning = match ($priorStatus) {
+            'sent' => "This parent already received this test on WhatsApp on {$prior['at']} {$sourcePhrase}.\n\nSend again with the current marks?\n\n",
+            'queued' => "A WhatsApp for this test is already queued for this parent ({$prior['at']} {$sourcePhrase}). Send another anyway?\n\n",
+            default => '',
+        };
+
+        $roll = filled($preview['roll']) ? $preview['roll'] : 'no roll number';
+
+        return [
+            'heading' => $heading,
+            'submit' => $submit,
+            'description' => $warning
+                ."To: {$preview['mobile']}\nRoll: {$roll}\nTest: {$preview['test_name']} ({$preview['test_date']})\nMarks: {$preview['marks_summary']}\nTemplate: {$preview['template_name']}\n\nOnly this student is messaged.",
         ];
     }
 

@@ -14,6 +14,12 @@
 
         return rtrim(rtrim(number_format((float) $max, 2), '0'), '.');
     };
+    $examMarksWhatsAppSends = $examMarksWhatsAppSends ?? [];
+    $whatsAppLabel = function (array $row) use ($examMarksWhatsAppSends): string {
+        $prior = $examMarksWhatsAppSends[$row['group_key'] ?? ''] ?? null;
+
+        return (($prior['status'] ?? null) === 'sent') ? 'Resend' : 'WhatsApp';
+    };
 @endphp
 <div class="space-y-2 lg:hidden">
     <p class="text-xs text-gray-500 dark:text-gray-400">Class exams — marks if this student appeared, blank if not. Add or edit this student only; the class sheet stays as it is.</p>
@@ -97,7 +103,7 @@
                             wire:target="confirmSendExamMarksWhatsApp"
                             class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70"
                         >
-                            WhatsApp
+                            {{ $whatsAppLabel($row) }}
                         </button>
                     @endif
                 </div>
@@ -199,7 +205,7 @@
                                         wire:target="confirmSendExamMarksWhatsApp"
                                         class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70"
                                     >
-                                        WhatsApp
+                                        {{ $whatsAppLabel($row) }}
                                     </button>
                                 @endif
                             </div>
