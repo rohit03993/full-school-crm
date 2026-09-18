@@ -203,14 +203,21 @@
         @apply overflow-visible;
     }
 
-    /* The grouped period control is `w-max`, so let it scroll rather than overflow */
+    /* Period pills wrap on phones so Custom is not clipped off the card */
     .crm-dash-filters .fi-fo-toggle-buttons-wrp {
-        @apply -mx-1 max-w-full overflow-x-auto px-1 pb-0.5;
+        @apply min-w-0 max-w-full overflow-visible px-0 pb-0.5;
         scrollbar-width: none;
     }
 
     .crm-dash-filters .fi-fo-toggle-buttons-wrp::-webkit-scrollbar {
         display: none;
+    }
+
+    .crm-dash-filters .fi-fo-toggle-buttons,
+    .crm-dash-filters .fi-fo-toggle-buttons-wrp > .fi-btn-group,
+    .crm-dash-filters .fi-fo-toggle-buttons-wrp [role="group"] {
+        max-width: 100%;
+        min-width: 0;
     }
 
     .crm-dash-filters__toggle {
@@ -246,8 +253,42 @@
     }
 
     @media (max-width: 1023px) {
+        .crm-dash-filters .fi-section-content {
+            @apply min-w-0;
+        }
+
         .crm-dash-filters:not(.is-expanded) .crm-dash-filters__more {
             @apply hidden;
+        }
+
+        .crm-dash-filters .fi-fo-toggle-buttons-wrp,
+        .crm-dash-filters .fi-fo-toggle-buttons,
+        .crm-dash-filters .fi-fo-toggle-buttons-wrp > *,
+        .crm-dash-filters .fi-fo-toggle-buttons-wrp [role="group"] {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+        }
+
+        .crm-dash-filters .fi-fo-toggle-buttons,
+        .crm-dash-filters .fi-fo-toggle-buttons-wrp [role="group"],
+        .crm-dash-filters .fi-fo-toggle-buttons-wrp > .fi-btn-group {
+            display: grid !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .crm-dash-filters .fi-fo-toggle-buttons .fi-btn,
+        .crm-dash-filters .fi-fo-toggle-buttons-wrp .fi-btn {
+            @apply min-w-0 justify-center px-1 text-xs;
+        }
+
+        .fi-page:has(.crm-dash-filters) .fi-page-header {
+            @apply mb-1.5;
+        }
+
+        .fi-page:has(.crm-dash-filters) .fi-header-actions,
+        .fi-page:has(.crm-dash-filters) .fi-header-actions-ctn {
+            @apply w-full;
         }
     }
 

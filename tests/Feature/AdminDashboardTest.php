@@ -48,6 +48,9 @@ class AdminDashboardTest extends TestCase
             ->assertDontSee('Set the session and period once')
             ->assertSee('crm-dash-filters__toggle', false)
             ->assertSee('This month')
+            ->assertDontSee('Fee collection trend')
+            ->assertDontSee('Where leads came from')
+            ->assertDontSee('Hide analytics')
             ->assertSchemaStateSet([
                 'academic_session_id' => $session->id,
                 'range' => DashboardFilters::RANGE_MONTH,

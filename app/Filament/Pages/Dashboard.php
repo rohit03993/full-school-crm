@@ -5,15 +5,10 @@ namespace App\Filament\Pages;
 use App\Filament\Widgets\BatchOverviewWidget;
 use App\Filament\Widgets\CrmFinanceStatsWidget;
 use App\Filament\Widgets\CrmLeadStatsWidget;
-use App\Filament\Widgets\CourseAdmissionsChartWidget;
-use App\Filament\Widgets\DashboardAnalyticsWidget;
 use App\Filament\Widgets\DashboardAttentionWidget;
 use App\Filament\Widgets\DashboardHeroWidget;
 use App\Filament\Widgets\DashboardTodayPulseWidget;
 use App\Filament\Widgets\LicenseStatusWidget;
-use App\Filament\Widgets\LeadSourceChartWidget;
-use App\Filament\Widgets\MonthlyAdmissionsChartWidget;
-use App\Filament\Widgets\MonthlyFeeCollectionChartWidget;
 use App\Filament\Widgets\PendingAdmissionsWidget;
 use App\Filament\Widgets\RecentEnquiriesWidget;
 use App\Models\AcademicSession;
@@ -201,16 +196,11 @@ class Dashboard extends BaseDashboard
             DashboardHeroWidget::class,
             DashboardAttentionWidget::class,
             DashboardTodayPulseWidget::class,
-            DashboardAnalyticsWidget::class,
             CrmFinanceStatsWidget::class,
             CrmLeadStatsWidget::class,
             BatchOverviewWidget::class,
             RecentEnquiriesWidget::class,
             PendingAdmissionsWidget::class,
-            MonthlyFeeCollectionChartWidget::class,
-            MonthlyAdmissionsChartWidget::class,
-            LeadSourceChartWidget::class,
-            CourseAdmissionsChartWidget::class,
         ];
     }
 }
