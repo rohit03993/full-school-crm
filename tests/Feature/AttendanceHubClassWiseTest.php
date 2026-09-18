@@ -88,8 +88,13 @@ class AttendanceHubClassWiseTest extends TestCase
         $this->assertSame(2, $row['absent']);
         $this->assertArrayNotHasKey('unmarked', $row);
         $this->assertSame(2, $overview['students_absent']);
-        $this->assertSame(3, $overview['students_manual_marked']);
+        $this->assertSame(1, $overview['students_present']);
+        $this->assertSame(1, $overview['students_manual_marked']);
         $this->assertSame(0, $overview['students_auto_marked']);
+        $this->assertSame(
+            $overview['students_present'],
+            $overview['students_auto_marked'] + $overview['students_manual_marked'],
+        );
 
         $presentRoster = app(AttendanceHubOverviewService::class)
             ->classBucketRoster($batch->id, '2026-09-11', 'present');
@@ -274,18 +279,31 @@ class AttendanceHubClassWiseTest extends TestCase
             'marked_by_user_id' => $staff->id,
         ]);
 
+        $manualPresent = $this->makeStudent('Manual Present', '9876500005');
+        $this->attachStudentToBatch($manualPresent, $batch, $staff, 'HUB-M');
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $manualPresent->id,
+            'attendance_date' => '2026-09-11',
+            'status' => AttendanceStatus::Present,
+            'punch_source' => 'manual',
+            'marked_by_user_id' => $staff->id,
+        ]);
+
         $service = app(AttendanceHubOverviewService::class);
         $overview = $service->overview('2026-09-11');
 
         $this->assertSame(2, $overview['students_absent']);
+        $this->assertSame(2, $overview['students_present']);
         $this->assertSame(1, $overview['students_auto_marked']);
-        $this->assertSame(2, $overview['students_manual_marked']);
+        $this->assertSame(1, $overview['students_manual_marked']);
+        $this->assertSame(
+            $overview['students_present'],
+            $overview['students_auto_marked'] + $overview['students_manual_marked'],
+        );
 
         $manual = $service->overviewStudentList('2026-09-11', 'manual');
-        $this->assertEqualsCanonicalizing(
-            [$leave->id, $explicitAbsent->id],
-            collect($manual['students'])->pluck('id')->all(),
-        );
+        $this->assertSame([$manualPresent->id], collect($manual['students'])->pluck('id')->all());
 
         $onLeave = $service->overviewStudentList('2026-09-11', 'leave');
         $this->assertSame([$leave->id], collect($onLeave['students'])->pluck('id')->all());
@@ -296,6 +314,13 @@ class AttendanceHubClassWiseTest extends TestCase
 
         Livewire::test(AttendanceHubPage::class)
             ->set('overviewDate', '2026-09-11')
+            ->call('openOverviewList', 'manual')
+            ->assertSet('overviewList', 'manual')
+            ->assertSee('Manual Present')
+            ->assertSee('1 student')
+            ->assertDontSeeHtml('overview-list-student-manual-'.$leave->id)
+            ->assertDontSeeHtml('overview-list-student-manual-'.$explicitAbsent->id)
+            ->call('closeOverviewList')
             ->call('openOverviewList', 'leave')
             ->assertSet('overviewList', 'leave')
             ->assertSee('Leave Student')

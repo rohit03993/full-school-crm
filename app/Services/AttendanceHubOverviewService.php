@@ -66,11 +66,13 @@ class AttendanceHubOverviewService
         $classRows = $this->classRows($day);
         $studentsAbsent = (int) array_sum(array_column($classRows, 'absent'));
         $studentsMarked = $studentsPresent + $explicitAbsent + $studentsLeave;
+        // Auto / manual split the Present count only. Leave and absent stay separate.
         $studentsManualMarked = (int) Attendance::query()
             ->whereDate('attendance_date', $day)
+            ->where('status', AttendanceStatus::Present)
             ->whereIn('punch_source', ['manual', 'roll_call'])
             ->count();
-        $studentsAutoMarked = max(0, $studentsMarked - $studentsManualMarked);
+        $studentsAutoMarked = max(0, $studentsPresent - $studentsManualMarked);
 
         $staffExpected = (int) StaffProfile::query()
             ->whereHas('user', fn ($q) => $q->where('is_active', true))
@@ -323,7 +325,7 @@ class AttendanceHubOverviewService
     }
 
     /**
-     * School-wide name list for the overview tile (leave, or hand-marked rows).
+     * School-wide name list for the overview tile (leave, or staff-marked present).
      *
      * @param  'manual'|'leave'  $kind
      * @return array{
@@ -349,7 +351,8 @@ class AttendanceHubOverviewService
         if ($kind === 'leave') {
             $query->where('status', AttendanceStatus::Leave);
         } else {
-            $query->whereIn('punch_source', ['manual', 'roll_call']);
+            $query->where('status', AttendanceStatus::Present)
+                ->whereIn('punch_source', ['manual', 'roll_call']);
         }
 
         $students = $query->get()
