@@ -88,7 +88,7 @@ class TestMarksReviewPage extends Page
 
         if (is_array($this->markSheet) && ! $this->marksAreLocked()) {
             $actions[] = Action::make('uploadMarks')
-                ->label(CrmMenuLabels::uploadMarksExcel())
+                ->label('Update Excel')
                 ->icon(Heroicon::OutlinedArrowUpTray)
                 ->url(fn (): string => BulkActivityMarksImportPage::urlForTest(
                     (string) ($this->markSheet['test_label'] ?? ''),

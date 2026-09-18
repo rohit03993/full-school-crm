@@ -15,6 +15,15 @@
         </div>
     @endif
 
+    @if ($updatingExistingExam ?? false)
+        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            <p class="font-semibold">This updates the existing exam — it is not a second import</p>
+            <p class="mt-1">
+                Same name and date keep this exam. Students in the new Excel get new marks. Students missing from the file keep their old marks. The exam is not deleted.
+            </p>
+        </div>
+    @endif
+
     <div class="overflow-hidden rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 sm:p-5">
         <nav aria-label="Import progress" class="grid gap-3 sm:grid-cols-4">
             @foreach ($steps as $number => $meta)

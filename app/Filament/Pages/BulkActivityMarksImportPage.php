@@ -64,7 +64,7 @@ class BulkActivityMarksImportPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Name the exam, upload Excel — roll numbers and all subject columns in one file.';
+        return 'Same exam name and date updates this exam. Students in the new file get new marks; others keep theirs.';
     }
 
     public int $step = 1;
@@ -131,10 +131,13 @@ class BulkActivityMarksImportPage extends Page
 
     public ?string $importError = null;
 
+    public bool $updatingExistingExam = false;
+
     public function mount(): void
     {
         $this->academicSessionId = AcademicSession::current()?->id;
         $this->sessionDate = request()->query('date', now()->toDateString());
+        $this->updatingExistingExam = request()->boolean('existing');
 
         if (filled(request()->query('test_name'))) {
             $this->testName = (string) request()->query('test_name');
@@ -170,6 +173,7 @@ class BulkActivityMarksImportPage extends Page
             'activity_type_id' => $activityTypeId,
             'batch_id' => $batchId,
             'date' => $sessionDate,
+            'existing' => 1,
         ], fn (mixed $value): bool => filled($value));
 
         $base = static::getUrl();
@@ -568,6 +572,7 @@ class BulkActivityMarksImportPage extends Page
                     'uploadFileName' => $this->uploadFile?->getClientOriginalName(),
                     'maxRows' => StudentImportFileReader::MAX_ROWS,
                     'importError' => $this->importError,
+                    'updatingExistingExam' => $this->updatingExistingExam,
                 ]),
         ]);
     }
