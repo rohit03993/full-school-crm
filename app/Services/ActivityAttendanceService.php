@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Support\CrmMenuLabels;
 use App\Support\PublishedResultsGate;
+use App\Support\StudentExamMarksMatrix;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -412,10 +413,14 @@ class ActivityAttendanceService
 
         $marks = filled($score['marks_obtained'] ?? null) ? (float) $score['marks_obtained'] : null;
 
-        if ($marks !== null && $maxMarks !== null && $marks > $maxMarks) {
-            throw ValidationException::withMessages([
-                'marks_obtained' => "Marks cannot exceed max marks ({$maxMarks}).",
-            ]);
+        if ($marks !== null) {
+            $rangeError = StudentExamMarksMatrix::obtainedRangeError($marks, $maxMarks);
+
+            if ($rangeError !== null) {
+                throw ValidationException::withMessages([
+                    'marks_obtained' => 'Marks '.$rangeError,
+                ]);
+            }
         }
 
         $grade = filled($score['grade'] ?? null) ? (string) $score['grade'] : null;

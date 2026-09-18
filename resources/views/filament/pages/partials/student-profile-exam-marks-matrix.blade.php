@@ -52,8 +52,7 @@
                                     <input
                                         type="number"
                                         step="0.01"
-                                        min="0"
-                                        @if (($cell['max'] ?? null) !== null) max="{{ $cell['max'] }}" @endif
+                                        @if (($cell['max'] ?? null) !== null) min="{{ \App\Support\StudentExamMarksMatrix::obtainedFloor((float) $cell['max']) }}" max="{{ $cell['max'] }}" @endif
                                         wire:model="examMarksDraft.{{ $subject }}"
                                         class="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm dark:border-white/10 dark:bg-gray-950"
                                         placeholder="{{ ($cell['max'] ?? null) !== null ? '/ '.$formatMax($cell['max']) : 'Marks' }}"
@@ -137,8 +136,7 @@
                                 <input
                                     type="number"
                                     step="0.01"
-                                    min="0"
-                                    @if (($cell['max'] ?? null) !== null) max="{{ $cell['max'] }}" @endif
+                                    @if (($cell['max'] ?? null) !== null) min="{{ \App\Support\StudentExamMarksMatrix::obtainedFloor((float) $cell['max']) }}" max="{{ $cell['max'] }}" @endif
                                     wire:model="examMarksDraft.{{ $subject }}"
                                     class="mx-auto w-20 rounded-md border border-gray-200 bg-white px-2 py-1 text-center text-sm dark:border-white/10 dark:bg-gray-950"
                                     placeholder="{{ ($cell['max'] ?? null) !== null ? '/ '.$formatMax($cell['max']) : '' }}"

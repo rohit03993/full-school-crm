@@ -388,6 +388,37 @@ class StudentExamMarksMatrix
         return filled($grade) ? $grade : $empty;
     }
 
+    /**
+     * Lowest allowed obtained marks for a paper (penalty). Same magnitude as max, opposite sign.
+     */
+    public static function obtainedFloor(?float $maxMarks): ?float
+    {
+        if ($maxMarks === null || $maxMarks <= 0) {
+            return null;
+        }
+
+        return round(-1 * $maxMarks, 2);
+    }
+
+    public static function obtainedRangeError(float $marks, ?float $maxMarks): ?string
+    {
+        if ($maxMarks === null) {
+            return null;
+        }
+
+        if ($marks > $maxMarks) {
+            return 'cannot exceed max marks ('.$maxMarks.').';
+        }
+
+        $floor = self::obtainedFloor($maxMarks);
+
+        if ($floor !== null && $marks < $floor) {
+            return 'cannot be below '.$floor.'.';
+        }
+
+        return null;
+    }
+
     public static function percentage(?float $marks, ?float $maxMarks): ?float
     {
         if ($marks === null || $maxMarks === null || $maxMarks <= 0) {

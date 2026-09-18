@@ -20,9 +20,11 @@ use App\Models\Student;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppTemplate;
+use App\Services\ActivityAttendanceService;
 use App\Services\ExamTestGroupService;
 use App\Support\StudentExamMarksMatrix;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -206,6 +208,45 @@ class ExamTestGroupServiceTest extends TestCase
         $this->assertSame(300.0, $row['total']['max']);
         $this->assertSame(63.0, $row['total']['percentage']);
         $this->assertArrayNotHasKey('Mathematics', $row['scores']);
+    }
+
+    public function test_totals_include_negative_marks_in_weighted_percentage(): void
+    {
+        [$staff, $batch, $type] = $this->examContext();
+        $student = $this->createBatchStudent($batch, $staff, '9876500004', 'Neg Marks Student');
+
+        $maths = $this->createTestSession($type, $batch, $staff, 'neg-test', 'Negative Test', 'Maths', 100);
+        $physics = $this->createTestSession($type, $batch, $staff, 'neg-test', 'Negative Test', 'Physics', 100);
+        $chemistry = $this->createTestSession($type, $batch, $staff, 'neg-test', 'Negative Test', 'Chemistry', 100);
+        $attendance = app(ActivityAttendanceService::class);
+
+        $attendance->saveMarks($maths, [$student->id => true], $staff, [$student->id => ['marks_obtained' => -10]]);
+        $attendance->saveMarks($physics, [$student->id => true], $staff, [$student->id => ['marks_obtained' => 80]]);
+        $attendance->saveMarks($chemistry, [$student->id => true], $staff, [$student->id => ['marks_obtained' => 40]]);
+
+        $row = StudentExamMarksMatrix::forStudent($student->fresh(), $type->id)['rows'][0];
+
+        $this->assertSame(-10.0, $row['scores']['Maths']['marks']);
+        $this->assertSame(110.0, $row['total']['marks']);
+        $this->assertSame(300.0, $row['total']['max']);
+        $this->assertSame(36.67, $row['total']['percentage']);
+        $this->assertStringContainsString('-10', $row['scores']['Maths']['display']);
+    }
+
+    public function test_marks_cannot_go_below_negative_of_max(): void
+    {
+        [$staff, $batch, $type] = $this->examContext();
+        $student = $this->createBatchStudent($batch, $staff, '9876500005', 'Below Floor Student');
+        $maths = $this->createTestSession($type, $batch, $staff, 'floor-test', 'Floor Test', 'Maths', 100);
+
+        $this->expectException(ValidationException::class);
+
+        app(ActivityAttendanceService::class)->saveMarks(
+            $maths,
+            [$student->id => true],
+            $staff,
+            [$student->id => ['marks_obtained' => -100.01]],
+        );
     }
 
     /**

@@ -204,8 +204,7 @@
                                     <input
                                         type="number"
                                         step="0.01"
-                                        min="0"
-                                        @if ($maxMarks) max="{{ $maxMarks }}" @endif
+                                        @if ($maxMarks) min="{{ \App\Support\StudentExamMarksMatrix::obtainedFloor((float) $maxMarks) }}" max="{{ $maxMarks }}" @endif
                                         wire:model.live.debounce.300ms="scoreMarks.{{ $student->id }}.marks_obtained"
                                         class="fi-crm-input block w-full text-center text-base font-bold tabular-nums lg:py-2"
                                         placeholder="0"

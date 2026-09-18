@@ -9,6 +9,7 @@ use App\Models\Enrollment;
 use App\Models\User;
 use App\Support\ExamSubjectCatalog;
 use App\Support\PublishedResultsGate;
+use App\Support\StudentExamMarksMatrix;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -123,15 +124,12 @@ class ActivityMarksBulkImportService
                 }
 
                 $mark = (float) $rawMark;
+                $rangeError = StudentExamMarksMatrix::obtainedRangeError($mark, $maxMarks);
 
-                if ($mark < 0) {
-                    $subjectErrors[] = "{$subject}: mark cannot be negative.";
+                if ($rangeError !== null) {
+                    $subjectErrors[] = "{$subject}: mark {$rangeError}";
 
                     continue;
-                }
-
-                if ($mark > $maxMarks) {
-                    $subjectErrors[] = "{$subject}: mark exceeds max marks ({$maxMarks}).";
                 }
 
                 $subjectMarks[$subject] = $mark;

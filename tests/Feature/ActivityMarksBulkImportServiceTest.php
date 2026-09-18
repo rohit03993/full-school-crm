@@ -432,4 +432,94 @@ class ActivityMarksBulkImportServiceTest extends TestCase
             'marks_obtained' => 150,
         ]);
     }
+
+    public function test_import_accepts_negative_marks_within_max(): void
+    {
+        $staff = $this->createStaffUser();
+        $student = $this->createEnrolledStudent($staff, '701', '9876543701');
+        $course = Course::query()->firstOrFail();
+
+        $batch = Batch::query()->create([
+            'name' => 'Negative Marks Batch',
+            'course_id' => $course->id,
+            'trainer_user_id' => $staff->id,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-12-31',
+            'status' => BatchStatus::Active,
+        ]);
+
+        app(BatchService::class)->assign($student, $batch, $staff);
+
+        $activityType = ActivityType::query()->create([
+            'name' => 'Penalty Test',
+            'field_schema' => [
+                ['key' => 'subject', 'label' => 'Subject', 'type' => 'text'],
+                ['key' => 'max_marks', 'label' => 'Max Marks', 'type' => 'number'],
+            ],
+            'is_enabled' => true,
+        ]);
+
+        $service = app(ActivityMarksBulkImportService::class);
+        $preview = $service->buildPreview(
+            ['Roll Number', 'Mathematics', 'Physics'],
+            [['701', '-12', '80']],
+            ['roll_column' => 0, 'subject_columns' => [1, 2]],
+            null,
+            null,
+            100,
+        );
+
+        $this->assertSame(1, $preview['ready_count']);
+        $this->assertSame(0, $preview['error_count']);
+
+        $result = $service->import(
+            $staff,
+            $activityType,
+            'Negative Marks Paper',
+            '2026-09-18',
+            100,
+            $preview['rows'],
+        );
+
+        $this->assertSame(2, $result['marks_saved']);
+        $this->assertDatabaseHas('activity_attendances', [
+            'student_id' => $student->id,
+            'marks_obtained' => -12,
+        ]);
+        $this->assertDatabaseHas('activity_attendances', [
+            'student_id' => $student->id,
+            'marks_obtained' => 80,
+        ]);
+    }
+
+    public function test_import_rejects_marks_below_negative_max(): void
+    {
+        $staff = $this->createStaffUser();
+        $student = $this->createEnrolledStudent($staff, '702', '9876543702');
+        $course = Course::query()->firstOrFail();
+
+        $batch = Batch::query()->create([
+            'name' => 'Floor Batch',
+            'course_id' => $course->id,
+            'trainer_user_id' => $staff->id,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-12-31',
+            'status' => BatchStatus::Active,
+        ]);
+
+        app(BatchService::class)->assign($student, $batch, $staff);
+
+        $preview = app(ActivityMarksBulkImportService::class)->buildPreview(
+            ['Roll Number', 'Mathematics'],
+            [['702', '-100.01']],
+            ['roll_column' => 0, 'subject_columns' => [1]],
+            null,
+            null,
+            100,
+        );
+
+        $this->assertSame(0, $preview['ready_count']);
+        $this->assertSame(1, $preview['error_count']);
+        $this->assertStringContainsString('cannot be below', implode(' ', $preview['rows'][0]['errors'] ?? []));
+    }
 }
