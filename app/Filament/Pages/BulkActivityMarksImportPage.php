@@ -249,6 +249,7 @@ class BulkActivityMarksImportPage extends Page
         $this->fileHeaders = $parsed['headers'];
         $this->fileRows = $parsed['rows'];
         $this->columnMapping = $mapper->guess($this->fileHeaders);
+        $this->normalizeColumnMapping();
         $this->syncSubjectMappingFromFile();
         $this->previewPayload = null;
         $this->importResult = null;
@@ -259,6 +260,9 @@ class BulkActivityMarksImportPage extends Page
 
     public function buildPreview(ActivityMarksBulkImportService $importService): void
     {
+        $this->normalizeColumnMapping();
+        $this->syncSubjectMappingFromFile();
+
         $missing = app(ActivityMarksImportColumnMapper::class)->missingRequiredFields($this->columnMapping);
 
         if ($missing !== []) {
@@ -447,7 +451,34 @@ class BulkActivityMarksImportPage extends Page
 
     public function updatedColumnMapping(): void
     {
+        $this->normalizeColumnMapping();
         $this->syncSubjectMappingFromFile();
+    }
+
+    /**
+     * Keep roll column 0 valid (Laravel filled(0) is false) and drop it from subject ticks.
+     */
+    protected function normalizeColumnMapping(): void
+    {
+        $roll = $this->columnMapping['roll_column'] ?? null;
+        $this->columnMapping['roll_column'] = ($roll === null || $roll === '')
+            ? null
+            : (int) $roll;
+
+        $subjects = array_values(array_unique(array_map(
+            'intval',
+            $this->columnMapping['subject_columns'] ?? [],
+        )));
+        $rollColumn = $this->columnMapping['roll_column'];
+
+        if ($rollColumn !== null) {
+            $subjects = array_values(array_filter(
+                $subjects,
+                fn (int $index): bool => $index !== $rollColumn,
+            ));
+        }
+
+        $this->columnMapping['subject_columns'] = $subjects;
     }
 
     protected function syncSubjectMappingFromFile(): void
@@ -573,6 +604,7 @@ class BulkActivityMarksImportPage extends Page
                     'maxRows' => StudentImportFileReader::MAX_ROWS,
                     'importError' => $this->importError,
                     'updatingExistingExam' => $this->updatingExistingExam,
+                    'defaultMaxMarks' => $this->defaultMaxMarks,
                 ]),
         ]);
     }

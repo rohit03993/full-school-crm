@@ -130,18 +130,23 @@
             <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
                 <h2 class="text-lg font-bold">Map columns</h2>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Tick mark columns. Short headers are suggested for you — <strong>P</strong> Physics,
-                    <strong>C</strong> Chemistry, <strong>M</strong> Maths, <strong>B</strong> Biology,
-                    <strong>Z</strong> Zoology. Change the name if this file uses a different subject
-                    (for example P as Physical Education). Totals apply to <strong>this test only</strong>.
+                    Roll number is mapped automatically when the file has a Roll No column
+                    (S.No is ignored). Tick subject columns, then set <strong>Out of</strong> for this test
+                    (100, 180, 50 — whatever the paper was). That value is saved with the exam.
                 </p>
             </div>
 
             <div class="grid gap-5 p-4 sm:p-6">
-                <x-crm.select-input label="Roll number column" for="roll-column" wire:model="columnMapping.roll_column">
+                @php
+                    $rollColumn = $columnMapping['roll_column'] ?? null;
+                    $hasRollColumn = $rollColumn !== null && $rollColumn !== '';
+                    $selectedColumns = array_map('intval', $columnMapping['subject_columns'] ?? []);
+                @endphp
+
+                <x-crm.select-input label="Roll number column" for="roll-column" wire:model.live="columnMapping.roll_column">
                     <option value="">Select column…</option>
                     @foreach ($fileHeaders as $index => $header)
-                        <option value="{{ $index }}">{{ $header ?: 'Column '.($index + 1) }}</option>
+                        <option value="{{ $index }}" @selected($hasRollColumn && (int) $index === (int) $rollColumn)>{{ $header ?: 'Column '.($index + 1) }}</option>
                     @endforeach
                 </x-crm.select-input>
 
@@ -156,21 +161,21 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-white/10">
-                            @php
-                                $selectedColumns = array_map('intval', $columnMapping['subject_columns'] ?? []);
-                            @endphp
                             @foreach ($fileHeaders as $index => $header)
-                                @if (filled($columnMapping['roll_column'] ?? null) && (int) $index === (int) $columnMapping['roll_column'])
+                                @if ($hasRollColumn && (int) $index === (int) $rollColumn)
                                     @continue
                                 @endif
                                 @php
                                     $isSubject = in_array((int) $index, $selectedColumns, true);
                                     $suggested = \App\Support\ExamSubjectCatalog::resolveLabel($header);
                                 @endphp
-                                <tr @class([
-                                    'bg-primary-50/40 dark:bg-primary-500/5' => $isSubject,
-                                    'bg-white dark:bg-gray-900' => ! $isSubject,
-                                ])>
+                                <tr
+                                    wire:key="marks-map-col-{{ $index }}"
+                                    @class([
+                                        'bg-primary-50/40 dark:bg-primary-500/5' => $isSubject,
+                                        'bg-white dark:bg-gray-900' => ! $isSubject,
+                                    ])
+                                >
                                     <td class="px-3 py-2.5 align-top">
                                         <input
                                             type="checkbox"
@@ -202,8 +207,10 @@
                                                 type="number"
                                                 min="1"
                                                 max="9999"
-                                                wire:model.live="subjectMaxMarks.{{ $index }}"
+                                                step="0.01"
+                                                wire:model.blur="subjectMaxMarks.{{ $index }}"
                                                 class="w-28 rounded-lg border-gray-300 text-sm dark:border-white/10 dark:bg-gray-900"
+                                                placeholder="{{ (int) $defaultMaxMarks }}"
                                             >
                                         @else
                                             <span class="text-gray-400">—</span>
