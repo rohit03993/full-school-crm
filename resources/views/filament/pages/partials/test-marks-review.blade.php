@@ -14,30 +14,26 @@
         $declaration = $status['declaration'] ?? null;
     @endphp
 
-    <div class="mb-4 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-        <div class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+    <div class="mb-3 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+        <div class="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-5 sm:py-3">
             <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <h3 class="text-sm font-bold text-gray-950 dark:text-white">Results</h3>
                 <span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $statusBadge }}">{{ $status['label'] }}</span>
             </div>
             @if (($canPublish ?? false) && ! in_array($status['status'] ?? 'none', ['published', 'issued'], true))
-                <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                    <div class="flex min-w-0 items-center gap-2">
-                        <label for="declaration-date" class="shrink-0 text-[11px] font-medium text-gray-500 dark:text-gray-400">Publish date</label>
-                        <input id="declaration-date" type="date" wire:model="declarationDate" class="fi-input min-w-0 flex-1 rounded-lg border-gray-300 py-1.5 text-sm sm:w-[11rem] sm:flex-none dark:border-white/10 dark:bg-white/5" />
-                    </div>
-                    <button type="button" wire:click="publishResults" class="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-500 sm:min-h-0 sm:w-auto sm:py-1.5 sm:text-xs">
+                <div class="flex w-full items-center gap-2">
+                    <label for="declaration-date" class="sr-only">Publish date</label>
+                    <input id="declaration-date" type="date" wire:model="declarationDate" class="fi-input min-w-0 flex-1 rounded-lg border-gray-300 py-1.5 text-sm sm:max-w-[11rem] dark:border-white/10 dark:bg-white/5" />
+                    <button type="button" wire:click="publishResults" class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-500">
                         Publish
                     </button>
                 </div>
             @elseif (($canIssueMarksheet ?? false) && ($status['status'] ?? '') === 'published')
-                <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                    <div class="flex min-w-0 items-center gap-2">
-                        <label for="issue-date" class="shrink-0 text-[11px] font-medium text-gray-500 dark:text-gray-400">Issue date</label>
-                        <input id="issue-date" type="date" wire:model="marksheetIssueDate" class="fi-input min-w-0 flex-1 rounded-lg border-gray-300 py-1.5 text-sm sm:w-[11rem] sm:flex-none dark:border-white/10 dark:bg-white/5" />
-                    </div>
-                    <button type="button" wire:click="issueMarksheets" class="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-500 sm:min-h-0 sm:w-auto sm:py-1.5 sm:text-xs">
-                        Generate PDFs
+                <div class="flex w-full items-center gap-2">
+                    <label for="issue-date" class="sr-only">Issue date</label>
+                    <input id="issue-date" type="date" wire:model="marksheetIssueDate" class="fi-input min-w-0 flex-1 rounded-lg border-gray-300 py-1.5 text-sm sm:max-w-[11rem] dark:border-white/10 dark:bg-white/5" />
+                    <button type="button" wire:click="issueMarksheets" class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white hover:bg-primary-500">
+                        PDFs
                     </button>
                 </div>
             @endif
@@ -137,13 +133,11 @@
             @endif
             @if ($marksAreLocked ?? false)
                 · Marks locked
-            @elseif ($editing)
-                · Empty cell = Absent
             @endif
         </p>
     </div>
 
-    <div class="mb-4 space-y-3 lg:hidden">
+    <div @class(['mb-4 space-y-3 lg:hidden', 'crm-sticky-above-nav-pad' => $editing])>
         @foreach ($sheetRows as $row)
             @continue(! is_array($row))
             <div class="rounded-xl bg-white p-3 ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-white/10">
@@ -278,7 +272,7 @@
     </div>
 
     @if ($editing)
-        <div class="sticky bottom-3 z-20 mt-3 flex flex-col gap-2 rounded-xl border border-primary-200 bg-white p-3 shadow-lg sm:flex-row sm:items-center dark:border-primary-500/30 dark:bg-gray-900">
+        <div class="crm-sticky-above-nav mt-3 flex flex-col gap-2 rounded-xl border border-primary-200 bg-white p-3 shadow-lg sm:flex-row sm:items-center dark:border-primary-500/30 dark:bg-gray-900">
             <button type="button" wire:click="saveBulkMarks" wire:loading.attr="disabled" wire:target="saveBulkMarks" class="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70 sm:min-h-0 sm:w-auto sm:py-1.5 sm:text-xs">
                 <span wire:loading.remove wire:target="saveBulkMarks">Save marks</span>
                 <span wire:loading wire:target="saveBulkMarks">Saving…</span>
@@ -286,7 +280,7 @@
             <button type="button" wire:click="cancelBulkEdit" wire:loading.attr="disabled" wire:target="saveBulkMarks" class="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-gray-200 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:min-h-0 sm:w-auto sm:py-1.5 sm:text-xs dark:border-white/10 dark:text-gray-300">
                 Cancel
             </button>
-            <p class="text-center text-xs text-gray-500 sm:text-left dark:text-gray-400">Empty = Absent. Negative marks allowed down to −max.</p>
+            <p class="text-center text-xs text-gray-500 sm:text-left dark:text-gray-400">Empty = Absent</p>
         </div>
     @endif
 

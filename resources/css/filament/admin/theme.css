@@ -14,11 +14,11 @@
     /* ── Back to previous page (render hook on every panel page) ── */
     /* The chip takes over the page's top padding, so the heading below tightens up */
     .fi-crm-back {
-        @apply flex pt-6 sm:pt-8;
+        @apply flex pt-2 sm:pt-8;
     }
 
     .fi-page:has(> .fi-crm-back) .fi-page-header-main-ctn {
-        @apply pt-3 sm:pt-4;
+        @apply pt-1 sm:pt-4;
     }
 
     .fi-crm-back__link {
@@ -46,12 +46,16 @@
 
     /* Thumb-friendly on phones — the sidebar is closed there, so this is the main way up */
     @media (max-width: 639px) {
+        .fi-crm-back {
+            @apply pt-1;
+        }
+
         .fi-crm-back__link {
-            @apply min-h-11 touch-manipulation py-2 pe-4 text-sm active:scale-[0.98];
+            @apply min-h-8 touch-manipulation py-1 pe-2.5 text-xs active:scale-[0.98];
         }
 
         .fi-crm-back__icon {
-            @apply h-7 w-7;
+            @apply h-5 w-5;
         }
     }
 
@@ -577,6 +581,22 @@
         @apply pt-2;
     }
 
+    /* Sticky bars (save, call) sit above the 4.25rem bottom nav — never on top of it */
+    .crm-sticky-above-nav {
+        @apply sticky z-20;
+        bottom: 0.75rem;
+    }
+
+    @media (max-width: 1023px) {
+        .fi-body:has(.fi-mobile-bottom-nav) .crm-sticky-above-nav {
+            bottom: calc(4.25rem + env(safe-area-inset-bottom) + 0.5rem);
+        }
+
+        .fi-body:has(.fi-mobile-bottom-nav) .crm-sticky-above-nav-pad {
+            padding-bottom: 5.5rem;
+        }
+    }
+
     /* Bottom nav spacing — all mobile pages */
     .fi-body:has(.fi-mobile-bottom-nav) .fi-main-ctn {
         @apply pb-2;
@@ -734,16 +754,20 @@
             @apply px-2;
         }
 
+        .fi-page-header {
+            @apply mb-2;
+        }
+
         .fi-page-header-main-ctn {
-            @apply gap-2;
+            @apply gap-1.5;
         }
 
         .fi-header-heading {
-            @apply text-lg leading-tight;
+            @apply line-clamp-2 text-base leading-snug;
         }
 
         .fi-header-subheading {
-            @apply text-xs leading-relaxed;
+            @apply text-xs leading-snug;
         }
 
         .fi-header-actions,
@@ -753,12 +777,12 @@
 
         .fi-header-actions .fi-ac,
         .fi-header-actions-ctn > .fi-ac {
-            @apply w-full flex-wrap gap-2;
+            @apply w-full flex-nowrap justify-end gap-1.5;
         }
 
         .fi-header-actions .fi-btn,
         .fi-header-actions-ctn .fi-btn {
-            @apply min-h-11 flex-1 touch-manipulation text-sm;
+            @apply min-h-9 w-auto flex-none touch-manipulation px-2.5 text-xs;
         }
 
         .fi-topbar {
