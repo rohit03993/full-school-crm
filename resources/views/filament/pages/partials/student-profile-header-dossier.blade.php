@@ -29,12 +29,12 @@
         <div class="pointer-events-none absolute inset-0 rounded-t-xl bg-gradient-to-br from-primary-500/[0.07] via-transparent to-emerald-500/[0.05] dark:from-primary-500/10 dark:to-emerald-500/5 sm:rounded-t-2xl"></div>
 
         <div class="fi-student-profile-identity relative grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2.5 p-3 sm:flex sm:flex-row sm:gap-4 sm:p-5 lg:gap-5">
-            {{-- Photo --}}
+            {{-- Passport-size frame (35×45mm / 7:9). object-contain so the file is not cropped. --}}
             <div class="fi-student-profile-photo shrink-0">
                 @if ($photo && $photo->isImage() && $photo->fileExistsOnDisk())
                     <button
                         type="button"
-                        class="js-media-preview-trigger group relative cursor-zoom-in overflow-hidden rounded-2xl shadow-md ring-2 ring-white dark:ring-gray-800 sm:shadow-lg"
+                        class="js-media-preview-trigger relative flex h-36 w-28 cursor-zoom-in items-center justify-center overflow-hidden rounded-md bg-white shadow-md ring-1 ring-gray-200 dark:bg-gray-950 dark:ring-gray-700 sm:h-48 sm:w-36 sm:shadow-lg"
                         data-preview-url="{{ $photo->previewUrl() }}"
                         data-preview-title="{{ $record->name }} — photo"
                         data-preview-pdf="0"
@@ -42,12 +42,13 @@
                         <img
                             src="{{ $photo->previewUrl() }}"
                             alt="{{ $record->name }}"
-                            class="h-28 w-28 object-cover transition duration-300 group-hover:scale-105 sm:h-36 sm:w-36"
+                            class="max-h-full max-w-full object-contain"
+                            style="object-fit: contain; max-height: 100%; max-width: 100%;"
                         />
                     </button>
                 @else
-                    <div class="flex h-28 w-28 flex-col items-center justify-center rounded-2xl border border-dashed border-primary-200/80 bg-white/80 shadow-sm dark:border-primary-500/25 dark:bg-white/5 sm:h-36 sm:w-36">
-                        <svg class="h-7 w-7 text-primary-300 dark:text-primary-500/50 sm:h-7 sm:w-7" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <div class="flex h-36 w-28 flex-col items-center justify-center rounded-md border border-dashed border-primary-200/80 bg-white/80 shadow-sm dark:border-primary-500/25 dark:bg-white/5 sm:h-48 sm:w-36">
+                        <svg class="h-7 w-7 text-primary-300 dark:text-primary-500/50" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                         </svg>
                         <span class="mt-1 text-[10px] font-medium text-gray-400">{{ $photo ? 'File missing' : 'No photo' }}</span>
