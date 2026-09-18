@@ -165,6 +165,15 @@ class StudentSearchServiceTest extends TestCase
         $this->assertTrue($byMobile->contains(fn (Student $student): bool => $student->is($enrolled)));
     }
 
+    public function test_quick_search_matches_each_name_word_so_a_last_name_typo_still_finds_the_person(): void
+    {
+        $student = $this->createStudent('Tanmay Agarwal', '9000000033');
+
+        $matches = app(StudentSearchService::class)->quickSearch('TANMAY ADARWAL');
+
+        $this->assertTrue($matches->contains(fn (Student $row): bool => $row->is($student)));
+    }
+
     protected function createStudent(string $name, string $mobile): Student
     {
         return Student::query()->create([

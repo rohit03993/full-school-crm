@@ -44,6 +44,24 @@ class GlobalPeopleSearchTest extends TestCase
             ->assertSee('Lead');
     }
 
+    public function test_top_bar_two_word_search_shows_the_person_name(): void
+    {
+        $this->actingAsSuperAdmin();
+
+        Student::query()->create([
+            'name' => 'Tanmay Agarwal',
+            'father_name' => 'Parent',
+            'mobile' => '9000000033',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        Livewire::test(GlobalSearch::class)
+            ->set('search', 'TANMAY ADARWAL')
+            ->assertSuccessful()
+            ->assertSee('Tanmay Agarwal')
+            ->assertSee('Lead');
+    }
+
     protected function actingAsSuperAdmin(): User
     {
         Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);

@@ -378,7 +378,9 @@ class StudentResource extends Resource
 
     public static function getGlobalSearchResultTitle(Model $record): string
     {
-        return (string) $record->name;
+        $name = trim((string) $record->name);
+
+        return $name !== '' ? $name : 'Person #'.$record->getKey();
     }
 
     public static function getGlobalSearchResultUrl(Model $record): string
@@ -398,7 +400,10 @@ class StudentResource extends Resource
             default => $record->status?->label() ?? 'Person',
         };
 
+        $name = trim((string) $record->name);
+
         return array_filter([
+            'Name' => $name !== '' ? $name : null,
             'Type' => $kind,
             'Mobile' => filled($record->mobile) ? (string) $record->mobile : null,
             'Roll' => filled($record->activeEnrollment?->enrollment_number)

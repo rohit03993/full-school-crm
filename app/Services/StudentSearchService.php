@@ -139,24 +139,33 @@ class StudentSearchService
      */
     public function quickSearch(string $term, int $limit = 8): Collection
     {
-        $term = trim($term);
+        $term = trim(preg_replace('/\s+/u', ' ', $term) ?? '');
 
         if ($term === '') {
             return new Collection;
         }
 
-        $like = '%'.str_replace(['%', '_'], ['\\%', '\\_'], mb_strtolower($term)).'%';
+        $like = '%'.$this->escapeLike(mb_strtolower($term)).'%';
         $digits = $this->digitsOnly($term);
-        $roll = str_replace(['%', '_'], ['\\%', '\\_'], strtoupper($term));
+        $roll = $this->escapeLike(strtoupper($term));
+        $words = array_values(array_filter(
+            preg_split('/\s+/u', $term) ?: [],
+            fn (string $word): bool => mb_strlen($word) >= 2,
+        ));
 
         return Student::query()
             ->with(['activeEnrollment', 'latestEnquiry'])
-            ->where(function ($query) use ($like, $digits, $roll): void {
-                $query->whereRaw('LOWER(name) LIKE ?', [$like])
-                    ->orWhereHas(
-                        'enrollments',
-                        fn ($enrollment) => $enrollment->where('enrollment_number', 'like', '%'.$roll.'%'),
-                    );
+            ->where(function ($query) use ($like, $digits, $roll, $words): void {
+                $query->whereRaw('LOWER(name) LIKE ?', [$like]);
+
+                foreach ($words as $word) {
+                    $query->orWhereRaw('LOWER(name) LIKE ?', ['%'.$this->escapeLike(mb_strtolower($word)).'%']);
+                }
+
+                $query->orWhereHas(
+                    'enrollments',
+                    fn ($enrollment) => $enrollment->where('enrollment_number', 'like', '%'.$roll.'%'),
+                );
 
                 if (filled($digits) && strlen($digits) >= 4) {
                     $query->orWhere('mobile', 'like', '%'.$digits.'%')
@@ -164,12 +173,18 @@ class StudentSearchService
                 }
             })
             ->orderByRaw("CASE
-                WHEN status = ? THEN 0
+                WHEN LOWER(name) LIKE ? THEN 0
                 WHEN status = ? THEN 1
-                ELSE 2
-            END", [StudentStatus::Enrolled->value, StudentStatus::Enquiry->value])
+                WHEN status = ? THEN 2
+                ELSE 3
+            END", [$like, StudentStatus::Enrolled->value, StudentStatus::Enquiry->value])
             ->orderBy('name')
             ->limit($limit)
             ->get();
+    }
+
+    protected function escapeLike(string $value): string
+    {
+        return str_replace(['%', '_'], ['\\%', '\\_'], $value);
     }
 }
