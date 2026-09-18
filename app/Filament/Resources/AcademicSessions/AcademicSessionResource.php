@@ -26,6 +26,8 @@ use UnitEnum;
 
 class AcademicSessionResource extends Resource
 {
+    protected static bool $isGloballySearchable = false;
+
     protected static ?string $model = AcademicSession::class;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;

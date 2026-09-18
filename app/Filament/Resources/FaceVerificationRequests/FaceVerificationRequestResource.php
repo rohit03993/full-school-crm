@@ -19,6 +19,8 @@ use UnitEnum;
 
 class FaceVerificationRequestResource extends Resource
 {
+    protected static bool $isGloballySearchable = false;
+
     protected static ?string $model = FaceVerificationRequest::class;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedFaceSmile;

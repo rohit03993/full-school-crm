@@ -2,12 +2,17 @@
 
 namespace Tests\Unit;
 
-use App\Enums\Gender;
-use App\Enums\StudentStatus;
+use App\Enums\AdmissionStatus;
 use App\Enums\CourseStatus;
+use App\Enums\EnrollmentStatus;
+use App\Enums\Gender;
 use App\Enums\LeadSource;
+use App\Enums\StudentStatus;
+use App\Models\AcademicSession;
+use App\Models\Admission;
 use App\Models\Course;
 use App\Models\Enquiry;
+use App\Models\Enrollment;
 use App\Models\Student;
 use App\Services\StudentSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -89,6 +94,75 @@ class StudentSearchServiceTest extends TestCase
 
         $this->assertSame(StudentSearchService::OUTCOME_FOUND, $result['outcome']);
         $this->assertTrue($result['student']->is($student));
+    }
+
+    public function test_quick_search_finds_a_lead_by_name_and_a_student_by_roll(): void
+    {
+        $lead = $this->createStudent('Neha Lead', '9000000001');
+        $enrolled = Student::query()->create([
+            'name' => 'Arjun Student',
+            'father_name' => 'Parent',
+            'mobile' => '9000000002',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        $course = Course::query()->create([
+            'name' => 'Class 11',
+            'code' => 'CLS-11-QS',
+            'programme_category' => 'school',
+            'duration' => 1,
+            'duration_type' => 'years',
+            'fee' => 0,
+            'status' => CourseStatus::Active,
+        ]);
+
+        $session = AcademicSession::query()->create([
+            'name' => '2026-2027',
+            'code' => '2026-27-qs',
+            'starts_on' => '2026-04-01',
+            'ends_on' => '2027-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
+
+        $enquiry = Enquiry::query()->create([
+            'student_id' => $enrolled->id,
+            'enquiry_number' => 'CRM-ENQ-2026-004411',
+            'course_id' => $course->id,
+            'lead_source' => LeadSource::Website,
+        ]);
+
+        $admission = Admission::query()->create([
+            'student_id' => $enrolled->id,
+            'enquiry_id' => $enquiry->id,
+            'admission_number' => 'ADM-QS-4411',
+            'course_fee' => 0,
+            'discount_amount' => 0,
+            'net_fee' => 0,
+            'use_installment_plan' => false,
+            'status' => AdmissionStatus::Approved,
+            'approved_at' => now(),
+            'submitted_at' => now(),
+        ]);
+
+        Enrollment::query()->create([
+            'student_id' => $enrolled->id,
+            'admission_id' => $admission->id,
+            'course_id' => $course->id,
+            'academic_session_id' => $session->id,
+            'enrollment_number' => 'JEE-4411',
+            'enrolled_at' => now(),
+            'status' => EnrollmentStatus::Enrolled,
+            'is_active' => true,
+        ]);
+
+        $byName = app(StudentSearchService::class)->quickSearch('Neha');
+        $byRoll = app(StudentSearchService::class)->quickSearch('JEE-4411');
+        $byMobile = app(StudentSearchService::class)->quickSearch('9000000002');
+
+        $this->assertTrue($byName->contains(fn (Student $student): bool => $student->is($lead)));
+        $this->assertTrue($byRoll->contains(fn (Student $student): bool => $student->is($enrolled)));
+        $this->assertTrue($byMobile->contains(fn (Student $student): bool => $student->is($enrolled)));
     }
 
     protected function createStudent(string $name, string $mobile): Student

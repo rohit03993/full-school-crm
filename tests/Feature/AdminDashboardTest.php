@@ -51,6 +51,10 @@ class AdminDashboardTest extends TestCase
             ->assertDontSee('Fee collection trend')
             ->assertDontSee('Where leads came from')
             ->assertDontSee('Hide analytics')
+            ->assertDontSee('Today by batch')
+            ->assertDontSee('Recent Leads')
+            ->assertDontSee('Pending Admissions')
+            ->assertDontSee('Search Student')
             ->assertSchemaStateSet([
                 'academic_session_id' => $session->id,
                 'range' => DashboardFilters::RANGE_MONTH,

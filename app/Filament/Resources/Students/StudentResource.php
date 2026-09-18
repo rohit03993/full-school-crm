@@ -15,6 +15,7 @@ use App\Models\Student;
 use App\Services\BatchService;
 use App\Services\FaceVerify\FaceVerifyGateService;
 use App\Services\StudentProfileDeleteService;
+use App\Services\StudentSearchService;
 use App\Support\BatchSelectOptions;
 use App\Support\ClassSectionLabel;
 use App\Support\CrmAccess;
@@ -34,6 +35,7 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -338,5 +340,49 @@ class StudentResource extends Resource
     public static function canCreate(): bool
     {
         return false;
+    }
+
+    public static function canGloballySearch(): bool
+    {
+        return static::canViewAny();
+    }
+
+    public static function getGlobalSearchResults(string $search): Collection
+    {
+        return app(StudentSearchService::class)->quickSearch($search);
+    }
+
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        return Student::query()->with(['activeEnrollment', 'latestEnquiry']);
+    }
+
+    public static function getGlobalSearchResultTitle(Model $record): string
+    {
+        return (string) $record->name;
+    }
+
+    public static function getGlobalSearchResultUrl(Model $record): string
+    {
+        return StudentProfilePage::getUrl(['record' => $record->id]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function getGlobalSearchResultDetails(Model $record): array
+    {
+        /** @var Student $record */
+        $kind = match ($record->status) {
+            StudentStatus::Enquiry => 'Lead',
+            StudentStatus::Enrolled, StudentStatus::Completed, StudentStatus::Dropped => 'Student',
+            default => $record->status?->label() ?? 'Person',
+        };
+
+        return array_filter([
+            'Type' => $kind,
+            'Mobile' => $record->mobile,
+            'Roll' => $record->activeEnrollment?->enrollment_number,
+        ], fn (?string $value): bool => filled($value));
     }
 }

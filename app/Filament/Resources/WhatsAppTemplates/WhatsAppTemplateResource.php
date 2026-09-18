@@ -25,6 +25,8 @@ use UnitEnum;
 
 class WhatsAppTemplateResource extends Resource
 {
+    protected static bool $isGloballySearchable = false;
+
     protected static ?string $model = WhatsAppTemplate::class;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedChatBubbleLeftRight;

@@ -2,22 +2,18 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Widgets\BatchOverviewWidget;
 use App\Filament\Widgets\CrmFinanceStatsWidget;
 use App\Filament\Widgets\CrmLeadStatsWidget;
 use App\Filament\Widgets\DashboardAttentionWidget;
 use App\Filament\Widgets\DashboardHeroWidget;
 use App\Filament\Widgets\DashboardTodayPulseWidget;
 use App\Filament\Widgets\LicenseStatusWidget;
-use App\Filament\Widgets\PendingAdmissionsWidget;
-use App\Filament\Widgets\RecentEnquiriesWidget;
 use App\Models\AcademicSession;
 use App\Models\Batch;
 use App\Support\CrmMenuLabels;
 use App\Support\DashboardFilters;
 use App\Support\InstituteProfile;
 use App\Support\InstituteTerminology;
-use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\ToggleButtons;
@@ -28,7 +24,6 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 
 class Dashboard extends BaseDashboard
@@ -151,22 +146,6 @@ class Dashboard extends BaseDashboard
         ]);
     }
 
-    /**
-     * @return array<Action>
-     */
-    protected function getHeaderActions(): array
-    {
-        return [
-            Action::make('searchStudent')
-                ->label('Search Student')
-                ->icon(Heroicon::OutlinedMagnifyingGlass)
-                ->url(StudentSearchPage::getUrl())
-                ->color('primary')
-                ->extraAttributes(['class' => 'crm-dash-search'])
-                ->visible(fn (): bool => StudentSearchPage::canAccess()),
-        ];
-    }
-
     public function dashboardFilterSummary(): string
     {
         $filters = DashboardFilters::fromArray($this->filters ?? []);
@@ -198,9 +177,6 @@ class Dashboard extends BaseDashboard
             DashboardTodayPulseWidget::class,
             CrmFinanceStatsWidget::class,
             CrmLeadStatsWidget::class,
-            BatchOverviewWidget::class,
-            RecentEnquiriesWidget::class,
-            PendingAdmissionsWidget::class,
         ];
     }
 }

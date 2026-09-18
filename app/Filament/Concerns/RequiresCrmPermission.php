@@ -27,4 +27,9 @@ trait RequiresCrmPermission
 
         return CrmAccess::can(Auth::user(), static::requiredCrmPermission());
     }
+
+    public static function canGloballySearch(): bool
+    {
+        return false;
+    }
 }

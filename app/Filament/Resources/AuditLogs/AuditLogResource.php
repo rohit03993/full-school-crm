@@ -23,6 +23,8 @@ use UnitEnum;
 
 class AuditLogResource extends Resource
 {
+    protected static bool $isGloballySearchable = false;
+
     protected static ?string $model = AuditLog::class;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentList;

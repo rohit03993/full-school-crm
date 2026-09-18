@@ -26,6 +26,8 @@ use UnitEnum;
 
 class BiometricDeviceResource extends Resource
 {
+    protected static bool $isGloballySearchable = false;
+
     protected static ?string $model = BiometricDevice::class;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCpuChip;

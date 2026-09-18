@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\StudentStatus;
 use App\Models\Enquiry;
 use App\Models\Student;
 use App\Support\CrmPagination;
@@ -129,5 +130,46 @@ class StudentSearchService
         $digits = preg_replace('/\D/', '', $value);
 
         return filled($digits) ? $digits : null;
+    }
+
+    /**
+     * Top-bar lookup: name, mobile, or roll. Returns leads and students together.
+     *
+     * @return Collection<int, Student>
+     */
+    public function quickSearch(string $term, int $limit = 8): Collection
+    {
+        $term = trim($term);
+
+        if ($term === '') {
+            return new Collection;
+        }
+
+        $like = '%'.str_replace(['%', '_'], ['\\%', '\\_'], mb_strtolower($term)).'%';
+        $digits = $this->digitsOnly($term);
+        $roll = str_replace(['%', '_'], ['\\%', '\\_'], strtoupper($term));
+
+        return Student::query()
+            ->with(['activeEnrollment', 'latestEnquiry'])
+            ->where(function ($query) use ($like, $digits, $roll): void {
+                $query->whereRaw('LOWER(name) LIKE ?', [$like])
+                    ->orWhereHas(
+                        'enrollments',
+                        fn ($enrollment) => $enrollment->where('enrollment_number', 'like', '%'.$roll.'%'),
+                    );
+
+                if (filled($digits) && strlen($digits) >= 4) {
+                    $query->orWhere('mobile', 'like', '%'.$digits.'%')
+                        ->orWhere('alternate_mobile', 'like', '%'.$digits.'%');
+                }
+            })
+            ->orderByRaw("CASE
+                WHEN status = ? THEN 0
+                WHEN status = ? THEN 1
+                ELSE 2
+            END", [StudentStatus::Enrolled->value, StudentStatus::Enquiry->value])
+            ->orderBy('name')
+            ->limit($limit)
+            ->get();
     }
 }
