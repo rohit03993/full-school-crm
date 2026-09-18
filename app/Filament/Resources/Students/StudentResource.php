@@ -25,6 +25,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Forms\Components\Select;
+use Filament\GlobalSearch\GlobalSearchResult;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
@@ -36,6 +37,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -347,9 +349,26 @@ class StudentResource extends Resource
         return static::canViewAny();
     }
 
-    public static function getGlobalSearchResults(string $search): Collection
+    public static function getGlobalSearchResults(string $search): SupportCollection
     {
-        return app(StudentSearchService::class)->quickSearch($search);
+        return SupportCollection::make(
+            app(StudentSearchService::class)->quickSearch($search)->all(),
+        )
+            ->map(function (Student $record): ?GlobalSearchResult {
+                $url = static::getGlobalSearchResultUrl($record);
+
+                if (blank($url)) {
+                    return null;
+                }
+
+                return new GlobalSearchResult(
+                    title: static::getGlobalSearchResultTitle($record),
+                    url: $url,
+                    details: static::getGlobalSearchResultDetails($record),
+                );
+            })
+            ->filter()
+            ->values();
     }
 
     public static function getGlobalSearchEloquentQuery(): Builder
@@ -381,8 +400,10 @@ class StudentResource extends Resource
 
         return array_filter([
             'Type' => $kind,
-            'Mobile' => $record->mobile,
-            'Roll' => $record->activeEnrollment?->enrollment_number,
-        ], fn (?string $value): bool => filled($value));
+            'Mobile' => filled($record->mobile) ? (string) $record->mobile : null,
+            'Roll' => filled($record->activeEnrollment?->enrollment_number)
+                ? (string) $record->activeEnrollment->enrollment_number
+                : null,
+        ], fn (mixed $value): bool => filled($value));
     }
 }
