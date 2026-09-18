@@ -111,11 +111,31 @@ class CrmBackLinkTest extends TestCase
         $this->get(AttendanceHubPage::getUrl())
             ->assertOk()
             ->assertSee('fi-crm-back__link', false)
+            ->assertSee('fi-crm-back--with-title', false)
+            ->assertSee('fi-crm-back__title', false)
+            ->assertSee('Attendance', false)
             ->assertSee('to Dashboard', false);
 
         $this->get(Dashboard::getUrl())
             ->assertOk()
             ->assertDontSee('fi-crm-back__link', false);
+    }
+
+    public function test_upload_excel_uses_compact_chrome_without_a_second_back_button(): void
+    {
+        Setting::setValue('site.name', 'Test Institute', 'general');
+        Setting::setValue('crm.onboarding_completed', '1', 'crm');
+
+        $this->get(BulkActivityMarksImportPage::getUrl())
+            ->assertOk()
+            ->assertSee('fi-crm-back__title', false)
+            ->assertSee('Upload Excel', false)
+            ->assertSee('Name, date, then the file.', false)
+            ->assertSee('Continue', false)
+            ->assertSee('Download template', false)
+            ->assertDontSee('Updating this exam', false)
+            ->assertDontSee('Upload corrected Excel', false)
+            ->assertDontSee('Name the exam &amp; upload Excel', false);
     }
 
     public function test_back_link_falls_back_to_dashboard_when_hub_module_is_off(): void

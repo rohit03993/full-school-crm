@@ -6,10 +6,8 @@ use App\Enums\BatchStatus;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Support\CrmAccess;
-use App\Support\CrmHint;
 use App\Support\FeatureGate;
 use App\Exports\ActivityMarksImportTemplateExport;
-use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
 use App\Models\AcademicSession;
 use App\Models\ActivityType;
 use App\Models\Batch;
@@ -20,10 +18,8 @@ use App\Services\ActivityMarksWhatsAppService;
 use App\Services\StudentImportFileReader;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
-use App\Support\EduExamLabels;
 use App\Support\ExamSubjectCatalog;
 use App\Support\WhatsAppSendUi;
-use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
@@ -66,10 +62,10 @@ class BulkActivityMarksImportPage extends Page
     public function getSubheading(): ?string
     {
         if ($this->isLockedToExistingExam()) {
-            return 'This file updates the exam you opened. Students in the file get new marks; others keep theirs.';
+            return 'Only students in this file are overwritten.';
         }
 
-        return CrmHint::text('activity.marks.import');
+        return 'Name, date, then the file.';
     }
 
     public int $step = 1;
@@ -208,16 +204,6 @@ class BulkActivityMarksImportPage extends Page
     public function isLockedToExistingExam(): bool
     {
         return $this->updatingExistingExam && filled($this->existingTestKey);
-    }
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            Action::make('backToTests')
-                ->label('Back to '.EduExamLabels::tests())
-                ->color('gray')
-                ->url(ActivitySessionResource::getUrl('index')),
-        ];
     }
 
     public function downloadTemplate(): BinaryFileResponse

@@ -14,15 +14,19 @@
     /* ── Back to previous page (render hook on every panel page) ── */
     /* The chip takes over the page's top padding, so the heading below tightens up */
     .fi-crm-back {
-        @apply flex pt-2 sm:pt-8;
+        @apply flex flex-col pt-2 sm:pt-8;
     }
 
     .fi-page:has(> .fi-crm-back) .fi-page-header-main-ctn {
         @apply pt-1 sm:pt-4;
     }
 
+    .fi-crm-back__row {
+        @apply flex min-w-0 items-center gap-2;
+    }
+
     .fi-crm-back__link {
-        @apply inline-flex max-w-full items-center gap-2 rounded-full bg-white/80 py-1.5 pe-3.5 ps-2 text-xs font-semibold text-gray-600 ring-1 ring-gray-950/[0.07] backdrop-blur transition duration-150;
+        @apply inline-flex max-w-full shrink-0 items-center gap-2 rounded-full bg-white/80 py-1.5 pe-3.5 ps-2 text-xs font-semibold text-gray-600 ring-1 ring-gray-950/[0.07] backdrop-blur transition duration-150;
         @apply hover:bg-white hover:text-gray-900 hover:ring-primary-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500;
         @apply dark:bg-white/[0.06] dark:text-gray-300 dark:ring-white/10 dark:hover:bg-white/[0.1] dark:hover:text-white;
     }
@@ -44,10 +48,15 @@
         @apply hidden font-normal text-gray-400 sm:inline dark:text-gray-500;
     }
 
+    .fi-crm-back__title,
+    .fi-crm-back__hint {
+        @apply hidden;
+    }
+
     /* Thumb-friendly on phones — the sidebar is closed there, so this is the main way up */
     @media (max-width: 639px) {
         .fi-crm-back {
-            @apply pt-1;
+            @apply gap-0.5 pt-1;
         }
 
         .fi-crm-back__link {
@@ -56,6 +65,24 @@
 
         .fi-crm-back__icon {
             @apply h-5 w-5;
+        }
+
+        .fi-crm-back--with-title .fi-crm-back__title {
+            @apply block min-w-0 flex-1 truncate text-end text-sm font-semibold leading-tight text-gray-950 dark:text-white;
+        }
+
+        .fi-crm-back--with-title .fi-crm-back__hint {
+            @apply mt-0.5 line-clamp-1 text-xs leading-snug text-gray-500 dark:text-gray-400;
+        }
+
+        /* Compact title lives in the Back row — do not also show Filament's H1. Student profile keeps its own header. */
+        .fi-page:has(> .fi-crm-back--with-title):not(:has(.fi-student-profile-shell)) .fi-header-heading,
+        .fi-page:has(> .fi-crm-back--with-title):not(:has(.fi-student-profile-shell)) .fi-header-subheading {
+            @apply hidden;
+        }
+
+        .fi-page:has(> .fi-crm-back--with-title):not(:has(.fi-student-profile-shell)) .fi-page-header:not(:has(.fi-btn)):not(:has(.fi-dropdown-trigger)) {
+            @apply mb-0 hidden;
         }
     }
 
@@ -594,6 +621,14 @@
 
         .fi-body:has(.fi-mobile-bottom-nav) .crm-sticky-above-nav-pad {
             padding-bottom: 5.5rem;
+        }
+    }
+
+    @media (min-width: 1024px) {
+        .crm-sticky-above-nav--in-flow {
+            position: static;
+            bottom: auto;
+            z-index: auto;
         }
     }
 
