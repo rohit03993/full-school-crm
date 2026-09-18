@@ -168,7 +168,7 @@ class TestMarksReviewPage extends Page
                     (string) ($this->markSheet['test_label'] ?? ''),
                     isset($this->markSheet['activity_type_id']) ? (int) $this->markSheet['activity_type_id'] : null,
                     isset($this->markSheet['batch_id']) ? (int) $this->markSheet['batch_id'] : null,
-                    $this->markSheet['date']?->format('Y-m-d') ?? null,
+                    $this->markSheetDateForUrl(),
                     $this->groupKey,
                 ));
         }
@@ -199,6 +199,13 @@ class TestMarksReviewPage extends Page
         return CrmAccess::can($user, CrmPermission::AcademicsManage);
     }
 
+    protected function markSheetDateForUrl(): ?string
+    {
+        return \App\Support\StudentExamMarksMatrix::dateForUrl(
+            is_array($this->markSheet) ? ($this->markSheet['date'] ?? null) : null,
+        );
+    }
+
     public function startBulkEdit(): void
     {
         abort_unless($this->userCanBulkEditMarks(), 403);
@@ -221,16 +228,20 @@ class TestMarksReviewPage extends Page
 
         $draft = [];
 
-        foreach ($this->markSheet['rows'] as $row) {
+        foreach ($this->markSheet['rows'] ?? [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
             $studentId = (int) ($row['student_id'] ?? 0);
 
             if ($studentId < 1) {
                 continue;
             }
 
-            foreach ($this->markSheet['subjects'] as $subject) {
-                $marks = $row['cells'][$subject]['marks'] ?? null;
-                $draft[$studentId][$subject] = $marks === null ? '' : (string) $marks;
+            foreach ($this->markSheet['subjects'] ?? [] as $subject) {
+                $cell = \App\Support\StudentExamMarksMatrix::sheetCell($row, (string) $subject);
+                $draft[$studentId][(string) $subject] = $cell['marks'] === null ? '' : (string) $cell['marks'];
             }
         }
 
@@ -609,7 +620,7 @@ class TestMarksReviewPage extends Page
                 $template->id,
                 $this->groupKey,
                 (string) $this->markSheet['test_label'],
-                $this->markSheet['date']?->format('Y-m-d') ?? now()->toDateString(),
+                $this->markSheetDateForUrl() ?? now()->toDateString(),
             );
 
             Notification::make()

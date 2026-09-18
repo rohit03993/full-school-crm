@@ -152,7 +152,7 @@ class ExamTestGroupMatrix
      * @return array{
      *     test_label: string,
      *     batch: ?string,
-     *     date: ?\Illuminate\Support\Carbon,
+     *     date: ?string,
      *     subjects: list<string>,
      *     subject_max: array<string, float|null>,
      *     rows: list<array{
@@ -297,7 +297,7 @@ class ExamTestGroupMatrix
             'batch' => $first->batch?->name,
             'batch_id' => $first->batch_id,
             'activity_type_id' => $first->activity_type_id,
-            'date' => $first->session_date,
+            'date' => $first->session_date?->toDateString(),
             'subjects' => $subjectList,
             'subject_max' => $subjectMax,
             'rows' => $rows,

@@ -78,9 +78,9 @@
 
         @if (in_array($status['status'] ?? 'none', ['published', 'issued'], true))
             <div class="border-t border-gray-100 px-4 py-2 text-xs text-gray-600 dark:border-white/10 dark:text-gray-400 sm:px-5">
-                Declaration date: <strong class="text-gray-800 dark:text-gray-200">{{ $declaration?->declaration_date?->format('d M Y') ?? '—' }}</strong>
-                @if ($declaration?->marksheet_issue_date)
-                    · Issue date: <strong class="text-gray-800 dark:text-gray-200">{{ $declaration->marksheet_issue_date->format('d M Y') }}</strong>
+                Declaration date: <strong class="text-gray-800 dark:text-gray-200">{{ \App\Support\StudentExamMarksMatrix::formatDateLabel($declaration?->declaration_date ?? null) }}</strong>
+                @if (filled($declaration?->marksheet_issue_date))
+                    · Issue date: <strong class="text-gray-800 dark:text-gray-200">{{ \App\Support\StudentExamMarksMatrix::formatDateLabel($declaration->marksheet_issue_date) }}</strong>
                 @endif
                 @if (filled($declaration?->remarks))
                     · Remarks: {{ $declaration->remarks }}
@@ -117,19 +117,15 @@
     </div>
 
     @php
-        $editing = ($editingMarks ?? false) && ($canBulkEditMarks ?? false);
-        $formatMax = function ($max): string {
-            if ($max === null) {
-                return '';
-            }
-
-            return rtrim(rtrim(number_format((float) $max, 2), '0'), '.');
-        };
+        $editing = (bool) ($editingMarks ?? false) && (bool) ($canBulkEditMarks ?? false);
+        $sheetRows = is_array($markSheet['rows'] ?? null) ? $markSheet['rows'] : [];
+        $sheetSubjects = is_array($markSheet['subjects'] ?? null) ? $markSheet['subjects'] : [];
+        $examDateLabel = \App\Support\StudentExamMarksMatrix::formatDateLabel($markSheet['date'] ?? null);
     @endphp
 
     <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
         <p>
-            {{ $markSheet['batch'] ?? '—' }} · {{ $markSheet['date']?->format('d M Y') ?? '—' }}
+            {{ $markSheet['batch'] ?? '—' }} · {{ $examDateLabel }}
             @if ($marksAreLocked ?? false)
                 · Marks locked
             @elseif ($editing)
@@ -155,12 +151,13 @@
 
     <div class="mb-4 space-y-2 lg:hidden">
         <p class="text-xs text-gray-500 dark:text-gray-400">One card per student — subject scores below the name.</p>
-        @foreach ($markSheet['rows'] as $row)
+                @foreach ($sheetRows as $row)
+            @continue(! is_array($row))
             <div class="rounded-xl bg-white p-3 ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-white/10">
                 <div class="flex items-start justify-between gap-2">
                     <div>
-                        <p class="font-semibold text-gray-950 dark:text-white">{{ $row['student_name'] }}</p>
-                        <p class="font-mono text-xs text-gray-500">{{ $row['roll_number'] }}</p>
+                        <p class="font-semibold text-gray-950 dark:text-white">{{ $row['student_name'] ?? '—' }}</p>
+                        <p class="font-mono text-xs text-gray-500">{{ $row['roll_number'] ?? '—' }}</p>
                     </div>
                     @if (in_array($status['status'] ?? 'none', ['published', 'issued'], true))
                         @php($sheet = $studentMarksheets[$row['student_id'] ?? 0] ?? null)
@@ -171,10 +168,10 @@
                     @endif
                 </div>
                 <dl class="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3 dark:border-white/10">
-                    @foreach ($markSheet['subjects'] as $subject)
+                    @foreach ($sheetSubjects as $subject)
                         @php
-                            $cell = $row['cells'][$subject] ?? null;
-                            $display = $row['scores'][$subject] ?? 'Absent';
+                            $cell = \App\Support\StudentExamMarksMatrix::sheetCell(is_array($row) ? $row : [], (string) $subject);
+                            $display = $cell['display'];
                         @endphp
                         <div class="rounded-lg bg-gray-50 px-2.5 py-2 dark:bg-white/5">
                             <dt class="truncate text-[10px] font-semibold uppercase text-gray-500">{{ $subject }}</dt>
@@ -186,7 +183,7 @@
                                         @if (($cell['max'] ?? null) !== null) min="{{ \App\Support\StudentExamMarksMatrix::obtainedFloor((float) $cell['max']) }}" max="{{ $cell['max'] }}" @endif
                                         wire:model="marksDraft.{{ $row['student_id'] }}.{{ $subject }}"
                                         class="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm font-semibold dark:border-white/10 dark:bg-gray-950"
-                                        placeholder="{{ ($cell['max'] ?? null) !== null ? '/ '.$formatMax($cell['max']) : 'Marks' }}"
+                                        placeholder="{{ ($cell['max'] ?? null) !== null ? '/ '.\App\Support\StudentExamMarksMatrix::formatMaxLabel($cell['max']) : 'Marks' }}"
                                     >
                                 @else
                                     {{ $display }}
@@ -217,7 +214,7 @@
                 <tr>
                     <th class="sticky left-0 z-10 bg-gray-50 px-4 py-2.5 dark:bg-gray-900">Roll No.</th>
                     <th class="px-4 py-2.5">Student</th>
-                    @foreach ($markSheet['subjects'] as $subject)
+                    @foreach ($sheetSubjects as $subject)
                         <th class="px-4 py-2.5 text-center">{{ $subject }}</th>
                     @endforeach
                     @if (in_array($status['status'] ?? 'none', ['published', 'issued'], true))
@@ -229,16 +226,17 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-white/10">
-                @foreach ($markSheet['rows'] as $row)
+                @foreach ($sheetRows as $row)
+                    @continue(! is_array($row))
                     <tr class="bg-white dark:bg-gray-900">
                         <td class="sticky left-0 z-10 bg-white px-4 py-2.5 font-mono text-gray-950 dark:bg-gray-900 dark:text-white">
-                            {{ $row['roll_number'] }}
+                            {{ $row['roll_number'] ?? '—' }}
                         </td>
-                        <td class="px-4 py-2.5 font-medium text-gray-950 dark:text-white">{{ $row['student_name'] }}</td>
-                        @foreach ($markSheet['subjects'] as $subject)
+                        <td class="px-4 py-2.5 font-medium text-gray-950 dark:text-white">{{ $row['student_name'] ?? '—' }}</td>
+                        @foreach ($sheetSubjects as $subject)
                             @php
-                                $cell = $row['cells'][$subject] ?? null;
-                                $display = $row['scores'][$subject] ?? 'Absent';
+                                $cell = \App\Support\StudentExamMarksMatrix::sheetCell(is_array($row) ? $row : [], (string) $subject);
+                                $display = $cell['display'];
                             @endphp
                             <td @class([
                                 'px-2 py-1.5 text-center',
@@ -252,7 +250,7 @@
                                         @if (($cell['max'] ?? null) !== null) min="{{ \App\Support\StudentExamMarksMatrix::obtainedFloor((float) $cell['max']) }}" max="{{ $cell['max'] }}" @endif
                                         wire:model="marksDraft.{{ $row['student_id'] }}.{{ $subject }}"
                                         class="mx-auto w-[4.5rem] rounded-md border border-gray-200 bg-white px-1.5 py-1 text-center text-sm dark:border-white/10 dark:bg-gray-950"
-                                        placeholder="{{ ($cell['max'] ?? null) !== null ? '/ '.$formatMax($cell['max']) : '' }}"
+                                        placeholder="{{ ($cell['max'] ?? null) !== null ? '/ '.\App\Support\StudentExamMarksMatrix::formatMaxLabel($cell['max']) : '' }}"
                                     >
                                 @else
                                     {{ $display }}

@@ -388,6 +388,76 @@ class StudentExamMarksMatrix
         return filled($grade) ? $grade : $empty;
     }
 
+    public static function formatMaxLabel(mixed $max): string
+    {
+        if ($max === null || $max === '' || is_array($max)) {
+            return '';
+        }
+
+        return rtrim(rtrim(number_format((float) $max, 2), '0'), '.');
+    }
+
+    public static function formatDateLabel(mixed $date, string $pattern = 'd M Y'): string
+    {
+        if ($date instanceof \DateTimeInterface) {
+            return $date->format($pattern);
+        }
+
+        if (! filled($date) || is_array($date)) {
+            return '—';
+        }
+
+        try {
+            return Carbon::parse((string) $date)->format($pattern);
+        } catch (\Throwable) {
+            return (string) $date;
+        }
+    }
+
+    public static function dateForUrl(mixed $date): ?string
+    {
+        if ($date instanceof \DateTimeInterface) {
+            return $date->format('Y-m-d');
+        }
+
+        if (! filled($date) || is_array($date)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse((string) $date)->toDateString();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array{marks: ?float, max: ?float, display: string}
+     */
+    public static function sheetCell(array $row, string $subject): array
+    {
+        $cell = $row['cells'][$subject] ?? null;
+
+        if (! is_array($cell)) {
+            $display = $row['scores'][$subject] ?? 'Absent';
+
+            return [
+                'marks' => null,
+                'max' => null,
+                'display' => is_array($display) ? (string) ($display['display'] ?? 'Absent') : (string) $display,
+            ];
+        }
+
+        $display = $cell['display'] ?? $row['scores'][$subject] ?? 'Absent';
+
+        return [
+            'marks' => isset($cell['marks']) && $cell['marks'] !== '' ? (float) $cell['marks'] : null,
+            'max' => isset($cell['max']) && $cell['max'] !== '' ? (float) $cell['max'] : null,
+            'display' => is_array($display) ? (string) ($display['display'] ?? 'Absent') : (string) $display,
+        ];
+    }
+
     /**
      * Lowest allowed obtained marks for a paper (penalty). Same magnitude as max, opposite sign.
      */
