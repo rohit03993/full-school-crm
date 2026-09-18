@@ -743,7 +743,7 @@ class DashboardHeroWidget extends Widget
             ],
             [
                 'label' => CrmMenuLabels::examResults(),
-                'description' => 'Enter, review, and publish marks',
+                'description' => 'Teachers enter marks or upload Excel, then publish',
                 'icon' => 'heroicon-o-clipboard-document-list',
                 'url' => ActivitySessionResource::getUrl('index'),
                 'feature' => LicenseFeature::Marks,

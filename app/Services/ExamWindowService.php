@@ -14,7 +14,6 @@ use App\Models\ExamWindow;
 use App\Models\ExamWindowSubject;
 use App\Models\User;
 use App\Support\CrmAccess;
-use App\Support\CrmMenuLabels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -43,7 +42,7 @@ class ExamWindowService
 
         if ($subjects->isEmpty()) {
             throw ValidationException::withMessages([
-                'batch_id' => 'Select subjects on this section first — then create an exam window.',
+                'batch_id' => 'Select subjects on this section first — then create the exam.',
             ]);
         }
 
@@ -187,7 +186,7 @@ class ExamWindowService
 
         if ($window->status !== ExamWindowStatus::Approved) {
             throw ValidationException::withMessages([
-                'status' => 'Approve the exam before publishing results. Open '.CrmMenuLabels::createExam().' from Academics.',
+                'status' => 'Approve this exam before publishing results. Open it from Exams.',
             ]);
         }
     }
@@ -407,7 +406,7 @@ class ExamWindowService
     {
         if (! $this->isAdmin($user)) {
             throw ValidationException::withMessages([
-                'permission' => 'You do not have permission to manage exam windows.',
+                'permission' => 'You do not have permission to manage this exam.',
             ]);
         }
     }

@@ -8,10 +8,13 @@ use App\Enums\RoleName;
 use App\Filament\Pages\AttendanceHubPage;
 use App\Filament\Pages\AttendancePage;
 use App\Filament\Pages\BackupsPage;
+use App\Filament\Pages\BulkActivityMarksImportPage;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\SetupHubPage;
+use App\Filament\Pages\TestMarksReviewPage;
 use App\Filament\Pages\WhatsAppHubPage;
 use App\Filament\Pages\WhatsAppInboxPage;
+use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
 use App\Filament\Resources\WhatsAppCampaigns\Pages\ListWhatsAppCampaigns;
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Models\Setting;
@@ -73,6 +76,15 @@ class CrmBackLinkTest extends TestCase
         $setupBack = CrmBackLink::forScopes([BackupsPage::class]);
         $this->assertSame(SetupHubPage::getUrl(), $setupBack['url']);
         $this->assertSame('Setup', $setupBack['label']);
+
+        $this->assertSame(
+            ActivitySessionResource::getUrl('index'),
+            CrmBackLink::forScopes([TestMarksReviewPage::class])['url'],
+        );
+        $this->assertSame(
+            ActivitySessionResource::getUrl('index'),
+            CrmBackLink::forScopes([BulkActivityMarksImportPage::class])['url'],
+        );
     }
 
     public function test_resource_list_page_points_at_hub_and_child_page_points_at_list(): void

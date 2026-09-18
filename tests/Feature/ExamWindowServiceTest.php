@@ -23,6 +23,7 @@ use App\Services\CourseSubjectService;
 use App\Services\BatchSubjectService;
 use App\Services\ExamWindowService;
 use App\Services\ResultDeclarationService;
+use App\Support\ExamMarksPath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
@@ -71,6 +72,14 @@ class ExamWindowServiceTest extends TestCase
         $session = ActivitySession::query()->where('batch_id', $batch->id)->firstOrFail();
         $this->assertSame('Unit Test 1', $session->metadataValue('test_name'));
         $this->assertNotNull($session->metadataValue('course_subject_id'));
+
+        $this->actingAs($admin);
+        $path = ExamMarksPath::forGroupKeys([$window->test_key, 'excel-only-exam']);
+        $this->assertSame('teachers', $path[$window->test_key]['mode']);
+        $this->assertSame($window->id, $path[$window->test_key]['window_id']);
+        $this->assertSame('excel', $path['excel-only-exam']['mode']);
+        $this->assertSame('Excel upload', $path['excel-only-exam']['label']);
+        $this->assertNull($path['excel-only-exam']['url']);
     }
 
     public function test_workflow_submit_approve_and_publish_gate(): void

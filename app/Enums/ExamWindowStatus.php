@@ -13,9 +13,9 @@ enum ExamWindowStatus: string
     {
         return match ($this) {
             self::Draft => 'Draft',
-            self::Open => 'Open for teachers',
-            self::Submitted => 'Submitted for approval',
-            self::Approved => 'Approved',
+            self::Open => 'Teachers entering',
+            self::Submitted => 'Waiting approval',
+            self::Approved => 'Ready to publish',
         };
     }
 

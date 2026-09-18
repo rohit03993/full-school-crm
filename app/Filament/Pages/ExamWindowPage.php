@@ -82,8 +82,8 @@ class ExamWindowPage extends Page
     {
         return [
             Action::make('back')
-                ->label('Back to '.CrmMenuLabels::createExam())
-                ->url(ExamWindowsPage::getUrl())
+                ->label('Back to '.CrmMenuLabels::examResults())
+                ->url(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::getUrl('index'))
                 ->color('gray'),
         ];
     }

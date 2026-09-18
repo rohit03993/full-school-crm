@@ -132,11 +132,12 @@ class CrmBackLink
 
         AddClassSectionPage::class => ClassSectionsPage::class,
 
-        ExamWindowPage::class => ExamWindowsPage::class,
-        CreateExamWindowPage::class => ExamWindowsPage::class,
-        TestMarksReviewPage::class => ExamWindowsPage::class,
-        ConsolidatedReportCardsPage::class => ExamWindowsPage::class,
-        BulkActivityMarksImportPage::class => ExamWindowsPage::class,
+        ExamWindowsPage::class => ActivitySessionResource::class,
+        ExamWindowPage::class => ActivitySessionResource::class,
+        CreateExamWindowPage::class => ActivitySessionResource::class,
+        TestMarksReviewPage::class => ActivitySessionResource::class,
+        ConsolidatedReportCardsPage::class => ActivitySessionResource::class,
+        BulkActivityMarksImportPage::class => ActivitySessionResource::class,
 
         ActivityAttendancePage::class => ActivitySessionResource::class,
         SessionAttendancePage::class => ActivitySessionResource::class,

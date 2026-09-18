@@ -13,6 +13,7 @@ use App\Services\ActivityMarksWhatsAppService;
 use App\Services\ExamWindowService;
 use App\Services\ResultDeclarationService;
 use App\Support\CrmHint;
+use App\Support\CrmMenuLabels;
 use App\Support\ExamTestGroupMatrix;
 use App\Support\PublishedResultsGate;
 use App\Support\ResultAuditTrail;
@@ -29,7 +30,7 @@ class TestMarksReviewPage extends Page
 {
     protected static bool $shouldRegisterNavigation = false;
 
-    protected static ?string $title = 'Test mark sheet';
+    protected static ?string $title = 'Exam mark sheet';
 
     public static function canAccess(): bool
     {
@@ -87,7 +88,7 @@ class TestMarksReviewPage extends Page
 
         if (is_array($this->markSheet) && ! $this->marksAreLocked()) {
             $actions[] = Action::make('uploadMarks')
-                ->label('Upload marks')
+                ->label(CrmMenuLabels::uploadMarksExcel())
                 ->icon(Heroicon::OutlinedArrowUpTray)
                 ->url(fn (): string => BulkActivityMarksImportPage::urlForTest(
                     (string) ($this->markSheet['test_label'] ?? ''),
@@ -98,7 +99,7 @@ class TestMarksReviewPage extends Page
         }
 
         $actions[] = Action::make('back')
-            ->label('Back to tests')
+            ->label('Back to '.CrmMenuLabels::examResults())
             ->url(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::getUrl('index'));
 
         return $actions;
@@ -114,7 +115,7 @@ class TestMarksReviewPage extends Page
         ]);
 
         if (blank($this->groupKey)) {
-            Notification::make()->title('Test not found')->warning()->send();
+            Notification::make()->title('Exam not found')->warning()->send();
 
             return;
         }
@@ -150,7 +151,7 @@ class TestMarksReviewPage extends Page
         ]);
 
         if (blank($this->groupKey)) {
-            Notification::make()->title('Test not found')->warning()->send();
+            Notification::make()->title('Exam not found')->warning()->send();
 
             return;
         }
@@ -196,7 +197,7 @@ class TestMarksReviewPage extends Page
         ]);
 
         if (blank($this->groupKey)) {
-            Notification::make()->title('Test not found')->warning()->send();
+            Notification::make()->title('Exam not found')->warning()->send();
 
             return;
         }
@@ -251,7 +252,7 @@ class TestMarksReviewPage extends Page
         abort_unless(CrmAccess::can(Auth::user(), CrmPermission::MarksPublish), 403);
 
         if (blank($this->groupKey)) {
-            Notification::make()->title('Test not found')->warning()->send();
+            Notification::make()->title('Exam not found')->warning()->send();
 
             return;
         }
@@ -394,7 +395,7 @@ class TestMarksReviewPage extends Page
 
         if (! is_array($this->markSheet) || blank($this->groupKey)) {
             Notification::make()
-                ->title('Test not found')
+                ->title('Exam not found')
                 ->body('Open a test mark sheet first, then send WhatsApp messages.')
                 ->warning()
                 ->send();

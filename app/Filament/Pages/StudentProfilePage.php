@@ -711,7 +711,7 @@ class StudentProfilePage extends Page
         if ($row['marks_locked'] ?? false) {
             Notification::make()
                 ->title('Marks are locked')
-                ->body('Unlock this exam on Exam results → View sheet before editing.')
+                ->body('Unlock this exam on Exams → View sheet before editing.')
                 ->warning()
                 ->send();
 

@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\ActivitySessions\Pages;
 
 use App\Filament\Concerns\ShowsCrmPageHint;
+use App\Enums\RoleName;
+use App\Filament\Pages\CreateExamWindowPage;
 use App\Filament\Pages\BulkActivityMarksImportPage;
 use App\Filament\Pages\ConsolidatedReportCardsPage;
 use App\Filament\Pages\ExamWindowsPage;
@@ -15,6 +17,7 @@ use App\Services\ExamTestGroupService;
 use App\Services\ResultDeclarationService;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmPagination;
+use App\Support\ExamMarksPath;
 use App\Support\ExamTestGroupMatrix;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -86,7 +89,7 @@ class ListActivitySessions extends ListRecords
 
             Notification::make()
                 ->title('Exam deleted')
-                ->body('This test and its marks were removed. Other exams were not changed.')
+                ->body('This exam and its marks were removed. Other exams were not changed.')
                 ->success()
                 ->send();
         } catch (ValidationException $exception) {
@@ -140,6 +143,9 @@ class ListActivitySessions extends ListRecords
         $canDeleteExams = Auth::user()
             ? app(ExamTestGroupService::class)->userCanManage(Auth::user())
             : false;
+        $createTeacherExamUrl = CreateExamWindowPage::canAccess() ? CreateExamWindowPage::getUrl() : null;
+        $uploadExcelUrl = BulkActivityMarksImportPage::canAccess() ? BulkActivityMarksImportPage::getUrl() : null;
+        $teacherExamsListUrl = CreateExamWindowPage::canAccess() ? ExamWindowsPage::getUrl() : null;
 
         return $schema->components([
             View::make('filament.resources.activity-sessions.exam-test-groups-list')
@@ -152,6 +158,10 @@ class ListActivitySessions extends ListRecords
                     'activityTypeOptions' => ActivityType::scoringOptions(),
                     'importMarksUrl' => BulkActivityMarksImportPage::getUrl(),
                     'reviewPageBaseUrl' => TestMarksReviewPage::getUrl(),
+                    'createTeacherExamUrl' => $createTeacherExamUrl,
+                    'uploadExcelUrl' => $uploadExcelUrl,
+                    'teacherExamsListUrl' => $teacherExamsListUrl,
+                    'entryMeta' => ExamMarksPath::forGroupKeys($groupKeys),
                     'declarationStatuses' => collect($pageRows)
                         ->mapWithKeys(fn (array $row): array => [
                             (string) ($row['group_key'] ?? '') => ResultDeclarationService::statusMetaForGroupKey((string) ($row['group_key'] ?? '')),
@@ -171,21 +181,31 @@ class ListActivitySessions extends ListRecords
     {
         $actions = [];
 
+        if (CreateExamWindowPage::canAccess()) {
+            $actions[] = Action::make('teachersEnterMarks')
+                ->label(CrmMenuLabels::createExam())
+                ->icon(Heroicon::OutlinedClipboardDocumentCheck)
+                ->color('success')
+                ->url(CreateExamWindowPage::getUrl())
+                ->tooltip('Create the exam for a class. Teachers type marks per subject.');
+        }
+
         if (BulkActivityMarksImportPage::canAccess()) {
             $actions[] = Action::make('uploadMarks')
                 ->label(CrmMenuLabels::uploadMarksExcel())
                 ->icon(Heroicon::OutlinedArrowUpTray)
                 ->color('primary')
-                ->url(BulkActivityMarksImportPage::getUrl());
+                ->url(BulkActivityMarksImportPage::getUrl())
+                ->tooltip('Name the exam and upload a spreadsheet of marks.');
         }
 
-        if (ExamWindowsPage::canAccess()) {
-            $actions[] = Action::make('examWindows')
-                ->label(CrmMenuLabels::createExam())
-                ->icon(Heroicon::OutlinedClipboardDocumentCheck)
-                ->color('success')
+        if (CreateExamWindowPage::canAccess()) {
+            $actions[] = Action::make('teacherExamsInProgress')
+                ->label(CrmMenuLabels::teacherExamsInProgress())
+                ->icon(Heroicon::OutlinedListBullet)
+                ->color('gray')
                 ->url(ExamWindowsPage::getUrl())
-                ->tooltip('Create exams from section subjects — teacher entry, approval, then publish.');
+                ->tooltip('Draft, teacher-entry, and waiting-approval exams.');
         }
 
         if (ConsolidatedReportCardsPage::canAccess()) {
@@ -207,7 +227,7 @@ class ListActivitySessions extends ListRecords
             }
         }
 
-        if (ActivitySessionResource::canCreate()) {
+        if (ActivitySessionResource::canCreate() && Auth::user()?->hasRole(RoleName::SuperAdmin->value)) {
             $actions[] = Action::make('scheduleSingleSubject')
                 ->label('One subject (manual)')
                 ->icon(Heroicon::OutlinedPlus)

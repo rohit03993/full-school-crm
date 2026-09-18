@@ -1,6 +1,6 @@
 @if (! is_array($markSheet))
     <div class="rounded-xl bg-gray-50 px-4 py-10 text-center text-sm text-gray-600 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10">
-        Test not found. Go back to {{ \App\Support\CrmMenuLabels::examResults() }} and choose <strong>View sheet</strong>.
+        Exam not found. Go back to {{ \App\Support\CrmMenuLabels::examResults() }} and choose <strong>View sheet</strong>.
     </div>
 @else
     @php
@@ -60,13 +60,13 @@
 
             @if (($examWindowStatus['exists'] ?? false) && ! ($canPublish ?? false) && ! in_array($status['status'] ?? 'none', ['published', 'issued'], true))
                 <div class="rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-500/20 dark:bg-amber-500/5 sm:col-span-2">
-                    <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Exam window: {{ $examWindowStatus['label'] ?? 'Pending' }}</p>
+                    <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Teachers still entering: {{ $examWindowStatus['label'] ?? 'Pending' }}</p>
                     <p class="mt-1 text-xs text-amber-800 dark:text-amber-300">
-                        Approve the exam window before publishing. Class lead submits → admin approves on the exam window page.
+                        Approve this exam before publishing. Class lead submits → you approve on the exam page.
                     </p>
                     @if (! empty($examWindowStatus['url']))
                         <a href="{{ $examWindowStatus['url'] }}" class="mt-3 inline-flex rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500">
-                            Open exam window
+                            Open exam
                         </a>
                     @endif
                 </div>

@@ -81,7 +81,7 @@ class ActivitySessionResource extends Resource
         return $schema
             ->components([
                 Section::make('Exam')
-                    ->description('For most exams, use '.CrmMenuLabels::examResults().' → '.CrmMenuLabels::uploadMarksExcel().'. Use this form only to add one subject manually.')
+                    ->description('For most exams, use '.CrmMenuLabels::examResults().' → '.CrmMenuLabels::createExam().' or '.CrmMenuLabels::uploadMarksExcel().'. Use this form only to add one subject manually.')
                     ->schema(ActivitySessionFormSchema::fields())
                     ->columns(1),
             ]);

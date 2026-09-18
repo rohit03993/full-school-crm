@@ -1,6 +1,6 @@
 @php
     $steps = [
-        1 => ['label' => 'Test & file', 'hint' => 'Name, date, upload'],
+        1 => ['label' => 'Exam & file', 'hint' => 'Name, date, upload'],
         2 => ['label' => 'Map columns', 'hint' => 'Roll + subjects'],
         3 => ['label' => 'Preview', 'hint' => 'Review matches'],
         4 => ['label' => 'Results', 'hint' => 'Import & WhatsApp'],
@@ -43,9 +43,9 @@
             <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <h2 class="text-lg font-bold text-gray-950 dark:text-white">Name your test & upload Excel</h2>
+                        <h2 class="text-lg font-bold text-gray-950 dark:text-white">Name the exam & upload Excel</h2>
                         <p class="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-                            The <strong>test name</strong> and <strong>date</strong> create the test record. Upload your institute Excel (title row is OK) with <strong>Roll No</strong> and subject columns such as <strong>P, C, M</strong> or full names. Totals / rank / percent columns are ignored.
+                            The <strong>exam name</strong> and <strong>date</strong> identify this exam. Upload your institute Excel (title row is OK) with <strong>Roll No</strong> and subject columns such as <strong>P, C, M</strong> or full names. Totals / rank / percent columns are ignored.
                         </p>
                     </div>
                     <button type="button" wire:click="downloadTemplate" class="rounded-xl border border-primary-200 px-3.5 py-2 text-sm font-semibold text-primary-700 hover:bg-primary-50 dark:border-primary-500/30 dark:text-primary-300">
@@ -64,13 +64,13 @@
                     @endforelse
                 </x-crm.select-input>
 
-                <x-crm.text-input label="Test name" model="testName" placeholder="e.g. Unit Test March 2026" />
+                <x-crm.text-input label="Exam name" model="testName" placeholder="e.g. Unit Test March 2026" />
 
-                <x-crm.text-input label="Test date" model="sessionDate" type="date" />
+                <x-crm.text-input label="Exam date" model="sessionDate" type="date" />
 
                 <div>
                     <x-crm.text-input label="Starting out of" model="defaultMaxMarks" type="number" />
-                    <p class="mt-1 text-xs text-gray-500">Starting value only. On the next step you set 180, 100, 50, or any number per subject for this test.</p>
+                    <p class="mt-1 text-xs text-gray-500">Starting value only. On the next step you set 180, 100, 50, or any number per subject for this exam.</p>
                 </div>
 
                 <x-crm.select-input label="Academic session (optional filter)" for="marks-session" wire:model="academicSessionId" class="lg:col-span-2">

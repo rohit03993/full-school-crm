@@ -8,6 +8,7 @@ use App\Enums\RoleName;
 use App\Filament\Pages\AllCasesPage;
 use App\Filament\Pages\AttendanceHubPage;
 use App\Filament\Pages\AttendancePage;
+use App\Filament\Pages\ExamWindowsPage;
 use App\Filament\Pages\FeesDashboardPage;
 use App\Filament\Pages\FeesHubPage;
 use App\Filament\Pages\SetupHubPage;
@@ -66,6 +67,14 @@ class NavigationHubsTest extends TestCase
 
         $this->assertTrue(SetupHubPage::shouldRegisterNavigation());
         $this->assertFalse(AllCasesPage::shouldRegisterNavigation());
+    }
+
+    public function test_exams_hub_hides_teacher_entry_list_from_sidebar(): void
+    {
+        $this->assertFalse(ExamWindowsPage::shouldRegisterNavigation());
+        $this->assertSame('Exams', CrmMenuLabels::examResults());
+        $this->assertSame('Teachers enter marks', CrmMenuLabels::createExam());
+        $this->assertSame('Upload Excel', CrmMenuLabels::uploadMarksExcel());
     }
 
     public function test_student_call_log_label_and_setup_whatsapp_groups_start_collapsed(): void

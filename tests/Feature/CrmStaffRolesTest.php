@@ -252,6 +252,7 @@ class CrmStaffRolesTest extends TestCase
         $this->assertFalse($user->canCrm(CrmPermission::HomeworkManage));
         $this->assertFalse(\App\Support\CrmAccess::canSendExamMarksWhatsApp($user));
         $this->assertFalse(\App\Filament\Pages\CreateExamWindowPage::canAccess());
+        $this->assertTrue(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::canAccess());
         $this->assertTrue(\App\Filament\Pages\AttendancePage::canAccess());
     }
 

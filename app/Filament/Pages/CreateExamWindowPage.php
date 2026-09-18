@@ -81,8 +81,8 @@ class CreateExamWindowPage extends Page
     {
         return [
             Action::make('back')
-                ->label('All exam windows')
-                ->url(ExamWindowsPage::getUrl())
+                ->label('Back to '.CrmMenuLabels::examResults())
+                ->url(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::getUrl('index'))
                 ->color('gray'),
         ];
     }
@@ -182,8 +182,8 @@ class CreateExamWindowPage extends Page
         }
 
         Notification::make()
-            ->title('Exam window created')
-            ->body("{$window->test_name} is ready with {$window->subjects->count()} subject(s).")
+            ->title('Exam created')
+            ->body("{$window->test_name} is ready with {$window->subjects->count()} subject(s). Teachers can enter marks.")
             ->success()
             ->send();
 
@@ -205,7 +205,7 @@ class CreateExamWindowPage extends Page
             ->footer([
                 Actions::make([
                     Action::make('save')
-                        ->label('Create exam window')
+                        ->label('Create exam')
                         ->icon(Heroicon::OutlinedPlus)
                         ->submit('save'),
                 ]),

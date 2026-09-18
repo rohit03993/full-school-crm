@@ -758,7 +758,7 @@ class WhatsAppSettingsService
             .'Not automatic — publishing results or generating PDFs does <strong>not</strong> message parents. '
             .'Staff open the mark sheet (or finish Excel import) and click <strong>Queue WhatsApp</strong>. '
             .'Map <code class="text-xs">'.e(TestMarksWhatsAppTemplate::NAME).'</code> variables on WhatsApp → Templates, then pick it below. '
-            .'Open a sheet from <a href="'.$reviewUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Exam results</a>.</p></div>'
+            .'Open a sheet from <a href="'.$reviewUrl.'" class="font-semibold text-primary-600 hover:underline dark:text-primary-400">Exams</a>.</p></div>'
             .'<div class="px-4 py-3"><p class="text-xs font-bold text-gray-950 dark:text-white"><code>'.e(TestMarksWhatsAppTemplate::NAME).'</code> (4 params)</p>'
             .'<pre class="mt-2 whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">'.$body.'</pre></div>'
             .'<div class="overflow-x-auto border-t border-amber-200/60 dark:border-amber-500/20">'

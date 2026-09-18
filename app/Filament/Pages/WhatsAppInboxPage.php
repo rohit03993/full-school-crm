@@ -39,6 +39,8 @@ class WhatsAppInboxPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedInbox;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationLabel = null;
 
     protected static ?string $title = null;

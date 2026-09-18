@@ -204,17 +204,22 @@ final class CrmMenuLabels
 
     public static function createExam(): string
     {
-        return 'Create exam';
+        return 'Teachers enter marks';
     }
 
     public static function examResults(): string
     {
-        return 'Exam results';
+        return 'Exams';
+    }
+
+    public static function teacherExamsInProgress(): string
+    {
+        return 'Teacher exams in progress';
     }
 
     public static function uploadMarksExcel(): string
     {
-        return 'Upload marks (Excel)';
+        return 'Upload Excel';
     }
 
     public static function attendance(): string

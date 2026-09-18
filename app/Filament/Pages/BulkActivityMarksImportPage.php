@@ -64,7 +64,7 @@ class BulkActivityMarksImportPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Name the test, upload Excel — roll numbers and all subject columns in one file.';
+        return 'Name the exam, upload Excel — roll numbers and all subject columns in one file.';
     }
 
     public int $step = 1;

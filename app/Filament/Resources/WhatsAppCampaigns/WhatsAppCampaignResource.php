@@ -69,7 +69,7 @@ class WhatsAppCampaignResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return true;
+        return false;
     }
 
     protected static ?string $model = WhatsAppCampaign::class;

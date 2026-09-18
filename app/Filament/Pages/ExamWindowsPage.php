@@ -34,18 +34,20 @@ class ExamWindowsPage extends Page
 
     protected static ?string $slug = 'exam-windows';
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?int $navigationSort = 25;
 
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_ACADEMICS;
 
     public static function getNavigationLabel(): string
     {
-        return CrmMenuLabels::createExam();
+        return CrmMenuLabels::teacherExamsInProgress();
     }
 
     public function getTitle(): string
     {
-        return CrmMenuLabels::createExam();
+        return CrmMenuLabels::teacherExamsInProgress();
     }
 
     public string $search = '';
@@ -85,7 +87,7 @@ class ExamWindowsPage extends Page
 
         return [
             Action::make('create')
-                ->label('Create exam')
+                ->label(CrmMenuLabels::createExam())
                 ->icon(Heroicon::OutlinedPlus)
                 ->url(CreateExamWindowPage::getUrl()),
         ];

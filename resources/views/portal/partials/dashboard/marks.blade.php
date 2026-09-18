@@ -1,7 +1,7 @@
 @if (! empty($examMarksSections))
     <section class="space-y-3">
         <div>
-            <h2 class="font-display text-lg font-bold text-navy-900">Test &amp; exam marks</h2>
+            <h2 class="font-display text-lg font-bold text-navy-900">Exam marks</h2>
             <p class="mt-0.5 text-sm text-navy-500">Declared results — visible after your institute publishes them online</p>
         </div>
 

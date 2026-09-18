@@ -5,8 +5,6 @@ namespace App\Filament\Forms;
 use App\Enums\BatchStatus;
 use App\Models\ActivityType;
 use App\Models\Batch;
-use App\Support\CrmMenuLabels;
-use App\Support\EduExamLabels;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -29,7 +27,7 @@ class ActivitySessionFormSchema
                 ->live()
                 ->searchable()
                 ->default(fn (): ?int => ActivityType::scoringTypes()->first()?->id)
-                ->helperText('Exams only — use '.CrmMenuLabels::createExam().' to create tests from class subjects.'),
+                ->helperText('Exams only — use Exams → Teachers enter marks for a full class, or Upload Excel.'),
             TextInput::make('title')
                 ->label('Title')
                 ->placeholder('e.g. Unit Test — Mathematics')

@@ -6,7 +6,7 @@
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex-1">
             <p class="text-sm text-gray-600 dark:text-gray-400">
-                Admin creates exams from section subjects → teachers enter marks → class lead submits → admin approves → publish.
+                Teachers type marks per subject. Class lead submits. You approve, then publish from Exams → View sheet.
             </p>
         </div>
         <a
@@ -14,7 +14,7 @@
             class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500"
         >
             <x-filament::icon icon="heroicon-m-plus" class="h-4 w-4" />
-            Create exam
+            {{ \App\Support\CrmMenuLabels::createExam() }}
         </a>
     </div>
 
@@ -37,12 +37,12 @@
 
     @if ($windows->isEmpty())
         <div class="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center dark:border-white/20 dark:bg-gray-900">
-            <p class="text-lg font-semibold text-gray-950 dark:text-white">No exam windows yet</p>
+            <p class="text-lg font-semibold text-gray-950 dark:text-white">No teacher-entry exams yet</p>
             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Create Unit Test 1 (or any exam) for a section — only that section’s selected subjects are included.
+                Create Unit Test 1 (or any exam) for a class — only that class’s subjects are included. Excel uploads are on Exams, not here.
             </p>
             <a href="{{ $createUrl }}" class="mt-4 inline-flex items-center rounded-xl bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-500">
-                Create exam
+                {{ \App\Support\CrmMenuLabels::createExam() }}
             </a>
         </div>
     @else

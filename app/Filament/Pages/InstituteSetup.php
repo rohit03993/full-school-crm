@@ -4,8 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Enums\RoleName;
 use App\Filament\Pages\ClassSectionsPage;
-use App\Filament\Pages\ExamWindowsPage;
 use App\Filament\Resources\AcademicSessions\AcademicSessionResource;
+use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
 use App\Models\AcademicSession;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
@@ -98,9 +98,9 @@ class InstituteSetup extends Page
                 'icon' => 'heroicon-o-calendar-days',
             ],
             [
-                'label' => CrmMenuLabels::createExam(),
-                'description' => 'Create unit tests and term exams from each section’s selected subjects.',
-                'url' => ExamWindowsPage::getUrl(),
+                'label' => CrmMenuLabels::examResults(),
+                'description' => 'Add marks two ways: teachers type them, or upload Excel. Then publish for parents.',
+                'url' => ActivitySessionResource::getUrl('index'),
                 'icon' => 'heroicon-o-clipboard-document-check',
             ],
             [
