@@ -1,0 +1,297 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\AdmissionStatus;
+use App\Enums\BatchStatus;
+use App\Enums\CourseStatus;
+use App\Enums\EnrollmentStatus;
+use App\Enums\Gender;
+use App\Enums\LeadSource;
+use App\Enums\RoleName;
+use App\Enums\StudentStatus;
+use App\Enums\WhatsAppCampaignStatus;
+use App\Filament\Pages\StudentProfilePage;
+use App\Jobs\RunWhatsAppCampaignJob;
+use App\Models\AcademicSession;
+use App\Models\ActivitySession;
+use App\Models\ActivityType;
+use App\Models\Admission;
+use App\Models\Batch;
+use App\Models\BatchStudent;
+use App\Models\Course;
+use App\Models\Enquiry;
+use App\Models\Enrollment;
+use App\Models\Setting;
+use App\Models\Student;
+use App\Models\User;
+use App\Models\WhatsAppCampaign;
+use App\Models\WhatsAppTemplate;
+use App\Services\ActivityAttendanceService;
+use App\Services\ActivityMarksWhatsAppService;
+use App\Support\StudentExamMarksMatrix;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
+use Tests\TestCase;
+
+class StudentProfileExamMarksWhatsAppTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->travelTo('2026-09-19 10:00:00');
+
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-test-token'), 'meta_whatsapp');
+        Setting::flushValueCache();
+    }
+
+    public function test_create_marks_campaign_can_target_one_student_and_refresh_keeps_that_filter(): void
+    {
+        Queue::fake();
+
+        $this->seed(\Database\Seeders\ActivityTypeSeeder::class);
+
+        $staff = $this->createSuperAdmin();
+        [$studentA, $studentB, $groupKey] = $this->createClassWithTwoMarkedStudents($staff);
+        $template = $this->createMarksTemplate();
+
+        $service = app(ActivityMarksWhatsAppService::class);
+        $campaign = $service->createMarksCampaign(
+            $staff,
+            $template,
+            $groupKey,
+            'Unit Test — Sept 2026',
+            '2026-09-12',
+            $studentA->id,
+        );
+
+        $this->assertSame(1, $campaign->total_recipients);
+        $this->assertSame([$studentA->id], $campaign->recipients()->pluck('student_id')->all());
+        $this->assertSame((string) $studentA->id, (string) $campaign->campaignVariable('only_student_id'));
+        $this->assertStringContainsString($studentA->name, $campaign->name);
+
+        $preview = $service->previewForStudent($studentA, $groupKey);
+        $this->assertNotNull($preview);
+        $this->assertSame('9876501001', $preview['mobile']);
+        $this->assertStringContainsString('Maths: 42/50', $preview['marks_summary']);
+        $this->assertNotNull($service->previewForStudent($studentB, $groupKey));
+        $this->assertNull($service->previewForStudent($studentA, $groupKey.'-missing'));
+
+        $queued = $service->queueMarksCampaign(
+            $staff,
+            $template->id,
+            $groupKey,
+            'Unit Test — Sept 2026',
+            '2026-09-12',
+            $studentA->id,
+        );
+
+        $this->assertSame(WhatsAppCampaignStatus::Queued, $queued->status);
+        $this->assertSame(1, $queued->recipients()->count());
+        $this->assertSame([$studentA->id], $queued->recipients()->pluck('student_id')->all());
+        Queue::assertPushed(RunWhatsAppCampaignJob::class, fn (RunWhatsAppCampaignJob $job): bool => $job->campaignId === $queued->id);
+    }
+
+    public function test_profile_shows_whatsapp_only_when_the_student_appeared_and_queues_that_student(): void
+    {
+        Queue::fake();
+
+        $this->seed(\Database\Seeders\ActivityTypeSeeder::class);
+
+        $admin = $this->createSuperAdmin();
+        [$studentA, $studentB, $groupKey] = $this->createClassWithTwoMarkedStudents($admin, markSecond: false);
+        $this->createMarksTemplate();
+
+        $this->actingAs($admin);
+
+        $appeared = Livewire::test(StudentProfilePage::class, ['record' => $studentA])
+            ->set('profileTab', 'activities')
+            ->assertSee('Unit Test — Sept 2026')
+            ->assertSeeHtml('confirmSendExamMarksWhatsApp');
+
+        $toolbarNames = collect($appeared->instance()->studentProfileDeskToolbar()['primary'])
+            ->pluck('name')
+            ->merge(collect($appeared->instance()->studentProfileDeskToolbar()['more'])->pluck('name'));
+        $this->assertFalse($toolbarNames->contains('sendExamMarksWhatsApp'));
+
+        $appeared
+            ->call('confirmSendExamMarksWhatsApp', $groupKey)
+            ->assertActionMounted('sendExamMarksWhatsApp')
+            ->callMountedAction()
+            ->assertNotified()
+            ->assertRedirect();
+
+        $campaign = WhatsAppCampaign::query()->latest('id')->first();
+        $this->assertNotNull($campaign);
+        $this->assertSame(1, $campaign->recipients()->count());
+        $this->assertSame($studentA->id, $campaign->recipients()->value('student_id'));
+        $this->assertSame((string) $studentA->id, (string) $campaign->campaignVariable('only_student_id'));
+
+        Livewire::test(StudentProfilePage::class, ['record' => $studentB])
+            ->set('profileTab', 'activities')
+            ->assertSee('Unit Test — Sept 2026')
+            ->assertDontSeeHtml('confirmSendExamMarksWhatsApp');
+    }
+
+    /**
+     * @return array{0: Student, 1: Student, 2: string}
+     */
+    protected function createClassWithTwoMarkedStudents(User $staff, bool $markSecond = true): array
+    {
+        $session = AcademicSession::query()->create([
+            'name' => '2026-27',
+            'code' => '2026-27',
+            'starts_on' => '2026-04-01',
+            'ends_on' => '2027-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
+
+        $course = Course::query()->create([
+            'name' => 'Class 12 Science',
+            'code' => 'WA-EX-12',
+            'programme_category' => 'coaching',
+            'duration' => 12,
+            'duration_type' => 'months',
+            'fee' => 50000,
+            'status' => CourseStatus::Active,
+        ]);
+
+        $batch = Batch::query()->create([
+            'name' => '12-A Marks WA',
+            'course_id' => $course->id,
+            'academic_session_id' => $session->id,
+            'trainer_user_id' => $staff->id,
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-12-31',
+            'status' => BatchStatus::Active,
+        ]);
+
+        $studentA = $this->createEnrolledStudent($staff, $course, $batch, $session, 'Aarav Marks', '9876501001', 'WA-1001');
+        $studentB = $this->createEnrolledStudent($staff, $course, $batch, $session, 'Bhavya Marks', '9876501002', 'WA-1002');
+
+        $examType = ActivityType::query()->where('slug', 'exam')->firstOrFail();
+        $testName = 'Unit Test — Sept 2026';
+        $testDate = '2026-09-12';
+        $groupKey = Str::slug($testName).'-'.$testDate;
+        $attendance = app(ActivityAttendanceService::class);
+
+        $mathSession = ActivitySession::query()->create([
+            'activity_type_id' => $examType->id,
+            'title' => "{$testName} — Mathematics",
+            'batch_id' => $batch->id,
+            'session_date' => $testDate,
+            'metadata' => [
+                'test_key' => $groupKey,
+                'test_name' => $testName,
+                'subject' => 'Mathematics',
+                'max_marks' => 50,
+            ],
+            'created_by_user_id' => $staff->id,
+        ]);
+
+        $scores = [$studentA->id => 42];
+
+        if ($markSecond) {
+            $scores[$studentB->id] = 38;
+        }
+
+        $attendance->importStudentScores($mathSession, $scores, $staff);
+
+        $this->assertTrue(StudentExamMarksMatrix::forStudent($studentA->fresh(), $examType->id)['rows'][0]['appeared']);
+
+        return [$studentA->fresh(), $studentB->fresh(), $groupKey];
+    }
+
+    protected function createEnrolledStudent(
+        User $staff,
+        Course $course,
+        Batch $batch,
+        AcademicSession $session,
+        string $name,
+        string $mobile,
+        string $roll,
+    ): Student {
+        $student = Student::query()->create([
+            'name' => $name,
+            'father_name' => 'Parent',
+            'date_of_birth' => '2008-05-15',
+            'gender' => Gender::Male,
+            'mobile' => $mobile,
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        $enquiry = Enquiry::query()->create([
+            'student_id' => $student->id,
+            'enquiry_number' => 'CRM-ENQ-'.$roll,
+            'course_id' => $course->id,
+            'lead_source' => LeadSource::WalkIn,
+            'meeting_for' => 'school',
+            'visit_type' => 'first_visit',
+            'latest_visit_status' => 'interested',
+        ]);
+
+        $admission = Admission::query()->create([
+            'student_id' => $student->id,
+            'enquiry_id' => $enquiry->id,
+            'admission_number' => 'CRM-ADM-'.$roll,
+            'status' => AdmissionStatus::Approved,
+        ]);
+
+        Enrollment::query()->create([
+            'student_id' => $student->id,
+            'admission_id' => $admission->id,
+            'course_id' => $course->id,
+            'academic_session_id' => $session->id,
+            'enrollment_number' => $roll,
+            'enrolled_at' => now(),
+            'status' => EnrollmentStatus::Enrolled,
+            'is_active' => true,
+        ]);
+
+        BatchStudent::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $student->id,
+            'is_active' => true,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $staff->id,
+        ]);
+
+        return $student->fresh(['activeEnrollment', 'activeBatchStudent']);
+    }
+
+    protected function createMarksTemplate(): WhatsAppTemplate
+    {
+        return WhatsAppTemplate::query()->create([
+            'name' => 'test_marks',
+            'param_count' => 4,
+            'param_mappings' => [
+                'student.name',
+                'student.enrollment_number',
+                'activity.test_name',
+                'activity.marks_summary',
+            ],
+            'body' => 'Hi {{1}}, Roll {{2}} — {{3}}: {{4}}',
+            'is_active' => true,
+        ]);
+    }
+
+    protected function createSuperAdmin(): User
+    {
+        Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);
+
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole(RoleName::SuperAdmin->value);
+
+        return $user;
+    }
+}

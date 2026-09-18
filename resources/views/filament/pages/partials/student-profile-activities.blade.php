@@ -12,6 +12,7 @@
         @include('filament.pages.partials.student-profile-exam-marks-matrix', [
             'matrix' => $matrix,
             'canEditExamMarks' => $canEditExamMarks ?? false,
+            'canSendExamMarksWhatsApp' => $canSendExamMarksWhatsApp ?? false,
             'examMarksEditGroupKey' => $examMarksEditGroupKey ?? null,
             'examMarksDraft' => $examMarksDraft ?? [],
         ])

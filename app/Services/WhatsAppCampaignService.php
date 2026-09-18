@@ -337,6 +337,14 @@ class WhatsAppCampaignService
         $marksService = app(ActivityMarksWhatsAppService::class);
         $summaries = $marksService->buildStudentMarksSummaries($testKey);
         $students = $marksService->studentsWithMarks($testKey);
+        $onlyStudentId = (int) $campaign->campaignVariable('only_student_id');
+
+        if ($onlyStudentId > 0) {
+            $summaries = array_key_exists($onlyStudentId, $summaries)
+                ? [$onlyStudentId => $summaries[$onlyStudentId]]
+                : [];
+            $students = $students->where('id', $onlyStudentId)->values();
+        }
 
         $campaign->update([
             'campaign_variables' => array_merge($campaign->campaign_variables ?? [], [

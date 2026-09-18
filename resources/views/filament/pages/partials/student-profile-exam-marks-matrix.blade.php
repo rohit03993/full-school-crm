@@ -70,21 +70,34 @@
                 </dl>
             @endif
 
-            @if ($canEditExamMarks ?? false)
+            @if (($canEditExamMarks ?? false) || (($canSendExamMarksWhatsApp ?? false) && ($row['appeared'] ?? false)))
                 <div class="mt-3 flex flex-wrap items-center gap-2">
-                    @if ($row['marks_locked'] ?? false)
-                        <p class="text-xs text-amber-700 dark:text-amber-300">Locked on the class sheet — unlock there before editing.</p>
-                    @elseif ($editing)
-                        <button type="button" wire:click="saveExamMarks" wire:loading.attr="disabled" wire:target="saveExamMarks" class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70">
-                            <span wire:loading.remove wire:target="saveExamMarks">Save marks</span>
-                            <span wire:loading wire:target="saveExamMarks">Saving…</span>
-                        </button>
-                        <button type="button" wire:click="cancelExamMarksEdit" wire:loading.attr="disabled" wire:target="saveExamMarks" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300">
-                            Cancel
-                        </button>
-                    @else
-                        <button type="button" wire:click="startExamMarksEdit({{ \Illuminate\Support\Js::from($row['group_key']) }})" class="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-100">
-                            {{ ($row['appeared'] ?? false) ? 'Edit marks' : 'Add marks' }}
+                    @if ($canEditExamMarks ?? false)
+                        @if ($row['marks_locked'] ?? false)
+                            <p class="text-xs text-amber-700 dark:text-amber-300">Locked on the class sheet — unlock there before editing.</p>
+                        @elseif ($editing)
+                            <button type="button" wire:click="saveExamMarks" wire:loading.attr="disabled" wire:target="saveExamMarks" class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70">
+                                <span wire:loading.remove wire:target="saveExamMarks">Save marks</span>
+                                <span wire:loading wire:target="saveExamMarks">Saving…</span>
+                            </button>
+                            <button type="button" wire:click="cancelExamMarksEdit" wire:loading.attr="disabled" wire:target="saveExamMarks" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300">
+                                Cancel
+                            </button>
+                        @else
+                            <button type="button" wire:click="startExamMarksEdit({{ \Illuminate\Support\Js::from($row['group_key']) }})" class="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-100">
+                                {{ ($row['appeared'] ?? false) ? 'Edit marks' : 'Add marks' }}
+                            </button>
+                        @endif
+                    @endif
+                    @if (($canSendExamMarksWhatsApp ?? false) && ($row['appeared'] ?? false) && ! $editing)
+                        <button
+                            type="button"
+                            wire:click="confirmSendExamMarksWhatsApp({{ \Illuminate\Support\Js::from($row['group_key']) }})"
+                            wire:loading.attr="disabled"
+                            wire:target="confirmSendExamMarksWhatsApp"
+                            class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70"
+                        >
+                            WhatsApp
                         </button>
                     @endif
                 </div>
@@ -105,7 +118,7 @@
                 @endforeach
                 <th class="px-4 py-2.5 text-center">Total</th>
                 <th class="px-4 py-2.5 text-center">%</th>
-                @if ($canEditExamMarks ?? false)
+                @if (($canEditExamMarks ?? false) || ($canSendExamMarksWhatsApp ?? false))
                     <th class="px-4 py-2.5"></th>
                 @endif
             </tr>
@@ -160,23 +173,36 @@
                             —
                         @endif
                     </td>
-                    @if ($canEditExamMarks ?? false)
+                    @if (($canEditExamMarks ?? false) || ($canSendExamMarksWhatsApp ?? false))
                         <td class="whitespace-nowrap px-4 py-2.5">
-                            @if ($row['marks_locked'] ?? false)
-                                <span class="text-xs text-amber-700 dark:text-amber-300">Locked</span>
-                            @elseif ($editing)
-                                <div class="flex gap-2">
-                                    <button type="button" wire:click="saveExamMarks" wire:loading.attr="disabled" wire:target="saveExamMarks" class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70">
-                                        <span wire:loading.remove wire:target="saveExamMarks">Save</span>
-                                        <span wire:loading wire:target="saveExamMarks">Saving…</span>
+                            <div class="flex flex-wrap items-center justify-end gap-2">
+                                @if ($canEditExamMarks ?? false)
+                                    @if ($row['marks_locked'] ?? false)
+                                        <span class="text-xs text-amber-700 dark:text-amber-300">Locked</span>
+                                    @elseif ($editing)
+                                        <button type="button" wire:click="saveExamMarks" wire:loading.attr="disabled" wire:target="saveExamMarks" class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70">
+                                            <span wire:loading.remove wire:target="saveExamMarks">Save</span>
+                                            <span wire:loading wire:target="saveExamMarks">Saving…</span>
+                                        </button>
+                                        <button type="button" wire:click="cancelExamMarksEdit" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300">Cancel</button>
+                                    @else
+                                        <button type="button" wire:click="startExamMarksEdit({{ \Illuminate\Support\Js::from($row['group_key']) }})" class="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-100">
+                                            {{ ($row['appeared'] ?? false) ? 'Edit marks' : 'Add marks' }}
+                                        </button>
+                                    @endif
+                                @endif
+                                @if (($canSendExamMarksWhatsApp ?? false) && ($row['appeared'] ?? false) && ! $editing)
+                                    <button
+                                        type="button"
+                                        wire:click="confirmSendExamMarksWhatsApp({{ \Illuminate\Support\Js::from($row['group_key']) }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="confirmSendExamMarksWhatsApp"
+                                        class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70"
+                                    >
+                                        WhatsApp
                                     </button>
-                                    <button type="button" wire:click="cancelExamMarksEdit" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300">Cancel</button>
-                                </div>
-                            @else
-                                <button type="button" wire:click="startExamMarksEdit({{ \Illuminate\Support\Js::from($row['group_key']) }})" class="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-100">
-                                    {{ ($row['appeared'] ?? false) ? 'Edit marks' : 'Add marks' }}
-                                </button>
-                            @endif
+                                @endif
+                            </div>
                         </td>
                     @endif
                 </tr>

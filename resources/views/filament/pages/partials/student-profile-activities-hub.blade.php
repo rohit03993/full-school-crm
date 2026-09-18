@@ -46,6 +46,7 @@
                     'records' => $selectedRecords,
                     'student' => $student ?? null,
                     'canEditExamMarks' => $canEditExamMarks ?? false,
+                    'canSendExamMarksWhatsApp' => $canSendExamMarksWhatsApp ?? false,
                     'examMarksEditGroupKey' => $examMarksEditGroupKey ?? null,
                     'examMarksDraft' => $examMarksDraft ?? [],
                 ])

@@ -111,14 +111,56 @@ class ActivityMarksWhatsAppService
             ->get();
     }
 
+    /**
+     * @return array{mobile: string, test_name: string, test_date: string, marks_summary: string, roll: string, template_name: ?string}|null
+     */
+    public function previewForStudent(Student $student, string $marksKey): ?array
+    {
+        $summaries = $this->buildStudentMarksSummaries($marksKey);
+        $summary = $summaries[$student->id] ?? null;
+
+        if (! filled($summary)) {
+            return null;
+        }
+
+        $session = $this->sessionsForMarksKey($marksKey)->first();
+
+        if (! $session) {
+            return null;
+        }
+
+        $student->loadMissing('activeEnrollment');
+
+        return [
+            'mobile' => (string) ($student->mobile ?? ''),
+            'test_name' => StudentExamMarksMatrix::testLabelForSession($session),
+            'test_date' => $session->session_date?->format('d M Y') ?? '—',
+            'marks_summary' => (string) $summary,
+            'roll' => (string) ($student->activeEnrollment?->enrollment_number ?? ''),
+            'template_name' => $this->defaultTemplateName(),
+        ];
+    }
+
     public function createMarksCampaign(
         User $creator,
         WhatsAppTemplate $template,
         string $marksKey,
         string $testName,
         string $sessionDate,
+        ?int $onlyStudentId = null,
     ): WhatsAppCampaign {
         $summaries = $this->buildStudentMarksSummaries($marksKey);
+
+        if ($onlyStudentId !== null) {
+            $summary = $summaries[$onlyStudentId] ?? null;
+
+            if (! filled($summary)) {
+                throw new \InvalidArgumentException('This student has no marks for this test.');
+            }
+
+            $summaries = [$onlyStudentId => $summary];
+        }
+
         $studentIds = array_keys($summaries);
 
         if ($studentIds === []) {
@@ -133,19 +175,27 @@ class ActivityMarksWhatsAppService
             ->pluck('enrollment_number', 'student_id')
             ->all();
 
+        $campaignName = 'Marks · '.$testName;
+
+        if ($onlyStudentId !== null) {
+            $studentName = Student::query()->whereKey($onlyStudentId)->value('name');
+            $campaignName .= ' · '.(filled($studentName) ? $studentName : '#'.$onlyStudentId);
+        }
+
         return $this->campaigns->createCampaign([
-            'name' => 'Marks · '.$testName,
+            'name' => $campaignName,
             'whatsapp_template_id' => $template->id,
             'student_ids' => $studentIds,
-            'campaign_variables' => [
+            'campaign_variables' => array_filter([
                 'audience_source' => 'activity_marks',
                 'test_key' => $marksKey,
                 'test_name' => $testName,
                 'test_date' => $sessionDate,
+                'only_student_id' => $onlyStudentId,
                 '_student_ids' => $studentIds,
                 '_student_marks' => $summaries,
                 '_student_rolls' => $rollNumbers,
-            ],
+            ], fn (mixed $value): bool => $value !== null),
         ], $creator);
     }
 
@@ -155,6 +205,7 @@ class ActivityMarksWhatsAppService
         string $marksKey,
         string $testName,
         string $sessionDate,
+        ?int $onlyStudentId = null,
     ): WhatsAppCampaign {
         if (! \App\Support\FeatureGate::enabled(\App\Enums\LicenseFeature::WhatsApp)) {
             throw new \RuntimeException('WhatsApp module is not enabled.');
@@ -172,6 +223,7 @@ class ActivityMarksWhatsAppService
             $marksKey,
             $testName,
             $sessionDate,
+            $onlyStudentId,
         );
 
         return $this->campaigns->queueCampaign($campaign, $creator, wait: false);

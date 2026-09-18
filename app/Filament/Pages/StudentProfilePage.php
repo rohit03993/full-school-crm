@@ -73,6 +73,7 @@ use App\Services\PenaltyCalculationService;
 use App\Services\ReceiptService;
 use App\Services\StorageCleanupService;
 use App\Services\StudentCaseService;
+use App\Services\ActivityMarksWhatsAppService;
 use App\Services\StudentExamMarksWriter;
 use App\Services\CertificateService;
 use App\Services\StudentCounterService;
@@ -785,6 +786,22 @@ class StudentProfilePage extends Page
     {
         return $this->licensed(LicenseFeature::Marks)
             && $this->userCan(CrmPermission::MarksImport);
+    }
+
+    protected function canSendExamMarksWhatsApp(): bool
+    {
+        return $this->licensed(LicenseFeature::WhatsApp)
+            && $this->licensed(LicenseFeature::Marks)
+            && CrmAccess::canSendExamMarksWhatsApp(Auth::user())
+            && $this->record->activeEnrollment !== null
+            && filled($this->record->mobile);
+    }
+
+    public function confirmSendExamMarksWhatsApp(string $groupKey): void
+    {
+        abort_unless($this->canSendExamMarksWhatsApp(), 403);
+
+        $this->mountAction('sendExamMarksWhatsApp', ['groupKey' => $groupKey]);
     }
 
     /**
@@ -2692,7 +2709,7 @@ class StudentProfilePage extends Page
         foreach ($this->getHeaderActions() as $action) {
             if ($action instanceof ActionGroup) {
                 foreach ($action->getFlatActions() as $child) {
-                    if ($child->isHidden()) {
+                    if ($child->isHidden() || $child->getName() === 'sendExamMarksWhatsApp') {
                         continue;
                     }
 
@@ -2706,7 +2723,7 @@ class StudentProfilePage extends Page
                 continue;
             }
 
-            if ($action->isHidden()) {
+            if ($action->isHidden() || $action->getName() === 'sendExamMarksWhatsApp') {
                 continue;
             }
 
@@ -2794,6 +2811,106 @@ class StudentProfilePage extends Page
                     && $this->licensed(LicenseFeature::WhatsApp)
                     && $this->userCan(CrmPermission::FeesCollect)
                     && $this->record->activeEnrollment?->feeStructure !== null),
+            Action::make('sendExamMarksWhatsApp')
+                ->label('Send marks on WhatsApp')
+                ->icon('heroicon-o-chat-bubble-left-ellipsis')
+                ->color('success')
+                ->extraAttributes(WhatsAppSendUi::loadingAttributes())
+                ->requiresConfirmation()
+                ->modalHeading('Send this test on WhatsApp?')
+                ->modalSubmitActionLabel('Send now')
+                ->arguments(['groupKey' => null])
+                ->modalDescription(function (array $arguments): string {
+                    $preview = app(ActivityMarksWhatsAppService::class)
+                        ->previewForStudent($this->record, (string) ($arguments['groupKey'] ?? ''));
+
+                    if (! $preview) {
+                        return 'This student has no marks for this test. Nothing will be sent.';
+                    }
+
+                    if (blank($preview['mobile'])) {
+                        return 'Add a parent mobile number before sending.';
+                    }
+
+                    if (blank($preview['template_name'])) {
+                        return 'Pick test_marks on WhatsApp → Automations → Exam marks, then try again.';
+                    }
+
+                    $roll = filled($preview['roll']) ? $preview['roll'] : 'no roll number';
+
+                    return "To: {$preview['mobile']}\nRoll: {$roll}\nTest: {$preview['test_name']} ({$preview['test_date']})\nMarks: {$preview['marks_summary']}\nTemplate: {$preview['template_name']}\n\nOnly this student is messaged.";
+                })
+                ->action(function (array $arguments): void {
+                    abort_unless($this->canSendExamMarksWhatsApp(), 403);
+
+                    $groupKey = (string) ($arguments['groupKey'] ?? '');
+                    $row = $this->examMarksRow($groupKey);
+                    $service = app(ActivityMarksWhatsAppService::class);
+                    $templateId = $service->resolveTemplateId();
+
+                    if ($templateId === null) {
+                        Notification::make()
+                            ->title('Exam marks template not set')
+                            ->body('Pick test_marks on WhatsApp → Automations → Exam marks, then try again.')
+                            ->warning()
+                            ->send();
+
+                        return;
+                    }
+
+                    if (! $row || ! ($row['appeared'] ?? false)) {
+                        Notification::make()
+                            ->title('No marks for this test')
+                            ->body('Save marks for this student first, then send WhatsApp.')
+                            ->warning()
+                            ->send();
+
+                        return;
+                    }
+
+                    if (blank($this->record->mobile)) {
+                        Notification::make()
+                            ->title('No mobile number')
+                            ->body('Add a parent mobile before sending.')
+                            ->warning()
+                            ->send();
+
+                        return;
+                    }
+
+                    try {
+                        $date = $row['date'] ?? null;
+                        $campaign = $service->queueMarksCampaign(
+                            Auth::user(),
+                            $templateId,
+                            $groupKey,
+                            (string) $row['label'],
+                            $date instanceof \Illuminate\Support\Carbon ? $date->toDateString() : now()->toDateString(),
+                            $this->record->id,
+                        );
+                    } catch (\Throwable $exception) {
+                        Notification::make()
+                            ->title('Could not queue WhatsApp')
+                            ->body($exception instanceof \InvalidArgumentException || $exception instanceof \RuntimeException
+                                ? $exception->getMessage()
+                                : 'Check WhatsApp setup and that this student has a mobile number.')
+                            ->danger()
+                            ->send();
+
+                        return;
+                    }
+
+                    Notification::make()
+                        ->title('WhatsApp queued')
+                        ->body('Opening send progress for this student. Do not click Send again.')
+                        ->success()
+                        ->send();
+
+                    if ($url = WhatsAppSendUi::campaignViewUrl($campaign->id)) {
+                        $this->redirect($url);
+                    }
+                })
+                ->visible(fn (): bool => $this->canSendExamMarksWhatsApp()),
             Action::make('addVisit')
                 ->label('Add Visit')
                 ->icon('heroicon-o-plus-circle')
@@ -3842,6 +3959,7 @@ class StudentProfilePage extends Page
                                     'records' => $this->activityRecords,
                                     'student' => $this->record,
                                     'canEditExamMarks' => $this->canEditExamMarks(),
+                                    'canSendExamMarksWhatsApp' => $this->canSendExamMarksWhatsApp(),
                                     'examMarksEditGroupKey' => $this->examMarksEditGroupKey,
                                     'examMarksDraft' => $this->examMarksDraft,
                                 ]),
