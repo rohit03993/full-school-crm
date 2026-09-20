@@ -2156,6 +2156,15 @@
     }
 
     @media (min-width: 1024px) {
+        .fi-page:has(.crm-wa-global-inbox) .fi-page-header-main-ctn,
+        .fi-page:has(.crm-wa-global-inbox) .fi-page-main {
+            padding-top: 8px !important;
+        }
+
+        .crm-wa-global-inbox {
+            height: calc(100dvh - 6.5rem - 8px);
+        }
+
         .crm-wa-global-inbox__shell {
             grid-template-rows: minmax(0, 1fr);
         }
