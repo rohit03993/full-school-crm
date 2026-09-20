@@ -180,7 +180,8 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertSee('Reply pending', false)
             ->assertSee('crm-wa-global-inbox__list-head', false)
             ->assertSee('crm-wa-global-inbox__filters', false)
-            ->assertSee('pollInbox', false);
+            ->assertSee('pollInbox', false)
+            ->assertSee('crm-pwa-install-banner--admin', false);
     }
 
     public function test_poll_inbox_loads_new_inbound_without_clearing_an_empty_composer(): void

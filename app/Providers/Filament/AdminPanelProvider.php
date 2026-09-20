@@ -112,7 +112,7 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): string => Blade::render('<x-crm.media-preview-dialog />')
-                    .Blade::render('<x-pwa.install-prompt />')
+                    .Blade::render('<x-pwa.install-prompt context="admin" />')
                     .view('filament.partials.mobile-bottom-nav')->render()
                     .view('filament.partials.pending-call-flow')->render()
                     .view('filament.partials.ask-crm-widget')->render(),

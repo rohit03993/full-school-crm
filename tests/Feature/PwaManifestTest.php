@@ -260,7 +260,7 @@ class PwaManifestTest extends TestCase
             file_get_contents(app_path('Providers/Filament/AdminPanelProvider.php')),
         );
         $this->assertStringContainsString(
-            'install-prompt',
+            'install-prompt context="admin"',
             file_get_contents(app_path('Providers/Filament/AdminPanelProvider.php')),
         );
     }
