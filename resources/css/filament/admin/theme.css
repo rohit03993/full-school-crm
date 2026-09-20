@@ -2040,6 +2040,9 @@
         .crm-wa-global-inbox {
             height: calc(100dvh - 8.25rem - env(safe-area-inset-bottom, 0px));
             min-height: 0;
+            margin-left: 0;
+            margin-right: 0;
+            overflow: hidden;
         }
 
         .fi-body:has(.fi-mobile-bottom-nav) .crm-wa-global-inbox {
@@ -2079,7 +2082,11 @@
         }
 
         .crm-wa-global-inbox__list-head {
-            @apply border-b-0 px-3 py-2;
+            @apply border-b-0 px-4 py-1.5;
+        }
+
+        .crm-wa-global-inbox__list-title {
+            @apply text-xl leading-tight;
         }
 
         .crm-wa-global-inbox__list-sub {
@@ -2087,15 +2094,19 @@
         }
 
         .crm-wa-global-inbox__search {
-            @apply border-b-0 px-3 py-1.5;
+            @apply border-b-0 px-4 py-1.5;
         }
 
         .crm-wa-global-inbox__search-icon {
-            @apply left-6;
+            left: 1.75rem;
         }
 
         .crm-wa-global-inbox__search-input {
-            @apply rounded-full border-0 bg-gray-100 py-1.5 shadow-none dark:bg-white/10;
+            @apply rounded-full border-0 bg-gray-100 py-2 shadow-none dark:bg-white/10;
+        }
+
+        .crm-wa-global-inbox__filter {
+            @apply px-2 py-1;
         }
 
         .crm-wa-global-inbox__filter--active {
@@ -2103,7 +2114,30 @@
         }
 
         .crm-wa-global-inbox__item {
-            @apply px-3 py-2.5;
+            @apply gap-3 border-b-0 px-4 py-2.5;
+        }
+
+        .crm-wa-global-inbox__list .crm-wa-contact-tag,
+        .crm-wa-global-inbox__list .crm-wa-global-inbox__item-new,
+        .crm-wa-global-inbox__list .crm-wa-global-inbox__badge--open {
+            display: none;
+        }
+
+        .crm-wa-global-inbox__list .crm-wa-global-inbox__badge:not(.crm-wa-global-inbox__badge--open) {
+            @apply h-2.5 w-2.5 min-w-0 rounded-full bg-emerald-500 p-0 text-[0px] leading-none;
+        }
+
+        .crm-wa-global-inbox__items {
+            scrollbar-width: none;
+        }
+
+        .crm-wa-global-inbox__chat .crm-wa-chat {
+            scrollbar-width: none;
+        }
+
+        .crm-wa-global-inbox__items::-webkit-scrollbar,
+        .crm-wa-global-inbox__chat .crm-wa-chat::-webkit-scrollbar {
+            display: none;
         }
 
         .crm-wa-inbox--compact .crm-wa-inbox__compose {
@@ -2221,7 +2255,15 @@
     }
 
     .crm-wa-global-inbox__item-name {
-        @apply inline-flex max-w-full flex-wrap items-center gap-1 text-sm font-semibold text-gray-950 dark:text-white;
+        @apply inline-flex min-w-0 max-w-full items-center gap-1 text-sm font-semibold text-gray-950 dark:text-white;
+    }
+
+    .crm-wa-global-inbox__item-name-text {
+        @apply min-w-0 truncate;
+    }
+
+    .crm-wa-global-inbox__item-new {
+        @apply ml-1 rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-bold uppercase text-amber-800 dark:text-amber-200;
     }
 
     .crm-wa-contact-tag {
@@ -3056,14 +3098,26 @@ body.fi-body:has(.fi-student-profile-page) .fi-page-content {
 }
 
 /*
- * WhatsApp Inbox on phones: hide the in-flow bottom-nav spacer (nav is already
- * fixed). Inbox height accounts for the top bar + nav, so the page does not
- * bounce. Do not lock every ancestor to overflow:hidden — that clips reply
- * and template controls inside an open chat.
+ * WhatsApp Inbox on phones: stop the document bouncing without clipping
+ * the reply/template bar. Hide the in-flow bottom-nav spacer (nav is fixed)
+ * and the duplicate Filament people search.
  */
 @media (max-width: 1023px) {
+    html.fi:has(.crm-wa-global-inbox),
+    html.fi:has(.crm-wa-global-inbox) body.fi-body {
+        height: 100dvh;
+        overflow: hidden;
+        overscroll-behavior: none;
+    }
+
     html.fi:has(.crm-wa-global-inbox) .fi-mobile-bottom-nav > div[aria-hidden="true"] {
         display: none !important;
+    }
+
+    html.fi:has(.crm-wa-global-inbox) .fi-main-ctn {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        padding-bottom: 0 !important;
     }
 
     html.fi:has(.crm-wa-global-inbox) .fi-topbar .fi-global-search-ctn,

@@ -113,7 +113,7 @@
                             <span class="crm-wa-global-inbox__item-body">
                                 <span class="crm-wa-global-inbox__item-top">
                                     <span class="crm-wa-global-inbox__item-name">
-                                        {{ $conversation['student_name'] }}
+                                        <span class="crm-wa-global-inbox__item-name-text">{{ $conversation['student_name'] }}</span>
                                         @foreach ($contactTags as $tag)
                                             <span @class([
                                                 'crm-wa-contact-tag',
@@ -123,7 +123,7 @@
                                             ])>{{ $tag }}</span>
                                         @endforeach
                                         @unless ($conversation['is_linked'] ?? true)
-                                            <span class="ml-1 rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-bold uppercase text-amber-800 dark:text-amber-200">New</span>
+                                            <span class="crm-wa-global-inbox__item-new">New</span>
                                         @endunless
                                     </span>
                                     <span class="crm-wa-global-inbox__item-time">{{ $conversation['last_at_label'] }}</span>
