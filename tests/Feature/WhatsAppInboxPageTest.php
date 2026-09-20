@@ -90,6 +90,7 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertSee('Dear Parent, attendance update for Kapil.')
             ->assertSeeHtml('crm-wa-global-inbox__shell--chat-open')
             ->assertSeeHtml('crm-wa-global-inbox__back')
+            ->assertSeeHtml('crm-wa-inbox__compose')
             ->call('clearConversation')
             ->assertSet('selectedStudentId', null)
             ->assertSet('selectedPhone', null)

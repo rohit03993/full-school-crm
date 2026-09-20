@@ -2035,15 +2035,15 @@
         @apply min-h-0 flex-1 overflow-hidden pt-0;
     }
 
-    /* Mobile: fill the pane under the top bar; unlayered rules lock the page so only chats scroll */
+    /* Mobile: sit between top bar and bottom nav; only the chat list / thread scrolls */
     @media (max-width: 1023px) {
         .crm-wa-global-inbox {
-            height: 100%;
+            height: calc(100dvh - 8.25rem - env(safe-area-inset-bottom, 0px));
             min-height: 0;
         }
 
         .fi-body:has(.fi-mobile-bottom-nav) .crm-wa-global-inbox {
-            height: 100%;
+            height: calc(100dvh - 8.25rem - env(safe-area-inset-bottom, 0px));
         }
     }
 
@@ -2107,7 +2107,17 @@
         }
 
         .crm-wa-inbox--compact .crm-wa-inbox__compose {
-            @apply pe-3 pb-3;
+            @apply max-h-[40vh] pe-3 pb-3;
+        }
+
+        .crm-wa-global-inbox__chat .crm-wa-inbox--compact,
+        .crm-wa-global-inbox__chat .crm-wa-inbox__layout--compact {
+            @apply flex min-h-0 flex-1 flex-col overflow-hidden;
+        }
+
+        .crm-wa-global-inbox__chat .crm-wa-inbox__compose {
+            flex-shrink: 0;
+            z-index: 2;
         }
     }
 
@@ -3046,75 +3056,14 @@ body.fi-body:has(.fi-student-profile-page) .fi-page-content {
 }
 
 /*
- * WhatsApp Inbox on phones: one scroll (the chat list / thread).
- * Other admin pages use document scroll plus a 4.25rem bottom-nav spacer.
- * That spacer + a shortened inbox made the whole page scroll a little as well.
+ * WhatsApp Inbox on phones: hide the in-flow bottom-nav spacer (nav is already
+ * fixed). Inbox height accounts for the top bar + nav, so the page does not
+ * bounce. Do not lock every ancestor to overflow:hidden — that clips reply
+ * and template controls inside an open chat.
  */
 @media (max-width: 1023px) {
-    html.fi:has(.crm-wa-global-inbox),
-    html.fi:has(.crm-wa-global-inbox) body.fi-body {
-        height: 100dvh;
-        overflow: hidden;
-        overscroll-behavior: none;
-    }
-
-    html.fi:has(.crm-wa-global-inbox) body.fi-body {
-        display: flex;
-        flex-direction: column;
-    }
-
     html.fi:has(.crm-wa-global-inbox) .fi-mobile-bottom-nav > div[aria-hidden="true"] {
         display: none !important;
-    }
-
-    html.fi:has(.crm-wa-global-inbox) .fi-layout {
-        flex: 1 1 0% !important;
-        min-height: 0 !important;
-        height: auto !important;
-        max-height: none !important;
-        overflow: hidden !important;
-    }
-
-    html.fi:has(.crm-wa-global-inbox) .fi-main-ctn {
-        flex: 1 1 0% !important;
-        min-height: 0 !important;
-        height: auto !important;
-        max-height: none !important;
-        overflow: hidden !important;
-        display: flex !important;
-        flex-direction: column !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        padding-bottom: calc(4.25rem + env(safe-area-inset-bottom)) !important;
-    }
-
-    html.fi:has(.crm-wa-global-inbox) .fi-main,
-    html.fi:has(.crm-wa-global-inbox) .fi-page,
-    html.fi:has(.crm-wa-global-inbox) .fi-page-header-main-ctn,
-    html.fi:has(.crm-wa-global-inbox) .fi-page-main,
-    html.fi:has(.crm-wa-global-inbox) .fi-page-content,
-    html.fi:has(.crm-wa-global-inbox) .fi-schemas,
-    html.fi:has(.crm-wa-global-inbox) .fi-page-content > *,
-    html.fi:has(.crm-wa-global-inbox) .fi-schemas > * {
-        flex: 1 1 0% !important;
-        min-height: 0 !important;
-        height: auto !important;
-        max-height: none !important;
-        overflow: hidden !important;
-        display: flex !important;
-        flex-direction: column !important;
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-    }
-
-    html.fi:has(.crm-wa-global-inbox) .crm-wa-global-inbox {
-        flex: 1 1 0%;
-        height: auto !important;
-        min-height: 0;
-        margin-left: 0;
-        margin-right: 0;
     }
 
     html.fi:has(.crm-wa-global-inbox) .fi-topbar .fi-global-search-ctn,
