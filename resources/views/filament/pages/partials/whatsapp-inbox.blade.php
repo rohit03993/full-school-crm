@@ -2,10 +2,13 @@
     $chatOpen = filled($selectedPhone) || filled($selectedStudentId);
 @endphp
 
-<div @class([
-    'crm-wa-global-inbox',
-    'crm-wa-global-inbox--chat-open' => $chatOpen,
-])>
+<div
+    @class([
+        'crm-wa-global-inbox',
+        'crm-wa-global-inbox--chat-open' => $chatOpen,
+    ])
+    wire:poll.10s.visible="pollInbox"
+>
     <div @class([
         'crm-wa-global-inbox__shell',
         'crm-wa-global-inbox__shell--chat-open' => $chatOpen,

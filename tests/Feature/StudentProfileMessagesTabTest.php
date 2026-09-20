@@ -40,6 +40,7 @@ class StudentProfileMessagesTabTest extends TestCase
         Livewire::test(StudentProfilePage::class, ['record' => $student])
             ->set('profileTab', 'messages')
             ->assertSet('profileTab', 'messages')
+            ->assertDontSee('pollInbox', false)
             ->assertStatus(200);
     }
 

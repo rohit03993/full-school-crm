@@ -9,7 +9,6 @@ use App\Filament\Concerns\RequiresCrmPermission;
 use App\Models\Student;
 use App\Services\MetaWhatsAppConversationService;
 use App\Services\StudentWhatsAppThreadService;
-use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\MetaWhatsAppConversation;
@@ -18,6 +17,7 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\View\View as ViewContract;
 use Livewire\WithFileUploads;
 use UnitEnum;
 
@@ -57,6 +57,21 @@ class WhatsAppInboxPage extends Page
         return CrmMenuLabels::whatsAppInbox();
     }
 
+    public function getHeading(): string
+    {
+        return '';
+    }
+
+    public function getSubheading(): ?string
+    {
+        return null;
+    }
+
+    public function getHeader(): ?ViewContract
+    {
+        return view('filament.pages.partials.student-profile-no-page-header');
+    }
+
     protected static string|UnitEnum|null $navigationGroup = CrmNavigation::GROUP_META_WHATSAPP;
 
     public string $search = '';
@@ -94,11 +109,6 @@ class WhatsAppInboxPage extends Page
         }
     }
 
-    public function getSubheading(): ?string
-    {
-        return CrmHint::text('meta_whatsapp.inbox');
-    }
-
     public function updatedSearch(): void
     {
         $this->loadInbox();
@@ -130,6 +140,37 @@ class WhatsAppInboxPage extends Page
             $this->conversations,
             fn (array $conversation): bool => (bool) ($conversation['needs_reply'] ?? false),
         ));
+    }
+
+    public function pollInbox(): void
+    {
+        if ($this->inboxPollShouldSkip()) {
+            return;
+        }
+
+        $this->loadInbox();
+
+        if (filled($this->selectedPhone) || filled($this->selectedStudentId)) {
+            $this->messagesTabLoaded = false;
+            $this->loadMessagesTab();
+        }
+    }
+
+    protected function inboxPollShouldSkip(): bool
+    {
+        if (trim($this->metaReplyText) !== '') {
+            return true;
+        }
+
+        if ($this->metaReplyAttachment !== null || $this->showMetaReplyAttachment) {
+            return true;
+        }
+
+        if ($this->sendWhatsAppTemplateId) {
+            return true;
+        }
+
+        return false;
     }
 
     public function loadInbox(): void

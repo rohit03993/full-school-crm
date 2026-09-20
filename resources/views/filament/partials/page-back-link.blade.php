@@ -25,6 +25,7 @@
     }
 
     $skipCompactTitle = $livewire instanceof \App\Filament\Pages\StudentProfilePage;
+    $skipPageBack = $livewire instanceof \App\Filament\Pages\WhatsAppInboxPage;
 
     if ($livewire && ! $skipCompactTitle) {
         try {
@@ -46,7 +47,7 @@
     }
 @endphp
 
-@if ($back)
+@if ($back && ! ($skipPageBack ?? false))
     <div @class(['fi-crm-back', 'fi-crm-back--with-title' => filled($pageTitle)])>
         <div class="fi-crm-back__row">
             <a

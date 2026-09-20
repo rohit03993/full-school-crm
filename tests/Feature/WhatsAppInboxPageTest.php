@@ -160,6 +160,129 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertStatus(200);
     }
 
+    public function test_inbox_hides_page_back_and_long_hint_but_keeps_chats_and_filters(): void
+    {
+        Http::fake();
+
+        Setting::setValue('site.name', 'Test Institute', 'general');
+        Setting::setValue('crm.onboarding_completed', '1', 'crm');
+
+        $admin = $this->createSuperAdmin();
+        $this->actingAs($admin);
+
+        $this->get(WhatsAppInboxPage::getUrl())
+            ->assertOk()
+            ->assertDontSee('fi-crm-back__link', false)
+            ->assertDontSee('fi-crm-back__hint', false)
+            ->assertDontSee('WhatsApp inbox — all recent chats', false)
+            ->assertSee('Chats', false)
+            ->assertSee('Reply pending', false)
+            ->assertSee('pollInbox', false);
+    }
+
+    public function test_poll_inbox_loads_new_inbound_without_clearing_an_empty_composer(): void
+    {
+        Http::fake();
+
+        $admin = $this->createSuperAdmin();
+
+        $student = Student::query()->create([
+            'name' => 'Polling Parent',
+            'mobile' => '9811000201',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.POLL-OUT',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '919811000201',
+            'student_id' => $student->id,
+            'body_preview' => 'School already messaged this parent.',
+            'message_type' => 'text',
+            'status' => 'sent',
+            'status_at' => now()->subMinutes(2),
+        ]);
+
+        $this->actingAs($admin);
+
+        $component = Livewire::test(WhatsAppInboxPage::class)
+            ->call('selectConversation', '919811000201', $student->id)
+            ->assertSee('School already messaged this parent.')
+            ->assertDontSee('Can you send the timetable?')
+            ->assertSet('listFilter', 'all')
+            ->assertSet('metaReplyText', '');
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.POLL-IN',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919811000201',
+            'student_id' => $student->id,
+            'body_preview' => 'Can you send the timetable?',
+            'message_type' => 'text',
+            'status' => 'received',
+            'status_at' => now(),
+        ]);
+
+        $component
+            ->call('pollInbox')
+            ->assertSet('listFilter', 'all')
+            ->assertSet('metaReplyText', '')
+            ->assertSee('Can you send the timetable?')
+            ->assertStatus(200);
+    }
+
+    public function test_poll_inbox_skips_refresh_while_staff_is_composing_a_reply(): void
+    {
+        Http::fake();
+
+        $admin = $this->createSuperAdmin();
+
+        $student = Student::query()->create([
+            'name' => 'Draft Parent',
+            'mobile' => '9811000202',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.DRAFT-IN',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919811000202',
+            'student_id' => $student->id,
+            'body_preview' => 'Please call me back.',
+            'message_type' => 'text',
+            'status' => 'received',
+            'status_at' => now()->subMinute(),
+        ]);
+
+        $this->actingAs($admin);
+
+        $component = Livewire::test(WhatsAppInboxPage::class)
+            ->call('selectConversation', '919811000202', $student->id)
+            ->set('metaReplyText', 'Draft reply still typing')
+            ->assertSee('Please call me back.')
+            ->assertDontSee('New inbound while typing');
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.DRAFT-IN-2',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919811000202',
+            'student_id' => $student->id,
+            'body_preview' => 'New inbound while typing',
+            'message_type' => 'text',
+            'status' => 'received',
+            'status_at' => now(),
+        ]);
+
+        $component
+            ->call('pollInbox')
+            ->assertSet('metaReplyText', 'Draft reply still typing')
+            ->assertDontSee('New inbound while typing')
+            ->assertSee('Please call me back.')
+            ->call('setListFilter', 'pending')
+            ->assertSet('listFilter', 'pending')
+            ->assertStatus(200);
+    }
+
     public function test_unknown_number_conversation_opens_in_inbox(): void
     {
         Http::fake();
