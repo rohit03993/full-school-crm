@@ -99,6 +99,67 @@ class WhatsAppInboxPageTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_reply_pending_filter_shows_only_chats_waiting_for_a_reply(): void
+    {
+        Http::fake();
+
+        $admin = $this->createSuperAdmin();
+
+        $waiting = Student::query()->create([
+            'name' => 'Waiting Parent',
+            'mobile' => '9811000101',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $answered = Student::query()->create([
+            'name' => 'Answered Parent',
+            'mobile' => '9811000102',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.WAIT-IN',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919811000101',
+            'student_id' => $waiting->id,
+            'body_preview' => 'When is the next test?',
+            'message_type' => 'text',
+            'status' => 'received',
+            'status_at' => now(),
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.ANS-OUT',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '919811000102',
+            'student_id' => $answered->id,
+            'body_preview' => 'Dear Parent, This is to inform you',
+            'message_type' => 'text',
+            'status' => 'sent',
+            'status_at' => now()->subMinute(),
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(WhatsAppInboxPage::class)
+            ->assertSet('listFilter', 'all')
+            ->assertSee('Waiting Parent')
+            ->assertSee('Answered Parent')
+            ->assertSee('Reply pending')
+            ->assertSee('When is the next test?')
+            ->call('setListFilter', 'pending')
+            ->assertSet('listFilter', 'pending')
+            ->assertSee('Waiting Parent')
+            ->assertSee('When is the next test?')
+            ->assertDontSee('Answered Parent')
+            ->assertDontSee('Dear Parent, This is to inform you')
+            ->call('selectConversation', '919811000101', $waiting->id)
+            ->assertSet('listFilter', 'pending')
+            ->assertSee('Waiting Parent')
+            ->assertSee('When is the next test?')
+            ->assertStatus(200);
+    }
+
     public function test_unknown_number_conversation_opens_in_inbox(): void
     {
         Http::fake();

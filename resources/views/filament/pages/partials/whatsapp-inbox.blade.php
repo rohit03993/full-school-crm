@@ -16,7 +16,14 @@
                     <h2 class="crm-wa-global-inbox__list-title">Chats</h2>
                     <p class="crm-wa-global-inbox__list-sub">
                         @if ($inboxLoaded)
-                            {{ count($conversations) }} conversation{{ count($conversations) === 1 ? '' : 's' }}
+                            @if (($listFilter ?? 'all') === 'pending')
+                                {{ (int) ($pendingReplyCount ?? 0) }} waiting for a reply
+                            @else
+                                {{ (int) ($totalConversationCount ?? count($conversations)) }} conversation{{ ((int) ($totalConversationCount ?? count($conversations))) === 1 ? '' : 's' }}
+                                @if ((int) ($pendingReplyCount ?? 0) > 0)
+                                    · {{ (int) $pendingReplyCount }} waiting
+                                @endif
+                            @endif
                         @else
                             Loading…
                         @endif
@@ -34,15 +41,52 @@
                 />
             </div>
 
+            <div class="crm-wa-global-inbox__filters" role="tablist" aria-label="Chat filters">
+                <button
+                    type="button"
+                    wire:click="setListFilter('all')"
+                    role="tab"
+                    aria-selected="{{ ($listFilter ?? 'all') === 'all' ? 'true' : 'false' }}"
+                    @class([
+                        'crm-wa-global-inbox__filter',
+                        'crm-wa-global-inbox__filter--active' => ($listFilter ?? 'all') === 'all',
+                    ])
+                >
+                    All
+                </button>
+                <button
+                    type="button"
+                    wire:click="setListFilter('pending')"
+                    role="tab"
+                    aria-selected="{{ ($listFilter ?? 'all') === 'pending' ? 'true' : 'false' }}"
+                    @class([
+                        'crm-wa-global-inbox__filter',
+                        'crm-wa-global-inbox__filter--active' => ($listFilter ?? 'all') === 'pending',
+                    ])
+                >
+                    Reply pending
+                    @if ((int) ($pendingReplyCount ?? 0) > 0)
+                        <span class="crm-wa-global-inbox__filter-count">{{ (int) $pendingReplyCount }}</span>
+                    @endif
+                </button>
+            </div>
+
             <div class="crm-wa-global-inbox__items">
                 @if (! $inboxLoaded)
                     <p class="crm-wa-global-inbox__empty">Loading chats…</p>
                 @elseif ($conversations === [])
                     <div class="crm-wa-global-inbox__empty">
-                        <p class="font-medium text-gray-800 dark:text-gray-200">No conversations yet</p>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            Sends and replies will appear here.
-                        </p>
+                        @if (($listFilter ?? 'all') === 'pending')
+                            <p class="font-medium text-gray-800 dark:text-gray-200">No chats waiting for a reply</p>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                The last message in every chat is from the school.
+                            </p>
+                        @else
+                            <p class="font-medium text-gray-800 dark:text-gray-200">No conversations yet</p>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                Sends and replies will appear here.
+                            </p>
+                        @endif
                     </div>
                 @else
                     @foreach ($conversations as $conversation)

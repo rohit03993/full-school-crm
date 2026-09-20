@@ -2122,6 +2122,22 @@
         @apply w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-white/10 dark:bg-gray-950 dark:text-white;
     }
 
+    .crm-wa-global-inbox__filters {
+        @apply flex shrink-0 gap-1.5 border-b border-gray-200/70 px-3 py-2 dark:border-white/10;
+    }
+
+    .crm-wa-global-inbox__filter {
+        @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-gray-600 transition hover:bg-white hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
+    }
+
+    .crm-wa-global-inbox__filter--active {
+        @apply bg-white text-gray-950 shadow-sm ring-1 ring-gray-200/80 dark:bg-white/10 dark:text-white dark:ring-white/15;
+    }
+
+    .crm-wa-global-inbox__filter-count {
+        @apply inline-flex min-w-4 items-center justify-center rounded-full bg-primary-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white;
+    }
+
     .crm-wa-global-inbox__items {
         @apply min-h-0 flex-1 overflow-y-auto overscroll-contain;
         -webkit-overflow-scrolling: touch;

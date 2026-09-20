@@ -70,6 +70,9 @@ class WhatsAppInboxPage extends Page
 
     public bool $inboxLoaded = false;
 
+    /** @var 'all'|'pending' */
+    public string $listFilter = 'all';
+
     public function mount(): void
     {
         $this->initializeWhatsAppInboxState();
@@ -99,6 +102,34 @@ class WhatsAppInboxPage extends Page
     public function updatedSearch(): void
     {
         $this->loadInbox();
+    }
+
+    public function setListFilter(string $filter): void
+    {
+        $this->listFilter = $filter === 'pending' ? 'pending' : 'all';
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function visibleConversations(): array
+    {
+        if ($this->listFilter !== 'pending') {
+            return $this->conversations;
+        }
+
+        return array_values(array_filter(
+            $this->conversations,
+            fn (array $conversation): bool => (bool) ($conversation['needs_reply'] ?? false),
+        ));
+    }
+
+    public function pendingReplyCount(): int
+    {
+        return count(array_filter(
+            $this->conversations,
+            fn (array $conversation): bool => (bool) ($conversation['needs_reply'] ?? false),
+        ));
     }
 
     public function loadInbox(): void
@@ -193,7 +224,10 @@ class WhatsAppInboxPage extends Page
                 ->viewData(fn (): array => [
                     'search' => $this->search,
                     'inboxLoaded' => $this->inboxLoaded,
-                    'conversations' => $this->conversations,
+                    'listFilter' => $this->listFilter,
+                    'pendingReplyCount' => $this->pendingReplyCount(),
+                    'totalConversationCount' => count($this->conversations),
+                    'conversations' => $this->visibleConversations(),
                     'selectedStudentId' => $this->selectedStudentId,
                     'selectedPhone' => $this->selectedPhone,
                     'chatStudent' => $this->whatsAppMessageStudent(),
