@@ -177,6 +177,8 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertDontSee('WhatsApp inbox — all recent chats', false)
             ->assertSee('Chats', false)
             ->assertSee('Reply pending', false)
+            ->assertSee('crm-wa-global-inbox__list-head', false)
+            ->assertSee('crm-wa-global-inbox__filters', false)
             ->assertSee('pollInbox', false);
     }
 

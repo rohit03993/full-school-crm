@@ -2035,14 +2035,15 @@
         @apply min-h-0 flex-1 overflow-hidden pt-0;
     }
 
-    /* Mobile: full-height chat under the top bar + bottom nav */
+    /* Mobile: fill the pane under the top bar; unlayered rules lock the page so only chats scroll */
     @media (max-width: 1023px) {
         .crm-wa-global-inbox {
-            height: calc(100dvh - 5.75rem);
+            height: 100%;
+            min-height: 0;
         }
 
         .fi-body:has(.fi-mobile-bottom-nav) .crm-wa-global-inbox {
-            height: calc(100dvh - 10rem);
+            height: 100%;
         }
     }
 
@@ -2076,6 +2077,38 @@
         .crm-wa-global-inbox__placeholder--desktop {
             display: none !important;
         }
+
+        .crm-wa-global-inbox__list-head {
+            @apply border-b-0 px-3 py-2;
+        }
+
+        .crm-wa-global-inbox__list-sub {
+            @apply hidden;
+        }
+
+        .crm-wa-global-inbox__search {
+            @apply border-b-0 px-3 py-1.5;
+        }
+
+        .crm-wa-global-inbox__search-icon {
+            @apply left-6;
+        }
+
+        .crm-wa-global-inbox__search-input {
+            @apply rounded-full border-0 bg-gray-100 py-1.5 shadow-none dark:bg-white/10;
+        }
+
+        .crm-wa-global-inbox__filter--active {
+            @apply bg-gray-100 shadow-none ring-0 dark:bg-white/10;
+        }
+
+        .crm-wa-global-inbox__item {
+            @apply px-3 py-2.5;
+        }
+
+        .crm-wa-inbox--compact .crm-wa-inbox__compose {
+            @apply pe-3 pb-3;
+        }
     }
 
     @media (min-width: 1024px) {
@@ -2103,7 +2136,11 @@
     }
 
     .crm-wa-global-inbox__list-head {
-        @apply shrink-0 border-b border-gray-200/70 px-4 py-3 dark:border-white/10;
+        @apply flex shrink-0 items-center justify-between gap-2 border-b border-gray-200/70 px-4 py-3 dark:border-white/10;
+    }
+
+    .crm-wa-global-inbox__list-copy {
+        @apply min-w-0;
     }
 
     .crm-wa-global-inbox__list-title {
@@ -2127,7 +2164,7 @@
     }
 
     .crm-wa-global-inbox__filters {
-        @apply flex shrink-0 gap-1.5 border-b border-gray-200/70 px-3 py-2 dark:border-white/10;
+        @apply flex shrink-0 gap-1.5 dark:border-white/10;
     }
 
     .crm-wa-global-inbox__filter {
@@ -3006,4 +3043,82 @@ body.fi-body:has(.fi-student-profile-page) .fi-page-content {
 .fi-ac,
 .fi-dropdown-trigger {
     overflow: visible !important;
+}
+
+/*
+ * WhatsApp Inbox on phones: one scroll (the chat list / thread).
+ * Other admin pages use document scroll plus a 4.25rem bottom-nav spacer.
+ * That spacer + a shortened inbox made the whole page scroll a little as well.
+ */
+@media (max-width: 1023px) {
+    html.fi:has(.crm-wa-global-inbox),
+    html.fi:has(.crm-wa-global-inbox) body.fi-body {
+        height: 100dvh;
+        overflow: hidden;
+        overscroll-behavior: none;
+    }
+
+    html.fi:has(.crm-wa-global-inbox) body.fi-body {
+        display: flex;
+        flex-direction: column;
+    }
+
+    html.fi:has(.crm-wa-global-inbox) .fi-mobile-bottom-nav > div[aria-hidden="true"] {
+        display: none !important;
+    }
+
+    html.fi:has(.crm-wa-global-inbox) .fi-layout {
+        flex: 1 1 0% !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: hidden !important;
+    }
+
+    html.fi:has(.crm-wa-global-inbox) .fi-main-ctn {
+        flex: 1 1 0% !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        padding-bottom: calc(4.25rem + env(safe-area-inset-bottom)) !important;
+    }
+
+    html.fi:has(.crm-wa-global-inbox) .fi-main,
+    html.fi:has(.crm-wa-global-inbox) .fi-page,
+    html.fi:has(.crm-wa-global-inbox) .fi-page-header-main-ctn,
+    html.fi:has(.crm-wa-global-inbox) .fi-page-main,
+    html.fi:has(.crm-wa-global-inbox) .fi-page-content,
+    html.fi:has(.crm-wa-global-inbox) .fi-schemas,
+    html.fi:has(.crm-wa-global-inbox) .fi-page-content > *,
+    html.fi:has(.crm-wa-global-inbox) .fi-schemas > * {
+        flex: 1 1 0% !important;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    html.fi:has(.crm-wa-global-inbox) .crm-wa-global-inbox {
+        flex: 1 1 0%;
+        height: auto !important;
+        min-height: 0;
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    html.fi:has(.crm-wa-global-inbox) .fi-topbar .fi-global-search-ctn,
+    html.fi:has(.crm-wa-global-inbox) .fi-topbar .fi-global-search {
+        display: none !important;
+    }
 }

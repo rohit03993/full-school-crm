@@ -15,7 +15,7 @@
     ])>
         <aside class="crm-wa-global-inbox__list" aria-label="Recent chats">
             <div class="crm-wa-global-inbox__list-head">
-                <div>
+                <div class="crm-wa-global-inbox__list-copy">
                     <h2 class="crm-wa-global-inbox__list-title">Chats</h2>
                     <p class="crm-wa-global-inbox__list-sub">
                         @if ($inboxLoaded)
@@ -32,6 +32,36 @@
                         @endif
                     </p>
                 </div>
+
+                <div class="crm-wa-global-inbox__filters" role="tablist" aria-label="Chat filters">
+                    <button
+                        type="button"
+                        wire:click="setListFilter('all')"
+                        role="tab"
+                        aria-selected="{{ ($listFilter ?? 'all') === 'all' ? 'true' : 'false' }}"
+                        @class([
+                            'crm-wa-global-inbox__filter',
+                            'crm-wa-global-inbox__filter--active' => ($listFilter ?? 'all') === 'all',
+                        ])
+                    >
+                        All
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="setListFilter('pending')"
+                        role="tab"
+                        aria-selected="{{ ($listFilter ?? 'all') === 'pending' ? 'true' : 'false' }}"
+                        @class([
+                            'crm-wa-global-inbox__filter',
+                            'crm-wa-global-inbox__filter--active' => ($listFilter ?? 'all') === 'pending',
+                        ])
+                    >
+                        Reply pending
+                        @if ((int) ($pendingReplyCount ?? 0) > 0)
+                            <span class="crm-wa-global-inbox__filter-count">{{ (int) $pendingReplyCount }}</span>
+                        @endif
+                    </button>
+                </div>
             </div>
 
             <div class="crm-wa-global-inbox__search">
@@ -42,36 +72,6 @@
                     placeholder="Search name or mobile…"
                     class="crm-wa-global-inbox__search-input"
                 />
-            </div>
-
-            <div class="crm-wa-global-inbox__filters" role="tablist" aria-label="Chat filters">
-                <button
-                    type="button"
-                    wire:click="setListFilter('all')"
-                    role="tab"
-                    aria-selected="{{ ($listFilter ?? 'all') === 'all' ? 'true' : 'false' }}"
-                    @class([
-                        'crm-wa-global-inbox__filter',
-                        'crm-wa-global-inbox__filter--active' => ($listFilter ?? 'all') === 'all',
-                    ])
-                >
-                    All
-                </button>
-                <button
-                    type="button"
-                    wire:click="setListFilter('pending')"
-                    role="tab"
-                    aria-selected="{{ ($listFilter ?? 'all') === 'pending' ? 'true' : 'false' }}"
-                    @class([
-                        'crm-wa-global-inbox__filter',
-                        'crm-wa-global-inbox__filter--active' => ($listFilter ?? 'all') === 'pending',
-                    ])
-                >
-                    Reply pending
-                    @if ((int) ($pendingReplyCount ?? 0) > 0)
-                        <span class="crm-wa-global-inbox__filter-count">{{ (int) $pendingReplyCount }}</span>
-                    @endif
-                </button>
             </div>
 
             <div class="crm-wa-global-inbox__items">
