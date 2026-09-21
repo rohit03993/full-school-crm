@@ -149,12 +149,16 @@ class CallReportService
     }
 
     /**
-     * @param  iterable<int, StudentCall>  $calls
+     * @param  iterable<int, StudentCall>|\Illuminate\Contracts\Pagination\Paginator  $calls
      * @return array<int, int> student_id => first_call_id
      */
     public function firstCallIdsFor(iterable $calls): array
     {
-        $studentIds = collect($calls)->pluck('student_id')->unique()->filter()->values();
+        $rows = $calls instanceof LengthAwarePaginator
+            ? $calls->getCollection()
+            : Collection::make($calls);
+
+        $studentIds = $rows->pluck('student_id')->unique()->filter()->values();
 
         if ($studentIds->isEmpty()) {
             return [];

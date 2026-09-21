@@ -115,6 +115,36 @@ class CallReportServiceTest extends TestCase
         $this->assertSame(1, $report->summary($followupFilters, $staff)['total']);
     }
 
+    public function test_table_type_uses_first_ever_call_from_paginated_results(): void
+    {
+        $staff = $this->createStaffUser();
+        $student = $this->createLeadStudent($staff);
+
+        $first = app(CallLogService::class)->log($student, $staff, [
+            'call_connected' => false,
+            'call_status' => CallStatus::NoAnswer->value,
+        ]);
+
+        $second = app(CallLogService::class)->log($student->fresh(), $staff, [
+            'call_connected' => true,
+            'who_answered' => 'father',
+            'visit_status' => VisitStatus::Interested->value,
+            'call_notes' => 'Follow-up call connected with parent.',
+            'next_followup_at' => now()->addDays(2)->format('Y-m-d H:i:s'),
+        ]);
+
+        $report = app(CallReportService::class);
+        $filters = $report->normalizeFilters([], $staff);
+        $page = $report->calls($filters, $staff);
+        $firstCallIds = $report->firstCallIdsFor($page);
+
+        $this->assertSame((int) $first->id, (int) ($firstCallIds[$student->id] ?? 0));
+        $this->assertTrue((int) ($firstCallIds[$student->id] ?? 0) === (int) $first->id);
+        $this->assertFalse((int) ($firstCallIds[$student->id] ?? 0) === (int) $second->id);
+        $this->assertSame(1, $report->summary($filters, $staff)['new_calls']);
+        $this->assertSame(1, $report->summary($filters, $staff)['followup_calls']);
+    }
+
     public function test_purpose_filter_limits_results_and_summary(): void
     {
         $staff = $this->createStaffUser();
