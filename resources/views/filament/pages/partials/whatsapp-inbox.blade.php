@@ -21,10 +21,15 @@
                         @if ($inboxLoaded)
                             @if (($listFilter ?? 'all') === 'pending')
                                 {{ (int) ($pendingReplyCount ?? 0) }} waiting for a reply
+                            @elseif (($listFilter ?? 'all') === 'failed')
+                                {{ (int) ($failedSendCount ?? 0) }} last school send{{ ((int) ($failedSendCount ?? 0)) === 1 ? '' : 's' }} failed
                             @else
                                 {{ (int) ($totalConversationCount ?? count($conversations)) }} conversation{{ ((int) ($totalConversationCount ?? count($conversations))) === 1 ? '' : 's' }}
                                 @if ((int) ($pendingReplyCount ?? 0) > 0)
                                     · {{ (int) $pendingReplyCount }} waiting
+                                @endif
+                                @if ((int) ($failedSendCount ?? 0) > 0)
+                                    · {{ (int) $failedSendCount }} failed
                                 @endif
                             @endif
                         @else
@@ -61,6 +66,21 @@
                             <span class="crm-wa-global-inbox__filter-count">{{ (int) $pendingReplyCount }}</span>
                         @endif
                     </button>
+                    <button
+                        type="button"
+                        wire:click="setListFilter('failed')"
+                        role="tab"
+                        aria-selected="{{ ($listFilter ?? 'all') === 'failed' ? 'true' : 'false' }}"
+                        @class([
+                            'crm-wa-global-inbox__filter',
+                            'crm-wa-global-inbox__filter--active' => ($listFilter ?? 'all') === 'failed',
+                        ])
+                    >
+                        Failed
+                        @if ((int) ($failedSendCount ?? 0) > 0)
+                            <span class="crm-wa-global-inbox__filter-count crm-wa-global-inbox__filter-count--failed">{{ (int) $failedSendCount }}</span>
+                        @endif
+                    </button>
                 </div>
             </div>
 
@@ -83,6 +103,11 @@
                             <p class="font-medium text-gray-800 dark:text-gray-200">No chats waiting for a reply</p>
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                 The last message in every chat is from the school.
+                            </p>
+                        @elseif (($listFilter ?? 'all') === 'failed')
+                            <p class="font-medium text-gray-800 dark:text-gray-200">No failed sends</p>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                The last school message to each number reached WhatsApp.
                             </p>
                         @else
                             <p class="font-medium text-gray-800 dark:text-gray-200">No conversations yet</p>
@@ -137,6 +162,8 @@
                                     </span>
                                     @if ($conversation['needs_reply'] ?? false)
                                         <span class="crm-wa-global-inbox__badge">Reply</span>
+                                    @elseif ($conversation['last_send_failed'] ?? false)
+                                        <span class="crm-wa-global-inbox__badge crm-wa-global-inbox__badge--failed">Failed</span>
                                     @elseif ($conversation['session_open'] ?? false)
                                         <span class="crm-wa-global-inbox__badge crm-wa-global-inbox__badge--open">24h</span>
                                     @endif

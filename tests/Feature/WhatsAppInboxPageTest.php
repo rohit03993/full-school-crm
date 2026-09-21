@@ -161,6 +161,71 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertStatus(200);
     }
 
+    public function test_failed_filter_shows_only_chats_whose_last_school_send_failed(): void
+    {
+        Http::fake();
+
+        $admin = $this->createSuperAdmin();
+
+        $failed = Student::query()->create([
+            'name' => 'Failed Parent',
+            'mobile' => '9811000401',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $delivered = Student::query()->create([
+            'name' => 'Delivered Parent',
+            'mobile' => '9811000402',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.FAIL-OUT',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '919811000401',
+            'student_id' => $failed->id,
+            'body_preview' => 'This homework never reached WhatsApp',
+            'message_type' => 'text',
+            'status' => 'failed',
+            'status_at' => now(),
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.OK-OUT',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '919811000402',
+            'student_id' => $delivered->id,
+            'body_preview' => 'Dear Parent, homework reached this number',
+            'message_type' => 'text',
+            'status' => 'delivered',
+            'status_at' => now()->subMinute(),
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(WhatsAppInboxPage::class)
+            ->assertSet('listFilter', 'all')
+            ->assertSee('Failed Parent')
+            ->assertSee('Delivered Parent')
+            ->assertSee('Failed')
+            ->assertSee('Reply pending')
+            ->call('setListFilter', 'failed')
+            ->assertSet('listFilter', 'failed')
+            ->assertSee('Failed Parent')
+            ->assertSee('This homework never reached WhatsApp')
+            ->assertDontSee('Delivered Parent')
+            ->assertDontSee('Dear Parent, homework reached this number')
+            ->call('selectConversation', '919811000401', $failed->id)
+            ->assertSet('listFilter', 'failed')
+            ->assertSeeHtml('crm-wa-global-inbox__shell--chat-open')
+            ->assertSeeHtml('crm-wa-global-inbox__back')
+            ->assertSee('Failed Parent')
+            ->call('clearConversation')
+            ->assertDontSeeHtml('crm-wa-global-inbox__shell--chat-open')
+            ->assertSee('Failed Parent')
+            ->assertStatus(200);
+    }
+
     public function test_inbox_hides_page_back_and_long_hint_but_keeps_chats_and_filters(): void
     {
         Http::fake();
@@ -178,6 +243,7 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertDontSee('WhatsApp inbox — all recent chats', false)
             ->assertSee('Chats', false)
             ->assertSee('Reply pending', false)
+            ->assertSee('Failed', false)
             ->assertSee('crm-wa-global-inbox__list-head', false)
             ->assertSee('crm-wa-global-inbox__filters', false)
             ->assertSee('pollInbox', false)

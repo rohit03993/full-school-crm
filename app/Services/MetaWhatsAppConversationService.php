@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Enums\MetaWhatsAppMessageDirection;
+use App\Enums\MetaWhatsAppMessageStatus;
 use App\Enums\WhatsAppContactKind;
+use App\Enums\WhatsAppRecipientStatus;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Student;
 use App\Models\WhatsAppCampaignRecipient;
@@ -50,6 +52,7 @@ class MetaWhatsAppConversationService
             ->all();
 
         $resolvedContacts = $this->contacts->resolveMany($phones);
+        $lastOutboundFailed = $this->lastOutboundFailedByPhone($latestMeta);
 
         $conversations = collect();
         $seenStudentIds = [];
@@ -70,7 +73,12 @@ class MetaWhatsAppConversationService
                 $seenStudentIds[$student->id] = true;
             }
 
-            $conversations->push($this->conversationFromMetaMessage($message, $contact, $phone));
+            $conversations->push($this->conversationFromMetaMessage(
+                $message,
+                $contact,
+                $phone,
+                (bool) ($lastOutboundFailed[$phone] ?? $lastOutboundFailed[(string) $message->phone] ?? false),
+            ));
         }
 
         WhatsAppCampaignRecipient::query()
@@ -140,10 +148,60 @@ class MetaWhatsAppConversationService
         return $this->filterAndSort($conversations, $search, $limit);
     }
 
+    /**
+     * Last school send per chat phone: true when Meta marked that outbound row failed.
+     *
+     * @param  Collection<int, MetaWhatsAppMessage>  $latestMeta
+     * @return array<string, bool>
+     */
+    protected function lastOutboundFailedByPhone(Collection $latestMeta): array
+    {
+        $phones = $latestMeta
+            ->flatMap(function (MetaWhatsAppMessage $message): array {
+                $raw = (string) $message->phone;
+                $normalized = $this->thread->normalizePhoneForStorage($raw);
+
+                return array_values(array_filter([$raw, $normalized]));
+            })
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($phones === []) {
+            return [];
+        }
+
+        $latestOutboundIds = MetaWhatsAppMessage::query()
+            ->selectRaw('MAX(id) as id')
+            ->where('direction', MetaWhatsAppMessageDirection::Outbound->value)
+            ->whereIn('phone', $phones)
+            ->groupBy('phone')
+            ->pluck('id');
+
+        $map = [];
+
+        MetaWhatsAppMessage::query()
+            ->whereIn('id', $latestOutboundIds)
+            ->get(['phone', 'status'])
+            ->each(function (MetaWhatsAppMessage $message) use (&$map): void {
+                $failed = strtolower((string) $message->status) === MetaWhatsAppMessageStatus::Failed->value;
+                $raw = (string) $message->phone;
+                $normalized = $this->thread->normalizePhoneForStorage($raw);
+                $map[$raw] = $failed;
+
+                if ($normalized !== '') {
+                    $map[$normalized] = $failed;
+                }
+            });
+
+        return $map;
+    }
+
     protected function conversationFromMetaMessage(
         MetaWhatsAppMessage $message,
         WhatsAppInboxContact $contact,
         ?string $normalizedPhone = null,
+        bool $lastSendFailed = false,
     ): MetaWhatsAppConversation {
         $messageType = Schema::hasColumn('meta_whatsapp_messages', 'message_type')
             ? (string) ($message->message_type ?? 'text')
@@ -195,6 +253,7 @@ class MetaWhatsAppConversationService
                 ? $this->thread->sessionOpenForStudent($student)
                 : $this->thread->sessionOpenForPhone($phone),
             needsReply: $direction === 'inbound',
+            lastSendFailed: $lastSendFailed,
             isLinked: $contact->isLinked(),
             contactKind: $contact->kind->value,
             contactTags: $contact->tagLabels(),
@@ -225,6 +284,7 @@ class MetaWhatsAppConversationService
             lastAt: $recipient->updated_at ?? $recipient->created_at,
             sessionOpen: $student ? $this->thread->sessionOpenForStudent($student) : false,
             needsReply: false,
+            lastSendFailed: $recipient->status === WhatsAppRecipientStatus::Failed,
             isLinked: $contact->isLinked(),
             contactKind: $contact->kind->value,
             contactTags: $contact->tagLabels(),

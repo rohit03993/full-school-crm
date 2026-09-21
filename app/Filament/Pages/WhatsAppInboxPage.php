@@ -85,7 +85,7 @@ class WhatsAppInboxPage extends Page
 
     public bool $inboxLoaded = false;
 
-    /** @var 'all'|'pending' */
+    /** @var 'all'|'pending'|'failed' */
     public string $listFilter = 'all';
 
     public function mount(): void
@@ -116,7 +116,11 @@ class WhatsAppInboxPage extends Page
 
     public function setListFilter(string $filter): void
     {
-        $this->listFilter = $filter === 'pending' ? 'pending' : 'all';
+        $this->listFilter = match ($filter) {
+            'pending' => 'pending',
+            'failed' => 'failed',
+            default => 'all',
+        };
     }
 
     /**
@@ -124,14 +128,21 @@ class WhatsAppInboxPage extends Page
      */
     public function visibleConversations(): array
     {
-        if ($this->listFilter !== 'pending') {
-            return $this->conversations;
+        if ($this->listFilter === 'pending') {
+            return array_values(array_filter(
+                $this->conversations,
+                fn (array $conversation): bool => (bool) ($conversation['needs_reply'] ?? false),
+            ));
         }
 
-        return array_values(array_filter(
-            $this->conversations,
-            fn (array $conversation): bool => (bool) ($conversation['needs_reply'] ?? false),
-        ));
+        if ($this->listFilter === 'failed') {
+            return array_values(array_filter(
+                $this->conversations,
+                fn (array $conversation): bool => (bool) ($conversation['last_send_failed'] ?? false),
+            ));
+        }
+
+        return $this->conversations;
     }
 
     public function pendingReplyCount(): int
@@ -139,6 +150,14 @@ class WhatsAppInboxPage extends Page
         return count(array_filter(
             $this->conversations,
             fn (array $conversation): bool => (bool) ($conversation['needs_reply'] ?? false),
+        ));
+    }
+
+    public function failedSendCount(): int
+    {
+        return count(array_filter(
+            $this->conversations,
+            fn (array $conversation): bool => (bool) ($conversation['last_send_failed'] ?? false),
         ));
     }
 
@@ -267,6 +286,7 @@ class WhatsAppInboxPage extends Page
                     'inboxLoaded' => $this->inboxLoaded,
                     'listFilter' => $this->listFilter,
                     'pendingReplyCount' => $this->pendingReplyCount(),
+                    'failedSendCount' => $this->failedSendCount(),
                     'totalConversationCount' => count($this->conversations),
                     'conversations' => $this->visibleConversations(),
                     'selectedStudentId' => $this->selectedStudentId,

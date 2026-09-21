@@ -2083,6 +2083,14 @@
 
         .crm-wa-global-inbox__list-head {
             @apply border-b-0 px-4 py-1.5;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.25rem 0.5rem;
+        }
+
+        .crm-wa-global-inbox__filters {
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
         .crm-wa-global-inbox__list-title {
@@ -2123,8 +2131,12 @@
             display: none;
         }
 
-        .crm-wa-global-inbox__list .crm-wa-global-inbox__badge:not(.crm-wa-global-inbox__badge--open) {
+        .crm-wa-global-inbox__list .crm-wa-global-inbox__badge:not(.crm-wa-global-inbox__badge--open):not(.crm-wa-global-inbox__badge--failed) {
             @apply h-2.5 w-2.5 min-w-0 rounded-full bg-emerald-500 p-0 text-[0px] leading-none;
+        }
+
+        .crm-wa-global-inbox__list .crm-wa-global-inbox__badge--failed {
+            @apply h-2.5 w-2.5 min-w-0 rounded-full bg-rose-500 p-0 text-[0px] leading-none;
         }
 
         .crm-wa-global-inbox__items {
@@ -2189,7 +2201,7 @@
     }
 
     .crm-wa-global-inbox__list-head {
-        @apply flex shrink-0 items-center justify-between gap-2 border-b border-gray-200/70 px-4 py-3 dark:border-white/10;
+        @apply flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200/70 px-4 py-3 dark:border-white/10;
     }
 
     .crm-wa-global-inbox__list-copy {
@@ -2217,7 +2229,7 @@
     }
 
     .crm-wa-global-inbox__filters {
-        @apply flex shrink-0 gap-1.5 dark:border-white/10;
+        @apply flex shrink-0 flex-wrap gap-1.5 dark:border-white/10;
     }
 
     .crm-wa-global-inbox__filter {
@@ -2230,6 +2242,10 @@
 
     .crm-wa-global-inbox__filter-count {
         @apply inline-flex min-w-4 items-center justify-center rounded-full bg-primary-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white;
+    }
+
+    .crm-wa-global-inbox__filter-count--failed {
+        @apply bg-rose-600;
     }
 
     .crm-wa-global-inbox__items {
@@ -2313,6 +2329,10 @@
 
     .crm-wa-global-inbox__badge--open {
         @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300;
+    }
+
+    .crm-wa-global-inbox__badge--failed {
+        @apply bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200;
     }
 
     .crm-wa-global-inbox__empty {
