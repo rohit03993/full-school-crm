@@ -9,8 +9,10 @@ use App\Models\MetaWhatsAppMessage;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Student;
 use App\Models\WhatsAppCampaignRecipient;
+use App\Support\CombinedHomeworkWhatsAppTemplate;
 use App\Support\MetaWhatsAppInboundMessageParser;
 use App\Support\StudentWhatsAppThreadItem;
+use App\Support\WhatsAppInboxBodyPreview;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
@@ -287,7 +289,12 @@ class StudentWhatsAppThreadService
 
         if ($preview !== '' && ! $this->isTemplateSlug($preview, $templateName)) {
             if (! str_contains($preview, '{{')) {
-                return $preview;
+                $rebuilt = $this->rebuildOutboundPreview($row);
+                if (is_string($rebuilt) && $rebuilt !== '' && mb_strlen($rebuilt) > mb_strlen($preview) && ! str_contains($rebuilt, '{{')) {
+                    return $rebuilt;
+                }
+
+                return $this->finishTruncatedTemplatePreview($preview, $row);
             }
 
             $rebuilt = $this->rebuildOutboundPreview($row);
@@ -312,6 +319,29 @@ class StudentWhatsAppThreadService
         }
 
         return $preview !== '' ? $preview : 'Message';
+    }
+
+    protected function finishTruncatedTemplatePreview(string $preview, MetaWhatsAppMessage $row): string
+    {
+        $templateName = (string) ($row->template_name ?? '');
+        $templateBody = '';
+
+        if ($templateName !== '') {
+            $metaTemplate = $this->metaTemplate($templateName, (string) ($row->language ?? ''));
+            if ($metaTemplate && filled($metaTemplate->body)) {
+                $templateBody = (string) $metaTemplate->body;
+            }
+        }
+
+        if ($templateBody === '' && CombinedHomeworkWhatsAppTemplate::looksLikeName($templateName)) {
+            $templateBody = CombinedHomeworkWhatsAppTemplate::BODY;
+        }
+
+        if ($templateBody === '') {
+            return $preview;
+        }
+
+        return WhatsAppInboxBodyPreview::appendMissingTemplateSuffix($preview, $templateBody);
     }
 
     protected function rebuildOutboundPreview(MetaWhatsAppMessage $row): ?string

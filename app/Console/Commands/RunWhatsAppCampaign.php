@@ -17,6 +17,7 @@ use App\Models\WhatsAppCampaignRecipient;
 use App\Models\MetaWhatsAppTemplate;
 use App\Services\MetaWhatsAppService;
 use App\Services\WhatsAppAnalyticsService;
+use App\Support\WhatsAppInboxBodyPreview;
 use App\Services\WhatsAppDispatchService;
 use App\Services\WhatsAppTemplateParamResolver;
 use Illuminate\Console\Command;
@@ -182,7 +183,7 @@ class RunWhatsAppCampaign extends Command
                         // Keep inbox preview in sync with the filled campaign text.
                         if (filled($recipient->message_sent) && ! str_contains((string) $recipient->message_sent, '{{')) {
                             $metaMessage->forceFill([
-                                'body_preview' => mb_substr((string) $recipient->message_sent, 0, 500),
+                                'body_preview' => WhatsAppInboxBodyPreview::clip((string) $recipient->message_sent),
                             ])->save();
                         }
                     }

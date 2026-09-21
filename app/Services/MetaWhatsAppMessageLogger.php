@@ -9,6 +9,7 @@ use App\Enums\WhatsAppSendActor;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Student;
+use App\Support\WhatsAppInboxBodyPreview;
 
 class MetaWhatsAppMessageLogger
 {
@@ -56,7 +57,7 @@ class MetaWhatsAppMessageLogger
             'send_actor' => $attribution['send_actor'],
             'template_name' => $templateName !== '' ? $templateName : null,
             'language' => $language !== '' ? $language : null,
-            'body_preview' => mb_substr($preview, 0, 500),
+            'body_preview' => WhatsAppInboxBodyPreview::clip($preview),
             'message_type' => 'text',
             'conversation_category' => $context['conversation_category'] ?? $estimate['category'],
             'message_source' => $messageSource,
@@ -102,7 +103,7 @@ class MetaWhatsAppMessageLogger
             'student_id' => $context['student_id'] ?? $studentId ?? $this->guessStudentId($phone),
             'sent_by_user_id' => $attribution['sent_by_user_id'],
             'send_actor' => $attribution['send_actor'],
-            'body_preview' => mb_substr((string) ($mediaAttributes['body_preview'] ?? 'Media message'), 0, 500),
+            'body_preview' => WhatsAppInboxBodyPreview::clip((string) ($mediaAttributes['body_preview'] ?? 'Media message')),
             'message_type' => (string) ($mediaAttributes['message_type'] ?? 'document'),
             'conversation_category' => $context['conversation_category'] ?? $estimate['category'],
             'message_source' => $messageSource,
@@ -150,7 +151,7 @@ class MetaWhatsAppMessageLogger
             'student_id' => $context['student_id'] ?? $studentId ?? $this->guessStudentId($phone),
             'sent_by_user_id' => $attribution['sent_by_user_id'],
             'send_actor' => $attribution['send_actor'],
-            'body_preview' => mb_substr($bodyPreview, 0, 500),
+            'body_preview' => WhatsAppInboxBodyPreview::clip($bodyPreview),
             'message_type' => 'text',
             'conversation_category' => $estimate['category'],
             'message_source' => $messageSource,
@@ -178,7 +179,7 @@ class MetaWhatsAppMessageLogger
             'direction' => MetaWhatsAppMessageDirection::Inbound->value,
             'phone' => $this->normalizePhone($phone),
             'student_id' => $this->guessStudentId($phone),
-            'body_preview' => mb_substr($bodyPreview, 0, 500),
+            'body_preview' => WhatsAppInboxBodyPreview::clip($bodyPreview),
             'message_type' => $messageType !== '' ? $messageType : 'text',
             'media_id' => $mediaId,
             'media_mime_type' => $mediaMimeType,
