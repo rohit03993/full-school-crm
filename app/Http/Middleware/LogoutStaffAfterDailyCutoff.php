@@ -50,7 +50,6 @@ class LogoutStaffAfterDailyCutoff
         $this->sessions->logoutStaff($request, releaseDevice: true);
 
         return redirect()
-            ->route('staff.otp-login')
-            ->with('otp_success', 'Your CRM session ended at '.$this->sessions->logoutTime().' IST. Sign in again with a new WhatsApp OTP.');
+            ->route('staff.otp-login');
     }
 }

@@ -35,12 +35,7 @@
                 <p class="text-xs font-bold uppercase tracking-widest text-brand-400">{{ $institute['name'] ?? config('app.name') }}</p>
                 <h1 class="mt-2 font-display text-3xl font-bold sm:text-4xl">Staff OTP Login</h1>
                 <p class="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-navy-300">
-                    @if ($otpOnly ?? false)
-                        Sign in with a 4-digit code sent to your WhatsApp. Password login is turned off.
-                    @else
-                        Sign in with a 4-digit code sent to your WhatsApp. Password login still works as usual.
-                    @endif
-                    Sessions end at 8:00 PM IST every day.
+                    Sign in with a 4-digit code sent to your WhatsApp.
                 </p>
             </div>
 
@@ -83,7 +78,6 @@
                                     class="portal-input tracking-[0.4em] text-center text-lg font-semibold" placeholder="••••">
                                 @error('otp')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
                             </div>
-                            <p class="text-xs text-navy-500">You stay signed in until 8:00 PM IST. After that you will need a new WhatsApp OTP.</p>
                             <button type="submit" class="touch-manipulation w-full rounded-xl bg-brand-500 py-3.5 text-base font-bold text-navy-950 shadow-lg transition hover:bg-brand-400">
                                 Verify &amp; sign in
                             </button>
