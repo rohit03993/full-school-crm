@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\CallStatus;
 use App\Enums\CrmPermission;
+use App\Enums\EnrolledCallPurpose;
 use App\Enums\LicenseFeature;
 use App\Enums\VisitStatus;
 use App\Support\CrmAccess;
@@ -92,6 +93,8 @@ class CallReportPage extends Page
 
     public string $callTypeFilter = 'all';
 
+    public ?string $purposeFilter = null;
+
     public string $search = '';
 
     public ?int $staffUserId = null;
@@ -154,6 +157,12 @@ class CallReportPage extends Page
         $this->loadReport(app(CallReportService::class));
     }
 
+    public function updatedPurposeFilter(): void
+    {
+        $this->resetPage();
+        $this->loadReport(app(CallReportService::class));
+    }
+
     public function updatedSearch(): void
     {
         $this->resetPage();
@@ -172,6 +181,7 @@ class CallReportPage extends Page
         $this->callStatusFilter = null;
         $this->visitStatusFilter = null;
         $this->callTypeFilter = 'all';
+        $this->purposeFilter = null;
         $this->search = '';
         $this->staffUserId = null;
         $this->applyDefaultDates();
@@ -204,7 +214,7 @@ class CallReportPage extends Page
             $report->filteredQueryForExport($filters, $viewer)
                 ->with(['student', 'staff'])
                 ->orderByDesc('called_at')
-                ->chunk(200, function ($calls) use ($handle): void {
+                ->chunk(200, function ($calls) use ($handle, $viewer): void {
                     foreach ($calls as $call) {
                         fputcsv($handle, [
                             $call->called_at?->format('Y-m-d H:i:s'),
@@ -242,6 +252,7 @@ class CallReportPage extends Page
             'call_status' => $this->callStatusFilter,
             'visit_status' => $this->visitStatusFilter,
             'call_type' => $this->callTypeFilter,
+            'purpose' => $this->purposeFilter,
             'search' => $this->search,
             'staff_user_id' => $this->staffUserId,
         ], $viewer);
@@ -263,6 +274,7 @@ class CallReportPage extends Page
             'call_status' => $this->callStatusFilter,
             'visit_status' => $this->visitStatusFilter,
             'call_type' => $this->callTypeFilter,
+            'purpose' => $this->purposeFilter,
             'search' => $this->search,
             'staff_user_id' => $this->staffUserId,
         ], Auth::user());
@@ -291,6 +303,7 @@ class CallReportPage extends Page
                         'visitStatusOptions' => collect(VisitStatus::cases())
                             ->mapWithKeys(fn (VisitStatus $status): array => [$status->value => $status->label()])
                             ->all(),
+                        'purposeOptions' => EnrolledCallPurpose::options(),
                         'reportService' => $report,
                         'firstCallIds' => $report->firstCallIdsFor($calls),
                     ];

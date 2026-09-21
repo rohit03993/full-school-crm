@@ -45,6 +45,15 @@
                 </x-crm.select>
             </div>
             <div>
+                <label class="text-xs font-semibold text-gray-600 dark:text-gray-400">Purpose</label>
+                <x-crm.select wire:model.live="purposeFilter" class="mt-2">
+                    <option value="">Any</option>
+                    @foreach ($purposeOptions as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </x-crm.select>
+            </div>
+            <div>
                 <label class="text-xs font-semibold text-gray-600 dark:text-gray-400">Not connected reason</label>
                 <x-crm.select wire:model.live="callStatusFilter" class="mt-2">
                     <option value="">Any</option>

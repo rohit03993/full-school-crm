@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\CallStatus;
+use App\Enums\EnrolledCallPurpose;
 use App\Enums\RoleName;
 use App\Enums\VisitStatus;
 use App\Models\StudentCall;
@@ -26,6 +27,7 @@ class CallReportService
      *     call_status: ?string,
      *     visit_status: ?string,
      *     call_type: string,
+     *     purpose: ?string,
      *     search: string,
      *     staff_user_id: ?int
      * }
@@ -51,6 +53,11 @@ class CallReportService
                 : null;
         }
 
+        $purpose = filled($input['purpose'] ?? null) ? (string) $input['purpose'] : null;
+        if ($purpose !== null && EnrolledCallPurpose::tryFrom($purpose) === null) {
+            $purpose = null;
+        }
+
         return [
             'from' => $from,
             'to' => $to,
@@ -62,6 +69,7 @@ class CallReportService
             'call_type' => in_array($input['call_type'] ?? 'all', ['all', 'new', 'followup'], true)
                 ? ($input['call_type'] ?? 'all')
                 : 'all',
+            'purpose' => $purpose,
             'search' => trim((string) ($input['search'] ?? '')),
             'staff_user_id' => $staffUserId,
         ];
@@ -204,6 +212,10 @@ class CallReportService
             $query->where('visit_status_changed_to', $filters['visit_status']);
         }
 
+        if ($filters['purpose'] ?? null) {
+            $query->where('call_purpose', $filters['purpose']);
+        }
+
         if ($filters['search'] !== '') {
             $term = $filters['search'];
             $digits = preg_replace('/\D/', '', $term);
@@ -262,6 +274,10 @@ class CallReportService
 
         if ($filters['visit_status']) {
             $query->where('sc.visit_status_changed_to', $filters['visit_status']);
+        }
+
+        if ($filters['purpose'] ?? null) {
+            $query->where('sc.call_purpose', $filters['purpose']);
         }
 
         if ($filters['search'] !== '') {

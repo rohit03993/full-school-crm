@@ -2,11 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AdmissionStatus;
 use App\Enums\CallStatus;
+use App\Enums\CourseStatus;
+use App\Enums\EnrolledCallPurpose;
+use App\Enums\EnrollmentStatus;
 use App\Enums\LeadSource;
 use App\Enums\RoleName;
+use App\Enums\StudentStatus;
 use App\Enums\VisitStatus;
 use App\Filament\Pages\CallReportPage;
+use App\Models\Admission;
+use App\Models\Course;
+use App\Models\Enrollment;
 use App\Models\User;
 use App\Services\CallLogService;
 use App\Services\CallReportService;
@@ -107,6 +115,85 @@ class CallReportServiceTest extends TestCase
         $this->assertSame(1, $report->summary($followupFilters, $staff)['total']);
     }
 
+    public function test_purpose_filter_limits_results_and_summary(): void
+    {
+        $staff = $this->createStaffUser();
+        $enrolled = $this->createEnrolledStudent($staff);
+        $lead = $this->createLeadStudent($staff);
+
+        app(CallLogService::class)->logForEnrolledStudent($enrolled, $staff, [
+            'call_connected' => true,
+            'who_answered' => 'father',
+            'call_purpose' => EnrolledCallPurpose::Attendance->value,
+            'call_notes' => 'Asked about missing attendance yesterday.',
+        ]);
+
+        app(CallLogService::class)->logForEnrolledStudent($enrolled->fresh(['activeEnrollment']), $staff, [
+            'call_connected' => true,
+            'who_answered' => 'student',
+            'call_purpose' => EnrolledCallPurpose::FeeQuery->value,
+            'call_notes' => 'Discussed next fee installment due date.',
+        ]);
+
+        app(CallLogService::class)->log($lead, $staff, [
+            'call_connected' => false,
+            'call_status' => CallStatus::NoAnswer->value,
+            'call_notes' => 'Lead call with no purpose.',
+        ]);
+
+        $report = app(CallReportService::class);
+        $baseFilters = $report->normalizeFilters([], $staff);
+
+        $this->assertSame(3, $report->summary($baseFilters, $staff)['total']);
+
+        $attendanceFilters = [...$baseFilters, 'purpose' => EnrolledCallPurpose::Attendance->value];
+        $attendance = $report->calls($attendanceFilters, $staff);
+        $this->assertSame(1, $report->summary($attendanceFilters, $staff)['total']);
+        $this->assertSame(1, $attendance->total());
+        $this->assertSame(EnrolledCallPurpose::Attendance, $attendance->first()->call_purpose);
+
+        $feeFilters = [...$baseFilters, 'purpose' => EnrolledCallPurpose::FeeQuery->value];
+        $this->assertSame(1, $report->summary($feeFilters, $staff)['total']);
+
+        $ignored = $report->normalizeFilters(['purpose' => 'not-a-real-purpose'], $staff);
+        $this->assertNull($ignored['purpose']);
+        $this->assertSame(3, $report->summary($ignored, $staff)['total']);
+    }
+
+    public function test_call_report_page_filters_by_purpose(): void
+    {
+        Role::findOrCreate(RoleName::SuperAdmin->value);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+
+        $student = $this->createEnrolledStudent($admin);
+        app(CallLogService::class)->logForEnrolledStudent($student, $admin, [
+            'call_connected' => true,
+            'who_answered' => 'father',
+            'call_purpose' => EnrolledCallPurpose::Attendance->value,
+            'call_notes' => 'Attendance follow-up.',
+        ]);
+        app(CallLogService::class)->logForEnrolledStudent($student->fresh(['activeEnrollment']), $admin, [
+            'call_connected' => true,
+            'who_answered' => 'mother',
+            'call_purpose' => EnrolledCallPurpose::FeeQuery->value,
+            'call_notes' => 'Fee query follow-up.',
+        ]);
+
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(CallReportPage::class)
+            ->assertSuccessful()
+            ->assertSee('Purpose')
+            ->assertSee('Attendance')
+            ->assertSee('Fee query')
+            ->set('purposeFilter', EnrolledCallPurpose::Attendance->value)
+            ->assertSee('Attendance follow-up.')
+            ->assertDontSee('Fee query follow-up.');
+    }
+
     public function test_call_report_page_exports_filtered_csv(): void
     {
         Role::findOrCreate(RoleName::SuperAdmin->value);
@@ -154,5 +241,55 @@ class CallReportServiceTest extends TestCase
         ], $staff, LeadSource::WalkIn);
 
         return $enquiry->student;
+    }
+
+    protected function createEnrolledStudent(User $staff): \App\Models\Student
+    {
+        $course = Course::query()->create([
+            'name' => 'Class 12',
+            'code' => 'C12-CR-'.uniqid(),
+            'programme_category' => 'school',
+            'duration' => 1,
+            'duration_type' => 'years',
+            'fee' => 80000,
+            'status' => CourseStatus::Active,
+        ]);
+
+        $enquiry = app(EnquiryService::class)->create([
+            'name' => 'Enrolled Report Student',
+            'mobile' => '9000000402',
+            'course_id' => $course->id,
+            'meeting_with_user_id' => $staff->id,
+            'visit_status' => VisitStatus::Interested->value,
+        ], $staff, LeadSource::WalkIn);
+
+        $student = $enquiry->student;
+
+        $admission = Admission::query()->create([
+            'student_id' => $student->id,
+            'enquiry_id' => $enquiry->id,
+            'admission_number' => 'ADM-CR-'.$student->id,
+            'course_fee' => 80000,
+            'discount_amount' => 0,
+            'net_fee' => 80000,
+            'use_installment_plan' => false,
+            'status' => AdmissionStatus::Approved,
+            'approved_at' => now(),
+            'submitted_at' => now(),
+        ]);
+
+        Enrollment::query()->create([
+            'student_id' => $student->id,
+            'admission_id' => $admission->id,
+            'course_id' => $course->id,
+            'enrollment_number' => 'ENR-CR-'.$student->id,
+            'enrolled_at' => now(),
+            'status' => EnrollmentStatus::Enrolled,
+            'is_active' => true,
+        ]);
+
+        $student->update(['status' => StudentStatus::Enrolled]);
+
+        return $student->fresh(['activeEnrollment']);
     }
 }
