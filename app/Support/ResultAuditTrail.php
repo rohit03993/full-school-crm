@@ -100,16 +100,6 @@ class ResultAuditTrail
 
         return collect($history['sends'] ?? [])
             ->map(function (array $send): ResultAuditTrailEntry {
-                $parts = [];
-                $parts[] = $send['sent'].' sent';
-                if ((int) $send['failed'] > 0) {
-                    $parts[] = $send['failed'].' failed';
-                }
-                if ((int) $send['pending'] > 0) {
-                    $parts[] = $send['pending'].' pending';
-                }
-                $parts[] = $send['total'].' in queue';
-
                 $at = filled($send['at_iso'] ?? null)
                     ? Carbon::parse($send['at_iso'])
                     : null;
@@ -118,7 +108,7 @@ class ResultAuditTrail
                     action: 'marks_whatsapp_sent',
                     created_at: $at,
                     user_name: (string) ($send['staff_name'] ?? 'Staff'),
-                    detail: implode(' · ', $parts),
+                    detail: (string) ($send['result_line'] ?? ''),
                 );
             });
     }

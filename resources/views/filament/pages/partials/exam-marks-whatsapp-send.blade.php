@@ -45,7 +45,7 @@
                 <div class="rounded-xl bg-gray-50 px-3 py-3 text-sm text-gray-700 ring-1 ring-gray-950/5 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10">
                     <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Messages sent for this exam</p>
                     <p class="mt-1">
-                        Eligible now (marks + mobile):
+                        Eligible students with marks and mobile numbers:
                         <span class="font-semibold text-gray-950 dark:text-white">{{ $whatsappSendHistory['eligible_now'] }}</span>
                     </p>
                     <ul class="mt-2 space-y-1.5">
@@ -53,14 +53,7 @@
                             <li>
                                 <span class="font-semibold text-gray-950 dark:text-white">{{ $send['staff_name'] }}</span>
                                 · {{ $send['at'] }}
-                                · {{ $send['sent'] }} sent
-                                @if ((int) $send['failed'] > 0)
-                                    · {{ $send['failed'] }} failed
-                                @endif
-                                @if ((int) $send['pending'] > 0)
-                                    · {{ $send['pending'] }} pending
-                                @endif
-                                · {{ $send['total'] }} in queue
+                                · {{ $send['result_line'] }}
                             </li>
                         @endforeach
                     </ul>

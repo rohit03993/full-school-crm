@@ -257,12 +257,14 @@ class StudentProfileExamMarksWhatsAppTest extends TestCase
         $this->assertSame('Khushi Mam', $history['sends'][0]['staff_name']);
         $this->assertSame(2, $history['sends'][0]['sent']);
         $this->assertSame(2, $history['sends'][0]['total']);
+        $this->assertSame('2 delivered · 0 failed', $history['sends'][0]['result_line']);
+        $this->assertStringNotContainsString('queue', $history['sends'][0]['result_line']);
 
         $trail = \App\Support\ResultAuditTrail::entriesForGroupKey($groupKey);
         $whatsapp = $trail->first(fn ($entry): bool => $entry->action === 'marks_whatsapp_sent');
         $this->assertNotNull($whatsapp);
         $this->assertSame('Khushi Mam', $whatsapp->user_name);
-        $this->assertStringContainsString('2 sent', (string) $whatsapp->detail);
+        $this->assertSame('2 delivered · 0 failed', $whatsapp->detail);
 
         $this->actingAs($admin);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
@@ -273,7 +275,11 @@ class StudentProfileExamMarksWhatsAppTest extends TestCase
             ->assertSee('Resend WhatsApp to all students with marks')
             ->assertSee('Khushi Mam')
             ->assertSee('WhatsApp marks sent')
-            ->assertSee('Messages sent for this exam');
+            ->assertSee('Messages sent for this exam')
+            ->assertSee('Eligible students with marks and mobile numbers')
+            ->assertSee('2 delivered')
+            ->assertSee('0 failed')
+            ->assertDontSee('in queue');
     }
 
     /**

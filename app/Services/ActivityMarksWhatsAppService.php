@@ -203,6 +203,7 @@ class ActivityMarksWhatsAppService
      *         sent: int,
      *         failed: int,
      *         pending: int,
+     *         result_line: string,
      *         status: string
      *     }>
      * }
@@ -263,6 +264,7 @@ class ActivityMarksWhatsAppService
                 'sent' => $sent,
                 'failed' => $failed,
                 'pending' => $pending,
+                'result_line' => $this->classSendResultLine($sent, $failed, $pending),
                 'status' => $campaign->status instanceof WhatsAppCampaignStatus
                     ? $campaign->status->value
                     : (string) $campaign->status,
@@ -277,6 +279,17 @@ class ActivityMarksWhatsAppService
             'button_label' => $hasPrior ? $resendLabel : $queueLabel,
             'sends' => $sends,
         ];
+    }
+
+    protected function classSendResultLine(int $sent, int $failed, int $pending): string
+    {
+        $parts = [$sent.' delivered', $failed.' failed'];
+
+        if ($pending > 0) {
+            $parts[] = $pending.' still in queue';
+        }
+
+        return implode(' · ', $parts);
     }
 
     /**
