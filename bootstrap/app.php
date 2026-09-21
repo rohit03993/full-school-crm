@@ -42,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withSchedule(function (Schedule $schedule): void {
+        $schedule->command('staff:end-daily-sessions')->everyMinute()->withoutOverlapping();
         $schedule->command('crm:cleanup')->dailyAt('03:00');
         $schedule->command('crm:backup')->dailyAt((string) config('crm-backup.schedule_at', '02:15'));
         $schedule->command('crm:process-late-fees')->dailyAt('00:30');

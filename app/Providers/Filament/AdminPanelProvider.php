@@ -11,6 +11,7 @@ use App\Filament\Pages\MyAccountPage;
 use App\Filament\Pages\TestMarksReviewPage;
 use App\Http\Middleware\EnsureInstituteOnboardingComplete;
 use App\Http\Middleware\EnsureLicenseActive;
+use App\Http\Middleware\LogoutStaffAfterDailyCutoff;
 use App\Support\CrmNavigation;
 use App\Support\InstituteSettings;
 use Filament\Http\Middleware\Authenticate;
@@ -95,6 +96,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                LogoutStaffAfterDailyCutoff::class,
                 EnsureInstituteOnboardingComplete::class,
             ])
             ->renderHook(

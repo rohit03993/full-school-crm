@@ -29,7 +29,6 @@ class Login extends BaseLogin
             ->components([
                 $this->getLoginFormComponent(),
                 $this->getPasswordFormComponent(),
-                $this->getRememberFormComponent(),
             ]);
     }
 
@@ -74,6 +73,8 @@ class Login extends BaseLogin
             ]);
         }
 
+        $this->data['remember'] = false;
+
         $response = parent::authenticate();
 
         $user = auth()->user();
@@ -84,6 +85,10 @@ class Login extends BaseLogin
             throw ValidationException::withMessages([
                 'data.login' => 'Use the vendor console URL to sign in as platform operator.',
             ]);
+        }
+
+        if ($user) {
+            app(\App\Services\StaffDailySessionService::class)->claimDevice($user, request());
         }
 
         return $response;

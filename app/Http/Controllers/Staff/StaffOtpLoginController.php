@@ -88,7 +88,6 @@ class StaffOtpLoginController extends Controller
         $data = $request->validate([
             'mobile' => ['required', 'regex:/^[6-9]\d{9}$/'],
             'otp' => ['required', 'string', 'size:4', 'regex:/^\d{4}$/'],
-            'remember' => ['sometimes', 'boolean'],
         ], [
             'otp.size' => 'OTP must be 4 digits.',
             'otp.regex' => 'OTP must be 4 digits.',
@@ -96,7 +95,7 @@ class StaffOtpLoginController extends Controller
 
         if (! $otp->verify($data['mobile'], WhatsAppOtpService::PURPOSE_STAFF, $data['otp'])) {
             return back()
-                ->withInput($request->only('mobile', 'remember'))
+                ->withInput($request->only('mobile'))
                 ->with('otp_sent', true)
                 ->with('otp_mobile', $mobile)
                 ->withErrors(['otp' => 'Invalid or expired OTP. Please request a new one.']);
@@ -110,8 +109,9 @@ class StaffOtpLoginController extends Controller
                 ->withErrors(['mobile' => 'This mobile number is not registered for staff login.']);
         }
 
-        Auth::login($user, $request->boolean('remember'));
+        Auth::login($user, false);
         $request->session()->regenerate();
+        app(\App\Services\StaffDailySessionService::class)->claimDevice($user, $request);
 
         return redirect()->intended(Filament::getPanel('admin')->getUrl());
     }

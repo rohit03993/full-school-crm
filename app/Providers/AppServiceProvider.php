@@ -32,6 +32,7 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(Login::class, function (Login $event): void {
             app(StaffLoginSessionService::class)->handleLoginEvent($event);
+            app(\App\Services\StaffDailySessionService::class)->startFromLoginEvent($event);
         });
         Event::listen(Logout::class, function (Logout $event): void {
             app(StaffLoginSessionService::class)->handleLogoutEvent($event);

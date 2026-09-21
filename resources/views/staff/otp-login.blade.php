@@ -40,6 +40,7 @@
                     @else
                         Sign in with a 4-digit code sent to your WhatsApp. Password login still works as usual.
                     @endif
+                    Sessions end at 8:00 PM IST every day.
                 </p>
             </div>
 
@@ -82,10 +83,7 @@
                                     class="portal-input tracking-[0.4em] text-center text-lg font-semibold" placeholder="••••">
                                 @error('otp')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
                             </div>
-                            <label class="flex items-center gap-2 text-sm text-navy-700">
-                                <input type="checkbox" name="remember" value="1" class="rounded border-navy-300">
-                                Remember me
-                            </label>
+                            <p class="text-xs text-navy-500">You stay signed in until 8:00 PM IST. After that you will need a new WhatsApp OTP.</p>
                             <button type="submit" class="touch-manipulation w-full rounded-xl bg-brand-500 py-3.5 text-base font-bold text-navy-950 shadow-lg transition hover:bg-brand-400">
                                 Verify &amp; sign in
                             </button>
