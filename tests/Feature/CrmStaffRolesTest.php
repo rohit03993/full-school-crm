@@ -235,6 +235,9 @@ class CrmStaffRolesTest extends TestCase
         $this->assertFalse(WhatsAppCampaignResource::canView($other));
         $this->assertNotNull(WhatsAppSendUi::campaignViewUrl($own->id));
         $this->assertNull(WhatsAppSendUi::campaignViewUrl($other->id));
+        $this->assertTrue(\App\Filament\Resources\WhatsAppCampaigns\Pages\ViewWhatsAppCampaign::canAccess());
+        $this->assertTrue(\App\Filament\Resources\WhatsAppCampaigns\Pages\ViewWhatsAppCampaign::canAccess(['record' => $own]));
+        $this->assertFalse(\App\Filament\Resources\WhatsAppCampaigns\Pages\ViewWhatsAppCampaign::canAccess(['record' => $other]));
     }
 
     public function test_teacher_can_enter_marks_but_not_publish_or_manage_academics(): void

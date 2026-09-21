@@ -6,6 +6,7 @@ use App\Enums\WhatsAppCampaignStatus;
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Models\WhatsAppCampaign;
 use App\Services\WhatsAppCampaignService;
+use App\Support\CrmAccess;
 use App\Support\WhatsAppSendUi;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -19,7 +20,7 @@ class ViewWhatsAppCampaign extends ViewRecord
 
     public static function canAccess(array $parameters = []): bool
     {
-        $record = $parameters['record'] ?? null;
+        $record = $parameters['record'] ?? request()->route('record');
 
         if (! $record instanceof WhatsAppCampaign && filled($record)) {
             $record = WhatsAppCampaign::query()->find($record);
@@ -29,7 +30,10 @@ class ViewWhatsAppCampaign extends ViewRecord
             return WhatsAppCampaignResource::canView($record);
         }
 
-        return WhatsAppCampaignResource::canAccess();
+        // Filament may check access before the campaign id is bound.
+        // Staff who can click Send on the mark sheet must reach this progress page.
+        return WhatsAppCampaignResource::canAccess()
+            || CrmAccess::canSendExamMarksWhatsApp(Auth::user());
     }
 
     public function hasCombinedRelationManagerTabsWithContent(): bool

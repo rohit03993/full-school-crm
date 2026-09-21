@@ -601,6 +601,14 @@ class BulkActivityMarksImportPage extends Page
                     'examMarksAutomationsUrl' => ManageWhatsAppSettings::getUrl(['automation' => 'exam-marks']),
                     'canSendWhatsApp' => FeatureGate::enabled(LicenseFeature::WhatsApp)
                         && CrmAccess::canSendExamMarksWhatsApp(Auth::user()),
+                    'whatsappSendHistory' => filled($this->importResult['test_key'] ?? null)
+                        ? app(ActivityMarksWhatsAppService::class)->classSheetSendHistory((string) $this->importResult['test_key'])
+                        : [
+                            'eligible_now' => 0,
+                            'has_prior_class_send' => false,
+                            'button_label' => 'Queue WhatsApp to all students with marks',
+                            'sends' => [],
+                        ],
                     'fileHeaders' => $this->fileHeaders,
                     'columnMapping' => $this->columnMapping,
                     'subjectMaxMarks' => $this->subjectMaxMarks,

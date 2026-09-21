@@ -13,6 +13,7 @@ use App\Enums\StudentStatus;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Enums\WhatsAppRecipientStatus;
 use App\Filament\Pages\StudentProfilePage;
+use App\Filament\Pages\TestMarksReviewPage;
 use App\Jobs\RunWhatsAppCampaignJob;
 use App\Models\AcademicSession;
 use App\Models\ActivitySession;
@@ -32,6 +33,7 @@ use App\Models\WhatsAppTemplate;
 use App\Services\ActivityAttendanceService;
 use App\Services\ActivityMarksWhatsAppService;
 use App\Support\StudentExamMarksMatrix;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Queue;
@@ -196,6 +198,82 @@ class StudentProfileExamMarksWhatsAppTest extends TestCase
             ->assertSee('Resend')
             ->call('confirmSendExamMarksWhatsApp', $groupKey)
             ->assertActionMounted('sendExamMarksWhatsApp');
+    }
+
+    public function test_class_sheet_send_history_counts_staff_and_switches_to_resend(): void
+    {
+        $this->seed(\Database\Seeders\ActivityTypeSeeder::class);
+
+        $admin = $this->createSuperAdmin();
+        $admin->update(['name' => 'Khushi Mam']);
+        [$studentA, $studentB, $groupKey] = $this->createClassWithTwoMarkedStudents($admin);
+        $this->createMarksTemplate();
+
+        $service = app(ActivityMarksWhatsAppService::class);
+        $empty = $service->classSheetSendHistory($groupKey);
+
+        $this->assertSame(2, $empty['eligible_now']);
+        $this->assertFalse($empty['has_prior_class_send']);
+        $this->assertSame('Queue WhatsApp to all students with marks', $empty['button_label']);
+        $this->assertSame([], $empty['sends']);
+
+        $profileOnly = $service->createMarksCampaign(
+            $admin,
+            WhatsAppTemplate::query()->where('name', 'test_marks')->firstOrFail(),
+            $groupKey,
+            'Unit Test — Sept 2026',
+            '2026-09-12',
+            $studentA->id,
+        );
+        $profileOnly->update([
+            'status' => WhatsAppCampaignStatus::Completed,
+            'sent_count' => 1,
+            'shot_by' => $admin->id,
+            'shot_at' => now(),
+        ]);
+
+        $stillEmpty = $service->classSheetSendHistory($groupKey);
+        $this->assertFalse($stillEmpty['has_prior_class_send']);
+
+        $classCampaign = $service->createMarksCampaign(
+            $admin,
+            WhatsAppTemplate::query()->where('name', 'test_marks')->firstOrFail(),
+            $groupKey,
+            'Unit Test — Sept 2026',
+            '2026-09-12',
+        );
+        $classCampaign->update([
+            'status' => WhatsAppCampaignStatus::Completed,
+            'sent_count' => 2,
+            'failed_count' => 0,
+            'shot_by' => $admin->id,
+            'shot_at' => now(),
+        ]);
+
+        $history = $service->classSheetSendHistory($groupKey);
+        $this->assertTrue($history['has_prior_class_send']);
+        $this->assertSame('Resend WhatsApp to all students with marks', $history['button_label']);
+        $this->assertCount(1, $history['sends']);
+        $this->assertSame('Khushi Mam', $history['sends'][0]['staff_name']);
+        $this->assertSame(2, $history['sends'][0]['sent']);
+        $this->assertSame(2, $history['sends'][0]['total']);
+
+        $trail = \App\Support\ResultAuditTrail::entriesForGroupKey($groupKey);
+        $whatsapp = $trail->first(fn ($entry): bool => $entry->action === 'marks_whatsapp_sent');
+        $this->assertNotNull($whatsapp);
+        $this->assertSame('Khushi Mam', $whatsapp->user_name);
+        $this->assertStringContainsString('2 sent', (string) $whatsapp->detail);
+
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::withQueryParams(['group' => $groupKey])
+            ->test(TestMarksReviewPage::class)
+            ->assertSuccessful()
+            ->assertSee('Resend WhatsApp to all students with marks')
+            ->assertSee('Khushi Mam')
+            ->assertSee('WhatsApp marks sent')
+            ->assertSee('Messages sent for this exam');
     }
 
     /**

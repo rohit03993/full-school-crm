@@ -302,9 +302,9 @@
                             </p>
                         </div>
                         <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                            {{ $entry->user_name ?? 'System' }}
-                            @if ($entry->action === 'marks_changed_after_publish')
-                                · marks updated after publish
+                            {{ $entry->user_name }}
+                            @if (filled($entry->detail))
+                                · {{ $entry->detail }}
                             @endif
                         </p>
                     </div>

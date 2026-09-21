@@ -188,6 +188,98 @@ class ActivityMarksWhatsAppService
     }
 
     /**
+     * Class-sheet sends for this exam (not one-student profile sends).
+     *
+     * @return array{
+     *     eligible_now: int,
+     *     has_prior_class_send: bool,
+     *     button_label: string,
+     *     sends: list<array{
+     *         campaign_id: int,
+     *         at: string,
+     *         at_iso: ?string,
+     *         staff_name: string,
+     *         total: int,
+     *         sent: int,
+     *         failed: int,
+     *         pending: int,
+     *         status: string
+     *     }>
+     * }
+     */
+    public function classSheetSendHistory(string $marksKey): array
+    {
+        $eligibleNow = $this->studentsWithMarks($marksKey)->count();
+        $queueLabel = 'Queue WhatsApp to all students with marks';
+        $resendLabel = 'Resend WhatsApp to all students with marks';
+
+        if (blank($marksKey) || ! Schema::hasTable('whatsapp_campaigns')) {
+            return [
+                'eligible_now' => $eligibleNow,
+                'has_prior_class_send' => false,
+                'button_label' => $queueLabel,
+                'sends' => [],
+            ];
+        }
+
+        $campaigns = WhatsAppCampaign::query()
+            ->with(['createdBy', 'shotBy'])
+            ->where('campaign_variables->audience_source', 'activity_marks')
+            ->where('campaign_variables->test_key', $marksKey)
+            ->where(function ($query): void {
+                $query
+                    ->whereIn('status', [
+                        WhatsAppCampaignStatus::Queued,
+                        WhatsAppCampaignStatus::Running,
+                        WhatsAppCampaignStatus::Paused,
+                        WhatsAppCampaignStatus::Completed,
+                    ])
+                    ->orWhere('sent_count', '>', 0);
+            })
+            ->orderByDesc('id')
+            ->get()
+            ->filter(fn (WhatsAppCampaign $campaign): bool => (int) $campaign->campaignVariable('only_student_id') === 0)
+            ->values();
+
+        $sends = $campaigns->map(function (WhatsAppCampaign $campaign): array {
+            $total = (int) $campaign->total_recipients;
+            $sent = (int) $campaign->sent_count;
+            $failed = (int) $campaign->failed_count;
+            $pending = max(0, $total - $sent - $failed);
+            $at = $campaign->shot_at
+                ?? $campaign->finished_at
+                ?? $campaign->created_at;
+
+            $staffName = $campaign->shotBy?->name
+                ?? $campaign->createdBy?->name
+                ?? 'Staff';
+
+            return [
+                'campaign_id' => (int) $campaign->id,
+                'at' => $at?->timezone((string) config('app.timezone'))->format('d M Y, h:i A') ?? '—',
+                'at_iso' => $at?->toIso8601String(),
+                'staff_name' => (string) $staffName,
+                'total' => $total,
+                'sent' => $sent,
+                'failed' => $failed,
+                'pending' => $pending,
+                'status' => $campaign->status instanceof WhatsAppCampaignStatus
+                    ? $campaign->status->value
+                    : (string) $campaign->status,
+            ];
+        })->all();
+
+        $hasPrior = $sends !== [];
+
+        return [
+            'eligible_now' => $eligibleNow,
+            'has_prior_class_send' => $hasPrior,
+            'button_label' => $hasPrior ? $resendLabel : $queueLabel,
+            'sends' => $sends,
+        ];
+    }
+
+    /**
      * @return array{mobile: string, test_name: string, test_date: string, marks_summary: string, roll: string, template_name: ?string, prior_send: array{status: string, at: string, source: string, campaign_id: int}|null}|null
      */
     public function previewForStudent(Student $student, string $marksKey): ?array

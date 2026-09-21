@@ -1,4 +1,13 @@
 @if ($canSendWhatsApp ?? false)
+    @php
+        $whatsappSendHistory = $whatsappSendHistory ?? [
+            'eligible_now' => 0,
+            'has_prior_class_send' => false,
+            'button_label' => 'Queue WhatsApp to all students with marks',
+            'sends' => [],
+        ];
+        $whatsappSends = $whatsappSendHistory['sends'] ?? [];
+    @endphp
     <div class="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
         <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
             <h3 class="text-base font-bold text-gray-950 dark:text-white">Send marks via WhatsApp</h3>
@@ -32,6 +41,32 @@
                 </x-crm.select-input>
             @endif
 
+            @if ($whatsappSends !== [])
+                <div class="rounded-xl bg-gray-50 px-3 py-3 text-sm text-gray-700 ring-1 ring-gray-950/5 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Messages sent for this exam</p>
+                    <p class="mt-1">
+                        Eligible now (marks + mobile):
+                        <span class="font-semibold text-gray-950 dark:text-white">{{ $whatsappSendHistory['eligible_now'] }}</span>
+                    </p>
+                    <ul class="mt-2 space-y-1.5">
+                        @foreach ($whatsappSends as $send)
+                            <li>
+                                <span class="font-semibold text-gray-950 dark:text-white">{{ $send['staff_name'] }}</span>
+                                · {{ $send['at'] }}
+                                · {{ $send['sent'] }} sent
+                                @if ((int) $send['failed'] > 0)
+                                    · {{ $send['failed'] }} failed
+                                @endif
+                                @if ((int) $send['pending'] > 0)
+                                    · {{ $send['pending'] }} pending
+                                @endif
+                                · {{ $send['total'] }} in queue
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <button
                 type="button"
                 wire:click="queueWhatsAppCampaign"
@@ -39,7 +74,7 @@
                 wire:target="queueWhatsAppCampaign"
                 class="justify-self-start rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70"
             >
-                <span wire:loading.remove wire:target="queueWhatsAppCampaign">Queue WhatsApp to all students with marks</span>
+                <span wire:loading.remove wire:target="queueWhatsAppCampaign">{{ $whatsappSendHistory['button_label'] }}</span>
                 <span wire:loading wire:target="queueWhatsAppCampaign">Queuing… opening send progress</span>
             </button>
         </div>

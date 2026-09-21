@@ -62,9 +62,12 @@ class WhatsAppCampaignResource extends Resource
 
         $user = Auth::user();
 
-        return $user !== null
-            && $record instanceof WhatsAppCampaign
-            && (int) $record->created_by === (int) $user->id;
+        if ($user === null || ! $record instanceof WhatsAppCampaign) {
+            return false;
+        }
+
+        return (int) $record->created_by === (int) $user->id
+            || (int) $record->shot_by === (int) $user->id;
     }
 
     public static function shouldRegisterNavigation(): bool

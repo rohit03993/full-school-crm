@@ -5,17 +5,37 @@ namespace App\Support;
 use App\Models\ActivitySession;
 use App\Models\AuditLog;
 use App\Models\ResultDeclaration;
+use App\Services\ActivityMarksWhatsAppService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 class ResultAuditTrail
 {
     /**
-     * @return Collection<int, AuditLog>
+     * @return Collection<int, ResultAuditTrailEntry>
      */
     public static function entriesForGroupKey(string $groupKey): Collection
     {
-        if (! Schema::hasTable('audit_logs') || blank($groupKey)) {
+        if (blank($groupKey)) {
+            return collect();
+        }
+
+        $logs = self::auditLogEntries($groupKey);
+        $whatsapp = self::whatsappEntries($groupKey);
+
+        return $logs
+            ->concat($whatsapp)
+            ->sortByDesc(fn (ResultAuditTrailEntry $entry): int => $entry->created_at?->getTimestamp() ?? 0)
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, ResultAuditTrailEntry>
+     */
+    protected static function auditLogEntries(string $groupKey): Collection
+    {
+        if (! Schema::hasTable('audit_logs')) {
             return collect();
         }
 
@@ -54,7 +74,53 @@ class ResultAuditTrail
             })
             ->orderByDesc('created_at')
             ->limit(50)
-            ->get();
+            ->get()
+            ->map(function (AuditLog $log): ResultAuditTrailEntry {
+                $createdAt = $log->created_at instanceof Carbon
+                    ? $log->created_at
+                    : ($log->created_at ? Carbon::parse($log->created_at) : null);
+
+                return new ResultAuditTrailEntry(
+                    action: (string) $log->action,
+                    created_at: $createdAt,
+                    user_name: (string) ($log->user_name ?? $log->user?->name ?? 'System'),
+                    detail: $log->action === 'marks_changed_after_publish'
+                        ? 'marks updated after publish'
+                        : null,
+                );
+            });
+    }
+
+    /**
+     * @return Collection<int, ResultAuditTrailEntry>
+     */
+    protected static function whatsappEntries(string $groupKey): Collection
+    {
+        $history = app(ActivityMarksWhatsAppService::class)->classSheetSendHistory($groupKey);
+
+        return collect($history['sends'] ?? [])
+            ->map(function (array $send): ResultAuditTrailEntry {
+                $parts = [];
+                $parts[] = $send['sent'].' sent';
+                if ((int) $send['failed'] > 0) {
+                    $parts[] = $send['failed'].' failed';
+                }
+                if ((int) $send['pending'] > 0) {
+                    $parts[] = $send['pending'].' pending';
+                }
+                $parts[] = $send['total'].' in queue';
+
+                $at = filled($send['at_iso'] ?? null)
+                    ? Carbon::parse($send['at_iso'])
+                    : null;
+
+                return new ResultAuditTrailEntry(
+                    action: 'marks_whatsapp_sent',
+                    created_at: $at,
+                    user_name: (string) ($send['staff_name'] ?? 'Staff'),
+                    detail: implode(' · ', $parts),
+                );
+            });
     }
 
     public static function labelForAction(string $action): string
@@ -68,6 +134,7 @@ class ResultAuditTrail
             'marks_changed_after_publish' => 'Marks changed after publish',
             'activity_attendance_marked' => 'Marks entered / updated',
             'activity_marks_imported' => 'Marks imported from Excel',
+            'marks_whatsapp_sent' => 'WhatsApp marks sent',
             default => str_replace('_', ' ', ucfirst($action)),
         };
     }

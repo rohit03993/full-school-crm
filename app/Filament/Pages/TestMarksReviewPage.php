@@ -555,7 +555,7 @@ class TestMarksReviewPage extends Page
     }
 
     /**
-     * @return array<int, \App\Models\AuditLog>
+     * @return array<int, \App\Support\ResultAuditTrailEntry>
      */
     public function auditTrailEntries(): array
     {
@@ -699,6 +699,14 @@ class TestMarksReviewPage extends Page
                     'examMarksAutomationsUrl' => ManageWhatsAppSettings::getUrl(['automation' => 'exam-marks']),
                     'canSendWhatsApp' => FeatureGate::enabled(LicenseFeature::WhatsApp)
                         && CrmAccess::canSendExamMarksWhatsApp(Auth::user()),
+                    'whatsappSendHistory' => filled($this->groupKey)
+                        ? app(ActivityMarksWhatsAppService::class)->classSheetSendHistory((string) $this->groupKey)
+                        : [
+                            'eligible_now' => 0,
+                            'has_prior_class_send' => false,
+                            'button_label' => 'Queue WhatsApp to all students with marks',
+                            'sends' => [],
+                        ],
                     'resultStatus' => $this->resultStatus(),
                     'canPublish' => FeatureGate::enabled(LicenseFeature::Results)
                         && CrmAccess::can(Auth::user(), CrmPermission::MarksPublish)
