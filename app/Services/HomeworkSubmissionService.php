@@ -292,6 +292,113 @@ class HomeworkSubmissionService
     }
 
     /**
+     * Teacher submissions still waiting for admin/coordinator approval, for one date.
+     * Grouped by programme (class) then section so staff do not open every class first.
+     *
+     * @return array{
+     *     date: string,
+     *     total: int,
+     *     groups: list<array{
+     *         course_name: string,
+     *         sections: list<array{
+     *             batch_id: int,
+     *             section: string,
+     *             class_label: string,
+     *             items: list<array{
+     *                 assignment_id: int,
+     *                 teacher: string,
+     *                 subject: string,
+     *                 title: string,
+     *                 submitted_at: ?string
+     *             }>
+     *         }>
+     *     }>
+     * }
+     */
+    public function pendingReviewForDate(string $date): array
+    {
+        $date = $this->normalizeDate($date);
+
+        $assignments = HomeworkAssignment::query()
+            ->whereDate('homework_date', $date)
+            ->where('status', HomeworkAssignmentStatus::Submitted)
+            ->whereNotNull('course_subject_id')
+            ->with(['batch.course', 'courseSubject', 'submittedBy', 'createdBy'])
+            ->orderBy('id')
+            ->get();
+
+        /** @var array<string, array{course_name: string, sections: array<int, array{batch_id: int, section: string, class_label: string, items: list<array{assignment_id: int, teacher: string, subject: string, title: string, submitted_at: ?string}>}>}> $grouped */
+        $grouped = [];
+
+        foreach ($assignments as $assignment) {
+            $batch = $assignment->batch;
+
+            if ($batch === null) {
+                continue;
+            }
+
+            $courseName = filled($batch->course?->name)
+                ? (string) $batch->course->name
+                : (string) $batch->name;
+            $section = filled($batch->section) ? (string) $batch->section : '—';
+            $batchId = (int) $batch->id;
+
+            $grouped[$courseName] ??= [
+                'course_name' => $courseName,
+                'sections' => [],
+            ];
+
+            $grouped[$courseName]['sections'][$batchId] ??= [
+                'batch_id' => $batchId,
+                'section' => $section,
+                'class_label' => $batch->displayLabel(),
+                'items' => [],
+            ];
+
+            $grouped[$courseName]['sections'][$batchId]['items'][] = [
+                'assignment_id' => (int) $assignment->id,
+                'teacher' => $assignment->submittedBy?->name ?? $assignment->createdBy?->name ?? '—',
+                'subject' => $assignment->courseSubject?->displayLabel() ?? '—',
+                'title' => (string) ($assignment->title ?? ''),
+                'submitted_at' => $assignment->submitted_at?->timezone((string) config('app.timezone'))->format('h:i A'),
+            ];
+        }
+
+        ksort($grouped, SORT_NATURAL | SORT_FLAG_CASE);
+
+        $groups = [];
+        $total = 0;
+
+        foreach ($grouped as $course) {
+            $sections = array_values($course['sections']);
+
+            usort($sections, function (array $left, array $right): int {
+                return strnatcasecmp($left['section'], $right['section']);
+            });
+
+            foreach ($sections as $index => $sectionRow) {
+                $items = $sectionRow['items'];
+                usort($items, function (array $left, array $right): int {
+                    return strnatcasecmp($left['subject'], $right['subject']);
+                });
+                $sections[$index]['items'] = $items;
+                $total += count($items);
+            }
+
+            $groups[] = [
+                'course_name' => $course['course_name'],
+                'sections' => $sections,
+            ];
+        }
+
+        return [
+            'date' => $date,
+            'total' => $total,
+            'groups' => $groups,
+        ];
+    }
+
+    /**
      * Review board for one class/date: one row per subject with its submission state.
      *
      * @return array{

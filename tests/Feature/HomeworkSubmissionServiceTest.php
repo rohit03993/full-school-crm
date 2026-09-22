@@ -218,6 +218,133 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame(1, $board['summary']['missing']);
     }
 
+    public function test_pending_review_groups_by_class_and_section_for_selected_date_only(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+
+        $sectionB = Batch::query()->create([
+            'name' => 'Class 11 JEE - B',
+            'section' => 'B',
+            'course_id' => $data['batch']->course_id,
+            'academic_session_id' => $data['batch']->academic_session_id,
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'status' => BatchStatus::Active,
+        ]);
+        $sectionB->subjects()->attach([
+            $data['physics']->id => ['sort_order' => 1],
+        ]);
+        BatchStaffAssignment::query()->create([
+            'batch_id' => $sectionB->id,
+            'user_id' => $data['physicsTeacher']->id,
+            'role' => BatchStaffRole::SubjectTeacher,
+            'course_subject_id' => $data['physics']->id,
+        ]);
+
+        $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra today',
+            'description' => 'Ex 5.2',
+        ]);
+
+        $service->submit($data['physicsTeacher'], [
+            'batch_id' => $sectionB->id,
+            'course_subject_id' => $data['physics']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Optics today',
+            'description' => 'Chapter 9',
+        ]);
+
+        $yesterdayHomework = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->subDay()->toDateString(),
+            'title' => 'Yesterday only',
+            'description' => 'Revision',
+        ]);
+
+        $approved = $service->submit($data['physicsTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['physics']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Already approved',
+            'description' => 'Waves',
+        ]);
+        $service->approve($data['admin'], $approved->id);
+
+        $today = $service->pendingReviewForDate(now()->toDateString());
+
+        $this->assertSame(2, $today['total']);
+        $this->assertCount(1, $today['groups']);
+        $this->assertSame('Class 11 JEE', $today['groups'][0]['course_name']);
+        $this->assertSame(['A', 'B'], array_column($today['groups'][0]['sections'], 'section'));
+        $this->assertSame($data['mathTeacher']->name, $today['groups'][0]['sections'][0]['items'][0]['teacher']);
+        $this->assertSame($data['physicsTeacher']->name, $today['groups'][0]['sections'][1]['items'][0]['teacher']);
+
+        $yesterday = $service->pendingReviewForDate(now()->subDay()->toDateString());
+
+        $this->assertSame(1, $yesterday['total']);
+        $this->assertSame($yesterdayHomework->id, $yesterday['groups'][0]['sections'][0]['items'][0]['assignment_id']);
+        $this->assertSame('Yesterday only', $yesterday['groups'][0]['sections'][0]['items'][0]['title']);
+    }
+
+    public function test_review_page_shows_pending_without_picking_a_class_first(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+
+        $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra practice',
+            'description' => 'Ex 5.2',
+        ]);
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->assertSuccessful()
+            ->assertSee('Pending homework')
+            ->assertSee($data['mathTeacher']->name)
+            ->assertSee('Section A')
+            ->assertSee('Algebra practice')
+            ->assertDontSee('No homework for today')
+            ->call('openClass', $data['batch']->id)
+            ->assertSet('data.batch_id', $data['batch']->id)
+            ->assertSee('Submitted: 1');
+    }
+
+    public function test_review_page_shows_empty_today_and_loads_past_date_pending(): void
+    {
+        $data = $this->seedClass();
+        $yesterday = now()->subDay()->toDateString();
+
+        app(HomeworkSubmissionService::class)->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => $yesterday,
+            'title' => 'Past algebra',
+            'description' => 'Revision worksheet',
+        ]);
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->assertSuccessful()
+            ->assertSee('No homework for today')
+            ->assertDontSee('Past algebra')
+            ->set('data.homework_date', $yesterday)
+            ->assertSee($data['mathTeacher']->name)
+            ->assertSee('Past algebra')
+            ->assertDontSee('No homework for today');
+    }
+
     public function test_combined_send_only_covers_approved_subjects(): void
     {
         $sequence = 0;
@@ -332,10 +459,10 @@ class HomeworkSubmissionServiceTest extends TestCase
         $admin->assignRole(RoleName::SuperAdmin->value);
 
         $mathTeacher = User::factory()->create(['is_active' => true]);
-        $mathTeacher->assignRole(RoleName::Staff->value);
+        $mathTeacher->assignRole(StaffJobRole::Teacher->value);
 
         $physicsTeacher = User::factory()->create(['is_active' => true]);
-        $physicsTeacher->assignRole(RoleName::Staff->value);
+        $physicsTeacher->assignRole(StaffJobRole::Teacher->value);
 
         $session = AcademicSession::query()->create([
             'name' => '2026–27',

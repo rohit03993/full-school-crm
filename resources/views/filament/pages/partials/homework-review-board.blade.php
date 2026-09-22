@@ -1,7 +1,7 @@
 <div class="mt-4 space-y-4">
     @if (! $ready)
         <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400">
-            Pick a <strong>class</strong> and <strong>date</strong> to see what each subject teacher has submitted.
+            Tap <strong>Open class</strong> on a pending row, or pick a class below, to approve subjects and send to parents.
         </div>
     @else
         @php($summary = $board['summary'])

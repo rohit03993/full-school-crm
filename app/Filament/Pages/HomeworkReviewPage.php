@@ -64,7 +64,7 @@ class HomeworkReviewPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Review each subject for the class/date. Approve what teachers submitted (or add a subject yourself), then send ONE combined WhatsApp to parents — only subjects with homework are included. The staff who add and send are stored on the homework record.';
+        return 'Pending homework for the selected date is listed first (teacher + class/section). Open a class to approve subjects and send ONE combined WhatsApp to parents — only subjects with homework are included.';
     }
 
     public function mount(): void
@@ -89,29 +89,49 @@ class HomeworkReviewPage extends Page
         $service = app(HomeworkSubmissionService::class);
 
         return $schema->components([
-            Section::make('Class & date')
+            Section::make('Date')
+                ->description('Today is selected. Pick a past date to see that day’s pending homework.')
                 ->schema([
-                    Select::make('batch_id')
-                        ->label('Class')
-                        ->options(fn (): array => $service->allBatchOptions())
-                        ->searchable()
-                        ->required()
-                        ->native(false)
-                        ->live()
-                        ->afterStateUpdated(function (): void {
-                            $this->data['course_subject_id'] = null;
-                            $this->lastCombinedSendResult = null;
-                        }),
                     DatePicker::make('homework_date')
-                        ->label('Date')
+                        ->label('Homework date')
                         ->native(false)
                         ->required()
                         ->maxDate(now())
                         ->live()
                         ->afterStateUpdated(function (): void {
                             $this->lastCombinedSendResult = null;
+                        }),
+                ])
+                ->columns(2),
+            Section::make('Pending homework')
+                ->description('Teacher submissions waiting for your approval. Grouped by class and section.')
+                ->schema([
+                    View::make('filament.pages.partials.homework-review-pending')
+                        ->viewData(function (): array {
+                            $date = $this->dateString();
+
+                            return [
+                                'pending' => app(HomeworkSubmissionService::class)->pendingReviewForDate($date),
+                                'selectedBatchId' => (int) ($this->data['batch_id'] ?? 0),
+                                'dateLabel' => Carbon::parse($date)->format('d M Y'),
+                                'isToday' => $date === now()->toDateString(),
+                            ];
                         })
-                        ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
+                        ->columnSpanFull(),
+                ]),
+            Section::make('Open a class')
+                ->description('Use this if you want to add a subject yourself, or after you tap Open class on a pending row above.')
+                ->schema([
+                    Select::make('batch_id')
+                        ->label('Class')
+                        ->options(fn (): array => $service->allBatchOptions())
+                        ->searchable()
+                        ->native(false)
+                        ->live()
+                        ->afterStateUpdated(function (): void {
+                            $this->data['course_subject_id'] = null;
+                            $this->lastCombinedSendResult = null;
+                        }),
                 ])
                 ->columns(2),
             Section::make('Add / edit a subject')
@@ -190,20 +210,36 @@ class HomeworkReviewPage extends Page
                 ->viewData(function (): array {
                     $user = Auth::user();
                     $batchId = (int) ($this->data['batch_id'] ?? 0);
-                    $ready = $user && $batchId > 0 && filled($this->data['homework_date'] ?? null);
+                    $date = $this->dateString();
+                    $ready = $user && $batchId > 0 && filled($date);
+                    $service = app(HomeworkSubmissionService::class);
 
                     $board = $ready
-                        ? app(HomeworkSubmissionService::class)->boardForClassDate($user, $batchId, $this->dateString())
+                        ? $service->boardForClassDate($user, $batchId, $date)
                         : ['subjects' => [], 'summary' => ['total' => 0, 'submitted' => 0, 'approved' => 0, 'sent' => 0, 'missing' => 0]];
 
                     return [
                         'ready' => (bool) $ready,
                         'board' => $board,
-                        'dateLabel' => Carbon::parse($this->dateString())->format('d M Y'),
+                        'dateLabel' => Carbon::parse($date)->format('d M Y'),
                         'lastCombinedSendResult' => $this->lastCombinedSendResult,
                     ];
                 }),
         ]);
+    }
+
+    public function openClass(int $batchId): void
+    {
+        if ($batchId < 1) {
+            return;
+        }
+
+        $this->form->fill([
+            ...($this->data ?? []),
+            'batch_id' => $batchId,
+            'course_subject_id' => null,
+        ]);
+        $this->lastCombinedSendResult = null;
     }
 
     public function saveAdmin(): void

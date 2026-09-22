@@ -25,7 +25,7 @@
                         <span class="inline-flex rounded-full bg-primary-600 px-2.5 py-1 text-xs font-bold text-white">Start here</span>
                         <h3 class="mt-3 text-base font-bold text-gray-950 dark:text-white">Review &amp; send</h3>
                         <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                            See every subject for a class and date, approve submissions, then send one combined WhatsApp.
+                            See pending homework by teacher and class for today (or a past date), approve, then send one combined WhatsApp.
                         </p>
                     </div>
                     <span class="text-xl text-primary-600 transition group-hover:translate-x-1 dark:text-primary-400">→</span>
