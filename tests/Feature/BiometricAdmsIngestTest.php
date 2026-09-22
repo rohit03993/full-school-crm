@@ -124,4 +124,21 @@ class BiometricAdmsIngestTest extends TestCase
         // Within sync interval → no repeat command.
         $this->get('/iclock/getrequest?SN=K40TEST001')->assertOk()->assertSee('OK', false);
     }
+
+    public function test_essl_push_aspx_handshake_matches_cdata(): void
+    {
+        BiometricDevice::query()->create([
+            'name' => 'Horizon X2008',
+            'serial_number' => 'BJ2C230860354',
+            'is_active' => true,
+        ]);
+
+        $response = $this->get(
+            '/iclock/cdata.aspx?SN=BJ2C230860354&options=all&language=69&pushver=2.4.1&DeviceType=att'
+        );
+
+        $response->assertOk();
+        $response->assertSee('GET OPTION FROM: BJ2C230860354', false);
+        $response->assertSee('TimeZone=330', false);
+    }
 }

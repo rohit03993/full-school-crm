@@ -6,6 +6,7 @@
 |-------|-----|-----|------|
 | **1** | [**server-checklist.md**](server-checklist.md) | IT / DevOps | Commands, `.env`, Web Push VAPID, cron, queue, smoke test |
 | **2** | [**customize-for-school.md**](customize-for-school.md) | Super Admin / institute | Setup wizard, branding, terminology, WhatsApp, modules |
+| **3** | [**biometric-adms.md**](biometric-adms.md) | IT / on-site | ZKTeco Pro + eSSL ADMS, Never seen, CloudPanel HTTP `/iclock` |
 
 Also useful (outside this folder):
 

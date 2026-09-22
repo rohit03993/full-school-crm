@@ -34,6 +34,7 @@ CloudPanel/nginx requires `public/vendor/livewire/` (run `php artisan crm:publis
 Share **`docs/install/`** with each school — start at [`docs/install/README.md`](docs/install/README.md).  
 - Server: [`docs/install/server-checklist.md`](docs/install/server-checklist.md)  
 - Customize: [`docs/install/customize-for-school.md`](docs/install/customize-for-school.md)  
+- Biometric ADMS (ZKTeco Pro + eSSL, Never seen, CloudPanel `/iclock`): [`docs/install/biometric-adms.md`](docs/install/biometric-adms.md)  
 In admin: **Setup → Setup Guide**.
 
 ## Module packaging

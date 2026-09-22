@@ -199,6 +199,8 @@ GOOGLE_DRIVE_CLIENT_SECRET=
 
 ### 2.7 Attendance + biometric (typical school)
 
+Machine setup, Never seen, curl tests, and CloudPanel HTTP `/iclock` (ZKTeco Pro + eSSL): **[biometric-adms.md](biometric-adms.md)**.
+
 ```env
 ATTENDANCE_AUTO_OUT_ENABLED=true
 ATTENDANCE_AUTO_OUT_TIME=20:00
