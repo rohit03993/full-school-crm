@@ -5,11 +5,13 @@ namespace App\Filament\Pages;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
+use App\Filament\Resources\HomeworkAssignments\HomeworkAssignmentResource;
 use App\Services\HomeworkSubmissionService;
 use App\Services\HomeworkWhatsAppService;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Carbon\Carbon;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -17,6 +19,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
@@ -45,7 +48,7 @@ class HomeworkReviewPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentList;
 
-    protected static ?string $title = 'Homework Review';
+    protected static ?string $title = 'Homework';
 
     protected static ?int $navigationSort = 47;
 
@@ -64,7 +67,7 @@ class HomeworkReviewPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Pending homework for the selected date is listed first (teacher + class/section). Open a class to approve subjects and send ONE combined WhatsApp to parents — only subjects with homework are included.';
+        return 'Today’s desk by class and section. Approve what teachers sent, add a subject yourself if needed, then send ONE combined WhatsApp — only subjects with homework are included.';
     }
 
     public function mount(): void
@@ -90,7 +93,7 @@ class HomeworkReviewPage extends Page
 
         return $schema->components([
             Section::make('Date')
-                ->description('Today is selected. Pick a past date to see that day’s pending homework.')
+                ->description('Today is selected. Pick a past date to review that day.')
                 ->schema([
                     DatePicker::make('homework_date')
                         ->label('Homework date')
@@ -104,23 +107,27 @@ class HomeworkReviewPage extends Page
                 ])
                 ->columns(2),
             Section::make('Pending homework')
-                ->description('Teacher submissions waiting for your approval. Grouped by class and section.')
+                ->description('Waiting first, then ready to send, then already sent, then classes with no homework yet.')
                 ->schema([
                     View::make('filament.pages.partials.homework-review-pending')
                         ->viewData(function (): array {
                             $date = $this->dateString();
 
                             return [
-                                'pending' => app(HomeworkSubmissionService::class)->pendingReviewForDate($date),
+                                'desk' => app(HomeworkSubmissionService::class)->deskForDate($date),
                                 'selectedBatchId' => (int) ($this->data['batch_id'] ?? 0),
                                 'dateLabel' => Carbon::parse($date)->format('d M Y'),
                                 'isToday' => $date === now()->toDateString(),
+                                'submitUrl' => SubmitHomeworkPage::getUrl(),
+                                'checkUrl' => HomeworkCheckPage::getUrl(),
+                                'historyUrl' => HomeworkAssignmentResource::getUrl('index'),
                             ];
                         })
                         ->columnSpanFull(),
                 ]),
             Section::make('Open a class')
-                ->description('Use this if you want to add a subject yourself, or after you tap Open class on a pending row above.')
+                ->description('Tap Add subject on a row above, or pick a class here, to add homework from your login (saved as approved) and see every subject.')
+                ->collapsed()
                 ->schema([
                     Select::make('batch_id')
                         ->label('Class')
@@ -135,8 +142,7 @@ class HomeworkReviewPage extends Page
                 ])
                 ->columns(2),
             Section::make('Add / edit a subject')
-                ->description('Use this if a teacher is absent — you can create or replace any subject\'s homework. Saved here it is approved immediately and ready to send.')
-                ->collapsed()
+                ->description('Use this if a teacher is absent — save from your login is approved immediately and ready to send.')
                 ->schema([
                     Select::make('course_subject_id')
                         ->label('Subject')
@@ -167,6 +173,12 @@ class HomeworkReviewPage extends Page
                         ])
                         ->maxSize(10240)
                         ->columnSpanFull(),
+                    Actions::make([
+                        Action::make('saveAdminHomework')
+                            ->label('Save & approve')
+                            ->color('primary')
+                            ->action('saveAdmin'),
+                    ])->columnSpanFull(),
                 ])
                 ->columns(2)
                 ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
@@ -240,6 +252,48 @@ class HomeworkReviewPage extends Page
             'course_subject_id' => null,
         ]);
         $this->lastCombinedSendResult = null;
+    }
+
+    public function approvePending(int $batchId): void
+    {
+        $user = Auth::user();
+
+        if (! $user || $batchId < 1) {
+            return;
+        }
+
+        try {
+            $count = app(HomeworkSubmissionService::class)->approvePendingForClassDate($user, $batchId, $this->dateString());
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first() ?? 'Could not approve.';
+            Notification::make()->title((string) $message)->warning()->send();
+
+            return;
+        }
+
+        $this->openClass($batchId);
+
+        if ($count < 1) {
+            Notification::make()->title('Nothing waiting to approve')->warning()->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('Approved')
+            ->body($count.' subject(s) approved and ready to send.')
+            ->success()
+            ->send();
+    }
+
+    public function sendCombinedForBatch(int $batchId): void
+    {
+        if ($batchId < 1) {
+            return;
+        }
+
+        $this->openClass($batchId);
+        $this->sendCombined();
     }
 
     public function saveAdmin(): void

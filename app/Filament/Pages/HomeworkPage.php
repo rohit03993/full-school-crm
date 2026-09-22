@@ -53,6 +53,13 @@ class HomeworkPage extends Page
         return 'One place for the complete daily homework workflow.';
     }
 
+    public function mount(): void
+    {
+        if (HomeworkReviewPage::canAccess()) {
+            $this->redirect(HomeworkReviewPage::getUrl(), navigate: true);
+        }
+    }
+
     public function content(Schema $schema): Schema
     {
         $user = Auth::user();

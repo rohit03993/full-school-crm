@@ -127,7 +127,7 @@ class CrmBackLink
         BackupsPage::class => SetupHubPage::class,
 
         SubmitHomeworkPage::class => HomeworkPage::class,
-        HomeworkReviewPage::class => HomeworkPage::class,
+        HomeworkReviewPage::class => Dashboard::class,
         HomeworkCheckPage::class => HomeworkPage::class,
 
         AddClassSectionPage::class => ClassSectionsPage::class,

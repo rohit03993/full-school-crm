@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\BatchStatus;
 use App\Enums\HomeworkAssignmentStatus;
 use App\Enums\HomeworkContentType;
 use App\Enums\LicenseFeature;
@@ -270,6 +271,24 @@ class HomeworkSubmissionService
         return $assignment->fresh(['batch', 'courseSubject']);
     }
 
+    public function approvePendingForClassDate(User $admin, int $batchId, string $date): int
+    {
+        $date = $this->normalizeDate($date);
+
+        $ids = HomeworkAssignment::query()
+            ->where('batch_id', $batchId)
+            ->whereDate('homework_date', $date)
+            ->where('status', HomeworkAssignmentStatus::Submitted)
+            ->orderBy('id')
+            ->pluck('id');
+
+        foreach ($ids as $id) {
+            $this->approve($admin, (int) $id);
+        }
+
+        return $ids->count();
+    }
+
     public function deleteSubmission(User $user, int $assignmentId, bool $asAdmin = false): void
     {
         $assignment = HomeworkAssignment::query()->findOrFail($assignmentId);
@@ -394,6 +413,160 @@ class HomeworkSubmissionService
         return [
             'date' => $date,
             'total' => $total,
+            'groups' => $groups,
+        ];
+    }
+
+    /**
+     * Full coordinator desk for one date: every active class/section, with that day's homework.
+     *
+     * @return array{
+     *     date: string,
+     *     counts: array{waiting: int, ready: int, sent: int, empty: int},
+     *     groups: list<array{
+     *         course_name: string,
+     *         sections: list<array{
+     *             batch_id: int,
+     *             section: string,
+     *             class_label: string,
+     *             priority: int,
+     *             submitted: int,
+     *             approved: int,
+     *             sent: int,
+     *             items: list<array{
+     *                 assignment_id: int,
+     *                 teacher: string,
+     *                 subject: string,
+     *                 title: string,
+     *                 status: string,
+     *                 status_key: string,
+     *                 submitted_at: ?string
+     *             }>
+     *         }>
+     *     }>
+     * }
+     */
+    public function deskForDate(string $date): array
+    {
+        $date = $this->normalizeDate($date);
+
+        $batches = Batch::query()
+            ->where('status', BatchStatus::Active)
+            ->with(['course'])
+            ->orderBy('name')
+            ->get();
+
+        $assignmentsByBatch = HomeworkAssignment::query()
+            ->whereDate('homework_date', $date)
+            ->whereNotNull('course_subject_id')
+            ->with(['courseSubject', 'submittedBy', 'createdBy', 'combinedSentBy'])
+            ->orderBy('id')
+            ->get()
+            ->groupBy('batch_id');
+
+        $grouped = [];
+        $counts = [
+            'waiting' => 0,
+            'ready' => 0,
+            'sent' => 0,
+            'empty' => 0,
+        ];
+
+        foreach ($batches as $batch) {
+            $courseName = filled($batch->course?->name)
+                ? (string) $batch->course->name
+                : (string) $batch->name;
+            $section = filled($batch->section) ? (string) $batch->section : '—';
+            $batchId = (int) $batch->id;
+
+            /** @var Collection<int, HomeworkAssignment> $batchAssignments */
+            $batchAssignments = $assignmentsByBatch->get($batchId, collect());
+
+            $items = [];
+            $submitted = 0;
+            $approved = 0;
+            $sent = 0;
+
+            foreach ($batchAssignments as $assignment) {
+                $status = $assignment->status ?? HomeworkAssignmentStatus::Submitted;
+
+                match ($status) {
+                    HomeworkAssignmentStatus::Submitted => $submitted++,
+                    HomeworkAssignmentStatus::Approved => $approved++,
+                    HomeworkAssignmentStatus::Sent => $sent++,
+                    default => null,
+                };
+
+                $items[] = [
+                    'assignment_id' => (int) $assignment->id,
+                    'teacher' => $assignment->submittedBy?->name ?? $assignment->createdBy?->name ?? '—',
+                    'subject' => $assignment->courseSubject?->displayLabel() ?? '—',
+                    'title' => (string) ($assignment->title ?? ''),
+                    'status' => $status->label(),
+                    'status_key' => $status->value,
+                    'submitted_at' => $assignment->submitted_at?->timezone((string) config('app.timezone'))->format('h:i A'),
+                ];
+            }
+
+            usort($items, function (array $left, array $right): int {
+                return strnatcasecmp($left['subject'], $right['subject']);
+            });
+
+            if ($submitted > 0) {
+                $priority = 1;
+                $counts['waiting'] += $submitted;
+            } elseif ($approved > 0) {
+                $priority = 2;
+                $counts['ready'] += $approved;
+            } elseif ($sent > 0) {
+                $priority = 3;
+                $counts['sent'] += $sent;
+            } else {
+                $priority = 4;
+                $counts['empty']++;
+            }
+
+            $grouped[$courseName] ??= [
+                'course_name' => $courseName,
+                'sections' => [],
+            ];
+
+            $grouped[$courseName]['sections'][] = [
+                'batch_id' => $batchId,
+                'section' => $section,
+                'class_label' => $batch->displayLabel(),
+                'priority' => $priority,
+                'submitted' => $submitted,
+                'approved' => $approved,
+                'sent' => $sent,
+                'items' => $items,
+            ];
+        }
+
+        ksort($grouped, SORT_NATURAL | SORT_FLAG_CASE);
+
+        $groups = [];
+
+        foreach ($grouped as $course) {
+            $sections = $course['sections'];
+
+            usort($sections, function (array $left, array $right): int {
+                if ($left['priority'] !== $right['priority']) {
+                    return $left['priority'] <=> $right['priority'];
+                }
+
+                return strnatcasecmp($left['section'], $right['section']);
+            });
+
+            $groups[] = [
+                'course_name' => $course['course_name'],
+                'sections' => $sections,
+            ];
+        }
+
+        return [
+            'date' => $date,
+            'counts' => $counts,
             'groups' => $groups,
         ];
     }

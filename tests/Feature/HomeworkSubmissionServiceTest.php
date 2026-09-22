@@ -345,6 +345,115 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertDontSee('No homework for today');
     }
 
+    public function test_desk_lists_every_active_section_including_empty(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+
+        Batch::query()->create([
+            'name' => 'Class 11 JEE - B',
+            'section' => 'B',
+            'course_id' => $data['batch']->course_id,
+            'academic_session_id' => $data['batch']->academic_session_id,
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'status' => BatchStatus::Active,
+        ]);
+
+        $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra today',
+            'description' => 'Ex 5.2',
+        ]);
+
+        $desk = $service->deskForDate(now()->toDateString());
+
+        $this->assertSame(1, $desk['counts']['waiting']);
+        $this->assertSame(0, $desk['counts']['ready']);
+        $this->assertSame(1, $desk['counts']['empty']);
+        $this->assertSame('Class 11 JEE', $desk['groups'][0]['course_name']);
+        $this->assertSame(['A', 'B'], array_column($desk['groups'][0]['sections'], 'section'));
+        $this->assertSame(1, $desk['groups'][0]['sections'][0]['priority']);
+        $this->assertSame(4, $desk['groups'][0]['sections'][1]['priority']);
+        $this->assertSame($data['mathTeacher']->name, $desk['groups'][0]['sections'][0]['items'][0]['teacher']);
+        $this->assertSame([], $desk['groups'][0]['sections'][1]['items']);
+    }
+
+    public function test_homework_menu_sends_admin_to_the_desk(): void
+    {
+        $data = $this->seedClass();
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkPage::class)
+            ->assertRedirect(HomeworkReviewPage::getUrl());
+    }
+
+    public function test_homework_menu_keeps_teacher_on_the_hub(): void
+    {
+        $data = $this->seedClass();
+        $this->actingAs($data['mathTeacher']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkPage::class)
+            ->assertSuccessful()
+            ->assertSee('Submit homework')
+            ->assertDontSee('Review & send');
+    }
+
+    public function test_coordinator_approves_adds_and_sends_from_the_desk(): void
+    {
+        $sequence = 0;
+
+        Http::fake([
+            'https://graph.facebook.com/*' => function () use (&$sequence) {
+                $sequence++;
+
+                return Http::response([
+                    'messages' => [['id' => 'wamid.DESK'.$sequence]],
+                ], 200);
+            },
+        ]);
+
+        $data = $this->seedClass();
+        $this->seedCombinedTemplate();
+        $service = app(HomeworkSubmissionService::class);
+
+        $maths = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Ex 5.2',
+        ]);
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('approvePending', $data['batch']->id)
+            ->assertSet('data.batch_id', $data['batch']->id)
+            ->set('data.course_subject_id', $data['physics']->id)
+            ->set('data.description', 'Chapter 3 numericals')
+            ->call('saveAdmin')
+            ->call('sendCombinedForBatch', $data['batch']->id);
+
+        $maths->refresh();
+        $physics = HomeworkAssignment::query()
+            ->where('course_subject_id', $data['physics']->id)
+            ->first();
+
+        $this->assertSame(HomeworkAssignmentStatus::Sent, $maths->status);
+        $this->assertSame($data['admin']->id, $maths->approved_by_user_id);
+        $this->assertSame($data['admin']->id, $maths->combined_sent_by_user_id);
+        $this->assertNotNull($physics);
+        $this->assertSame(HomeworkAssignmentStatus::Sent, $physics->status);
+        $this->assertSame($data['admin']->id, $physics->created_by_user_id);
+        $this->assertSame($data['admin']->id, $physics->combined_sent_by_user_id);
+    }
+
     public function test_combined_send_only_covers_approved_subjects(): void
     {
         $sequence = 0;
