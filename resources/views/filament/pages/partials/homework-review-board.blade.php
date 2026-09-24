@@ -16,7 +16,7 @@
                 @disabled($summary['approved'] === 0 && $summary['sent'] === 0)
                 class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-                <span wire:loading.remove wire:target="sendCombined">Send combined to parents</span>
+                <span wire:loading.remove wire:target="sendCombined">{{ ($summary['approved'] ?? 0) > 0 ? 'Send combined to parents' : 'Resend' }}</span>
                 <span wire:loading wire:target="sendCombined">Sending… do not click again</span>
             </button>
         </div>

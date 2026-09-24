@@ -527,6 +527,13 @@ class HomeworkSubmissionService
             }
 
             usort($items, function (array $left, array $right): int {
+                $leftHasHomework = filled($left['status_key']);
+                $rightHasHomework = filled($right['status_key']);
+
+                if ($leftHasHomework !== $rightHasHomework) {
+                    return $rightHasHomework <=> $leftHasHomework;
+                }
+
                 return strnatcasecmp($left['subject'], $right['subject']);
             });
 

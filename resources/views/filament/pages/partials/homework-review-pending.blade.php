@@ -59,6 +59,12 @@
                             @php
                                 $batchId = (int) $section['batch_id'];
                                 $isOpen = $openBatchId === $batchId;
+                                $hasWaiting = (int) $section['submitted'] > 0;
+                                $hasReady = (int) $section['approved'] > 0;
+                                $hasSent = (int) $section['sent'] > 0;
+                                $sectionTitle = filled($section['section']) && $section['section'] !== '—'
+                                    ? (string) $section['section']
+                                    : (string) $section['class_label'];
                             @endphp
                             <div @class([
                                 'px-4 py-3',
@@ -68,34 +74,33 @@
                                     <button
                                         type="button"
                                         wire:click="toggleDeskSection({{ $batchId }})"
-                                        class="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left hover:bg-gray-50 dark:hover:bg-white/5"
+                                        class="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-0.5 text-left hover:bg-gray-50 dark:hover:bg-white/5"
                                     >
                                         <svg @class([
                                             'h-4 w-4 shrink-0 text-gray-400 transition-transform',
                                             'rotate-90' => $isOpen,
                                         ]) viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                            <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.17 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd" />
+                                            <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.17 10 7.23 6.29a.75.75 0 0 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd" />
                                         </svg>
                                         <span class="min-w-0">
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                                {{ $section['class_label'] }}
+                                                {{ $sectionTitle }}
                                             </span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">
-                                                Section {{ $section['section'] }}
-                                                @if ((int) $section['submitted'] > 0)
-                                                    · {{ (int) $section['submitted'] }} waiting
-                                                @elseif ((int) $section['approved'] > 0)
-                                                    · {{ (int) $section['approved'] }} ready to send
-                                                @elseif ((int) $section['sent'] > 0)
-                                                    · sent
+                                                @if ($hasWaiting)
+                                                    {{ (int) $section['submitted'] }} waiting
+                                                @elseif ($hasReady)
+                                                    Ready to send
+                                                @elseif ($hasSent)
+                                                    Sent
                                                 @else
-                                                    · no homework yet
+                                                    No homework yet
                                                 @endif
                                             </span>
                                         </span>
                                     </button>
                                     <div class="flex min-w-0 flex-wrap gap-2">
-                                        @if ((int) $section['submitted'] > 0)
+                                        @if ($hasWaiting)
                                             <button
                                                 type="button"
                                                 wire:click="approvePending({{ $batchId }})"
@@ -104,7 +109,7 @@
                                                 Approve pending
                                             </button>
                                         @endif
-                                        @if ((int) $section['approved'] > 0 || (int) $section['sent'] > 0)
+                                        @if ($hasReady)
                                             <button
                                                 type="button"
                                                 wire:click="sendCombinedForBatch({{ $batchId }})"
@@ -114,6 +119,16 @@
                                             >
                                                 Send to parents
                                             </button>
+                                        @elseif ($hasSent)
+                                            <button
+                                                type="button"
+                                                wire:click="sendCombinedForBatch({{ $batchId }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="sendCombinedForBatch({{ $batchId }})"
+                                                class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/15 dark:bg-transparent dark:text-gray-200 dark:hover:bg-white/5 disabled:opacity-50"
+                                            >
+                                                Resend
+                                            </button>
                                         @endif
                                     </div>
                                 </div>
@@ -122,22 +137,20 @@
                                     @if (($section['items'] ?? []) === [])
                                         <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">No subjects on this class yet.</p>
                                     @else
-                                        <ul class="mt-3 divide-y divide-gray-100 rounded-xl border border-gray-100 dark:divide-white/5 dark:border-white/10">
+                                        <ul class="mt-3 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white dark:divide-white/5 dark:border-white/10 dark:bg-gray-900/40">
                                             @foreach ($section['items'] as $item)
-                                                <li class="flex min-w-0 items-start justify-between gap-3 px-3 py-2.5">
-                                                    <div class="min-w-0">
-                                                        <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $item['subject'] }}</p>
-                                                        @if (filled($item['teacher']))
-                                                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ $item['teacher'] }}</p>
-                                                        @endif
-                                                        @if (filled($item['title']))
-                                                            <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-300">{{ $item['title'] }}</p>
-                                                        @else
-                                                            <p class="mt-0.5 text-xs text-gray-400">No homework</p>
-                                                        @endif
-                                                    </div>
-                                                    <div class="shrink-0 text-right">
-                                                        @if ($item['status_key'])
+                                                @if (filled($item['status_key']))
+                                                    <li class="flex min-w-0 items-start justify-between gap-3 px-3 py-2.5">
+                                                        <div class="min-w-0">
+                                                            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $item['subject'] }}</p>
+                                                            @if (filled($item['teacher']))
+                                                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ $item['teacher'] }}</p>
+                                                            @endif
+                                                            @if (filled($item['title']))
+                                                                <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-300">{{ $item['title'] }}</p>
+                                                            @endif
+                                                        </div>
+                                                        <div class="shrink-0 text-right">
                                                             <span @class([
                                                                 'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
                                                                 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200' => $item['status_key'] === 'submitted',
@@ -154,12 +167,17 @@
                                                                     {{ $item['status'] }}
                                                                 @endif
                                                             </span>
-                                                        @endif
-                                                        @if ($item['submitted_at'])
-                                                            <p class="mt-1 text-xs text-gray-400">{{ $item['submitted_at'] }}</p>
-                                                        @endif
-                                                    </div>
-                                                </li>
+                                                            @if ($item['submitted_at'])
+                                                                <p class="mt-1 text-xs text-gray-400">{{ $item['submitted_at'] }}</p>
+                                                            @endif
+                                                        </div>
+                                                    </li>
+                                                @else
+                                                    <li class="flex min-w-0 items-baseline justify-between gap-3 px-3 py-1.5 text-xs text-gray-400">
+                                                        <span>{{ $item['subject'] }}@if (filled($item['teacher'])) · {{ $item['teacher'] }}@endif</span>
+                                                        <span>No homework</span>
+                                                    </li>
+                                                @endif
                                             @endforeach
                                         </ul>
                                     @endif

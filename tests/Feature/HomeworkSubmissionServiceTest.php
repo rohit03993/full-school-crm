@@ -312,7 +312,7 @@ class HomeworkSubmissionServiceTest extends TestCase
         Livewire::test(HomeworkReviewPage::class)
             ->assertSuccessful()
             ->assertSee('Pending homework')
-            ->assertSee('Section A')
+            ->assertSee('Class 11 JEE')
             ->assertSee('Approve pending')
             ->assertDontSee('Algebra practice')
             ->assertDontSee('Add subject')
@@ -628,7 +628,10 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertDontSee('Add subject')
             ->call('approvePending', $data['batch']->id)
             ->assertSet('data.batch_id', $data['batch']->id)
-            ->call('sendCombinedForBatch', $data['batch']->id);
+            ->assertSee('Send to parents')
+            ->assertDontSee('Resend')
+            ->call('sendCombinedForBatch', $data['batch']->id)
+            ->assertSee('Resend');
 
         $maths->refresh();
 
