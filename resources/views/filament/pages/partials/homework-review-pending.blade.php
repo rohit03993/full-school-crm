@@ -152,7 +152,7 @@
                                                         'border-gray-200 dark:border-white/10' => ! in_array($item['status_key'], ['submitted', 'approved', 'sent'], true),
                                                     ])>
                                                         <div class="flex min-w-0 items-start justify-between gap-3">
-                                                            <div class="min-w-0">
+                                                            <div class="flex min-w-0 flex-wrap items-center gap-2">
                                                                 @if (filled($item['public_url']))
                                                                     <a
                                                                         href="{{ $item['public_url'] }}"
@@ -166,9 +166,7 @@
                                                                     <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $item['subject'] }}</p>
                                                                 @endif
                                                                 @if (filled($item['teacher']))
-                                                                    <p class="mt-1">
-                                                                        <span class="inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">{{ $item['teacher'] }}</span>
-                                                                    </p>
+                                                                    <span class="inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">{{ $item['teacher'] }}</span>
                                                                 @endif
                                                             </div>
                                                             <div class="shrink-0 text-right">
