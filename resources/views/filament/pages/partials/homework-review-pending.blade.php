@@ -165,9 +165,7 @@
                                                                 @else
                                                                     <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $item['subject'] }}</p>
                                                                 @endif
-                                                                @if (filled($item['submitted_by']))
-                                                                    <span class="inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">{{ $item['submitted_by'] }}</span>
-                                                                @elseif (filled($item['teacher']))
+                                                                @if (filled($item['teacher']))
                                                                     <span class="inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">{{ $item['teacher'] }}</span>
                                                                 @endif
                                                             </div>
@@ -202,6 +200,9 @@
                                                         @endif
                                                         @if ($item['has_file'])
                                                             <p class="mt-1 text-xs font-medium text-gray-500 dark:text-gray-400">File attached</p>
+                                                        @endif
+                                                        @if (filled($item['submitted_by']) && $item['submitted_by'] !== $item['teacher'])
+                                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Added by {{ $item['submitted_by'] }}</p>
                                                         @endif
 
                                                         <div class="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">

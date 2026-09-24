@@ -213,7 +213,8 @@ class HomeworkSubmissionServiceTest extends TestCase
 
         Livewire::test(HomeworkReviewPage::class)
             ->call('toggleDeskSection', $data['batch']->id)
-            ->assertSee('Khushi Coordinator');
+            ->assertSee($data['physicsTeacher']->name)
+            ->assertSee('Added by Khushi Coordinator');
     }
 
     public function test_board_lists_every_subject_with_status(): void
@@ -343,6 +344,7 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('Physics')
             ->assertSee('No homework')
             ->assertSee('Remove')
+            ->assertDontSee('Added by')
             ->call('openClass', $data['batch']->id)
             ->assertSet('data.batch_id', $data['batch']->id)
             ->assertSee('Submitted: 1');
