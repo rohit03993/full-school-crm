@@ -57,6 +57,12 @@ class HomeworkPage extends Page
     {
         if (HomeworkReviewPage::canAccess()) {
             $this->redirect(HomeworkReviewPage::getUrl(), navigate: true);
+
+            return;
+        }
+
+        if (SubmitHomeworkPage::canAccess()) {
+            $this->redirect(SubmitHomeworkPage::getUrl(), navigate: true);
         }
     }
 

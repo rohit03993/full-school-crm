@@ -126,7 +126,7 @@ class CrmBackLink
         ManageAttendanceDisplayPage::class => SetupHubPage::class,
         BackupsPage::class => SetupHubPage::class,
 
-        SubmitHomeworkPage::class => HomeworkPage::class,
+        SubmitHomeworkPage::class => Dashboard::class,
         HomeworkReviewPage::class => Dashboard::class,
         HomeworkCheckPage::class => HomeworkPage::class,
 

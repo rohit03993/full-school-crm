@@ -391,16 +391,71 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertRedirect(HomeworkReviewPage::getUrl());
     }
 
-    public function test_homework_menu_keeps_teacher_on_the_hub(): void
+    public function test_homework_menu_sends_teacher_to_their_desk(): void
     {
         $data = $this->seedClass();
         $this->actingAs($data['mathTeacher']);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
         Livewire::test(HomeworkPage::class)
+            ->assertRedirect(SubmitHomeworkPage::getUrl());
+    }
+
+    public function test_teacher_desk_lists_only_assigned_subjects(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+
+        $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra today',
+            'description' => 'Ex 5.2',
+        ]);
+
+        $desk = $service->teacherDeskForDate($data['mathTeacher'], now()->toDateString());
+
+        $this->assertSame(0, $desk['counts']['missing']);
+        $this->assertSame(1, $desk['counts']['submitted']);
+        $this->assertCount(1, $desk['groups'][0]['sections'][0]['subjects']);
+        $this->assertSame($data['maths']->id, $desk['groups'][0]['sections'][0]['subjects'][0]['course_subject_id']);
+        $this->assertSame('submitted', $desk['groups'][0]['sections'][0]['subjects'][0]['status_key']);
+
+        $physicsDesk = $service->teacherDeskForDate($data['physicsTeacher'], now()->toDateString());
+
+        $this->assertSame(1, $physicsDesk['counts']['missing']);
+        $this->assertSame(0, $physicsDesk['counts']['submitted']);
+        $this->assertSame($data['physics']->id, $physicsDesk['groups'][0]['sections'][0]['subjects'][0]['course_subject_id']);
+        $this->assertNull($physicsDesk['groups'][0]['sections'][0]['subjects'][0]['assignment_id']);
+    }
+
+    public function test_teacher_desk_page_shows_assigned_class_without_picking_first(): void
+    {
+        $data = $this->seedClass();
+        $this->actingAs($data['mathTeacher']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(SubmitHomeworkPage::class)
             ->assertSuccessful()
-            ->assertSee('Submit homework')
-            ->assertDontSee('Review & send');
+            ->assertSee('Section A')
+            ->assertSee('Mathematics')
+            ->assertSee('Add homework')
+            ->assertDontSee('Review & send')
+            ->call('startAdd', $data['batch']->id, $data['maths']->id)
+            ->assertSet('data.batch_id', $data['batch']->id)
+            ->assertSet('data.course_subject_id', $data['maths']->id)
+            ->set('data.description', 'Complete exercise 5.2')
+            ->call('submit');
+
+        $assignment = HomeworkAssignment::query()
+            ->where('course_subject_id', $data['maths']->id)
+            ->first();
+
+        $this->assertNotNull($assignment);
+        $this->assertSame(HomeworkAssignmentStatus::Submitted, $assignment->status);
+        $this->assertSame($data['mathTeacher']->id, $assignment->submitted_by_user_id);
+        $this->assertNull($assignment->approved_by_user_id);
     }
 
     public function test_coordinator_approves_adds_and_sends_from_the_desk(): void

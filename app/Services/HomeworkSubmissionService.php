@@ -653,6 +653,155 @@ class HomeworkSubmissionService
     }
 
     /**
+     * Teacher work list for one date: only assigned classes and subjects.
+     *
+     * @return array{
+     *     date: string,
+     *     counts: array{missing: int, submitted: int, approved: int, sent: int},
+     *     groups: list<array{
+     *         course_name: string,
+     *         sections: list<array{
+     *             batch_id: int,
+     *             section: string,
+     *             class_label: string,
+     *             subjects: list<array{
+     *                 course_subject_id: int,
+     *                 subject: string,
+     *                 assignment_id: ?int,
+     *                 title: ?string,
+     *                 status: ?string,
+     *                 status_key: ?string,
+     *                 can_remove: bool
+     *             }>
+     *         }>
+     *     }>
+     * }
+     */
+    public function teacherDeskForDate(User $user, string $date): array
+    {
+        $date = $this->normalizeDate($date);
+
+        $assignedBatchIds = BatchStaffAssignment::query()
+            ->where('user_id', $user->id)
+            ->pluck('batch_id')
+            ->unique()
+            ->filter()
+            ->map(fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+
+        $counts = [
+            'missing' => 0,
+            'submitted' => 0,
+            'approved' => 0,
+            'sent' => 0,
+        ];
+
+        if ($assignedBatchIds === []) {
+            return [
+                'date' => $date,
+                'counts' => $counts,
+                'groups' => [],
+            ];
+        }
+
+        $batches = Batch::query()
+            ->whereIn('id', $assignedBatchIds)
+            ->where('status', BatchStatus::Active)
+            ->with(['course'])
+            ->orderBy('name')
+            ->get();
+
+        $homeworkByBatch = HomeworkAssignment::query()
+            ->whereDate('homework_date', $date)
+            ->whereIn('batch_id', $assignedBatchIds)
+            ->whereNotNull('course_subject_id')
+            ->with(['courseSubject'])
+            ->get()
+            ->groupBy('batch_id');
+
+        $grouped = [];
+
+        foreach ($batches as $batch) {
+            $subjectOptions = $this->scope->subjectOptionsForBatch($user, (int) $batch->id);
+
+            if ($subjectOptions === []) {
+                continue;
+            }
+
+            $courseName = filled($batch->course?->name)
+                ? (string) $batch->course->name
+                : (string) $batch->name;
+            $section = filled($batch->section) ? (string) $batch->section : '—';
+            $batchId = (int) $batch->id;
+            /** @var Collection<int, HomeworkAssignment> $batchHomework */
+            $batchHomework = $homeworkByBatch->get($batchId, collect())->keyBy('course_subject_id');
+
+            $subjects = [];
+
+            foreach ($subjectOptions as $subjectId => $label) {
+                /** @var HomeworkAssignment|null $assignment */
+                $assignment = $batchHomework->get((int) $subjectId) ?? $batchHomework->get((string) $subjectId);
+                $status = $assignment?->status;
+
+                if ($assignment === null) {
+                    $counts['missing']++;
+                } else {
+                    match ($status) {
+                        HomeworkAssignmentStatus::Submitted => $counts['submitted']++,
+                        HomeworkAssignmentStatus::Approved => $counts['approved']++,
+                        HomeworkAssignmentStatus::Sent => $counts['sent']++,
+                        default => null,
+                    };
+                }
+
+                $subjects[] = [
+                    'course_subject_id' => (int) $subjectId,
+                    'subject' => (string) $label,
+                    'assignment_id' => $assignment?->id,
+                    'title' => $assignment?->title,
+                    'status' => $status?->label(),
+                    'status_key' => $status?->value,
+                    'can_remove' => $assignment !== null && $status !== HomeworkAssignmentStatus::Sent,
+                ];
+            }
+
+            $grouped[$courseName] ??= [
+                'course_name' => $courseName,
+                'sections' => [],
+            ];
+
+            $grouped[$courseName]['sections'][] = [
+                'batch_id' => $batchId,
+                'section' => $section,
+                'class_label' => $batch->displayLabel(),
+                'subjects' => $subjects,
+            ];
+        }
+
+        ksort($grouped, SORT_NATURAL | SORT_FLAG_CASE);
+
+        $groups = [];
+
+        foreach ($grouped as $course) {
+            $sections = $course['sections'];
+            usort($sections, function (array $left, array $right): int {
+                return strnatcasecmp($left['section'], $right['section']);
+            });
+            $groups[] = [
+                'course_name' => $course['course_name'],
+                'sections' => $sections,
+            ];
+        }
+
+        return [
+            'date' => $date,
+            'counts' => $counts,
+            'groups' => $groups,
+        ];
+    }
+
+    /**
      * Submissions a teacher made for a class/date (their own subjects).
      *
      * @return Collection<int, HomeworkAssignment>

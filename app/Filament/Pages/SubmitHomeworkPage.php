@@ -8,6 +8,7 @@ use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
 use Carbon\Carbon;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -15,6 +16,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
@@ -31,7 +33,7 @@ class SubmitHomeworkPage extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
-    protected static ?string $title = 'Submit Homework';
+    protected static ?string $title = 'Homework';
 
     protected static ?int $navigationSort = 44;
 
@@ -58,7 +60,7 @@ class SubmitHomeworkPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Pick your class and subject, add today\'s homework, then submit it to admin. Admin combines all subjects and sends one WhatsApp to parents.';
+        return 'Your classes for the selected date. Add homework for empty subjects. Admin or academic coordinator will review and send one WhatsApp to parents.';
     }
 
     public function mount(): void
@@ -84,14 +86,47 @@ class SubmitHomeworkPage extends Page
         $user = Auth::user();
 
         return $schema->components([
-            Section::make('Homework details')
-                ->description('Subject auto-fills when you teach only one for the class. Attach a PDF/image or type the homework.')
+            Section::make('Date')
+                ->description('Today is selected. Pick a past date only if you need to add a missed day.')
+                ->schema([
+                    DatePicker::make('homework_date')
+                        ->label('Homework date')
+                        ->native(false)
+                        ->required()
+                        ->maxDate(now())
+                        ->live(),
+                ])
+                ->columns(2),
+            Section::make('My classes')
+                ->description('Only classes and subjects assigned to you.')
+                ->schema([
+                    View::make('filament.pages.partials.submit-homework')
+                        ->viewData(function () use ($service, $user): array {
+                            $date = $this->dateString();
+                            $batchId = (int) ($this->data['batch_id'] ?? 0);
+                            $subjectId = (int) ($this->data['course_subject_id'] ?? 0);
+
+                            return [
+                                'desk' => $user
+                                    ? $service->teacherDeskForDate($user, $date)
+                                    : ['counts' => ['missing' => 0, 'submitted' => 0, 'approved' => 0, 'sent' => 0], 'groups' => []],
+                                'selectedBatchId' => $batchId,
+                                'selectedSubjectId' => $subjectId,
+                                'ready' => $batchId > 0 && $subjectId > 0,
+                                'dateLabel' => Carbon::parse($date)->format('d M Y'),
+                                'isToday' => $date === now()->toDateString(),
+                            ];
+                        })
+                        ->columnSpanFull(),
+                ]),
+            Section::make('Pick a class')
+                ->description('Use this if Add homework did not open the form.')
+                ->collapsed()
                 ->schema([
                     Select::make('batch_id')
                         ->label('Class')
                         ->options(fn (): array => $user ? $service->batchOptionsFor($user) : [])
                         ->searchable()
-                        ->required()
                         ->native(false)
                         ->live()
                         ->afterStateUpdated(function () use ($service, $user): void {
@@ -106,27 +141,23 @@ class SubmitHomeworkPage extends Page
                             return ($batchId > 0 && $user) ? $service->subjectOptionsForBatch($user, $batchId) : [];
                         })
                         ->searchable()
-                        ->required()
                         ->native(false)
                         ->live()
                         ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
-                    DatePicker::make('homework_date')
-                        ->label('Homework date')
-                        ->native(false)
-                        ->required()
-                        ->maxDate(now())
-                        ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
+                ])
+                ->columns(2),
+            Section::make('Homework details')
+                ->description('Attach a PDF/image or type the homework, then submit to admin.')
+                ->schema([
                     TextInput::make('title')
                         ->label('Title (optional)')
                         ->placeholder('e.g. Chapter 5 – Q1 to Q10')
-                        ->maxLength(255)
-                        ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
+                        ->maxLength(255),
                     Textarea::make('description')
                         ->label('Homework details')
                         ->placeholder('Type the homework, or attach a file below.')
                         ->rows(4)
-                        ->columnSpanFull()
-                        ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
+                        ->columnSpanFull(),
                     FileUpload::make('attachment')
                         ->label('PDF or image (optional)')
                         ->disk('public')
@@ -138,10 +169,16 @@ class SubmitHomeworkPage extends Page
                             'image/webp',
                         ])
                         ->maxSize(10240)
-                        ->columnSpanFull()
-                        ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
+                        ->columnSpanFull(),
+                    Actions::make([
+                        Action::make('submitHomework')
+                            ->label('Submit to admin')
+                            ->color('primary')
+                            ->action('submit'),
+                    ])->columnSpanFull(),
                 ])
-                ->columns(3),
+                ->columns(2)
+                ->visible(fn (): bool => filled($this->data['batch_id'] ?? null) && filled($this->data['course_subject_id'] ?? null)),
         ]);
     }
 
@@ -150,19 +187,6 @@ class SubmitHomeworkPage extends Page
         return $schema->components([
             Form::make([EmbeddedSchema::make('form')])
                 ->id('submitHomeworkForm'),
-            View::make('filament.pages.partials.submit-homework')
-                ->viewData(function (): array {
-                    $user = Auth::user();
-                    $batchId = (int) ($this->data['batch_id'] ?? 0);
-
-                    return [
-                        'ready' => $batchId > 0 && filled($this->data['course_subject_id'] ?? null),
-                        'submissions' => ($user && $batchId > 0)
-                            ? app(HomeworkSubmissionService::class)->submissionsForTeacher($user, $batchId, $this->dateString())
-                            : collect(),
-                        'dateLabel' => Carbon::parse($this->dateString())->format('d M Y'),
-                    ];
-                }),
         ]);
     }
 
@@ -175,6 +199,12 @@ class SubmitHomeworkPage extends Page
         }
 
         $state = $this->form->getState();
+
+        if ((int) ($state['batch_id'] ?? 0) < 1 || (int) ($state['course_subject_id'] ?? 0) < 1) {
+            Notification::make()->title('Pick a class and subject first')->warning()->send();
+
+            return;
+        }
 
         try {
             $assignment = app(HomeworkSubmissionService::class)->submit($user, [
@@ -201,6 +231,22 @@ class SubmitHomeworkPage extends Page
             ->body($assignment->courseSubject?->displayLabel().' homework submitted for '.Carbon::parse($this->dateString())->format('d M Y').'. Admin will review and send it to parents.')
             ->success()
             ->send();
+    }
+
+    public function startAdd(int $batchId, int $subjectId): void
+    {
+        if ($batchId < 1 || $subjectId < 1) {
+            return;
+        }
+
+        $this->form->fill([
+            ...($this->data ?? []),
+            'batch_id' => $batchId,
+            'course_subject_id' => $subjectId,
+            'title' => '',
+            'description' => '',
+            'attachment' => null,
+        ]);
     }
 
     public function deleteSubmission(int $assignmentId): void
