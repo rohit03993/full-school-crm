@@ -43,7 +43,6 @@ class PublicHomeworkController extends Controller
 
         return HomeworkAssignment::query()
             ->where('public_token', $token)
-            ->whereNotNull('published_at')
             ->firstOrFail();
     }
 }

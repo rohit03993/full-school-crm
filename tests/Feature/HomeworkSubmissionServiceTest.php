@@ -133,6 +133,11 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertNull($assignment->published_at);
         $this->assertSame($data['mathTeacher']->id, $assignment->submitted_by_user_id);
         $this->assertNull($assignment->approved_by_user_id);
+
+        $this->get($assignment->publicUrl())
+            ->assertOk()
+            ->assertSee('Algebra practice')
+            ->assertSee('Complete exercise 5.2');
     }
 
     public function test_teacher_cannot_submit_subject_they_do_not_teach(): void
@@ -311,7 +316,7 @@ class HomeworkSubmissionServiceTest extends TestCase
 
         Livewire::test(HomeworkReviewPage::class)
             ->assertSuccessful()
-            ->assertSee('Pending homework')
+            ->assertSee('Classes')
             ->assertSee('Class 11 JEE')
             ->assertSee('Approve pending')
             ->assertDontSee('Algebra practice')
@@ -322,6 +327,8 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee($data['mathTeacher']->name)
             ->assertSee($data['physicsTeacher']->name)
             ->assertSee('Algebra practice')
+            ->assertSee('Ex 5.2')
+            ->assertSee('Open homework')
             ->assertSee('Physics')
             ->assertSee('No homework')
             ->assertSee('Remove')
@@ -405,6 +412,8 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame($data['mathTeacher']->name, $sectionA[$data['maths']->id]['teacher']);
         $this->assertSame('Algebra today', $sectionA[$data['maths']->id]['title']);
         $this->assertSame('submitted', $sectionA[$data['maths']->id]['status_key']);
+        $this->assertNotEmpty($sectionA[$data['maths']->id]['public_url']);
+        $this->assertSame('Ex 5.2', $sectionA[$data['maths']->id]['description']);
         $this->assertSame($data['physicsTeacher']->name, $sectionA[$data['physics']->id]['teacher']);
         $this->assertSame('', $sectionA[$data['physics']->id]['title']);
         $this->assertNull($sectionA[$data['physics']->id]['status_key']);

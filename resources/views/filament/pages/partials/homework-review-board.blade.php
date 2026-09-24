@@ -115,7 +115,7 @@
                                     <span class="block max-w-xs truncate">{{ $row['title'] }}</span>
                                     <span class="mt-0.5 flex flex-wrap gap-2 text-xs">
                                         @if ($row['public_url'])
-                                            <a href="{{ $row['public_url'] }}" target="_blank" class="text-primary-600 underline underline-offset-2 dark:text-primary-400">Preview link</a>
+                                            <a href="{{ $row['public_url'] }}" target="_blank" rel="noopener" class="text-primary-600 underline underline-offset-2 dark:text-primary-400">Open homework</a>
                                         @endif
                                         @if ($row['has_file'])
                                             <span class="text-gray-400">· file attached</span>

@@ -64,7 +64,7 @@ class HomeworkReviewPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Today’s desk by class and section. Approve what teachers sent, then send ONE combined WhatsApp — only subjects with homework are included.';
+        return 'Tap a class, open the homework, then approve and send one WhatsApp to parents.';
     }
 
     public function mount(): void
@@ -99,8 +99,8 @@ class HomeworkReviewPage extends Page
                     Hidden::make('batch_id'),
                 ])
                 ->columns(2),
-            Section::make('Pending homework')
-                ->description('Tap a class to see every subject. Waiting first, then ready to send, then already sent.')
+            Section::make('Classes')
+                ->description('Open a class to read each subject. Waiting = check it. Ready = send. Sent = parents already have it.')
                 ->schema([
                     View::make('filament.pages.partials.homework-review-pending')
                         ->viewData(function (): array {

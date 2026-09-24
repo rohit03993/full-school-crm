@@ -440,6 +440,9 @@ class HomeworkSubmissionService
      *                 teacher: string,
      *                 subject: string,
      *                 title: string,
+     *                 description: string,
+     *                 has_file: bool,
+     *                 public_url: ?string,
      *                 status: string,
      *                 status_key: ?string,
      *                 submitted_at: ?string
@@ -520,6 +523,11 @@ class HomeworkSubmissionService
                     'teacher' => $teacherName,
                     'subject' => (string) $subject->name,
                     'title' => (string) ($assignment?->title ?? ''),
+                    'description' => (string) ($assignment?->description ?? ''),
+                    'has_file' => (bool) ($assignment?->hasFile() ?? false),
+                    'public_url' => ($assignment && filled($assignment->public_token))
+                        ? route('homework.public.show', ['token' => $assignment->public_token])
+                        : null,
                     'status' => $status?->label() ?? '',
                     'status_key' => $status?->value,
                     'submitted_at' => $assignment?->submitted_at?->timezone((string) config('app.timezone'))->format('h:i A'),

@@ -26,10 +26,10 @@
     </div>
 
     <div class="flex min-w-0 flex-wrap gap-2 text-xs font-medium">
-        <span class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">Waiting: {{ $waiting }}</span>
-        <span class="rounded-full bg-sky-100 px-2.5 py-1 text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">Ready to send: {{ $ready }}</span>
-        <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">Sent: {{ $sent }}</span>
-        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600 dark:bg-white/5 dark:text-gray-300">No homework: {{ $empty }}</span>
+        <span class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">Waiting {{ $waiting }} · check</span>
+        <span class="rounded-full bg-sky-100 px-2.5 py-1 text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">Ready {{ $ready }} · send</span>
+        <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">Sent {{ $sent }} · parents have it</span>
+        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600 dark:bg-white/5 dark:text-gray-300">No homework {{ $empty }}</span>
     </div>
 
     @if ($waiting === 0 && $ready === 0 && $sent === 0)
@@ -87,14 +87,18 @@
                                                 {{ $sectionTitle }}
                                             </span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">
-                                                @if ($hasWaiting)
-                                                    {{ (int) $section['submitted'] }} waiting
-                                                @elseif ($hasReady)
-                                                    Ready to send
-                                                @elseif ($hasSent)
-                                                    Sent
-                                                @else
+                                                @if (! $hasWaiting && ! $hasReady && ! $hasSent)
                                                     No homework yet
+                                                @else
+                                                    @if ($hasWaiting)
+                                                        {{ (int) $section['submitted'] }} waiting
+                                                    @endif
+                                                    @if ($hasReady)
+                                                        {{ $hasWaiting ? ' · ' : '' }}ready to send
+                                                    @endif
+                                                    @if ($hasSent)
+                                                        {{ ($hasWaiting || $hasReady) ? ' · ' : '' }}sent
+                                                    @endif
                                                 @endif
                                             </span>
                                         </span>
@@ -137,57 +141,103 @@
                                     @if (($section['items'] ?? []) === [])
                                         <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">No subjects on this class yet.</p>
                                     @else
-                                        <ul class="mt-3 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white dark:divide-white/5 dark:border-white/10 dark:bg-gray-900/40">
+                                        <ul class="mt-3 space-y-2">
                                             @foreach ($section['items'] as $item)
                                                 @if (filled($item['status_key']))
-                                                    <li class="flex min-w-0 items-start justify-between gap-3 px-3 py-2.5">
-                                                        <div class="min-w-0">
-                                                            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $item['subject'] }}</p>
-                                                            @if (filled($item['teacher']))
-                                                                <p class="mt-1">
-                                                                    <span class="inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">{{ $item['teacher'] }}</span>
-                                                                </p>
-                                                            @endif
-                                                            @if (filled($item['title']))
-                                                                <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-300">{{ $item['title'] }}</p>
-                                                            @endif
-                                                        </div>
-                                                        <div class="shrink-0 text-right">
-                                                            <span @class([
-                                                                'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                                                                'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200' => $item['status_key'] === 'submitted',
-                                                                'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-200' => $item['status_key'] === 'approved',
-                                                                'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200' => $item['status_key'] === 'sent',
-                                                            ])>
-                                                                @if ($item['status_key'] === 'submitted')
-                                                                    Waiting
-                                                                @elseif ($item['status_key'] === 'approved')
-                                                                    Ready
-                                                                @elseif ($item['status_key'] === 'sent')
-                                                                    Sent
+                                                    <li @class([
+                                                        'rounded-xl border bg-white px-3 py-3 dark:bg-gray-900/60',
+                                                        'border-amber-200 dark:border-amber-500/20' => $item['status_key'] === 'submitted',
+                                                        'border-sky-200 dark:border-sky-500/20' => $item['status_key'] === 'approved',
+                                                        'border-emerald-200 dark:border-emerald-500/20' => $item['status_key'] === 'sent',
+                                                        'border-gray-200 dark:border-white/10' => ! in_array($item['status_key'], ['submitted', 'approved', 'sent'], true),
+                                                    ])>
+                                                        <div class="flex min-w-0 items-start justify-between gap-3">
+                                                            <div class="min-w-0">
+                                                                @if (filled($item['public_url']))
+                                                                    <a
+                                                                        href="{{ $item['public_url'] }}"
+                                                                        target="_blank"
+                                                                        rel="noopener"
+                                                                        class="text-sm font-semibold text-primary-700 hover:underline dark:text-primary-300"
+                                                                    >
+                                                                        {{ $item['subject'] }}
+                                                                    </a>
                                                                 @else
-                                                                    {{ $item['status'] }}
+                                                                    <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $item['subject'] }}</p>
                                                                 @endif
-                                                            </span>
-                                                            @if ($item['submitted_at'])
-                                                                <p class="mt-1 text-xs text-gray-400">{{ $item['submitted_at'] }}</p>
+                                                                @if (filled($item['teacher']))
+                                                                    <p class="mt-1">
+                                                                        <span class="inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">{{ $item['teacher'] }}</span>
+                                                                    </p>
+                                                                @endif
+                                                            </div>
+                                                            <div class="shrink-0 text-right">
+                                                                <span @class([
+                                                                    'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                                                                    'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200' => $item['status_key'] === 'submitted',
+                                                                    'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-200' => $item['status_key'] === 'approved',
+                                                                    'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200' => $item['status_key'] === 'sent',
+                                                                ])>
+                                                                    @if ($item['status_key'] === 'submitted')
+                                                                        Waiting
+                                                                    @elseif ($item['status_key'] === 'approved')
+                                                                        Ready
+                                                                    @elseif ($item['status_key'] === 'sent')
+                                                                        Sent
+                                                                    @else
+                                                                        {{ $item['status'] }}
+                                                                    @endif
+                                                                </span>
+                                                                @if ($item['submitted_at'])
+                                                                    <p class="mt-1 text-xs text-gray-400">{{ $item['submitted_at'] }}</p>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+
+                                                        @if (filled($item['title']))
+                                                            <p class="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">{{ $item['title'] }}</p>
+                                                        @endif
+                                                        @if (filled($item['description']))
+                                                            <p class="mt-1 line-clamp-3 whitespace-pre-line text-sm text-gray-600 dark:text-gray-300">{{ $item['description'] }}</p>
+                                                        @endif
+                                                        @if ($item['has_file'])
+                                                            <p class="mt-1 text-xs font-medium text-gray-500 dark:text-gray-400">File attached</p>
+                                                        @endif
+
+                                                        <div class="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                                                            @if (filled($item['public_url']))
+                                                                <a
+                                                                    href="{{ $item['public_url'] }}"
+                                                                    target="_blank"
+                                                                    rel="noopener"
+                                                                    class="text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
+                                                                >
+                                                                    Open homework
+                                                                </a>
+                                                            @endif
+                                                            @if ($item['status_key'] === 'submitted' && $item['assignment_id'])
+                                                                <button
+                                                                    type="button"
+                                                                    wire:click="approve({{ (int) $item['assignment_id'] }})"
+                                                                    class="text-xs font-semibold text-sky-700 hover:underline dark:text-sky-300"
+                                                                >
+                                                                    Approve
+                                                                </button>
                                                             @endif
                                                             @if ($item['assignment_id'] && $item['status_key'] !== 'sent')
-                                                                <p class="mt-1">
-                                                                    <button
-                                                                        type="button"
-                                                                        wire:click="remove({{ (int) $item['assignment_id'] }})"
-                                                                        wire:confirm="Remove this subject's homework for the day?"
-                                                                        class="text-xs font-semibold text-rose-600 hover:underline dark:text-rose-400"
-                                                                    >
-                                                                        Remove
-                                                                    </button>
-                                                                </p>
+                                                                <button
+                                                                    type="button"
+                                                                    wire:click="remove({{ (int) $item['assignment_id'] }})"
+                                                                    wire:confirm="Remove this subject's homework for the day?"
+                                                                    class="text-xs font-semibold text-rose-600 hover:underline dark:text-rose-400"
+                                                                >
+                                                                    Remove
+                                                                </button>
                                                             @endif
                                                         </div>
                                                     </li>
                                                 @else
-                                                    <li class="flex min-w-0 items-baseline justify-between gap-3 px-3 py-1.5 text-xs text-gray-400">
+                                                    <li class="flex min-w-0 items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 text-xs text-gray-400">
                                                         <span>
                                                             {{ $item['subject'] }}
                                                             @if (filled($item['teacher']))
