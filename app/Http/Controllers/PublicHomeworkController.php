@@ -39,7 +39,7 @@ class PublicHomeworkController extends Controller
 
     protected function resolvePublished(string $token): HomeworkAssignment
     {
-        abort_unless(strlen($token) >= 24, 404);
+        abort_unless(strlen($token) >= HomeworkAssignment::PUBLIC_TOKEN_LENGTH && strlen($token) <= 64, 404);
 
         return HomeworkAssignment::query()
             ->where('public_token', $token)

@@ -122,13 +122,13 @@ Route::get('/verify/{enrollment}', IdCardVerifyController::class)->name('id-card
 
 Route::middleware(['license.feature:homework', 'throttle:60,1'])->group(function (): void {
     Route::get('/h/{token}', [PublicHomeworkController::class, 'show'])
-        ->where('token', '[A-Za-z0-9]{24,64}')
+        ->where('token', '[A-Za-z0-9]{8,64}')
         ->name('homework.public.show');
     Route::get('/h/{token}/view', [PublicHomeworkController::class, 'view'])
-        ->where('token', '[A-Za-z0-9]{24,64}')
+        ->where('token', '[A-Za-z0-9]{8,64}')
         ->name('homework.public.view');
     Route::get('/h/{token}/download', [PublicHomeworkController::class, 'download'])
-        ->where('token', '[A-Za-z0-9]{24,64}')
+        ->where('token', '[A-Za-z0-9]{8,64}')
         ->name('homework.public.download');
 });
 

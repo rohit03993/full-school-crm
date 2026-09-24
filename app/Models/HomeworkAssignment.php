@@ -35,6 +35,8 @@ class HomeworkAssignment extends Model
         'whatsapp_failed_count',
     ];
 
+    public const PUBLIC_TOKEN_LENGTH = 8;
+
     protected static function booted(): void
     {
         static::creating(function (HomeworkAssignment $assignment): void {
@@ -47,7 +49,7 @@ class HomeworkAssignment extends Model
     public static function generateUniquePublicToken(): string
     {
         do {
-            $token = Str::random(48);
+            $token = Str::random(static::PUBLIC_TOKEN_LENGTH);
         } while (static::query()->where('public_token', $token)->exists());
 
         return $token;

@@ -18,6 +18,7 @@ use App\Models\BatchStudent;
 use App\Models\Course;
 use App\Models\Enquiry;
 use App\Models\Enrollment;
+use App\Models\HomeworkAssignment;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\HomeworkAssignmentService;
@@ -68,6 +69,7 @@ class HomeworkAssignmentServiceTest extends TestCase
         ]);
 
         $this->assertNotEmpty($assignment->public_token);
+        $this->assertSame(HomeworkAssignment::PUBLIC_TOKEN_LENGTH, strlen((string) $assignment->public_token));
         $this->assertStringContainsString('/h/', $assignment->publicUrl());
         $this->assertStringNotContainsString('/portal/', $assignment->publicUrl());
 
@@ -75,6 +77,26 @@ class HomeworkAssignmentServiceTest extends TestCase
             ->assertOk()
             ->assertSee('Public link homework')
             ->assertSee('Open without portal login.');
+    }
+
+    public function test_old_long_public_token_still_opens(): void
+    {
+        [, $batch, $staff] = $this->createStudentInBatch();
+
+        $assignment = app(HomeworkAssignmentService::class)->create($staff, [
+            'batch_id' => $batch->id,
+            'title' => 'Legacy public link',
+            'description' => 'Sent before short tokens.',
+            'send_whatsapp' => false,
+        ]);
+
+        $legacyToken = str_repeat('A', 48);
+        $assignment->forceFill(['public_token' => $legacyToken])->save();
+
+        $this->get('/h/'.$legacyToken)
+            ->assertOk()
+            ->assertSee('Legacy public link')
+            ->assertSee('Sent before short tokens.');
     }
 
     public function test_whatsapp_notify_uses_public_homework_link(): void
