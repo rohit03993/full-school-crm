@@ -144,7 +144,9 @@
                                                         <div class="min-w-0">
                                                             <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $item['subject'] }}</p>
                                                             @if (filled($item['teacher']))
-                                                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ $item['teacher'] }}</p>
+                                                                <p class="mt-1">
+                                                                    <span class="inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">{{ $item['teacher'] }}</span>
+                                                                </p>
                                                             @endif
                                                             @if (filled($item['title']))
                                                                 <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-300">{{ $item['title'] }}</p>
@@ -174,7 +176,12 @@
                                                     </li>
                                                 @else
                                                     <li class="flex min-w-0 items-baseline justify-between gap-3 px-3 py-1.5 text-xs text-gray-400">
-                                                        <span>{{ $item['subject'] }}@if (filled($item['teacher'])) · {{ $item['teacher'] }}@endif</span>
+                                                        <span>
+                                                            {{ $item['subject'] }}
+                                                            @if (filled($item['teacher']))
+                                                                <span class="ml-1 inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">{{ $item['teacher'] }}</span>
+                                                            @endif
+                                                        </span>
                                                         <span>No homework</span>
                                                     </li>
                                                 @endif
