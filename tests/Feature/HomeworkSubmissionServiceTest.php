@@ -502,7 +502,8 @@ class HomeworkSubmissionServiceTest extends TestCase
         ])->test(HomeworkCheckPage::class)
             ->assertSuccessful()
             ->assertSet('data.batch_id', $data['batch']->id)
-            ->assertSet('data.course_subject_id', null);
+            ->assertSet('data.course_subject_id', $data['maths']->id)
+            ->assertNotSet('data.course_subject_id', $data['physics']->id);
     }
 
     public function test_teacher_without_class_cannot_open_homework_check(): void
