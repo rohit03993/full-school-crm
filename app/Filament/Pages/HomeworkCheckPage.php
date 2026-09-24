@@ -7,7 +7,10 @@ use App\Enums\HomeworkCheckStatus;
 use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Services\HomeworkCheckService;
+use App\Services\HomeworkSubmissionService;
+use App\Support\CrmAccess;
 use App\Support\CrmNavigation;
+use App\Support\FeatureGate;
 use App\Support\WhatsAppSendUi;
 use Carbon\Carbon;
 use Filament\Forms\Components\DatePicker;
@@ -42,6 +45,22 @@ class HomeworkCheckPage extends Page
         return LicenseFeature::Homework;
     }
 
+    public static function canAccess(): bool
+    {
+        if (! FeatureGate::enabled(LicenseFeature::Homework)) {
+            return false;
+        }
+
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        return CrmAccess::can($user, CrmPermission::HomeworkManage)
+            || app(HomeworkSubmissionService::class)->canSubmit($user);
+    }
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
 
     protected static ?string $navigationLabel = 'Homework check';
@@ -67,10 +86,40 @@ class HomeworkCheckPage extends Page
 
     public function mount(): void
     {
+        $user = Auth::user();
+        $service = app(HomeworkCheckService::class);
+        $batchId = request()->integer('batch_id');
+        $subjectId = request()->integer('course_subject_id');
+        $requestedDate = request()->query('check_date');
+        $date = now()->toDateString();
+
+        if (filled($requestedDate)) {
+            $parsed = Carbon::parse((string) $requestedDate)->toDateString();
+
+            if ($parsed <= now()->toDateString()) {
+                $date = $parsed;
+            }
+        }
+
+        if ($batchId > 0 && $user && $service->userCanAccessBatch($user, $batchId)) {
+            $subjects = $service->subjectOptionsForBatch($user, $batchId);
+
+            if ($subjectId > 0 && ! array_key_exists($subjectId, $subjects)) {
+                $subjectId = 0;
+            }
+
+            if ($subjectId < 1 && count($subjects) === 1) {
+                $subjectId = (int) array_key_first($subjects);
+            }
+        } else {
+            $batchId = 0;
+            $subjectId = 0;
+        }
+
         $this->form->fill([
-            'batch_id' => null,
-            'course_subject_id' => null,
-            'check_date' => now()->toDateString(),
+            'batch_id' => $batchId > 0 ? $batchId : null,
+            'course_subject_id' => $subjectId > 0 ? $subjectId : null,
+            'check_date' => $date,
             'topic' => "Today's homework",
             'student_search' => '',
         ]);

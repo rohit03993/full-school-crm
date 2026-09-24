@@ -6,6 +6,7 @@ use App\Enums\BatchStaffRole;
 use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\HomeworkAssignmentStatus;
+use App\Enums\HomeworkCheckStatus;
 use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
@@ -29,6 +30,7 @@ use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\CrmPermissionSyncService;
+use App\Services\HomeworkCheckService;
 use App\Services\HomeworkSubmissionService;
 use App\Services\MetaWhatsAppCostEstimator;
 use App\Support\CombinedHomeworkWhatsAppTemplate;
@@ -443,6 +445,7 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('Section A')
             ->assertSee('Mathematics')
             ->assertSee('Add homework')
+            ->assertDontSee('Check completion')
             ->assertDontSee('Review & send')
             ->call('startAdd', $data['batch']->id, $data['maths']->id)
             ->assertSet('data.batch_id', $data['batch']->id)
@@ -458,6 +461,74 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame(HomeworkAssignmentStatus::Submitted, $assignment->status);
         $this->assertSame($data['mathTeacher']->id, $assignment->submitted_by_user_id);
         $this->assertNull($assignment->approved_by_user_id);
+    }
+
+    public function test_teacher_can_check_completion_from_their_desk_after_submit(): void
+    {
+        $data = $this->seedClass();
+        $this->actingAs($data['mathTeacher']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->assertTrue(HomeworkCheckPage::canAccess());
+        $this->assertFalse(HomeworkReviewPage::canAccess());
+
+        Livewire::test(SubmitHomeworkPage::class)
+            ->assertDontSee('Check completion')
+            ->call('startAdd', $data['batch']->id, $data['maths']->id)
+            ->set('data.description', 'Complete exercise 5.2')
+            ->call('submit')
+            ->assertSee('Check completion');
+
+        Livewire::withQueryParams([
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'check_date' => now()->toDateString(),
+        ])->test(HomeworkCheckPage::class)
+            ->assertSuccessful()
+            ->assertSet('data.batch_id', $data['batch']->id)
+            ->assertSet('data.course_subject_id', $data['maths']->id);
+    }
+
+    public function test_teacher_check_does_not_open_unassigned_subject(): void
+    {
+        $data = $this->seedClass();
+        $this->actingAs($data['mathTeacher']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::withQueryParams([
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['physics']->id,
+            'check_date' => now()->toDateString(),
+        ])->test(HomeworkCheckPage::class)
+            ->assertSuccessful()
+            ->assertSet('data.batch_id', $data['batch']->id)
+            ->assertSet('data.course_subject_id', null);
+    }
+
+    public function test_teacher_without_class_cannot_open_homework_check(): void
+    {
+        $teacher = User::factory()->create(['is_active' => true]);
+        $teacher->assignRole(StaffJobRole::Teacher->value);
+        $this->actingAs($teacher);
+
+        $this->assertFalse(HomeworkCheckPage::canAccess());
+    }
+
+    public function test_teacher_cannot_mark_unassigned_subject(): void
+    {
+        $data = $this->seedClass();
+        $student = Student::query()->first();
+
+        $this->expectException(ValidationException::class);
+
+        app(HomeworkCheckService::class)->mark(
+            $data['mathTeacher'],
+            $data['batch']->id,
+            $student->id,
+            $data['physics']->id,
+            'Topic',
+            HomeworkCheckStatus::Done,
+        );
     }
 
     public function test_coordinator_approves_and_sends_from_the_desk(): void

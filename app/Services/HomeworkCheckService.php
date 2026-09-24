@@ -77,6 +77,15 @@ class HomeworkCheckService
             ->exists();
     }
 
+    public function userCanAccessSubject(User $user, int $batchId, int $courseSubjectId): bool
+    {
+        if ($batchId < 1 || $courseSubjectId < 1) {
+            return false;
+        }
+
+        return array_key_exists($courseSubjectId, $this->subjectOptionsForBatch($user, $batchId));
+    }
+
     /**
      * @return array<int, string>
      */
@@ -189,6 +198,12 @@ class HomeworkCheckService
         if (! $this->userCanAccessBatch($teacher, $batchId)) {
             throw ValidationException::withMessages([
                 'batch_id' => 'You are not assigned to this class.',
+            ]);
+        }
+
+        if (! $this->userCanAccessSubject($teacher, $batchId, $courseSubjectId)) {
+            throw ValidationException::withMessages([
+                'course_subject_id' => 'You are not assigned to this subject.',
             ]);
         }
 

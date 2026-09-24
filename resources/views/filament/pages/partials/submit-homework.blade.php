@@ -6,6 +6,8 @@
     $selectedBatchId = (int) ($selectedBatchId ?? 0);
     $selectedSubjectId = (int) ($selectedSubjectId ?? 0);
     $ready = (bool) ($ready ?? false);
+    $checkBaseUrl = $checkBaseUrl ?? '#';
+    $checkDate = $checkDate ?? now()->toDateString();
 @endphp
 
 <div class="space-y-3">
@@ -83,6 +85,14 @@
                                                     >
                                                         Remove
                                                     </button>
+                                                @endif
+                                                @if ($subject['assignment_id'])
+                                                    <a
+                                                        href="{{ $checkBaseUrl }}?{{ http_build_query(['batch_id' => (int) $section['batch_id'], 'course_subject_id' => (int) $subject['course_subject_id'], 'check_date' => $checkDate]) }}"
+                                                        class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
+                                                    >
+                                                        Check completion
+                                                    </a>
                                                 @endif
                                             </div>
                                         </li>

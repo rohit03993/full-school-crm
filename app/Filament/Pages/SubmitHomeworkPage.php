@@ -60,7 +60,7 @@ class SubmitHomeworkPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Your classes for the selected date. Add homework for empty subjects. Admin or academic coordinator will review and send one WhatsApp to parents.';
+        return 'Your classes for the selected date. Add homework for empty subjects. After you submit, you can mark Done or Not done. Admin will still review and send one WhatsApp to parents.';
     }
 
     public function mount(): void
@@ -115,6 +115,8 @@ class SubmitHomeworkPage extends Page
                                 'ready' => $batchId > 0 && $subjectId > 0,
                                 'dateLabel' => Carbon::parse($date)->format('d M Y'),
                                 'isToday' => $date === now()->toDateString(),
+                                'checkBaseUrl' => HomeworkCheckPage::getUrl(),
+                                'checkDate' => $date,
                             ];
                         })
                         ->columnSpanFull(),
