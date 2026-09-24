@@ -203,6 +203,17 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame($coordinator->id, $assignment->created_by_user_id);
         $this->assertSame($coordinator->id, $assignment->submitted_by_user_id);
         $this->assertSame($coordinator->id, $assignment->approved_by_user_id);
+
+        $desk = $service->deskForDate(now()->toDateString());
+        $physicsRow = collect($desk['groups'][0]['sections'][0]['items'])
+            ->firstWhere('course_subject_id', $data['physics']->id);
+
+        $this->assertSame('Khushi Coordinator', $physicsRow['submitted_by']);
+        $this->assertSame($data['physicsTeacher']->name, $physicsRow['teacher']);
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('toggleDeskSection', $data['batch']->id)
+            ->assertSee('Khushi Coordinator');
     }
 
     public function test_board_lists_every_subject_with_status(): void
@@ -410,6 +421,7 @@ class HomeworkSubmissionServiceTest extends TestCase
         $sectionA = collect($desk['groups'][0]['sections'][0]['items'])->keyBy('course_subject_id');
         $this->assertCount(3, $sectionA);
         $this->assertSame($data['mathTeacher']->name, $sectionA[$data['maths']->id]['teacher']);
+        $this->assertSame($data['mathTeacher']->name, $sectionA[$data['maths']->id]['submitted_by']);
         $this->assertSame('Algebra today', $sectionA[$data['maths']->id]['title']);
         $this->assertSame('submitted', $sectionA[$data['maths']->id]['status_key']);
         $this->assertNotEmpty($sectionA[$data['maths']->id]['public_url']);

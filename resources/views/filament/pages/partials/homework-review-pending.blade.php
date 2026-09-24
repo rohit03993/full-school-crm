@@ -165,7 +165,9 @@
                                                                 @else
                                                                     <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $item['subject'] }}</p>
                                                                 @endif
-                                                                @if (filled($item['teacher']))
+                                                                @if (filled($item['submitted_by']))
+                                                                    <span class="inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">{{ $item['submitted_by'] }}</span>
+                                                                @elseif (filled($item['teacher']))
                                                                     <span class="inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">{{ $item['teacher'] }}</span>
                                                                 @endif
                                                             </div>

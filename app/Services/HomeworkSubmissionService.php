@@ -438,6 +438,7 @@ class HomeworkSubmissionService
      *                 course_subject_id: int,
      *                 assignment_id: ?int,
      *                 teacher: string,
+     *                 submitted_by: string,
      *                 subject: string,
      *                 title: string,
      *                 description: string,
@@ -521,6 +522,9 @@ class HomeworkSubmissionService
                     'course_subject_id' => $subjectId,
                     'assignment_id' => $assignment?->id,
                     'teacher' => $teacherName,
+                    'submitted_by' => (string) ($assignment?->submittedBy?->name
+                        ?? $assignment?->createdBy?->name
+                        ?? ''),
                     'subject' => (string) $subject->name,
                     'title' => (string) ($assignment?->title ?? ''),
                     'description' => (string) ($assignment?->description ?? ''),
