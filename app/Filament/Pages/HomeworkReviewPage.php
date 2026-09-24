@@ -97,7 +97,7 @@ class HomeworkReviewPage extends Page
                 ])
                 ->columns(2),
             Section::make('Pending homework')
-                ->description('Waiting first, then ready to send, then already sent, then classes with no homework yet.')
+                ->description('Waiting first, then ready to send, then already sent, then classes with no homework yet. Every subject of the class is listed.')
                 ->schema([
                     View::make('filament.pages.partials.homework-review-pending')
                         ->viewData(function (): array {

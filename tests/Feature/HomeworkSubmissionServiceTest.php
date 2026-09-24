@@ -313,8 +313,10 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSuccessful()
             ->assertSee('Pending homework')
             ->assertSee($data['mathTeacher']->name)
+            ->assertSee($data['physicsTeacher']->name)
             ->assertSee('Section A')
             ->assertSee('Algebra practice')
+            ->assertSee('Physics (PHY)')
             ->assertSee('Approve pending')
             ->assertDontSee('Add subject')
             ->assertDontSee('No homework for today')
@@ -364,6 +366,16 @@ class HomeworkSubmissionServiceTest extends TestCase
             'status' => BatchStatus::Active,
         ]);
 
+        $biology = CourseSubject::query()->create([
+            'course_id' => $data['batch']->course_id,
+            'name' => 'Biology',
+            'code' => 'BIO',
+            'default_max_marks' => 100,
+            'sort_order' => 3,
+            'is_active' => true,
+        ]);
+        $data['batch']->subjects()->attach($biology->id, ['sort_order' => 3]);
+
         $service->submit($data['mathTeacher'], [
             'batch_id' => $data['batch']->id,
             'course_subject_id' => $data['maths']->id,
@@ -381,7 +393,17 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame(['A', 'B'], array_column($desk['groups'][0]['sections'], 'section'));
         $this->assertSame(1, $desk['groups'][0]['sections'][0]['priority']);
         $this->assertSame(4, $desk['groups'][0]['sections'][1]['priority']);
-        $this->assertSame($data['mathTeacher']->name, $desk['groups'][0]['sections'][0]['items'][0]['teacher']);
+
+        $sectionA = collect($desk['groups'][0]['sections'][0]['items'])->keyBy('course_subject_id');
+        $this->assertCount(3, $sectionA);
+        $this->assertSame($data['mathTeacher']->name, $sectionA[$data['maths']->id]['teacher']);
+        $this->assertSame('Algebra today', $sectionA[$data['maths']->id]['title']);
+        $this->assertSame('submitted', $sectionA[$data['maths']->id]['status_key']);
+        $this->assertSame($data['physicsTeacher']->name, $sectionA[$data['physics']->id]['teacher']);
+        $this->assertSame('', $sectionA[$data['physics']->id]['title']);
+        $this->assertNull($sectionA[$data['physics']->id]['status_key']);
+        $this->assertSame('', $sectionA[$biology->id]['teacher']);
+        $this->assertSame('', $sectionA[$biology->id]['title']);
         $this->assertSame([], $desk['groups'][0]['sections'][1]['items']);
     }
 

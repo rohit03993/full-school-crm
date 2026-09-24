@@ -103,28 +103,44 @@
                                 </div>
 
                                 @if (($section['items'] ?? []) === [])
-                                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">No homework yet.</p>
+                                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">No subjects on this class yet.</p>
                                 @else
-                                    <ul class="mt-3 space-y-2">
-                                        @foreach ($section['items'] as $item)
-                                            <li class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-white/5">
-                                                <span class="font-semibold text-gray-900 dark:text-gray-100">{{ $item['teacher'] }}</span>
-                                                <span class="text-gray-500 dark:text-gray-400">{{ $item['subject'] }}</span>
-                                                <span class="min-w-0 grow basis-full truncate text-gray-600 sm:basis-auto dark:text-gray-300">{{ $item['title'] }}</span>
-                                                @if ($item['status_key'])
-                                                    <span @class([
-                                                        'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                                                        'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200' => $item['status_key'] === 'submitted',
-                                                        'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-200' => $item['status_key'] === 'approved',
-                                                        'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200' => $item['status_key'] === 'sent',
-                                                    ])>{{ $item['status'] }}</span>
-                                                @endif
-                                                @if ($item['submitted_at'])
-                                                    <span class="text-xs text-gray-400">{{ $item['submitted_at'] }}</span>
-                                                @endif
-                                            </li>
-                                        @endforeach
-                                    </ul>
+                                    <div class="mt-3 overflow-x-auto">
+                                        <table class="min-w-full text-left text-sm">
+                                            <thead>
+                                                <tr class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                                    <th class="px-3 py-1.5 font-medium">Subject</th>
+                                                    <th class="px-3 py-1.5 font-medium">Teacher</th>
+                                                    <th class="px-3 py-1.5 font-medium">Homework</th>
+                                                    <th class="px-3 py-1.5 font-medium">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-100 dark:divide-white/5">
+                                                @foreach ($section['items'] as $item)
+                                                    <tr class="align-top">
+                                                        <td class="px-3 py-2 font-semibold text-gray-900 dark:text-gray-100">{{ $item['subject'] }}</td>
+                                                        <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ $item['teacher'] }}</td>
+                                                        <td class="min-w-0 px-3 py-2 text-gray-600 dark:text-gray-300">
+                                                            {{ $item['title'] }}
+                                                            @if ($item['submitted_at'])
+                                                                <span class="ml-1 whitespace-nowrap text-xs text-gray-400">{{ $item['submitted_at'] }}</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="px-3 py-2">
+                                                            @if ($item['status_key'])
+                                                                <span @class([
+                                                                    'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                                                                    'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200' => $item['status_key'] === 'submitted',
+                                                                    'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-200' => $item['status_key'] === 'approved',
+                                                                    'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200' => $item['status_key'] === 'sent',
+                                                                ])>{{ $item['status'] }}</span>
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 @endif
                             </div>
                         @endforeach

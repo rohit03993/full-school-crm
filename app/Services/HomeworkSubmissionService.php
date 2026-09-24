@@ -418,7 +418,8 @@ class HomeworkSubmissionService
     }
 
     /**
-     * Full coordinator desk for one date: every active class/section, with that day's homework.
+     * Full coordinator desk for one date: every active class/section, every class subject,
+     * assigned subject teacher (blank if none), and that day's homework if it exists.
      *
      * @return array{
      *     date: string,
@@ -434,12 +435,13 @@ class HomeworkSubmissionService
      *             approved: int,
      *             sent: int,
      *             items: list<array{
-     *                 assignment_id: int,
+     *                 course_subject_id: int,
+     *                 assignment_id: ?int,
      *                 teacher: string,
      *                 subject: string,
      *                 title: string,
      *                 status: string,
-     *                 status_key: string,
+     *                 status_key: ?string,
      *                 submitted_at: ?string
      *             }>
      *         }>
@@ -452,7 +454,11 @@ class HomeworkSubmissionService
 
         $batches = Batch::query()
             ->where('status', BatchStatus::Active)
-            ->with(['course'])
+            ->with([
+                'course',
+                'activeSubjects',
+                'staffAssignments.user',
+            ])
             ->orderBy('name')
             ->get();
 
@@ -481,30 +487,42 @@ class HomeworkSubmissionService
 
             /** @var Collection<int, HomeworkAssignment> $batchAssignments */
             $batchAssignments = $assignmentsByBatch->get($batchId, collect());
+            $homeworkBySubject = $batchAssignments->keyBy(
+                fn (HomeworkAssignment $assignment): int => (int) $assignment->course_subject_id,
+            );
+            $teachersBySubject = $batch->staffAssignments
+                ->filter(fn (BatchStaffAssignment $row): bool => $row->isSubjectTeacher() && filled($row->course_subject_id))
+                ->keyBy(fn (BatchStaffAssignment $row): int => (int) $row->course_subject_id);
 
             $items = [];
             $submitted = 0;
             $approved = 0;
             $sent = 0;
 
-            foreach ($batchAssignments as $assignment) {
-                $status = $assignment->status ?? HomeworkAssignmentStatus::Submitted;
+            foreach ($batch->activeSubjects as $subject) {
+                $subjectId = (int) $subject->id;
+                /** @var HomeworkAssignment|null $assignment */
+                $assignment = $homeworkBySubject->get($subjectId);
+                $status = $assignment?->status;
+                $teacherName = (string) ($teachersBySubject->get($subjectId)?->user?->name ?? '');
 
-                match ($status) {
-                    HomeworkAssignmentStatus::Submitted => $submitted++,
-                    HomeworkAssignmentStatus::Approved => $approved++,
-                    HomeworkAssignmentStatus::Sent => $sent++,
-                    default => null,
-                };
+                if ($status === HomeworkAssignmentStatus::Submitted) {
+                    $submitted++;
+                } elseif ($status === HomeworkAssignmentStatus::Approved) {
+                    $approved++;
+                } elseif ($status === HomeworkAssignmentStatus::Sent) {
+                    $sent++;
+                }
 
                 $items[] = [
-                    'assignment_id' => (int) $assignment->id,
-                    'teacher' => $assignment->submittedBy?->name ?? $assignment->createdBy?->name ?? '—',
-                    'subject' => $assignment->courseSubject?->displayLabel() ?? '—',
-                    'title' => (string) ($assignment->title ?? ''),
-                    'status' => $status->label(),
-                    'status_key' => $status->value,
-                    'submitted_at' => $assignment->submitted_at?->timezone((string) config('app.timezone'))->format('h:i A'),
+                    'course_subject_id' => $subjectId,
+                    'assignment_id' => $assignment?->id,
+                    'teacher' => $teacherName,
+                    'subject' => $subject->displayLabel(),
+                    'title' => (string) ($assignment?->title ?? ''),
+                    'status' => $status?->label() ?? '',
+                    'status_key' => $status?->value,
+                    'submitted_at' => $assignment?->submitted_at?->timezone((string) config('app.timezone'))->format('h:i A'),
                 ];
             }
 
