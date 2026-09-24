@@ -11,15 +11,10 @@ use App\Services\HomeworkWhatsAppService;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Carbon\Carbon;
-use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Hidden;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
@@ -67,7 +62,7 @@ class HomeworkReviewPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Today’s desk by class and section. Approve what teachers sent, add a subject yourself if needed, then send ONE combined WhatsApp — only subjects with homework are included.';
+        return 'Today’s desk by class and section. Approve what teachers sent, then send ONE combined WhatsApp — only subjects with homework are included.';
     }
 
     public function mount(): void
@@ -75,10 +70,6 @@ class HomeworkReviewPage extends Page
         $this->form->fill([
             'batch_id' => null,
             'homework_date' => now()->toDateString(),
-            'course_subject_id' => null,
-            'title' => '',
-            'description' => '',
-            'attachment' => null,
         ]);
     }
 
@@ -89,8 +80,6 @@ class HomeworkReviewPage extends Page
 
     public function form(Schema $schema): Schema
     {
-        $service = app(HomeworkSubmissionService::class);
-
         return $schema->components([
             Section::make('Date')
                 ->description('Today is selected. Pick a past date to review that day.')
@@ -104,6 +93,7 @@ class HomeworkReviewPage extends Page
                         ->afterStateUpdated(function (): void {
                             $this->lastCombinedSendResult = null;
                         }),
+                    Hidden::make('batch_id'),
                 ])
                 ->columns(2),
             Section::make('Pending homework')
@@ -125,63 +115,6 @@ class HomeworkReviewPage extends Page
                         })
                         ->columnSpanFull(),
                 ]),
-            Section::make('Open a class')
-                ->description('Tap Add subject on a row above, or pick a class here, to add homework from your login (saved as approved) and see every subject.')
-                ->collapsed()
-                ->schema([
-                    Select::make('batch_id')
-                        ->label('Class')
-                        ->options(fn (): array => $service->allBatchOptions())
-                        ->searchable()
-                        ->native(false)
-                        ->live()
-                        ->afterStateUpdated(function (): void {
-                            $this->data['course_subject_id'] = null;
-                            $this->lastCombinedSendResult = null;
-                        }),
-                ])
-                ->columns(2),
-            Section::make('Add / edit a subject')
-                ->description('Use this if a teacher is absent — save from your login is approved immediately and ready to send.')
-                ->schema([
-                    Select::make('course_subject_id')
-                        ->label('Subject')
-                        ->options(function () use ($service): array {
-                            $batchId = (int) ($this->data['batch_id'] ?? 0);
-
-                            return $batchId > 0 ? $service->allSubjectOptionsForBatch($batchId) : [];
-                        })
-                        ->searchable()
-                        ->native(false)
-                        ->live(),
-                    TextInput::make('title')
-                        ->label('Title (optional)')
-                        ->maxLength(255),
-                    Textarea::make('description')
-                        ->label('Homework details')
-                        ->rows(3)
-                        ->columnSpanFull(),
-                    FileUpload::make('attachment')
-                        ->label('PDF or image (optional)')
-                        ->disk('public')
-                        ->directory('homework')
-                        ->acceptedFileTypes([
-                            'application/pdf',
-                            'image/jpeg',
-                            'image/png',
-                            'image/webp',
-                        ])
-                        ->maxSize(10240)
-                        ->columnSpanFull(),
-                    Actions::make([
-                        Action::make('saveAdminHomework')
-                            ->label('Save & approve')
-                            ->color('primary')
-                            ->action('saveAdmin'),
-                    ])->columnSpanFull(),
-                ])
-                ->columns(2)
-                ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
             Section::make('Send to parents')
                 ->description(function (): string {
                     $template = app(HomeworkWhatsAppService::class)->defaultCombinedTemplateName();
@@ -249,7 +182,6 @@ class HomeworkReviewPage extends Page
         $this->form->fill([
             ...($this->data ?? []),
             'batch_id' => $batchId,
-            'course_subject_id' => null,
         ]);
         $this->lastCombinedSendResult = null;
     }
@@ -294,50 +226,6 @@ class HomeworkReviewPage extends Page
 
         $this->openClass($batchId);
         $this->sendCombined();
-    }
-
-    public function saveAdmin(): void
-    {
-        $user = Auth::user();
-
-        if (! $user) {
-            return;
-        }
-
-        $state = $this->form->getState();
-
-        if ((int) ($state['course_subject_id'] ?? 0) < 1) {
-            Notification::make()->title('Pick a subject to add homework')->warning()->send();
-
-            return;
-        }
-
-        try {
-            $assignment = app(HomeworkSubmissionService::class)->submit($user, [
-                'batch_id' => (int) ($state['batch_id'] ?? 0),
-                'course_subject_id' => (int) ($state['course_subject_id'] ?? 0),
-                'homework_date' => $this->dateString(),
-                'title' => (string) ($state['title'] ?? ''),
-                'description' => (string) ($state['description'] ?? ''),
-                'file_path' => $this->attachmentPath($state['attachment'] ?? null),
-            ], asAdmin: true);
-        } catch (ValidationException $exception) {
-            $message = collect($exception->errors())->flatten()->first() ?? 'Could not save.';
-            Notification::make()->title((string) $message)->warning()->send();
-
-            return;
-        }
-
-        $this->data['course_subject_id'] = null;
-        $this->data['title'] = '';
-        $this->data['description'] = '';
-        $this->data['attachment'] = null;
-
-        Notification::make()
-            ->title('Saved & approved')
-            ->body($assignment->courseSubject?->displayLabel().' homework is approved and ready to send.')
-            ->success()
-            ->send();
     }
 
     public function approve(int $assignmentId): void
@@ -417,17 +305,6 @@ class HomeworkReviewPage extends Page
             ->danger()
             ->persistent()
             ->send();
-    }
-
-    protected function attachmentPath(mixed $attachment): ?string
-    {
-        if (is_array($attachment)) {
-            $first = $attachment[array_key_first($attachment)] ?? reset($attachment);
-
-            return filled($first) ? (string) $first : null;
-        }
-
-        return filled($attachment) ? (string) $attachment : null;
     }
 
     protected function dateString(): string

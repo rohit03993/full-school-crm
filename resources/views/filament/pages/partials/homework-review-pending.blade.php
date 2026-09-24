@@ -39,7 +39,6 @@
             @else
                 No homework for {{ $dateLabel }}.
             @endif
-            You can still add a subject on a class below.
         </div>
     @endif
 
@@ -100,13 +99,6 @@
                                                 Send to parents
                                             </button>
                                         @endif
-                                        <button
-                                            type="button"
-                                            wire:click="openClass({{ (int) $section['batch_id'] }})"
-                                            class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
-                                        >
-                                            Add subject
-                                        </button>
                                     </div>
                                 </div>
 

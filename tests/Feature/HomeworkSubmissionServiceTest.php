@@ -313,6 +313,8 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee($data['mathTeacher']->name)
             ->assertSee('Section A')
             ->assertSee('Algebra practice')
+            ->assertSee('Approve pending')
+            ->assertDontSee('Add subject')
             ->assertDontSee('No homework for today')
             ->call('openClass', $data['batch']->id)
             ->assertSet('data.batch_id', $data['batch']->id)
@@ -458,7 +460,7 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertNull($assignment->approved_by_user_id);
     }
 
-    public function test_coordinator_approves_adds_and_sends_from_the_desk(): void
+    public function test_coordinator_approves_and_sends_from_the_desk(): void
     {
         $sequence = 0;
 
@@ -488,25 +490,16 @@ class HomeworkSubmissionServiceTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
         Livewire::test(HomeworkReviewPage::class)
+            ->assertDontSee('Add subject')
             ->call('approvePending', $data['batch']->id)
             ->assertSet('data.batch_id', $data['batch']->id)
-            ->set('data.course_subject_id', $data['physics']->id)
-            ->set('data.description', 'Chapter 3 numericals')
-            ->call('saveAdmin')
             ->call('sendCombinedForBatch', $data['batch']->id);
 
         $maths->refresh();
-        $physics = HomeworkAssignment::query()
-            ->where('course_subject_id', $data['physics']->id)
-            ->first();
 
         $this->assertSame(HomeworkAssignmentStatus::Sent, $maths->status);
         $this->assertSame($data['admin']->id, $maths->approved_by_user_id);
         $this->assertSame($data['admin']->id, $maths->combined_sent_by_user_id);
-        $this->assertNotNull($physics);
-        $this->assertSame(HomeworkAssignmentStatus::Sent, $physics->status);
-        $this->assertSame($data['admin']->id, $physics->created_by_user_id);
-        $this->assertSame($data['admin']->id, $physics->combined_sent_by_user_id);
     }
 
     public function test_combined_send_only_covers_approved_subjects(): void
