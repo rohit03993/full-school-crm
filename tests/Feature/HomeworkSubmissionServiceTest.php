@@ -324,6 +324,7 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('Algebra practice')
             ->assertSee('Physics')
             ->assertSee('No homework')
+            ->assertSee('Remove')
             ->call('openClass', $data['batch']->id)
             ->assertSet('data.batch_id', $data['batch']->id)
             ->assertSee('Submitted: 1');
@@ -631,13 +632,40 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('Send to parents')
             ->assertDontSee('Resend')
             ->call('sendCombinedForBatch', $data['batch']->id)
-            ->assertSee('Resend');
+            ->assertSee('Resend')
+            ->assertDontSee('Remove');
 
         $maths->refresh();
 
         $this->assertSame(HomeworkAssignmentStatus::Sent, $maths->status);
         $this->assertSame($data['admin']->id, $maths->approved_by_user_id);
         $this->assertSame($data['admin']->id, $maths->combined_sent_by_user_id);
+    }
+
+    public function test_coordinator_can_remove_waiting_homework_from_the_open_class(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+
+        $maths = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Ex 5.2',
+        ]);
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->assertDontSee('Remove')
+            ->call('toggleDeskSection', $data['batch']->id)
+            ->assertSee('Remove')
+            ->call('remove', $maths->id)
+            ->assertDontSee('Algebra');
+
+        $this->assertNull(HomeworkAssignment::query()->find($maths->id));
     }
 
     public function test_combined_send_only_covers_approved_subjects(): void

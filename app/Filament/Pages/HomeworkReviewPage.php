@@ -269,7 +269,14 @@ class HomeworkReviewPage extends Page
             return;
         }
 
-        app(HomeworkSubmissionService::class)->deleteSubmission($user, $assignmentId, asAdmin: true);
+        try {
+            app(HomeworkSubmissionService::class)->deleteSubmission($user, $assignmentId, asAdmin: true);
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first() ?? 'Could not remove.';
+            Notification::make()->title((string) $message)->warning()->send();
+
+            return;
+        }
 
         Notification::make()->title('Removed')->success()->send();
     }

@@ -172,6 +172,18 @@
                                                             @if ($item['submitted_at'])
                                                                 <p class="mt-1 text-xs text-gray-400">{{ $item['submitted_at'] }}</p>
                                                             @endif
+                                                            @if ($item['assignment_id'] && $item['status_key'] !== 'sent')
+                                                                <p class="mt-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        wire:click="remove({{ (int) $item['assignment_id'] }})"
+                                                                        wire:confirm="Remove this subject's homework for the day?"
+                                                                        class="text-xs font-semibold text-rose-600 hover:underline dark:text-rose-400"
+                                                                    >
+                                                                        Remove
+                                                                    </button>
+                                                                </p>
+                                                            @endif
                                                         </div>
                                                     </li>
                                                 @else

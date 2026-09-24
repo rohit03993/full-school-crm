@@ -293,16 +293,16 @@ class HomeworkSubmissionService
     {
         $assignment = HomeworkAssignment::query()->findOrFail($assignmentId);
 
+        if ($assignment->status === HomeworkAssignmentStatus::Sent) {
+            throw ValidationException::withMessages([
+                'delete' => 'This homework was already sent to parents and cannot be removed here.',
+            ]);
+        }
+
         if (! $asAdmin && ! $this->scope->userCanManageHomeworkDesk($user)) {
             if (! $this->scope->userCanAccessBatch($user, (int) $assignment->batch_id)) {
                 throw ValidationException::withMessages([
                     'delete' => 'You cannot remove homework for this class.',
-                ]);
-            }
-
-            if ($assignment->status === HomeworkAssignmentStatus::Sent) {
-                throw ValidationException::withMessages([
-                    'delete' => 'This homework was already sent to parents and cannot be removed here.',
                 ]);
             }
         }
