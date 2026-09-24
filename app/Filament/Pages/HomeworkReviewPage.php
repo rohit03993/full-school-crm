@@ -55,6 +55,8 @@ class HomeworkReviewPage extends Page
     /** @var array<string, mixed>|null */
     public ?array $lastCombinedSendResult = null;
 
+    public ?int $openBatchId = null;
+
     public static function getNavigationLabel(): string
     {
         return CrmMenuLabels::homeworkReview();
@@ -92,12 +94,13 @@ class HomeworkReviewPage extends Page
                         ->live()
                         ->afterStateUpdated(function (): void {
                             $this->lastCombinedSendResult = null;
+                            $this->openBatchId = null;
                         }),
                     Hidden::make('batch_id'),
                 ])
                 ->columns(2),
             Section::make('Pending homework')
-                ->description('Waiting first, then ready to send, then already sent, then classes with no homework yet. Every subject of the class is listed.')
+                ->description('Tap a class to see every subject. Waiting first, then ready to send, then already sent.')
                 ->schema([
                     View::make('filament.pages.partials.homework-review-pending')
                         ->viewData(function (): array {
@@ -105,7 +108,7 @@ class HomeworkReviewPage extends Page
 
                             return [
                                 'desk' => app(HomeworkSubmissionService::class)->deskForDate($date),
-                                'selectedBatchId' => (int) ($this->data['batch_id'] ?? 0),
+                                'openBatchId' => (int) ($this->openBatchId ?? 0),
                                 'dateLabel' => Carbon::parse($date)->format('d M Y'),
                                 'isToday' => $date === now()->toDateString(),
                                 'submitUrl' => SubmitHomeworkPage::getUrl(),
@@ -183,7 +186,17 @@ class HomeworkReviewPage extends Page
             ...($this->data ?? []),
             'batch_id' => $batchId,
         ]);
+        $this->openBatchId = $batchId;
         $this->lastCombinedSendResult = null;
+    }
+
+    public function toggleDeskSection(int $batchId): void
+    {
+        if ($batchId < 1) {
+            return;
+        }
+
+        $this->openBatchId = (int) $this->openBatchId === $batchId ? null : $batchId;
     }
 
     public function approvePending(int $batchId): void

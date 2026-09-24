@@ -312,14 +312,18 @@ class HomeworkSubmissionServiceTest extends TestCase
         Livewire::test(HomeworkReviewPage::class)
             ->assertSuccessful()
             ->assertSee('Pending homework')
-            ->assertSee($data['mathTeacher']->name)
-            ->assertSee($data['physicsTeacher']->name)
             ->assertSee('Section A')
-            ->assertSee('Algebra practice')
-            ->assertSee('Physics (PHY)')
             ->assertSee('Approve pending')
+            ->assertDontSee('Algebra practice')
             ->assertDontSee('Add subject')
             ->assertDontSee('No homework for today')
+            ->call('toggleDeskSection', $data['batch']->id)
+            ->assertSet('openBatchId', $data['batch']->id)
+            ->assertSee($data['mathTeacher']->name)
+            ->assertSee($data['physicsTeacher']->name)
+            ->assertSee('Algebra practice')
+            ->assertSee('Physics')
+            ->assertSee('No homework')
             ->call('openClass', $data['batch']->id)
             ->assertSet('data.batch_id', $data['batch']->id)
             ->assertSee('Submitted: 1');
@@ -346,6 +350,7 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('No homework for today')
             ->assertDontSee('Past algebra')
             ->set('data.homework_date', $yesterday)
+            ->call('toggleDeskSection', $data['batch']->id)
             ->assertSee($data['mathTeacher']->name)
             ->assertSee('Past algebra')
             ->assertDontSee('No homework for today');
@@ -405,6 +410,42 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame('', $sectionA[$biology->id]['teacher']);
         $this->assertSame('', $sectionA[$biology->id]['title']);
         $this->assertSame([], $desk['groups'][0]['sections'][1]['items']);
+    }
+
+    public function test_desk_accordion_opens_one_class_at_a_time(): void
+    {
+        $data = $this->seedClass();
+        $other = Batch::query()->create([
+            'name' => 'Class 11 JEE - B',
+            'section' => 'B',
+            'course_id' => $data['batch']->course_id,
+            'academic_session_id' => $data['batch']->academic_session_id,
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'status' => BatchStatus::Active,
+        ]);
+
+        app(HomeworkSubmissionService::class)->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra practice',
+            'description' => 'Ex 5.2',
+        ]);
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->assertDontSee('Algebra practice')
+            ->call('toggleDeskSection', $data['batch']->id)
+            ->assertSet('openBatchId', $data['batch']->id)
+            ->assertSee('Algebra practice')
+            ->call('toggleDeskSection', $other->id)
+            ->assertSet('openBatchId', $other->id)
+            ->assertDontSee('Algebra practice')
+            ->call('toggleDeskSection', $other->id)
+            ->assertSet('openBatchId', null);
     }
 
     public function test_homework_menu_sends_admin_to_the_desk(): void

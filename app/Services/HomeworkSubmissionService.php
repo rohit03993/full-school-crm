@@ -518,7 +518,7 @@ class HomeworkSubmissionService
                     'course_subject_id' => $subjectId,
                     'assignment_id' => $assignment?->id,
                     'teacher' => $teacherName,
-                    'subject' => $subject->displayLabel(),
+                    'subject' => (string) $subject->name,
                     'title' => (string) ($assignment?->title ?? ''),
                     'status' => $status?->label() ?? '',
                     'status_key' => $status?->value,
