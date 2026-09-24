@@ -7,6 +7,7 @@ use App\Enums\HomeworkContentType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -50,9 +51,27 @@ class HomeworkAssignment extends Model
     {
         do {
             $token = Str::random(static::PUBLIC_TOKEN_LENGTH);
-        } while (static::query()->where('public_token', $token)->exists());
+        } while (static::shareTokenIsTaken($token));
 
         return $token;
+    }
+
+    public static function generateShareToken(): string
+    {
+        return static::generateUniquePublicToken();
+    }
+
+    public static function shareTokenIsTaken(string $token): bool
+    {
+        if (static::query()->where('public_token', $token)->exists()) {
+            return true;
+        }
+
+        if (! Schema::hasTable('homework_student_links')) {
+            return false;
+        }
+
+        return HomeworkStudentLink::query()->where('token', $token)->exists();
     }
 
     public function ensurePublicToken(): string
@@ -109,6 +128,11 @@ class HomeworkAssignment extends Model
     public function combinedSentBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'combined_sent_by_user_id');
+    }
+
+    public function studentLinks(): HasMany
+    {
+        return $this->hasMany(HomeworkStudentLink::class);
     }
 
     public function views(): HasMany

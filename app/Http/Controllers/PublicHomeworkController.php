@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\HomeworkAssignment;
+use App\Models\HomeworkStudentLink;
+use App\Services\HomeworkAssignmentService;
 use App\Support\InstituteSettings;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -41,8 +44,29 @@ class PublicHomeworkController extends Controller
     {
         abort_unless(strlen($token) >= HomeworkAssignment::PUBLIC_TOKEN_LENGTH && strlen($token) <= 64, 404);
 
+        $studentLink = $this->studentLinkForToken($token);
+
+        if ($studentLink) {
+            $studentLink->recordOpen();
+            app(HomeworkAssignmentService::class)->recordView($studentLink->assignment, $studentLink->student);
+
+            return $studentLink->assignment;
+        }
+
         return HomeworkAssignment::query()
             ->where('public_token', $token)
             ->firstOrFail();
+    }
+
+    protected function studentLinkForToken(string $token): ?HomeworkStudentLink
+    {
+        if (! Schema::hasTable('homework_student_links')) {
+            return null;
+        }
+
+        return HomeworkStudentLink::query()
+            ->where('token', $token)
+            ->with(['assignment', 'student'])
+            ->first();
     }
 }

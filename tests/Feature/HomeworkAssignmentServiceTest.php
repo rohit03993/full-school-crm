@@ -99,6 +99,44 @@ class HomeworkAssignmentServiceTest extends TestCase
             ->assertSee('Sent before short tokens.');
     }
 
+    public function test_student_homework_link_records_that_student_and_keeps_class_link_working(): void
+    {
+        [$student, $batch, $staff] = $this->createStudentInBatch();
+
+        $assignment = app(HomeworkAssignmentService::class)->create($staff, [
+            'batch_id' => $batch->id,
+            'title' => 'Tracked homework',
+            'description' => 'Click me.',
+            'send_whatsapp' => false,
+        ]);
+
+        $link = app(\App\Services\HomeworkStudentLinkService::class)
+            ->ensureForAssignment($assignment, collect([$student]))
+            ->get($student->id);
+
+        $this->assertNotNull($link);
+        $this->assertNotSame($assignment->public_token, $link->token);
+
+        $this->get($link->publicUrl())
+            ->assertOk()
+            ->assertSee('Tracked homework');
+
+        $link->refresh();
+
+        $this->assertSame(1, $link->click_count);
+        $this->assertNotNull($link->first_clicked_at);
+        $this->assertDatabaseHas('homework_views', [
+            'homework_assignment_id' => $assignment->id,
+            'student_id' => $student->id,
+        ]);
+
+        $this->get($assignment->publicUrl())
+            ->assertOk()
+            ->assertSee('Tracked homework');
+
+        $this->assertSame(1, $link->fresh()->click_count);
+    }
+
     public function test_whatsapp_notify_uses_public_homework_link(): void
     {
         [$student, $batch, $staff] = $this->createStudentInBatch();
@@ -127,10 +165,17 @@ class HomeworkAssignmentServiceTest extends TestCase
         $fake->shouldReceive('send')
             ->once()
             ->withArgs(function (string $mobile, array $params) use ($student, $assignment): bool {
+                $studentToken = \App\Models\HomeworkStudentLink::query()
+                    ->where('homework_assignment_id', $assignment->id)
+                    ->where('student_id', $student->id)
+                    ->value('token');
+
                 return $mobile === $student->mobile
                     && $params[0] === $student->name
                     && $params[2] === 'WA share homework'
-                    && str_contains($params[3], '/h/'.$assignment->public_token);
+                    && is_string($studentToken)
+                    && str_contains($params[3], '/h/'.$studentToken)
+                    && ! str_contains($params[3], '/h/'.$assignment->public_token);
             })
             ->andReturn(['status' => 'success']);
 

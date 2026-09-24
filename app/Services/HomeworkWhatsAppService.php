@@ -20,6 +20,7 @@ class HomeworkWhatsAppService
     public function __construct(
         protected WhatsAppDispatchService $whatsapp,
         protected HomeworkAssignmentService $homework,
+        protected HomeworkStudentLinkService $studentLinks,
         protected MetaWhatsAppCostEstimator $costEstimator,
         protected WhatsAppSettingsService $settings,
     ) {}
@@ -168,16 +169,19 @@ class HomeworkWhatsAppService
 
         $estimate = $this->costEstimator->estimateForTemplate($resolved);
         $unitCost = (float) $estimate['cost_inr'];
-        $linksBlock = $this->buildSubjectLinksBlock($assignments);
-
-        if ($linksBlock === '') {
-            return [...$empty, 'template' => $resolved, 'error' => 'None of the selected homework has a shareable link.'];
-        }
 
         $students = $this->homework->batchStudentsWithMobile($batch->id);
 
         if ($students->isEmpty()) {
             return [...$empty, 'template' => $resolved, 'error' => 'No students with a Mobile number in this class.'];
+        }
+
+        $this->studentLinks->ensureForAssignments($assignments, $students);
+
+        $sampleBlock = $this->buildSubjectLinksBlock($assignments, $students->first());
+
+        if ($sampleBlock === '') {
+            return [...$empty, 'template' => $resolved, 'error' => 'None of the selected homework has a shareable link.'];
         }
 
         $sent = 0;
@@ -209,7 +213,7 @@ class HomeworkWhatsAppService
                 (string) ($student->name ?? 'Student'),
                 $roll !== '' ? $roll : '—',
                 $dateLabel,
-                $linksBlock,
+                $this->buildSubjectLinksBlock($assignments, $student),
             ];
 
             // One student's failure must not stop the rest of the class.
@@ -286,15 +290,17 @@ class HomeworkWhatsAppService
      *
      * @param  Collection<int, HomeworkAssignment>  $assignments
      */
-    protected function buildSubjectLinksBlock(Collection $assignments): string
+    protected function buildSubjectLinksBlock(Collection $assignments, ?Student $student = null): string
     {
         return $assignments
-            ->map(function (HomeworkAssignment $assignment): ?string {
+            ->map(function (HomeworkAssignment $assignment) use ($student): ?string {
                 $label = $assignment->courseSubject?->displayLabel()
                     ?? $assignment->title
                     ?? 'Homework';
 
-                $link = $assignment->publicUrl();
+                $link = $student
+                    ? $this->studentLinks->publicUrlFor($assignment, $student)
+                    : $assignment->publicUrl();
 
                 if (blank($link)) {
                     return null;
@@ -336,7 +342,6 @@ class HomeworkWhatsAppService
             ];
         }
 
-        $link = $assignment->publicUrl();
         $students = $this->homework->batchStudentsWithMobile($assignment->batch_id);
 
         if ($students->isEmpty()) {
@@ -347,13 +352,20 @@ class HomeworkWhatsAppService
             ];
         }
 
+        $this->studentLinks->ensureForAssignment($assignment, $students);
+
         $sent = 0;
         $failed = 0;
         $skipped = 0;
         $lastError = null;
 
         foreach ($students as $student) {
-            $result = $this->notifyStudent($student, $assignment, $resolved, $link);
+            $result = $this->notifyStudent(
+                $student,
+                $assignment,
+                $resolved,
+                $this->studentLinks->publicUrlFor($assignment, $student),
+            );
 
             if ($result['status'] === 'sent') {
                 $sent++;
@@ -395,7 +407,7 @@ class HomeworkWhatsAppService
             return ['status' => 'skipped', 'error' => blank($resolved) ? 'No share template selected.' : 'Student has no mobile.'];
         }
 
-        $link ??= $assignment->publicUrl();
+        $link ??= $this->studentLinks->publicUrlFor($assignment, $student);
         $roll = (string) ($student->activeEnrollment?->enrollment_number ?? '');
 
         $params = [

@@ -136,6 +136,7 @@ class StudentDataResetService
             'exam_window_subjects',
             'exam_windows',
             'homework_checks',
+            'homework_student_links',
             'homework_views',
             'homework_assignments',
             'activity_attendances',

@@ -24,6 +24,7 @@ use App\Models\BatchStudent;
 use App\Models\Course;
 use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
+use App\Models\HomeworkStudentLink;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
@@ -767,6 +768,60 @@ class HomeworkSubmissionServiceTest extends TestCase
             HomeworkAssignment::query()
                 ->where('course_subject_id', $data['physics']->id)
                 ->first()->status,
+        );
+    }
+
+    public function test_combined_send_gives_each_student_a_unique_link_and_reuses_it_on_resend(): void
+    {
+        $sequence = 0;
+
+        Http::fake([
+            'https://graph.facebook.com/*' => function () use (&$sequence) {
+                $sequence++;
+
+                return Http::response([
+                    'messages' => [['id' => 'wamid.UNIQ'.$sequence]],
+                ], 200);
+            },
+        ]);
+
+        $data = $this->seedClass();
+        $this->seedCombinedTemplate();
+        $service = app(HomeworkSubmissionService::class);
+
+        $maths = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Ex 5.2',
+        ]);
+        $service->approve($data['admin'], $maths->id);
+
+        $first = $service->combinedSend($data['admin'], $data['batch']->id, now()->toDateString());
+
+        $this->assertSame(2, $first['sent'], (string) ($first['error'] ?? ''));
+
+        $links = HomeworkStudentLink::query()
+            ->where('homework_assignment_id', $maths->id)
+            ->orderBy('student_id')
+            ->get();
+
+        $this->assertCount(2, $links);
+        $this->assertCount(2, $links->pluck('token')->unique());
+        $this->assertNotContains($maths->public_token, $links->pluck('token')->all());
+
+        $tokens = $links->pluck('token')->all();
+
+        $second = $service->combinedSend($data['admin'], $data['batch']->id, now()->toDateString());
+
+        $this->assertSame(2, $second['sent'], (string) ($second['error'] ?? ''));
+        $this->assertEqualsCanonicalizing(
+            $tokens,
+            HomeworkStudentLink::query()
+                ->where('homework_assignment_id', $maths->id)
+                ->pluck('token')
+                ->all(),
         );
     }
 
