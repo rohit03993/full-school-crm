@@ -218,6 +218,83 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('Added by Khushi Coordinator');
     }
 
+    public function test_coordinator_adds_homework_from_review_desk_popup(): void
+    {
+        $data = $this->seedClass();
+        app(CrmPermissionSyncService::class)->sync();
+
+        $coordinator = User::factory()->create(['is_active' => true, 'name' => 'Khushi Coordinator']);
+        $coordinator->syncRoles([RoleName::Staff->value, StaffJobRole::AcademicCoordinator->value]);
+
+        $this->actingAs($coordinator);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('toggleDeskSection', $data['batch']->id)
+            ->assertSee('Add homework')
+            ->call('startAdd', $data['batch']->id, $data['physics']->id)
+            ->assertActionMounted('addHomework')
+            ->setActionData(['description' => 'Chapter 3 numericals'])
+            ->callMountedAction()
+            ->assertHasNoActionErrors()
+            ->assertNotified();
+
+        $assignment = HomeworkAssignment::query()
+            ->where('course_subject_id', $data['physics']->id)
+            ->first();
+
+        $this->assertNotNull($assignment);
+        $this->assertSame(HomeworkAssignmentStatus::Approved, $assignment->status);
+        $this->assertSame($coordinator->id, $assignment->approved_by_user_id);
+    }
+
+    public function test_admin_adds_homework_from_review_desk_popup(): void
+    {
+        $data = $this->seedClass();
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('toggleDeskSection', $data['batch']->id)
+            ->call('startAdd', $data['batch']->id, $data['maths']->id)
+            ->assertActionMounted('addHomework')
+            ->setActionData(['description' => 'Algebra worksheet'])
+            ->callMountedAction()
+            ->assertHasNoActionErrors();
+
+        $assignment = HomeworkAssignment::query()
+            ->where('course_subject_id', $data['maths']->id)
+            ->first();
+
+        $this->assertNotNull($assignment);
+        $this->assertSame(HomeworkAssignmentStatus::Approved, $assignment->status);
+        $this->assertSame($data['admin']->id, $assignment->approved_by_user_id);
+    }
+
+    public function test_admin_add_homework_header_popup_picks_class_and_subject(): void
+    {
+        $data = $this->seedClass();
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->callAction('addHomework', data: [
+                'batch_id' => $data['batch']->id,
+                'course_subject_id' => $data['physics']->id,
+                'description' => 'From the top button',
+            ])
+            ->assertHasNoActionErrors();
+
+        $assignment = HomeworkAssignment::query()
+            ->where('course_subject_id', $data['physics']->id)
+            ->first();
+
+        $this->assertNotNull($assignment);
+        $this->assertSame(HomeworkAssignmentStatus::Approved, $assignment->status);
+    }
+
     public function test_board_lists_every_subject_with_status(): void
     {
         $data = $this->seedClass();
@@ -535,11 +612,12 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('Add homework')
             ->assertDontSee('Check completion')
             ->assertDontSee('Review & send')
+            ->assertDontSee('Use this if Add homework did not open the form.')
             ->call('startAdd', $data['batch']->id, $data['maths']->id)
-            ->assertSet('data.batch_id', $data['batch']->id)
-            ->assertSet('data.course_subject_id', $data['maths']->id)
-            ->set('data.description', 'Complete exercise 5.2')
-            ->call('submit');
+            ->assertActionMounted('addHomework')
+            ->setActionData(['description' => 'Complete exercise 5.2'])
+            ->callMountedAction()
+            ->assertHasNoActionErrors();
 
         $assignment = HomeworkAssignment::query()
             ->where('course_subject_id', $data['maths']->id)
@@ -563,8 +641,10 @@ class HomeworkSubmissionServiceTest extends TestCase
         Livewire::test(SubmitHomeworkPage::class)
             ->assertDontSee('Check completion')
             ->call('startAdd', $data['batch']->id, $data['maths']->id)
-            ->set('data.description', 'Complete exercise 5.2')
-            ->call('submit')
+            ->assertActionMounted('addHomework')
+            ->setActionData(['description' => 'Complete exercise 5.2'])
+            ->callMountedAction()
+            ->assertHasNoActionErrors()
             ->assertSee('Check completion');
 
         Livewire::withQueryParams([

@@ -281,14 +281,20 @@
                                                         @endif
                                                     </li>
                                                 @else
-                                                    <li class="flex min-w-0 items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 text-xs text-gray-400">
-                                                        <span>
+                                                    <li class="flex min-w-0 items-center justify-between gap-3 rounded-lg px-3 py-1.5 text-xs">
+                                                        <span class="text-gray-400">
                                                             {{ $item['subject'] }}
                                                             @if (filled($item['teacher']))
                                                                 <span class="ml-1 inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">{{ $item['teacher'] }}</span>
                                                             @endif
                                                         </span>
-                                                        <span>No homework</span>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="startAdd({{ $batchId }}, {{ (int) $item['course_subject_id'] }})"
+                                                            class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500"
+                                                        >
+                                                            Add homework
+                                                        </button>
                                                     </li>
                                                 @endif
                                             @endforeach

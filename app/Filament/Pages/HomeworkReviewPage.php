@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
+use App\Filament\Concerns\AddsHomeworkModal;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Resources\HomeworkAssignments\HomeworkAssignmentResource;
 use App\Services\HomeworkSubmissionService;
@@ -27,6 +28,7 @@ use UnitEnum;
 
 class HomeworkReviewPage extends Page
 {
+    use AddsHomeworkModal;
     use RequiresCrmPermission;
 
     protected static bool $shouldRegisterNavigation = false;
