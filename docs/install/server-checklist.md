@@ -118,7 +118,8 @@ DB_USERNAME=your_db_user
 DB_PASSWORD=your_db_password
 
 SESSION_DRIVER=file
-SESSION_LIFETIME=120
+# 1440 = 24 hours idle. Staff still sign in again at 8:00 PM IST (not after 2 hours on phone/PWA).
+SESSION_LIFETIME=1440
 SESSION_ENCRYPT=false
 SESSION_PATH=/
 SESSION_DOMAIN=null

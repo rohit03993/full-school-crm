@@ -14,10 +14,17 @@ use Illuminate\Support\Facades\Cache;
 /**
  * Staff stay signed in until 8:00 PM IST the same working day, then must OTP again.
  * Login after 8:00 PM lasts until 8:00 PM the next day.
+ *
+ * Idle time (phone locked, PWA in background) must not ask OTP before that cutoff.
+ * Laravel session files/cookies use WORKING_DAY_MINUTES so a 2-hour pause does not
+ * delete the login. 8 PM logout is still hasExpired() + LogoutStaffAfterDailyCutoff.
  */
 class StaffDailySessionService
 {
     public const SESSION_KEY = 'staff_daily_logout_at';
+
+    /** Minutes the login cookie/file may sit unused. Covers login after 8 PM until the next 8 PM. */
+    public const WORKING_DAY_MINUTES = 1440;
 
     public function deviceCacheKey(int $userId): string
     {
@@ -101,30 +108,47 @@ class StaffDailySessionService
         return max(1, (int) ceil($seconds / 60));
     }
 
+    /**
+     * Keep the session file alive for a full working day, even if .env still says 120.
+     * Call this at app boot — before Laravel reads the session — or idle 2 hours deletes the login.
+     */
+    public function applyWorkingDayLifetime(): void
+    {
+        $current = (int) config('session.lifetime');
+
+        config(['session.lifetime' => max($current, self::WORKING_DAY_MINUTES)]);
+    }
+
+    /**
+     * Browser cookie should end around 8 PM. Call only after the session is already open.
+     * Do not call this at boot: shrinking lifetime before read would kill a long idle pause.
+     */
+    public function applyCookieLifetime(?CarbonInterface $now = null): void
+    {
+        config(['session.lifetime' => $this->minutesUntilLogout($now)]);
+    }
+
     public function start(Request $request, ?CarbonInterface $now = null): void
     {
         $ends = $this->nextLogoutAt($now);
         $request->session()->put(self::SESSION_KEY, $ends->toIso8601String());
-        config(['session.lifetime' => $this->minutesUntilLogout($now)]);
+        $this->applyCookieLifetime($now);
     }
 
     public function ensureStarted(Request $request, ?CarbonInterface $now = null): void
     {
-        if ($request->session()->has(self::SESSION_KEY)) {
-            return;
+        if (! $request->session()->has(self::SESSION_KEY)) {
+            $now = $this->now($now);
+            $todayCutoff = $this->todayCutoff($now);
+
+            if ($now->gte($todayCutoff)) {
+                $request->session()->put(self::SESSION_KEY, $now->copy()->subSecond()->toIso8601String());
+            } else {
+                $request->session()->put(self::SESSION_KEY, $todayCutoff->toIso8601String());
+            }
         }
 
-        $now = $this->now($now);
-        $todayCutoff = $this->todayCutoff($now);
-
-        if ($now->gte($todayCutoff)) {
-            $request->session()->put(self::SESSION_KEY, $now->copy()->subSecond()->toIso8601String());
-
-            return;
-        }
-
-        $request->session()->put(self::SESSION_KEY, $todayCutoff->toIso8601String());
-        config(['session.lifetime' => $this->minutesUntilLogout($now)]);
+        $this->applyCookieLifetime($now);
     }
 
     public function hasExpired(Request $request, ?CarbonInterface $now = null): bool

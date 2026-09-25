@@ -10,6 +10,7 @@ use App\Support\CrmLivewireErrors;
 use App\Support\CrmPagination;
 use App\Support\FeatureGate;
 use App\Support\SiteContent;
+use App\Services\StaffDailySessionService;
 use App\Services\StaffLoginSessionService;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
 use Filament\Tables\Table;
@@ -28,11 +29,14 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Before the session cookie is read: idle 2 hours must not delete staff OTP login.
+        app(StaffDailySessionService::class)->applyWorkingDayLifetime();
+
         CrmLivewireErrors::register();
 
         Event::listen(Login::class, function (Login $event): void {
             app(StaffLoginSessionService::class)->handleLoginEvent($event);
-            app(\App\Services\StaffDailySessionService::class)->startFromLoginEvent($event);
+            app(StaffDailySessionService::class)->startFromLoginEvent($event);
         });
         Event::listen(Logout::class, function (Logout $event): void {
             app(StaffLoginSessionService::class)->handleLogoutEvent($event);

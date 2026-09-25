@@ -56,6 +56,60 @@ class StaffDailySessionTest extends TestCase
                 ->timezone('Asia/Kolkata')
                 ->format('Y-m-d H:i:s'),
         );
+        $this->assertSame(
+            app(StaffDailySessionService::class)->minutesUntilLogout(),
+            (int) config('session.lifetime'),
+        );
+    }
+
+    public function test_boot_keeps_session_alive_for_a_full_working_day_even_if_env_says_120(): void
+    {
+        $this->assertSame(120, (int) env('SESSION_LIFETIME'));
+        $this->assertGreaterThanOrEqual(
+            StaffDailySessionService::WORKING_DAY_MINUTES,
+            (int) config('session.lifetime'),
+        );
+    }
+
+    public function test_each_admin_page_keeps_the_cookie_until_8pm_not_two_hours(): void
+    {
+        $this->enableAdminAccess();
+        Carbon::setTestNow(Carbon::parse('2026-09-21 11:00:00', 'Asia/Kolkata'));
+
+        $user = $this->staffUser();
+        $service = app(StaffDailySessionService::class);
+
+        $this->actingAs($user);
+        session([
+            StaffDailySessionService::SESSION_KEY => $service->nextLogoutAt()->toIso8601String(),
+        ]);
+
+        $this->get(Dashboard::getUrl())->assertOk();
+
+        $this->assertSame($service->minutesUntilLogout(), (int) config('session.lifetime'));
+        $this->assertGreaterThan(120, (int) config('session.lifetime'));
+    }
+
+    public function test_staff_stay_signed_in_after_three_hours_idle_before_8pm(): void
+    {
+        $this->enableAdminAccess();
+        Carbon::setTestNow(Carbon::parse('2026-09-21 11:00:00', 'Asia/Kolkata'));
+
+        $user = $this->staffUser();
+        $service = app(StaffDailySessionService::class);
+
+        $this->actingAs($user);
+        session([
+            StaffDailySessionService::SESSION_KEY => $service->nextLogoutAt()->toIso8601String(),
+        ]);
+
+        $this->get(Dashboard::getUrl())->assertOk();
+        $this->assertAuthenticatedAs($user);
+
+        Carbon::setTestNow(Carbon::parse('2026-09-21 14:00:00', 'Asia/Kolkata'));
+
+        $this->get(Dashboard::getUrl())->assertOk();
+        $this->assertAuthenticatedAs($user);
     }
 
     public function test_staff_are_logged_out_after_8pm_and_must_sign_in_again(): void
