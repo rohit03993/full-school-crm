@@ -200,38 +200,6 @@ class HomeworkReviewPage extends Page
         $this->openBatchId = (int) $this->openBatchId === $batchId ? null : $batchId;
     }
 
-    public function approvePending(int $batchId): void
-    {
-        $user = Auth::user();
-
-        if (! $user || $batchId < 1) {
-            return;
-        }
-
-        try {
-            $count = app(HomeworkSubmissionService::class)->approvePendingForClassDate($user, $batchId, $this->dateString());
-        } catch (ValidationException $exception) {
-            $message = collect($exception->errors())->flatten()->first() ?? 'Could not approve.';
-            Notification::make()->title((string) $message)->warning()->send();
-
-            return;
-        }
-
-        $this->openClass($batchId);
-
-        if ($count < 1) {
-            Notification::make()->title('Nothing waiting to approve')->warning()->send();
-
-            return;
-        }
-
-        Notification::make()
-            ->title('Approved')
-            ->body($count.' subject(s) approved and ready to send.')
-            ->success()
-            ->send();
-    }
-
     public function sendCombinedForBatch(int $batchId): void
     {
         if ($batchId < 1) {

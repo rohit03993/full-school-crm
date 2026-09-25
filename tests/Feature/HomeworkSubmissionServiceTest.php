@@ -407,7 +407,8 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSuccessful()
             ->assertSee('Classes')
             ->assertSee('Class 11 JEE')
-            ->assertSee('Approve pending')
+            ->assertSee('1 to check')
+            ->assertDontSee('Approve pending')
             ->assertDontSee('Algebra practice')
             ->assertDontSee('Add subject')
             ->assertDontSee('No homework for today')
@@ -446,6 +447,7 @@ class HomeworkSubmissionServiceTest extends TestCase
         Livewire::test(HomeworkReviewPage::class)
             ->assertSuccessful()
             ->assertSee('No homework for today')
+            ->assertSee('2 subjects · none yet')
             ->assertDontSee('Past algebra')
             ->set('data.homework_date', $yesterday)
             ->call('toggleDeskSection', $data['batch']->id)
@@ -730,8 +732,11 @@ class HomeworkSubmissionServiceTest extends TestCase
 
         Livewire::test(HomeworkReviewPage::class)
             ->assertDontSee('Add subject')
-            ->call('approvePending', $data['batch']->id)
-            ->assertSet('data.batch_id', $data['batch']->id)
+            ->assertSee('1 to check')
+            ->assertDontSee('Approve pending')
+            ->call('toggleDeskSection', $data['batch']->id)
+            ->assertSee('Open homework')
+            ->call('approve', $maths->id)
             ->assertSee('Send to parents')
             ->assertDontSee('Resend')
             ->call('sendCombinedForBatch', $data['batch']->id)
@@ -743,6 +748,40 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame(HomeworkAssignmentStatus::Sent, $maths->status);
         $this->assertSame($data['admin']->id, $maths->approved_by_user_id);
         $this->assertSame($data['admin']->id, $maths->combined_sent_by_user_id);
+    }
+
+    public function test_approving_one_subject_does_not_approve_the_other(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+
+        $maths = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Ex 5.2',
+        ]);
+        $physics = $service->submit($data['physicsTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['physics']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Optics',
+            'description' => 'Chapter 9',
+        ]);
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->assertSee('2 to check')
+            ->assertDontSee('Approve pending')
+            ->call('toggleDeskSection', $data['batch']->id)
+            ->assertSee('Open homework')
+            ->call('approve', $maths->id);
+
+        $this->assertSame(HomeworkAssignmentStatus::Approved, $maths->fresh()->status);
+        $this->assertSame(HomeworkAssignmentStatus::Submitted, $physics->fresh()->status);
     }
 
     public function test_coordinator_can_remove_waiting_homework_from_the_open_class(): void

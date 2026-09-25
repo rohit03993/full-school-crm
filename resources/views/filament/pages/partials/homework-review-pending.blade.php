@@ -61,6 +61,8 @@
                                 $hasWaiting = (int) $section['submitted'] > 0;
                                 $hasReady = (int) $section['approved'] > 0;
                                 $hasSent = (int) $section['sent'] > 0;
+                                $subjectCount = count($section['items'] ?? []);
+                                $waitingCount = (int) $section['submitted'];
                                 $sectionTitle = filled($section['section']) && $section['section'] !== '—'
                                     ? (string) $section['section']
                                     : (string) $section['class_label'];
@@ -102,15 +104,19 @@
                                             </span>
                                         </span>
                                     </button>
-                                    <div class="flex min-w-0 flex-wrap gap-2">
+                                    <div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
                                         @if ($hasWaiting)
-                                            <button
-                                                type="button"
-                                                wire:click="approvePending({{ $batchId }})"
-                                                class="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500"
-                                            >
-                                                Approve pending
-                                            </button>
+                                            <span class="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
+                                                {{ $waitingCount }} to check
+                                            </span>
+                                        @elseif (! $hasReady && ! $hasSent)
+                                            <span class="px-1 text-xs font-medium text-gray-400 dark:text-gray-500">
+                                                @if ($subjectCount < 1)
+                                                    No subjects
+                                                @else
+                                                    {{ $subjectCount }} {{ $subjectCount === 1 ? 'subject' : 'subjects' }} · none yet
+                                                @endif
+                                            </span>
                                         @endif
                                         @if ($hasReady)
                                             <button
