@@ -7,8 +7,10 @@ use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\EnrollmentStatus;
 use App\Enums\Gender;
+use App\Enums\HomeworkAssignmentStatus;
 use App\Enums\HomeworkCheckNotifyStatus;
 use App\Enums\HomeworkCheckStatus;
+use App\Enums\HomeworkContentType;
 use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
@@ -21,9 +23,11 @@ use App\Models\Course;
 use App\Models\CourseSubject;
 use App\Models\Enquiry;
 use App\Models\Enrollment;
+use App\Models\HomeworkAssignment;
 use App\Models\HomeworkCheck;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\HomeworkStudentLinkService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
@@ -59,11 +63,87 @@ class StudentProfileHomeworkTabTest extends TestCase
             ->assertSet('profileTab', 'homework')
             ->assertSet('homeworkTabLoaded', true)
             ->assertStatus(200)
-            ->assertSee('Homework check marks')
+            ->assertSee('Homework for this student, grouped by date.')
+            ->assertSee(now()->format('d M Y'))
+            ->assertDontSee('Assigned homework')
+            ->assertDontSee('Not viewed')
+            ->assertDontSee('Homework check marks')
             ->assertSee('Not Done')
             ->assertSee('Mathematics')
             ->assertSee("Today's homework")
             ->assertSee('Not Done mark(s) this week');
+    }
+
+    public function test_homework_tab_groups_subjects_under_the_homework_date(): void
+    {
+        $admin = $this->createSuperAdmin();
+        [$student, $batch, $maths] = $this->createEnrolledStudent();
+
+        $physics = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'Physics',
+            'code' => 'PHY-HW',
+            'default_max_marks' => 100,
+            'sort_order' => 2,
+            'is_active' => true,
+        ]);
+        $batch->subjects()->attach($physics->id, ['sort_order' => 2]);
+
+        $today = now()->toDateString();
+        $earlier = now()->subDays(2)->toDateString();
+
+        $mathsToday = HomeworkAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $maths->id,
+            'created_by_user_id' => $admin->id,
+            'title' => 'Algebra practice',
+            'description' => 'Ex 5.2',
+            'content_type' => HomeworkContentType::Text,
+            'status' => HomeworkAssignmentStatus::Sent,
+            'homework_date' => $today,
+            'published_at' => now(),
+        ]);
+        HomeworkAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $physics->id,
+            'created_by_user_id' => $admin->id,
+            'title' => 'Ray optics',
+            'description' => 'TIR worksheet',
+            'content_type' => HomeworkContentType::Text,
+            'status' => HomeworkAssignmentStatus::Sent,
+            'homework_date' => $today,
+            'published_at' => now(),
+        ]);
+        HomeworkAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $maths->id,
+            'created_by_user_id' => $admin->id,
+            'title' => 'Older algebra',
+            'description' => 'Revision',
+            'content_type' => HomeworkContentType::Text,
+            'status' => HomeworkAssignmentStatus::Sent,
+            'homework_date' => $earlier,
+            'published_at' => now()->subDays(2),
+        ]);
+
+        $link = app(HomeworkStudentLinkService::class)
+            ->ensureForAssignment($mathsToday, collect([$student]))
+            ->get($student->id);
+        $this->assertNotNull($link);
+        $link->recordOpen();
+
+        $this->actingAs($admin);
+
+        Livewire::test(StudentProfilePage::class, ['record' => $student])
+            ->set('profileTab', 'homework')
+            ->assertSee(now()->format('d M Y'))
+            ->assertSee(now()->subDays(2)->format('d M Y'))
+            ->assertSee('Algebra practice')
+            ->assertSee('Ray optics')
+            ->assertSee('Older algebra')
+            ->assertSee('Opened')
+            ->assertDontSee('Not viewed')
+            ->assertDontSee('Assigned homework');
     }
 
     /**

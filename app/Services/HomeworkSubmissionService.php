@@ -4,12 +4,16 @@ namespace App\Services;
 
 use App\Enums\BatchStatus;
 use App\Enums\HomeworkAssignmentStatus;
+use App\Enums\HomeworkCheckStatus;
 use App\Enums\HomeworkContentType;
 use App\Enums\LicenseFeature;
 use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
+use App\Models\BatchStudent;
 use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
+use App\Models\HomeworkCheck;
+use App\Models\Student;
 use App\Models\User;
 use App\Support\FeatureGate;
 use Carbon\Carbon;
@@ -965,5 +969,175 @@ class HomeworkSubmissionService
         }
 
         return [...$result, 'subjects' => $assignments->count()];
+    }
+
+    /**
+     * Student profile Homework tab: one card per date, subjects listed under that day.
+     *
+     * @return list<array{
+     *     date: string,
+     *     date_label: string,
+     *     class_label: string,
+     *     subjects: list<array{
+     *         subject: string,
+     *         title: string,
+     *         description: string,
+     *         public_url: ?string,
+     *         opened: bool,
+     *         link_tracked: bool,
+     *         opened_at: ?string,
+     *         check_status: ?string,
+     *         check_is_not_done: bool
+     *     }>
+     * }>
+     */
+    public function profileDaysForStudent(Student $student, int $dayLimit = 14): array
+    {
+        $batchIds = BatchStudent::query()
+            ->where('student_id', $student->id)
+            ->where('is_active', true)
+            ->pluck('batch_id');
+
+        if ($batchIds->isEmpty()) {
+            return [];
+        }
+
+        $assignments = HomeworkAssignment::query()
+            ->with([
+                'batch',
+                'courseSubject',
+                'studentLinks' => fn ($query) => $query->where('student_id', $student->id),
+            ])
+            ->whereIn('batch_id', $batchIds)
+            ->whereNotNull('homework_date')
+            ->whereNotNull('course_subject_id')
+            ->orderByDesc('homework_date')
+            ->orderBy('id')
+            ->get();
+
+        $checks = HomeworkCheck::query()
+            ->with('batch')
+            ->where('student_id', $student->id)
+            ->whereIn('batch_id', $batchIds)
+            ->get();
+
+        $checksByAssignment = $checks
+            ->filter(fn (HomeworkCheck $check): bool => filled($check->homework_assignment_id))
+            ->keyBy(fn (HomeworkCheck $check): int => (int) $check->homework_assignment_id);
+
+        $checksByDateSubject = $checks->keyBy(
+            fn (HomeworkCheck $check): string => ($check->checked_on?->toDateString() ?? '').'|'.(int) $check->course_subject_id,
+        );
+
+        $usedCheckIds = [];
+        $days = [];
+
+        foreach ($assignments as $assignment) {
+            $date = $assignment->homework_date?->toDateString();
+
+            if ($date === null) {
+                continue;
+            }
+
+            $days[$date] ??= [
+                'date' => $date,
+                'date_label' => $assignment->homework_date->format('d M Y'),
+                'class_label' => $assignment->batch?->displayLabel() ?? '',
+                'subjects' => [],
+            ];
+
+            $link = $assignment->studentLinks->first();
+            $check = $checksByAssignment->get((int) $assignment->id)
+                ?? $checksByDateSubject->get($date.'|'.(int) $assignment->course_subject_id);
+
+            if ($check instanceof HomeworkCheck) {
+                $usedCheckIds[$check->id] = true;
+            }
+
+            $subjectLabel = $assignment->courseSubject?->displayLabel() ?? (string) $assignment->title;
+
+            $days[$date]['subjects'][] = $this->profileSubjectRow(
+                $subjectLabel,
+                (string) $assignment->title,
+                (string) ($assignment->description ?? ''),
+                $link?->publicUrl() ?? (filled($assignment->public_token) ? $assignment->publicUrl() : null),
+                $link,
+                $check,
+            );
+        }
+
+        foreach ($checks as $check) {
+            if (isset($usedCheckIds[$check->id])) {
+                continue;
+            }
+
+            $date = $check->checked_on?->toDateString() ?? $check->created_at?->toDateString();
+
+            if ($date === null) {
+                continue;
+            }
+
+            $days[$date] ??= [
+                'date' => $date,
+                'date_label' => Carbon::parse($date)->format('d M Y'),
+                'class_label' => $check->batch?->displayLabel() ?? '',
+                'subjects' => [],
+            ];
+
+            $days[$date]['subjects'][] = $this->profileSubjectRow(
+                (string) $check->subject_name,
+                (string) ($check->topic ?? ''),
+                '',
+                null,
+                null,
+                $check,
+            );
+        }
+
+        krsort($days, SORT_STRING);
+
+        return array_slice(array_values($days), 0, $dayLimit);
+    }
+
+    /**
+     * @return array{
+     *     subject: string,
+     *     title: string,
+     *     description: string,
+     *     public_url: ?string,
+     *     opened: bool,
+     *     link_tracked: bool,
+     *     opened_at: ?string,
+     *     check_status: ?string,
+     *     check_is_not_done: bool
+     * }
+     */
+    protected function profileSubjectRow(
+        string $subject,
+        string $title,
+        string $description,
+        ?string $publicUrl,
+        mixed $link,
+        ?HomeworkCheck $check,
+    ): array {
+        $openedAt = null;
+
+        if ($link && filled($link->first_clicked_at ?? null)) {
+            $openedAt = $link->first_clicked_at
+                ->timezone((string) config('app.timezone'))
+                ->format('d M, h:i A');
+        }
+
+        return [
+            'subject' => $subject,
+            'title' => $title,
+            'description' => $description,
+            'public_url' => $publicUrl,
+            'opened' => $openedAt !== null,
+            'link_tracked' => $link !== null,
+            'opened_at' => $openedAt,
+            'check_status' => $check?->status?->label(),
+            'check_is_not_done' => $check?->status === HomeworkCheckStatus::NotDone,
+        ];
     }
 }

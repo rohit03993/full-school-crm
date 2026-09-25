@@ -64,8 +64,8 @@ use App\Services\FeeInstallmentService;
 use App\Services\FeeMiscChargeAdjustmentService;
 use App\Services\FeeMiscChargeService;
 use App\Services\FeeStructureService;
-use App\Services\HomeworkAssignmentService;
 use App\Services\HomeworkCheckService;
+use App\Services\HomeworkSubmissionService;
 use App\Services\IdCardService;
 use App\Services\LeadAssignmentService;
 use App\Services\PaymentService;
@@ -291,14 +291,9 @@ class StudentProfilePage extends Page
     public string $whatsappProviderLabel = 'Meta WhatsApp';
 
     /**
-     * @var Collection<int, \App\Models\HomeworkAssignment>
+     * @var list<array<string, mixed>>
      */
-    public Collection $homeworkAssignments;
-
-    /**
-     * @var Collection<int, \App\Models\HomeworkCheck>
-     */
-    public Collection $homeworkChecks;
+    public array $homeworkDays = [];
 
     public int $homeworkNotDoneThisWeek = 0;
 
@@ -421,8 +416,7 @@ class StudentProfilePage extends Page
         $this->profileCertificateType = CertificateType::Bonafide->value;
         $this->openCaseBanners = [];
         $this->messageThread = [];
-        $this->homeworkAssignments = new Collection;
-        $this->homeworkChecks = new Collection;
+        $this->homeworkDays = [];
         $this->documents = new Collection;
         $this->payments = new Collection;
         $this->installments = new Collection;
@@ -2270,11 +2264,10 @@ class StudentProfilePage extends Page
         }
 
         $this->homeworkTabLoaded = true;
-        $service = app(HomeworkCheckService::class);
-        $this->homeworkChecks = $service->forStudent((int) $this->record->id);
-        $this->homeworkNotDoneThisWeek = $service->notDoneCountThisWeek((int) $this->record->id);
-        $this->homeworkAssignments = app(HomeworkAssignmentService::class)
-            ->assignmentsForStudentProfile($this->record);
+        $this->homeworkNotDoneThisWeek = app(HomeworkCheckService::class)
+            ->notDoneCountThisWeek((int) $this->record->id);
+        $this->homeworkDays = app(HomeworkSubmissionService::class)
+            ->profileDaysForStudent($this->record);
     }
 
     public function openIdCardPreview(): void
@@ -3936,10 +3929,8 @@ class StudentProfilePage extends Page
                             View::make('filament.pages.partials.student-profile-homework')
                                 ->viewData(fn (): array => [
                                     'homeworkTabLoaded' => $this->homeworkTabLoaded,
-                                    'checks' => $this->homeworkChecks,
                                     'notDoneThisWeek' => $this->homeworkNotDoneThisWeek,
-                                    'assignments' => $this->homeworkAssignments,
-                                    'portalUrl' => route('portal.homework.index'),
+                                    'days' => $this->homeworkDays,
                                 ]),
                         ]),
                     'activities' => Tab::make('Exams')

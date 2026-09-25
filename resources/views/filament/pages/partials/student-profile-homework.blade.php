@@ -1,115 +1,78 @@
 @if (! $homeworkTabLoaded)
     <p class="text-sm text-gray-500 dark:text-gray-400">Loading homework…</p>
 @else
-    <div class="space-y-6">
-        <div class="space-y-3">
-            <div>
-                <p class="text-sm font-semibold text-gray-950 dark:text-white">Homework check marks</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Done / Not Done marks from class homework check.</p>
+    <div class="space-y-4">
+        <p class="text-xs text-gray-500 dark:text-gray-400">Homework for this student, grouped by date.</p>
+
+        @if (($notDoneThisWeek ?? 0) > 0)
+            <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                <span class="font-semibold">{{ $notDoneThisWeek }}</span> Not Done mark(s) this week.
             </div>
+        @endif
 
-            @if (($notDoneThisWeek ?? 0) > 0)
-                <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                    <span class="font-semibold">{{ $notDoneThisWeek }}</span> Not Done mark(s) this week.
-                </div>
-            @endif
-
-            @if ($checks->isEmpty())
-                <p class="text-sm text-gray-500 dark:text-gray-400">No Done / Not Done marks recorded for this student yet.</p>
-            @else
-                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-white/5">
-                    <x-crm.responsive-table>
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-gray-50 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-white/5 dark:text-gray-400">
-                            <tr>
-                                <th class="px-4 py-2">Date</th>
-                                <th class="px-4 py-2">Subject</th>
-                                <th class="px-4 py-2">Topic</th>
-                                <th class="px-4 py-2">Status</th>
-                                <th class="px-4 py-2">WhatsApp</th>
-                                <th class="px-4 py-2">Marked by</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-white/10">
-                            @foreach ($checks as $check)
-                                @php
-                                    $isNotDone = $check->status === \App\Enums\HomeworkCheckStatus::NotDone;
-                                @endphp
-                                <tr wire:key="hw-check-{{ $check->id }}">
-                                    <td class="px-4 py-2 whitespace-nowrap text-gray-600 dark:text-gray-300 crm-responsive-table__title" data-label="Date">
-                                        {{ $check->checked_on?->format('d M Y') ?? $check->created_at?->format('d M Y H:i') }}
-                                        <span class="mt-0.5 block text-sm font-semibold text-gray-950 dark:text-white md:hidden">{{ $check->subject_name }}</span>
-                                    </td>
-                                    <td class="hidden px-4 py-2 font-medium text-gray-950 dark:text-white md:table-cell" data-label="Subject">
-                                        {{ $check->subject_name }}
-                                    </td>
-                                    <td class="crm-responsive-table__wide px-4 py-2 text-gray-600 dark:text-gray-300" data-label="Topic">
-                                        {{ \Illuminate\Support\Str::limit($check->topic, 48) }}
-                                        @if ($check->homeworkAssignment)
-                                            <span class="mt-0.5 block text-[11px] text-primary-600 dark:text-primary-400">
-                                                Linked: {{ $check->homeworkAssignment->title }}
+        @if (($days ?? []) === [])
+            <p class="text-sm text-gray-500 dark:text-gray-400">No homework for this student yet.</p>
+        @else
+            <div class="space-y-4">
+                @foreach ($days as $day)
+                    <section class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-white/5">
+                        <div class="flex min-w-0 flex-wrap items-baseline justify-between gap-2 border-b border-gray-100 bg-gray-50 px-4 py-2.5 dark:border-white/5 dark:bg-white/5">
+                            <p class="text-sm font-bold text-gray-950 dark:text-white">{{ $day['date_label'] }}</p>
+                            @if (filled($day['class_label'] ?? null))
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ $day['class_label'] }}</p>
+                            @endif
+                        </div>
+                        <ul class="divide-y divide-gray-100 dark:divide-white/5">
+                            @foreach ($day['subjects'] as $row)
+                                <li class="flex min-w-0 flex-wrap items-start justify-between gap-3 px-4 py-3">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-semibold text-gray-950 dark:text-white">{{ $row['subject'] }}</p>
+                                        @if (filled($row['title']) && $row['title'] !== $row['subject'])
+                                            <p class="mt-0.5 text-sm text-gray-700 dark:text-gray-200">{{ $row['title'] }}</p>
+                                        @endif
+                                        @if (filled($row['description']))
+                                            <p class="mt-0.5 line-clamp-2 whitespace-pre-line text-xs text-gray-500 dark:text-gray-400">{{ $row['description'] }}</p>
+                                        @endif
+                                        @if (filled($row['public_url']))
+                                            <a
+                                                href="{{ $row['public_url'] }}"
+                                                target="_blank"
+                                                rel="noopener"
+                                                class="mt-1 inline-block text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
+                                            >
+                                                Open homework
+                                            </a>
+                                        @endif
+                                    </div>
+                                    <div class="flex shrink-0 flex-col items-end gap-1">
+                                        @if ($row['link_tracked'])
+                                            <span @class([
+                                                'inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                                                'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' => $row['opened'],
+                                                'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300' => ! $row['opened'],
+                                            ])>
+                                                {{ $row['opened'] ? 'Opened' : 'Not opened' }}
+                                            </span>
+                                            @if ($row['opened'] && filled($row['opened_at'] ?? null))
+                                                <span class="text-[11px] text-gray-400">{{ $row['opened_at'] }}</span>
+                                            @endif
+                                        @endif
+                                        @if (filled($row['check_status']))
+                                            <span @class([
+                                                'inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                                                'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300' => $row['check_is_not_done'],
+                                                'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' => ! $row['check_is_not_done'],
+                                            ])>
+                                                {{ $row['check_status'] }}
                                             </span>
                                         @endif
-                                    </td>
-                                    <td class="px-4 py-2" data-label="Status">
-                                        <span @class([
-                                            'inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold',
-                                            'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300' => $isNotDone,
-                                            'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' => ! $isNotDone,
-                                        ])>
-                                            {{ $check->status?->label() }}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-2 text-xs text-gray-500 dark:text-gray-400" data-label="WhatsApp">
-                                        {{ $check->notify_status?->label() ?? '—' }}
-                                    </td>
-                                    <td class="px-4 py-2 text-gray-600 dark:text-gray-300" data-label="Marked by">
-                                        {{ $check->createdBy?->name ?? '—' }}
-                                    </td>
-                                </tr>
+                                    </div>
+                                </li>
                             @endforeach
-                        </tbody>
-                    </table>
-                    </x-crm.responsive-table>
-                </div>
-            @endif
-        </div>
-
-        <div class="space-y-3">
-            <div>
-                <p class="text-sm font-semibold text-gray-950 dark:text-white">Assigned homework</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Portal homework shared with this student&apos;s batch.</p>
+                        </ul>
+                    </section>
+                @endforeach
             </div>
-
-            @if ($assignments->isEmpty())
-                <p class="text-sm text-gray-500 dark:text-gray-400">No homework assigned to this student&apos;s batch yet.</p>
-            @else
-                <div class="space-y-3">
-                    @foreach ($assignments as $assignment)
-                        @php
-                            $viewed = $assignment->views->isNotEmpty();
-                        @endphp
-                        <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-white/5">
-                            <div class="flex flex-wrap items-start justify-between gap-2">
-                                <div>
-                                    <p class="font-semibold text-gray-950 dark:text-white">{{ $assignment->title }}</p>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                        {{ $assignment->batch?->name }} · {{ $assignment->published_at?->format('d M Y') }}
-                                    </p>
-                                </div>
-                                <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $viewed ? 'bg-success-100 text-success-700 dark:bg-success-500/10 dark:text-success-300' : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300' }}">
-                                    {{ $viewed ? 'Viewed in portal' : 'Not viewed' }}
-                                </span>
-                            </div>
-                            <p class="mt-2 text-sm text-gray-700 dark:text-gray-200 line-clamp-3">{{ $assignment->description }}</p>
-                        </div>
-                    @endforeach
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                        Students open homework in the portal:
-                        <a href="{{ $portalUrl }}" target="_blank" class="font-medium text-primary-600 hover:underline dark:text-primary-400">{{ $portalUrl }}</a>
-                    </p>
-                </div>
-            @endif
-        </div>
+        @endif
     </div>
 @endif
