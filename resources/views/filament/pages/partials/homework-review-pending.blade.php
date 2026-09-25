@@ -144,7 +144,9 @@
                                         <ul class="mt-3 space-y-2">
                                             @foreach ($section['items'] as $item)
                                                 @if (filled($item['status_key']))
-                                                    <li @class([
+                                                    <li
+                                                        x-data="{ who: false }"
+                                                        @class([
                                                         'rounded-xl border bg-white px-3 py-3 dark:bg-gray-900/60',
                                                         'border-amber-200 dark:border-amber-500/20' => $item['status_key'] === 'submitted',
                                                         'border-sky-200 dark:border-sky-500/20' => $item['status_key'] === 'approved',
@@ -188,6 +190,17 @@
                                                                 </span>
                                                                 @if ($item['submitted_at'])
                                                                     <p class="mt-1 text-xs text-gray-400">{{ $item['submitted_at'] }}</p>
+                                                                @endif
+                                                                @if ($item['status_key'] === 'sent' && (int) ($item['link_total'] ?? 0) > 0)
+                                                                    <p class="mt-1">
+                                                                        <button
+                                                                            type="button"
+                                                                            x-on:click="who = ! who"
+                                                                            class="text-xs font-semibold text-gray-700 hover:underline dark:text-gray-200"
+                                                                        >
+                                                                            Opened {{ (int) $item['link_opened'] }} / {{ (int) $item['link_total'] }}
+                                                                        </button>
+                                                                    </p>
                                                                 @endif
                                                             </div>
                                                         </div>
@@ -236,6 +249,36 @@
                                                                 </button>
                                                             @endif
                                                         </div>
+
+                                                        @if ($item['status_key'] === 'sent' && (int) ($item['link_total'] ?? 0) > 0)
+                                                            <div x-show="who" x-cloak class="mt-3 grid gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-xs dark:border-white/10 dark:bg-white/5 sm:grid-cols-2">
+                                                                <div>
+                                                                    <p class="font-semibold text-gray-900 dark:text-gray-100">Opened</p>
+                                                                    <ul class="mt-1 space-y-0.5 text-gray-600 dark:text-gray-300">
+                                                                        @forelse ($item['link_opened_people'] ?? [] as $person)
+                                                                            <li>
+                                                                                {{ $person['name'] }}
+                                                                                @if (filled($person['at'] ?? null))
+                                                                                    <span class="text-gray-400">· {{ $person['at'] }}</span>
+                                                                                @endif
+                                                                            </li>
+                                                                        @empty
+                                                                            <li class="text-gray-400">None yet</li>
+                                                                        @endforelse
+                                                                    </ul>
+                                                                </div>
+                                                                <div>
+                                                                    <p class="font-semibold text-gray-900 dark:text-gray-100">Not opened</p>
+                                                                    <ul class="mt-1 space-y-0.5 text-gray-600 dark:text-gray-300">
+                                                                        @forelse ($item['link_not_opened_people'] ?? [] as $name)
+                                                                            <li>{{ $name }}</li>
+                                                                        @empty
+                                                                            <li class="text-gray-400">Everyone opened</li>
+                                                                        @endforelse
+                                                                    </ul>
+                                                                </div>
+                                                            </div>
+                                                        @endif
                                                     </li>
                                                 @else
                                                     <li class="flex min-w-0 items-baseline justify-between gap-3 rounded-lg px-3 py-1.5 text-xs text-gray-400">

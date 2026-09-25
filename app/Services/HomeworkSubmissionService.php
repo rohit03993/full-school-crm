@@ -10,10 +10,12 @@ use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
 use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
+use App\Models\HomeworkStudentLink;
 use App\Models\User;
 use App\Support\FeatureGate;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -446,7 +448,11 @@ class HomeworkSubmissionService
      *                 public_url: ?string,
      *                 status: string,
      *                 status_key: ?string,
-     *                 submitted_at: ?string
+     *                 submitted_at: ?string,
+     *                 link_opened: int,
+     *                 link_total: int,
+     *                 link_opened_people: list<array{name: string, at: ?string}>,
+     *                 link_not_opened_people: list<string>
      *             }>
      *         }>
      *     }>
@@ -473,6 +479,10 @@ class HomeworkSubmissionService
             ->orderBy('id')
             ->get()
             ->groupBy('batch_id');
+
+        $linkStatsByAssignment = $this->linkStatsByAssignmentId(
+            $assignmentsByBatch->flatten(1)->pluck('id'),
+        );
 
         $grouped = [];
         $counts = [
@@ -518,6 +528,10 @@ class HomeworkSubmissionService
                     $sent++;
                 }
 
+                $stats = $assignment
+                    ? ($linkStatsByAssignment[(int) $assignment->id] ?? $this->emptyLinkStats())
+                    : $this->emptyLinkStats();
+
                 $items[] = [
                     'course_subject_id' => $subjectId,
                     'assignment_id' => $assignment?->id,
@@ -535,6 +549,10 @@ class HomeworkSubmissionService
                     'status' => $status?->label() ?? '',
                     'status_key' => $status?->value,
                     'submitted_at' => $assignment?->submitted_at?->timezone((string) config('app.timezone'))->format('h:i A'),
+                    'link_opened' => $stats['opened'],
+                    'link_total' => $stats['total'],
+                    'link_opened_people' => $stats['opened_people'],
+                    'link_not_opened_people' => $stats['not_opened_people'],
                 ];
             }
 
@@ -606,6 +624,75 @@ class HomeworkSubmissionService
             'counts' => $counts,
             'groups' => $groups,
         ];
+    }
+
+    /**
+     * @return array{opened: int, total: int, opened_people: list<array{name: string, at: ?string}>, not_opened_people: list<string>}
+     */
+    protected function emptyLinkStats(): array
+    {
+        return [
+            'opened' => 0,
+            'total' => 0,
+            'opened_people' => [],
+            'not_opened_people' => [],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $assignmentIds
+     * @return array<int, array{opened: int, total: int, opened_people: list<array{name: string, at: ?string}>, not_opened_people: list<string>}>
+     */
+    protected function linkStatsByAssignmentId(Collection $assignmentIds): array
+    {
+        $ids = $assignmentIds
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty() || ! Schema::hasTable('homework_student_links')) {
+            return [];
+        }
+
+        $grouped = HomeworkStudentLink::query()
+            ->whereIn('homework_assignment_id', $ids)
+            ->with('student')
+            ->get()
+            ->groupBy('homework_assignment_id');
+
+        $stats = [];
+
+        foreach ($grouped as $assignmentId => $links) {
+            $openedPeople = [];
+            $notOpenedPeople = [];
+
+            foreach ($links as $link) {
+                $name = filled($link->student?->name) ? (string) $link->student->name : 'Student';
+                $opened = ((int) $link->click_count) > 0 || $link->first_clicked_at !== null;
+
+                if ($opened) {
+                    $openedPeople[] = [
+                        'name' => $name,
+                        'at' => $link->last_clicked_at?->timezone((string) config('app.timezone'))->format('h:i A'),
+                    ];
+                } else {
+                    $notOpenedPeople[] = $name;
+                }
+            }
+
+            usort($openedPeople, fn (array $left, array $right): int => strnatcasecmp($left['name'], $right['name']));
+            usort($notOpenedPeople, fn (string $left, string $right): int => strnatcasecmp($left, $right));
+
+            $stats[(int) $assignmentId] = [
+                'opened' => count($openedPeople),
+                'total' => $links->count(),
+                'opened_people' => $openedPeople,
+                'not_opened_people' => $notOpenedPeople,
+            ];
+        }
+
+        return $stats;
     }
 
     /**

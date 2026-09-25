@@ -825,6 +825,78 @@ class HomeworkSubmissionServiceTest extends TestCase
         );
     }
 
+    public function test_desk_shows_who_opened_unique_homework_links(): void
+    {
+        $sequence = 0;
+
+        Http::fake([
+            'https://graph.facebook.com/*' => function () use (&$sequence) {
+                $sequence++;
+
+                return Http::response([
+                    'messages' => [['id' => 'wamid.OPEN'.$sequence]],
+                ], 200);
+            },
+        ]);
+
+        $data = $this->seedClass();
+        $this->seedCombinedTemplate();
+        $service = app(HomeworkSubmissionService::class);
+
+        $maths = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Ex 5.2',
+        ]);
+        $service->approve($data['admin'], $maths->id);
+
+        $waitingDesk = $this->mathsDeskItem($service, $data['maths']->id);
+        $this->assertSame(0, $waitingDesk['link_total']);
+
+        $service->combinedSend($data['admin'], $data['batch']->id, now()->toDateString());
+
+        $sentDesk = $this->mathsDeskItem($service, $data['maths']->id);
+        $this->assertSame(0, $sentDesk['link_opened']);
+        $this->assertSame(2, $sentDesk['link_total']);
+        $this->assertSame([], $sentDesk['link_opened_people']);
+        $this->assertEqualsCanonicalizing(['Aman Verma', 'Riya Sharma'], $sentDesk['link_not_opened_people']);
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('toggleDeskSection', $data['batch']->id)
+            ->assertSee('Opened 0 / 2')
+            ->assertSee('None yet')
+            ->assertSee('Aman Verma')
+            ->assertSee('Riya Sharma');
+
+        $riyaLink = HomeworkStudentLink::query()
+            ->where('homework_assignment_id', $maths->id)
+            ->whereHas('student', fn ($query) => $query->where('name', 'Riya Sharma'))
+            ->first();
+
+        $this->assertNotNull($riyaLink);
+        $this->get($riyaLink->publicUrl())->assertOk();
+
+        $this->get($maths->publicUrl())->assertOk();
+
+        $afterOpen = $this->mathsDeskItem($service, $data['maths']->id);
+        $this->assertSame(1, $afterOpen['link_opened']);
+        $this->assertSame(2, $afterOpen['link_total']);
+        $this->assertSame(['Aman Verma'], $afterOpen['link_not_opened_people']);
+        $this->assertSame('Riya Sharma', $afterOpen['link_opened_people'][0]['name']);
+        $this->assertNotNull($afterOpen['link_opened_people'][0]['at']);
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('toggleDeskSection', $data['batch']->id)
+            ->assertSee('Opened 1 / 2')
+            ->assertSee('Riya Sharma')
+            ->assertSee('Aman Verma');
+    }
+
     public function test_combined_send_without_approved_returns_error(): void
     {
         $data = $this->seedClass();
@@ -842,6 +914,25 @@ class HomeworkSubmissionServiceTest extends TestCase
 
         $this->assertSame(0, $result['sent']);
         $this->assertNotNull($result['error']);
+    }
+
+    /**
+     * @return array{
+     *     course_subject_id: int,
+     *     link_opened: int,
+     *     link_total: int,
+     *     link_opened_people: list<array{name: string, at: ?string}>,
+     *     link_not_opened_people: list<string>
+     * }
+     */
+    protected function mathsDeskItem(HomeworkSubmissionService $service, int $mathsId): array
+    {
+        $desk = $service->deskForDate(now()->toDateString());
+        $items = collect($desk['groups'][0]['sections'][0]['items'])->keyBy('course_subject_id');
+
+        $this->assertTrue($items->has($mathsId));
+
+        return $items->get($mathsId);
     }
 
     /**
