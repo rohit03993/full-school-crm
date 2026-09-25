@@ -2,7 +2,7 @@
 
 @section('title', $homework->title)
 @section('heading', $homework->title)
-@section('subheading', $homework->batch?->name.' · Published '.$homework->published_at?->format('d M Y'))
+@section('subheading', $homework->batch?->name.($homework->homeworkDateLabel() ? ' · '.$homework->homeworkDateLabel() : ''))
 
 @section('content')
     <article class="space-y-4">

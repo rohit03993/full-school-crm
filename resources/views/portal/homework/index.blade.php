@@ -24,7 +24,7 @@
                         {{ $viewed ? 'Viewed' : 'New' }}
                     </span>
                 </div>
-                <p class="mt-2.5 text-xs text-navy-400">Published {{ $assignment->published_at?->format('d M Y') }}</p>
+                <p class="mt-2.5 text-xs text-navy-400">{{ $assignment->homeworkDateLabel() }}</p>
             </a>
         @empty
             <div class="rounded-2xl border border-dashed border-navy-200 bg-white px-6 py-10 text-center">

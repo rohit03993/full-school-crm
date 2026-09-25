@@ -150,6 +150,16 @@ class HomeworkAssignment extends Model
         return route('homework.public.show', ['token' => $this->ensurePublicToken()]);
     }
 
+    /**
+     * Date parents should see: the class homework day, not the WhatsApp send day.
+     */
+    public function homeworkDateLabel(): ?string
+    {
+        $date = $this->homework_date ?? $this->published_at;
+
+        return $date?->timezone(config('app.timezone'))->format('d M Y');
+    }
+
     public function publicViewUrl(): ?string
     {
         if (! $this->hasFile()) {

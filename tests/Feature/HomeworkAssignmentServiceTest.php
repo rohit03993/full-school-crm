@@ -79,6 +79,27 @@ class HomeworkAssignmentServiceTest extends TestCase
             ->assertSee('Open without portal login.');
     }
 
+    public function test_public_homework_page_shows_homework_date_not_the_send_day(): void
+    {
+        [, $batch, $staff] = $this->createStudentInBatch();
+
+        $assignment = HomeworkAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'created_by_user_id' => $staff->id,
+            'title' => 'THIS IS CHEMISTRY HOMEWORK',
+            'description' => 'Open the photo.',
+            'homework_date' => '2026-09-22',
+            'content_type' => HomeworkContentType::Text,
+            'published_at' => '2026-09-25 18:00:00',
+        ]);
+
+        $this->get($assignment->publicUrl())
+            ->assertOk()
+            ->assertSee('THIS IS CHEMISTRY HOMEWORK')
+            ->assertSee('22 Sep 2026')
+            ->assertDontSee('25 Sep 2026');
+    }
+
     public function test_old_long_public_token_still_opens(): void
     {
         [, $batch, $staff] = $this->createStudentInBatch();

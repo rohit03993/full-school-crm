@@ -33,8 +33,8 @@
         <h1>{{ $homework->title }}</h1>
         <p class="meta">
             {{ $homework->batch?->name }}
-            @if ($homework->published_at)
-                · {{ $homework->published_at->format('d M Y') }}
+            @if ($homework->homeworkDateLabel())
+                · {{ $homework->homeworkDateLabel() }}
             @endif
         </p>
 

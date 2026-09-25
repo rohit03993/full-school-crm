@@ -86,7 +86,9 @@ class HomeworkReviewPage extends Page
     {
         return $schema->components([
             Section::make('Date')
-                ->description('Today is selected. Pick a past date to review that day.')
+                ->description(fn (): string => $this->dateString() === now()->toDateString()
+                    ? 'Today is selected. Pick a past date to review that day.'
+                    : 'Showing this homework date. Change the date to see another day.')
                 ->schema([
                     DatePicker::make('homework_date')
                         ->label('Homework date')
