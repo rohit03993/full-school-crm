@@ -13,15 +13,21 @@ use App\Models\StaffProfile;
 use App\Models\StudentCall;
 use App\Support\AttendanceSourceLabel;
 use App\Support\ClassSectionLabel;
+use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 
 class AttendanceHubOverviewService
 {
     public const FEED_PER_PAGE = 10;
+
+    public function __construct(
+        protected BatchStaffAssignmentService $classAssignments,
+    ) {}
 
     /**
      * @return array{
@@ -44,53 +50,72 @@ class AttendanceHubOverviewService
      *     class_rows: list<array{batch_id: int, name: string, expected: int, present: int, absent: int, leave: int}>
      * }
      */
-    public function overview(string $date): array
+    public function overview(string $date, ?User $user = null): array
     {
         $day = Carbon::parse($date)->toDateString();
+        $user ??= Auth::user();
+        $limitIds = $this->classAssignments->limitedBatchIdsFor($user);
+        $classRows = $this->classRows($day, $limitIds);
 
-        $studentsExpected = (int) BatchStudent::query()->where('is_active', true)->count();
+        $studentsExpectedQuery = BatchStudent::query()->where('is_active', true);
+        $this->classAssignments->constrainBatchColumn($studentsExpectedQuery, $user);
+        $studentsExpected = (int) $studentsExpectedQuery->count();
 
-        $studentsPresent = (int) Attendance::query()
+        $presentQuery = Attendance::query()
             ->whereDate('attendance_date', $day)
-            ->where('status', AttendanceStatus::Present)
-            ->count();
-        $explicitAbsent = (int) Attendance::query()
+            ->where('status', AttendanceStatus::Present);
+        $this->classAssignments->constrainBatchColumn($presentQuery, $user);
+        $studentsPresent = (int) $presentQuery->count();
+
+        $explicitAbsentQuery = Attendance::query()
             ->whereDate('attendance_date', $day)
-            ->where('status', AttendanceStatus::Absent)
-            ->count();
-        $studentsLeave = (int) Attendance::query()
+            ->where('status', AttendanceStatus::Absent);
+        $this->classAssignments->constrainBatchColumn($explicitAbsentQuery, $user);
+
+        $leaveQuery = Attendance::query()
             ->whereDate('attendance_date', $day)
-            ->where('status', AttendanceStatus::Leave)
-            ->count();
-        // Same rule as each class row (expected − present − leave), then added together.
-        $classRows = $this->classRows($day);
+            ->where('status', AttendanceStatus::Leave);
+        $this->classAssignments->constrainBatchColumn($leaveQuery, $user);
+        $studentsLeave = (int) $leaveQuery->count();
+
         $studentsAbsent = (int) array_sum(array_column($classRows, 'absent'));
-        $studentsMarked = $studentsPresent + $explicitAbsent + $studentsLeave;
-        // Auto / manual split the Present count only. Leave and absent stay separate.
-        $studentsManualMarked = (int) Attendance::query()
+        $studentsMarked = $studentsPresent + (int) $explicitAbsentQuery->count() + $studentsLeave;
+
+        $manualQuery = Attendance::query()
             ->whereDate('attendance_date', $day)
             ->where('status', AttendanceStatus::Present)
-            ->whereIn('punch_source', ['manual', 'roll_call'])
-            ->count();
+            ->whereIn('punch_source', ['manual', 'roll_call']);
+        $this->classAssignments->constrainBatchColumn($manualQuery, $user);
+        $studentsManualMarked = (int) $manualQuery->count();
         $studentsAutoMarked = max(0, $studentsPresent - $studentsManualMarked);
 
-        $staffExpected = (int) StaffProfile::query()
-            ->whereHas('user', fn ($q) => $q->where('is_active', true))
-            ->count();
+        $includeStaff = $limitIds === null;
 
-        $staffPresent = (int) StaffAttendance::query()
-            ->whereDate('attendance_date', $day)
-            ->where('status', AttendanceStatus::Present)
-            ->count();
-        $staffAbsent = (int) StaffAttendance::query()
-            ->whereDate('attendance_date', $day)
-            ->where('status', AttendanceStatus::Absent)
-            ->count();
-        $staffLeave = (int) StaffAttendance::query()
-            ->whereDate('attendance_date', $day)
-            ->where('status', AttendanceStatus::Leave)
-            ->count();
-        $staffMarked = $staffPresent + $staffAbsent + $staffLeave;
+        $staffExpected = 0;
+        $staffPresent = 0;
+        $staffAbsent = 0;
+        $staffLeave = 0;
+        $staffMarked = 0;
+
+        if ($includeStaff) {
+            $staffExpected = (int) StaffProfile::query()
+                ->whereHas('user', fn ($q) => $q->where('is_active', true))
+                ->count();
+
+            $staffPresent = (int) StaffAttendance::query()
+                ->whereDate('attendance_date', $day)
+                ->where('status', AttendanceStatus::Present)
+                ->count();
+            $staffAbsent = (int) StaffAttendance::query()
+                ->whereDate('attendance_date', $day)
+                ->where('status', AttendanceStatus::Absent)
+                ->count();
+            $staffLeave = (int) StaffAttendance::query()
+                ->whereDate('attendance_date', $day)
+                ->where('status', AttendanceStatus::Leave)
+                ->count();
+            $staffMarked = $staffPresent + $staffAbsent + $staffLeave;
+        }
 
         return [
             'date' => $day,
@@ -114,14 +139,24 @@ class AttendanceHubOverviewService
     }
 
     /**
+     * @param  list<int>|null  $limitIds
      * @return list<array{batch_id: int, name: string, expected: int, present: int, absent: int, leave: int}>
      */
-    protected function classRows(string $day): array
+    protected function classRows(string $day, ?array $limitIds = null): array
     {
-        $batches = Batch::query()
+        $query = Batch::query()
             ->withCount(['activeStudents'])
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if ($limitIds !== null) {
+            if ($limitIds === []) {
+                return [];
+            }
+
+            $query->whereIn('id', $limitIds);
+        }
+
+        $batches = $query->get();
 
         $rows = [];
 
@@ -187,8 +222,13 @@ class AttendanceHubOverviewService
      *     }>
      * }|null
      */
-    public function classBucketRoster(int $batchId, string $date, string $bucket): ?array
+    public function classBucketRoster(int $batchId, string $date, string $bucket, ?User $user = null): ?array
     {
+        $user ??= Auth::user();
+
+        if (! $this->classAssignments->canAccessClass($user, $batchId)) {
+            return null;
+        }
         $bucket = in_array($bucket, ['present', 'absent', 'leave'], true) ? $bucket : 'absent';
         $day = Carbon::parse($date)->toDateString();
 
@@ -336,7 +376,7 @@ class AttendanceHubOverviewService
      *     students: list<array{id: int, name: string, roll: ?string, class: string, status_label: string}>
      * }|null
      */
-    public function overviewStudentList(string $date, string $kind): ?array
+    public function overviewStudentList(string $date, string $kind, ?User $user = null): ?array
     {
         if (! in_array($kind, ['manual', 'leave'], true)) {
             return null;
@@ -347,6 +387,7 @@ class AttendanceHubOverviewService
         $query = Attendance::query()
             ->whereDate('attendance_date', $day)
             ->with(['student.activeEnrollment', 'batch.course']);
+        $this->classAssignments->constrainBatchColumn($query, $user ?? Auth::user());
 
         if ($kind === 'leave') {
             $query->where('status', AttendanceStatus::Leave);
@@ -398,20 +439,22 @@ class AttendanceHubOverviewService
      *
      * @param  'all'|'student'|'staff'  $type
      */
-    public function feed(string $date, string $type = 'all', int $page = 1, int $perPage = self::FEED_PER_PAGE): LengthAwarePaginator
+    public function feed(string $date, string $type = 'all', int $page = 1, int $perPage = self::FEED_PER_PAGE, ?User $user = null): LengthAwarePaginator
     {
         $day = Carbon::parse($date)->toDateString();
         $type = in_array($type, ['all', 'student', 'staff'], true) ? $type : 'all';
         $page = max(1, $page);
         $perPage = max(1, min(50, $perPage));
+        $user ??= Auth::user();
+        $hideStaff = $this->classAssignments->shouldLimitToAssignedClasses($user);
 
         $items = collect();
 
         if ($type === 'all' || $type === 'student') {
-            $items = $items->concat($this->studentFeedRows($day));
+            $items = $items->concat($this->studentFeedRows($day, $user));
         }
 
-        if ($type === 'all' || $type === 'staff') {
+        if (! $hideStaff && ($type === 'all' || $type === 'staff')) {
             $items = $items->concat($this->staffFeedRows($day));
         }
 
@@ -437,14 +480,15 @@ class AttendanceHubOverviewService
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    protected function studentFeedRows(string $day): Collection
+    protected function studentFeedRows(string $day, ?User $user = null): Collection
     {
-        $records = Attendance::query()
+        $recordsQuery = Attendance::query()
             ->whereDate('attendance_date', $day)
             ->with(['student.activeEnrollment', 'batch.course', 'markedBy'])
             ->orderByDesc('checked_in_at')
-            ->orderBy('id')
-            ->get();
+            ->orderBy('id');
+        $this->classAssignments->constrainBatchColumn($recordsQuery, $user ?? Auth::user());
+        $records = $recordsQuery->get();
 
         $waByStudent = $this->whatsappStatusByStudent($day, $records->pluck('student_id')->filter()->all());
 

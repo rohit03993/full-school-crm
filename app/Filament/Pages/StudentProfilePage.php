@@ -51,6 +51,7 @@ use App\Services\ReportPdfService;
 use App\Services\ReportService;
 use App\Enums\ReportType;
 use App\Services\BatchService;
+use App\Services\BatchStaffAssignmentService;
 use App\Services\CallLogService;
 use App\Services\ConvertToAdmissionPresenter;
 use App\Services\CourseFeeSyncService;
@@ -391,6 +392,11 @@ class StudentProfilePage extends Page
 
     public function mount(Student $record): void
     {
+        abort_unless(
+            app(BatchStaffAssignmentService::class)->canViewStudent(Auth::user(), $record),
+            403,
+        );
+
         $this->record = $record->load([
             'enquiries.course',
             'enquiries.meetingWith',

@@ -39,6 +39,7 @@ class LivePunchDashboardService
         ?string $rollFilter = null,
         ?string $nameFilter = null,
         ?string $stateFilter = null,
+        ?array $allowedBatchIds = null,
     ): array {
         if (! $this->logs->punchTableExists()) {
             return [
@@ -49,7 +50,19 @@ class LivePunchDashboardService
 
         $rolls = $this->rollsWithPunchesOnDate($date);
 
-        if ($batchId) {
+        if ($allowedBatchIds !== null) {
+            if ($allowedBatchIds === [] || ($batchId && ! in_array($batchId, $allowedBatchIds, true))) {
+                $rolls = collect();
+            } elseif ($batchId) {
+                $rolls = $rolls->intersect($this->rollsForBatch($batchId))->values();
+            } else {
+                $allowedRolls = collect();
+                foreach ($allowedBatchIds as $id) {
+                    $allowedRolls = $allowedRolls->merge($this->rollsForBatch((int) $id));
+                }
+                $rolls = $rolls->intersect($allowedRolls->unique()->values())->values();
+            }
+        } elseif ($batchId) {
             $batchRolls = $this->rollsForBatch($batchId);
             $rolls = $rolls->intersect($batchRolls)->values();
         }
@@ -306,13 +319,24 @@ class LivePunchDashboardService
     }
 
     /**
+     * @param  list<int>|null  $allowedBatchIds
      * @return list<array{id: int, name: string}>
      */
-    public function activeBatchOptions(): array
+    public function activeBatchOptions(?array $allowedBatchIds = null): array
     {
-        return Batch::query()
+        $query = Batch::query()
             ->where('status', BatchStatus::Active)
-            ->orderBy('name')
+            ->orderBy('name');
+
+        if ($allowedBatchIds !== null) {
+            if ($allowedBatchIds === []) {
+                return [];
+            }
+
+            $query->whereIn('id', $allowedBatchIds);
+        }
+
+        return $query
             ->get(['id', 'name'])
             ->map(fn (Batch $batch): array => ['id' => $batch->id, 'name' => $batch->name])
             ->all();

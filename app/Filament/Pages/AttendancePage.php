@@ -3,7 +3,6 @@
 namespace App\Filament\Pages;
 
 use App\Enums\AttendanceStatus;
-use App\Enums\BatchStatus;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Filament\Concerns\FinishesAttendanceSave;
@@ -12,6 +11,7 @@ use App\Models\BatchStudent;
 use App\Models\Enrollment;
 use App\Models\Student;
 use App\Services\AttendanceService;
+use App\Services\BatchStaffAssignmentService;
 use App\Services\Punch\LivePunchDashboardService;
 use App\Services\Punch\ManualBatchAttendanceService;
 use App\Services\Punch\PunchAttendanceProcessor;
@@ -163,6 +163,41 @@ class AttendancePage extends Page
         return CrmAccess::can(Auth::user(), CrmPermission::AttendanceMark);
     }
 
+    protected function classAssignments(): BatchStaffAssignmentService
+    {
+        return app(BatchStaffAssignmentService::class);
+    }
+
+    /**
+     * @return list<array{id: int, name: string}>
+     */
+    protected function liveBatchOptions(): array
+    {
+        return app(LivePunchDashboardService::class)->activeBatchOptions(
+            $this->classAssignments()->limitedBatchIdsFor(Auth::user()),
+        );
+    }
+
+    protected function dropDisallowedClassFilter(): void
+    {
+        $batchId = filled($this->filters['batch_id'] ?? null) ? (int) $this->filters['batch_id'] : 0;
+
+        if ($batchId > 0 && ! $this->classAssignments()->canAccessClass(Auth::user(), $batchId)) {
+            $this->filters['batch_id'] = null;
+        }
+    }
+
+    protected function assertSelectedClassAllowed(): void
+    {
+        $batchId = filled($this->filters['batch_id'] ?? null) ? (int) $this->filters['batch_id'] : 0;
+
+        if ($batchId < 1) {
+            return;
+        }
+
+        abort_unless($this->classAssignments()->canAccessClass(Auth::user(), $batchId), 403);
+    }
+
     public function getSubheading(): ?string
     {
         return null;
@@ -180,6 +215,8 @@ class AttendancePage extends Page
         if ($batchId = request()->integer('batch_id')) {
             $this->filters['batch_id'] = $batchId;
         }
+
+        $this->dropDisallowedClassFilter();
 
         if ($this->viewMode === 'manual') {
             $this->loadRoster();
@@ -210,12 +247,15 @@ class AttendancePage extends Page
         }
 
         $this->punchTableReady = $dashboard->punchTableReady();
+        $this->dropDisallowedClassFilter();
+        $allowedBatchIds = $this->classAssignments()->limitedBatchIdsFor(Auth::user());
         $this->dashboard = $dashboard->dashboardForDate(
             $this->filters['date'] ?? now()->toDateString(),
             filled($this->filters['batch_id'] ?? null) ? (int) $this->filters['batch_id'] : null,
             filled($this->filters['roll'] ?? null) ? (string) $this->filters['roll'] : null,
             filled($this->filters['name'] ?? null) ? (string) $this->filters['name'] : null,
             filled($this->filters['state'] ?? null) ? (string) $this->filters['state'] : null,
+            $allowedBatchIds,
         );
 
         $this->lastRefreshedAt = now()->format('H:i:s');
@@ -254,6 +294,17 @@ class AttendancePage extends Page
         }
 
         $batchId = filled($this->filters['batch_id'] ?? null) ? (int) $this->filters['batch_id'] : null;
+
+        if ($this->classAssignments()->shouldLimitToAssignedClasses(Auth::user()) && $batchId === null) {
+            Notification::make()
+                ->title('Pick your class first')
+                ->body('You can search only inside a class assigned to you.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $result = $roster->findByQuickSearch(
             $term,
             $this->filters['date'] ?? now()->toDateString(),
@@ -321,6 +372,8 @@ class AttendancePage extends Page
 
             return;
         }
+
+        $this->assertSelectedClassAllowed();
 
         $this->rosterLoaded = true;
         $batch = Batch::query()->findOrFail($batchId);
@@ -463,6 +516,8 @@ class AttendancePage extends Page
 
             return;
         }
+
+        $this->assertSelectedClassAllowed();
 
         $batch = Batch::query()->findOrFail($batchId);
 
@@ -927,9 +982,9 @@ class AttendancePage extends Page
                     ->native(false),
                 Select::make('batch_id')
                     ->label('Batch')
-                    ->options(fn (LivePunchDashboardService $dashboard): array => collect($dashboard->activeBatchOptions())
-                        ->mapWithKeys(fn (array $batch): array => [$batch['id'] => $batch['name']])
-                        ->all())
+                    ->options(fn (): array => collect($this->liveBatchOptions())->mapWithKeys(
+                        fn (array $batch): array => [$batch['id'] => $batch['name']],
+                    )->all())
                     ->searchable()
                     ->placeholder('All batches')
                     ->nullable()
@@ -962,15 +1017,7 @@ class AttendancePage extends Page
             ->components([
                 Select::make('batch_id')
                     ->label('Batch')
-                    ->options(fn (): array => Batch::query()
-                        ->where('status', BatchStatus::Active)
-                        ->with('course')
-                        ->orderBy('name')
-                        ->get()
-                        ->mapWithKeys(fn (Batch $batch): array => [
-                            $batch->id => "{$batch->name} · {$batch->course?->name}",
-                        ])
-                        ->all())
+                    ->options(fn (): array => $this->classAssignments()->activeBatchOptionsFor(Auth::user()))
                     ->searchable()
                     ->required()
                     ->native(false),

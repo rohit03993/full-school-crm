@@ -257,6 +257,7 @@ class CrmStaffRolesTest extends TestCase
         $this->assertFalse(\App\Filament\Pages\CreateExamWindowPage::canAccess());
         $this->assertTrue(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::canAccess());
         $this->assertTrue(\App\Filament\Pages\AttendancePage::canAccess());
+        $this->assertFalse(\App\Filament\Pages\StaffAttendancePage::canAccess());
     }
 
     public function test_messaging_coordinator_can_send_whatsapp_not_enter_marks(): void

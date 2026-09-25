@@ -3,10 +3,17 @@
 namespace App\Services;
 
 use App\Enums\BatchStaffRole;
+use App\Enums\BatchStatus;
+use App\Enums\CrmPermission;
+use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
 use App\Models\CourseSubject;
+use App\Models\Student;
 use App\Models\User;
+use App\Support\CrmAccess;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 
 class BatchStaffAssignmentService
@@ -116,6 +123,149 @@ class BatchStaffAssignmentService
         return BatchStaffAssignment::query()
             ->where('user_id', $user->id)
             ->exists();
+    }
+
+    /**
+     * Teacher / Faculty only sees classes assigned in Class & Sections.
+     * Super Admin and Academic coordinator keep the full list.
+     */
+    public function shouldLimitToAssignedClasses(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->hasRole(RoleName::SuperAdmin->value)) {
+            return false;
+        }
+
+        if (CrmAccess::can($user, CrmPermission::AcademicsManage)
+            || CrmAccess::can($user, CrmPermission::HomeworkManage)) {
+            return false;
+        }
+
+        return $user->hasRole(StaffJobRole::Teacher->value);
+    }
+
+    /**
+     * @return list<int>|null null means no class lock
+     */
+    public function limitedBatchIdsFor(?User $user): ?array
+    {
+        if (! $this->shouldLimitToAssignedClasses($user) || ! $user) {
+            return null;
+        }
+
+        return $this->assignedBatchIds($user);
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function assignedBatchIds(User $user): array
+    {
+        return BatchStaffAssignment::query()
+            ->where('user_id', $user->id)
+            ->pluck('batch_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function canAccessClass(?User $user, int $batchId): bool
+    {
+        if ($batchId < 1) {
+            return false;
+        }
+
+        $ids = $this->limitedBatchIdsFor($user);
+
+        if ($ids === null) {
+            return true;
+        }
+
+        return in_array($batchId, $ids, true);
+    }
+
+    public function canViewStudent(?User $user, Student|int $student): bool
+    {
+        $studentId = $student instanceof Student ? (int) $student->id : (int) $student;
+
+        if ($studentId < 1) {
+            return false;
+        }
+
+        $query = Student::query()->whereKey($studentId);
+        $this->constrainStudentsQuery($query, $user);
+
+        return $query->exists();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function activeBatchOptionsFor(?User $user): array
+    {
+        $query = Batch::query()
+            ->where('status', BatchStatus::Active)
+            ->with('course')
+            ->orderBy('name');
+
+        $ids = $this->limitedBatchIdsFor($user);
+
+        if ($ids !== null) {
+            if ($ids === []) {
+                return [];
+            }
+
+            $query->whereIn('id', $ids);
+        }
+
+        return $query
+            ->get()
+            ->mapWithKeys(fn (Batch $batch): array => [
+                $batch->id => filled($batch->course?->name)
+                    ? "{$batch->name} · {$batch->course->name}"
+                    : (string) $batch->name,
+            ])
+            ->all();
+    }
+
+    public function constrainStudentsQuery(Builder $query, ?User $user): Builder
+    {
+        $ids = $this->limitedBatchIdsFor($user);
+
+        if ($ids === null) {
+            return $query;
+        }
+
+        if ($ids === []) {
+            return $query->whereRaw('0 = 1');
+        }
+
+        return $query->whereHas(
+            'batchStudents',
+            fn (Builder $batchStudents): Builder => $batchStudents
+                ->where('is_active', true)
+                ->whereIn('batch_id', $ids),
+        );
+    }
+
+    public function constrainBatchColumn(Builder $query, ?User $user, string $column = 'batch_id'): Builder
+    {
+        $ids = $this->limitedBatchIdsFor($user);
+
+        if ($ids === null) {
+            return $query;
+        }
+
+        if ($ids === []) {
+            return $query->whereRaw('0 = 1');
+        }
+
+        return $query->whereIn($column, $ids);
     }
 
     /**

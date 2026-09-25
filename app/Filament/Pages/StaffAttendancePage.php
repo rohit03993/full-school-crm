@@ -8,6 +8,7 @@ use App\Enums\LicenseFeature;
 use App\Filament\Resources\Staff\StaffResource;
 use App\Models\StaffAttendance;
 use App\Models\User;
+use App\Services\BatchStaffAssignmentService;
 use App\Services\Punch\ManualStaffAttendanceService;
 use App\Support\AttendanceSourceLabel;
 use App\Support\CrmAccess;
@@ -53,8 +54,10 @@ class StaffAttendancePage extends Page
             return false;
         }
 
-        return CrmAccess::can(Auth::user(), CrmPermission::AttendanceMark)
-            || CrmAccess::can(Auth::user(), CrmPermission::StaffManage);
+        return (
+            CrmAccess::can(Auth::user(), CrmPermission::AttendanceMark)
+            && ! app(BatchStaffAssignmentService::class)->shouldLimitToAssignedClasses(Auth::user())
+        ) || CrmAccess::can(Auth::user(), CrmPermission::StaffManage);
     }
 
     public function getSubheading(): ?string

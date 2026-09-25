@@ -13,6 +13,7 @@ use App\Models\AcademicSession;
 use App\Models\Batch;
 use App\Models\Student;
 use App\Services\BatchService;
+use App\Services\BatchStaffAssignmentService;
 use App\Services\FaceVerify\FaceVerifyGateService;
 use App\Services\StudentProfileDeleteService;
 use App\Services\StudentSearchService;
@@ -77,6 +78,8 @@ class StudentResource extends Resource
     {
         return parent::getEloquentQuery()
             ->inStudentsDirectory()
+            ->tap(fn (Builder $query) => app(BatchStaffAssignmentService::class)
+                ->constrainStudentsQuery($query, Auth::user()))
             ->with([
                 'activeEnrollment.course',
                 'activeEnrollment.academicSession',
@@ -352,7 +355,7 @@ class StudentResource extends Resource
     public static function getGlobalSearchResults(string $search): SupportCollection
     {
         return SupportCollection::make(
-            app(StudentSearchService::class)->quickSearch($search)->all(),
+            app(StudentSearchService::class)->quickSearch($search, 8, Auth::user())->all(),
         )
             ->map(function (Student $record): ?GlobalSearchResult {
                 $url = static::getGlobalSearchResultUrl($record);

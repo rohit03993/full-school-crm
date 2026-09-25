@@ -126,7 +126,7 @@ class StudentSearchPage extends Page
             return;
         }
 
-        $result = app(StudentSearchService::class)->search(null, null, null, $roll);
+        $result = app(StudentSearchService::class)->search(null, null, null, $roll, Auth::user());
 
         if ($result['outcome'] === StudentSearchService::OUTCOME_FOUND && $result['student']) {
             $this->redirect(
@@ -261,7 +261,7 @@ class StudentSearchPage extends Page
             $this->resetLookupState();
             $this->isSearching = true;
 
-            $result = $service->search($mobile, null, null, null);
+            $result = $service->search($mobile, null, null, null, Auth::user());
 
             if ($result['outcome'] === StudentSearchService::OUTCOME_FOUND && $result['student']) {
                 $this->redirect(
@@ -306,7 +306,7 @@ class StudentSearchPage extends Page
             $this->isSearching = true;
             $this->searchedName = $name;
 
-            $result = $service->search(null, $name, null, null);
+            $result = $service->search(null, $name, null, null, Auth::user());
             $this->isSearching = false;
 
             if ($result['outcome'] === StudentSearchService::OUTCOME_FOUND && $result['student']) {

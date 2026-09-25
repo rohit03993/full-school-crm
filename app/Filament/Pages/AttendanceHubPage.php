@@ -289,12 +289,13 @@ class AttendanceHubPage extends Page
         $date = $this->resolvedDate();
         $overviewService = app(AttendanceHubOverviewService::class);
 
-        $overview = $overviewService->overview($date);
+        $overview = $overviewService->overview($date, Auth::user());
         $feed = $overviewService->feed(
             $date,
             $this->feedType,
             $this->getPage(),
             AttendanceHubOverviewService::FEED_PER_PAGE,
+            Auth::user(),
         );
 
         $classDrill = null;
@@ -303,11 +304,12 @@ class AttendanceHubPage extends Page
                 $this->classDrillBatchId,
                 $date,
                 $this->classDrillBucket,
+                Auth::user(),
             );
         }
 
         $overviewList = $this->overviewList
-            ? $overviewService->overviewStudentList($date, $this->overviewList)
+            ? $overviewService->overviewStudentList($date, $this->overviewList, Auth::user())
             : null;
 
         $cards = [];
