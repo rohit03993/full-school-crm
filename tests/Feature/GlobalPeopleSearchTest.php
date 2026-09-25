@@ -41,7 +41,9 @@ class GlobalPeopleSearchTest extends TestCase
             ->set('search', 'ar')
             ->assertSuccessful()
             ->assertSee('Arjun Lead')
-            ->assertSee('Lead');
+            ->assertSee('Lead')
+            ->assertDontSee('9000000099')
+            ->assertDontSee('Mobile');
     }
 
     public function test_top_bar_two_word_search_shows_the_person_name(): void
@@ -59,7 +61,8 @@ class GlobalPeopleSearchTest extends TestCase
             ->set('search', 'TANMAY ADARWAL')
             ->assertSuccessful()
             ->assertSee('Tanmay Agarwal')
-            ->assertSee('Lead');
+            ->assertSee('Lead')
+            ->assertDontSee('9000000033');
     }
 
     protected function actingAsSuperAdmin(): User

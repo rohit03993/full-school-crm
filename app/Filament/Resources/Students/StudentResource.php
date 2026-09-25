@@ -403,12 +403,8 @@ class StudentResource extends Resource
             default => $record->status?->label() ?? 'Person',
         };
 
-        $name = trim((string) $record->name);
-
         return array_filter([
-            'Name' => $name !== '' ? $name : null,
             'Type' => $kind,
-            'Mobile' => filled($record->mobile) ? (string) $record->mobile : null,
             'Roll' => filled($record->activeEnrollment?->enrollment_number)
                 ? (string) $record->activeEnrollment->enrollment_number
                 : null,
