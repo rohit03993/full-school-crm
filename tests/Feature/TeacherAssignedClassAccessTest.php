@@ -4,7 +4,10 @@ namespace Tests\Feature;
 
 use App\Enums\BatchStaffRole;
 use App\Enums\BatchStatus;
+use App\Enums\CallDirection;
+use App\Enums\CallStatus;
 use App\Enums\CourseStatus;
+use App\Enums\CrmPermission;
 use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
@@ -17,10 +20,12 @@ use App\Models\BatchStaffAssignment;
 use App\Models\BatchStudent;
 use App\Models\Course;
 use App\Models\Student;
+use App\Models\StudentCall;
 use App\Models\User;
 use App\Services\AttendanceHubOverviewService;
 use App\Services\BatchStaffAssignmentService;
 use App\Services\CrmPermissionSyncService;
+use App\Services\StudentActivityTimelineService;
 use App\Services\StudentSearchService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -102,6 +107,44 @@ class TeacherAssignedClassAccessTest extends TestCase
         Livewire::test(StudentProfilePage::class, ['record' => $data['ownStudent']])
             ->assertSuccessful()
             ->assertSee($data['ownStudent']->name);
+    }
+
+    public function test_teacher_does_not_see_call_log_on_student_profile(): void
+    {
+        $data = $this->seedTwoClasses();
+
+        StudentCall::query()->create([
+            'student_id' => $data['ownStudent']->id,
+            'user_id' => $data['teacher']->id,
+            'called_at' => now()->subHour(),
+            'call_direction' => CallDirection::Outgoing,
+            'call_status' => CallStatus::Connected,
+            'call_notes' => 'Teacher must not see this call note',
+        ]);
+
+        $data['ownStudent']->update([
+            'total_calls' => 1,
+            'last_call_at' => now()->subHour(),
+            'last_call_status' => CallStatus::Connected,
+            'last_call_notes' => 'Teacher must not see this call note',
+        ]);
+
+        $this->actingAs($data['teacher']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->assertFalse($data['teacher']->canCrm(CrmPermission::LeadsCall));
+
+        $types = collect(app(StudentActivityTimelineService::class)
+            ->forStudent($data['ownStudent']->fresh(), $data['teacher'], 40)['items'])
+            ->pluck('type')
+            ->all();
+        $this->assertNotContains('call', $types);
+
+        Livewire::test(StudentProfilePage::class, ['record' => $data['ownStudent']->fresh()])
+            ->assertSuccessful()
+            ->assertDontSee('Teacher must not see this call note')
+            ->assertDontSee('Last call')
+            ->assertDontSee('Not called yet');
     }
 
     public function test_coordinator_still_sees_every_class_and_student(): void

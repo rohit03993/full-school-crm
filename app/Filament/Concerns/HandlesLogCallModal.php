@@ -6,6 +6,7 @@ use App\Enums\LicenseFeature;
 use App\Enums\VisitStatus;
 use App\Models\Student;
 use App\Services\CallLogService;
+use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
@@ -66,6 +67,15 @@ trait HandlesLogCallModal
         if (! FeatureGate::enabled(LicenseFeature::Calls)) {
             Notification::make()
                 ->title('Calling module is not enabled')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (! CrmAccess::canViewCallLog(Auth::user())) {
+            Notification::make()
+                ->title('You cannot log calls')
                 ->warning()
                 ->send();
 

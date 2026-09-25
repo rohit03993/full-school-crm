@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Enums\CrmPermission;
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Models\User;
@@ -63,6 +64,19 @@ class CrmAccess
             CrmPermission::FeesAdjustStructure,
             CrmPermission::DashboardFinanceStats,
         );
+    }
+
+    /**
+     * See the student Calls tab, last-call box, and call rows on the activity timeline.
+     * Counsellor and Admission officer have this. Teacher / Faculty does not.
+     */
+    public static function canViewCallLog(?User $user): bool
+    {
+        if (! FeatureGate::enabled(LicenseFeature::Calls)) {
+            return false;
+        }
+
+        return self::can($user, CrmPermission::LeadsCall);
     }
 
     /**

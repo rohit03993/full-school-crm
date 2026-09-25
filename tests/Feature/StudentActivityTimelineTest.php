@@ -143,6 +143,29 @@ class StudentActivityTimelineTest extends TestCase
         $this->assertNotContains('fee', $types);
     }
 
+    public function test_timeline_hides_calls_without_call_permission(): void
+    {
+        [$staff, $student] = $this->seedStudentWithStaff();
+        $staff->syncRoles([StaffJobRole::Teacher->value]);
+
+        StudentCall::query()->create([
+            'student_id' => $student->id,
+            'user_id' => $staff->id,
+            'called_at' => now(),
+            'call_direction' => CallDirection::Outgoing,
+            'call_status' => CallStatus::Connected,
+            'call_purpose' => EnrolledCallPurpose::Attendance,
+            'call_notes' => 'Asked about class',
+        ]);
+
+        $this->assertFalse($staff->fresh()->canCrm(CrmPermission::LeadsCall));
+
+        $result = app(StudentActivityTimelineService::class)->forStudent($student, $staff->fresh(), 40);
+        $types = collect($result['items'])->pluck('type')->all();
+
+        $this->assertNotContains('call', $types);
+    }
+
     public function test_timeline_shows_staff_name_for_manual_punch_and_biometric_for_machine_punch(): void
     {
         [$staff, $student, $feeStructure, $batch] = $this->seedStudentWithStaff();

@@ -90,7 +90,7 @@ class StudentActivityTimelineService
      */
     protected function calls(Student $student, ?User $viewer, int $limit): array
     {
-        if (! FeatureGate::enabled(LicenseFeature::Calls) || ! CrmAccess::can($viewer, CrmPermission::StudentsView)) {
+        if (! FeatureGate::enabled(LicenseFeature::Calls) || ! CrmAccess::canViewCallLog($viewer)) {
             return [];
         }
 

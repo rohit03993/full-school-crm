@@ -1,8 +1,9 @@
 @php
     $compact = $compact ?? false;
+    $canViewCallLog = \App\Support\CrmAccess::canViewCallLog(auth()->user());
 @endphp
 
-@if ($record->last_call_at)
+@if ($canViewCallLog && $record->last_call_at)
     <div @class([
         'rounded-lg bg-gray-50 text-xs text-gray-600 dark:bg-white/5 dark:text-gray-400',
         'mt-1.5 px-2.5 py-1.5' => $compact,
@@ -35,6 +36,6 @@
             </span>
         @endif
     </div>
-@elseif (! $compact && (int) $record->total_calls === 0 && filled($record->mobile))
+@elseif ($canViewCallLog && ! $compact && (int) $record->total_calls === 0 && filled($record->mobile))
     <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">Not called yet</p>
 @endif

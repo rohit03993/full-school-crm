@@ -619,7 +619,7 @@ class StudentProfilePage extends Page
             $tabs[] = 'visits';
         }
 
-        if ($this->licensed(LicenseFeature::Calls)) {
+        if ($this->userCanViewCallLog()) {
             $tabs[] = 'calls';
         }
 
@@ -850,12 +850,20 @@ class StudentProfilePage extends Page
     {
         if ($this->cachedProfileSummary === null) {
             $this->cachedProfileSummary = app(StudentCounterService::class)->profile($this->record);
-            $this->cachedProfileSummary['calling_assignment'] = app(LeadAssignmentService::class)
-                ->profileCallingAssignment($this->record, Auth::user());
+            $this->cachedProfileSummary['calling_assignment'] = $this->userCanViewCallLog()
+                ? app(LeadAssignmentService::class)->profileCallingAssignment($this->record, Auth::user())
+                : null;
             $this->cachedProfileSummary['meeting_assignment'] = app(VisitMeetingAssignmentService::class)
                 ->profileMeetingAssignment($this->record, Auth::user());
             $this->cachedProfileSummary['open_cases'] = app(StudentCaseService::class)
                 ->overviewBanners($this->record, Auth::user());
+
+            if (! $this->userCanViewCallLog()) {
+                $this->cachedProfileSummary['items'] = array_values(array_filter(
+                    $this->cachedProfileSummary['items'] ?? [],
+                    fn (array $item): bool => ($item['tab'] ?? null) !== 'calls' && ($item['label'] ?? '') !== 'Calls',
+                ));
+            }
         }
 
         return $this->cachedProfileSummary;
@@ -1085,6 +1093,8 @@ class StudentProfilePage extends Page
 
     public function loadCallsTab(): void
     {
+        abort_unless($this->userCanViewCallLog(), 403);
+
         if ($this->callsTabLoaded) {
             return;
         }
@@ -1741,6 +1751,11 @@ class StudentProfilePage extends Page
     protected function userCanViewFees(): bool
     {
         return CrmAccess::canViewFees(Auth::user());
+    }
+
+    protected function userCanViewCallLog(): bool
+    {
+        return CrmAccess::canViewCallLog(Auth::user());
     }
 
     public function getCanManageAdmissionFeePlanProperty(): bool
@@ -3759,7 +3774,7 @@ class StudentProfilePage extends Page
                         ]),
                     'calls' => Tab::make('Calls')
                         ->icon('heroicon-o-phone')
-                        ->visible(fn (): bool => $this->licensed(LicenseFeature::Calls))
+                        ->visible(fn (): bool => $this->userCanViewCallLog())
                         ->schema([
                             View::make('filament.pages.partials.student-profile-calls')
                                 ->viewData(fn (): array => [
