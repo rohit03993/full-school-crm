@@ -142,6 +142,8 @@ class StudentProfileHomeworkTabTest extends TestCase
             ->assertSee('Ray optics')
             ->assertSee('Older algebra')
             ->assertSee('Opened')
+            ->assertSee('2 subjects')
+            ->assertSee('1 subject')
             ->assertDontSee('Not viewed')
             ->assertDontSee('Assigned homework');
     }
