@@ -33,7 +33,7 @@
             </a>
         @endif
 
-        @if ($canSubmit)
+        @if ($canSubmit && ! $canManage)
             <a
                 href="{{ $submitUrl }}"
                 class="group rounded-2xl border border-gray-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md dark:border-white/10 dark:bg-gray-900"

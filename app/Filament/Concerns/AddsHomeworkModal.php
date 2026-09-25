@@ -17,31 +17,12 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Exceptions\Halt;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 trait AddsHomeworkModal
 {
     abstract protected function dateString(): string;
-
-    /**
-     * @return list<Action>
-     */
-    protected function getHeaderActions(): array
-    {
-        if (! $this->homeworkModalAllowsPickingClass()) {
-            return [];
-        }
-
-        return [
-            Action::make('addHomeworkHeader')
-                ->label('Add homework')
-                ->icon(Heroicon::OutlinedPlus)
-                ->color('primary')
-                ->action(fn () => $this->mountAction('addHomework')),
-        ];
-    }
 
     public function startAdd(int $batchId, int $subjectId): void
     {

@@ -19,7 +19,6 @@
             @endif
         </p>
         <div class="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs font-semibold">
-            <a href="{{ $submitUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">Submit</a>
             <a href="{{ $checkUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">Check completion</a>
             <a href="{{ $historyUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">History</a>
         </div>

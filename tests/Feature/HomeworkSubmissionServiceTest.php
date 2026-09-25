@@ -80,6 +80,7 @@ class HomeworkSubmissionServiceTest extends TestCase
 
         Livewire::test(HomeworkReviewPage::class)
             ->assertSuccessful()
+            ->assertDontSee('>Submit</a>', escape: false)
             ->set('data.batch_id', $data['batch']->id)
             ->assertSuccessful()
             ->set('lastCombinedSendResult', [
@@ -272,27 +273,25 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame($data['admin']->id, $assignment->approved_by_user_id);
     }
 
-    public function test_admin_add_homework_header_popup_picks_class_and_subject(): void
+    public function test_submit_page_is_only_for_teachers(): void
     {
         $data = $this->seedClass();
+        app(CrmPermissionSyncService::class)->sync();
+
+        $coordinator = User::factory()->create(['is_active' => true, 'name' => 'Khushi Coordinator']);
+        $coordinator->syncRoles([RoleName::Staff->value, StaffJobRole::AcademicCoordinator->value]);
 
         $this->actingAs($data['admin']);
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->assertFalse(SubmitHomeworkPage::canAccess());
+        $this->assertTrue(HomeworkReviewPage::canAccess());
 
-        Livewire::test(HomeworkReviewPage::class)
-            ->callAction('addHomework', data: [
-                'batch_id' => $data['batch']->id,
-                'course_subject_id' => $data['physics']->id,
-                'description' => 'From the top button',
-            ])
-            ->assertHasNoActionErrors();
+        $this->actingAs($coordinator);
+        $this->assertFalse(SubmitHomeworkPage::canAccess());
+        $this->assertTrue(HomeworkReviewPage::canAccess());
 
-        $assignment = HomeworkAssignment::query()
-            ->where('course_subject_id', $data['physics']->id)
-            ->first();
-
-        $this->assertNotNull($assignment);
-        $this->assertSame(HomeworkAssignmentStatus::Approved, $assignment->status);
+        $this->actingAs($data['mathTeacher']);
+        $this->assertTrue(SubmitHomeworkPage::canAccess());
+        $this->assertFalse(HomeworkReviewPage::canAccess());
     }
 
     public function test_board_lists_every_subject_with_status(): void

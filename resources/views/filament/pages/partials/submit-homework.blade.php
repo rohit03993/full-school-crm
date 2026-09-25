@@ -5,7 +5,6 @@
     $isToday = $isToday ?? false;
     $checkBaseUrl = $checkBaseUrl ?? '#';
     $checkDate = $checkDate ?? now()->toDateString();
-    $canPickAnyClass = (bool) ($canPickAnyClass ?? false);
 @endphp
 
 <div class="space-y-3">
@@ -25,11 +24,7 @@
 
     @if (($desk['groups'] ?? []) === [])
         <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400">
-            @if ($canPickAnyClass)
-                Tap Add homework at the top to pick a class and subject.
-            @else
-                You are not assigned to any class yet. Ask admin to assign you in Class &amp; Sections.
-            @endif
+            You are not assigned to any class yet. Ask admin to assign you in Class &amp; Sections.
         </div>
     @else
         <div class="space-y-4">

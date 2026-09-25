@@ -113,7 +113,6 @@ class HomeworkReviewPage extends Page
                                 'openBatchId' => (int) ($this->openBatchId ?? 0),
                                 'dateLabel' => Carbon::parse($date)->format('d M Y'),
                                 'isToday' => $date === now()->toDateString(),
-                                'submitUrl' => SubmitHomeworkPage::getUrl(),
                                 'checkUrl' => HomeworkCheckPage::getUrl(),
                                 'historyUrl' => HomeworkAssignmentResource::getUrl('index'),
                             ];

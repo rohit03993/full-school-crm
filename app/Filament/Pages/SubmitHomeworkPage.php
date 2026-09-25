@@ -2,9 +2,11 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Filament\Concerns\AddsHomeworkModal;
 use App\Services\HomeworkSubmissionService;
+use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
@@ -52,7 +54,11 @@ class SubmitHomeworkPage extends Page
 
         $user = Auth::user();
 
-        return $user !== null && app(HomeworkSubmissionService::class)->canSubmit($user);
+        if (! $user || CrmAccess::can($user, CrmPermission::HomeworkManage)) {
+            return false;
+        }
+
+        return app(HomeworkSubmissionService::class)->canSubmit($user);
     }
 
     public function getSubheading(): ?string
@@ -104,7 +110,6 @@ class SubmitHomeworkPage extends Page
                                 'isToday' => $date === now()->toDateString(),
                                 'checkBaseUrl' => HomeworkCheckPage::getUrl(),
                                 'checkDate' => $date,
-                                'canPickAnyClass' => $this->homeworkModalAllowsPickingClass(),
                             ];
                         })
                         ->columnSpanFull(),
