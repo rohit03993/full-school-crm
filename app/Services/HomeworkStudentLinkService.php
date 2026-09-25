@@ -6,6 +6,7 @@ use App\Models\HomeworkAssignment;
 use App\Models\HomeworkStudentLink;
 use App\Models\Student;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class HomeworkStudentLinkService
 {
@@ -70,5 +71,112 @@ class HomeworkStudentLinkService
         return $link instanceof HomeworkStudentLink
             ? $link->publicUrl()
             : $assignment->publicUrl();
+    }
+
+    /**
+     * @return array{opened: int, total: int, opened_people: list<array{name: string, at: ?string}>, not_opened_people: list<string>}
+     */
+    public function emptyStats(): array
+    {
+        return [
+            'opened' => 0,
+            'total' => 0,
+            'opened_people' => [],
+            'not_opened_people' => [],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $assignmentIds
+     * @return array<int, array{opened: int, total: int, opened_people: list<array{name: string, at: ?string}>, not_opened_people: list<string>}>
+     */
+    public function statsByAssignmentId(Collection $assignmentIds): array
+    {
+        $ids = $assignmentIds
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty() || ! Schema::hasTable('homework_student_links')) {
+            return [];
+        }
+
+        $grouped = HomeworkStudentLink::query()
+            ->whereIn('homework_assignment_id', $ids)
+            ->with('student')
+            ->get()
+            ->groupBy('homework_assignment_id');
+
+        $stats = [];
+
+        foreach ($grouped as $assignmentId => $links) {
+            $openedPeople = [];
+            $notOpenedPeople = [];
+
+            foreach ($links as $link) {
+                $name = filled($link->student?->name) ? (string) $link->student->name : 'Student';
+                $opened = $this->linkWasOpened($link);
+
+                if ($opened) {
+                    $openedPeople[] = [
+                        'name' => $name,
+                        'at' => $link->last_clicked_at?->timezone((string) config('app.timezone'))->format('h:i A'),
+                    ];
+                } else {
+                    $notOpenedPeople[] = $name;
+                }
+            }
+
+            usort($openedPeople, fn (array $left, array $right): int => strnatcasecmp($left['name'], $right['name']));
+            usort($notOpenedPeople, fn (string $left, string $right): int => strnatcasecmp($left, $right));
+
+            $stats[(int) $assignmentId] = [
+                'opened' => count($openedPeople),
+                'total' => $links->count(),
+                'opened_people' => $openedPeople,
+                'not_opened_people' => $notOpenedPeople,
+            ];
+        }
+
+        return $stats;
+    }
+
+    /**
+     * Unique-link open state for one class/subject/date. Empty when there is no unique send yet.
+     *
+     * @return array<int, array{opened: bool, at: ?string}>
+     */
+    public function openStateForClassSubjectDate(int $batchId, int $courseSubjectId, string $date): array
+    {
+        if ($batchId < 1 || $courseSubjectId < 1 || ! Schema::hasTable('homework_student_links')) {
+            return [];
+        }
+
+        $assignment = HomeworkAssignment::query()
+            ->where('batch_id', $batchId)
+            ->where('course_subject_id', $courseSubjectId)
+            ->whereDate('homework_date', $date)
+            ->first();
+
+        if ($assignment === null) {
+            return [];
+        }
+
+        return HomeworkStudentLink::query()
+            ->where('homework_assignment_id', $assignment->id)
+            ->get()
+            ->mapWithKeys(fn (HomeworkStudentLink $link): array => [
+                (int) $link->student_id => [
+                    'opened' => $this->linkWasOpened($link),
+                    'at' => $link->last_clicked_at?->timezone((string) config('app.timezone'))->format('h:i A'),
+                ],
+            ])
+            ->all();
+    }
+
+    protected function linkWasOpened(HomeworkStudentLink $link): bool
+    {
+        return ((int) $link->click_count) > 0 || $link->first_clicked_at !== null;
     }
 }

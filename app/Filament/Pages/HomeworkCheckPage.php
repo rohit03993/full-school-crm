@@ -581,7 +581,7 @@ class HomeworkCheckPage extends Page
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array{id: int, name: string, mobile: ?string, check_id: ?int, last_status: ?string, last_notify: ?string, can_resend: bool}>
+     * @return \Illuminate\Support\Collection<int, array{id: int, name: string, mobile: ?string, check_id: ?int, last_status: ?string, last_notify: ?string, can_resend: bool, link_tracked: bool, link_opened: bool, link_opened_at: ?string}>
      */
     protected function rosterStudents(): \Illuminate\Support\Collection
     {

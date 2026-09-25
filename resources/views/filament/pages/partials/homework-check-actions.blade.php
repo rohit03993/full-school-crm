@@ -98,6 +98,15 @@
                     <p class="text-xs text-gray-500 dark:text-gray-400">
                         Tick students who did <strong>not</strong> finish, then Submit. The system will ask before sending WhatsApp.
                     </p>
+                    @php
+                        $linkTrackedStudents = collect($students)->where('link_tracked', true);
+                        $linkOpenedCount = $linkTrackedStudents->where('link_opened', true)->count();
+                    @endphp
+                    @if ($linkTrackedStudents->isNotEmpty())
+                        <p class="mt-1 text-xs font-semibold text-gray-700 dark:text-gray-200">
+                            Link opened {{ $linkOpenedCount }} / {{ $linkTrackedStudents->count() }}
+                        </p>
+                    @endif
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button
@@ -139,6 +148,7 @@
                             <th class="px-4 py-2 w-10"></th>
                             <th class="px-4 py-2">Student</th>
                             <th class="px-4 py-2">Mobile</th>
+                            <th class="px-4 py-2">Link</th>
                             <th class="px-4 py-2">Week ND</th>
                             <th class="px-4 py-2">{{ $checkDateLabel }}</th>
                             <th class="px-4 py-2 text-right">Quick</th>
@@ -168,6 +178,24 @@
                                     <x-crm.person-name :student-id="$student['id']" :name="$student['name']" />
                                 </td>
                                 <td class="px-4 py-2 text-gray-500" data-label="Mobile">{{ $student['mobile'] ?: '—' }}</td>
+                                <td class="px-4 py-2 text-xs" data-label="Link">
+                                    @if ($student['link_tracked'] ?? false)
+                                        @if ($student['link_opened'] ?? false)
+                                            <span class="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">
+                                                Opened
+                                                @if (filled($student['link_opened_at'] ?? null))
+                                                    · {{ $student['link_opened_at'] }}
+                                                @endif
+                                            </span>
+                                        @else
+                                            <span class="rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                                                Not opened
+                                            </span>
+                                        @endif
+                                    @else
+                                        <span class="text-gray-400">—</span>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-2 text-xs" data-label="Week ND">
                                     @if (($student['not_done_week'] ?? 0) > 0)
                                         <span class="rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
@@ -213,7 +241,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
                                     No students found for this class.
                                 </td>
                             </tr>

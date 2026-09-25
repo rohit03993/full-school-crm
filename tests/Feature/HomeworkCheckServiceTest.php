@@ -197,6 +197,88 @@ class HomeworkCheckServiceTest extends TestCase
         unset($teacher);
     }
 
+    public function test_roster_shows_link_opened_next_to_not_done(): void
+    {
+        Http::fake();
+
+        [$teacher, $batch, $riya, $subject] = $this->seedClass();
+        $aman = Student::query()->create([
+            'name' => 'Aman Verma',
+            'mobile' => '9123456780',
+            'status' => StudentStatus::Enrolled,
+        ]);
+        BatchStudent::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $aman->id,
+            'is_active' => true,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $teacher->id,
+        ]);
+
+        $assignment = \App\Models\HomeworkAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'created_by_user_id' => $teacher->id,
+            'title' => 'Algebra worksheet',
+            'description' => 'Complete all questions',
+            'content_type' => \App\Enums\HomeworkContentType::Text,
+            'status' => \App\Enums\HomeworkAssignmentStatus::Sent,
+            'homework_date' => now()->toDateString(),
+            'published_at' => now(),
+        ]);
+
+        $links = app(\App\Services\HomeworkStudentLinkService::class)->ensureForAssignment(
+            $assignment,
+            collect([$riya, $aman]),
+        );
+
+        app(HomeworkCheckService::class)->mark(
+            $teacher,
+            $batch->id,
+            $riya->id,
+            $subject->id,
+            'Algebra worksheet',
+            HomeworkCheckStatus::NotDone,
+            now()->toDateString(),
+        );
+
+        $roster = app(HomeworkCheckService::class)
+            ->rosterForBatch($batch->id, $subject->id, null, now()->toDateString())
+            ->keyBy('id');
+
+        $this->assertTrue($roster[$riya->id]['link_tracked']);
+        $this->assertFalse($roster[$riya->id]['link_opened']);
+        $this->assertSame('Not Done', $roster[$riya->id]['last_status']);
+        $this->assertTrue($roster[$aman->id]['link_tracked']);
+        $this->assertFalse($roster[$aman->id]['link_opened']);
+        $this->assertNull($roster[$aman->id]['last_status']);
+
+        $links->get($riya->id)->recordOpen();
+
+        $afterOpen = app(HomeworkCheckService::class)
+            ->rosterForBatch($batch->id, $subject->id, null, now()->toDateString())
+            ->keyBy('id');
+
+        $this->assertTrue($afterOpen[$riya->id]['link_opened']);
+        $this->assertSame('Not Done', $afterOpen[$riya->id]['last_status']);
+        $this->assertFalse($afterOpen[$aman->id]['link_opened']);
+        $this->assertNotNull($afterOpen[$riya->id]['link_opened_at']);
+
+        $this->actingAs($teacher);
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+
+        Livewire::withQueryParams([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'check_date' => now()->toDateString(),
+        ])->test(HomeworkCheckPage::class)
+            ->assertSee('Link opened 1 / 2')
+            ->assertSee('Not Done')
+            ->assertSee('Opened')
+            ->assertSee('Not opened')
+            ->assertSee('Submit Not Done');
+    }
+
     public function test_mark_remaining_done_only_marks_unmarked_students(): void
     {
         Http::fake();

@@ -25,6 +25,7 @@ class HomeworkCheckService
     public function __construct(
         protected HomeworkCheckWhatsAppService $whatsapp,
         protected BatchStaffAssignmentService $assignments,
+        protected HomeworkStudentLinkService $studentLinks,
     ) {}
 
     /**
@@ -439,7 +440,7 @@ class HomeworkCheckService
     }
 
     /**
-     * @return Collection<int, array{id: int, name: string, mobile: ?string, check_id: ?int, last_status: ?string, last_notify: ?string, can_resend: bool, not_done_week: int}>
+     * @return Collection<int, array{id: int, name: string, mobile: ?string, check_id: ?int, last_status: ?string, last_notify: ?string, can_resend: bool, not_done_week: int, link_tracked: bool, link_opened: bool, link_opened_at: ?string}>
      */
     public function rosterForBatch(
         int $batchId,
@@ -475,9 +476,12 @@ class HomeworkCheckService
         $rows = $query->get();
         $studentIds = $rows->pluck('student_id')->filter()->map(fn ($id): int => (int) $id)->all();
         $notDoneWeek = $this->notDoneCountsThisWeek($studentIds);
+        $linkStateByStudent = ($courseSubjectId && $courseSubjectId > 0)
+            ? $this->studentLinks->openStateForClassSubjectDate($batchId, $courseSubjectId, $checkedOnDate)
+            : [];
 
         return $rows
-            ->map(function (BatchStudent $row) use ($latestByStudent, $notDoneWeek): ?array {
+            ->map(function (BatchStudent $row) use ($latestByStudent, $notDoneWeek, $linkStateByStudent): ?array {
                 $student = $row->student;
                 if (! $student) {
                     return null;
@@ -492,6 +496,8 @@ class HomeworkCheckService
                         HomeworkCheckNotifyStatus::Pending,
                     ], true);
 
+                $linkState = $linkStateByStudent[(int) $student->id] ?? null;
+
                 return [
                     'id' => $student->id,
                     'name' => $student->name,
@@ -501,6 +507,9 @@ class HomeworkCheckService
                     'last_notify' => $latest?->notify_status?->label(),
                     'can_resend' => $canResend,
                     'not_done_week' => (int) ($notDoneWeek[$student->id] ?? 0),
+                    'link_tracked' => is_array($linkState),
+                    'link_opened' => (bool) ($linkState['opened'] ?? false),
+                    'link_opened_at' => $linkState['at'] ?? null,
                 ];
             })
             ->filter()

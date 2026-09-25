@@ -897,6 +897,75 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('Aman Verma');
     }
 
+    public function test_teacher_desk_shows_who_opened_unique_homework_links(): void
+    {
+        $sequence = 0;
+
+        Http::fake([
+            'https://graph.facebook.com/*' => function () use (&$sequence) {
+                $sequence++;
+
+                return Http::response([
+                    'messages' => [['id' => 'wamid.TEACH'.$sequence]],
+                ], 200);
+            },
+        ]);
+
+        $data = $this->seedClass();
+        $this->seedCombinedTemplate();
+        $service = app(HomeworkSubmissionService::class);
+
+        $maths = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Ex 5.2',
+        ]);
+        $service->approve($data['admin'], $maths->id);
+        $service->combinedSend($data['admin'], $data['batch']->id, now()->toDateString());
+
+        $mathsCard = $service->teacherDeskForDate($data['mathTeacher'], now()->toDateString())['groups'][0]['sections'][0]['subjects'][0];
+        $this->assertSame(0, $mathsCard['link_opened']);
+        $this->assertSame(2, $mathsCard['link_total']);
+
+        $physicsCard = $service->teacherDeskForDate($data['physicsTeacher'], now()->toDateString())['groups'][0]['sections'][0]['subjects'][0];
+        $this->assertSame(0, $physicsCard['link_total']);
+        $this->assertSame($data['physics']->id, $physicsCard['course_subject_id']);
+
+        $this->actingAs($data['mathTeacher']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(SubmitHomeworkPage::class)
+            ->assertSee('Opened 0 / 2')
+            ->assertDontSee('Review & send');
+
+        $riyaLink = HomeworkStudentLink::query()
+            ->where('homework_assignment_id', $maths->id)
+            ->whereHas('student', fn ($query) => $query->where('name', 'Riya Sharma'))
+            ->first();
+
+        $this->assertNotNull($riyaLink);
+        $this->get($riyaLink->publicUrl())->assertOk();
+
+        $afterOpen = $service->teacherDeskForDate($data['mathTeacher'], now()->toDateString())['groups'][0]['sections'][0]['subjects'][0];
+        $this->assertSame(1, $afterOpen['link_opened']);
+        $this->assertSame(2, $afterOpen['link_total']);
+
+        Livewire::test(SubmitHomeworkPage::class)
+            ->assertSee('Opened 1 / 2');
+
+        Livewire::withQueryParams([
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'check_date' => now()->toDateString(),
+        ])->test(HomeworkCheckPage::class)
+            ->assertSee('Link opened 1 / 2')
+            ->assertSee('Opened')
+            ->assertSee('Not opened')
+            ->assertSee('Submit Not Done');
+    }
+
     public function test_combined_send_without_approved_returns_error(): void
     {
         $data = $this->seedClass();
