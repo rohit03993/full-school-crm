@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RoleName;
 use App\Enums\CallDirection;
 use App\Enums\CallStatus;
 use App\Enums\CrmPermission;
@@ -16,6 +17,7 @@ use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\User;
 use App\Services\CrmPermissionSyncService;
+use Spatie\Permission\Models\Role;
 use App\Services\StaffActivityService;
 use App\Services\StaffActivityTimelineService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -85,7 +87,14 @@ class StaffActivityServiceTest extends TestCase
         $service = app(StaffActivityService::class);
 
         $this->assertFalse($service->canView($counsellor, $other));
-        $this->assertTrue($service->canView($counsellor, $counsellor));
+        $this->assertFalse($service->canView($counsellor, $counsellor));
+
+        Role::findOrCreate(RoleName::SuperAdmin->value);
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+
+        $this->assertTrue($service->canView($admin, $other));
+        $this->assertTrue($service->canView($admin, $counsellor));
     }
 
     public function test_timeline_orders_login_and_call_without_other_roles(): void

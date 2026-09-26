@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AdmissionStatus;
 use App\Enums\BatchStaffRole;
 use App\Enums\BatchStatus;
 use App\Enums\CallDirection;
 use App\Enums\CallStatus;
 use App\Enums\CourseStatus;
 use App\Enums\CrmPermission;
+use App\Enums\EnrollmentStatus;
+use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
@@ -17,10 +20,13 @@ use App\Filament\Pages\StudentProfilePage;
 use App\Filament\Resources\Students\StudentResource;
 use App\Filament\Widgets\DashboardHeroWidget;
 use App\Models\AcademicSession;
+use App\Models\Admission;
 use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
 use App\Models\BatchStudent;
 use App\Models\Course;
+use App\Models\Enrollment;
+use App\Models\Enquiry;
 use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\User;
@@ -146,6 +152,51 @@ class TeacherAssignedClassAccessTest extends TestCase
             ->assertDontSee('Teacher must not see this call note')
             ->assertDontSee('Last call')
             ->assertDontSee('Not called yet');
+    }
+
+    public function test_teacher_cannot_edit_profile_marks_batch_or_office_tabs(): void
+    {
+        $data = $this->seedTwoClasses();
+        $this->enrollStudent($data['ownStudent'], $data['ownBatch']);
+        $this->actingAs($data['teacher']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(StudentProfilePage::class, ['record' => $data['ownStudent']->fresh()])
+            ->assertSuccessful()
+            ->assertActionHidden('assignBatch')
+            ->assertDontSee('Visits')
+            ->assertDontSee('Cases')
+            ->assertDontSee('Documents')
+            ->assertDontSee('Edit marks')
+            ->call('openActivityTimelineTab', 'visits')
+            ->assertSet('profileTab', 'overview')
+            ->call('openActivityTimelineTab', 'cases')
+            ->assertSet('profileTab', 'overview')
+            ->call('openActivityTimelineTab', 'documents')
+            ->assertSet('profileTab', 'overview')
+            ->call('startExamMarksEdit', 'missing-exam')
+            ->assertForbidden();
+    }
+
+    public function test_academic_head_still_sees_profile_marks_batch_and_office_tabs(): void
+    {
+        $data = $this->seedTwoClasses();
+        $this->enrollStudent($data['ownStudent'], $data['ownBatch']);
+        $coordinator = User::factory()->create(['is_active' => true]);
+        $coordinator->assignRole(StaffJobRole::AcademicCoordinator->value);
+        $this->actingAs($coordinator);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(StudentProfilePage::class, ['record' => $data['ownStudent']->fresh()])
+            ->assertSuccessful()
+            ->assertActionVisible('assignBatch')
+            ->assertSee('Visits')
+            ->assertSee('Cases')
+            ->assertSee('Documents')
+            ->call('openActivityTimelineTab', 'documents')
+            ->assertSet('profileTab', 'documents')
+            ->call('openActivityTimelineTab', 'cases')
+            ->assertSet('profileTab', 'cases');
     }
 
     public function test_coordinator_still_sees_every_class_and_student(): void
@@ -296,5 +347,36 @@ class TeacherAssignedClassAccessTest extends TestCase
         ]);
 
         return compact('teacher', 'ownBatch', 'otherBatch', 'ownStudent', 'otherStudent');
+    }
+
+    protected function enrollStudent(Student $student, Batch $batch): void
+    {
+        $enquiry = Enquiry::query()->create([
+            'student_id' => $student->id,
+            'enquiry_number' => 'ENQ-TEACHER-'.$student->id,
+            'course_id' => $batch->course_id,
+            'lead_source' => LeadSource::WalkIn,
+            'meeting_for' => 'school',
+            'visit_type' => 'first_visit',
+            'latest_visit_status' => 'interested',
+        ]);
+
+        $admission = Admission::query()->create([
+            'student_id' => $student->id,
+            'enquiry_id' => $enquiry->id,
+            'admission_number' => 'ADM-TEACHER-'.$student->id,
+            'status' => AdmissionStatus::Approved,
+        ]);
+
+        Enrollment::query()->create([
+            'student_id' => $student->id,
+            'admission_id' => $admission->id,
+            'course_id' => $batch->course_id,
+            'academic_session_id' => $batch->academic_session_id,
+            'enrollment_number' => 'ROLL-TEACHER-'.$student->id,
+            'enrolled_at' => now(),
+            'status' => EnrollmentStatus::Enrolled,
+            'is_active' => true,
+        ]);
     }
 }

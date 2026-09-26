@@ -39,10 +39,6 @@ class StaffActivityService
             return false;
         }
 
-        if ($viewer->id === $subject->id) {
-            return CrmAccess::hasPanelAccess($viewer);
-        }
-
         return CrmAccess::can($viewer, CrmPermission::StaffManage);
     }
 

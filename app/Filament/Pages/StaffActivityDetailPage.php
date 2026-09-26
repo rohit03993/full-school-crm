@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\CrmPermission;
 use App\Enums\StaffActivityRange;
 use App\Enums\StaffActivityType;
 use App\Models\User;
@@ -45,7 +46,7 @@ class StaffActivityDetailPage extends Page
 
     public static function canAccess(): bool
     {
-        return CrmAccess::hasPanelAccess(Auth::user());
+        return CrmAccess::can(Auth::user(), CrmPermission::StaffManage);
     }
 
     public static function urlFor(User $subject, StaffActivityType $type, StaffActivityRange $range): string

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\CrmPermission;
 use App\Enums\StaffActivityRange;
 use App\Enums\StaffActivityType;
 use App\Filament\Pages\StaffActivityDetailPage;
@@ -18,6 +19,8 @@ use Illuminate\Support\Facades\Auth;
 
 class StaffActivityPage extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
 
     protected static ?string $navigationLabel = null;
@@ -57,7 +60,7 @@ class StaffActivityPage extends Page
 
     public static function canAccess(): bool
     {
-        return CrmAccess::hasPanelAccess(Auth::user());
+        return CrmAccess::can(Auth::user(), CrmPermission::StaffManage);
     }
 
     public static function urlFor(User $subject, StaffActivityRange $range = StaffActivityRange::Today): string

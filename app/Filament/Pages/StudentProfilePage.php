@@ -529,6 +529,10 @@ class StudentProfilePage extends Page
             $this->profileTab = 'activities';
         }
 
+        if (! in_array($this->profileTab, $this->validProfileTabs(), true)) {
+            $this->profileTab = 'overview';
+        }
+
         if ($this->profileTab === 'activities') {
             $this->ensureActivitySubTabSelected();
 
@@ -613,9 +617,13 @@ class StudentProfilePage extends Page
      */
     protected function validProfileTabs(): array
     {
-        $tabs = ['overview', 'documents'];
+        $tabs = ['overview'];
 
-        if ($this->licensed(LicenseFeature::Enquiries)) {
+        if (! $this->viewerIsClassTeacherOnly()) {
+            $tabs[] = 'documents';
+        }
+
+        if ($this->licensed(LicenseFeature::Enquiries) && ! $this->viewerIsClassTeacherOnly()) {
             $tabs[] = 'visits';
         }
 
@@ -625,7 +633,8 @@ class StudentProfilePage extends Page
 
         if ($this->record->activeEnrollment !== null
             && $this->licensed(LicenseFeature::Cases)
-            && $this->userCan(CrmPermission::CasesView)) {
+            && $this->userCan(CrmPermission::CasesView)
+            && ! $this->viewerIsClassTeacherOnly()) {
             $tabs[] = 'cases';
         }
 
@@ -785,7 +794,7 @@ class StudentProfilePage extends Page
     protected function canEditExamMarks(): bool
     {
         return $this->licensed(LicenseFeature::Marks)
-            && $this->userCan(CrmPermission::MarksImport);
+            && $this->userCan(CrmPermission::AcademicsManage);
     }
 
     protected function canSendExamMarksWhatsApp(): bool
@@ -1741,6 +1750,12 @@ class StudentProfilePage extends Page
     protected function userCan(CrmPermission $permission): bool
     {
         return CrmAccess::can(Auth::user(), $permission);
+    }
+
+    protected function viewerIsClassTeacherOnly(): bool
+    {
+        return app(BatchStaffAssignmentService::class)
+            ->shouldLimitToAssignedClasses(Auth::user());
     }
 
     protected function userCanAny(CrmPermission ...$permissions): bool
@@ -3208,6 +3223,8 @@ class StudentProfilePage extends Page
                         ->helperText('Only one active batch per student. Assigning a new batch deactivates the previous one.'),
                 ])
                 ->action(function (array $data, BatchService $batches): void {
+                    abort_unless($this->userCan(CrmPermission::AcademicsManage), 403);
+
                     $batch = Batch::query()->findOrFail($data['batch_id']);
                     $batches->assign($this->record, $batch, Auth::user());
 
@@ -3221,7 +3238,7 @@ class StudentProfilePage extends Page
                         ->success()
                         ->send();
                 })
-                ->visible(fn (): bool => $this->userCan(CrmPermission::AttendanceMark)
+                ->visible(fn (): bool => $this->userCan(CrmPermission::AcademicsManage)
                     && $this->record->activeEnrollment !== null),
             Action::make('addPayment')
                 ->label('Add Payment')
@@ -3763,7 +3780,8 @@ class StudentProfilePage extends Page
                         ]),
                     'visits' => Tab::make('Visits')
                         ->icon('heroicon-o-calendar-days')
-                        ->visible(fn (): bool => $this->licensed(LicenseFeature::Enquiries))
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::Enquiries)
+                            && ! $this->viewerIsClassTeacherOnly())
                         ->schema([
                             View::make('filament.pages.partials.student-profile-visits')
                                 ->viewData(fn (): array => [
@@ -3789,7 +3807,8 @@ class StudentProfilePage extends Page
                             : null)
                         ->visible(fn (): bool => $this->record->activeEnrollment !== null
                             && $this->licensed(LicenseFeature::Cases)
-                            && $this->userCan(CrmPermission::CasesView))
+                            && $this->userCan(CrmPermission::CasesView)
+                            && ! $this->viewerIsClassTeacherOnly())
                         ->schema([
                             View::make('filament.pages.partials.student-profile-cases')
                                 ->viewData(fn (): array => [
@@ -3853,6 +3872,7 @@ class StudentProfilePage extends Page
                         ]),
                     'documents' => Tab::make('Documents')
                         ->icon('heroicon-o-folder')
+                        ->visible(fn (): bool => ! $this->viewerIsClassTeacherOnly())
                         ->schema([
                             View::make('filament.pages.partials.student-profile-documents')
                                 ->viewData(fn (): array => [
