@@ -8,6 +8,8 @@ use App\Models\Batch;
 use App\Models\BatchStudent;
 use App\Models\Enrollment;
 use App\Models\Student;
+use App\Support\CrmAccess;
+use Illuminate\Support\Facades\Auth;
 
 class PunchBatchRosterService
 {
@@ -158,7 +160,9 @@ class PunchBatchRosterService
             'roll' => $roll,
             'student_id' => $student->id,
             'student_name' => $student->name,
-            'mobile' => $student->mobile,
+            'mobile' => filled($student->mobile) && CrmAccess::canViewStudentMobile(Auth::user())
+                ? (string) $student->mobile
+                : null,
             'profile_url' => StudentProfilePage::getUrl(['record' => $student->id]),
         ];
     }

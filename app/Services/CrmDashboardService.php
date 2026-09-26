@@ -249,9 +249,48 @@ class CrmDashboardService
     }
 
     /**
+     * Counts for one person's assigned classes. The full coaching totals stay in stats().
+     *
+     * @param  list<int>  $batchIds
+     * @return array{
+     *     active_students: int,
+     *     active_batches: int,
+     *     attendance_present_today: int,
+     *     attendance_marked_today: int,
+     *     attendance_students_in_batches: int
+     * }
+     */
+    public function statsForBatches(array $batchIds, ?DashboardFilters $filters = null): array
+    {
+        $filters ??= DashboardFilters::default();
+        $batchIds = array_values(array_unique(array_filter(
+            array_map(static fn (mixed $id): int => (int) $id, $batchIds),
+            static fn (int $id): bool => $id > 0,
+        )));
+        sort($batchIds);
+
+        return $this->remember(
+            $filters->cacheKey('stats_for_batches').':'.implode(',', $batchIds),
+            self::STATS_CACHE_SECONDS,
+            function () use ($filters, $batchIds): array {
+                $attendance = $this->attendanceTotals($filters, $batchIds);
+
+                return [
+                    'active_students' => $attendance['students_in_batches'],
+                    'active_batches' => $this->batchQuery($filters, $batchIds)->count(),
+                    'attendance_present_today' => $attendance['present'],
+                    'attendance_marked_today' => $attendance['marked'],
+                    'attendance_students_in_batches' => $attendance['students_in_batches'],
+                ];
+            },
+        );
+    }
+
+    /**
+     * @param  list<int>|null  $onlyBatchIds  null keeps every active class. An empty list matches no class.
      * @return Builder<Batch>
      */
-    protected function batchQuery(DashboardFilters $filters): Builder
+    protected function batchQuery(DashboardFilters $filters, ?array $onlyBatchIds = null): Builder
     {
         return Batch::query()
             ->where('status', BatchStatus::Active)
@@ -261,7 +300,11 @@ class CrmDashboardService
                     ->orWhereNull('academic_session_id'),
             ))
             ->when($filters->courseId, fn (Builder $query, int $courseId) => $query->where('course_id', $courseId))
-            ->when($filters->batchId, fn (Builder $query, int $batchId) => $query->whereKey($batchId));
+            ->when($filters->batchId, fn (Builder $query, int $batchId) => $query->whereKey($batchId))
+            ->when($onlyBatchIds !== null, fn (Builder $query) => $query->whereIn(
+                'id',
+                $onlyBatchIds === [] ? [-1] : $onlyBatchIds,
+            ));
     }
 
     /**
@@ -294,11 +337,12 @@ class CrmDashboardService
     }
 
     /**
+     * @param  list<int>|null  $onlyBatchIds
      * @return array{present: int, marked: int, students_in_batches: int}
      */
-    protected function attendanceTotals(DashboardFilters $filters): array
+    protected function attendanceTotals(DashboardFilters $filters, ?array $onlyBatchIds = null): array
     {
-        $batchIds = $this->batchQuery($filters)->pluck('id');
+        $batchIds = $this->batchQuery($filters, $onlyBatchIds)->pluck('id');
 
         if ($batchIds->isEmpty()) {
             return ['present' => 0, 'marked' => 0, 'students_in_batches' => 0];

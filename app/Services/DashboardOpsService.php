@@ -56,7 +56,7 @@ class DashboardOpsService
         return $this->remember(
             $filters->cacheKey('ops_attention.'.$user->id.($isOwner ? '.owner' : '.staff')),
             function () use ($filters, $user, $isOwner): array {
-                $stats = app(CrmDashboardService::class)->stats($filters);
+                $stats = $this->statsForUser($filters, $user);
                 $canSeeAdmissions = $isOwner || CrmAccess::can($user, CrmPermission::AdmissionsApprove);
                 $admissions = $canSeeAdmissions && FeatureGate::enabled(LicenseFeature::Admissions)
                     ? CrmNavBadges::admissionsPendingAction()
@@ -154,7 +154,7 @@ class DashboardOpsService
             $filters->cacheKey('ops_pulse.'.$user->id.($isOwner ? '.owner' : '.staff')),
             function () use ($filters, $user, $isOwner): array {
                 $today = today();
-                $stats = app(CrmDashboardService::class)->stats($filters);
+                $stats = $this->statsForUser($filters, $user);
 
                 $callsToday = 0;
                 $callsConnected = 0;
@@ -318,6 +318,24 @@ class DashboardOpsService
             ->whereNotNull('meeting_with_user_id')
             ->whereHas('student', fn ($query) => $query->where('total_calls', 0))
             ->count();
+    }
+
+    /**
+     * A teacher’s attendance totals count only the classes assigned to them.
+     * Everyone else keeps the coaching-wide numbers from stats().
+     *
+     * @return array<string, mixed>
+     */
+    protected function statsForUser(DashboardFilters $filters, User $user): array
+    {
+        $stats = app(CrmDashboardService::class)->stats($filters);
+        $limitedIds = app(BatchStaffAssignmentService::class)->limitedBatchIdsFor($user);
+
+        if ($limitedIds === null) {
+            return $stats;
+        }
+
+        return array_merge($stats, app(CrmDashboardService::class)->statsForBatches($limitedIds, $filters));
     }
 
     protected function remember(string $key, callable $callback): mixed

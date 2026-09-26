@@ -9,9 +9,11 @@ use App\Models\Enrollment;
 use App\Filament\Pages\StudentProfilePage;
 use App\Filament\Resources\Students\StudentResource;
 use App\Models\Student;
+use App\Support\CrmAccess;
 use App\Support\PunchDuration;
 use App\Support\PunchWhatsappStatus;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class LivePunchDashboardService
@@ -147,7 +149,7 @@ class LivePunchDashboardService
             'student_id' => $student?->id,
             'student_name' => $student?->name ?? 'Unmapped punch',
             'batch_name' => $student?->activeBatchStudent?->batch?->name,
-            'mobile' => $student?->mobile,
+            'mobile' => $this->mobileForViewer($student),
             'pairs' => $pairs,
             'current_state' => $currentState,
             'last_device' => $lastDevice,
@@ -163,6 +165,23 @@ class LivePunchDashboardService
                 : null,
             'find_student_url' => StudentResource::getUrl('index').'?action=addStudent&roll='.urlencode($roll),
         ];
+    }
+
+    /**
+     * The attendance card gets a phone number only when this login is allowed to see student mobiles.
+     * Super Admin always is. A teacher is allowed only when the staff switch is on.
+     */
+    private function mobileForViewer(?Student $student): ?string
+    {
+        if ($student === null || ! filled($student->mobile)) {
+            return null;
+        }
+
+        if (! CrmAccess::canViewStudentMobile(Auth::user())) {
+            return null;
+        }
+
+        return (string) $student->mobile;
     }
 
     /**

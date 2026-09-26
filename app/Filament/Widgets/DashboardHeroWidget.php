@@ -25,6 +25,7 @@ use App\Filament\Resources\Enquiries\EnquiryResource;
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Filament\Widgets\Concerns\UsesDashboardFilters;
 use App\Models\AcademicSession;
+use App\Services\BatchStaffAssignmentService;
 use App\Services\CrmDashboardService;
 use App\Services\DashboardOpsService;
 use App\Support\CrmAccess;
@@ -405,7 +406,14 @@ class DashboardHeroWidget extends Widget
      */
     protected function academicMetrics(): array
     {
-        $stats = app(CrmDashboardService::class)->stats($this->dashboardFilters());
+        $filters = $this->dashboardFilters();
+        $stats = app(CrmDashboardService::class)->stats($filters);
+        $limitedIds = app(BatchStaffAssignmentService::class)->limitedBatchIdsFor(Auth::user());
+
+        if ($limitedIds !== null) {
+            $stats = array_merge($stats, app(CrmDashboardService::class)->statsForBatches($limitedIds, $filters));
+        }
+
         $metrics = [];
 
         if (FeatureGate::enabled(LicenseFeature::Attendance)) {

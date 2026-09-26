@@ -74,7 +74,7 @@
         <div class="flex flex-col gap-3 border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-end sm:justify-between sm:px-5">
             <div class="min-w-0 flex-1">
                 <label for="live-punch-quick-search" class="text-sm font-semibold text-gray-950 dark:text-white">Quick find student</label>
-                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Roll, mobile, or name</p>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ \App\Support\CrmAccess::canViewStudentMobile(auth()->user()) ? 'Roll, mobile, or name' : 'Roll or name' }}</p>
                 <div class="relative mt-2">
                     <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
@@ -226,7 +226,7 @@
                             </div>
                             <button type="button" x-on:click="open = ! open" class="mt-0.5 w-full text-left text-xs text-gray-500 dark:text-gray-400">
                                 {{ $row['batch_name'] ?? 'No active batch' }}
-                                @if (filled($row['mobile'])) · {{ $row['mobile'] }} @endif
+                                @if (\App\Support\CrmAccess::canViewStudentMobile(auth()->user()) && filled($row['mobile'])) · {{ $row['mobile'] }} @endif
                                 @if (filled($row['last_device'] ?? null)) · {{ $row['last_device'] }} @endif
                             </button>
                         </div>

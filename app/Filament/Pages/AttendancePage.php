@@ -323,7 +323,9 @@ class AttendancePage extends Page
 
         Notification::make()
             ->title('No match found')
-            ->body('Try roll number, 10-digit mobile, or part of the student name.')
+            ->body(CrmAccess::canViewStudentMobile(Auth::user())
+                ? 'Try roll number, 10-digit mobile, or part of the student name.'
+                : 'Try roll number or part of the student name.')
             ->warning()
             ->send();
     }
@@ -986,7 +988,9 @@ class AttendancePage extends Page
                         fn (array $batch): array => [$batch['id'] => $batch['name']],
                     )->all())
                     ->searchable()
-                    ->placeholder('All batches')
+                    ->placeholder(fn (): string => $this->classAssignments()->shouldLimitToAssignedClasses(Auth::user())
+                        ? 'My classes'
+                        : 'All batches')
                     ->nullable()
                     ->native(false),
                 TextInput::make('roll')

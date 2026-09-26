@@ -14,6 +14,7 @@ use App\Enums\StudentStatus;
 use App\Filament\Pages\StaffAttendancePage;
 use App\Filament\Pages\StudentProfilePage;
 use App\Filament\Resources\Students\StudentResource;
+use App\Filament\Widgets\DashboardHeroWidget;
 use App\Models\AcademicSession;
 use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
@@ -24,14 +25,16 @@ use App\Models\StudentCall;
 use App\Models\User;
 use App\Services\AttendanceHubOverviewService;
 use App\Services\BatchStaffAssignmentService;
+use App\Services\DashboardOpsService;
+use App\Services\Punch\PunchBatchRosterService;
 use App\Services\CrmPermissionSyncService;
 use App\Services\StudentActivityTimelineService;
 use App\Services\StudentSearchService;
+use App\Support\CrmAccess;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class TeacherAssignedClassAccessTest extends TestCase
@@ -90,12 +93,8 @@ class TeacherAssignedClassAccessTest extends TestCase
         $this->actingAs($data['teacher']);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        try {
-            Livewire::test(StudentProfilePage::class, ['record' => $data['otherStudent']]);
-            $this->fail('Teacher must not open a student from another class.');
-        } catch (HttpException $exception) {
-            $this->assertSame(403, $exception->getStatusCode());
-        }
+        Livewire::test(StudentProfilePage::class, ['record' => $data['otherStudent']])
+            ->assertForbidden();
     }
 
     public function test_teacher_can_open_assigned_student_profile(): void
@@ -163,6 +162,48 @@ class TeacherAssignedClassAccessTest extends TestCase
         $this->assertArrayHasKey($data['ownBatch']->id, $options);
         $this->assertArrayHasKey($data['otherBatch']->id, $options);
         $this->assertTrue(StaffAttendancePage::canAccess());
+    }
+
+    public function test_teacher_home_counts_only_the_assigned_class(): void
+    {
+        $data = $this->seedTwoClasses();
+        $this->actingAs($data['teacher']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(DashboardHeroWidget::class)
+            ->assertSuccessful()
+            ->assertSee('1 students enrolled')
+            ->assertDontSee('2 students enrolled');
+
+        $attention = app(DashboardOpsService::class)->attentionSnapshot(null, $data['teacher']);
+        $this->assertSame(1, $attention['attendance_expected']);
+
+        $coordinator = User::factory()->create(['is_active' => true]);
+        $coordinator->assignRole(StaffJobRole::AcademicCoordinator->value);
+        $coordinatorAttention = app(DashboardOpsService::class)->attentionSnapshot(null, $coordinator);
+        $this->assertSame(2, $coordinatorAttention['attendance_expected']);
+    }
+
+    public function test_teacher_attendance_card_hides_mobile_until_the_staff_switch_is_on(): void
+    {
+        $data = $this->seedTwoClasses();
+        $this->actingAs($data['teacher']);
+
+        $hidden = app(PunchBatchRosterService::class)->rosterForBatch($data['ownBatch']->id, now()->toDateString());
+        $this->assertSame('Riya Sharma', $hidden['absent'][0]['student_name']);
+        $this->assertNull($hidden['absent'][0]['mobile']);
+
+        CrmAccess::setStudentMobileVisibility($data['teacher'], true);
+
+        $shown = app(PunchBatchRosterService::class)->rosterForBatch($data['ownBatch']->id, now()->toDateString());
+        $this->assertSame('9876501111', $shown['absent'][0]['mobile']);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $this->actingAs($admin);
+
+        $adminRoster = app(PunchBatchRosterService::class)->rosterForBatch($data['ownBatch']->id, now()->toDateString());
+        $this->assertSame('9876501111', $adminRoster['absent'][0]['mobile']);
     }
 
     /**

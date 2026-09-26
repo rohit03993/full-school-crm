@@ -77,7 +77,7 @@
                                         <p class="truncate font-semibold text-gray-950 dark:text-white">{{ $row['student_name'] }}</p>
                                     @endif
                                     <p class="mt-0.5 font-mono text-xs text-gray-500 dark:text-gray-400">{{ $row['roll'] ?? 'No roll' }}</p>
-                                    @if (filled($row['mobile'] ?? null))
+                                    @if (\App\Support\CrmAccess::canViewStudentMobile(auth()->user()) && filled($row['mobile'] ?? null))
                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $row['mobile'] }}</p>
                                     @endif
                                 </div>
