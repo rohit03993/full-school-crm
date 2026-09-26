@@ -121,6 +121,7 @@ TXT;
                 'index' => $index,
                 'label' => $variable['label'],
                 'example' => $variable['example'],
+                'source' => (string) ($variable['crm_source'] ?? ''),
             ];
         }
 

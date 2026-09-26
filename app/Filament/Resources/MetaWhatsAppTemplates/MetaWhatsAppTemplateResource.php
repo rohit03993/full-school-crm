@@ -107,7 +107,7 @@ class MetaWhatsAppTemplateResource extends Resource
                     .'<div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-white/10 dark:bg-white/5">'
                     .'<p class="font-bold text-gray-950 dark:text-white">Any template (generic)</p>'
                     .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
-                    .'Use <code class="text-xs">{{1}}</code>, <code class="text-xs">{{2}}</code>, … in the body. Sample fields appear as Variable 1, Variable 2, … — edit the samples for Meta approval. Map CRM fields after approve on the Edit screen.'
+                    .'Use <code class="text-xs">{{1}}</code>, <code class="text-xs">{{2}}</code>, … in the body. Each number then asks which CRM field it is (student name, class, father name) and a sample word for Meta.'
                     .'</p></div>'
                     .'<div class="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-sm dark:border-amber-500/20 dark:bg-amber-500/5">'
                     .'<p class="font-bold text-gray-950 dark:text-white">Known CRM presets (optional)</p>'
@@ -247,7 +247,7 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->rows(8)
                 ->helperText(fn (Get $get): string => MetaWhatsAppTemplateBuilder::isAuthenticationOtp((string) $get('name'), (string) $get('category'))
                     ? 'Preview only. Create submits an Authentication Copy-code OTP template to Meta (fixed OTP text + Copy code button).'
-                    : 'Any Meta template: use {{1}}, {{2}}, … Samples below are for approval only. Optional presets auto-fill when you use a known CRM template name.')
+                    : 'Type {{1}}, {{2}}, … A dropdown appears for each one. Choose student name, class, father name, and so on. The sample line under it is only for Meta approval.')
                 ->live(debounce: 400)
                 ->afterStateUpdated(function (?string $state, Set $set, Get $get): void {
                     $set(
@@ -261,7 +261,7 @@ class MetaWhatsAppTemplateResource extends Resource
                 })
                 ->columnSpanFull(),
             Section::make('Template variables')
-                ->description('Meta needs one sample per {{n}}. Labels are hints only — edit samples freely. After approval, map params to CRM fields on Edit.')
+                ->description('For each {{n}}, choose the CRM field the message should use. Then type a sample word so Meta can approve the template.')
                 ->schema([
                     Repeater::make('body_variable_samples')
                         ->label('')
@@ -272,8 +272,16 @@ class MetaWhatsAppTemplateResource extends Resource
                             TextInput::make('label')
                                 ->hidden()
                                 ->dehydrated(),
+                            Select::make('source')
+                                ->label(fn (Get $get): string => '{{'.$get('index').'}} — CRM field')
+                                ->options(WhatsAppTemplateParamResolver::sourceOptions())
+                                ->searchable()
+                                ->placeholder('Student name, class, father name…')
+                                ->required(fn (Get $get): bool => (string) $get('../../category') !== 'AUTHENTICATION')
+                                ->visible(fn (Get $get): bool => (string) $get('../../category') !== 'AUTHENTICATION'),
                             TextInput::make('example')
-                                ->label(fn (Get $get): string => '{{'.$get('index').'}} — '.($get('label') ?: 'Variable'))
+                                ->label(fn (Get $get): string => '{{'.$get('index').'}} — sample for Meta')
+                                ->helperText('A short example only. Meta does not use this as the live student data.')
                                 ->required()
                                 ->maxLength(256)
                                 ->live(onBlur: true),
@@ -416,6 +424,17 @@ class MetaWhatsAppTemplateResource extends Resource
             $data['body_examples'] = MetaWhatsAppTemplateVariableHelper::rowsToExamplesList($samples);
             // Keep CSV for older callers / logs; prefer body_examples when submitting.
             $data['body_examples_csv'] = MetaWhatsAppTemplateVariableHelper::rowsToExamplesCsv($samples);
+
+            $mappings = collect($samples)
+                ->filter(fn (mixed $row): bool => is_array($row))
+                ->sortBy(fn (array $row): int => (int) ($row['index'] ?? 0))
+                ->map(fn (array $row): ?string => filled($row['source'] ?? null) ? (string) $row['source'] : null)
+                ->values()
+                ->all();
+
+            if ($mappings !== [] && ! in_array(null, $mappings, true)) {
+                $data['param_mappings'] = $mappings;
+            }
         }
 
         unset($data['body_variable_samples']);

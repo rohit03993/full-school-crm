@@ -63,7 +63,16 @@ class MetaWhatsAppTemplateSubmitService
                 $parsed['body'] = LoginOtpWhatsAppTemplate::BODY;
             }
         }
-        $inferredMappings = WhatsAppTemplateParamMappingInferrer::infer($bodyVariables, $paramCount, $name);
+        $providedMappings = $data['param_mappings'] ?? null;
+        $providedMappings = is_array($providedMappings) ? array_values($providedMappings) : [];
+        $providedMappings = array_values(array_filter(
+            $providedMappings,
+            static fn (mixed $source): bool => filled($source),
+        ));
+
+        $inferredMappings = count($providedMappings) === $paramCount && $paramCount > 0
+            ? $providedMappings
+            : WhatsAppTemplateParamMappingInferrer::infer($bodyVariables, $paramCount, $name);
 
         $language = (string) $payload['language'];
         $status = strtoupper((string) ($metaResponse['status'] ?? 'PENDING'));

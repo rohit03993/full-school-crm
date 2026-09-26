@@ -20,6 +20,7 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
         $this->assertSame(1, $rows[0]['index']);
         $this->assertSame('Variable 1', $rows[0]['label']);
         $this->assertSame('Sample 1', $rows[0]['example']);
+        $this->assertSame('', $rows[0]['source']);
         $this->assertSame(3, $rows[2]['index']);
         $this->assertSame('Variable 3', $rows[2]['label']);
         $this->assertSame('Sample 3', $rows[2]['example']);
@@ -42,12 +43,13 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
         $body = 'Hi {{1}}, roll {{2}}.';
 
         $rows = MetaWhatsAppTemplateVariableHelper::syncRowsFromBody($body, [
-            ['index' => 1, 'label' => 'Student name', 'example' => 'Custom Name'],
-            ['index' => 2, 'label' => 'Roll number', 'example' => 'ROLL-99'],
+            ['index' => 1, 'label' => 'Student name', 'example' => 'Custom Name', 'source' => 'student.name'],
+            ['index' => 2, 'label' => 'Roll number', 'example' => 'ROLL-99', 'source' => 'student.enrollment_number'],
         ]);
 
         $this->assertSame('Custom Name', $rows[0]['example']);
         $this->assertSame('ROLL-99', $rows[1]['example']);
+        $this->assertSame('student.name', $rows[0]['source']);
     }
 
     public function test_fee_reminder_body_uses_fee_sample_labels(): void
@@ -61,6 +63,8 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
         $this->assertCount(4, $rows);
         $this->assertSame('Institute name', $rows[0]['label']);
         $this->assertSame('Springdale Public School', $rows[0]['example']);
+        $this->assertSame('institute.name', $rows[0]['source']);
+        $this->assertSame('student.name', $rows[1]['source']);
         $this->assertSame('Student name', $rows[1]['label']);
         $this->assertSame('Pending amount', $rows[2]['label']);
         $this->assertSame('Due date', $rows[3]['label']);

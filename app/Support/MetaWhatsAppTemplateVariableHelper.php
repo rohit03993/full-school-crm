@@ -16,7 +16,7 @@ class MetaWhatsAppTemplateVariableHelper
 
     /**
      * @param  list<array<string, mixed>>  $existingRows
-     * @return list<array{index: int, label: string, example: string}>
+     * @return list<array{index: int, label: string, example: string, source: string}>
      */
     public static function syncRowsFromBody(string $bodyText, array $existingRows = [], ?string $templateName = null): array
     {
@@ -33,6 +33,8 @@ class MetaWhatsAppTemplateVariableHelper
         foreach ($order as $index) {
             $previous = $existingByIndex->get($index);
             $preset = $presetVariables[$index] ?? null;
+            $presetSource = trim((string) ($preset['crm_source'] ?? ''));
+            $previousSource = trim((string) ($previous['source'] ?? ''));
 
             $rows[] = [
                 'index' => $index,
@@ -40,6 +42,7 @@ class MetaWhatsAppTemplateVariableHelper
                 'example' => filled($previous['example'] ?? null)
                     ? trim((string) $previous['example'])
                     : ($preset['example'] ?? self::defaultSampleForIndex($index)),
+                'source' => $previousSource !== '' ? $previousSource : $presetSource,
             ];
         }
 
