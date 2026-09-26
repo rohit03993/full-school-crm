@@ -7,7 +7,9 @@ use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Filament\Resources\ActivitySessions\ActivitySessionResource;
 use App\Models\BatchStudent;
+use App\Models\ActivitySession;
 use App\Services\ActivityAttendanceService;
+use App\Services\ExamWindowService;
 use App\Support\ClassSectionLabel;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
@@ -112,6 +114,7 @@ class ActivityAttendancePage extends Page
         }
 
         $activity = app(ActivityAttendanceService::class)->resolve($id);
+        $this->abortUnlessAssignedSubject($activity);
         $activity->loadMissing(['batch.academicSession', 'batch.course']);
 
         $this->activityTitle = $activity->displayTitle();
@@ -184,6 +187,7 @@ class ActivityAttendancePage extends Page
 
         try {
             $activity = $attendance->resolve($id);
+            $this->abortUnlessAssignedSubject($activity);
             $saved = $attendance->saveMarks($activity, $this->marks, Auth::user(), $this->scoreMarks);
         } catch (\Illuminate\Validation\ValidationException $exception) {
             Notification::make()
@@ -205,6 +209,23 @@ class ActivityAttendancePage extends Page
             "{$saved} student record(s) saved.",
             $redirectTo,
         );
+    }
+
+    protected function abortUnlessAssignedSubject(ActivitySession $activity): void
+    {
+        $scope = app(ExamWindowService::class)->assignedSubjectScope(Auth::user());
+
+        if ($scope === null) {
+            return;
+        }
+
+        $subjectId = (int) ($activity->metadataValue('course_subject_id') ?? 0);
+        $subjectName = trim((string) ($activity->metadataValue('subject') ?? ''));
+        $batchAllowed = in_array((int) $activity->batch_id, $scope['batch_ids'], true);
+        $subjectAllowed = ($subjectId > 0 && in_array($subjectId, $scope['subject_ids'], true))
+            || ($subjectName !== '' && in_array($subjectName, $scope['subject_names'], true));
+
+        abort_unless($batchAllowed && $subjectAllowed, 403);
     }
 
     public function getHeading(): string

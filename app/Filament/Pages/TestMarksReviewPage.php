@@ -92,7 +92,10 @@ class TestMarksReviewPage extends Page
             return null;
         }
 
-        return ExamTestGroupMatrix::markSheetForGroup((string) $this->groupKey);
+        return ExamTestGroupMatrix::markSheetForGroup(
+            (string) $this->groupKey,
+            app(ExamWindowService::class)->assignedSubjectScope(Auth::user()),
+        );
     }
 
     public function getTitle(): string

@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Enums\BatchStaffRole;
 use App\Enums\CrmPermission;
 use App\Enums\ExamWindowStatus;
+use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Models\ActivitySession;
 use App\Models\ActivityType;
 use App\Models\Batch;
@@ -346,22 +348,59 @@ class ExamWindowService
             return false;
         }
 
-        if (CrmAccess::can($user, CrmPermission::MarksImport)) {
-            return true;
-        }
-
-        $subjectId = $windowSubject->course_subject_id;
-
         return BatchStaffAssignment::query()
             ->where('batch_id', $window->batch_id)
             ->where('user_id', $user->id)
-            ->where(function ($query) use ($subjectId): void {
-                $query->where(fn ($q) => $q
-                    ->where('role', BatchStaffRole::SubjectTeacher)
-                    ->where('course_subject_id', $subjectId))
-                    ->orWhere('role', BatchStaffRole::LeadTeacher);
-            })
+            ->where('role', BatchStaffRole::SubjectTeacher)
+            ->where('course_subject_id', $windowSubject->course_subject_id)
             ->exists();
+    }
+
+    /**
+     * null means this login sees every exam. A teacher gets only assigned class + subject.
+     *
+     * @return array{batch_ids: list<int>, subject_ids: list<int>, subject_names: list<string>}|null
+     */
+    public function assignedSubjectScope(?User $user): ?array
+    {
+        if (! $user?->is_active) {
+            return [
+                'batch_ids' => [],
+                'subject_ids' => [],
+                'subject_names' => [],
+            ];
+        }
+
+        if ($user->hasRole(RoleName::SuperAdmin->value) || CrmAccess::can($user, CrmPermission::AcademicsManage)) {
+            return null;
+        }
+
+        if (! $user->hasRole(StaffJobRole::Teacher->value)) {
+            return null;
+        }
+
+        $assignments = BatchStaffAssignment::query()
+            ->where('user_id', $user->id)
+            ->where('role', BatchStaffRole::SubjectTeacher)
+            ->whereNotNull('course_subject_id')
+            ->with('courseSubject')
+            ->get();
+
+        $names = [];
+
+        foreach ($assignments as $assignment) {
+            $name = trim((string) ($assignment->courseSubject?->name ?? ''));
+
+            if ($name !== '') {
+                $names[] = $name;
+            }
+        }
+
+        return [
+            'batch_ids' => $assignments->pluck('batch_id')->map(fn (mixed $id): int => (int) $id)->unique()->values()->all(),
+            'subject_ids' => $assignments->pluck('course_subject_id')->map(fn (mixed $id): int => (int) $id)->unique()->values()->all(),
+            'subject_names' => array_values(array_unique($names)),
+        ];
     }
 
     public function canUserSubmit(User $user, ExamWindow $window): bool
@@ -400,11 +439,7 @@ class ExamWindowService
 
     protected function isAdmin(User $user): bool
     {
-        return CrmAccess::canAny(
-            $user,
-            CrmPermission::AcademicsManage,
-            CrmPermission::MarksImport,
-        );
+        return CrmAccess::can($user, CrmPermission::AcademicsManage);
     }
 
     protected function assertAdmin(User $user): void

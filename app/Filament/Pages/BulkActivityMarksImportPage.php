@@ -13,6 +13,7 @@ use App\Models\ActivityType;
 use App\Models\Batch;
 use App\Models\WhatsAppTemplate;
 use App\Services\ActivityMarksBulkImportService;
+use App\Services\ExamWindowService;
 use App\Services\ActivityMarksImportColumnMapper;
 use App\Services\ActivityMarksWhatsAppService;
 use App\Services\StudentImportFileReader;
@@ -198,7 +199,11 @@ class BulkActivityMarksImportPage extends Page
             return false;
         }
 
-        return CrmAccess::can(Auth::user(), CrmPermission::MarksImport);
+        if (! CrmAccess::can(Auth::user(), CrmPermission::MarksImport)) {
+            return false;
+        }
+
+        return app(ExamWindowService::class)->assignedSubjectScope(Auth::user()) === null;
     }
 
     public function isLockedToExistingExam(): bool

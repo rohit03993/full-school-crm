@@ -6,6 +6,7 @@ use App\Enums\CrmPermission;
 use App\Enums\ExamWindowStatus;
 use App\Enums\LicenseFeature;
 use App\Models\ExamWindow;
+use App\Services\ExamWindowService;
 use App\Support\ClassSectionLabel;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
@@ -113,6 +114,15 @@ class ExamWindowsPage extends Page
 
         if (filled($this->statusFilter)) {
             $query->where('status', $this->statusFilter);
+        }
+
+        $subjectScope = app(ExamWindowService::class)->assignedSubjectScope(Auth::user());
+
+        if ($subjectScope !== null) {
+            $batchIds = $subjectScope['batch_ids'] === [] ? [-1] : $subjectScope['batch_ids'];
+            $subjectIds = $subjectScope['subject_ids'] === [] ? [-1] : $subjectScope['subject_ids'];
+            $query->whereIn('batch_id', $batchIds)
+                ->whereHas('subjects', fn ($subjects) => $subjects->whereIn('course_subject_id', $subjectIds));
         }
 
         $windows = $query->paginate($this->perPage);

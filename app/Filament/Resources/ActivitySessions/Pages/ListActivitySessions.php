@@ -14,6 +14,7 @@ use App\Filament\Resources\ActivityTypes\ActivityTypeResource;
 use App\Models\ActivityType;
 use App\Models\Batch;
 use App\Services\ExamTestGroupService;
+use App\Services\ExamWindowService;
 use App\Services\ResultDeclarationService;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmPagination;
@@ -171,7 +172,8 @@ class ListActivitySessions extends ListRecords
             ]);
         }
 
-        $matrix = ExamTestGroupMatrix::build($this->batchFilter, $this->activityTypeFilter);
+        $subjectScope = app(ExamWindowService::class)->assignedSubjectScope(Auth::user());
+        $matrix = ExamTestGroupMatrix::build($this->batchFilter, $this->activityTypeFilter, $subjectScope);
         $allRows = $matrix['rows'] ?? [];
         $perPage = CrmPagination::PER_PAGE;
         $lastPage = max(1, (int) ceil(count($allRows) / $perPage));
@@ -214,7 +216,14 @@ class ListActivitySessions extends ListRecords
                     'renameGroupKey' => $this->renameGroupKey,
                     'renameExamName' => $this->renameExamName,
                     'deleteEligibility' => $deleteEligibility,
-                    'batchOptions' => Batch::query()->orderBy('name')->pluck('name', 'id')->all(),
+                    'batchOptions' => Batch::query()
+                        ->when(
+                            $subjectScope !== null,
+                            fn ($query) => $query->whereIn('id', $subjectScope['batch_ids'] === [] ? [-1] : $subjectScope['batch_ids']),
+                        )
+                        ->orderBy('name')
+                        ->pluck('name', 'id')
+                        ->all(),
                     'activityTypeOptions' => ActivityType::scoringOptions(),
                     'importMarksUrl' => BulkActivityMarksImportPage::getUrl(),
                     'reviewPageBaseUrl' => TestMarksReviewPage::getUrl(),

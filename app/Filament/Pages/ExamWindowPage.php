@@ -54,18 +54,8 @@ class ExamWindowPage extends Page
         }
 
         $this->windowId = (int) $id;
-        $this->window = ExamWindow::query()
-            ->with([
-                'batch.course',
-                'batch.academicSession',
-                'activityType',
-                'subjects.courseSubject',
-                'subjects.enteredBy',
-                'subjects.activitySession',
-                'submittedBy',
-                'approvedBy',
-            ])
-            ->findOrFail($this->windowId);
+        $this->refreshWindow();
+        $this->abortUnlessAssignedSubject();
     }
 
     public function getTitle(): string
@@ -193,5 +183,27 @@ class ExamWindowPage extends Page
                 'approvedBy',
             ])
             ->findOrFail($this->windowId);
+
+        $this->abortUnlessAssignedSubject();
+    }
+
+    protected function abortUnlessAssignedSubject(): void
+    {
+        if (! $this->window) {
+            return;
+        }
+
+        $subjectScope = app(ExamWindowService::class)->assignedSubjectScope(Auth::user());
+
+        if ($subjectScope === null) {
+            return;
+        }
+
+        $batchAllowed = in_array((int) $this->window->batch_id, $subjectScope['batch_ids'], true);
+        $subjectAllowed = $this->window->subjects->contains(
+            fn ($row): bool => in_array((int) $row->course_subject_id, $subjectScope['subject_ids'], true),
+        );
+
+        abort_unless($batchAllowed && $subjectAllowed, 403);
     }
 }

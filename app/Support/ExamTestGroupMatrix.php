@@ -32,7 +32,10 @@ class ExamTestGroupMatrix
      *     }>
      * }
      */
-    public static function build(?int $batchId = null, ?int $activityTypeId = null): array
+    /**
+     * @param  array{batch_ids: list<int>, subject_ids: list<int>, subject_names: list<string>}|null  $subjectScope
+     */
+    public static function build(?int $batchId = null, ?int $activityTypeId = null, ?array $subjectScope = null): array
     {
         $query = ActivitySession::query()
             ->with(['activityType', 'batch'])
@@ -51,6 +54,8 @@ class ExamTestGroupMatrix
         if ($activityTypeId) {
             $query->where('activity_type_id', $activityTypeId);
         }
+
+        self::constrainToSubjectScope($query, $subjectScope);
 
         $scoringTypeIds = ActivityType::scoringTypeIds();
 
@@ -147,6 +152,50 @@ class ExamTestGroupMatrix
     }
 
     /**
+     * A teacher only keeps sessions for a class and subject assigned to them.
+     * null leaves the full coaching list.
+     *
+     * @param  Builder<ActivitySession>  $query
+     * @param  array{batch_ids: list<int>, subject_ids: list<int>, subject_names: list<string>}|null  $subjectScope
+     */
+    private static function constrainToSubjectScope(Builder $query, ?array $subjectScope): void
+    {
+        if ($subjectScope === null) {
+            return;
+        }
+
+        $batchIds = $subjectScope['batch_ids'];
+        $subjectIds = $subjectScope['subject_ids'];
+        $names = $subjectScope['subject_names'];
+
+        if ($batchIds === [] || ($subjectIds === [] && $names === [])) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereIn('batch_id', $batchIds);
+        $query->where(function (Builder $inner) use ($subjectIds, $names): void {
+            $applied = false;
+
+            foreach ($subjectIds as $subjectId) {
+                $method = $applied ? 'orWhere' : 'where';
+                $inner->{$method}(function (Builder $match) use ($subjectId): void {
+                    $match->where('metadata->course_subject_id', $subjectId)
+                        ->orWhere('metadata->course_subject_id', (string) $subjectId);
+                });
+                $applied = true;
+            }
+
+            foreach ($names as $name) {
+                $method = $applied ? 'orWhere' : 'where';
+                $inner->{$method}('metadata->subject', $name);
+                $applied = true;
+            }
+        });
+    }
+
+    /**
      * Batch mark sheet: students as rows, subjects as columns for one test group.
      *
      * @return array{
@@ -163,8 +212,10 @@ class ExamTestGroupMatrix
      *         cells: array<string, array{marks: ?float, max: ?float, display: string}>
      *     }>
      * }|null
+     *
+     * @param  array{batch_ids: list<int>, subject_ids: list<int>, subject_names: list<string>}|null  $subjectScope
      */
-    public static function markSheetForGroup(string $groupKey): ?array
+    public static function markSheetForGroup(string $groupKey, ?array $subjectScope = null): ?array
     {
         $query = ActivitySession::query()
             ->with(['batch', 'activityAttendances.student.activeEnrollment']);
@@ -183,6 +234,8 @@ class ExamTestGroupMatrix
                     ->where('metadata->test_name', $testLabel);
             }
         }
+
+        self::constrainToSubjectScope($query, $subjectScope);
 
         $sessions = $query->get()->values();
 

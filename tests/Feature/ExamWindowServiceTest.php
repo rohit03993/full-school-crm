@@ -9,6 +9,7 @@ use App\Enums\DurationType;
 use App\Enums\ExamWindowStatus;
 use App\Enums\ProgrammeCategory;
 use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Models\AcademicSession;
 use App\Models\ActivitySession;
 use App\Models\ActivityType;
@@ -21,9 +22,11 @@ use App\Models\User;
 use App\Services\ActivityAttendanceService;
 use App\Services\CourseSubjectService;
 use App\Services\BatchSubjectService;
+use App\Services\CrmPermissionSyncService;
 use App\Services\ExamWindowService;
 use App\Services\ResultDeclarationService;
 use App\Support\ExamMarksPath;
+use App\Support\ExamTestGroupMatrix;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
@@ -132,6 +135,40 @@ class ExamWindowServiceTest extends TestCase
 
         $published = $window->fresh()->load('subjects');
         $this->assertFalse($service->canUserEnterSubject($admin, $published, $published->subjects->first()));
+    }
+
+    public function test_teacher_enters_only_the_assigned_subject(): void
+    {
+        [$admin, $batch, , $subjectTeacher] = $this->seedBatchWithStaffAndStudent();
+        Role::findOrCreate(StaffJobRole::Teacher->value);
+        app(CrmPermissionSyncService::class)->sync();
+        $subjectTeacher->syncRoles([StaffJobRole::Teacher->value]);
+
+        $examType = ActivityType::query()->where('slug', 'exam')->firstOrFail();
+        $service = app(ExamWindowService::class);
+        $window = $service->create([
+            'batch_id' => $batch->id,
+            'activity_type_id' => $examType->id,
+            'test_name' => 'Unit Test 1',
+            'session_date' => '2026-08-01',
+            'open_immediately' => true,
+        ], $admin);
+
+        $own = $window->subjects->first();
+        $other = $window->subjects->last();
+
+        $this->assertTrue($service->canUserEnterSubject($subjectTeacher, $window, $own));
+        $this->assertFalse($service->canUserEnterSubject($subjectTeacher, $window, $other));
+        $this->assertTrue($service->canUserEnterSubject($admin, $window, $other));
+        $this->assertNull($service->assignedSubjectScope($admin));
+
+        $matrix = ExamTestGroupMatrix::build(null, null, $service->assignedSubjectScope($subjectTeacher));
+        $this->assertCount(1, $matrix['rows']);
+        $this->assertSame(['Maths'], $matrix['rows'][0]['subject_names']);
+
+        $full = ExamTestGroupMatrix::build();
+        $this->assertCount(2, $full['rows'][0]['subject_names']);
+        $this->assertContains('Maths', $full['rows'][0]['subject_names']);
     }
 
     public function test_create_rejects_batch_without_subjects(): void
