@@ -12,6 +12,7 @@ use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
 use App\Filament\Pages\StaffAttendancePage;
+use App\Filament\Pages\StudentCallsPage;
 use App\Filament\Pages\StudentProfilePage;
 use App\Filament\Resources\Students\StudentResource;
 use App\Filament\Widgets\DashboardHeroWidget;
@@ -80,6 +81,7 @@ class TeacherAssignedClassAccessTest extends TestCase
         $this->assertArrayNotHasKey($data['otherBatch']->id, $options);
 
         $this->assertFalse(StaffAttendancePage::canAccess());
+        $this->assertFalse(StudentCallsPage::canAccess());
 
         $overview = app(AttendanceHubOverviewService::class)->overview(now()->toDateString(), $data['teacher']);
         $batchIds = array_column($overview['class_rows'], 'batch_id');
@@ -162,6 +164,7 @@ class TeacherAssignedClassAccessTest extends TestCase
         $this->assertArrayHasKey($data['ownBatch']->id, $options);
         $this->assertArrayHasKey($data['otherBatch']->id, $options);
         $this->assertTrue(StaffAttendancePage::canAccess());
+        $this->assertTrue(StudentCallsPage::canAccess());
     }
 
     public function test_teacher_home_counts_only_the_assigned_class(): void

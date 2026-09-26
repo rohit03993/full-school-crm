@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
+use App\Enums\StaffJobRole;
 use App\Services\StudentCallsService;
 use App\Support\CrmAccess;
 use App\Support\CrmHint;
@@ -56,7 +57,18 @@ class StudentCallsPage extends Page
             return false;
         }
 
-        return CrmAccess::can(Auth::user(), CrmPermission::StudentsView);
+        $user = Auth::user();
+
+        if (! CrmAccess::can($user, CrmPermission::StudentsView)) {
+            return false;
+        }
+
+        // A teacher login does not use this list. Calling staff and Super Admin still do.
+        if ($user?->hasRole(StaffJobRole::Teacher->value) && ! CrmAccess::canViewCallLog($user)) {
+            return false;
+        }
+
+        return true;
     }
 
     public static function shouldRegisterNavigation(): bool
