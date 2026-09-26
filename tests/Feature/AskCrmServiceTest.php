@@ -869,9 +869,7 @@ class AskCrmServiceTest extends TestCase
         $this->actingAs($admin);
 
         Livewire::test(AskCrmPage::class)
-            ->assertSuccessful()
-            ->assertSee('Ask CRM is always one tap away')
-            ->assertSee('ask-crm-toggle', false);
+            ->assertForbidden();
     }
 
     public function test_ask_crm_session_persists_until_end_chat(): void

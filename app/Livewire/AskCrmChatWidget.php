@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use App\Enums\CrmPermission;
 use App\Services\AskCrmService;
 use App\Services\AskCrmSessionService;
 use App\Support\CrmAccess;
@@ -39,7 +38,7 @@ class AskCrmChatWidget extends Component
 
     public static function canView(): bool
     {
-        return CrmAccess::can(Auth::user(), CrmPermission::StudentsView);
+        return false;
     }
 
     #[On('open-ask-crm')]

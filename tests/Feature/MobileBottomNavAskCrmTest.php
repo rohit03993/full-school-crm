@@ -53,9 +53,9 @@ class MobileBottomNavAskCrmTest extends TestCase
         $this->get(Dashboard::getUrl())
             ->assertOk()
             ->assertSee('fi-mobile-bottom-nav', false)
-            ->assertSee("Livewire.dispatch('ask-crm-toggle')", false)
-            // The floating pill is CSS-hidden below lg so it can never cover a tab
-            ->assertSee('crm-ask__launcher', false);
+            ->assertDontSee("Livewire.dispatch('ask-crm-toggle')", false)
+            ->assertDontSee('crm-ask__launcher', false)
+            ->assertDontSee('>Ask CRM<', false);
     }
 
     public function test_nav_button_event_opens_and_closes_the_chat(): void

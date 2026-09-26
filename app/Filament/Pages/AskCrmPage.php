@@ -17,6 +17,11 @@ class AskCrmPage extends Page
 {
     use RequiresCrmPermission;
 
+    public static function canAccess(): bool
+    {
+        return false;
+    }
+
     protected static function requiredCrmPermission(): CrmPermission
     {
         return CrmPermission::StudentsView;
