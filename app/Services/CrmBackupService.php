@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Setting;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -41,10 +42,10 @@ class CrmBackupService
     {
         $this->ensureBackupDirectory();
 
-        $stamp = now()->format('Y-m-d_His');
+        $stamp = now()->format('Y-m-d_His').'-'.Str::lower(Str::random(4));
         $filename = 'school-crm-full-backup-'.$stamp.'.zip';
         $zipPath = $this->backupDirectory().DIRECTORY_SEPARATOR.$filename;
-        $workDir = storage_path('app/private/backups/.work-'.Str::lower(Str::random(8)));
+        $workDir = $this->backupDirectory().DIRECTORY_SEPARATOR.'.work-'.Str::lower(Str::random(8));
 
         File::ensureDirectoryExists($workDir);
 
@@ -56,7 +57,7 @@ class CrmBackupService
             $this->progress($onProgress, 'Collecting private files (documents, photos, receipts)…');
             $privateDir = $workDir.DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'private';
             $privateCopy = $this->copyStorageTree(
-                storage_path('app/private'),
+                $this->privateStoragePath(),
                 $privateDir,
                 config('crm-backup.exclude_private_prefixes', []),
             );
@@ -65,7 +66,7 @@ class CrmBackupService
             $this->progress($onProgress, 'Collecting public files (homework, logos, gallery)…');
             $publicDir = $workDir.DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'public';
             $publicCopy = $this->copyStorageTree(
-                storage_path('app/public'),
+                $this->publicStoragePath(),
                 $publicDir,
                 config('crm-backup.exclude_public_prefixes', []),
             );
@@ -300,6 +301,16 @@ class CrmBackupService
         return (string) config('crm-backup.disk_path', storage_path('app/private/backups'));
     }
 
+    public function privateStoragePath(): string
+    {
+        return (string) config('crm-backup.private_storage_path', storage_path('app/private'));
+    }
+
+    public function publicStoragePath(): string
+    {
+        return (string) config('crm-backup.public_storage_path', storage_path('app/public'));
+    }
+
     public function formatBytes(int $bytes): string
     {
         if ($bytes < 1024) {
@@ -333,7 +344,10 @@ class CrmBackupService
             throw new RuntimeException('Backup file not found.');
         }
 
-        $workDir = storage_path('app/private/backups/.restore-'.Str::lower(Str::random(8)));
+        @set_time_limit(0);
+        @ignore_user_abort(true);
+
+        $workDir = $this->backupDirectory().DIRECTORY_SEPARATOR.'.restore-'.Str::lower(Str::random(8));
         File::ensureDirectoryExists($workDir);
 
         try {
@@ -343,6 +357,7 @@ class CrmBackupService
                 throw new RuntimeException('Could not open backup zip.');
             }
 
+            $this->assertZipPathsAreSafe($zip);
             $zip->extractTo($workDir);
             $zip->close();
 
@@ -377,13 +392,13 @@ class CrmBackupService
 
             $privateFiles = $this->replaceStorageTree(
                 $privateSource,
-                storage_path('app/private'),
+                $this->privateStoragePath(),
                 config('crm-backup.exclude_private_prefixes', []),
             );
 
             $publicFiles = $this->replaceStorageTree(
                 $publicSource,
-                storage_path('app/public'),
+                $this->publicStoragePath(),
                 config('crm-backup.exclude_public_prefixes', []),
             );
 
@@ -583,14 +598,18 @@ class CrmBackupService
 
     protected function importDatabase(string $sqlPath): void
     {
-        $driver = config('database.default');
-        $sql = File::get($sqlPath);
+        @set_time_limit(0);
 
-        if ($driver === 'mysql' || $driver === 'mariadb') {
-            if ($this->tryMysqlImport($sqlPath)) {
-                return;
-            }
+        $driver = config('database.default');
+
+        if (($driver === 'mysql' || $driver === 'mariadb') && $this->findMysqlBinary()) {
+            $this->importWithMysqlBinary($sqlPath);
+            Setting::flushValueCache();
+
+            return;
         }
+
+        $sql = File::get($sqlPath);
 
         // PHP fallback: split on semicolons carefully enough for our dumps
         if ($driver === 'mysql' || $driver === 'mariadb') {
@@ -621,14 +640,16 @@ class CrmBackupService
         } elseif ($driver === 'sqlite') {
             DB::statement('PRAGMA foreign_keys = ON');
         }
+
+        Setting::flushValueCache();
     }
 
-    protected function tryMysqlImport(string $sqlPath): bool
+    protected function importWithMysqlBinary(string $sqlPath): void
     {
         $mysql = $this->findMysqlBinary();
 
         if (! $mysql) {
-            return false;
+            throw new RuntimeException('mysql command was not found.');
         }
 
         $connection = config('database.connections.'.config('database.default'));
@@ -651,11 +672,38 @@ class CrmBackupService
 
         $args[] = $database;
 
-        $result = Process::timeout(3600)
-            ->input(File::get($sqlPath))
-            ->run($args);
+        $handle = fopen($sqlPath, 'rb');
 
-        return $result->successful();
+        if ($handle === false) {
+            throw new RuntimeException('Could not read database.sql from the backup.');
+        }
+
+        try {
+            $result = Process::timeout(3600)->input($handle)->run($args);
+        } finally {
+            fclose($handle);
+        }
+
+        if (! $result->successful()) {
+            $error = trim($result->errorOutput());
+
+            throw new RuntimeException(
+                'Database restore failed.'.($error !== '' ? ' '.$error : '')
+            );
+        }
+    }
+
+    protected function assertZipPathsAreSafe(ZipArchive $zip): void
+    {
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = str_replace('\\', '/', (string) $zip->getNameIndex($i));
+
+            if ($name === '' || str_contains($name, '../') || str_starts_with($name, '/') || str_contains($name, ':')) {
+                $zip->close();
+
+                throw new RuntimeException('Backup zip contains an unsafe path.');
+            }
+        }
     }
 
     protected function findMysqlBinary(): ?string
@@ -1064,7 +1112,8 @@ Restore (server):
 6. php artisan cache:clear
 7. Restart queue worker / cron.
 
-Or from admin: Setup → Backups (Super Admin) after uploading is not supported — use artisan restore.
+Or from the CRM screen: log in as Super Admin, open Setup → Backups, upload this zip, tick the warning, and restore.
+The new server .env must already contain the same APP_KEY as app-key.txt.
 
 TXT;
     }

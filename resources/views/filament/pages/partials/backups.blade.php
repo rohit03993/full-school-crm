@@ -174,6 +174,15 @@
                             </a>
                             <button
                                 type="button"
+                                wire:click="restoreFromServer({{ json_encode($backup['filename']) }})"
+                                wire:confirm="Restore this backup? All current students, fees, files, and settings will be replaced."
+                                wire:loading.attr="disabled"
+                                class="inline-flex rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600 disabled:opacity-60"
+                            >
+                                Restore this copy
+                            </button>
+                            <button
+                                type="button"
                                 wire:click="deleteBackup({{ json_encode($backup['filename']) }})"
                                 wire:confirm="Delete this backup zip from the server?"
                                 class="inline-flex rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-200 dark:hover:bg-white/15"
@@ -192,45 +201,137 @@
         <div class="border-b border-rose-100 bg-rose-50/80 px-4 py-3 dark:border-rose-500/20 dark:bg-rose-500/10 sm:px-6">
             <h2 class="text-sm font-bold text-rose-950 dark:text-rose-100">Restore from backup (Admin UI)</h2>
             <p class="mt-1 text-xs text-rose-800/90 dark:text-rose-200/90">
-                After reinstalling the CRM and setting <code>APP_KEY</code> in <code>.env</code>, download the zip from Google Drive to your PC,
-                then upload it here. No terminal commands needed for restore.
+                Use <strong>Restore this copy</strong> when the zip is already in the list above.
+                Use the box below when the zip is on your computer or in Google Drive.
             </p>
         </div>
 
-        <div class="space-y-4 px-4 py-4 sm:px-6">
+        <div
+            class="space-y-4 px-4 py-4 sm:px-6"
+            x-data="{
+                progress: '',
+                busy: false,
+                async start() {
+                    if (this.busy) {
+                        return;
+                    }
+
+                    const file = this.$refs.file.files[0];
+
+                    if (! file) {
+                        this.progress = 'Choose the backup zip first.';
+                        return;
+                    }
+
+                    if (! this.$refs.confirm.checked) {
+                        this.progress = 'Tick the confirmation box first.';
+                        return;
+                    }
+
+                    if (! confirm('Restore now? All current students, fees, files, and settings will be replaced.')) {
+                        return;
+                    }
+
+                    this.busy = true;
+                    this.progress = 'Uploading…';
+
+                    try {
+                        const storedName = await this.upload(file);
+                        this.progress = 'Restoring… keep this tab open';
+                        await this.$wire.set('restoreConfirmed', true);
+                        await this.$wire.restoreAssembledUpload(storedName);
+                        this.progress = 'Finished. Read the message at the top of the screen, then log in again.';
+                    } catch (error) {
+                        this.progress = error.message || 'Upload failed.';
+                    } finally {
+                        this.busy = false;
+                    }
+                },
+                async upload(file) {
+                    const chunkBytes = {{ (int) $restoreChunkBytes }};
+                    const total = Math.max(1, Math.ceil(file.size / chunkBytes));
+                    const uploadId = [...crypto.getRandomValues(new Uint8Array(16))].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+
+                    for (let index = 0; index < total; index++) {
+                        const startAt = index * chunkBytes;
+                        const body = new FormData();
+                        body.append('upload_id', uploadId);
+                        body.append('index', String(index));
+                        body.append('total', String(total));
+                        body.append('original_name', file.name);
+                        body.append('chunk', file.slice(startAt, startAt + chunkBytes), 'chunk.bin');
+
+                        const response = await fetch('{{ route('admin.backups.restore-chunk') }}', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json',
+                            },
+                            body,
+                        });
+                        const data = await response.json().catch(() => ({}));
+
+                        if (! response.ok) {
+                            throw new Error(data.message || 'Upload failed.');
+                        }
+
+                        this.progress = 'Uploading… ' + Math.round(((index + 1) / total) * 100) + '%';
+
+                        if (data.done && data.stored_name) {
+                            return data.stored_name;
+                        }
+                    }
+
+                    throw new Error('Upload did not finish.');
+                },
+            }"
+        >
             <ol class="list-decimal space-y-1 pl-4 text-xs text-gray-600 dark:text-gray-400">
-                <li>Reinstall CRM on the server (hosting / installer).</li>
-                <li>Put the same <strong>APP_KEY</strong> from the zip’s <code>app-key.txt</code> into <code>.env</code>.</li>
-                <li>Log in as Super Admin → open this page.</li>
-                <li>Download the latest zip from Google Drive → upload below → confirm → Restore.</li>
+                <li>On this same server, click <strong>Restore this copy</strong> next to the zip in the list above.</li>
+                <li>On a new install, put the old <strong>APP_KEY</strong> from the zip’s <code>app-key.txt</code> into <code>.env</code>, then log in as Super Admin.</li>
+                <li>If the zip is on your PC or Google Drive, choose it below, tick the box, then click <strong>Upload and restore</strong>.</li>
+                <li>When it finishes, log in again with the staff password that was in that backup.</li>
             </ol>
 
             <div>
-                <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Backup zip from Google Drive / USB</label>
+                <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Backup zip from your computer or Google Drive</label>
                 <input
+                    x-ref="file"
                     type="file"
-                    wire:model="restoreUpload"
                     accept=".zip,application/zip"
                     class="mt-2 block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white dark:text-gray-200"
                 />
-                <div wire:loading wire:target="restoreUpload" class="mt-1 text-xs text-primary-600">Uploading file…</div>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">A large school zip is sent in small pieces, so it is not limited to 12 MB.</p>
             </div>
 
             <label class="flex items-start gap-2 text-sm text-gray-800 dark:text-gray-200">
-                <input type="checkbox" wire:model="restoreConfirmed" class="mt-1 rounded border-gray-300">
+                <input x-ref="confirm" type="checkbox" wire:model.live="restoreConfirmed" class="mt-1 rounded border-gray-300">
                 <span>I understand this will <strong>replace all current data and files</strong> with the backup contents.</span>
             </label>
 
+            @if ($pendingRestoreName)
+                <div class="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-950 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-100 dark:ring-amber-500/20">
+                    The zip is already on the server. Put the old APP_KEY into .env, tick the box, then try again.
+                    <button
+                        type="button"
+                        wire:click="restoreAssembledUpload({{ json_encode($pendingRestoreName) }})"
+                        class="mt-2 inline-flex rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-600"
+                    >
+                        Try restore again
+                    </button>
+                </div>
+            @endif
+
             <button
                 type="button"
-                wire:click="restoreFromUpload"
-                wire:confirm="Restore now? All current students, fees, files, and settings will be replaced."
-                wire:loading.attr="disabled"
+                x-on:click="start()"
+                x-bind:disabled="busy"
                 class="inline-flex rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-600 disabled:opacity-60"
             >
-                <span wire:loading.remove wire:target="restoreFromUpload">Restore from uploaded backup</span>
-                <span wire:loading wire:target="restoreFromUpload">Restoring… keep this tab open</span>
+                <span x-show="! busy">Upload and restore</span>
+                <span x-show="busy">Working… keep this tab open</span>
             </button>
+            <p class="text-xs text-gray-600 dark:text-gray-300" x-text="progress"></p>
         </div>
     </div>
 </div>

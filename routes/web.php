@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\BackupDownloadController;
+use App\Http\Controllers\Admin\BackupRestoreChunkController;
 use App\Http\Controllers\Admin\CertificateDownloadController;
 use App\Http\Controllers\Admin\ConsolidatedMarksheetDownloadController;
 use App\Http\Controllers\Admin\DocumentDownloadController;
@@ -64,6 +65,9 @@ Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
     Route::get('backups/{filename}/download', BackupDownloadController::class)
         ->where('filename', 'school-crm-full-backup-[\w\-]+\.zip')
         ->name('admin.backups.download');
+
+    Route::post('backups/restore-chunk', BackupRestoreChunkController::class)
+        ->name('admin.backups.restore-chunk');
 
     Route::get('backups/google/redirect', [GoogleDriveOAuthController::class, 'redirect'])
         ->name('admin.backups.google.redirect');

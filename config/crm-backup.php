@@ -14,6 +14,12 @@ return [
 
     'disk_path' => storage_path('app/private/backups'),
 
+    /** Uploaded student files, receipts, photos, WhatsApp media. */
+    'private_storage_path' => storage_path('app/private'),
+
+    /** Homework files, logos, gallery. */
+    'public_storage_path' => storage_path('app/public'),
+
     /** Keep this many completed backup archives (oldest deleted after a successful run). */
     'retain' => (int) env('CRM_BACKUP_RETAIN', 14),
 

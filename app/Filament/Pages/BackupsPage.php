@@ -18,15 +18,11 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
-use Livewire\WithFileUploads;
 use Throwable;
 use UnitEnum;
 
 class BackupsPage extends Page
 {
-    use WithFileUploads;
-
     protected static bool $shouldRegisterNavigation = false;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCircleStack;
@@ -49,7 +45,7 @@ class BackupsPage extends Page
 
     public bool $restoreConfirmed = false;
 
-    public ?TemporaryUploadedFile $restoreUpload = null;
+    public ?string $pendingRestoreName = null;
 
     public static function getNavigationLabel(): string
     {
@@ -330,59 +326,95 @@ class BackupsPage extends Page
             ->send();
     }
 
-    public function restoreFromUpload(CrmBackupService $backups, AuditService $audit): void
+    public function restoreFromServer(string $filename, CrmBackupService $backups, AuditService $audit): void
+    {
+        $path = $backups->findBackup($filename);
+
+        if (! $path) {
+            Notification::make()
+                ->title('Backup file not found')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->runRestore($backups, $audit, $path, $filename, 'server_copy', false);
+    }
+
+    public function restoreAssembledUpload(string $storedName, CrmBackupService $backups, AuditService $audit): void
     {
         if (! $this->restoreConfirmed) {
             Notification::make()
                 ->title('Confirm restore')
-                ->body('Tick the confirmation box — restore replaces all current data and files.')
+                ->body('Tick the confirmation box. Restore replaces all current data and files.')
                 ->warning()
                 ->send();
 
             return;
         }
 
-        if (! $this->restoreUpload) {
+        if (! preg_match('/^school-crm-full-backup-upload-[a-f0-9]{32}\.zip$/', $storedName)) {
             Notification::make()
-                ->title('Choose a backup zip')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
-        $originalName = $this->restoreUpload->getClientOriginalName();
-
-        if (! preg_match('/^school-crm-full-backup-[\w\-]+\.zip$/i', $originalName)) {
-            Notification::make()
-                ->title('Invalid file name')
-                ->body('Upload a file named like school-crm-full-backup-YYYY-mm-dd_His.zip')
+                ->title('Invalid upload')
                 ->danger()
                 ->send();
 
             return;
         }
 
-        File::ensureDirectoryExists(storage_path('app/private/.restore-upload'));
-        $storedPath = storage_path('app/private/.restore-upload/'.$originalName);
+        $path = storage_path('app/private/.restore-upload'.DIRECTORY_SEPARATOR.$storedName);
+
+        $this->runRestore($backups, $audit, $path, $storedName, 'admin_ui_upload', true);
+    }
+
+    public function restoreChunkBytes(): int
+    {
+        $upload = $this->iniToBytes((string) ini_get('upload_max_filesize'));
+        $post = $this->iniToBytes((string) ini_get('post_max_size'));
+        $limit = min(
+            $upload > 0 ? $upload : 2 * 1024 * 1024,
+            $post > 0 ? $post : 2 * 1024 * 1024,
+        );
+        $room = $limit - (256 * 1024);
+
+        if ($room < 256 * 1024) {
+            $room = max(128 * 1024, $limit);
+        }
+
+        return (int) min(4 * 1024 * 1024, $room);
+    }
+
+    protected function runRestore(
+        CrmBackupService $backups,
+        AuditService $audit,
+        string $path,
+        string $label,
+        string $source,
+        bool $deleteAfter,
+    ): void {
+        $keepUpload = false;
 
         try {
-            $this->restoreUpload->storeAs('.restore-upload', $originalName, 'local');
-            $storedPath = storage_path('app/private/.restore-upload/'.$originalName);
-
-            if (! is_file($storedPath)) {
+            if (! is_file($path)) {
                 Notification::make()
-                    ->title('Upload failed')
-                    ->body('Could not store the uploaded backup on the server.')
+                    ->title('Backup file not found')
+                    ->body('Upload the zip again.')
                     ->danger()
                     ->send();
 
                 return;
             }
 
-            $inspection = $backups->inspectBackupZip($storedPath);
+            $inspection = $backups->inspectBackupZip($path);
 
             if (! $inspection['valid'] || ! $inspection['app_key_matches']) {
+                $keepUpload = $deleteAfter && $inspection['valid'] && ! $inspection['app_key_matches'];
+
+                if ($keepUpload) {
+                    $this->pendingRestoreName = basename($path);
+                }
+
                 Notification::make()
                     ->title('Cannot restore this zip')
                     ->body($inspection['message'])
@@ -392,7 +424,8 @@ class BackupsPage extends Page
                 return;
             }
 
-            $result = $backups->restore($storedPath, force: true);
+            @set_time_limit(0);
+            $result = $backups->restore($path, force: true);
 
             Artisan::call('storage:link');
             Artisan::call('crm:publish-assets');
@@ -406,36 +439,55 @@ class BackupsPage extends Page
             $audit->log(
                 action: 'Full Backup Restored',
                 newValues: [
-                    'filename' => $originalName,
-                    'source' => 'admin_ui_upload',
+                    'filename' => $label,
+                    'source' => $source,
                     'created_at' => $result['manifest']['created_at'] ?? null,
                     'private_files' => $result['private_files'],
                     'public_files' => $result['public_files'],
                 ],
                 user: Auth::user(),
             );
+
+            $this->pendingRestoreName = null;
+
+            Notification::make()
+                ->title('Restore complete')
+                ->body('Students, staff, fees, files, and settings are back. Log in again with the password from this backup. Restart the queue worker if it is running.')
+                ->success()
+                ->persistent()
+                ->send();
         } catch (Throwable $exception) {
             Notification::make()
                 ->title('Restore failed')
                 ->body($exception->getMessage())
                 ->danger()
                 ->send();
-
-            return;
         } finally {
-            $this->restoreUpload = null;
             $this->restoreConfirmed = false;
 
-            if (isset($storedPath) && is_file($storedPath) && str_contains($storedPath, '.restore-upload')) {
-                @unlink($storedPath);
+            if ($deleteAfter && ! $keepUpload && is_file($path) && str_contains($path, '.restore-upload')) {
+                @unlink($path);
             }
         }
+    }
 
-        Notification::make()
-            ->title('Restore complete')
-            ->body('Database and files were restored. Refresh the page. Restart the queue worker if it is running.')
-            ->success()
-            ->send();
+    protected function iniToBytes(string $value): int
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            return 0;
+        }
+
+        $unit = strtolower(substr($value, -1));
+        $number = (float) $value;
+
+        return (int) match ($unit) {
+            'g' => $number * 1024 * 1024 * 1024,
+            'm' => $number * 1024 * 1024,
+            'k' => $number * 1024,
+            default => $number,
+        };
     }
 
     public function content(Schema $schema): Schema
@@ -451,6 +503,8 @@ class BackupsPage extends Page
                     'gdriveEnabled' => $this->gdriveEnabled,
                     'gdriveFolderId' => $this->gdriveFolderId,
                     'restoreConfirmed' => $this->restoreConfirmed,
+                    'pendingRestoreName' => $this->pendingRestoreName,
+                    'restoreChunkBytes' => $this->restoreChunkBytes(),
                 ]),
         ]);
     }
