@@ -455,6 +455,47 @@ class HomeworkCheckServiceTest extends TestCase
             ->assertSuccessful();
     }
 
+    public function test_check_page_hides_marks_until_homework_is_given(): void
+    {
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $this->actingAs($teacher);
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+
+        Livewire::withQueryParams([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'check_date' => now()->toDateString(),
+        ])->test(HomeworkCheckPage::class)
+            ->assertSee('No homework was given')
+            ->assertDontSee($student->name)
+            ->assertDontSee('Marks for');
+
+        \App\Models\HomeworkAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'created_by_user_id' => $teacher->id,
+            'title' => 'Algebra worksheet',
+            'description' => 'Complete all questions',
+            'content_type' => \App\Enums\HomeworkContentType::Text,
+            'status' => \App\Enums\HomeworkAssignmentStatus::Sent,
+            'homework_date' => now()->toDateString(),
+            'published_at' => now(),
+        ]);
+
+        Livewire::withQueryParams([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'check_date' => now()->toDateString(),
+        ])->test(HomeworkCheckPage::class)
+            ->assertSee($student->name)
+            ->assertSee('Done')
+            ->assertSee('Not done')
+            ->assertDontSee('Marks for')
+            ->assertDontSee('No homework was given');
+
+        Livewire::withQueryParams([]);
+    }
+
     public function test_multi_subject_grid_shows_separate_cells_per_subject(): void
     {
         Http::fake();

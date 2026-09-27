@@ -81,7 +81,7 @@ class HomeworkCheckPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Subject fills automatically when you teach only one. Select students who did not finish, Submit, then confirm WhatsApp count.';
+        return 'Subject fills automatically when you teach only one. Mark a student only after homework was given for that day.';
     }
 
     public function mount(): void
@@ -189,12 +189,12 @@ class HomeworkCheckPage extends Page
                         ->placeholder('e.g. Chapter 5 – Complete Questions 1 to 10')
                         ->rows(2)
                         ->columnSpanFull()
-                        ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
+                        ->visible(fn (): bool => $this->homeworkListOpen()),
                     TextInput::make('student_search')
                         ->label('Filter students')
                         ->placeholder('Type a name…')
                         ->live(debounce: 300)
-                        ->visible(fn (): bool => $this->rosterReady()),
+                        ->visible(fn (): bool => $this->homeworkListOpen()),
                 ])
                 ->columns(3),
         ]);
@@ -211,9 +211,12 @@ class HomeworkCheckPage extends Page
                     $summary = app(HomeworkCheckService::class)->daySummaryFromRoster($students);
                     $selected = $this->selectedStudentsPayload($students);
 
+                    $homeworkGiven = $this->homeworkListOpen();
+
                     return [
                         'rosterReady' => $this->rosterReady(),
-                        'students' => $students,
+                        'homeworkGiven' => $homeworkGiven,
+                        'students' => $homeworkGiven ? $students : collect(),
                         'selectedStudentIds' => $this->selectedStudentIds,
                         'checkDateLabel' => $this->checkDateLabel(),
                         'subjectLabel' => $this->subjectLabel(),
@@ -224,13 +227,6 @@ class HomeworkCheckPage extends Page
                         'selectedWithMobile' => $selected['with_mobile'],
                         'selectedWithoutMobile' => $selected['without_mobile'],
                         'otherSubjectsToday' => $this->otherSubjectsToday(),
-                        'recent' => filled($this->data['batch_id'] ?? null)
-                            ? app(HomeworkCheckService::class)->recentForBatch(
-                                (int) $this->data['batch_id'],
-                                20,
-                                $this->checkDate(),
-                            )
-                            : collect(),
                     ];
                 }),
         ]);
@@ -471,6 +467,19 @@ class HomeworkCheckPage extends Page
         }
 
         return 'No subjects found for this class.';
+    }
+
+    protected function homeworkListOpen(): bool
+    {
+        if (! $this->rosterReady()) {
+            return false;
+        }
+
+        return app(HomeworkCheckService::class)->homeworkWasGiven(
+            (int) $this->data['batch_id'],
+            (int) $this->data['course_subject_id'],
+            $this->checkDate(),
+        );
     }
 
     protected function rosterReady(): bool

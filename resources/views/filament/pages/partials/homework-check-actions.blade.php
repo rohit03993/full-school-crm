@@ -3,6 +3,10 @@
         <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400">
             Select a <strong>class</strong>. Subject will auto-fill if you teach only one; otherwise pick the subject, then the student list opens.
         </div>
+    @elseif (! ($homeworkGiven ?? false))
+        <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400">
+            No homework was given for <strong>{{ $subjectLabel }}</strong> on <strong>{{ $checkDateLabel }}</strong>. Give homework first, then mark Done or Not done.
+        </div>
     @else
         @if (count($otherSubjectsToday) > 1)
             <div class="flex flex-wrap gap-2">
@@ -130,27 +134,34 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-2 text-right crm-responsive-table__actions" data-label="">
-                                    @if (($student['status_key'] ?? null) === 'done')
-                                        <button
-                                            type="button"
-                                            wire:click="markStudentNotDone({{ $student['id'] }})"
-                                            wire:loading.attr="disabled"
-                                            wire:target="markStudentNotDone({{ $student['id'] }})"
-                                            class="rounded-md bg-rose-600 px-2.5 py-1.5 text-xs font-extrabold uppercase text-white disabled:opacity-50 touch-manipulation min-h-10"
-                                        >
-                                            Not done
-                                        </button>
-                                    @else
+                                    <div class="inline-flex overflow-hidden rounded-lg ring-1 ring-gray-200 dark:ring-white/10">
                                         <button
                                             type="button"
                                             wire:click="markStudentDone({{ $student['id'] }})"
                                             wire:loading.attr="disabled"
-                                            wire:target="markStudentDone({{ $student['id'] }})"
-                                            class="rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-extrabold uppercase text-white disabled:opacity-50 touch-manipulation min-h-10"
+                                            wire:target="markStudentDone({{ $student['id'] }}),markStudentNotDone({{ $student['id'] }})"
+                                            @class([
+                                                'min-h-10 px-3 py-1.5 text-xs font-extrabold uppercase touch-manipulation',
+                                                'bg-emerald-600 text-white' => ($student['status_key'] ?? null) === 'done',
+                                                'bg-white text-gray-500 hover:bg-emerald-50 dark:bg-gray-900 dark:text-gray-300' => ($student['status_key'] ?? null) !== 'done',
+                                            ])
                                         >
                                             Done
                                         </button>
-                                    @endif
+                                        <button
+                                            type="button"
+                                            wire:click="markStudentNotDone({{ $student['id'] }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="markStudentDone({{ $student['id'] }}),markStudentNotDone({{ $student['id'] }})"
+                                            @class([
+                                                'min-h-10 px-3 py-1.5 text-xs font-extrabold uppercase touch-manipulation',
+                                                'bg-rose-600 text-white' => ($student['status_key'] ?? null) === 'not_done',
+                                                'bg-white text-gray-500 hover:bg-rose-50 dark:bg-gray-900 dark:text-gray-300' => ($student['status_key'] ?? null) !== 'not_done',
+                                            ])
+                                        >
+                                            Not done
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -160,67 +171,6 @@
                                 </td>
                             </tr>
                         @endforelse
-                    </tbody>
-                </table>
-            </x-crm.responsive-table>
-        </div>
-    @endif
-
-    @if ($recent->isNotEmpty())
-        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-            <div class="border-b border-gray-100 px-4 py-3 text-sm font-semibold dark:border-gray-800">
-                Marks for {{ $checkDateLabel }}
-            </div>
-            <x-crm.responsive-table class="border-t border-gray-100 dark:border-gray-800">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-gray-50 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                        <tr>
-                            <th class="px-4 py-2">Student</th>
-                            <th class="px-4 py-2">Subject</th>
-                            <th class="px-4 py-2">Topic</th>
-                            <th class="px-4 py-2">Status</th>
-                            <th class="px-4 py-2">WhatsApp</th>
-                            <th class="px-4 py-2">Time</th>
-                            <th class="px-4 py-2"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                        @foreach ($recent as $row)
-                            @php
-                                $canResend = $row->status === \App\Enums\HomeworkCheckStatus::NotDone
-                                    && in_array($row->notify_status, [
-                                        \App\Enums\HomeworkCheckNotifyStatus::Failed,
-                                        \App\Enums\HomeworkCheckNotifyStatus::Pending,
-                                    ], true);
-                            @endphp
-                            <tr wire:key="hw-check-{{ $row->id }}">
-                                <td class="px-4 py-2 font-medium crm-responsive-table__title" data-label="Student">
-                                    <x-crm.person-name
-                                        :student-id="$row->student_id"
-                                        :name="$row->student?->name ?? '—'"
-                                    />
-                                </td>
-                                <td class="px-4 py-2" data-label="Subject">{{ $row->subject_name }}</td>
-                                <td class="crm-responsive-table__wide px-4 py-2 text-gray-600 dark:text-gray-300" data-label="Topic">{{ \Illuminate\Support\Str::limit($row->topic, 40) }}</td>
-                                <td class="px-4 py-2" data-label="Status">{{ $row->status?->label() }}</td>
-                                <td class="px-4 py-2 text-gray-500" data-label="WhatsApp">{{ $row->notify_status?->label() }}</td>
-                                <td class="px-4 py-2 text-xs text-gray-500" data-label="Time">{{ $row->created_at?->format('d M H:i') }}</td>
-                                <td class="px-4 py-2 text-right crm-responsive-table__actions" data-label="">
-                                    @if ($canResend)
-                                        <button
-                                            type="button"
-                                            wire:click="resendWhatsApp({{ $row->id }})"
-                                            wire:loading.attr="disabled"
-                                            wire:target="resendWhatsApp({{ $row->id }})"
-                                            class="min-h-10 text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400 touch-manipulation disabled:cursor-wait disabled:opacity-70"
-                                        >
-                                            <span wire:loading.remove wire:target="resendWhatsApp({{ $row->id }})">Resend</span>
-                                            <span wire:loading wire:target="resendWhatsApp({{ $row->id }})">Queuing…</span>
-                                        </button>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
                     </tbody>
                 </table>
             </x-crm.responsive-table>

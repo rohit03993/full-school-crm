@@ -770,9 +770,19 @@ class HomeworkCheckService
         ];
     }
 
-    /**
-     * @return Collection<int, HomeworkCheck>
-     */
+    public function homeworkWasGiven(int $batchId, int $courseSubjectId, ?string $checkedOn): bool
+    {
+        if ($batchId < 1 || $courseSubjectId < 1) {
+            return false;
+        }
+
+        return HomeworkAssignment::query()
+            ->where('batch_id', $batchId)
+            ->where('course_subject_id', $courseSubjectId)
+            ->whereDate('homework_date', $this->normalizeCheckedOn($checkedOn))
+            ->exists();
+    }
+
     public function recentForBatch(int $batchId, int $limit = 15, ?string $checkedOn = null): Collection
     {
         $query = HomeworkCheck::query()
