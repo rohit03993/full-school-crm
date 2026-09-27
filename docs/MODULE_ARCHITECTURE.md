@@ -378,7 +378,7 @@ Every management system below lists:
 | Inventory Management System | `inventory` | P2 | Stock movements | WMS |
 | Expense Accounting Management System | `accounting` | P2 | Day-to-day expenses | Full GST ERP |
 | Payroll Management System | `payroll` | P2 | Salary cycles | Complex payroll compliance V1 |
-| Syllabus and Planner | `syllabus` | P2 | Monthly planner + tracking | — |
+| Syllabus and Planner | `teacher_tracking` | In progress | Standard course planner is the first screen. Section plans, weekly dates, and student cards come next. | Timetable, WhatsApp |
 | Leave Management System | `leave` | P2 | Student/staff leave | — |
 | SMS Management System | `sms` | P2 | Transactional SMS | Replace WhatsApp |
 | Gallery | `gallery` | P3 | Albums | — |
@@ -439,11 +439,12 @@ LIVE LICENSED
 ├── Reports MS             (reports)
 ├── Website CMS MS         (website)
 ├── Student Cases MS       (cases)
-└── Certificates MS        (certificates)
+├── Certificates MS        (certificates)
+└── Teacher Tracking       (teacher_tracking) — Milestone 1: Standard course planner
 
 PLANNED
 ├── Front office / Notices / Timetable / Parent app
-├── Library / Inventory / Accounting / Payroll / Syllabus / Leave / SMS
+├── Library / Inventory / Accounting / Payroll / Leave / SMS
 └── Gallery / Online exams (later) — NO bus
 ```
 
@@ -453,6 +454,7 @@ PLANNED
 
 | Date | Change |
 |------|--------|
+| 2026-09-27 | Teacher Tracking module key `teacher_tracking`. Milestone 1 is the Standard course planner (programme + subject + chapters + topics). |
 | 2026-09-07 | Student Profile Overview = activity timeline (calls, fees, WhatsApp, attendance, etc.; click-through to tabs) |
 | 2026-09-07 | WhatsApp staff access: inbox / bulk campaigns / fee notices as separate job roles + sidebar leaves; full desk role kept for legacy |
 | 2026-09-05 | WhatsApp: Parent fee notices (manual bulk amounts) — independent of Fees; profile Parent updates tab |

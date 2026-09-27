@@ -19,6 +19,7 @@ enum LicenseFeature: string
     case Marksheets = 'marksheets';
     case Homework = 'homework';
     case Website = 'website';
+    case TeacherTracking = 'teacher_tracking';
 
     public function label(): string
     {
@@ -38,6 +39,7 @@ enum LicenseFeature: string
             self::Marksheets => 'Marksheets Management',
             self::Homework => 'Homework Management',
             self::Website => 'Website CMS',
+            self::TeacherTracking => 'Teacher Tracking',
         };
     }
 
@@ -59,6 +61,7 @@ enum LicenseFeature: string
             self::Marksheets => 'Issue downloadable PDF marksheets.',
             self::Homework => 'Homework assignments and checking.',
             self::Website => 'Public site content and branding.',
+            self::TeacherTracking => 'Standard course planner, teacher plans, and class tracking.',
         };
     }
 

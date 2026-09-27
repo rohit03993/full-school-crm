@@ -139,6 +139,10 @@ class LicenseService
             return [];
         }
 
+        if ($this->plan() === LicensePlan::FullResults) {
+            return LicenseFeature::values();
+        }
+
         $features = $this->current()['features'] ?? [];
 
         return is_array($features)
