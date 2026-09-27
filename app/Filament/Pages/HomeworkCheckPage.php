@@ -212,11 +212,22 @@ class HomeworkCheckPage extends Page
                     $selected = $this->selectedStudentsPayload($students);
 
                     $homeworkGiven = $this->homeworkListOpen();
+                    $showStudentMobile = CrmAccess::canViewStudentMobile(Auth::user());
+                    $visibleStudents = $homeworkGiven ? $students : collect();
+
+                    if (! $showStudentMobile) {
+                        $visibleStudents = $visibleStudents->map(function (array $row): array {
+                            $row['mobile'] = null;
+
+                            return $row;
+                        });
+                    }
 
                     return [
                         'rosterReady' => $this->rosterReady(),
                         'homeworkGiven' => $homeworkGiven,
-                        'students' => $homeworkGiven ? $students : collect(),
+                        'showStudentMobile' => $showStudentMobile,
+                        'students' => $visibleStudents,
                         'selectedStudentIds' => $this->selectedStudentIds,
                         'checkDateLabel' => $this->checkDateLabel(),
                         'subjectLabel' => $this->subjectLabel(),

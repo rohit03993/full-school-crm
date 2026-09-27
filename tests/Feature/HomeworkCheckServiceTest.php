@@ -245,6 +245,56 @@ class HomeworkCheckServiceTest extends TestCase
         ]);
     }
 
+    public function test_teacher_homework_list_hides_student_mobile(): void
+    {
+        [$admin, $batch, $student, $subject] = $this->seedClass(mobile: '9876543210');
+
+        $teacher = User::factory()->create(['is_active' => true]);
+        $teacher->assignRole(StaffJobRole::Teacher->value);
+
+        BatchStaffAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'user_id' => $teacher->id,
+            'role' => BatchStaffRole::SubjectTeacher,
+            'course_subject_id' => $subject->id,
+        ]);
+
+        \App\Models\HomeworkAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'created_by_user_id' => $teacher->id,
+            'title' => 'Today homework',
+            'description' => 'Page 12',
+            'content_type' => \App\Enums\HomeworkContentType::Text,
+            'status' => \App\Enums\HomeworkAssignmentStatus::Sent,
+            'homework_date' => now()->toDateString(),
+            'published_at' => now(),
+        ]);
+
+        $this->actingAs($teacher);
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+
+        Livewire::withQueryParams([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'check_date' => now()->toDateString(),
+        ])->test(HomeworkCheckPage::class)
+            ->assertSee('Riya Sharma')
+            ->assertDontSee('9876543210')
+            ->assertDontSee('Mobile');
+
+        $this->actingAs($admin);
+
+        Livewire::withQueryParams([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'check_date' => now()->toDateString(),
+        ])->test(HomeworkCheckPage::class)
+            ->assertSee('Riya Sharma')
+            ->assertSee('9876543210')
+            ->assertSee('Mobile');
+    }
+
     public function test_roster_lists_batch_students(): void
     {
         [$teacher, $batch, $student, $subject] = $this->seedClass();

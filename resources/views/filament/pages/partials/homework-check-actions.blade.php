@@ -70,7 +70,9 @@
                     <thead class="bg-gray-50 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                         <tr>
                             <th class="px-4 py-2">Student</th>
-                            <th class="px-4 py-2">Mobile</th>
+                            @if ($showStudentMobile ?? false)
+                                <th class="px-4 py-2">Mobile</th>
+                            @endif
                             <th class="px-4 py-2">Link</th>
                             <th class="px-4 py-2">Week ND</th>
                             <th class="px-4 py-2">{{ $checkDateLabel }}</th>
@@ -83,7 +85,9 @@
                                 <td class="px-4 py-2 font-medium crm-responsive-table__title" data-label="Student">
                                     <x-crm.person-name :student-id="$student['id']" :name="$student['name']" />
                                 </td>
-                                <td class="px-4 py-2 text-gray-500" data-label="Mobile">{{ $student['mobile'] ?: '—' }}</td>
+                                @if ($showStudentMobile ?? false)
+                                    <td class="px-4 py-2 text-gray-500" data-label="Mobile">{{ $student['mobile'] ?: '—' }}</td>
+                                @endif
                                 <td class="px-4 py-2 text-xs" data-label="Link">
                                     @if ($student['link_tracked'] ?? false)
                                         @if ($student['link_opened'] ?? false)
