@@ -63,7 +63,7 @@ class SubmitHomeworkPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Your classes for the selected date. Add homework for empty subjects. After you submit, you can mark Done or Not done. Admin will still review and send one WhatsApp to parents.';
+        return 'Your classes for the selected date. Add homework for empty subjects. Done and Not done open after admin approves. Admin still sends one WhatsApp to parents.';
     }
 
     public function mount(): void

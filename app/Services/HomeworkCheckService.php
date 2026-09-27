@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\CrmPermission;
+use App\Enums\HomeworkAssignmentStatus;
 use App\Enums\HomeworkCheckNotifyStatus;
 use App\Enums\HomeworkCheckStatus;
 use App\Enums\LicenseFeature;
@@ -215,6 +216,12 @@ class HomeworkCheckService
         }
 
         $checkedOnDate = $this->normalizeCheckedOn($checkedOn);
+
+        if (! $this->homeworkReadyToMark($batchId, $courseSubjectId, $checkedOnDate)) {
+            throw ValidationException::withMessages([
+                'status' => 'Admin has not approved this homework yet.',
+            ]);
+        }
 
         $batch = Batch::query()->with('course')->findOrFail($batchId);
         $student = Student::query()->findOrFail($studentId);
@@ -780,6 +787,23 @@ class HomeworkCheckService
             ->where('batch_id', $batchId)
             ->where('course_subject_id', $courseSubjectId)
             ->whereDate('homework_date', $this->normalizeCheckedOn($checkedOn))
+            ->exists();
+    }
+
+    public function homeworkReadyToMark(int $batchId, int $courseSubjectId, ?string $checkedOn): bool
+    {
+        if ($batchId < 1 || $courseSubjectId < 1) {
+            return false;
+        }
+
+        return HomeworkAssignment::query()
+            ->where('batch_id', $batchId)
+            ->where('course_subject_id', $courseSubjectId)
+            ->whereDate('homework_date', $this->normalizeCheckedOn($checkedOn))
+            ->whereIn('status', [
+                HomeworkAssignmentStatus::Approved->value,
+                HomeworkAssignmentStatus::Sent->value,
+            ])
             ->exists();
     }
 

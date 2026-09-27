@@ -212,6 +212,7 @@ class HomeworkCheckPage extends Page
                     $selected = $this->selectedStudentsPayload($students);
 
                     $homeworkGiven = $this->homeworkListOpen();
+                    $homeworkAwaitingApproval = $this->homeworkAwaitingApproval();
                     $showStudentMobile = CrmAccess::canViewStudentMobile(Auth::user());
                     $visibleStudents = $homeworkGiven ? $students : collect();
 
@@ -226,6 +227,7 @@ class HomeworkCheckPage extends Page
                     return [
                         'rosterReady' => $this->rosterReady(),
                         'homeworkGiven' => $homeworkGiven,
+                        'homeworkAwaitingApproval' => $homeworkAwaitingApproval,
                         'showStudentMobile' => $showStudentMobile,
                         'students' => $visibleStudents,
                         'selectedStudentIds' => $this->selectedStudentIds,
@@ -483,6 +485,19 @@ class HomeworkCheckPage extends Page
     protected function homeworkListOpen(): bool
     {
         if (! $this->rosterReady()) {
+            return false;
+        }
+
+        return app(HomeworkCheckService::class)->homeworkReadyToMark(
+            (int) $this->data['batch_id'],
+            (int) $this->data['course_subject_id'],
+            $this->checkDate(),
+        );
+    }
+
+    protected function homeworkAwaitingApproval(): bool
+    {
+        if (! $this->rosterReady() || $this->homeworkListOpen()) {
             return false;
         }
 

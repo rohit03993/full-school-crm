@@ -442,6 +442,7 @@ class HomeworkCheckServiceTest extends TestCase
 
         [$teacher, $batch, $student, $subject] = $this->seedClass();
         $past = now()->subDay()->toDateString();
+        $this->approveHomework($batch->id, $subject->id, $teacher->id, $past);
 
         $result = app(HomeworkCheckService::class)->mark(
             $teacher,
@@ -507,7 +508,7 @@ class HomeworkCheckServiceTest extends TestCase
 
     public function test_check_page_hides_marks_until_homework_is_given(): void
     {
-        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        [$teacher, $batch, $student, $subject] = $this->seedClass(approvedHomework: false);
         $this->actingAs($teacher);
         \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
 
@@ -546,6 +547,69 @@ class HomeworkCheckServiceTest extends TestCase
         Livewire::withQueryParams([]);
     }
 
+    public function test_done_and_not_done_wait_until_admin_approves(): void
+    {
+        [$teacher, $batch, $student, $subject] = $this->seedClass(approvedHomework: false);
+        $this->actingAs($teacher);
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+
+        $assignment = \App\Models\HomeworkAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'created_by_user_id' => $teacher->id,
+            'title' => 'Waiting homework',
+            'description' => 'Page 1',
+            'content_type' => \App\Enums\HomeworkContentType::Text,
+            'status' => \App\Enums\HomeworkAssignmentStatus::Submitted,
+            'homework_date' => now()->toDateString(),
+            'published_at' => now(),
+        ]);
+
+        Livewire::withQueryParams([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'check_date' => now()->toDateString(),
+        ])->test(HomeworkCheckPage::class)
+            ->assertSee('waiting for admin approval')
+            ->assertDontSee($student->name)
+            ->assertDontSee('Not done');
+
+        $blocked = false;
+
+        try {
+            app(HomeworkCheckService::class)->mark(
+                $teacher,
+                $batch->id,
+                $student->id,
+                $subject->id,
+                'Waiting homework',
+                HomeworkCheckStatus::Done,
+            );
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $blocked = true;
+            $this->assertSame(
+                'Admin has not approved this homework yet.',
+                $exception->errors()['status'][0] ?? null,
+            );
+        }
+
+        $this->assertTrue($blocked);
+
+        $assignment->update([
+            'status' => \App\Enums\HomeworkAssignmentStatus::Approved,
+            'approved_at' => now(),
+        ]);
+
+        Livewire::withQueryParams([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'check_date' => now()->toDateString(),
+        ])->test(HomeworkCheckPage::class)
+            ->assertSee($student->name)
+            ->assertSee('Not done')
+            ->assertDontSee('waiting for admin approval');
+    }
+
     public function test_multi_subject_grid_shows_separate_cells_per_subject(): void
     {
         Http::fake();
@@ -571,6 +635,8 @@ class HomeworkCheckServiceTest extends TestCase
             $physics->id => ['sort_order' => 2],
             $chemistry->id => ['sort_order' => 3],
         ]);
+
+        $this->approveHomework($batch->id, $physics->id, $teacher->id);
 
         $service = app(HomeworkCheckService::class);
 
@@ -724,10 +790,27 @@ class HomeworkCheckServiceTest extends TestCase
         $this->assertSame('Algebra worksheet', $result['check']->topic);
     }
 
+    protected function approveHomework(int $batchId, int $subjectId, int $userId, ?string $date = null): void
+    {
+        \App\Models\HomeworkAssignment::query()->create([
+            'batch_id' => $batchId,
+            'course_subject_id' => $subjectId,
+            'created_by_user_id' => $userId,
+            'approved_by_user_id' => $userId,
+            'title' => 'Approved homework',
+            'description' => 'Class work',
+            'content_type' => \App\Enums\HomeworkContentType::Text,
+            'status' => \App\Enums\HomeworkAssignmentStatus::Approved,
+            'homework_date' => $date ?? now()->toDateString(),
+            'published_at' => now(),
+            'approved_at' => now(),
+        ]);
+    }
+
     /**
      * @return array{0: User, 1: Batch, 2: Student, 3: CourseSubject}
      */
-    protected function seedClass(?string $mobile = '9876543210'): array
+    protected function seedClass(?string $mobile = '9876543210', bool $approvedHomework = true): array
     {
         $teacher = User::factory()->create(['is_active' => true]);
         $teacher->assignRole(RoleName::SuperAdmin->value);
@@ -792,6 +875,10 @@ class HomeworkCheckServiceTest extends TestCase
             'assigned_at' => now(),
             'assigned_by_user_id' => $teacher->id,
         ]);
+
+        if ($approvedHomework) {
+            $this->approveHomework($batch->id, $subject->id, $teacher->id);
+        }
 
         return [$teacher, $batch, $student, $subject];
     }
