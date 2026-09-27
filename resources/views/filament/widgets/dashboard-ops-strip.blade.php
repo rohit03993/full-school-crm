@@ -1,10 +1,20 @@
 @php
     $tiles = $tiles ?? [];
+    $hideOnPhone = $hideOnPhone ?? false;
 @endphp
 
 <x-filament-widgets::widget>
+    @if ($hideOnPhone)
+        <style>
+            @media (max-width: 1023px) {
+                .fi-wi-widget:has(.crm-ops-strip--phone-off) {
+                    display: none !important;
+                }
+            }
+        </style>
+    @endif
     @if ($tiles !== [])
-        <div class="crm-ops-strip" @if (! empty($poll)) wire:poll.{{ $poll }} @endif>
+        <div @class(['crm-ops-strip', 'crm-ops-strip--phone-off' => $hideOnPhone]) @if (! empty($poll)) wire:poll.{{ $poll }} @endif>
             <div class="crm-ops-strip__head">
                 <div>
                     <p class="crm-ops-strip__heading">{{ $heading }}</p>

@@ -247,6 +247,7 @@ class AdminDashboardTest extends TestCase
         Livewire::test(DashboardAttentionWidget::class)
             ->assertSuccessful()
             ->assertSee('Needs attention')
+            ->assertSee('crm-ops-strip--phone-off', false)
             ->assertSee('Admissions')
             ->assertSee('Students attendance');
 
