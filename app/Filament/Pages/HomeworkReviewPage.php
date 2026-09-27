@@ -75,6 +75,8 @@ class HomeworkReviewPage extends Page
             'batch_id' => null,
             'homework_date' => now()->toDateString(),
         ]);
+
+        $this->openHomeworkFromRequest();
     }
 
     public function defaultForm(Schema $schema): Schema

@@ -71,6 +71,8 @@ class SubmitHomeworkPage extends Page
         $this->form->fill([
             'homework_date' => now()->toDateString(),
         ]);
+
+        $this->openHomeworkFromRequest();
     }
 
     public function defaultForm(Schema $schema): Schema

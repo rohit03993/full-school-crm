@@ -24,6 +24,16 @@ trait AddsHomeworkModal
 {
     abstract protected function dateString(): string;
 
+    protected function openHomeworkFromRequest(): void
+    {
+        $batchId = request()->integer('batch_id');
+        $subjectId = request()->integer('course_subject_id');
+
+        if ($batchId > 0 && $subjectId > 0) {
+            $this->startAdd($batchId, $subjectId);
+        }
+    }
+
     public function startAdd(int $batchId, int $subjectId): void
     {
         if ($batchId < 1 || $subjectId < 1) {

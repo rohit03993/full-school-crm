@@ -13,6 +13,7 @@ use App\Enums\StudentStatus;
 use App\Enums\WhatsAppMessageSource;
 use App\Enums\WhatsAppSendActor;
 use App\Filament\Pages\HomeworkCheckPage;
+use App\Filament\Pages\MyTeachingAssignmentsPage;
 use App\Filament\Pages\HomeworkPage;
 use App\Filament\Pages\HomeworkReviewPage;
 use App\Filament\Pages\SubmitHomeworkPage;
@@ -605,6 +606,20 @@ class HomeworkSubmissionServiceTest extends TestCase
         $data = $this->seedClass();
         $this->actingAs($data['mathTeacher']);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(MyTeachingAssignmentsPage::class)
+            ->assertSuccessful()
+            ->assertSee('Give homework')
+            ->assertSee('batch_id='.$data['batch']->id, false)
+            ->assertSee('course_subject_id='.$data['maths']->id, false);
+
+        Livewire::withQueryParams([
+            'batch_id' => (string) $data['batch']->id,
+            'course_subject_id' => (string) $data['maths']->id,
+        ])->test(SubmitHomeworkPage::class)
+            ->assertActionMounted('addHomework');
+
+        Livewire::withQueryParams([]);
 
         Livewire::test(SubmitHomeworkPage::class)
             ->assertSuccessful()

@@ -100,12 +100,44 @@
                                     Subject: {{ $subject->displayLabel() }}
                                 </p>
                             @endif
-                            <a
-                                href="{{ \App\Filament\Pages\HomeworkCheckPage::getUrl() }}"
-                                class="mt-3 inline-flex text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
-                            >
-                                Homework check (Done / Not Done)
-                            </a>
+                            @php
+                                $homeworkQuery = array_filter([
+                                    'batch_id' => $batch?->id,
+                                    'course_subject_id' => $subject?->id,
+                                ]);
+                                $homeworkCheckUrl = \App\Filament\Pages\HomeworkCheckPage::getUrl();
+                                $giveHomeworkUrl = null;
+
+                                if (\App\Filament\Pages\SubmitHomeworkPage::canAccess()) {
+                                    $giveHomeworkUrl = \App\Filament\Pages\SubmitHomeworkPage::getUrl();
+                                } elseif (\App\Filament\Pages\HomeworkReviewPage::canAccess()) {
+                                    $giveHomeworkUrl = \App\Filament\Pages\HomeworkReviewPage::getUrl();
+                                }
+
+                                if ($homeworkQuery !== []) {
+                                    $homeworkCheckUrl .= '?'.http_build_query($homeworkQuery);
+
+                                    if ($giveHomeworkUrl) {
+                                        $giveHomeworkUrl .= '?'.http_build_query($homeworkQuery);
+                                    }
+                                }
+                            @endphp
+                            <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                                @if ($giveHomeworkUrl)
+                                    <a
+                                        href="{{ $giveHomeworkUrl }}"
+                                        class="inline-flex text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
+                                    >
+                                        Give homework
+                                    </a>
+                                @endif
+                                <a
+                                    href="{{ $homeworkCheckUrl }}"
+                                    class="inline-flex text-xs font-semibold text-primary-600 hover:underline dark:text-primary-400"
+                                >
+                                    Homework check (Done / Not Done)
+                                </a>
+                            </div>
                         </div>
 
                         @if ($isLead)
