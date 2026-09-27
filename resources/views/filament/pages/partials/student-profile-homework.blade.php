@@ -101,6 +101,9 @@
                                             ])>
                                                 {{ $row['check_status'] }}
                                             </span>
+                                            @if (filled($row['check_note'] ?? null))
+                                                <span class="text-[11px] text-gray-500 dark:text-gray-400">{{ $row['check_note'] }}</span>
+                                            @endif
                                         @endif
                                     </div>
                                 </li>

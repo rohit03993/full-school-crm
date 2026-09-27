@@ -1,53 +1,4 @@
 <div class="mt-4 space-y-4">
-    @if ($confirmNotDoneOpen)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
-            <div
-                class="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
-                wire:key="hw-confirm-not-done"
-            >
-                <h3 class="text-base font-semibold text-gray-950 dark:text-white">Send WhatsApp for Not Done?</h3>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                    You selected <strong>{{ $selectedCount }}</strong> student(s) for
-                    <strong>{{ $subjectLabel }}</strong> on <strong>{{ $checkDateLabel }}</strong>.
-                </p>
-                <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-gray-700 dark:text-gray-200">
-                    <li>
-                        WhatsApp will be attempted for
-                        <strong>{{ $selectedWithMobile }}</strong> student(s) who have a mobile number.
-                    </li>
-                    @if ($selectedWithoutMobile > 0)
-                        <li>
-                            <strong>{{ $selectedWithoutMobile }}</strong> have no mobile — they will be marked Not Done
-                            but WhatsApp cannot be sent.
-                        </li>
-                    @endif
-                    <li>Done students are not messaged. Only this Not Done submit sends WhatsApp.</li>
-                </ul>
-                <div class="mt-5 flex flex-wrap justify-end gap-2">
-                    <button
-                        type="button"
-                        wire:click="cancelMarkSelectedNotDone"
-                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="confirmMarkSelectedNotDone"
-                        wire:loading.attr="disabled"
-                        wire:target="confirmMarkSelectedNotDone"
-                        class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white hover:bg-rose-500 disabled:opacity-50"
-                    >
-                        <span wire:loading.remove wire:target="confirmMarkSelectedNotDone">
-                            Yes, mark Not Done &amp; send
-                        </span>
-                        <span wire:loading wire:target="confirmMarkSelectedNotDone">Sending…</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    @endif
-
     @if (! $rosterReady)
         <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400">
             Select a <strong>class</strong>. Subject will auto-fill if you teach only one; otherwise pick the subject, then the student list opens.
@@ -96,7 +47,7 @@
                         {{ $subjectLabel }} · {{ $checkDateLabel }}
                     </p>
                     <p class="text-xs text-gray-500 dark:text-gray-400">
-                        Tick students who did <strong>not</strong> finish, then Submit. The system will ask before sending WhatsApp.
+                        Tap <strong>Done</strong> or <strong>Not done</strong> on a student. Not done shares a message with parents. Done only changes the status.
                     </p>
                     @php
                         $linkTrackedStudents = collect($students)->where('link_tracked', true);
@@ -108,44 +59,12 @@
                         </p>
                     @endif
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <button
-                        type="button"
-                        wire:click="toggleSelectAll"
-                        class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
-                    >
-                        {{ count($selectedStudentIds) === count($students) && count($students) > 0 ? 'Clear selection' : 'Select all' }}
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="requestMarkSelectedNotDone"
-                        wire:loading.attr="disabled"
-                        wire:target="requestMarkSelectedNotDone,confirmMarkSelectedNotDone,markRemainingDone"
-                        class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-rose-500 disabled:opacity-50"
-                    >
-                        Submit Not Done
-                        @if (count($selectedStudentIds) > 0)
-                            ({{ count($selectedStudentIds) }})
-                        @endif
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="markRemainingDone"
-                        wire:loading.attr="disabled"
-                        wire:target="requestMarkSelectedNotDone,confirmMarkSelectedNotDone,markRemainingDone"
-                        @disabled($unmarkedCount < 1)
-                        class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-emerald-500 disabled:opacity-50"
-                    >
-                        Mark remaining Done{{ $unmarkedCount > 0 ? ' ('.$unmarkedCount.')' : '' }}
-                    </button>
-                </div>
             </div>
 
             <x-crm.responsive-table class="border-t border-gray-100 dark:border-gray-800">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-gray-50 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                         <tr>
-                            <th class="px-4 py-2 w-10"></th>
                             <th class="px-4 py-2">Student</th>
                             <th class="px-4 py-2">Mobile</th>
                             <th class="px-4 py-2">Link</th>
@@ -157,24 +76,7 @@
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         @forelse ($students as $student)
                             <tr wire:key="hw-roster-{{ $student['id'] }}">
-                                <td class="px-4 py-2 crm-responsive-table__title" data-label="">
-                                    <label class="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            value="{{ $student['id'] }}"
-                                            wire:model.live="selectedStudentIds"
-                                            class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800"
-                                        />
-                                        <span class="md:hidden">
-                                            <x-crm.person-name
-                                                :student-id="$student['id']"
-                                                :name="$student['name']"
-                                                class="font-medium"
-                                            />
-                                        </span>
-                                    </label>
-                                </td>
-                                <td class="hidden px-4 py-2 font-medium md:table-cell" data-label="Student">
+                                <td class="px-4 py-2 font-medium crm-responsive-table__title" data-label="Student">
                                     <x-crm.person-name :student-id="$student['id']" :name="$student['name']" />
                                 </td>
                                 <td class="px-4 py-2 text-gray-500" data-label="Mobile">{{ $student['mobile'] ?: '—' }}</td>
@@ -208,8 +110,8 @@
                                 <td class="crm-responsive-table__wide px-4 py-2 text-xs text-gray-500" data-label="{{ $checkDateLabel }}">
                                     @if ($student['last_status'])
                                         {{ $student['last_status'] }}
-                                        @if ($student['last_notify'])
-                                            · {{ $student['last_notify'] }}
+                                        @if (filled($student['parent_line'] ?? null))
+                                            · {{ $student['parent_line'] }}
                                         @endif
                                         @if ($student['can_resend'] && $student['check_id'])
                                             <button
@@ -228,20 +130,32 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-2 text-right crm-responsive-table__actions" data-label="">
-                                    <button
-                                        type="button"
-                                        wire:click="markStudentDone({{ $student['id'] }})"
-                                        wire:loading.attr="disabled"
-                                        wire:target="markStudentDone({{ $student['id'] }})"
-                                        class="rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-extrabold uppercase text-white disabled:opacity-50 touch-manipulation min-h-10"
-                                    >
-                                        Done
-                                    </button>
+                                    @if (($student['status_key'] ?? null) === 'done')
+                                        <button
+                                            type="button"
+                                            wire:click="markStudentNotDone({{ $student['id'] }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="markStudentNotDone({{ $student['id'] }})"
+                                            class="rounded-md bg-rose-600 px-2.5 py-1.5 text-xs font-extrabold uppercase text-white disabled:opacity-50 touch-manipulation min-h-10"
+                                        >
+                                            Not done
+                                        </button>
+                                    @else
+                                        <button
+                                            type="button"
+                                            wire:click="markStudentDone({{ $student['id'] }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="markStudentDone({{ $student['id'] }})"
+                                            class="rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-extrabold uppercase text-white disabled:opacity-50 touch-manipulation min-h-10"
+                                        >
+                                            Done
+                                        </button>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
                                     No students found for this class.
                                 </td>
                             </tr>

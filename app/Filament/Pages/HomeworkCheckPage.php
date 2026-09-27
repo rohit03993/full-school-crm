@@ -357,6 +357,11 @@ class HomeworkCheckPage extends Page
         $this->markOne($service, $studentId, HomeworkCheckStatus::Done);
     }
 
+    public function markStudentNotDone(int $studentId, HomeworkCheckService $service): void
+    {
+        $this->markOne($service, $studentId, HomeworkCheckStatus::NotDone);
+    }
+
     public function resendWhatsApp(int $checkId, HomeworkCheckService $service): void
     {
         $user = Auth::user();
@@ -423,9 +428,15 @@ class HomeworkCheckPage extends Page
             return;
         }
 
+        $markedNotDone = $status === HomeworkCheckStatus::NotDone;
+
         Notification::make()
-            ->title('Marked Done')
-            ->body($result['whatsapp']['message'] ?? 'Saved. No WhatsApp sent.')
+            ->title($markedNotDone ? 'Marked Not done' : 'Marked Done')
+            ->body($markedNotDone
+                ? (($result['whatsapp']['queued'] ?? false)
+                    ? 'Homework not done. Message shared with parents.'
+                    : (string) ($result['whatsapp']['message'] ?? 'Homework not done. Message was not shared.'))
+                : 'Status changed to Done. No message sent to parents.')
             ->success()
             ->send();
     }

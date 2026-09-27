@@ -253,21 +253,53 @@ class HomeworkCheckService
             ]);
         }
 
-        $check = HomeworkCheck::query()->create([
-            'student_id' => $student->id,
-            'batch_id' => $batch->id,
-            'course_subject_id' => $subject->id,
-            'homework_assignment_id' => $assignment?->id,
+        $existing = HomeworkCheck::query()
+            ->where('student_id', $student->id)
+            ->where('batch_id', $batch->id)
+            ->where('course_subject_id', $subject->id)
+            ->whereDate('checked_on', $checkedOnDate)
+            ->orderByDesc('id')
+            ->first();
+
+        if ($existing && $existing->status === $status) {
+            return [
+                'check' => $existing,
+                'whatsapp' => [
+                    'queued' => false,
+                    'message' => $status === HomeworkCheckStatus::Done
+                        ? 'Already marked Done.'
+                        : ($existing->notify_status === HomeworkCheckNotifyStatus::Sent
+                            ? 'Already marked Not Done. Message already shared with parents.'
+                            : 'Already marked Not Done.'),
+                ],
+            ];
+        }
+
+        $checkAttributes = [
+            'homework_assignment_id' => $assignment?->id ?? $existing?->homework_assignment_id,
             'subject_name' => $subject->displayLabel(),
             'topic' => $topic,
-            'checked_on' => $checkedOnDate,
             'status' => $status,
             'parent_mobile' => filled($student->mobile) ? (string) $student->mobile : null,
             'notify_status' => $status === HomeworkCheckStatus::Done
                 ? HomeworkCheckNotifyStatus::NotRequired
                 : HomeworkCheckNotifyStatus::Pending,
-            'created_by_user_id' => $teacher->id,
-        ]);
+            'notified_at' => null,
+        ];
+
+        if ($existing) {
+            $existing->update($checkAttributes);
+            $check = $existing->fresh();
+        } else {
+            $check = HomeworkCheck::query()->create([
+                'student_id' => $student->id,
+                'batch_id' => $batch->id,
+                'course_subject_id' => $subject->id,
+                'checked_on' => $checkedOnDate,
+                'created_by_user_id' => $teacher->id,
+                ...$checkAttributes,
+            ]);
+        }
 
         if ($status === HomeworkCheckStatus::Done) {
             return [
@@ -503,8 +535,10 @@ class HomeworkCheckService
                     'name' => $student->name,
                     'mobile' => $student->mobile,
                     'check_id' => $latest?->id,
+                    'status_key' => $latest?->status?->value,
                     'last_status' => $latest?->status?->label(),
                     'last_notify' => $latest?->notify_status?->label(),
+                    'parent_line' => $this->parentLine($latest),
                     'can_resend' => $canResend,
                     'not_done_week' => (int) ($notDoneWeek[$student->id] ?? 0),
                     'link_tracked' => is_array($linkState),
@@ -532,6 +566,19 @@ class HomeworkCheckService
                     .($assignment->published_at ? ' · '.$assignment->published_at->format('d M') : ''),
             ])
             ->all();
+    }
+
+    protected function parentLine(?HomeworkCheck $check): ?string
+    {
+        if ($check?->status !== HomeworkCheckStatus::NotDone) {
+            return null;
+        }
+
+        return match ($check->notify_status) {
+            HomeworkCheckNotifyStatus::Sent => 'Message shared with parents',
+            HomeworkCheckNotifyStatus::Failed => 'Message was not shared',
+            default => 'Message to parents is waiting',
+        };
     }
 
     public function notDoneCountThisWeek(int $studentId): int

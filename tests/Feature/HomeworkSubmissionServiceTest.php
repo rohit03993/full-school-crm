@@ -1096,7 +1096,8 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('Link opened 1 / 2')
             ->assertSee('Opened')
             ->assertSee('Not opened')
-            ->assertSee('Submit Not Done');
+            ->assertDontSee('Submit Not Done')
+            ->assertSee('Done');
     }
 
     public function test_combined_send_without_approved_returns_error(): void

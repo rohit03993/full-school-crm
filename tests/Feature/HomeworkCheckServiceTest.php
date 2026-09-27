@@ -18,11 +18,13 @@ use App\Models\BatchStaffAssignment;
 use App\Models\BatchStudent;
 use App\Models\Course;
 use App\Models\CourseSubject;
+use App\Models\HomeworkCheck;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\WhatsAppLiveCampaign;
+use App\Services\HomeworkSubmissionService;
 use App\Models\WhatsAppTemplate;
 use App\Services\HomeworkCheckService;
 use App\Support\HomeworkNotDoneWhatsAppTemplate;
@@ -70,6 +72,63 @@ class HomeworkCheckServiceTest extends TestCase
         $this->assertSame(HomeworkCheckNotifyStatus::NotRequired, $result['check']->notify_status);
         $this->assertFalse($result['whatsapp']['queued']);
         Http::assertNothingSent();
+    }
+
+    public function test_switching_done_and_not_done_updates_the_same_mark_and_profile(): void
+    {
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response([
+                'messages' => [['id' => 'wamid.HW999']],
+            ], 200),
+        ]);
+
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $this->enableHomeworkNotDoneAutomation();
+        $service = app(HomeworkCheckService::class);
+
+        $done = $service->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            'Chapter 5',
+            HomeworkCheckStatus::Done,
+        );
+        $notDone = $service->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            'Chapter 5',
+            HomeworkCheckStatus::NotDone,
+        );
+
+        $this->assertSame($done['check']->id, $notDone['check']->id);
+        $this->assertSame(HomeworkCheckStatus::NotDone, $notDone['check']->fresh()->status);
+        $this->assertSame(HomeworkCheckNotifyStatus::Sent, $notDone['check']->fresh()->notify_status);
+        $this->assertSame(1, HomeworkCheck::query()->count());
+
+        $roster = $service->rosterForBatch($batch->id, $subject->id, null, now()->toDateString())->keyBy('id');
+        $this->assertSame('not_done', $roster[$student->id]['status_key']);
+        $this->assertSame('Message shared with parents', $roster[$student->id]['parent_line']);
+
+        $days = app(HomeworkSubmissionService::class)->profileDaysForStudent($student);
+        $row = $days[0]['subjects'][0] ?? null;
+        $this->assertSame('Not Done', $row['check_status'] ?? null);
+        $this->assertSame('Message shared with parents', $row['check_note'] ?? null);
+
+        $backToDone = $service->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            'Chapter 5',
+            HomeworkCheckStatus::Done,
+        );
+
+        $this->assertSame($done['check']->id, $backToDone['check']->id);
+        $this->assertSame(HomeworkCheckStatus::Done, $backToDone['check']->fresh()->status);
+        $this->assertSame(1, HomeworkCheck::query()->count());
     }
 
     public function test_not_done_queues_whatsapp_when_configured(): void
@@ -276,7 +335,9 @@ class HomeworkCheckServiceTest extends TestCase
             ->assertSee('Not Done')
             ->assertSee('Opened')
             ->assertSee('Not opened')
-            ->assertSee('Submit Not Done');
+            ->assertDontSee('Submit Not Done')
+            ->assertDontSee('Mark remaining Done')
+            ->assertSee('Done');
     }
 
     public function test_mark_remaining_done_only_marks_unmarked_students(): void
@@ -527,6 +588,9 @@ class HomeworkCheckServiceTest extends TestCase
             HomeworkCheckStatus::NotDone,
             now()->toDateString(),
         );
+
+        $this->assertSame(1, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
+
         app(HomeworkCheckService::class)->mark(
             $teacher,
             $batch->id,
@@ -537,7 +601,7 @@ class HomeworkCheckServiceTest extends TestCase
             now()->toDateString(),
         );
 
-        $this->assertSame(1, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
+        $this->assertSame(0, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
     }
 
     public function test_mark_can_link_portal_homework_assignment(): void

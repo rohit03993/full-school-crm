@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\BatchStatus;
 use App\Enums\HomeworkAssignmentStatus;
+use App\Enums\HomeworkCheckNotifyStatus;
 use App\Enums\HomeworkCheckStatus;
 use App\Enums\HomeworkContentType;
 use App\Enums\LicenseFeature;
@@ -1019,6 +1020,7 @@ class HomeworkSubmissionService
             ->with('batch')
             ->where('student_id', $student->id)
             ->whereIn('batch_id', $batchIds)
+            ->orderBy('id')
             ->get();
 
         $checksByAssignment = $checks
@@ -1072,6 +1074,11 @@ class HomeworkSubmissionService
             }
 
             $date = $check->checked_on?->toDateString() ?? $check->created_at?->toDateString();
+            $latestForDay = $checksByDateSubject->get($date.'|'.(int) $check->course_subject_id);
+
+            if ($latestForDay instanceof HomeworkCheck && $latestForDay->id !== $check->id) {
+                continue;
+            }
 
             if ($date === null) {
                 continue;
@@ -1109,7 +1116,8 @@ class HomeworkSubmissionService
      *     link_tracked: bool,
      *     opened_at: ?string,
      *     check_status: ?string,
-     *     check_is_not_done: bool
+     *     check_is_not_done: bool,
+     *     check_note: ?string
      * }
      */
     protected function profileSubjectRow(
@@ -1138,6 +1146,13 @@ class HomeworkSubmissionService
             'opened_at' => $openedAt,
             'check_status' => $check?->status?->label(),
             'check_is_not_done' => $check?->status === HomeworkCheckStatus::NotDone,
+            'check_note' => $check?->status === HomeworkCheckStatus::NotDone
+                ? match ($check->notify_status) {
+                    HomeworkCheckNotifyStatus::Sent => 'Message shared with parents',
+                    HomeworkCheckNotifyStatus::Failed => 'Message was not shared',
+                    default => 'Message to parents is waiting',
+                }
+                : null,
         ];
     }
 }
