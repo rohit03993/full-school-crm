@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\MetaWhatsAppMessageDirection;
 use App\Enums\MetaWhatsAppMessageStatus;
+use App\Enums\StudentStatus;
 use App\Enums\WhatsAppContactKind;
 use App\Enums\WhatsAppRecipientStatus;
 use App\Models\MetaWhatsAppMessage;
@@ -294,8 +295,11 @@ class MetaWhatsAppConversationService
 
     protected function contactFromStudentOnly(Student $student): WhatsAppInboxContact
     {
-        $kind = $student->status === \App\Enums\StudentStatus::Enquiry
-            || (string) $student->status === \App\Enums\StudentStatus::Enquiry->value
+        $status = $student->status instanceof StudentStatus
+            ? $student->status
+            : (is_string($student->status) ? StudentStatus::tryFrom($student->status) : null);
+
+        $kind = $status === StudentStatus::Enquiry
             ? WhatsAppContactKind::Lead
             : WhatsAppContactKind::Student;
 

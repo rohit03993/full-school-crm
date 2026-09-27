@@ -4,9 +4,14 @@ namespace Tests\Feature;
 
 use App\Enums\MetaWhatsAppMessageDirection;
 use App\Enums\StudentStatus;
+use App\Enums\WhatsAppCampaignStatus;
+use App\Enums\WhatsAppRecipientStatus;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Student;
 use App\Models\User;
+use App\Models\WhatsAppCampaign;
+use App\Models\WhatsAppCampaignRecipient;
+use App\Models\WhatsAppTemplate;
 use App\Services\MetaWhatsAppConversationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -263,6 +268,74 @@ class MetaWhatsAppConversationServiceTest extends TestCase
 
         $this->assertCount(1, $conversations);
         $this->assertSame($student->id, $conversations->first()->studentId);
+    }
+
+    public function test_campaign_student_without_mobile_does_not_crash_inbox(): void
+    {
+        $normal = Student::query()->create([
+            'name' => 'Normal Chat',
+            'mobile' => '9811000099',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919811000099',
+            'student_id' => $normal->id,
+            'body_preview' => 'Hello',
+            'status' => 'received',
+            'status_at' => now(),
+        ]);
+
+        $enrolled = Student::query()->create([
+            'name' => 'No Mobile Enrolled',
+            'mobile' => null,
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        $lead = Student::query()->create([
+            'name' => 'No Mobile Lead',
+            'mobile' => null,
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'old_notice',
+            'body' => 'Hello',
+            'param_count' => 0,
+            'is_active' => true,
+        ]);
+
+        $campaign = WhatsAppCampaign::query()->create([
+            'whatsapp_template_id' => $template->id,
+            'name' => 'old_notice',
+            'status' => WhatsAppCampaignStatus::Completed,
+            'total_recipients' => 2,
+        ]);
+
+        WhatsAppCampaignRecipient::query()->create([
+            'whatsapp_campaign_id' => $campaign->id,
+            'student_id' => $enrolled->id,
+            'phone' => '0',
+            'status' => WhatsAppRecipientStatus::Sent,
+            'message_sent' => 'Old enrolled notice',
+        ]);
+
+        WhatsAppCampaignRecipient::query()->create([
+            'whatsapp_campaign_id' => $campaign->id,
+            'student_id' => $lead->id,
+            'phone' => '0',
+            'status' => WhatsAppRecipientStatus::Sent,
+            'message_sent' => 'Old lead notice',
+        ]);
+
+        $conversations = app(MetaWhatsAppConversationService::class)->recentConversations();
+        $byName = $conversations->keyBy('studentName');
+
+        $this->assertCount(3, $conversations);
+        $this->assertSame('student', $byName['No Mobile Enrolled']->contactKind);
+        $this->assertSame('lead', $byName['No Mobile Lead']->contactKind);
+        $this->assertSame('Hello', $byName['Normal Chat']->preview);
     }
 
     /**
