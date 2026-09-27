@@ -244,10 +244,14 @@ class AdminDashboardTest extends TestCase
         $this->createSession();
         $this->actingAsSuperAdmin();
 
+        Livewire::test(Dashboard::class)
+            ->assertSuccessful()
+            ->assertDontSee('Needs attention')
+            ->assertSee('Today');
+
         Livewire::test(DashboardAttentionWidget::class)
             ->assertSuccessful()
             ->assertSee('Needs attention')
-            ->assertSee('crm-ops-strip--phone-off', false)
             ->assertSee('Admissions')
             ->assertSee('Students attendance');
 
