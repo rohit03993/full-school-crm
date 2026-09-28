@@ -28,6 +28,7 @@ use App\Http\Controllers\Staff\StaffOtpLoginController;
 use App\Http\Controllers\StudentPortal\AuthController;
 use App\Http\Controllers\StudentPortal\DashboardController;
 use App\Http\Controllers\StudentPortal\HomeworkController;
+use App\Http\Controllers\StudentPortal\TopicsController;
 use App\Http\Controllers\StudentPortal\IdCardDownloadController as PortalIdCardDownloadController;
 use App\Http\Controllers\StudentPortal\ReceiptDownloadController as PortalReceiptDownloadController;
 use App\Http\Controllers\Webhooks\MetaWhatsAppWebhookController;
@@ -200,6 +201,9 @@ Route::prefix('portal')->name('portal.')->middleware(EnsurePortalLicensed::class
             ->name('receipts.download');
         Route::get('/id-card/download', [PortalIdCardDownloadController::class, 'download'])
             ->name('id-card.download');
+        Route::middleware('license.feature:teacher_tracking')->group(function (): void {
+            Route::get('/topics', [TopicsController::class, 'index'])->name('topics.index');
+        });
         Route::middleware('license.feature:homework')->group(function (): void {
             Route::get('/homework', [HomeworkController::class, 'index'])->name('homework.index');
             Route::get('/homework/{homeworkAssignment}', [HomeworkController::class, 'show'])->name('homework.show');

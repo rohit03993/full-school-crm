@@ -1,9 +1,11 @@
 @php
     $onHomework = request()->routeIs('portal.homework.*');
+    $onTopics = request()->routeIs('portal.topics.*');
     $onDashboard = request()->routeIs('portal.dashboard');
     $badge = (int) ($portalNav['homeworkBadge'] ?? 0);
     $showAdmission = (bool) ($portalNav['hasAdmission'] ?? false);
     $showHomework = (bool) ($portalNav['showHomework'] ?? true);
+    $showTopics = (bool) ($portalNav['showTopics'] ?? false);
     $showFees = (bool) ($portalNav['showFees'] ?? true);
     $showMarks = (bool) ($portalNav['showMarks'] ?? true);
     $showAttendance = (bool) ($portalNav['showAttendance'] ?? false);
@@ -16,6 +18,10 @@
 
     if ($showHomework) {
         $primaryNav[] = ['key' => 'homework', 'label' => 'Homework', 'href' => route('portal.homework.index'), 'route' => 'homework', 'icon' => 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253', 'badge' => $badge];
+    }
+
+    if ($showTopics) {
+        $primaryNav[] = ['key' => 'topics', 'label' => 'Topics', 'href' => route('portal.topics.index'), 'route' => 'topics', 'icon' => 'M4 6h16M4 10h16M4 14h10'];
     }
 
     if ($showFees) {
@@ -42,9 +48,13 @@
         $mobileNav = array_values(array_filter($mobileNav, fn (array $item): bool => $item['route'] !== 'marks'));
     }
 
-    $resolveActive = function (string $route) use ($onHomework, $onDashboard): bool {
+    $resolveActive = function (string $route) use ($onHomework, $onTopics, $onDashboard): bool {
         if ($onHomework) {
             return $route === 'homework';
+        }
+
+        if ($onTopics) {
+            return $route === 'topics';
         }
 
         return $onDashboard && $route === 'home';

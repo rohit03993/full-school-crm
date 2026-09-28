@@ -14,6 +14,7 @@ use App\Enums\DocumentType;
 use App\Enums\FeeMiscChargeAdjustmentType;
 use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
+use App\Services\SectionCoursePlanService;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use App\Support\StudentExamMarksMatrix;
@@ -157,6 +158,11 @@ class StudentProfilePage extends Page
     public bool $attendanceTabLoaded = false;
 
     public bool $homeworkTabLoaded = false;
+
+    public bool $topicsTabLoaded = false;
+
+    /** @var list<array<string, mixed>> */
+    public array $sectionTopicGroups = [];
 
     public bool $activityTimelineLoaded = false;
 
@@ -552,6 +558,7 @@ class StudentProfilePage extends Page
             'receipts' => $this->loadReceiptsTab(),
             'attendance' => $this->loadAttendanceTab(),
             'homework' => $this->loadHomeworkTab(),
+            'topics' => $this->loadTopicsTab(),
             default => null,
         };
     }
@@ -610,6 +617,21 @@ class StudentProfilePage extends Page
 
         $this->profileTab = $tab;
         $this->updatedProfileTab();
+    }
+
+    public function loadTopicsTab(): void
+    {
+        if ($this->topicsTabLoaded) {
+            return;
+        }
+
+        $this->topicsTabLoaded = true;
+        $this->sectionTopicGroups = app(SectionCoursePlanService::class)->finalTopicsForStudent($this->record);
+    }
+
+    protected function studentHasFinalTopics(): bool
+    {
+        return app(SectionCoursePlanService::class)->studentHasFinalTopics($this->record);
     }
 
     /**
@@ -671,6 +693,10 @@ class StudentProfilePage extends Page
 
         if ($this->licensed(LicenseFeature::Homework) && $this->record->activeBatchStudent !== null) {
             $tabs[] = 'homework';
+        }
+
+        if ($this->licensed(LicenseFeature::TeacherTracking) && $this->studentHasFinalTopics()) {
+            $tabs[] = 'topics';
         }
 
         if ($this->licensed(LicenseFeature::Marks)
@@ -3966,6 +3992,17 @@ class StudentProfilePage extends Page
                                     'homeworkTabLoaded' => $this->homeworkTabLoaded,
                                     'notDoneThisWeek' => $this->homeworkNotDoneThisWeek,
                                     'days' => $this->homeworkDays,
+                                ]),
+                        ]),
+                    'topics' => Tab::make('Topics')
+                        ->icon('heroicon-o-queue-list')
+                        ->visible(fn (): bool => $this->licensed(LicenseFeature::TeacherTracking)
+                            && $this->studentHasFinalTopics())
+                        ->schema([
+                            View::make('filament.pages.partials.student-profile-topics')
+                                ->viewData(fn (): array => [
+                                    'topicsTabLoaded' => $this->topicsTabLoaded,
+                                    'groups' => $this->sectionTopicGroups,
                                 ]),
                         ]),
                     'activities' => Tab::make('Exams')

@@ -71,6 +71,7 @@ class AppServiceProvider extends ServiceProvider
                 'hasAdmission' => false,
                 'showFees' => FeatureGate::enabled(LicenseFeature::Fees),
                 'showHomework' => FeatureGate::enabled(LicenseFeature::Homework),
+                'showTopics' => FeatureGate::enabled(LicenseFeature::TeacherTracking),
                 'showMarks' => FeatureGate::enabled(LicenseFeature::Marks)
                     || FeatureGate::enabled(LicenseFeature::Results),
                 'showAttendance' => FeatureGate::enabled(LicenseFeature::Attendance),
