@@ -232,7 +232,7 @@ class ManageInstituteSettings extends Page
                         ->label('Default student portal password')
                         ->password()
                         ->revealable()
-                        ->helperText('Leave blank to keep the current password. New students receive this password when enrolled. Changing it does not reset passwords students already changed.'),
+                        ->helperText('Leave blank to keep the current password. Students still on the old default get this new password. A student who already chose their own password keeps it.'),
                 ])
                 ->columns(1),
         ]);

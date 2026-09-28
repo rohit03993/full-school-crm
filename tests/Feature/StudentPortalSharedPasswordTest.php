@@ -6,6 +6,7 @@ use App\Enums\Gender;
 use App\Enums\StudentStatus;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Services\InstituteSettingsService;
 use App\Services\StudentAuthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -60,5 +61,42 @@ class StudentPortalSharedPasswordTest extends TestCase
 
         $this->assertNotNull($loggedIn);
         $this->assertFalse($auth->hasLegacyDobPortalPassword($student->fresh()));
+    }
+
+    public function test_changing_the_school_password_updates_students_still_on_the_old_default(): void
+    {
+        $auth = app(StudentAuthService::class);
+        $oldHash = $auth->hashPortalPassword('Student@2026');
+        Setting::setValue('portal.shared_password_hash', $oldHash, 'portal');
+
+        $onDefault = Student::query()->create([
+            'name' => 'Still Default',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2010-01-01',
+            'gender' => Gender::Male,
+            'mobile' => '9818208001',
+            'status' => StudentStatus::Enrolled,
+            'portal_password' => $oldHash,
+        ]);
+        $ownPassword = Student::query()->create([
+            'name' => 'Own Password',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2010-02-02',
+            'gender' => Gender::Female,
+            'mobile' => '9818208002',
+            'status' => StudentStatus::Enrolled,
+            'portal_password' => $auth->hashPortalPassword('MyOwn@99'),
+        ]);
+
+        app(InstituteSettingsService::class)->save([
+            'portal_shared_password' => '123456789',
+        ]);
+
+        $this->assertNotNull($auth->login('9818208001', '123456789'));
+        $this->assertNull($auth->login('9818208001', 'Student@2026'));
+        $this->assertNotNull($auth->login('9818208002', 'MyOwn@99'));
+        $this->assertNull($auth->login('9818208002', '123456789'));
+        $this->assertNotSame($oldHash, $onDefault->fresh()->portal_password);
+        $this->assertTrue($auth->verifyPortalPassword('MyOwn@99', (string) $ownPassword->fresh()->portal_password));
     }
 }

@@ -224,6 +224,49 @@ class StudentAuthService
         return $this->hasLegacyDobPortalPassword($student);
     }
 
+    /**
+     * Students still on the previous school password, a blank password, or the old date-of-birth password
+     * receive the new school password. A student who chose their own password is left as they are.
+     */
+    public function moveStudentsOntoNewSharedPassword(?string $previousHash, string $newHash): void
+    {
+        $factoryPlain = (string) config('institute.portal_default_password', 'Student@2026');
+
+        Student::query()
+            ->orderBy('id')
+            ->chunkById(200, function ($students) use ($previousHash, $newHash, $factoryPlain): void {
+                foreach ($students as $student) {
+                    if (! $this->shouldReceiveNewSharedPassword($student, $previousHash, $factoryPlain)) {
+                        continue;
+                    }
+
+                    if (filled($student->portal_password) && hash_equals((string) $student->portal_password, $newHash)) {
+                        continue;
+                    }
+
+                    $student->update(['portal_password' => $newHash]);
+                }
+            });
+    }
+
+    private function shouldReceiveNewSharedPassword(Student $student, ?string $previousHash, string $factoryPlain): bool
+    {
+        if (blank($student->portal_password)) {
+            return true;
+        }
+
+        if (filled($previousHash) && hash_equals((string) $student->portal_password, (string) $previousHash)) {
+            return true;
+        }
+
+        if ($this->hasLegacyDobPortalPassword($student)) {
+            return true;
+        }
+
+        return $factoryPlain !== ''
+            && $this->verifyPortalPassword($factoryPlain, (string) $student->portal_password);
+    }
+
     public function verifyStudentPassword(Student $student, string $plain): bool
     {
         if (filled($student->portal_password)

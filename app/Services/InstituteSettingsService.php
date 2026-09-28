@@ -90,10 +90,13 @@ class InstituteSettingsService
         $sharedPlain = trim((string) ($data['portal_shared_password'] ?? ''));
 
         if ($sharedPlain !== '') {
-            Setting::setValue(
-                'portal.shared_password_hash',
-                $this->studentAuth->hashPortalPassword($sharedPlain),
-                'portal',
+            $previousHash = Setting::getValue('portal.shared_password_hash');
+            $newHash = $this->studentAuth->hashPortalPassword($sharedPlain);
+
+            Setting::setValue('portal.shared_password_hash', $newHash, 'portal');
+            $this->studentAuth->moveStudentsOntoNewSharedPassword(
+                filled($previousHash) ? (string) $previousHash : null,
+                $newHash,
             );
         } else {
             $this->studentAuth->sharedPortalPasswordHash();
