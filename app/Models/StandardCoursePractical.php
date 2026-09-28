@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Enums\StandardCoursePracticalKind;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class StandardCourseChapter extends Model
+class StandardCoursePractical extends Model
 {
     protected $fillable = [
         'standard_course_plan_id',
         'name',
+        'kind',
+        'planned_minutes',
         'estimated_marks',
         'sort_order',
     ];
@@ -18,6 +20,8 @@ class StandardCourseChapter extends Model
     protected function casts(): array
     {
         return [
+            'kind' => StandardCoursePracticalKind::class,
+            'planned_minutes' => 'integer',
             'estimated_marks' => 'integer',
             'sort_order' => 'integer',
         ];
@@ -26,15 +30,5 @@ class StandardCourseChapter extends Model
     public function plan(): BelongsTo
     {
         return $this->belongsTo(StandardCoursePlan::class, 'standard_course_plan_id');
-    }
-
-    public function topics(): HasMany
-    {
-        return $this->hasMany(StandardCourseTopic::class)->orderBy('sort_order')->orderBy('id');
-    }
-
-    public function plannedMinutes(): int
-    {
-        return (int) $this->topics->sum('planned_minutes');
     }
 }

@@ -20,6 +20,6 @@ class ListStandardCoursePlans extends ListRecords
 
     public function getSubheading(): string|Htmlable|null
     {
-        return 'The recommended topics for one programme and one subject.';
+        return 'The recommended topics for one programme and one subject. Chapter marks and practicals are optional.';
     }
 }

@@ -8,6 +8,7 @@ use App\Enums\LicenseFeature;
 use App\Enums\LicensePlan;
 use App\Enums\RoleName;
 use App\Enums\StandardCoursePlanStatus;
+use App\Enums\StandardCoursePracticalKind;
 use App\Filament\Resources\StandardCoursePlans\Pages\CreateStandardCoursePlan;
 use App\Models\AcademicSession;
 use App\Models\Course;
@@ -15,6 +16,7 @@ use App\Models\CourseSubject;
 use App\Models\Setting;
 use App\Models\StandardCourseChapter;
 use App\Models\StandardCoursePlan;
+use App\Models\StandardCoursePractical;
 use App\Models\StandardCourseTopic;
 use App\Models\User;
 use App\Services\LicenseService;
@@ -43,7 +45,62 @@ class StandardCoursePlanServiceTest extends TestCase
             ->assertSuccessful()
             ->assertSee('Add chapter')
             ->assertSee('Add topic')
-            ->assertSee('Reference book');
+            ->assertSee('Reference book')
+            ->assertSee('Estimated marks')
+            ->assertSee('Add practical');
+    }
+
+    public function test_a_plan_can_be_ready_without_chapter_marks_or_practicals(): void
+    {
+        $user = User::factory()->create();
+        $plan = $this->makePlan();
+        $chapter = StandardCourseChapter::query()->create([
+            'standard_course_plan_id' => $plan->id,
+            'name' => 'Laws of Motion',
+            'estimated_marks' => null,
+            'sort_order' => 1,
+        ]);
+        StandardCourseTopic::query()->create([
+            'standard_course_chapter_id' => $chapter->id,
+            'name' => 'Newton\'s laws',
+            'planned_minutes' => 140,
+            'dpp_count' => 1,
+            'quiz_count' => 0,
+            'test_count' => 0,
+            'sort_order' => 1,
+        ]);
+
+        app(StandardCoursePlanService::class)->markReady($plan, $user);
+
+        $this->assertSame(StandardCoursePlanStatus::Ready, $plan->refresh()->status);
+        $this->assertNull($chapter->refresh()->estimated_marks);
+        $this->assertSame(0, $plan->practicals()->count());
+    }
+
+    public function test_chapter_marks_and_a_practical_can_be_saved_when_the_school_wants_them(): void
+    {
+        $plan = $this->makePlan();
+        $chapter = StandardCourseChapter::query()->create([
+            'standard_course_plan_id' => $plan->id,
+            'name' => 'Laws of Motion',
+            'estimated_marks' => 10,
+            'sort_order' => 1,
+        ]);
+        StandardCoursePractical::query()->create([
+            'standard_course_plan_id' => $plan->id,
+            'name' => 'Young\'s modulus of a wire',
+            'kind' => StandardCoursePracticalKind::Experiment,
+            'planned_minutes' => 80,
+            'estimated_marks' => null,
+            'sort_order' => 1,
+        ]);
+
+        $this->assertSame(10, $chapter->refresh()->estimated_marks);
+        $saved = $plan->practicals()->first();
+        $this->assertSame('Young\'s modulus of a wire', $saved->name);
+        $this->assertSame(StandardCoursePracticalKind::Experiment, $saved->kind);
+        $this->assertSame(80, $saved->planned_minutes);
+        $this->assertNull($saved->estimated_marks);
     }
 
     public function test_empty_plan_cannot_be_marked_ready(): void

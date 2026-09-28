@@ -58,6 +58,11 @@ class StandardCoursePlan extends Model
         return $this->hasMany(StandardCourseChapter::class)->orderBy('sort_order')->orderBy('id');
     }
 
+    public function practicals(): HasMany
+    {
+        return $this->hasMany(StandardCoursePractical::class)->orderBy('sort_order')->orderBy('id');
+    }
+
     public function topics(): HasManyThrough
     {
         return $this->hasManyThrough(StandardCourseTopic::class, StandardCourseChapter::class);

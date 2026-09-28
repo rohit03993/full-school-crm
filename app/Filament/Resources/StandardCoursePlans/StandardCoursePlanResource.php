@@ -5,6 +5,7 @@ namespace App\Filament\Resources\StandardCoursePlans;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Enums\StandardCoursePlanStatus;
+use App\Enums\StandardCoursePracticalKind;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Resources\StandardCoursePlans\Pages\CreateStandardCoursePlan;
 use App\Filament\Resources\StandardCoursePlans\Pages\EditStandardCoursePlan;
@@ -118,13 +119,22 @@ class StandardCoursePlanResource extends Resource
                             ->collapsible()
                             ->addActionLabel('Add chapter')
                             ->itemLabel(fn (array $state): ?string => filled($state['name'] ?? null) ? $state['name'] : 'New chapter')
+                            ->columns(3)
                             ->schema([
                                 TextInput::make('name')
                                     ->label('Chapter')
                                     ->placeholder('Electrostatics')
                                     ->required()
                                     ->maxLength(255)
-                                    ->columnSpanFull(),
+                                    ->columnSpan(2),
+                                TextInput::make('estimated_marks')
+                                    ->label('Estimated marks')
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->maxValue(100)
+                                    ->nullable()
+                                    ->placeholder('Optional')
+                                    ->helperText('Leave blank when this chapter has no mark estimate.'),
                                 Repeater::make('topics')
                                     ->label('Topics')
                                     ->relationship()
@@ -178,6 +188,55 @@ class StandardCoursePlanResource extends Resource
                             ])
                             ->columnSpanFull(),
                     ]),
+                Section::make('Practicals')
+                    ->description('Schools can list experiments and activities. Minutes and marks can stay blank. A plan can still be marked Ready from chapters and topics alone.')
+                    ->icon(Heroicon::OutlinedBeaker)
+                    ->columnSpanFull()
+                    ->schema([
+                        Repeater::make('practicals')
+                            ->hiddenLabel()
+                            ->relationship()
+                            ->orderColumn('sort_order')
+                            ->defaultItems(0)
+                            ->compact()
+                            ->addActionLabel('Add practical')
+                            ->table([
+                                TableColumn::make('Practical')->markAsRequired()->width('46%'),
+                                TableColumn::make('Type')->width('18%'),
+                                TableColumn::make('Minutes')->width('18%'),
+                                TableColumn::make('Marks')->width('18%'),
+                            ])
+                            ->schema([
+                                TextInput::make('name')
+                                    ->hiddenLabel()
+                                    ->placeholder('Young\'s modulus of a wire')
+                                    ->required()
+                                    ->maxLength(255),
+                                Select::make('kind')
+                                    ->hiddenLabel()
+                                    ->options(collect(StandardCoursePracticalKind::cases())->mapWithKeys(
+                                        fn (StandardCoursePracticalKind $kind): array => [$kind->value => $kind->label()],
+                                    ))
+                                    ->default(StandardCoursePracticalKind::Experiment->value)
+                                    ->required()
+                                    ->native(false),
+                                TextInput::make('planned_minutes')
+                                    ->hiddenLabel()
+                                    ->numeric()
+                                    ->minValue(1)
+                                    ->nullable()
+                                    ->suffix('min')
+                                    ->placeholder('Optional'),
+                                TextInput::make('estimated_marks')
+                                    ->hiddenLabel()
+                                    ->numeric()
+                                    ->minValue(0)
+                                    ->maxValue(100)
+                                    ->nullable()
+                                    ->placeholder('Optional'),
+                            ])
+                            ->columnSpanFull(),
+                    ]),
             ]);
     }
 
@@ -202,6 +261,9 @@ class StandardCoursePlanResource extends Resource
                 TextColumn::make('topics_count')
                     ->counts('topics')
                     ->label('Topics'),
+                TextColumn::make('practicals_count')
+                    ->counts('practicals')
+                    ->label('Practicals'),
                 TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn (StandardCoursePlanStatus $state): string => $state->label()),
