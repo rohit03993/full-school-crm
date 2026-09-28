@@ -19,10 +19,13 @@ use App\Models\Course;
 use App\Models\Enquiry;
 use App\Models\Enrollment;
 use App\Models\HomeworkAssignment;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\HomeworkAssignmentService;
+use App\Services\SiteImageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -97,7 +100,40 @@ class HomeworkAssignmentServiceTest extends TestCase
             ->assertOk()
             ->assertSee('THIS IS CHEMISTRY HOMEWORK')
             ->assertSee('22 Sep 2026')
-            ->assertDontSee('25 Sep 2026');
+            ->assertDontSee('25 Sep 2026')
+            ->assertSee('images/homework-footer.png', false);
+    }
+
+    public function test_public_homework_page_uses_the_picture_the_admin_saved(): void
+    {
+        Storage::fake(SiteImageService::DISK);
+        Storage::disk(SiteImageService::DISK)->put('crm/branding/school-banner.png', 'banner');
+        Setting::setValue('crm.homework_footer_image', 'crm/branding/school-banner.png', 'crm');
+        Setting::setValue('crm.homework_footer_enabled', '1', 'crm');
+
+        [, $batch, $staff] = $this->createStudentInBatch();
+
+        $assignment = HomeworkAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'created_by_user_id' => $staff->id,
+            'title' => 'Picture from admin',
+            'description' => 'Short letter.',
+            'homework_date' => '2026-09-22',
+            'content_type' => HomeworkContentType::Text,
+            'published_at' => '2026-09-25 18:00:00',
+        ]);
+
+        $this->get($assignment->publicUrl())
+            ->assertOk()
+            ->assertSee('crm/branding/school-banner.png', false)
+            ->assertDontSee('images/homework-footer.png', false);
+
+        Setting::setValue('crm.homework_footer_enabled', '0', 'crm');
+
+        $this->get($assignment->publicUrl())
+            ->assertOk()
+            ->assertDontSee('crm/branding/school-banner.png', false)
+            ->assertDontSee('images/homework-footer.png', false);
     }
 
     public function test_old_long_public_token_still_opens(): void

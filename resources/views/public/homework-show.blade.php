@@ -7,8 +7,12 @@
     <title>{{ $homework->title }} — {{ $instituteName }}</title>
     <style>
         * { box-sizing: border-box; }
+        html, body { height: 100%; }
         body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: #f8fafc; color: #0f172a; }
-        .wrap { max-width: 52rem; margin: 0 auto; padding: 1.25rem 1rem 2.5rem; }
+        .page { min-height: 100vh; display: flex; flex-direction: column; }
+        .wrap { max-width: 52rem; margin: 0 auto; padding: 1.25rem 1rem 1.5rem; width: 100%; }
+        .partner { margin-top: auto; margin-left: auto; margin-right: auto; width: 100%; max-width: 52rem; display: flex; justify-content: center; align-items: flex-end; padding: 0 1rem 1.25rem; }
+        .partner[hidden] { display: none; }
         .brand { font-size: 0.8rem; font-weight: 600; color: #64748b; letter-spacing: 0.02em; text-transform: uppercase; }
         h1 { margin: 0.35rem 0 0.25rem; font-size: 1.5rem; line-height: 1.25; }
         .meta { margin: 0; color: #64748b; font-size: 0.9rem; }
@@ -20,15 +24,17 @@
         a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; border-radius: 0.75rem; padding: 0.65rem 1rem; font-size: 0.9rem; font-weight: 600; }
         a.btn-primary { background: #ea580c; color: #fff; }
         a.btn-secondary { background: #fff; color: #0f172a; border: 1px solid #cbd5e1; }
-        iframe, img { width: 100%; margin-top: 0.9rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; background: #f1f5f9; }
+        iframe, .card img { width: 100%; margin-top: 0.9rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; background: #f1f5f9; }
         iframe { height: 65vh; }
-        img { max-height: 70vh; object-fit: contain; display: block; }
+        .card img { max-height: 70vh; object-fit: contain; display: block; }
+        .partner img { width: auto; max-width: min(40rem, 100%); height: auto; margin: 0; border: 0; border-radius: 0; background: transparent; display: block; object-fit: contain; }
         .hint { margin: 0.75rem 0 0; font-size: 0.8rem; color: #64748b; text-align: center; }
         .hint a { color: #c2410c; font-weight: 600; }
     </style>
 </head>
 <body>
-    <div class="wrap">
+    <div class="page">
+    <div class="wrap" id="homework-sheet">
         <p class="brand">{{ $instituteName }}</p>
         <h1>{{ $homework->title }}</h1>
         <p class="meta">
@@ -74,5 +80,50 @@
             </section>
         @endif
     </div>
+    @if (filled($footerImageUrl))
+        <div class="partner" id="homework-partner" hidden>
+            <img src="{{ $footerImageUrl }}" alt="{{ $instituteName }}">
+        </div>
+    @endif
+    </div>
+    @if (filled($footerImageUrl))
+    <script>
+        (function () {
+            var sheet = document.getElementById('homework-sheet');
+            var partner = document.getElementById('homework-partner');
+            var picture = partner.querySelector('img');
+            var smallestGap = 110;
+
+            function placePicture() {
+                partner.hidden = true;
+                picture.style.maxHeight = '';
+
+                var used = sheet.getBoundingClientRect().height;
+                var gap = window.innerHeight - used;
+
+                if (gap < smallestGap) {
+                    return;
+                }
+
+                var height = Math.min(gap - 36, 160);
+
+                if (height < 72) {
+                    return;
+                }
+
+                picture.style.maxHeight = height + 'px';
+                partner.hidden = false;
+            }
+
+            if (picture.complete) {
+                placePicture();
+            } else {
+                picture.addEventListener('load', placePicture);
+            }
+
+            window.addEventListener('resize', placePicture);
+        })();
+    </script>
+    @endif
 </body>
 </html>

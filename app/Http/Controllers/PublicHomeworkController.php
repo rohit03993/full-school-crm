@@ -19,6 +19,7 @@ class PublicHomeworkController extends Controller
         return view('public.homework-show', [
             'homework' => $homework,
             'instituteName' => InstituteSettings::brandName(),
+            'footerImageUrl' => InstituteSettings::homeworkFooterImageUrl(),
         ]);
     }
 

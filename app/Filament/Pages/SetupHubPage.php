@@ -66,7 +66,7 @@ class SetupHubPage extends Page
         if (ManageInstituteSettings::canAccess()) {
             $cards[] = [
                 'title' => CrmMenuLabels::instituteSettings(),
-                'description' => 'Name, logo, address, and PDF header/footer.',
+                'description' => 'Name, logo, address, PDFs, and the picture on the student homework link.',
                 'url' => ManageInstituteSettings::getUrl(),
             ];
         }

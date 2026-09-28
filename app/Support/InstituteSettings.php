@@ -21,6 +21,27 @@ class InstituteSettings
         return self::forDocuments()['name'];
     }
 
+    public static function homeworkFooterImageUrl(): ?string
+    {
+        $enabled = filter_var(Setting::getValue('crm.homework_footer_enabled', '1'), FILTER_VALIDATE_BOOLEAN);
+
+        if (! $enabled) {
+            return null;
+        }
+
+        $path = Setting::getValue('crm.homework_footer_image');
+
+        if (filled($path) && SiteImageService::existsOnDisk($path)) {
+            return SiteImageService::versionedUrl($path);
+        }
+
+        if (is_file(public_path('images/homework-footer.png'))) {
+            return asset('images/homework-footer.png');
+        }
+
+        return null;
+    }
+
     public static function numberPrefix(): string
     {
         $raw = Setting::getValue('crm.number_prefix');

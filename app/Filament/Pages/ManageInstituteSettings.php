@@ -148,6 +148,32 @@ class ManageInstituteSettings extends Page
                         ->helperText('Highlight behind roll / enrollment number.'),
                 ])
                 ->columns(2),
+            Section::make('Student homework link')
+                ->description('The picture sits in the empty space under a short homework letter. A long letter or a PDF fills the screen, so the picture stays hidden.')
+                ->schema([
+                    Toggle::make('homework_footer_enabled')
+                        ->label('Show a picture under the homework letter')
+                        ->default(true)
+                        ->columnSpanFull(),
+                    FileUpload::make('homework_footer_image')
+                        ->label('Homework link picture')
+                        ->image()
+                        ->maxSize(SiteImageService::MAX_KILOBYTES)
+                        ->imageEditor()
+                        ->imageEditorAspectRatioOptions([
+                            null => 'Free crop',
+                            '16:9' => '16:9',
+                            '4:3' => '4:3',
+                            '1:1' => 'Square',
+                        ])
+                        ->disk(SiteImageService::DISK)
+                        ->directory('crm/branding')
+                        ->visibility('public')
+                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+                        ->helperText('Upload a wide picture to replace the current one. Leave this empty to keep the original picture. Max 350 KB.')
+                        ->columnSpanFull(),
+                ])
+                ->columns(2),
             Section::make('Marksheet & report card PDF')
                 ->description('Controls fields shown on exam marksheets and consolidated report cards.')
                 ->schema([
@@ -220,7 +246,7 @@ class ManageInstituteSettings extends Page
 
         Notification::make()
             ->title('Institute settings saved')
-            ->body('Receipts, ID cards, and PDF exports will use the updated branding.')
+            ->body('Receipts, ID cards, PDFs, and the student homework link will use the updated branding.')
             ->success()
             ->send();
     }

@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Models\Setting;
 use App\Enums\NumberSequenceType;
 use App\Services\InstituteSettingsService;
+use App\Services\SiteImageService;
 use App\Support\InstituteSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class InstituteSettingsTest extends TestCase
@@ -45,5 +47,33 @@ class InstituteSettingsTest extends TestCase
 
         $this->assertSame('DEMO', InstituteSettings::numberPrefix());
         $this->assertSame('DEMO-ENQ', NumberSequenceType::Enquiry->prefix());
+    }
+
+    public function test_admin_can_replace_the_homework_link_picture(): void
+    {
+        Storage::fake(SiteImageService::DISK);
+        Storage::disk(SiteImageService::DISK)->put('crm/branding/school-banner.png', 'banner');
+
+        app(InstituteSettingsService::class)->save([
+            'receipt_logo' => null,
+            'homework_footer_image' => 'crm/branding/school-banner.png',
+            'homework_footer_enabled' => true,
+        ]);
+
+        $url = InstituteSettings::homeworkFooterImageUrl();
+
+        $this->assertNotNull($url);
+        $this->assertStringContainsString('crm/branding/school-banner.png', $url);
+    }
+
+    public function test_admin_can_hide_the_homework_link_picture(): void
+    {
+        app(InstituteSettingsService::class)->save([
+            'receipt_logo' => null,
+            'homework_footer_image' => null,
+            'homework_footer_enabled' => false,
+        ]);
+
+        $this->assertNull(InstituteSettings::homeworkFooterImageUrl());
     }
 }

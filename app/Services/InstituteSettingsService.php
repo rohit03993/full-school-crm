@@ -40,12 +40,20 @@ class InstituteSettingsService
             'marksheet_division_first' => (float) $g('marksheet.division_first', 55),
             'marksheet_division_second' => (float) $g('marksheet.division_second', 48),
             'marksheet_division_pass' => (float) $g('marksheet.division_pass', 40),
+            'homework_footer_image' => $g('crm.homework_footer_image'),
+            'homework_footer_enabled' => filter_var($g('crm.homework_footer_enabled', '1'), FILTER_VALIDATE_BOOLEAN),
         ];
     }
 
     public function save(array $data): void
     {
         $this->persistImage('crm.receipt_logo', $data['receipt_logo'] ?? null);
+        $this->persistImage('crm.homework_footer_image', $data['homework_footer_image'] ?? null);
+        Setting::setValue(
+            'crm.homework_footer_enabled',
+            ($data['homework_footer_enabled'] ?? true) ? '1' : '0',
+            'crm',
+        );
 
         Setting::setValue('crm.receipt_header', $data['receipt_header'] ?? '', 'crm');
         Setting::setValue('crm.receipt_footer', $data['receipt_footer'] ?? '', 'crm');
