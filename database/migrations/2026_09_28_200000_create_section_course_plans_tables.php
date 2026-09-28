@@ -8,10 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('section_course_plans')) {
-            return;
-        }
-
+        if (! Schema::hasTable('section_course_plans')) {
         Schema::create('section_course_plans', function (Blueprint $table) {
             $table->id();
             $table->foreignId('standard_course_plan_id')->nullable()->constrained()->nullOnDelete();
@@ -31,9 +28,11 @@ return new class extends Migration
             $table->foreignId('copied_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->unique(['batch_id', 'course_subject_id']);
+            $table->unique(['batch_id', 'course_subject_id'], 'section_plan_batch_subject_unique');
         });
+        }
 
+        if (! Schema::hasTable('section_course_chapters')) {
         Schema::create('section_course_chapters', function (Blueprint $table) {
             $table->id();
             $table->foreignId('section_course_plan_id')->constrained()->cascadeOnDelete();
@@ -42,7 +41,9 @@ return new class extends Migration
             $table->unsignedSmallInteger('sort_order')->default(0);
             $table->timestamps();
         });
+        }
 
+        if (! Schema::hasTable('section_course_topics')) {
         Schema::create('section_course_topics', function (Blueprint $table) {
             $table->id();
             $table->foreignId('section_course_chapter_id')->constrained()->cascadeOnDelete();
@@ -55,7 +56,9 @@ return new class extends Migration
             $table->unsignedSmallInteger('sort_order')->default(0);
             $table->timestamps();
         });
+        }
 
+        if (! Schema::hasTable('section_course_practicals')) {
         Schema::create('section_course_practicals', function (Blueprint $table) {
             $table->id();
             $table->foreignId('section_course_plan_id')->constrained()->cascadeOnDelete();
@@ -66,7 +69,9 @@ return new class extends Migration
             $table->unsignedSmallInteger('sort_order')->default(0);
             $table->timestamps();
         });
+        }
 
+        if (! Schema::hasTable('section_course_plan_versions')) {
         Schema::create('section_course_plan_versions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('section_course_plan_id')->constrained()->cascadeOnDelete();
@@ -79,8 +84,27 @@ return new class extends Migration
             $table->timestamp('finalized_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['section_course_plan_id', 'version']);
+            $table->unique(['section_course_plan_id', 'version'], 'section_plan_version_unique');
         });
+        } elseif (! $this->hasUniqueColumns('section_course_plan_versions', ['section_course_plan_id', 'version'])) {
+            Schema::table('section_course_plan_versions', function (Blueprint $table) {
+                $table->unique(['section_course_plan_id', 'version'], 'section_plan_version_unique');
+            });
+        }
+    }
+
+    /**
+     * @param  list<string>  $columns
+     */
+    private function hasUniqueColumns(string $table, array $columns): bool
+    {
+        foreach (Schema::getIndexes($table) as $index) {
+            if (($index['unique'] ?? false) && ($index['columns'] ?? []) === $columns) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function down(): void
