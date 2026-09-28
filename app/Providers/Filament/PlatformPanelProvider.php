@@ -27,6 +27,7 @@ class PlatformPanelProvider extends PanelProvider
         return $panel
             ->id('platform')
             ->path((string) config('license.platform_panel_path', '_vendor-console'))
+            ->authGuard('platform')
             ->login(PlatformLogin::class)
             ->brandName('Vendor Console')
             ->colors([

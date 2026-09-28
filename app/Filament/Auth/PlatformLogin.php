@@ -3,6 +3,7 @@
 namespace App\Filament\Auth;
 
 use Filament\Auth\Pages\Login as BaseLogin;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Illuminate\Validation\ValidationException;
@@ -38,10 +39,10 @@ class PlatformLogin extends Login
     {
         $response = BaseLogin::authenticate();
 
-        $user = auth()->user();
+        $user = Filament::auth()->user();
 
         if ($user && ! $user->isPlatformOperator()) {
-            auth()->logout();
+            Filament::auth()->logout();
 
             throw ValidationException::withMessages([
                 'data.login' => 'This console is restricted to the software vendor.',

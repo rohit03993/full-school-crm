@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RoleName;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\MetaWhatsAppService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class VendorConsoleLoginTest extends TestCase
@@ -35,5 +38,25 @@ class VendorConsoleLoginTest extends TestCase
             ->assertOk()
             ->assertSee('Vendor sign in with mobile and password.', false)
             ->assertSee('Password', false);
+    }
+
+    public function test_school_admin_session_does_not_block_the_vendor_login(): void
+    {
+        Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);
+
+        $admin = User::factory()->create([
+            'is_active' => true,
+            'is_platform_operator' => false,
+        ]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+
+        $this->actingAs($admin)
+            ->get('/_vendor-console')
+            ->assertRedirect('/_vendor-console/login');
+
+        $this->actingAs($admin)
+            ->get('/_vendor-console/login')
+            ->assertOk()
+            ->assertSee('Vendor sign in with mobile and password.', false);
     }
 }
