@@ -153,7 +153,27 @@ class SectionCoursePlanServiceTest extends TestCase
             ->assertSee('Submit')
             ->assertSee('Electrostatics')
             ->assertSee('Lecture duration')
-            ->assertDontSee('Finalize');
+            ->assertDontSee('Finalize')
+            ->assertActionHidden('delete');
+    }
+
+    public function test_delete_stays_hidden_after_the_teacher_submits(): void
+    {
+        [$plan, $batch, $teacher, $head] = $this->readyPlanOnSection();
+        $service = app(SectionCoursePlanService::class);
+        $sectionPlan = $service->copyFromStandard($plan, $batch, $head);
+        $service->submit($sectionPlan->refresh(), $teacher);
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->actingAs($teacher);
+        Livewire::test(EditSectionCoursePlan::class, ['record' => $sectionPlan->getRouteKey()])
+            ->assertActionHidden('delete');
+
+        $this->actingAs($head);
+        Livewire::test(EditSectionCoursePlan::class, ['record' => $sectionPlan->getRouteKey()])
+            ->assertActionHidden('delete')
+            ->assertSee('Finalize');
     }
 
     public function test_student_profile_and_portal_hide_minutes(): void

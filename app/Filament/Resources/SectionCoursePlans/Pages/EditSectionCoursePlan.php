@@ -117,7 +117,8 @@ class EditSectionCoursePlan extends EditRecord
                         ->success()
                         ->send();
                 }),
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->visible(fn (): bool => SectionCoursePlanResource::canDelete($this->sectionPlan())),
         ];
     }
 
