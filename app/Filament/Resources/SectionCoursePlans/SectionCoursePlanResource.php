@@ -18,6 +18,7 @@ use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
@@ -33,6 +34,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
 use UnitEnum;
 
 class SectionCoursePlanResource extends Resource
@@ -91,6 +93,23 @@ class SectionCoursePlanResource extends Resource
         return $schema
             ->columns(1)
             ->components([
+                Placeholder::make('review_note')
+                    ->hiddenLabel()
+                    ->visible(function (?SectionCoursePlan $record): bool {
+                        return $record instanceof SectionCoursePlan
+                            && $record->status === SectionCoursePlanStatus::SentBack
+                            && filled($record->review_comment);
+                    })
+                    ->content(function (?SectionCoursePlan $record): HtmlString {
+                        $comment = e((string) $record?->review_comment);
+
+                        return new HtmlString(
+                            '<div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">'
+                            .'<p class="font-semibold">The academic head sent this back</p>'
+                            .'<p class="mt-1 whitespace-pre-line">'.$comment.'</p>'
+                            .'</div>'
+                        );
+                    }),
                 Section::make('Section')
                     ->description('This copy belongs to one section and one subject. The year and programme stay as they were on the course plan.')
                     ->icon(Heroicon::OutlinedAcademicCap)
@@ -342,7 +361,28 @@ class SectionCoursePlanResource extends Resource
                     ->state(fn (SectionCoursePlan $record): string => $record->subjectTeacherName()),
                 TextColumn::make('status')
                     ->badge()
-                    ->formatStateUsing(fn (SectionCoursePlanStatus $state): string => $state->label()),
+                    ->formatStateUsing(function (SectionCoursePlanStatus|string|null $state): string {
+                        $status = $state instanceof SectionCoursePlanStatus
+                            ? $state
+                            : SectionCoursePlanStatus::tryFrom((string) $state);
+
+                        return $status?->label() ?? '—';
+                    })
+                    ->color(function (SectionCoursePlanStatus|string|null $state): string {
+                        $status = $state instanceof SectionCoursePlanStatus
+                            ? $state
+                            : SectionCoursePlanStatus::tryFrom((string) $state);
+
+                        return match ($status) {
+                            SectionCoursePlanStatus::Submitted => 'info',
+                            SectionCoursePlanStatus::SentBack => 'warning',
+                            SectionCoursePlanStatus::Final => 'success',
+                            default => 'gray',
+                        };
+                    })
+                    ->description(fn (SectionCoursePlan $record): ?string => filled($record->review_comment)
+                        ? (string) $record->review_comment
+                        : null),
                 TextColumn::make('version')
                     ->label('Version')
                     ->formatStateUsing(fn ($state): string => (int) $state > 0 ? (string) $state : '—'),

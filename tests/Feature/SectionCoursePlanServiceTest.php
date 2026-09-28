@@ -102,6 +102,17 @@ class SectionCoursePlanServiceTest extends TestCase
         $service->sendBack($sectionPlan->refresh(), $head, 'Add one more topic.');
         $this->assertSame(SectionCoursePlanStatus::SentBack, $sectionPlan->refresh()->status);
 
+        $this->actingAs($teacher);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(EditSectionCoursePlan::class, ['record' => $sectionPlan->getRouteKey()])
+            ->assertSee('The academic head sent this back')
+            ->assertSee('Add one more topic.');
+
+        Livewire::test(ListSectionCoursePlans::class)
+            ->assertSee('Sent back')
+            ->assertSee('Add one more topic.');
+
         $service->submit($sectionPlan->refresh(), $teacher);
         $service->finalize($sectionPlan->refresh(), $head);
 
