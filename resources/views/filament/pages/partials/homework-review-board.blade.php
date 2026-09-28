@@ -141,6 +141,15 @@
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex flex-wrap justify-end gap-2">
+                                    @if (in_array($row['status_key'], ['submitted', 'approved'], true))
+                                        <button
+                                            type="button"
+                                            wire:click="startAdd({{ (int) $batchId }}, {{ (int) $row['course_subject_id'] }})"
+                                            class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 dark:border-white/10 dark:text-gray-100 dark:hover:bg-white/5"
+                                        >
+                                            Edit
+                                        </button>
+                                    @endif
                                     @if ($row['status_key'] === 'submitted')
                                         <button
                                             type="button"

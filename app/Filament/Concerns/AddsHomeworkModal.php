@@ -2,6 +2,7 @@
 
 namespace App\Filament\Concerns;
 
+use App\Enums\HomeworkAssignmentStatus;
 use App\Models\Batch;
 use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
@@ -207,9 +208,13 @@ trait AddsHomeworkModal
         $dateLabel = Carbon::parse($this->dateString())->format('d M Y');
 
         if ($this->homeworkModalSavesAsAdmin()) {
+            $stillWaiting = $assignment->status === HomeworkAssignmentStatus::Submitted;
+
             Notification::make()
-                ->title('Homework saved')
-                ->body($subjectLabel.' is ready to send for '.$dateLabel.'.')
+                ->title($stillWaiting ? 'Homework updated' : 'Homework saved')
+                ->body($stillWaiting
+                    ? $subjectLabel.' is still waiting for approval on '.$dateLabel.'.'
+                    : $subjectLabel.' is ready to send for '.$dateLabel.'.')
                 ->success()
                 ->send();
 

@@ -173,6 +173,7 @@ class HomeworkReviewPage extends Page
 
                     return [
                         'ready' => (bool) $ready,
+                        'batchId' => $batchId,
                         'board' => $board,
                         'dateLabel' => Carbon::parse($date)->format('d M Y'),
                         'lastCombinedSendResult' => $this->lastCombinedSendResult,

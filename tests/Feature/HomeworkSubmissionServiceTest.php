@@ -179,6 +179,62 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame($data['admin']->id, $assignment->approved_by_user_id);
     }
 
+    public function test_admin_edit_keeps_a_teacher_submission_waiting(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+
+        $submitted = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Exercise 1',
+        ]);
+
+        $updated = $service->submit($data['admin'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra corrected',
+            'description' => 'Exercise 1 and 2',
+        ], asAdmin: true);
+
+        $this->assertSame($submitted->id, $updated->id);
+        $this->assertSame(HomeworkAssignmentStatus::Submitted, $updated->status);
+        $this->assertSame('Algebra corrected', $updated->title);
+        $this->assertSame('Exercise 1 and 2', $updated->description);
+        $this->assertNull($updated->approved_at);
+        $this->assertSame($data['mathTeacher']->id, $updated->submitted_by_user_id);
+    }
+
+    public function test_admin_edit_of_approved_homework_stays_ready_to_send(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+
+        $submitted = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Exercise 1',
+        ]);
+        $service->approve($data['admin'], (int) $submitted->id);
+
+        $updated = $service->submit($data['admin'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Exercise 1 revised',
+        ], asAdmin: true);
+
+        $this->assertSame(HomeworkAssignmentStatus::Approved, $updated->status);
+        $this->assertSame('Exercise 1 revised', $updated->description);
+        $this->assertSame($data['admin']->id, $updated->approved_by_user_id);
+    }
+
     public function test_academic_coordinator_uses_the_same_review_desk_without_class_assignment(): void
     {
         $data = $this->seedClass();

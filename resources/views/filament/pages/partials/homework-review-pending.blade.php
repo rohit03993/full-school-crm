@@ -234,6 +234,15 @@
                                                                     Open homework
                                                                 </a>
                                                             @endif
+                                                            @if (in_array($item['status_key'], ['submitted', 'approved'], true) && $item['assignment_id'])
+                                                                <button
+                                                                    type="button"
+                                                                    wire:click="startAdd({{ (int) $batchId }}, {{ (int) $item['course_subject_id'] }})"
+                                                                    class="text-xs font-semibold text-primary-700 hover:underline dark:text-primary-300"
+                                                                >
+                                                                    Edit
+                                                                </button>
+                                                            @endif
                                                             @if ($item['status_key'] === 'submitted' && $item['assignment_id'])
                                                                 <button
                                                                     type="button"

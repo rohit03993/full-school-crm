@@ -204,7 +204,14 @@ class HomeworkSubmissionService
                 : HomeworkContentType::Pdf;
         }
 
-        $status = $asAdmin ? HomeworkAssignmentStatus::Approved : HomeworkAssignmentStatus::Submitted;
+        $preserveReviewStatus = $asAdmin && $existing && in_array($existing->status, [
+            HomeworkAssignmentStatus::Submitted,
+            HomeworkAssignmentStatus::Approved,
+        ], true);
+
+        $status = $preserveReviewStatus
+            ? $existing->status
+            : ($asAdmin ? HomeworkAssignmentStatus::Approved : HomeworkAssignmentStatus::Submitted);
 
         $attributes = [
             'batch_id' => $batchId,
@@ -226,7 +233,7 @@ class HomeworkSubmissionService
                 // A teacher re-submitting after approval sends it back for review.
                 $existing->approved_by_user_id = null;
                 $existing->approved_at = null;
-            } else {
+            } elseif (! $preserveReviewStatus) {
                 $existing->approved_by_user_id = $user->id;
                 $existing->approved_at = now();
                 $existing->submitted_by_user_id ??= $user->id;
