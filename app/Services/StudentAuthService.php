@@ -225,46 +225,62 @@ class StudentAuthService
     }
 
     /**
-     * Students still on the previous school password, a blank password, or the old date-of-birth password
-     * receive the new school password. A student who chose their own password is left as they are.
+     * Students still on the previous school password, a blank password, or the original
+     * Student@2026 password receive the new school password. A student who chose their own password is left as they are.
+     * Old date-of-birth passwords are updated when that student next signs in, so this save stays quick.
      */
     public function moveStudentsOntoNewSharedPassword(?string $previousHash, string $newHash): void
     {
-        $factoryPlain = (string) config('institute.portal_default_password', 'Student@2026');
-
         Student::query()
-            ->orderBy('id')
-            ->chunkById(200, function ($students) use ($previousHash, $newHash, $factoryPlain): void {
-                foreach ($students as $student) {
-                    if (! $this->shouldReceiveNewSharedPassword($student, $previousHash, $factoryPlain)) {
-                        continue;
-                    }
+            ->where(function ($query): void {
+                $query->whereNull('portal_password')
+                    ->orWhere('portal_password', '');
+            })
+            ->update(['portal_password' => $newHash]);
 
-                    if (filled($student->portal_password) && hash_equals((string) $student->portal_password, $newHash)) {
-                        continue;
-                    }
-
-                    $student->update(['portal_password' => $newHash]);
-                }
-            });
-    }
-
-    private function shouldReceiveNewSharedPassword(Student $student, ?string $previousHash, string $factoryPlain): bool
-    {
-        if (blank($student->portal_password)) {
-            return true;
+        if (filled($previousHash)) {
+            Student::query()
+                ->where('portal_password', $previousHash)
+                ->update(['portal_password' => $newHash]);
         }
 
-        if (filled($previousHash) && hash_equals((string) $student->portal_password, (string) $previousHash)) {
-            return true;
+        $factoryPlain = $this->defaultPortalPasswordPlain();
+
+        if ($factoryPlain === '') {
+            return;
         }
 
-        if ($this->hasLegacyDobPortalPassword($student)) {
-            return true;
+        $groups = Student::query()
+            ->select('portal_password')
+            ->selectRaw('count(*) as student_count')
+            ->whereNotNull('portal_password')
+            ->where('portal_password', '!=', '')
+            ->where('portal_password', '!=', $newHash)
+            ->groupBy('portal_password')
+            ->get();
+
+        $sharedHashes = $groups->where('student_count', '>', 1)->pluck('portal_password');
+        $singleHashes = $groups->where('student_count', 1)->pluck('portal_password');
+
+        if ($singleHashes->count() <= 25) {
+            $sharedHashes = $sharedHashes->merge($singleHashes);
         }
 
-        return $factoryPlain !== ''
-            && $this->verifyPortalPassword($factoryPlain, (string) $student->portal_password);
+        foreach ($sharedHashes as $hash) {
+            try {
+                $matchesFactory = $this->verifyPortalPassword($factoryPlain, (string) $hash);
+            } catch (\Throwable) {
+                continue;
+            }
+
+            if (! $matchesFactory) {
+                continue;
+            }
+
+            Student::query()
+                ->where('portal_password', $hash)
+                ->update(['portal_password' => $newHash]);
+        }
     }
 
     public function verifyStudentPassword(Student $student, string $plain): bool

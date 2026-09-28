@@ -99,4 +99,42 @@ class StudentPortalSharedPasswordTest extends TestCase
         $this->assertNotSame($oldHash, $onDefault->fresh()->portal_password);
         $this->assertTrue($auth->verifyPortalPassword('MyOwn@99', (string) $ownPassword->fresh()->portal_password));
     }
+
+    public function test_a_student_still_on_student_2026_gets_the_new_password_after_the_setting_was_already_saved(): void
+    {
+        $auth = app(StudentAuthService::class);
+        Setting::setValue(
+            'portal.shared_password_hash',
+            $auth->hashPortalPassword('123456789'),
+            'portal',
+        );
+
+        Student::query()->create([
+            'name' => 'Still Old Default',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2010-03-03',
+            'gender' => Gender::Male,
+            'mobile' => '9818208001',
+            'status' => StudentStatus::Enrolled,
+            'portal_password' => $auth->hashPortalPassword('Student@2026'),
+        ]);
+        Student::query()->create([
+            'name' => 'Own Password',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2010-04-04',
+            'gender' => Gender::Female,
+            'mobile' => '9818208002',
+            'status' => StudentStatus::Enrolled,
+            'portal_password' => $auth->hashPortalPassword('MyOwn@99'),
+        ]);
+
+        app(InstituteSettingsService::class)->save([
+            'portal_shared_password' => '123456789',
+        ]);
+
+        $this->assertNotNull($auth->login('9818208001', '123456789'));
+        $this->assertNull($auth->login('9818208001', 'Student@2026'));
+        $this->assertNotNull($auth->login('9818208002', 'MyOwn@99'));
+        $this->assertNull($auth->login('9818208002', '123456789'));
+    }
 }
