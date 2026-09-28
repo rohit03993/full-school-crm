@@ -18,6 +18,7 @@ use App\Models\StandardCoursePlan;
 use App\Support\CrmNavigation;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
@@ -108,17 +109,94 @@ class StandardCoursePlanResource extends Resource
                             ->default(StandardCoursePlanStatus::Draft->value),
                     ]),
                 Section::make('Chapters and topics')
-                    ->description('Type the chapter name, then add each topic on one line. Minutes are teaching time. DPP, quiz, and test are counts. Drag a row to change the order.')
+                    ->description('Set the lecture length once for this subject. 60 minutes is 1 day. Each topic then shows how many days it needs. DPP, Quiz/PYQs, and test are counts.')
                     ->icon(Heroicon::OutlinedBookOpen)
                     ->columnSpanFull()
                     ->schema([
+                        TextInput::make('lecture_minutes')
+                            ->label('Lecture duration')
+                            ->helperText('Asked once for this subject. 60 minutes counts as 1 day. A topic of 160 minutes then shows as 3 days.')
+                            ->numeric()
+                            ->required()
+                            ->default(60)
+                            ->minValue(1)
+                            ->maxValue(300)
+                            ->suffix('min')
+                            ->live()
+                            ->afterStateUpdated(function ($state, Get $get, Set $set): void {
+                                $lecture = max(1, (int) $state);
+
+                                foreach ($get('chapters') ?? [] as $chapterKey => $chapter) {
+                                    if (! is_array($chapter)) {
+                                        continue;
+                                    }
+
+                                    foreach ($chapter['topics'] ?? [] as $topicKey => $topic) {
+                                        if (! is_array($topic)) {
+                                            continue;
+                                        }
+
+                                        $minutes = (int) ($topic['planned_minutes'] ?? 0);
+
+                                        if ($minutes > 0) {
+                                            $set("chapters.{$chapterKey}.topics.{$topicKey}.planned_days", StandardCoursePlan::teachingDays($minutes, $lecture));
+                                        }
+                                    }
+                                }
+                            }),
+                        Placeholder::make('plan_teaching_days')
+                            ->label('Total teaching days')
+                            ->content(function (Get $get): string {
+                                $lecture = max(1, (int) ($get('lecture_minutes') ?: 60));
+                                $minutes = 0;
+
+                                foreach ($get('chapters') ?? [] as $chapter) {
+                                    if (! is_array($chapter)) {
+                                        continue;
+                                    }
+
+                                    foreach ($chapter['topics'] ?? [] as $topic) {
+                                        if (is_array($topic)) {
+                                            $minutes += (int) ($topic['planned_minutes'] ?? 0);
+                                        }
+                                    }
+                                }
+
+                                $days = StandardCoursePlan::teachingDays($minutes, $lecture);
+
+                                return $days.' '.($days === 1 ? 'day' : 'days');
+                            }),
                         Repeater::make('chapters')
                             ->hiddenLabel()
                             ->relationship()
                             ->orderColumn('sort_order')
                             ->collapsible()
                             ->addActionLabel('Add chapter')
-                            ->itemLabel(fn (array $state): ?string => filled($state['name'] ?? null) ? $state['name'] : 'New chapter')
+                            ->extraAttributes(['class' => 'course-plan-chapters'])
+                            ->itemLabel(function (array $state, Get $get): string {
+                                $name = filled($state['name'] ?? null) ? (string) $state['name'] : 'New chapter';
+                                $lecture = max(1, (int) ($get('/data.lecture_minutes') ?: 60));
+                                $minutes = 0;
+
+                                foreach ($state['topics'] ?? [] as $topic) {
+                                    if (is_array($topic)) {
+                                        $minutes += (int) ($topic['planned_minutes'] ?? 0);
+                                    }
+                                }
+
+                                $label = $name;
+
+                                if ($minutes > 0) {
+                                    $days = StandardCoursePlan::teachingDays($minutes, $lecture);
+                                    $label .= ' · '.$days.' '.($days === 1 ? 'day' : 'days');
+                                }
+
+                                if (filled($state['estimated_marks'] ?? null)) {
+                                    $label .= ' · '.$state['estimated_marks'].' marks';
+                                }
+
+                                return $label;
+                            })
                             ->columns(3)
                             ->schema([
                                 TextInput::make('name')
@@ -142,11 +220,11 @@ class StandardCoursePlanResource extends Resource
                                     ->compact()
                                     ->addActionLabel('Add topic')
                                     ->table([
-                                        TableColumn::make('Topic')->markAsRequired()->width('28%'),
-                                        TableColumn::make('Minutes')->markAsRequired()->width('12%'),
-                                        TableColumn::make('Reference book')->width('24%'),
+                                        TableColumn::make('Topic')->markAsRequired()->width('26%'),
+                                        TableColumn::make('Days')->markAsRequired()->width('12%'),
+                                        TableColumn::make('Reference book')->width('22%'),
                                         TableColumn::make('DPP')->width('12%'),
-                                        TableColumn::make('Quiz')->width('12%'),
+                                        TableColumn::make('Quiz/PYQs')->width('16%'),
                                         TableColumn::make('Test')->width('12%'),
                                     ])
                                     ->schema([
@@ -155,12 +233,24 @@ class StandardCoursePlanResource extends Resource
                                             ->placeholder('Coulomb\'s Law')
                                             ->required()
                                             ->maxLength(255),
-                                        TextInput::make('planned_minutes')
+                                        TextInput::make('planned_days')
                                             ->hiddenLabel()
                                             ->numeric()
                                             ->required()
                                             ->minValue(1)
-                                            ->suffix('min'),
+                                            ->suffix('days')
+                                            ->dehydrated(false)
+                                            ->live()
+                                            ->afterStateHydrated(function (TextInput $component, Get $get): void {
+                                                $minutes = (int) $get('planned_minutes');
+                                                $lecture = max(1, (int) ($get('/data.lecture_minutes') ?: 60));
+                                                $component->state($minutes > 0 ? StandardCoursePlan::teachingDays($minutes, $lecture) : null);
+                                            })
+                                            ->afterStateUpdated(function ($state, Set $set, Get $get): void {
+                                                $lecture = max(1, (int) ($get('/data.lecture_minutes') ?: 60));
+                                                $set('planned_minutes', max(1, (int) $state) * $lecture);
+                                            }),
+                                        Hidden::make('planned_minutes'),
                                         TextInput::make('reference_book')
                                             ->hiddenLabel()
                                             ->placeholder('HC Verma')
@@ -189,7 +279,7 @@ class StandardCoursePlanResource extends Resource
                             ->columnSpanFull(),
                     ]),
                 Section::make('Practicals')
-                    ->description('Schools can list experiments and activities. Minutes and marks can stay blank. A plan can still be marked Ready from chapters and topics alone.')
+                    ->description('Schools can list experiments and activities. Days and marks can stay blank. A plan can still be marked Ready from chapters and topics alone.')
                     ->icon(Heroicon::OutlinedBeaker)
                     ->columnSpanFull()
                     ->schema([
@@ -203,7 +293,7 @@ class StandardCoursePlanResource extends Resource
                             ->table([
                                 TableColumn::make('Practical')->markAsRequired()->width('46%'),
                                 TableColumn::make('Type')->width('18%'),
-                                TableColumn::make('Minutes')->width('18%'),
+                                TableColumn::make('Days')->width('18%'),
                                 TableColumn::make('Marks')->width('18%'),
                             ])
                             ->schema([
@@ -220,13 +310,31 @@ class StandardCoursePlanResource extends Resource
                                     ->default(StandardCoursePracticalKind::Experiment->value)
                                     ->required()
                                     ->native(false),
-                                TextInput::make('planned_minutes')
+                                TextInput::make('planned_days')
                                     ->hiddenLabel()
                                     ->numeric()
                                     ->minValue(1)
                                     ->nullable()
-                                    ->suffix('min')
-                                    ->placeholder('Optional'),
+                                    ->suffix('days')
+                                    ->placeholder('Optional')
+                                    ->dehydrated(false)
+                                    ->live()
+                                    ->afterStateHydrated(function (TextInput $component, Get $get): void {
+                                        $minutes = (int) $get('planned_minutes');
+                                        $lecture = max(1, (int) ($get('/data.lecture_minutes') ?: 60));
+                                        $component->state($minutes > 0 ? StandardCoursePlan::teachingDays($minutes, $lecture) : null);
+                                    })
+                                    ->afterStateUpdated(function ($state, Set $set, Get $get): void {
+                                        if (blank($state)) {
+                                            $set('planned_minutes', null);
+
+                                            return;
+                                        }
+
+                                        $lecture = max(1, (int) ($get('/data.lecture_minutes') ?: 60));
+                                        $set('planned_minutes', max(1, (int) $state) * $lecture);
+                                    }),
+                                Hidden::make('planned_minutes'),
                                 TextInput::make('estimated_marks')
                                     ->hiddenLabel()
                                     ->numeric()

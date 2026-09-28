@@ -101,7 +101,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => view('filament.partials.pwa-head')->render(),
+                fn (): string => view('filament.partials.pwa-head')->render()
+                    .view('filament.partials.course-plan-colors')->render(),
             )
             ->renderHook(
                 PanelsRenderHook::USER_MENU_BEFORE,

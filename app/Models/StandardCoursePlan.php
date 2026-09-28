@@ -14,6 +14,7 @@ class StandardCoursePlan extends Model
         'academic_session_id',
         'course_id',
         'course_subject_id',
+        'lecture_minutes',
         'status',
         'ready_at',
         'ready_by_user_id',
@@ -23,6 +24,7 @@ class StandardCoursePlan extends Model
     protected function casts(): array
     {
         return [
+            'lecture_minutes' => 'integer',
             'status' => StandardCoursePlanStatus::class,
             'ready_at' => 'datetime',
         ];
@@ -71,5 +73,16 @@ class StandardCoursePlan extends Model
     public function totalPlannedMinutes(): int
     {
         return (int) $this->topics()->sum('standard_course_topics.planned_minutes');
+    }
+
+    public static function teachingDays(int $plannedMinutes, int $lectureMinutes): int
+    {
+        $lectureMinutes = max(1, $lectureMinutes);
+
+        if ($plannedMinutes < 1) {
+            return 0;
+        }
+
+        return (int) ceil($plannedMinutes / $lectureMinutes);
     }
 }

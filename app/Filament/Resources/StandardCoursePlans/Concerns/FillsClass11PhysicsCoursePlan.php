@@ -17,6 +17,7 @@ trait FillsClass11PhysicsCoursePlan
             'academic_session_id' => $current['academic_session_id'] ?? null,
             'course_id' => $current['course_id'] ?? null,
             'course_subject_id' => $current['course_subject_id'] ?? null,
+            'lecture_minutes' => $current['lecture_minutes'] ?? 60,
             'status' => $current['status'] ?? StandardCoursePlanStatus::Draft->value,
             'chapters' => Class11CbsePhysicsStarter::formChapters(),
             'practicals' => Class11CbsePhysicsStarter::formPracticals(),

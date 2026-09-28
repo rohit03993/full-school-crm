@@ -104,6 +104,14 @@ class StandardCoursePlanServiceTest extends TestCase
         $this->assertNull($saved->estimated_marks);
     }
 
+    public function test_lecture_duration_turns_topic_minutes_into_days(): void
+    {
+        $this->assertSame(1, StandardCoursePlan::teachingDays(60, 60));
+        $this->assertSame(3, StandardCoursePlan::teachingDays(160, 60));
+        $this->assertSame(2, StandardCoursePlan::teachingDays(120, 60));
+        $this->assertSame(2, StandardCoursePlan::teachingDays(160, 90));
+    }
+
     public function test_class_11_physics_fill_matches_the_cbse_time_and_marks(): void
     {
         $chapters = Class11CbsePhysicsStarter::chapters();
@@ -153,6 +161,7 @@ class StandardCoursePlanServiceTest extends TestCase
         $practicals = collect($component->get('data.practicals'));
 
         $this->assertCount(14, $chapters);
+        $this->assertSame(60, (int) $component->get('data.lecture_minutes'));
         $this->assertCount(34, $practicals);
         $this->assertTrue($chapters->contains(fn (array $chapter): bool => $chapter['name'] === 'Laws of Motion' && (int) $chapter['estimated_marks'] === 6));
         $this->assertTrue($practicals->contains(fn (array $practical): bool => $practical['name'] === 'Young\'s modulus of the material of a given wire'));
