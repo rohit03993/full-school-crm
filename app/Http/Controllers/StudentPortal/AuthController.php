@@ -59,13 +59,20 @@ class AuthController extends Controller
             'mobile.regex' => 'Enter a valid 10-digit mobile number.',
         ]);
 
+        if ($auth->findStudentsByLoginMobile($data['mobile'])->isEmpty()) {
+            return back()
+                ->withInput($request->only('mobile'))
+                ->with('login_tab', 'password')
+                ->withErrors(['mobile' => 'This mobile number is not saved on any student. Check Mobile or Alternate mobile on the student profile.']);
+        }
+
         $student = $auth->login($data['mobile'], $data['password']);
 
         if (! $student) {
             return back()
                 ->withInput($request->only('mobile'))
                 ->with('login_tab', 'password')
-                ->withErrors(['mobile' => 'Invalid mobile number or password.']);
+                ->withErrors(['password' => 'Wrong password. Use the Default student portal password from Setup → Institute settings.']);
         }
 
         return $this->completePortalLogin($request, $student->id, $data['mobile']);

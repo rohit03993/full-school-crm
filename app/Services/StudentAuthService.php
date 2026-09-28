@@ -98,8 +98,19 @@ class StudentAuthService
             $active = $matched;
         }
 
-        if (blank($active->portal_password) || $this->hasLegacyDobPortalPassword($active)) {
-            $active->update(['portal_password' => $this->sharedPortalPasswordHash()]);
+        $defaultHash = $this->sharedPortalPasswordHash();
+
+        if ($defaultHash !== null && $this->usesInstituteDefaultPassword($active)) {
+            $stored = (string) $active->portal_password;
+
+            if (blank($active->portal_password)) {
+                $active->update(['portal_password' => $defaultHash]);
+            } elseif (! $this->sameHash($stored, $defaultHash)) {
+                Student::query()
+                    ->where('portal_password', $stored)
+                    ->update(['portal_password' => $defaultHash]);
+                $active->portal_password = $defaultHash;
+            }
         }
 
         return $active;
@@ -131,11 +142,20 @@ class StudentAuthService
             return collect();
         }
 
+        $withCountry = '91'.$digits;
+        $withZero = '0'.$digits;
+
         return Student::query()
             ->with('activeEnrollment')
-            ->where(function ($query) use ($digits): void {
+            ->where(function ($query) use ($digits, $withCountry, $withZero): void {
                 $query->where('mobile', $digits)
-                    ->orWhere('alternate_mobile', $digits);
+                    ->orWhere('alternate_mobile', $digits)
+                    ->orWhere('mobile', $withCountry)
+                    ->orWhere('alternate_mobile', $withCountry)
+                    ->orWhere('mobile', $withZero)
+                    ->orWhere('alternate_mobile', $withZero)
+                    ->orWhereRaw($this->mobileDigitsSql('mobile').' in (?, ?, ?)', [$digits, $withCountry, $withZero])
+                    ->orWhereRaw($this->mobileDigitsSql('alternate_mobile').' in (?, ?, ?)', [$digits, $withCountry, $withZero]);
             })
             ->orderBy('name')
             ->get();
@@ -217,11 +237,52 @@ class StudentAuthService
 
         $defaultHash = $this->sharedPortalPasswordHash();
 
-        if ($defaultHash !== null && hash_equals($student->portal_password, $defaultHash)) {
+        if ($defaultHash !== null && $this->sameHash((string) $student->portal_password, $defaultHash)) {
+            return true;
+        }
+
+        $studentsWithThisPassword = Student::query()
+            ->where('portal_password', $student->portal_password)
+            ->count();
+
+        if ($studentsWithThisPassword > 1) {
+            return true;
+        }
+
+        if ($this->hasFactoryPortalPassword($student)) {
             return true;
         }
 
         return $this->hasLegacyDobPortalPassword($student);
+    }
+
+    private function sameHash(string $left, string $right): bool
+    {
+        if (strlen($left) !== strlen($right) || $left === '') {
+            return false;
+        }
+
+        return hash_equals($left, $right);
+    }
+
+    private function mobileDigitsSql(string $column): string
+    {
+        return "replace(replace(replace(replace({$column}, ' ', ''), '-', ''), '+', ''), '(', '')";
+    }
+
+    private function hasFactoryPortalPassword(Student $student): bool
+    {
+        if (blank($student->portal_password)) {
+            return false;
+        }
+
+        $factoryPlain = $this->defaultPortalPasswordPlain();
+
+        if ($factoryPlain === '') {
+            return false;
+        }
+
+        return $this->verifyPortalPassword($factoryPlain, (string) $student->portal_password);
     }
 
     /**

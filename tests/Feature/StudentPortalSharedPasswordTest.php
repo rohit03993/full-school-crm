@@ -137,4 +137,75 @@ class StudentPortalSharedPasswordTest extends TestCase
         $this->assertNotNull($auth->login('9818208002', 'MyOwn@99'));
         $this->assertNull($auth->login('9818208002', '123456789'));
     }
+
+    public function test_school_password_works_at_login_without_updating_every_student_first(): void
+    {
+        $auth = app(StudentAuthService::class);
+        $oldHash = $auth->hashPortalPassword('OldSchool@1');
+        Setting::setValue('portal.shared_password_hash', $auth->hashPortalPassword('123456789'), 'portal');
+
+        foreach (['9818208001', '9818208003'] as $mobile) {
+            Student::query()->create([
+                'name' => 'Shared '.$mobile,
+                'father_name' => 'Parent',
+                'date_of_birth' => '2010-05-05',
+                'gender' => Gender::Male,
+                'mobile' => $mobile,
+                'status' => StudentStatus::Enrolled,
+                'portal_password' => $oldHash,
+            ]);
+        }
+
+        $this->assertNotNull($auth->login('9818208001', '123456789'));
+        $this->assertNull($auth->login('9818208001', 'OldSchool@1'));
+        $this->assertNotNull($auth->login('9818208003', '123456789'));
+    }
+
+    public function test_login_finds_a_mobile_saved_with_country_code(): void
+    {
+        $auth = app(StudentAuthService::class);
+        Setting::setValue('portal.shared_password_hash', $auth->hashPortalPassword('123456789'), 'portal');
+
+        Student::query()->create([
+            'name' => 'Country Code',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2010-06-06',
+            'gender' => Gender::Male,
+            'mobile' => '+91 9818208001',
+            'status' => StudentStatus::Enrolled,
+            'portal_password' => null,
+        ]);
+
+        $this->assertNotNull($auth->login('9818208001', '123456789'));
+    }
+
+    public function test_login_page_says_whether_the_mobile_or_the_password_is_wrong(): void
+    {
+        $auth = app(StudentAuthService::class);
+        Setting::setValue('portal.shared_password_hash', $auth->hashPortalPassword('123456789'), 'portal');
+
+        Student::query()->create([
+            'name' => 'Known Student',
+            'father_name' => 'Parent',
+            'date_of_birth' => '2010-07-07',
+            'gender' => Gender::Male,
+            'mobile' => '9818208001',
+            'status' => StudentStatus::Enrolled,
+            'portal_password' => null,
+        ]);
+
+        $this->post(route('portal.login.submit'), [
+            'mobile' => '9818208099',
+            'password' => '123456789',
+        ])->assertSessionHasErrors([
+            'mobile' => 'This mobile number is not saved on any student. Check Mobile or Alternate mobile on the student profile.',
+        ]);
+
+        $this->post(route('portal.login.submit'), [
+            'mobile' => '9818208001',
+            'password' => 'not-the-password',
+        ])->assertSessionHasErrors([
+            'password' => 'Wrong password. Use the Default student portal password from Setup → Institute settings.',
+        ]);
+    }
 }
