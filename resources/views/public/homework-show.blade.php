@@ -11,7 +11,7 @@
         body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif; background: #f8fafc; color: #0f172a; }
         .page { min-height: 100vh; display: flex; flex-direction: column; }
         .wrap { max-width: 52rem; margin: 0 auto; padding: 1.25rem 1rem 1.5rem; width: 100%; }
-        .partner { margin-top: auto; margin-left: auto; margin-right: auto; width: 100%; max-width: 52rem; display: flex; justify-content: center; align-items: flex-end; padding: 0 1rem 1.25rem; }
+        .partner { margin: 1rem 0 0; width: 100%; display: flex; justify-content: center; }
         .partner[hidden] { display: none; }
         .brand { font-size: 0.8rem; font-weight: 600; color: #64748b; letter-spacing: 0.02em; text-transform: uppercase; }
         h1 { margin: 0.35rem 0 0.25rem; font-size: 1.5rem; line-height: 1.25; }
@@ -79,12 +79,12 @@
                 <a class="btn btn-primary" href="{{ $homework->publicDownloadUrl() }}">Download attachment</a>
             </section>
         @endif
+        @if (filled($footerImageUrl))
+            <div class="partner" id="homework-partner" hidden>
+                <img src="{{ $footerImageUrl }}" alt="{{ $instituteName }}">
+            </div>
+        @endif
     </div>
-    @if (filled($footerImageUrl))
-        <div class="partner" id="homework-partner" hidden>
-            <img src="{{ $footerImageUrl }}" alt="{{ $instituteName }}">
-        </div>
-    @endif
     </div>
     @if (filled($footerImageUrl))
     <script>
