@@ -21,6 +21,7 @@ use App\Models\StandardCourseTopic;
 use App\Models\User;
 use App\Services\LicenseService;
 use App\Services\StandardCoursePlanService;
+use App\Support\Class11CbsePhysicsStarter;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -101,6 +102,60 @@ class StandardCoursePlanServiceTest extends TestCase
         $this->assertSame(StandardCoursePracticalKind::Experiment, $saved->kind);
         $this->assertSame(80, $saved->planned_minutes);
         $this->assertNull($saved->estimated_marks);
+    }
+
+    public function test_class_11_physics_fill_matches_the_cbse_time_and_marks(): void
+    {
+        $chapters = Class11CbsePhysicsStarter::chapters();
+        $topics = collect($chapters)->flatMap(fn (array $chapter): array => $chapter['topics']);
+
+        $this->assertCount(14, $chapters);
+        $this->assertCount(36, $topics);
+        $this->assertSame(70, collect($chapters)->sum('estimated_marks'));
+        $this->assertSame(6400, $topics->sum('planned_minutes'));
+        $this->assertSame(14, $topics->where('quiz_count', 1)->count());
+        $this->assertSame(14, $topics->where('test_count', 1)->count());
+        $this->assertSame(36, $topics->where('dpp_count', 1)->count());
+        $this->assertCount(20, collect(Class11CbsePhysicsStarter::practicals())->where('kind', 'experiment'));
+        $this->assertCount(14, collect(Class11CbsePhysicsStarter::practicals())->where('kind', 'activity'));
+    }
+
+    public function test_filled_class_11_physics_plan_can_be_marked_ready(): void
+    {
+        $user = User::factory()->create();
+        $plan = $this->makePlan();
+
+        Class11CbsePhysicsStarter::apply($plan);
+
+        app(StandardCoursePlanService::class)->markReady($plan->refresh(), $user);
+
+        $this->assertSame(StandardCoursePlanStatus::Ready, $plan->refresh()->status);
+        $this->assertSame(14, $plan->chapters()->count());
+        $this->assertSame(36, $plan->topics()->count());
+        $this->assertSame(34, $plan->practicals()->count());
+        $this->assertSame(5, $plan->chapters()->where('name', 'Units and Measurements')->value('estimated_marks'));
+    }
+
+    public function test_create_screen_can_fill_class_11_physics_before_saving(): void
+    {
+        Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $component = Livewire::test(CreateStandardCoursePlan::class)
+            ->call('fillClass11Physics')
+            ->assertSee('Units and Measurements');
+
+        $chapters = collect($component->get('data.chapters'));
+        $practicals = collect($component->get('data.practicals'));
+
+        $this->assertCount(14, $chapters);
+        $this->assertCount(34, $practicals);
+        $this->assertTrue($chapters->contains(fn (array $chapter): bool => $chapter['name'] === 'Laws of Motion' && (int) $chapter['estimated_marks'] === 6));
+        $this->assertTrue($practicals->contains(fn (array $practical): bool => $practical['name'] === 'Young\'s modulus of the material of a given wire'));
     }
 
     public function test_empty_plan_cannot_be_marked_ready(): void
