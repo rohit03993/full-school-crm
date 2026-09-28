@@ -18,6 +18,7 @@ use App\Support\CrmNavigation;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
@@ -63,10 +64,13 @@ class StandardCoursePlanResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema
+            ->columns(1)
             ->components([
                 Section::make('Programme')
                     ->description('One plan is for one year, one programme, and one subject.')
+                    ->icon(Heroicon::OutlinedAcademicCap)
                     ->columns(3)
+                    ->columnSpanFull()
                     ->schema([
                         Select::make('academic_session_id')
                             ->label('Year')
@@ -103,13 +107,17 @@ class StandardCoursePlanResource extends Resource
                             ->default(StandardCoursePlanStatus::Draft->value),
                     ]),
                 Section::make('Chapters and topics')
-                    ->description('Planned minutes are the teaching time for that topic. DPP, quiz, and test are counts.')
+                    ->description('Type the chapter name, then add each topic on one line. Minutes are teaching time. DPP, quiz, and test are counts. Drag a row to change the order.')
+                    ->icon(Heroicon::OutlinedBookOpen)
+                    ->columnSpanFull()
                     ->schema([
                         Repeater::make('chapters')
+                            ->hiddenLabel()
                             ->relationship()
                             ->orderColumn('sort_order')
+                            ->collapsible()
                             ->addActionLabel('Add chapter')
-                            ->itemLabel(fn (array $state): ?string => filled($state['name'] ?? null) ? $state['name'] : 'Chapter')
+                            ->itemLabel(fn (array $state): ?string => filled($state['name'] ?? null) ? $state['name'] : 'New chapter')
                             ->schema([
                                 TextInput::make('name')
                                     ->label('Chapter')
@@ -118,47 +126,54 @@ class StandardCoursePlanResource extends Resource
                                     ->maxLength(255)
                                     ->columnSpanFull(),
                                 Repeater::make('topics')
+                                    ->label('Topics')
                                     ->relationship()
                                     ->orderColumn('sort_order')
+                                    ->compact()
                                     ->addActionLabel('Add topic')
-                                    ->itemLabel(fn (array $state): ?string => filled($state['name'] ?? null) ? $state['name'] : 'Topic')
+                                    ->table([
+                                        TableColumn::make('Topic')->markAsRequired()->width('28%'),
+                                        TableColumn::make('Minutes')->markAsRequired()->width('12%'),
+                                        TableColumn::make('Reference book')->width('24%'),
+                                        TableColumn::make('DPP')->width('12%'),
+                                        TableColumn::make('Quiz')->width('12%'),
+                                        TableColumn::make('Test')->width('12%'),
+                                    ])
                                     ->schema([
                                         TextInput::make('name')
-                                            ->label('Topic')
+                                            ->hiddenLabel()
                                             ->placeholder('Coulomb\'s Law')
                                             ->required()
-                                            ->maxLength(255)
-                                            ->columnSpanFull(),
+                                            ->maxLength(255),
                                         TextInput::make('planned_minutes')
-                                            ->label('Planned minutes')
+                                            ->hiddenLabel()
                                             ->numeric()
                                             ->required()
                                             ->minValue(1)
                                             ->suffix('min'),
                                         TextInput::make('reference_book')
-                                            ->label('Reference book')
+                                            ->hiddenLabel()
                                             ->placeholder('HC Verma')
                                             ->maxLength(255),
                                         TextInput::make('dpp_count')
-                                            ->label('DPP')
+                                            ->hiddenLabel()
                                             ->numeric()
                                             ->minValue(0)
                                             ->default(0)
                                             ->required(),
                                         TextInput::make('quiz_count')
-                                            ->label('Quiz')
+                                            ->hiddenLabel()
                                             ->numeric()
                                             ->minValue(0)
                                             ->default(0)
                                             ->required(),
                                         TextInput::make('test_count')
-                                            ->label('Test')
+                                            ->hiddenLabel()
                                             ->numeric()
                                             ->minValue(0)
                                             ->default(0)
                                             ->required(),
                                     ])
-                                    ->columns(2)
                                     ->columnSpanFull(),
                             ])
                             ->columnSpanFull(),

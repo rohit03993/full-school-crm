@@ -6,7 +6,9 @@ use App\Enums\CourseStatus;
 use App\Enums\DurationType;
 use App\Enums\LicenseFeature;
 use App\Enums\LicensePlan;
+use App\Enums\RoleName;
 use App\Enums\StandardCoursePlanStatus;
+use App\Filament\Resources\StandardCoursePlans\Pages\CreateStandardCoursePlan;
 use App\Models\AcademicSession;
 use App\Models\Course;
 use App\Models\CourseSubject;
@@ -17,13 +19,32 @@ use App\Models\StandardCourseTopic;
 use App\Models\User;
 use App\Services\LicenseService;
 use App\Services\StandardCoursePlanService;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class StandardCoursePlanServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_create_course_plan_screen_shows_topics_on_one_line(): void
+    {
+        Role::query()->firstOrCreate(['name' => RoleName::SuperAdmin->value, 'guard_name' => 'web']);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(CreateStandardCoursePlan::class)
+            ->assertSuccessful()
+            ->assertSee('Add chapter')
+            ->assertSee('Add topic')
+            ->assertSee('Reference book');
+    }
 
     public function test_empty_plan_cannot_be_marked_ready(): void
     {
