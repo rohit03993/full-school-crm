@@ -8,5 +8,8 @@ interface HomeworkTextImprover
 
     public function isConfigured(): bool;
 
-    public function improve(string $title, string $description): HomeworkImprovement;
+    /**
+     * @param  array{class_label?: string, subject_label?: string, school_name?: string}  $context
+     */
+    public function improve(string $title, string $description, array $context = []): HomeworkImprovement;
 }

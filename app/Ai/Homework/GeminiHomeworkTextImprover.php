@@ -17,7 +17,7 @@ final class GeminiHomeworkTextImprover implements HomeworkTextImprover
         return filled(config('ai.gemini.key'));
     }
 
-    public function improve(string $title, string $description): HomeworkImprovement
+    public function improve(string $title, string $description, array $context = []): HomeworkImprovement
     {
         $model = $this->model();
         $apiKey = (string) config('ai.gemini.key');
@@ -37,12 +37,12 @@ final class GeminiHomeworkTextImprover implements HomeworkTextImprover
                     'contents' => [
                         [
                             'parts' => [
-                                ['text' => HomeworkImprovePrompt::user($title, $description)],
+                                ['text' => HomeworkImprovePrompt::user($title, $description, $context)],
                             ],
                         ],
                     ],
                     'generationConfig' => [
-                        'temperature' => 0.2,
+                        'temperature' => 0.4,
                         'responseMimeType' => 'application/json',
                         'responseSchema' => [
                             'type' => 'OBJECT',

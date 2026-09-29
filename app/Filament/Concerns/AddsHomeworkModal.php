@@ -7,6 +7,7 @@ use App\Models\Batch;
 use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
 use App\Services\HomeworkAiService;
+use App\Support\SiteContent;
 use App\Services\HomeworkCheckService;
 use App\Services\HomeworkSubmissionService;
 use Carbon\Carbon;
@@ -454,7 +455,7 @@ trait AddsHomeworkModal
 
         $this->homeworkAiTries++;
 
-        $outcome = $service->improve($user, $title, $description);
+        $outcome = $service->improve($user, $title, $description, $this->homeworkAiContext());
 
         if (! $outcome->ok) {
             if ($outcome->temporary) {
@@ -492,6 +493,29 @@ trait AddsHomeworkModal
             'originalDescription' => (string) ($this->homeworkAiOriginalDescription ?? ''),
             'suggestedTitle' => $this->homeworkAiSuggestedTitle,
             'suggestedDescription' => $this->homeworkAiSuggestedDescription,
+        ];
+    }
+
+    /**
+     * @return array{class_label: string, subject_label: string, school_name: string}
+     */
+    protected function homeworkAiContext(): array
+    {
+        $state = $this->homeworkModalState();
+        $mounted = is_array($this->mountedActions) ? $this->mountedActions : [];
+        $current = $mounted === [] ? [] : ($mounted[array_key_last($mounted)] ?? []);
+        $arguments = is_array($current['arguments'] ?? null) ? $current['arguments'] : [];
+
+        $batchId = (int) ($state['batch_id'] ?? $arguments['batchId'] ?? 0);
+        $subjectId = (int) ($state['course_subject_id'] ?? $arguments['subjectId'] ?? 0);
+        $batch = $batchId > 0 ? Batch::query()->find($batchId) : null;
+        $subject = $subjectId > 0 ? CourseSubject::query()->find($subjectId) : null;
+        $school = SiteContent::institute()['name'] ?? '';
+
+        return [
+            'class_label' => $batch?->displayLabel() ?? '',
+            'subject_label' => $subject?->displayLabel() ?? '',
+            'school_name' => is_string($school) ? $school : '',
         ];
     }
 

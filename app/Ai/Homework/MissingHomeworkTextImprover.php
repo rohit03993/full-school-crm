@@ -16,7 +16,7 @@ final class MissingHomeworkTextImprover implements HomeworkTextImprover
         return false;
     }
 
-    public function improve(string $title, string $description): HomeworkImprovement
+    public function improve(string $title, string $description, array $context = []): HomeworkImprovement
     {
         throw new \RuntimeException('Homework AI provider is not set up.');
     }

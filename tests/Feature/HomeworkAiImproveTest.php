@@ -74,6 +74,8 @@ class HomeworkAiImproveTest extends TestCase
             return str_contains($request->url(), 'generativelanguage.googleapis.com')
                 && str_contains($request->url(), 'gemini-3.5-flash-lite')
                 && str_contains($body, 'Exercise 1 and 2')
+                && str_contains($body, 'Dear Students')
+                && str_contains($body, 'Mathematics (MATH)')
                 && str_contains($body, 'Do not add a test')
                 && ! str_contains($body, 'test-gemini-key');
         });

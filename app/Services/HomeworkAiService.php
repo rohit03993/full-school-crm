@@ -49,7 +49,10 @@ class HomeworkAiService
         ];
     }
 
-    public function improve(User $user, string $title, string $description): HomeworkImproveOutcome
+    /**
+     * @param  array{class_label?: string, subject_label?: string, school_name?: string}  $context
+     */
+    public function improve(User $user, string $title, string $description, array $context = []): HomeworkImproveOutcome
     {
         $used = $this->usedToday($user);
         $limit = $this->dailyLimit();
@@ -95,7 +98,7 @@ class HomeworkAiService
         }
 
         try {
-            $improvement = $this->improver->improve($title, $description);
+            $improvement = $this->improver->improve($title, $description, $this->cleanContext($context));
         } catch (\Throwable $exception) {
             Log::warning('Homework AI request failed', [
                 'user_id' => $user->id,
@@ -136,6 +139,19 @@ class HomeworkAiService
     private function dailyKey(User $user): string
     {
         return 'homework-ai-daily:'.$user->id.':'.now()->toDateString();
+    }
+
+    /**
+     * @param  array{class_label?: string, subject_label?: string, school_name?: string}  $context
+     * @return array{class_label: string, subject_label: string, school_name: string}
+     */
+    private function cleanContext(array $context): array
+    {
+        return [
+            'class_label' => $this->clean((string) ($context['class_label'] ?? ''), 200),
+            'subject_label' => $this->clean((string) ($context['subject_label'] ?? ''), 200),
+            'school_name' => $this->clean((string) ($context['school_name'] ?? ''), 200),
+        ];
     }
 
     private function clean(string $value, int $max): string

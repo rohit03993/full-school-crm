@@ -17,7 +17,7 @@ final class OpenAiHomeworkTextImprover implements HomeworkTextImprover
         return filled(config('ai.openai.key'));
     }
 
-    public function improve(string $title, string $description): HomeworkImprovement
+    public function improve(string $title, string $description, array $context = []): HomeworkImprovement
     {
         $model = $this->model();
         $apiKey = (string) config('ai.openai.key');
@@ -30,10 +30,10 @@ final class OpenAiHomeworkTextImprover implements HomeworkTextImprover
                 ->withToken($apiKey)
                 ->post($baseUrl.'/chat/completions', [
                     'model' => $model,
-                    'temperature' => 0.2,
+                    'temperature' => 0.4,
                     'messages' => [
                         ['role' => 'system', 'content' => HomeworkImprovePrompt::system()],
-                        ['role' => 'user', 'content' => HomeworkImprovePrompt::user($title, $description)],
+                        ['role' => 'user', 'content' => HomeworkImprovePrompt::user($title, $description, $context)],
                     ],
                     'response_format' => [
                         'type' => 'json_schema',
