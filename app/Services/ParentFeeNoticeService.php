@@ -5,12 +5,14 @@ namespace App\Services;
 use App\Enums\LicenseFeature;
 use App\Enums\ParentFeeNoticeStatus;
 use App\Enums\WhatsAppAudienceType;
+use App\Enums\WhatsAppCampaignStatus;
 use App\Models\Batch;
 use App\Models\ParentFeeNotice;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppTemplate;
+use App\Support\BulkSendGuard;
 use App\Support\FeatureGate;
 use App\Support\FeeReminderWhatsAppTemplate;
 use Illuminate\Support\Carbon;
@@ -110,47 +112,75 @@ class ParentFeeNoticeService
             ])
             ->all();
 
-        $campaign = $this->campaigns->createCampaign([
-            'name' => 'Parent fee notice · '.$batch->name.' · '.now()->format('d M Y H:i'),
-            'whatsapp_template_id' => $template->id,
-            'audience_type' => WhatsAppAudienceType::Batch->value,
-            'batch_id' => $batch->id,
-            'student_ids' => $studentIds,
-            'campaign_variables' => [
-                'audience_source' => 'parent_fee_notice',
-                'date' => now()->toDateString(),
-                '_student_ids' => $studentIds,
-                '_manual_fee_notice_context' => $contexts,
-                '_student_fee_context' => $contexts,
-            ],
-        ], $staff);
+        $guard = app(BulkSendGuard::class);
+        $lockKey = 'fee-notices:'.$batch->id;
 
-        $this->campaigns->queueCampaign($campaign, $staff, wait: false);
-        $campaign->load('recipients');
-
-        $now = now();
-
-        foreach ($selected as $row) {
-            $recipient = $campaign->recipients->firstWhere('student_id', $row['student_id']);
-
-            ParentFeeNotice::query()->create([
-                'student_id' => $row['student_id'],
-                'batch_id' => $batch->id,
-                'amount' => $row['amount'],
-                'due_date' => $row['due_date'],
-                'whatsapp_campaign_id' => $campaign->id,
-                'whatsapp_campaign_recipient_id' => $recipient?->id,
-                'sent_by_user_id' => $staff->id,
-                'sent_at' => $now,
-                'status' => ParentFeeNoticeStatus::Queued,
+        if (! $guard->acquire($lockKey)) {
+            throw ValidationException::withMessages([
+                'rows' => 'Fee notices for this class are already being sent. Please wait.',
             ]);
         }
 
-        return [
-            'queued' => $selected->count(),
-            'campaign_id' => $campaign->id,
-            'campaign' => $campaign,
-        ];
+        try {
+            $alreadySending = WhatsAppCampaign::query()
+                ->where('batch_id', $batch->id)
+                ->where('campaign_variables->audience_source', 'parent_fee_notice')
+                ->whereIn('status', [
+                    WhatsAppCampaignStatus::Queued,
+                    WhatsAppCampaignStatus::Running,
+                ])
+                ->exists();
+
+            if ($alreadySending) {
+                throw ValidationException::withMessages([
+                    'rows' => 'Fee notices for this class are already being sent. Please wait.',
+                ]);
+            }
+
+            $campaign = $this->campaigns->createCampaign([
+                'name' => 'Parent fee notice · '.$batch->name.' · '.now()->format('d M Y H:i'),
+                'whatsapp_template_id' => $template->id,
+                'audience_type' => WhatsAppAudienceType::Batch->value,
+                'batch_id' => $batch->id,
+                'student_ids' => $studentIds,
+                'campaign_variables' => [
+                    'audience_source' => 'parent_fee_notice',
+                    'date' => now()->toDateString(),
+                    '_student_ids' => $studentIds,
+                    '_manual_fee_notice_context' => $contexts,
+                    '_student_fee_context' => $contexts,
+                ],
+            ], $staff);
+
+            $this->campaigns->queueCampaign($campaign, $staff, wait: false);
+            $campaign->load('recipients');
+
+            $now = now();
+
+            foreach ($selected as $row) {
+                $recipient = $campaign->recipients->firstWhere('student_id', $row['student_id']);
+
+                ParentFeeNotice::query()->create([
+                    'student_id' => $row['student_id'],
+                    'batch_id' => $batch->id,
+                    'amount' => $row['amount'],
+                    'due_date' => $row['due_date'],
+                    'whatsapp_campaign_id' => $campaign->id,
+                    'whatsapp_campaign_recipient_id' => $recipient?->id,
+                    'sent_by_user_id' => $staff->id,
+                    'sent_at' => $now,
+                    'status' => ParentFeeNoticeStatus::Queued,
+                ]);
+            }
+
+            return [
+                'queued' => $selected->count(),
+                'campaign_id' => $campaign->id,
+                'campaign' => $campaign,
+            ];
+        } finally {
+            $guard->release($lockKey);
+        }
     }
 
     /**

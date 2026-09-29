@@ -63,13 +63,19 @@
             <button
                 type="button"
                 wire:click="queueWhatsAppCampaign"
+                @if ($whatsappSendHistory['has_prior_class_send'] ?? false)
+                    wire:confirm="Parents already received these marks. Send the same message again?"
+                @endif
                 wire:loading.attr="disabled"
                 wire:target="queueWhatsAppCampaign"
                 class="justify-self-start rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70"
             >
                 <span wire:loading.remove wire:target="queueWhatsAppCampaign">{{ $whatsappSendHistory['button_label'] }}</span>
-                <span wire:loading wire:target="queueWhatsAppCampaign">Queuing… opening send progress</span>
+                <span wire:loading wire:target="queueWhatsAppCampaign">Sending… please wait. Do not click again.</span>
             </button>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                One click starts the send. Wait until the progress page opens.
+            </p>
         </div>
     </div>
 @endif

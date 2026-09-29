@@ -35,6 +35,7 @@ use App\Services\CrmPermissionSyncService;
 use App\Services\HomeworkCheckService;
 use App\Services\HomeworkSubmissionService;
 use App\Services\MetaWhatsAppCostEstimator;
+use App\Support\BulkSendGuard;
 use App\Support\CombinedHomeworkWhatsAppTemplate;
 use Carbon\Carbon;
 use Filament\Facades\Filament;
@@ -1421,6 +1422,26 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertDontSee('Resend')
             ->call('sendCombinedForBatch', $data['batch']->id)
             ->assertNotified('Nothing sent');
+    }
+
+    public function test_a_second_homework_send_waits_instead_of_sending_again(): void
+    {
+        $data = $this->seedClass();
+        $guard = app(BulkSendGuard::class);
+        $key = 'homework-combined:'.$data['batch']->id.':'.now()->toDateString();
+
+        $this->assertTrue($guard->acquire($key));
+
+        $result = app(HomeworkSubmissionService::class)->combinedSend(
+            $data['admin'],
+            $data['batch']->id,
+            now()->toDateString(),
+        );
+
+        $guard->release($key);
+
+        $this->assertSame(0, $result['sent']);
+        $this->assertSame('This class is already being sent. Please wait.', $result['error']);
     }
 
     /**

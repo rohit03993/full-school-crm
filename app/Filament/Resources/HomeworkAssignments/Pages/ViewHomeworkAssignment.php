@@ -26,6 +26,9 @@ class ViewHomeworkAssignment extends ViewRecord
                 ->label('Resend WhatsApp')
                 ->icon('heroicon-o-chat-bubble-left-right')
                 ->color('primary')
+                ->requiresConfirmation()
+                ->modalHeading('Send this homework again?')
+                ->modalDescription('Parents already received this homework. Sending again delivers the same message once more.')
                 ->extraAttributes(WhatsAppSendUi::loadingAttributes())
                 ->visible(function (): bool {
                     $user = Auth::user();

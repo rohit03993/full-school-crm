@@ -12,6 +12,7 @@ use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
 use App\Models\WhatsAppTemplate;
 use App\Services\WhatsAppDispatchService;
+use App\Support\BulkSendGuard;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -80,33 +81,53 @@ class WhatsAppCampaignService
 
     public function queueCampaign(WhatsAppCampaign $campaign, User $sender, bool $wait = true): WhatsAppCampaign
     {
-        $dispatch = app(WhatsAppDispatchService::class);
+        $guard = app(BulkSendGuard::class);
+        $lockKey = 'whatsapp-campaign:'.$campaign->id;
 
-        if (! $dispatch->isConfigured()) {
-            throw new \RuntimeException($dispatch->configurationError());
+        if (! $guard->acquire($lockKey)) {
+            throw new \RuntimeException('This campaign is already being sent. Please wait.');
         }
 
-        $this->refreshCampaignRecipients($campaign);
+        try {
+            $campaign->refresh();
 
-        $campaign->refresh();
+            if (in_array($campaign->status, [
+                WhatsAppCampaignStatus::Queued,
+                WhatsAppCampaignStatus::Running,
+            ], true)) {
+                throw new \RuntimeException('This campaign is already being sent. Please wait.');
+            }
 
-        if ((int) $campaign->total_recipients < 1) {
-            throw new \RuntimeException('No recipients with mobile numbers for this campaign.');
+            $dispatch = app(WhatsAppDispatchService::class);
+
+            if (! $dispatch->isConfigured()) {
+                throw new \RuntimeException($dispatch->configurationError());
+            }
+
+            $this->refreshCampaignRecipients($campaign);
+
+            $campaign->refresh();
+
+            if ((int) $campaign->total_recipients < 1) {
+                throw new \RuntimeException('No recipients with mobile numbers for this campaign.');
+            }
+
+            $campaign->update([
+                'status' => WhatsAppCampaignStatus::Queued,
+                'shot_by' => $sender->id,
+                'shot_at' => now(),
+            ]);
+
+            if ($wait) {
+                $this->runCampaignNow($campaign);
+            } else {
+                RunWhatsAppCampaignJob::dispatch($campaign->id);
+            }
+
+            return $campaign->fresh();
+        } finally {
+            $guard->release($lockKey);
         }
-
-        $campaign->update([
-            'status' => WhatsAppCampaignStatus::Queued,
-            'shot_by' => $sender->id,
-            'shot_at' => now(),
-        ]);
-
-        if ($wait) {
-            $this->runCampaignNow($campaign);
-        } else {
-            RunWhatsAppCampaignJob::dispatch($campaign->id);
-        }
-
-        return $campaign->fresh();
     }
 
     protected function runCampaignNow(WhatsAppCampaign $campaign): void

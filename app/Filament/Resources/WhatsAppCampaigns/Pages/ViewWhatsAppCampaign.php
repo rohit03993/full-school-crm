@@ -93,6 +93,9 @@ class ViewWhatsAppCampaign extends ViewRecord
             Action::make('sendNow')
                 ->label('Send / resume')
                 ->icon('heroicon-o-paper-airplane')
+                ->requiresConfirmation()
+                ->modalHeading('Start sending these messages?')
+                ->modalDescription('Messages will go out to the people on this list. Do not click Send again while they are going out.')
                 ->extraAttributes(WhatsAppSendUi::loadingAttributes())
                 ->visible(fn (): bool => in_array($this->record->status, [
                     WhatsAppCampaignStatus::Draft,

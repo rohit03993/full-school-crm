@@ -10,6 +10,7 @@ use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\BulkSendGuard;
 use App\Support\CombinedHomeworkWhatsAppTemplate;
 use App\Support\HomeworkShareWhatsAppTemplate;
 use Illuminate\Support\Collection;
@@ -352,6 +353,30 @@ class HomeworkWhatsAppService
             ];
         }
 
+        $guard = app(BulkSendGuard::class);
+        $lockKey = 'homework-assignment:'.$assignment->id;
+
+        if (! $guard->acquire($lockKey)) {
+            return [
+                ...$empty,
+                'template' => $resolved,
+                'error' => 'This homework is already being sent. Please wait.',
+            ];
+        }
+
+        try {
+            return $this->notifyBatchWhileLocked($assignment, $students, $resolved);
+        } finally {
+            $guard->release($lockKey);
+        }
+    }
+
+    /**
+     * @param  Collection<int, Student>  $students
+     * @return array{sent: int, failed: int, skipped: int, error: ?string, template: ?string}
+     */
+    protected function notifyBatchWhileLocked(HomeworkAssignment $assignment, Collection $students, string $resolved): array
+    {
         $this->studentLinks->ensureForAssignment($assignment, $students);
 
         $sent = 0;

@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
 use App\Models\WhatsAppTemplate;
+use App\Support\BulkSendGuard;
 use App\Support\StudentExamMarksMatrix;
 use App\Support\TestMarksWhatsAppTemplate;
 use Illuminate\Support\Collection;
@@ -453,22 +454,62 @@ class ActivityMarksWhatsAppService
             throw new \RuntimeException('WhatsApp module is not enabled.');
         }
 
-        $template = WhatsAppTemplate::query()
-            ->whereKey($templateId)
-            ->where('is_active', true)
-            ->firstOrFail()
-            ->ensureParamMappings();
+        $guard = app(BulkSendGuard::class);
+        $lockKey = 'exam-marks:'.$marksKey.($onlyStudentId ? ':student:'.$onlyStudentId : ':class');
 
-        $campaign = $this->createMarksCampaign(
-            $creator,
-            $template,
-            $marksKey,
-            $testName,
-            $sessionDate,
-            $onlyStudentId,
-        );
+        if (! $guard->acquire($lockKey)) {
+            throw new \RuntimeException('Messages for this test are already being sent. Please wait.');
+        }
 
-        return $this->campaigns->queueCampaign($campaign, $creator, wait: false);
+        try {
+            if ($this->marksSendAlreadyRunning($marksKey, $onlyStudentId)) {
+                throw new \RuntimeException('Messages for this test are already being sent. Please wait.');
+            }
+
+            $template = WhatsAppTemplate::query()
+                ->whereKey($templateId)
+                ->where('is_active', true)
+                ->firstOrFail()
+                ->ensureParamMappings();
+
+            $campaign = $this->createMarksCampaign(
+                $creator,
+                $template,
+                $marksKey,
+                $testName,
+                $sessionDate,
+                $onlyStudentId,
+            );
+
+            return $this->campaigns->queueCampaign($campaign, $creator, wait: false);
+        } finally {
+            $guard->release($lockKey);
+        }
+    }
+
+    protected function marksSendAlreadyRunning(string $marksKey, ?int $onlyStudentId): bool
+    {
+        if (blank($marksKey) || ! Schema::hasTable('whatsapp_campaigns')) {
+            return false;
+        }
+
+        return WhatsAppCampaign::query()
+            ->where('campaign_variables->audience_source', 'activity_marks')
+            ->where('campaign_variables->test_key', $marksKey)
+            ->whereIn('status', [
+                WhatsAppCampaignStatus::Queued,
+                WhatsAppCampaignStatus::Running,
+            ])
+            ->get()
+            ->contains(function (WhatsAppCampaign $campaign) use ($onlyStudentId): bool {
+                $savedStudentId = (int) $campaign->campaignVariable('only_student_id');
+
+                if ($onlyStudentId === null) {
+                    return $savedStudentId === 0;
+                }
+
+                return $savedStudentId === $onlyStudentId;
+            });
     }
 
     public function defaultTemplate(): ?WhatsAppTemplate

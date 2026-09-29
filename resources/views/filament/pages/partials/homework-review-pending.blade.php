@@ -33,6 +33,14 @@
         </div>
     @endif
 
+    <div
+        wire:loading
+        wire:target="sendCombinedForBatch,sendCombined"
+        class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100"
+    >
+        Messages are going to parents. Please wait. Do not click again.
+    </div>
+
     <div class="flex min-w-0 flex-wrap gap-2 text-xs font-medium">
         <span class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">Waiting {{ $waiting }} · check</span>
         <span class="rounded-full bg-sky-100 px-2.5 py-1 text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">Ready {{ $ready }} · send</span>
@@ -132,20 +140,23 @@
                                                 type="button"
                                                 wire:click="sendCombinedForBatch({{ $batchId }})"
                                                 wire:loading.attr="disabled"
-                                                wire:target="sendCombinedForBatch({{ $batchId }})"
-                                                class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500 disabled:opacity-50"
+                                                wire:target="sendCombinedForBatch,sendCombined"
+                                                class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70"
                                             >
-                                                Send to parents
+                                                <span wire:loading.remove wire:target="sendCombinedForBatch,sendCombined">Send to parents</span>
+                                                <span wire:loading wire:target="sendCombinedForBatch,sendCombined">Sending… please wait</span>
                                             </button>
                                         @elseif ($canSend && $hasSent)
                                             <button
                                                 type="button"
                                                 wire:click="sendCombinedForBatch({{ $batchId }})"
+                                                wire:confirm="Parents already received this homework. Send the same message again?"
                                                 wire:loading.attr="disabled"
-                                                wire:target="sendCombinedForBatch({{ $batchId }})"
-                                                class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/15 dark:bg-transparent dark:text-gray-200 dark:hover:bg-white/5 disabled:opacity-50"
+                                                wire:target="sendCombinedForBatch,sendCombined"
+                                                class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/15 dark:bg-transparent dark:text-gray-200 dark:hover:bg-white/5 disabled:cursor-wait disabled:opacity-70"
                                             >
-                                                Resend
+                                                <span wire:loading.remove wire:target="sendCombinedForBatch,sendCombined">Resend</span>
+                                                <span wire:loading wire:target="sendCombinedForBatch,sendCombined">Sending… please wait</span>
                                             </button>
                                         @endif
                                     </div>

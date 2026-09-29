@@ -16,6 +16,7 @@ use App\Models\HomeworkAssignment;
 use App\Models\HomeworkCheck;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\BulkSendGuard;
 use App\Support\FeatureGate;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -1006,6 +1007,43 @@ class HomeworkSubmissionService
             ];
         }
 
+        $guard = app(BulkSendGuard::class);
+        $lockKey = 'homework-combined:'.$batchId.':'.$date;
+
+        if (! $guard->acquire($lockKey)) {
+            return [
+                'sent' => 0,
+                'failed' => 0,
+                'skipped' => 0,
+                'subjects' => 0,
+                'template' => null,
+                'error' => 'This class is already being sent. Please wait.',
+            ];
+        }
+
+        try {
+            return $this->combinedSendWhileLocked($admin, $batchId, $date, $templateName);
+        } finally {
+            $guard->release($lockKey);
+        }
+    }
+
+    /**
+     * @return array{
+     *     sent: int,
+     *     failed: int,
+     *     skipped: int,
+     *     error: ?string,
+     *     template: ?string,
+     *     subjects: int,
+     *     currency?: string,
+     *     unit_cost?: float,
+     *     estimated_total_cost?: float,
+     *     recipients?: list<array{name: string, phone: string, status: string, error: ?string, estimated_cost: float}>
+     * }
+     */
+    protected function combinedSendWhileLocked(User $admin, int $batchId, string $date, ?string $templateName = null): array
+    {
         $batch = Batch::query()->with('course')->findOrFail($batchId);
 
         $assignments = HomeworkAssignment::query()

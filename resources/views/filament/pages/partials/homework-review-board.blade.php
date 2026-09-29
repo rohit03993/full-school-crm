@@ -14,13 +14,16 @@
                 <button
                     type="button"
                     wire:click="sendCombined"
+                    @if (($summary['approved'] ?? 0) === 0 && ($summary['sent'] ?? 0) > 0)
+                        wire:confirm="Parents already received this homework. Send the same message again?"
+                    @endif
                     wire:loading.attr="disabled"
-                    wire:target="sendCombined"
+                    wire:target="sendCombined,sendCombinedForBatch"
                     @disabled($summary['approved'] === 0 && $summary['sent'] === 0)
-                    class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70"
                 >
-                    <span wire:loading.remove wire:target="sendCombined">{{ ($summary['approved'] ?? 0) > 0 ? 'Send combined to parents' : 'Resend' }}</span>
-                    <span wire:loading wire:target="sendCombined">Sending… do not click again</span>
+                    <span wire:loading.remove wire:target="sendCombined,sendCombinedForBatch">{{ ($summary['approved'] ?? 0) > 0 ? 'Send combined to parents' : 'Resend' }}</span>
+                    <span wire:loading wire:target="sendCombined,sendCombinedForBatch">Sending… please wait</span>
                 </button>
             @endif
         </div>
