@@ -3,6 +3,9 @@
     $counts = $desk['counts'] ?? ['waiting' => 0, 'ready' => 0, 'sent' => 0, 'empty' => 0];
     $dateLabel = $dateLabel ?? '';
     $isToday = $isToday ?? false;
+    $canEnter = (bool) ($canEnter ?? false);
+    $canSend = (bool) ($canSend ?? false);
+    $windowNote = $windowNote ?? null;
     $openBatchId = (int) ($openBatchId ?? 0);
     $waiting = (int) ($counts['waiting'] ?? 0);
     $ready = (int) ($counts['ready'] ?? 0);
@@ -23,6 +26,12 @@
             <a href="{{ $historyUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">History</a>
         </div>
     </div>
+
+    @if (filled($windowNote))
+        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+            {{ $windowNote }}
+        </div>
+    @endif
 
     <div class="flex min-w-0 flex-wrap gap-2 text-xs font-medium">
         <span class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">Waiting {{ $waiting }} · check</span>
@@ -118,7 +127,7 @@
                                                 @endif
                                             </span>
                                         @endif
-                                        @if ($hasReady)
+                                        @if ($canSend && $hasReady)
                                             <button
                                                 type="button"
                                                 wire:click="sendCombinedForBatch({{ $batchId }})"
@@ -128,7 +137,7 @@
                                             >
                                                 Send to parents
                                             </button>
-                                        @elseif ($hasSent)
+                                        @elseif ($canSend && $hasSent)
                                             <button
                                                 type="button"
                                                 wire:click="sendCombinedForBatch({{ $batchId }})"
@@ -234,7 +243,7 @@
                                                                     Open homework
                                                                 </a>
                                                             @endif
-                                                            @if (in_array($item['status_key'], ['submitted', 'approved'], true) && $item['assignment_id'])
+                                                            @if ($canEnter && in_array($item['status_key'], ['submitted', 'approved'], true) && $item['assignment_id'])
                                                                 <button
                                                                     type="button"
                                                                     wire:click="startAdd({{ (int) $batchId }}, {{ (int) $item['course_subject_id'] }})"
@@ -302,13 +311,15 @@
                                                                 <span class="ml-1 inline-flex rounded-md bg-sky-50 px-1.5 py-0.5 font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">{{ $item['teacher'] }}</span>
                                                             @endif
                                                         </span>
-                                                        <button
-                                                            type="button"
-                                                            wire:click="startAdd({{ $batchId }}, {{ (int) $item['course_subject_id'] }})"
-                                                            class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500"
-                                                        >
-                                                            Add homework
-                                                        </button>
+                                                        @if ($canEnter)
+                                                            <button
+                                                                type="button"
+                                                                wire:click="startAdd({{ $batchId }}, {{ (int) $item['course_subject_id'] }})"
+                                                                class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500"
+                                                            >
+                                                                Add homework
+                                                            </button>
+                                                        @endif
                                                     </li>
                                                 @endif
                                             @endforeach

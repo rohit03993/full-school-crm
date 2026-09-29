@@ -24,6 +24,7 @@ use App\Models\Student;
 use App\Models\User;
 use App\Services\HomeworkAssignmentService;
 use App\Services\SiteImageService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
@@ -32,6 +33,20 @@ use Tests\TestCase;
 class HomeworkAssignmentServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Carbon::setTestNow(Carbon::parse('2026-09-29 10:00:00', 'Asia/Kolkata'));
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
 
     public function test_create_homework_and_record_view_for_batch_student(): void
     {

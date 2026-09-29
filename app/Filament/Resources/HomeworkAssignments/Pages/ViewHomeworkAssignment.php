@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\HomeworkAssignments\Pages;
 
 use App\Filament\Resources\HomeworkAssignments\HomeworkAssignmentResource;
+use App\Models\HomeworkAssignment;
+use App\Services\HomeworkSubmissionService;
 use App\Services\HomeworkWhatsAppService;
 use App\Support\CrmAccess;
 use App\Support\WhatsAppSendUi;
@@ -25,7 +27,15 @@ class ViewHomeworkAssignment extends ViewRecord
                 ->icon('heroicon-o-chat-bubble-left-right')
                 ->color('primary')
                 ->extraAttributes(WhatsAppSendUi::loadingAttributes())
-                ->visible(fn (): bool => CrmAccess::can(Auth::user(), CrmPermission::HomeworkManage))
+                ->visible(function (): bool {
+                    $user = Auth::user();
+
+                    if (! $user || ! CrmAccess::can($user, CrmPermission::HomeworkManage)) {
+                        return false;
+                    }
+
+                    return $this->homeworkCanStillBeSent();
+                })
                 ->form([
                     Select::make('whatsapp_template_name')
                         ->label('WhatsApp template')
@@ -36,8 +46,18 @@ class ViewHomeworkAssignment extends ViewRecord
                         ->helperText('Approved Meta template with 4 params: name, roll, title, public link.'),
                 ])
                 ->action(function (array $data): void {
-                    /** @var \App\Models\HomeworkAssignment $record */
+                    /** @var HomeworkAssignment $record */
                     $record = $this->getRecord();
+
+                    if (! $this->homeworkCanStillBeSent()) {
+                        Notification::make()
+                            ->title('Homework is closed')
+                            ->body('This date has passed. Homework cannot be sent.')
+                            ->warning()
+                            ->send();
+
+                        return;
+                    }
 
                     $result = app(HomeworkWhatsAppService::class)->notifyBatch(
                         $record,
@@ -72,5 +92,18 @@ class ViewHomeworkAssignment extends ViewRecord
                         ->send();
                 }),
         ];
+    }
+
+    protected function homeworkCanStillBeSent(): bool
+    {
+        /** @var HomeworkAssignment $record */
+        $record = $this->getRecord();
+        $date = $record->homework_date ?? $record->published_at;
+
+        if ($date === null) {
+            return false;
+        }
+
+        return app(HomeworkSubmissionService::class)->canSendHomework($date->toDateString());
     }
 }

@@ -12,6 +12,7 @@ use App\Support\CrmPagination;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class HomeworkAssignmentService
 {
@@ -27,6 +28,14 @@ class HomeworkAssignmentService
      */
     public function create(User $creator, array $data): HomeworkAssignment
     {
+        $submission = app(HomeworkSubmissionService::class);
+
+        if (! $submission->canEnterHomework(now()->toDateString())) {
+            throw ValidationException::withMessages([
+                'title' => $submission->homeworkEntryClosedMessage(now()->toDateString()),
+            ]);
+        }
+
         $contentType = HomeworkContentType::Text;
         $filePath = filled($data['file_path'] ?? null) ? (string) $data['file_path'] : null;
 

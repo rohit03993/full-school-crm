@@ -63,7 +63,7 @@ class SubmitHomeworkPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Your classes for the selected date. Add homework for empty subjects. Done and Not done open after admin approves. Admin still sends one WhatsApp to parents.';
+        return 'Your classes for the selected date. Type homework for empty subjects until 9:00 PM. Done and Not done open after admin approves. Admin still sends one WhatsApp to parents.';
     }
 
     public function mount(): void
@@ -87,7 +87,7 @@ class SubmitHomeworkPage extends Page
 
         return $schema->components([
             Section::make('Date')
-                ->description('Today is selected. Pick a past date only if you need to add a missed day.')
+                ->description('Today is selected. New homework can be typed until 9:00 PM. A past date can be opened to read, but typing stays closed.')
                 ->schema([
                     DatePicker::make('homework_date')
                         ->label('Homework date')
@@ -110,6 +110,8 @@ class SubmitHomeworkPage extends Page
                                     : ['counts' => ['missing' => 0, 'submitted' => 0, 'approved' => 0, 'sent' => 0], 'groups' => []],
                                 'dateLabel' => Carbon::parse($date)->format('d M Y'),
                                 'isToday' => $date === now()->toDateString(),
+                                'canEnter' => $service->canEnterHomework($date),
+                                'windowNote' => $service->homeworkWindowNote($date),
                                 'checkBaseUrl' => HomeworkCheckPage::getUrl(),
                                 'checkDate' => $date,
                             ];

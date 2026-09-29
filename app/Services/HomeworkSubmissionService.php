@@ -117,6 +117,64 @@ class HomeworkSubmissionService
     }
 
     /**
+     * Teachers and admins may type homework only on today's date, and only before 9:00 PM.
+     */
+    public function canEnterHomework(string $date): bool
+    {
+        if (! $this->homeworkDateIsToday($date)) {
+            return false;
+        }
+
+        return ! $this->homeworkEntryCutoffHasPassed();
+    }
+
+    /**
+     * Parents can be sent today's homework only. A past date stays closed for everyone.
+     */
+    public function canSendHomework(string $date): bool
+    {
+        return $this->homeworkDateIsToday($date);
+    }
+
+    public function homeworkWindowNote(string $date): ?string
+    {
+        $day = Carbon::parse($date)->toDateString();
+        $today = now()->toDateString();
+
+        if ($day < $today) {
+            return 'This date has passed. No one can add or send homework now.';
+        }
+
+        if ($day === $today && $this->homeworkEntryCutoffHasPassed()) {
+            return 'It is after 9:00 PM. No one can add or edit homework now. You can still send homework that was already added today.';
+        }
+
+        return null;
+    }
+
+    public function homeworkEntryClosedMessage(string $date): string
+    {
+        if (Carbon::parse($date)->toDateString() < now()->toDateString()) {
+            return 'This date has passed. Homework cannot be added.';
+        }
+
+        return 'Homework entry closes at 9:00 PM. You cannot add homework now.';
+    }
+
+    protected function homeworkDateIsToday(string $date): bool
+    {
+        return Carbon::parse($date)->toDateString() === now()->toDateString();
+    }
+
+    protected function homeworkEntryCutoffHasPassed(): bool
+    {
+        $now = now()->timezone(config('app.timezone'));
+        $cutoff = $now->copy()->setTime(21, 0, 0);
+
+        return $now->greaterThanOrEqualTo($cutoff);
+    }
+
+    /**
      * Create or update a subject's homework for a class/date.
      *
      * Teacher submit → status Submitted (awaiting admin). Admin save → status Approved (ready to send).
@@ -142,6 +200,12 @@ class HomeworkSubmissionService
         $batchId = (int) $data['batch_id'];
         $subjectId = (int) $data['course_subject_id'];
         $date = $this->normalizeDate($data['homework_date'] ?? null);
+
+        if (! $this->canEnterHomework($date)) {
+            throw ValidationException::withMessages([
+                'homework_date' => $this->homeworkEntryClosedMessage($date),
+            ]);
+        }
 
         if (! $this->scope->userCanAccessBatch($user, $batchId)) {
             throw ValidationException::withMessages([
@@ -930,6 +994,18 @@ class HomeworkSubmissionService
     public function combinedSend(User $admin, int $batchId, string $date, ?string $templateName = null): array
     {
         $date = $this->normalizeDate($date);
+
+        if (! $this->canSendHomework($date)) {
+            return [
+                'sent' => 0,
+                'failed' => 0,
+                'skipped' => 0,
+                'subjects' => 0,
+                'template' => null,
+                'error' => 'This date has passed. Homework cannot be sent.',
+            ];
+        }
+
         $batch = Batch::query()->with('course')->findOrFail($batchId);
 
         $assignments = HomeworkAssignment::query()

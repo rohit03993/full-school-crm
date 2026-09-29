@@ -89,8 +89,8 @@ class HomeworkReviewPage extends Page
         return $schema->components([
             Section::make('Date')
                 ->description(fn (): string => $this->dateString() === now()->toDateString()
-                    ? 'Today is selected. Pick a past date to review that day.'
-                    : 'Showing this homework date. Change the date to see another day.')
+                    ? 'Today is selected. New homework can be typed until 9:00 PM. Sending stays open for today only.'
+                    : 'This date has passed. You can read what was saved. Adding and sending stay closed.')
                 ->schema([
                     DatePicker::make('homework_date')
                         ->label('Homework date')
@@ -112,11 +112,16 @@ class HomeworkReviewPage extends Page
                         ->viewData(function (): array {
                             $date = $this->dateString();
 
+                            $service = app(HomeworkSubmissionService::class);
+
                             return [
-                                'desk' => app(HomeworkSubmissionService::class)->deskForDate($date),
+                                'desk' => $service->deskForDate($date),
                                 'openBatchId' => (int) ($this->openBatchId ?? 0),
                                 'dateLabel' => Carbon::parse($date)->format('d M Y'),
                                 'isToday' => $date === now()->toDateString(),
+                                'canEnter' => $service->canEnterHomework($date),
+                                'canSend' => $service->canSendHomework($date),
+                                'windowNote' => $service->homeworkWindowNote($date),
                                 'checkUrl' => HomeworkCheckPage::getUrl(),
                                 'historyUrl' => HomeworkAssignmentResource::getUrl('index'),
                             ];
@@ -150,7 +155,8 @@ class HomeworkReviewPage extends Page
                         })
                         ->columnSpanFull(),
                 ])
-                ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)),
+                ->visible(fn (): bool => filled($this->data['batch_id'] ?? null)
+                    && app(HomeworkSubmissionService::class)->canSendHomework($this->dateString())),
         ]);
     }
 
@@ -176,6 +182,8 @@ class HomeworkReviewPage extends Page
                         'batchId' => $batchId,
                         'board' => $board,
                         'dateLabel' => Carbon::parse($date)->format('d M Y'),
+                        'canEnter' => $service->canEnterHomework($date),
+                        'canSend' => $service->canSendHomework($date),
                         'lastCombinedSendResult' => $this->lastCombinedSendResult,
                     ];
                 }),

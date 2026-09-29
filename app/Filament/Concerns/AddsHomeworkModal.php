@@ -41,6 +41,18 @@ trait AddsHomeworkModal
             return;
         }
 
+        $service = app(HomeworkSubmissionService::class);
+
+        if (! $service->canEnterHomework($this->dateString())) {
+            Notification::make()
+                ->title('Homework is closed')
+                ->body($service->homeworkEntryClosedMessage($this->dateString()))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->mountAction('addHomework', [
             'batchId' => $batchId,
             'subjectId' => $subjectId,

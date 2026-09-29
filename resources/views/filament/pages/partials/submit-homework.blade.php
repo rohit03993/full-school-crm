@@ -3,6 +3,8 @@
     $counts = $desk['counts'] ?? ['missing' => 0, 'submitted' => 0, 'approved' => 0, 'sent' => 0];
     $dateLabel = $dateLabel ?? '';
     $isToday = $isToday ?? false;
+    $canEnter = (bool) ($canEnter ?? false);
+    $windowNote = $windowNote ?? null;
     $checkBaseUrl = $checkBaseUrl ?? '#';
     $checkDate = $checkDate ?? now()->toDateString();
 @endphp
@@ -14,6 +16,12 @@
             · today
         @endif
     </p>
+
+    @if (filled($windowNote))
+        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+            {{ $windowNote }}
+        </div>
+    @endif
 
     <div class="flex min-w-0 flex-wrap gap-2 text-xs font-medium">
         <span class="rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 dark:bg-white/5 dark:text-gray-300">To add: {{ (int) ($counts['missing'] ?? 0) }}</span>
@@ -74,7 +82,7 @@
                                                 @endif
                                             </div>
                                             <div class="flex min-w-0 flex-wrap gap-2">
-                                                @if ($subject['assignment_id'] === null || $subject['can_remove'])
+                                                @if ($canEnter && ($subject['assignment_id'] === null || $subject['can_remove']))
                                                     <button
                                                         type="button"
                                                         wire:click="startAdd({{ (int) $section['batch_id'] }}, {{ (int) $subject['course_subject_id'] }})"

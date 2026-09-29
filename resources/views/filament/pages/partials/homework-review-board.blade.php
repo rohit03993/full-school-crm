@@ -1,6 +1,8 @@
 <div class="mt-4 space-y-4">
     @if ($ready)
         @php($summary = $board['summary'])
+        @php($canEnter = (bool) ($canEnter ?? false))
+        @php($canSend = (bool) ($canSend ?? false))
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex flex-wrap gap-2 text-xs font-medium">
                 <span class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">Submitted: {{ $summary['submitted'] }}</span>
@@ -8,17 +10,19 @@
                 <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">Sent: {{ $summary['sent'] }}</span>
                 <span class="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600 dark:bg-white/5 dark:text-gray-300">No homework: {{ $summary['missing'] }}</span>
             </div>
-            <button
-                type="button"
-                wire:click="sendCombined"
-                wire:loading.attr="disabled"
-                wire:target="sendCombined"
-                @disabled($summary['approved'] === 0 && $summary['sent'] === 0)
-                class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-                <span wire:loading.remove wire:target="sendCombined">{{ ($summary['approved'] ?? 0) > 0 ? 'Send combined to parents' : 'Resend' }}</span>
-                <span wire:loading wire:target="sendCombined">Sending… do not click again</span>
-            </button>
+            @if ($canSend)
+                <button
+                    type="button"
+                    wire:click="sendCombined"
+                    wire:loading.attr="disabled"
+                    wire:target="sendCombined"
+                    @disabled($summary['approved'] === 0 && $summary['sent'] === 0)
+                    class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    <span wire:loading.remove wire:target="sendCombined">{{ ($summary['approved'] ?? 0) > 0 ? 'Send combined to parents' : 'Resend' }}</span>
+                    <span wire:loading wire:target="sendCombined">Sending… do not click again</span>
+                </button>
+            @endif
         </div>
 
         @if ($summary['approved'] === 0 && $summary['sent'] === 0)
@@ -141,7 +145,7 @@
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex flex-wrap justify-end gap-2">
-                                    @if (in_array($row['status_key'], ['submitted', 'approved'], true))
+                                    @if ($canEnter && in_array($row['status_key'], ['submitted', 'approved'], true))
                                         <button
                                             type="button"
                                             wire:click="startAdd({{ (int) $batchId }}, {{ (int) $row['course_subject_id'] }})"

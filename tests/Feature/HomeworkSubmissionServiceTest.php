@@ -36,6 +36,7 @@ use App\Services\HomeworkCheckService;
 use App\Services\HomeworkSubmissionService;
 use App\Services\MetaWhatsAppCostEstimator;
 use App\Support\CombinedHomeworkWhatsAppTemplate;
+use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
@@ -60,6 +61,15 @@ class HomeworkSubmissionServiceTest extends TestCase
         Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
         Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-test-token'), 'meta_whatsapp');
         Setting::flushValueCache();
+
+        Carbon::setTestNow(Carbon::parse('2026-09-29 10:00:00', 'Asia/Kolkata'));
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
     }
 
     public function test_sidebar_registers_only_one_homework_entry(): void
@@ -411,7 +421,7 @@ class HomeworkSubmissionServiceTest extends TestCase
             'description' => 'Chapter 9',
         ]);
 
-        $yesterdayHomework = $service->submit($data['mathTeacher'], [
+        $yesterdayHomework = $this->submitWhileThatMorningWasOpen($data['mathTeacher'], [
             'batch_id' => $data['batch']->id,
             'course_subject_id' => $data['maths']->id,
             'homework_date' => now()->subDay()->toDateString(),
@@ -490,7 +500,7 @@ class HomeworkSubmissionServiceTest extends TestCase
         $data = $this->seedClass();
         $yesterday = now()->subDay()->toDateString();
 
-        app(HomeworkSubmissionService::class)->submit($data['mathTeacher'], [
+        $this->submitWhileThatMorningWasOpen($data['mathTeacher'], [
             'batch_id' => $data['batch']->id,
             'course_subject_id' => $data['maths']->id,
             'homework_date' => $yesterday,
@@ -1298,6 +1308,134 @@ class HomeworkSubmissionServiceTest extends TestCase
         }
 
         return compact('admin', 'mathTeacher', 'physicsTeacher', 'batch', 'maths', 'physics');
+    }
+
+    public function test_no_one_can_add_homework_after_9_pm_but_send_stays_open_today(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+
+        Carbon::setTestNow(Carbon::parse('2026-09-29 20:30:00', 'Asia/Kolkata'));
+
+        $maths = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => '2026-09-29',
+            'title' => 'Algebra',
+            'description' => 'Ex 5.2',
+        ]);
+        $service->approve($data['admin'], $maths->id);
+
+        Carbon::setTestNow(Carbon::parse('2026-09-29 21:00:00', 'Asia/Kolkata'));
+
+        $this->assertFalse($service->canEnterHomework('2026-09-29'));
+        $this->assertTrue($service->canSendHomework('2026-09-29'));
+
+        try {
+            $service->submit($data['physicsTeacher'], [
+                'batch_id' => $data['batch']->id,
+                'course_subject_id' => $data['physics']->id,
+                'homework_date' => '2026-09-29',
+                'title' => 'Too late',
+                'description' => 'Waves',
+            ]);
+            $this->fail('Homework was saved after 9:00 PM.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'Homework entry closes at 9:00 PM. You cannot add homework now.',
+                $exception->errors()['homework_date'][0],
+            );
+        }
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->assertSee('It is after 9:00 PM')
+            ->call('toggleDeskSection', $data['batch']->id)
+            ->assertDontSee('Add homework')
+            ->assertDontSee('Edit')
+            ->assertSee('Send to parents');
+
+        $this->actingAs($data['mathTeacher']);
+
+        Livewire::test(SubmitHomeworkPage::class)
+            ->assertSee('It is after 9:00 PM')
+            ->assertDontSee('Add homework')
+            ->assertDontSee('Update')
+            ->call('startAdd', $data['batch']->id, $data['physics']->id)
+            ->assertNotified('Homework is closed');
+    }
+
+    public function test_past_date_hides_add_and_send_for_everyone(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+
+        $maths = $this->submitWhileThatMorningWasOpen($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => '2026-09-28',
+            'title' => 'Yesterday algebra',
+            'description' => 'Revision',
+        ]);
+        $service->approve($data['admin'], $maths->id);
+
+        Carbon::setTestNow(Carbon::parse('2026-09-29 10:00:00', 'Asia/Kolkata'));
+
+        $this->assertFalse($service->canEnterHomework('2026-09-28'));
+        $this->assertFalse($service->canSendHomework('2026-09-28'));
+
+        $result = $service->combinedSend($data['admin'], $data['batch']->id, '2026-09-28');
+
+        $this->assertSame(0, $result['sent']);
+        $this->assertSame('This date has passed. Homework cannot be sent.', $result['error']);
+
+        try {
+            $service->submit($data['admin'], [
+                'batch_id' => $data['batch']->id,
+                'course_subject_id' => $data['physics']->id,
+                'homework_date' => '2026-09-28',
+                'title' => 'Late add',
+                'description' => 'Should not save',
+            ], asAdmin: true);
+            $this->fail('Homework was saved for a past date.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'This date has passed. Homework cannot be added.',
+                $exception->errors()['homework_date'][0],
+            );
+        }
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->set('data.homework_date', '2026-09-28')
+            ->assertSee('No one can add or send homework now.')
+            ->call('toggleDeskSection', $data['batch']->id)
+            ->assertSee('Yesterday algebra')
+            ->assertDontSee('Add homework')
+            ->assertDontSee('Edit')
+            ->assertDontSee('Send to parents')
+            ->assertDontSee('Resend')
+            ->call('sendCombinedForBatch', $data['batch']->id)
+            ->assertNotified('Nothing sent');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function submitWhileThatMorningWasOpen(User $user, array $data): HomeworkAssignment
+    {
+        $returnTo = now();
+        Carbon::setTestNow(Carbon::parse($data['homework_date'].' 10:00:00', 'Asia/Kolkata'));
+
+        try {
+            return app(HomeworkSubmissionService::class)->submit($user, $data);
+        } finally {
+            Carbon::setTestNow($returnTo);
+        }
     }
 
     protected function seedCombinedTemplate(): void
