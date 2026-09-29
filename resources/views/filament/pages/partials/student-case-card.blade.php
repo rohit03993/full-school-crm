@@ -212,44 +212,92 @@
                 @endif
             </div>
 
-            @if ($canAddUpdate)
-                <form wire:submit="submitCaseUpdate({{ $case->id }})" class="mt-4 space-y-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4 dark:border-amber-500/20 dark:bg-amber-500/5">
-                    <p class="text-sm font-semibold text-gray-950 dark:text-white">Log what was spoken</p>
-                    <p class="text-xs text-gray-600 dark:text-gray-300">The case stays open. Use this when the meeting is not finished yet.</p>
-                    <textarea wire:model="caseUpdateBody" rows="3" required class="fi-crm-input block w-full" placeholder="What was said in this meeting"></textarea>
-                    <button type="submit" class="inline-flex rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-500">
-                        Save on this case
-                    </button>
-                </form>
-            @endif
+            @php
+                $openPanel = ($expandedCaseId ?? null) === $case->id ? ($caseActionPanel ?? '') : '';
+            @endphp
 
             @if ($canReopen)
                 <form wire:submit="submitCaseReopen({{ $case->id }})" class="mt-4">
-                    <button type="submit" wire:confirm="Reopen this case?" class="inline-flex rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500">
+                    <button type="submit" wire:confirm="Reopen this case?" class="inline-flex min-h-11 items-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-500">
                         Reopen case
                     </button>
                 </form>
             @endif
 
-            @if ($case->isOpen() && $canLogCall)
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <button
-                        type="button"
-                        wire:click="openLogCallForCase({{ $case->id }})"
-                        class="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
-                    >
-                        Log call on case
-                    </button>
+            @if ($canAddUpdate || ($case->isOpen() && ($canLogCall || $canTransfer || $canClose)))
+                <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                    @if ($canAddUpdate)
+                        <button
+                            type="button"
+                            wire:click="openCaseAction({{ $case->id }}, 'note')"
+                            @class([
+                                'inline-flex min-h-11 items-center justify-center rounded-xl px-3 py-2.5 text-sm font-semibold',
+                                'bg-amber-600 text-white' => $openPanel === 'note',
+                                'bg-amber-50 text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-100 dark:ring-amber-500/30' => $openPanel !== 'note',
+                            ])
+                        >
+                            What was said
+                        </button>
+                    @endif
+                    @if ($case->isOpen() && $canLogCall)
+                        <button
+                            type="button"
+                            wire:click="openLogCallForCase({{ $case->id }})"
+                            class="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-900 ring-1 ring-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-500/30"
+                        >
+                            Log a call
+                        </button>
+                    @endif
+                    @if ($case->isOpen() && $canTransfer)
+                        <button
+                            type="button"
+                            wire:click="openCaseAction({{ $case->id }}, 'transfer')"
+                            @class([
+                                'inline-flex min-h-11 items-center justify-center rounded-xl px-3 py-2.5 text-sm font-semibold',
+                                'bg-primary-600 text-white' => $openPanel === 'transfer',
+                                'bg-white text-gray-800 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-white/5 dark:text-gray-100 dark:ring-white/15' => $openPanel !== 'transfer',
+                            ])
+                        >
+                            Give to someone else
+                        </button>
+                    @endif
+                    @if ($case->isOpen() && $canClose)
+                        <button
+                            type="button"
+                            wire:click="openCaseAction({{ $case->id }}, 'close')"
+                            @class([
+                                'inline-flex min-h-11 items-center justify-center rounded-xl px-3 py-2.5 text-sm font-semibold',
+                                'bg-gray-900 text-white dark:bg-white dark:text-gray-900' => $openPanel === 'close',
+                                'bg-white text-gray-800 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-white/5 dark:text-gray-100 dark:ring-white/15' => $openPanel !== 'close',
+                            ])
+                        >
+                            Close case
+                        </button>
+                    @endif
                 </div>
             @endif
 
-            @if ($case->isOpen() && $canTransfer)
-                <form wire:submit="submitCaseTransfer({{ $case->id }})" class="mt-4 space-y-3 rounded-xl border border-gray-200 p-4 dark:border-white/10">
-                    <p class="text-sm font-semibold text-gray-950 dark:text-white">
-                        {{ $isAdminReassign ? 'Reassign case (admin)' : 'Transfer case' }}
-                    </p>
+            @if ($openPanel === 'note')
+                <form wire:submit="submitCaseUpdate({{ $case->id }})" class="mt-3 space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-500/20 dark:bg-amber-500/5">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-semibold text-gray-950 dark:text-white">What was said</p>
+                        <button type="button" wire:click="openCaseAction({{ $case->id }}, 'note')" class="text-xs font-semibold text-gray-500">Cancel</button>
+                    </div>
+                    <textarea wire:model="caseUpdateBody" rows="3" required class="fi-crm-input block w-full" placeholder="Write what was said in the meeting"></textarea>
+                    <button type="submit" class="inline-flex min-h-11 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-500">
+                        Save
+                    </button>
+                </form>
+            @endif
+
+            @if ($openPanel === 'transfer')
+                <form wire:submit="submitCaseTransfer({{ $case->id }})" class="mt-3 space-y-3 rounded-xl border border-gray-200 p-4 dark:border-white/10">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-semibold text-gray-950 dark:text-white">Give to someone else</p>
+                        <button type="button" wire:click="openCaseAction({{ $case->id }}, 'transfer')" class="text-xs font-semibold text-gray-500">Cancel</button>
+                    </div>
                     <div>
-                        <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Assign to</label>
+                        <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Staff</label>
                         <x-crm.select wire:model="caseTransferAssigneeId" class="mt-1" required>
                             <option value="">Select staff…</option>
                             @foreach ($staffOptions as $id => $name)
@@ -260,31 +308,28 @@
                         </x-crm.select>
                     </div>
                     <div>
-                        <label class="text-xs font-medium text-gray-600 dark:text-gray-300">{{ $isAdminReassign ? 'Reassignment note' : 'Transfer note' }}</label>
-                        <textarea wire:model="caseTransferNote" rows="2" required class="fi-crm-input mt-1 block w-full" placeholder="{{ $isAdminReassign ? 'Why is admin reassigning this case?' : 'Why is this being reassigned?' }}"></textarea>
+                        <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Why</label>
+                        <textarea wire:model="caseTransferNote" rows="2" required class="fi-crm-input mt-1 block w-full" placeholder="Why are you giving this case to them?"></textarea>
                     </div>
-                    <button type="submit" class="inline-flex rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500">
-                        {{ $isAdminReassign ? 'Reassign' : 'Transfer' }}
+                    <button type="submit" class="inline-flex min-h-11 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-500">
+                        Save
                     </button>
                 </form>
             @endif
 
-            @if ($case->isOpen() && $canClose)
-                <form wire:submit="submitCaseClose({{ $case->id }})" class="mt-4 space-y-3 rounded-xl border border-gray-200 p-4 dark:border-white/10">
-                    <p class="text-sm font-semibold text-gray-950 dark:text-white">Close case</p>
-                    @if ($isAdminReassign)
-                        <p class="text-xs text-gray-600 dark:text-gray-300">Use this if the case was reopened by mistake.</p>
-                    @endif
-                    <div>
-                        <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Closing note</label>
-                        <textarea wire:model="caseClosingNote" rows="2" required class="fi-crm-input mt-1 block w-full" placeholder="Final resolution and outcome"></textarea>
+            @if ($openPanel === 'close')
+                <form wire:submit="submitCaseClose({{ $case->id }})" class="mt-3 space-y-3 rounded-xl border border-gray-200 p-4 dark:border-white/10">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-semibold text-gray-950 dark:text-white">Close case</p>
+                        <button type="button" wire:click="openCaseAction({{ $case->id }}, 'close')" class="text-xs font-semibold text-gray-500">Cancel</button>
                     </div>
+                    <textarea wire:model="caseClosingNote" rows="3" required class="fi-crm-input block w-full" placeholder="How was this finished?"></textarea>
                     @if (filled($earlierClosingNote))
                         <button type="button" wire:click="fillEarlierClosingNote({{ $case->id }})" class="text-xs font-semibold text-primary-600 dark:text-primary-400">
                             Use the earlier closing note
                         </button>
                     @endif
-                    <button type="submit" class="inline-flex rounded-lg bg-gray-800 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-700 dark:bg-gray-200 dark:text-gray-900">
+                    <button type="submit" class="inline-flex min-h-11 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900">
                         Close case
                     </button>
                 </form>

@@ -276,6 +276,8 @@ class StudentProfilePage extends Page
 
     public string $caseUpdateBody = '';
 
+    public string $caseActionPanel = '';
+
     public ?int $editingCaseNoteId = null;
 
     public string $editingCaseNoteBody = '';
@@ -968,9 +970,26 @@ class StudentProfilePage extends Page
         $this->caseTransferAssigneeId = null;
         $this->caseClosingNote = '';
         $this->caseUpdateBody = '';
+        $this->caseActionPanel = '';
         $this->editingCaseNoteId = null;
         $this->editingCaseNoteBody = '';
         $this->showEditCaseForm = false;
+    }
+
+    public function openCaseAction(int $caseId, string $panel): void
+    {
+        if (! in_array($panel, ['note', 'transfer', 'close'], true)) {
+            return;
+        }
+
+        if ($this->expandedCaseId === $caseId && $this->caseActionPanel === $panel) {
+            $this->caseActionPanel = '';
+
+            return;
+        }
+
+        $this->expandedCaseId = $caseId;
+        $this->caseActionPanel = $panel;
     }
 
     public function openOpenCaseForm(): void
@@ -1073,6 +1092,7 @@ class StudentProfilePage extends Page
             return;
         }
 
+        $this->caseActionPanel = '';
         $this->invalidateCasesTab();
         $this->expandedCaseId = $caseId;
 
@@ -1101,6 +1121,7 @@ class StudentProfilePage extends Page
             return;
         }
 
+        $this->caseActionPanel = '';
         $this->invalidateCasesTab();
         $this->expandedCaseId = null;
 
@@ -1127,6 +1148,7 @@ class StudentProfilePage extends Page
         }
 
         $this->caseUpdateBody = '';
+        $this->caseActionPanel = '';
         $this->invalidateCasesTab();
         $this->expandedCaseId = $caseId;
 
@@ -4146,6 +4168,7 @@ class StudentProfilePage extends Page
                                     'openCaseAssigneeId' => $this->openCaseAssigneeId,
                                     'openCaseHandoffNote' => $this->openCaseHandoffNote,
                                     'caseUpdateBody' => $this->caseUpdateBody,
+                                    'caseActionPanel' => $this->caseActionPanel,
                                     'editingCaseNoteId' => $this->editingCaseNoteId,
                                     'editingCaseNoteBody' => $this->editingCaseNoteBody,
                                     'showEditCaseForm' => $this->showEditCaseForm,
