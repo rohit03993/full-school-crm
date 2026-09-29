@@ -16,6 +16,7 @@ use App\Models\Enrollment;
 use App\Models\Enquiry;
 use App\Models\Student;
 use App\Models\StudentCase;
+use App\Models\StudentCaseNote;
 use App\Models\User;
 use App\Services\CallLogService;
 use App\Services\CrmPermissionSyncService;
@@ -344,6 +345,116 @@ class StudentCaseServiceTest extends TestCase
 
         $this->assertInstanceOf(StudentCase::class, $case);
         $this->assertSame($student->id, $case->student_id);
+    }
+
+    public function test_open_case_does_not_require_a_second_handoff_note(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
+
+        $case = app(StudentCaseService::class)->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::General,
+            'Absent from 7 days',
+            'Absent from last 7 days. Father said health issue.',
+            $accountant,
+            $counsellor,
+        );
+
+        $this->assertSame('Absent from last 7 days. Father said health issue.', $case->summary);
+        $this->assertDatabaseHas('student_case_assignments', [
+            'student_case_id' => $case->id,
+            'note' => 'Case opened.',
+        ]);
+
+        $trail = app(StudentCaseService::class)->activityTrail($case->fresh(['assignments.toUser', 'assignments.assignedBy', 'notes']));
+        $opened = $trail->firstWhere('label', 'Case opened');
+
+        $this->assertNotNull($opened);
+        $this->assertNull($opened['summary']);
+    }
+
+    public function test_same_story_is_not_repeated_when_handoff_matches_summary(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
+        $story = 'Absent from last 7 days. Father said health issue.';
+
+        $case = app(StudentCaseService::class)->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::General,
+            'Absent from 7 days',
+            $story,
+            $accountant,
+            $counsellor,
+            $story,
+        );
+
+        $this->assertDatabaseHas('student_case_assignments', [
+            'student_case_id' => $case->id,
+            'note' => $story,
+        ]);
+
+        $trail = app(StudentCaseService::class)->activityTrail($case);
+        $opened = $trail->firstWhere('label', 'Case opened');
+
+        $this->assertNull($opened['summary']);
+        $this->assertSame($story, $case->summary);
+    }
+
+    public function test_assignee_can_log_and_edit_a_meeting_note_without_closing(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
+        $service = app(StudentCaseService::class);
+
+        $case = $service->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::General,
+            'Absent from 7 days',
+            'Father reported a health issue.',
+            $accountant,
+            $counsellor,
+        );
+
+        $this->assertTrue($service->canAddUpdate($case, $accountant));
+        $this->assertFalse($service->canAddUpdate($case, $counsellor));
+
+        $note = $service->addUpdate($case, $accountant, 'Met the father. Still no medical note.');
+
+        $this->assertSame(StudentCaseStatus::Open, $case->fresh()->status);
+        $this->assertSame(StudentCaseNote::KIND_UPDATE, $note->kind);
+
+        $edited = $service->updateNote($note, $accountant, 'Met the father. He will bring a medical note tomorrow.');
+
+        $this->assertSame('Met the father. He will bring a medical note tomorrow.', $edited->body);
+        $this->assertSame(1, $case->notes()->count());
+    }
+
+    public function test_reopen_keeps_the_closing_note_in_history(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
+        $service = app(StudentCaseService::class);
+
+        $case = $service->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::General,
+            'Absent from 7 days',
+            'Father reported a health issue.',
+            $accountant,
+            $counsellor,
+        );
+
+        $case = $service->close($case, $accountant, 'Student returned with a medical note.');
+
+        $reopened = $service->reopen($case, $accountant);
+
+        $this->assertSame(StudentCaseStatus::Open, $reopened->status);
+        $this->assertNull($reopened->closed_at);
+        $this->assertNull($reopened->closing_note);
+        $this->assertDatabaseHas('student_case_notes', [
+            'student_case_id' => $case->id,
+            'kind' => StudentCaseNote::KIND_REOPEN,
+            'body' => 'Student returned with a medical note.',
+        ]);
+        $this->assertTrue($service->canAddUpdate($reopened, $accountant));
     }
 
     public function test_paginate_for_assignee_filters_by_status_and_search(): void

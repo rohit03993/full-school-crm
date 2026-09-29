@@ -19,7 +19,7 @@
                         rows="4"
                         required
                         class="fi-crm-input mt-2 block w-full"
-                        placeholder="What was discussed and the outcome…"
+                        placeholder="Filled from the handoff. Change it only if something new was said."
                     ></textarea>
                 </div>
 
@@ -27,18 +27,33 @@
                     <div>
                         <p class="text-sm font-semibold text-gray-950 dark:text-white">How was this visit resolved?</p>
                         <div class="mt-3 space-y-2">
+                            @if (($openCasesForMeeting ?? collect())->isNotEmpty())
+                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                    <input type="radio" wire:model.live="closeMeetingResolutionMode" value="log_on_case" class="border-gray-300">
+                                    Add these notes to an open case
+                                </label>
+                            @endif
                             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                 <input type="radio" wire:model.live="closeMeetingResolutionMode" value="resolved" class="border-gray-300">
                                 Resolved on spot (no case)
                             </label>
                             <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                 <input type="radio" wire:model.live="closeMeetingResolutionMode" value="open_case" class="border-gray-300">
-                                Open a case &amp; assign for follow-up
+                                Open a new case
                             </label>
                         </div>
                     </div>
 
-                    @if (($closeMeetingResolutionMode ?? 'resolved') === 'resolved')
+                    @if (($closeMeetingResolutionMode ?? 'resolved') === 'log_on_case')
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Open case</label>
+                            <x-crm.select wire:model="closeMeetingExistingCaseId" class="mt-2" required>
+                                @foreach ($openCasesForMeeting as $openCase)
+                                    <option value="{{ $openCase->id }}">{{ $openCase->case_number }} — {{ $openCase->title }}</option>
+                                @endforeach
+                            </x-crm.select>
+                        </div>
+                    @elseif (($closeMeetingResolutionMode ?? 'resolved') === 'resolved')
                         <div>
                             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Meeting outcome</label>
                             <x-crm.select wire:model="closeMeetingCampusOutcome" class="mt-2" required>
@@ -50,7 +65,7 @@
                     @else
                         <div class="rounded-xl border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-500/20 dark:bg-primary-500/5">
                             <p class="text-sm font-semibold text-gray-950 dark:text-white">Case details</p>
-                            <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">The visit is recorded and a traceable case is opened for the assigned staff member.</p>
+                            <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">The notes above become the case story. No second note is needed.</p>
 
                             <div class="mt-3">
                                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Case type</label>
@@ -77,16 +92,6 @@
                                         <option value="{{ $id }}">{{ $name }}</option>
                                     @endforeach
                                 </x-crm.select>
-                            </div>
-                            <div class="mt-3">
-                                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Handoff note <span class="text-danger-600">*</span></label>
-                                <textarea
-                                    wire:model="closeMeetingCaseHandoffNote"
-                                    rows="2"
-                                    required
-                                    class="fi-crm-input mt-2 block w-full"
-                                    placeholder="What should the assignee do next?"
-                                ></textarea>
                             </div>
                         </div>
                     @endif

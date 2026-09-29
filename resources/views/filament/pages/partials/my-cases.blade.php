@@ -69,7 +69,12 @@
             @foreach ($cases as $case)
                 @php
                     $student = $case->student;
-                    $latestNote = $case->assignments->first()?->note;
+                    $latestNote = trim((string) ($case->assignments->first()?->note ?? ''));
+                    $summary = trim((string) ($case->summary ?? ''));
+                    $showHandoff = $latestNote !== ''
+                        && strcasecmp($latestNote, 'Case opened.') !== 0
+                        && ($summary === '' || strcasecmp($latestNote, $summary) !== 0)
+                        && strcasecmp($latestNote, trim((string) $case->title)) !== 0;
                 @endphp
                 <a
                     href="{{ $student ? StudentProfilePage::getUrl(['record' => $student->id, 'tab' => 'cases', 'case' => $case->id]) : '#' }}"
@@ -99,9 +104,14 @@
                     <p class="text-xs text-gray-500 dark:text-gray-400">
                         Opened {{ $case->opened_at?->format('d M Y') }} by {{ $case->openedBy?->name ?? 'Staff' }}
                     </p>
-                    @if ($latestNote)
+                    @if ($summary !== '')
                         <p class="text-xs leading-relaxed text-gray-600 dark:text-gray-300">
-                            Handoff: {{ \Illuminate\Support\Str::limit($latestNote, 140) }}
+                            {{ \Illuminate\Support\Str::limit($summary, 140) }}
+                        </p>
+                    @endif
+                    @if ($showHandoff)
+                        <p class="text-xs leading-relaxed text-gray-600 dark:text-gray-300">
+                            Note: {{ \Illuminate\Support\Str::limit($latestNote, 140) }}
                         </p>
                     @endif
                 </a>

@@ -4,8 +4,10 @@ namespace App\Filament\Concerns;
 
 use App\Enums\CampusVisitOutcome;
 use App\Enums\CampusVisitPurpose;
+use App\Enums\StudentCaseStatus;
 use App\Enums\VisitStatus;
 use App\Models\Student;
+use App\Models\StudentCase;
 use App\Models\User;
 use App\Services\CallLogService;
 use App\Services\LeadAssignmentService;
@@ -41,6 +43,8 @@ trait HandlesCloseMeetingModal
 
     public string $closeMeetingCaseHandoffNote = '';
 
+    public ?int $closeMeetingExistingCaseId = null;
+
     abstract protected function studentForCloseMeeting(): Student;
 
     public function openCloseMeetingModal(): void
@@ -59,6 +63,24 @@ trait HandlesCloseMeetingModal
         }
 
         $this->resetCloseMeetingForm();
+
+        $handoff = trim((string) ($assignment['handoff_notes'] ?? ''));
+
+        if ($handoff !== '') {
+            $this->closeMeetingNotes = $handoff;
+        }
+
+        $openCase = StudentCase::query()
+            ->where('student_id', $this->studentForCloseMeeting()->id)
+            ->where('status', StudentCaseStatus::Open)
+            ->orderByDesc('opened_at')
+            ->first();
+
+        if ($openCase) {
+            $this->closeMeetingResolutionMode = 'log_on_case';
+            $this->closeMeetingExistingCaseId = $openCase->id;
+        }
+
         $this->showCloseMeetingModal = true;
     }
 
@@ -80,6 +102,7 @@ trait HandlesCloseMeetingModal
         $this->closeMeetingCaseTitle = '';
         $this->closeMeetingCaseAssigneeId = null;
         $this->closeMeetingCaseHandoffNote = '';
+        $this->closeMeetingExistingCaseId = null;
     }
 
     public function submitCloseMeeting(): void
@@ -101,6 +124,27 @@ trait HandlesCloseMeetingModal
         }
 
         $isEnrolled = $student->activeEnrollment !== null;
+
+        if ($isEnrolled && $this->closeMeetingResolutionMode === 'open_case' && ! $this->closeMeetingCaseAssigneeId) {
+            Notification::make()
+                ->title('Select staff')
+                ->body('Choose who should take this case.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($isEnrolled && $this->closeMeetingResolutionMode === 'log_on_case' && ! $this->closeMeetingExistingCaseId) {
+            Notification::make()
+                ->title('Select a case')
+                ->body('Choose the open case these notes belong to.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $visitStatus = $isEnrolled ? null : VisitStatus::tryFrom((string) $this->closeMeetingStatus);
         $campusOutcome = $isEnrolled
             ? $this->resolveEnrolledCampusOutcome()
@@ -142,7 +186,19 @@ trait HandlesCloseMeetingModal
             } catch (ValidationException $exception) {
                 Notification::make()
                     ->title('Meeting closed — case could not be opened')
-                    ->body(collect($exception->errors())->flatten()->first() ?? 'Please try again from the Cases tab (Super Admin) or close the meeting again.')
+                    ->body(collect($exception->errors())->flatten()->first() ?? 'Please try again from the Cases tab.')
+                    ->warning()
+                    ->send();
+            }
+        }
+
+        if ($isEnrolled && $this->closeMeetingResolutionMode === 'log_on_case') {
+            try {
+                $this->logMeetingOnOpenCase($student);
+            } catch (ValidationException $exception) {
+                Notification::make()
+                    ->title('Meeting closed — note was not added to the case')
+                    ->body(collect($exception->errors())->flatten()->first() ?? 'Open the case and use Log what was spoken.')
                     ->warning()
                     ->send();
             }
@@ -212,6 +268,10 @@ trait HandlesCloseMeetingModal
                 return 'Meeting notes saved and a support case was opened for follow-up.';
             }
 
+            if ($this->closeMeetingResolutionMode === 'log_on_case') {
+                return 'Meeting notes saved on the open case. The case stays open.';
+            }
+
             return 'Your meeting notes were saved.';
         }
 
@@ -230,6 +290,10 @@ trait HandlesCloseMeetingModal
     {
         if ($this->closeMeetingResolutionMode === 'open_case') {
             return CampusVisitOutcome::Referred;
+        }
+
+        if ($this->closeMeetingResolutionMode === 'log_on_case') {
+            return CampusVisitOutcome::NeedsFollowUp;
         }
 
         return CampusVisitOutcome::tryFrom((string) $this->closeMeetingCampusOutcome)
@@ -254,8 +318,30 @@ trait HandlesCloseMeetingModal
             trim($this->closeMeetingNotes),
             $assignee,
             Auth::user(),
-            trim($this->closeMeetingCaseHandoffNote),
+            null,
             $assignment->resultingVisit,
+        );
+    }
+
+    protected function logMeetingOnOpenCase(Student $student): void
+    {
+        $case = StudentCase::query()
+            ->whereKey((int) $this->closeMeetingExistingCaseId)
+            ->where('student_id', $student->id)
+            ->where('status', StudentCaseStatus::Open)
+            ->first();
+
+        if (! $case) {
+            throw ValidationException::withMessages([
+                'case' => 'That case is no longer open.',
+            ]);
+        }
+
+        app(StudentCaseService::class)->addUpdate(
+            $case,
+            Auth::user(),
+            trim($this->closeMeetingNotes),
+            fromMeeting: true,
         );
     }
 

@@ -274,6 +274,20 @@ class StudentProfilePage extends Page
 
     public string $openCaseHandoffNote = '';
 
+    public string $caseUpdateBody = '';
+
+    public ?int $editingCaseNoteId = null;
+
+    public string $editingCaseNoteBody = '';
+
+    public bool $showEditCaseForm = false;
+
+    public string $editCaseTitle = '';
+
+    public string $editCaseSummary = '';
+
+    public string $editCaseClosingNote = '';
+
     /**
      * @var array<int, array<string, mixed>>
      */
@@ -953,6 +967,10 @@ class StudentProfilePage extends Page
         $this->caseTransferNote = '';
         $this->caseTransferAssigneeId = null;
         $this->caseClosingNote = '';
+        $this->caseUpdateBody = '';
+        $this->editingCaseNoteId = null;
+        $this->editingCaseNoteBody = '';
+        $this->showEditCaseForm = false;
     }
 
     public function openOpenCaseForm(): void
@@ -1088,6 +1106,170 @@ class StudentProfilePage extends Page
 
         Notification::make()
             ->title('Case closed')
+            ->success()
+            ->send();
+    }
+
+    public function submitCaseUpdate(int $caseId, StudentCaseService $cases): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+
+        try {
+            $cases->addUpdate($case, Auth::user(), $this->caseUpdateBody);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not save the note')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Please check the note.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->caseUpdateBody = '';
+        $this->invalidateCasesTab();
+        $this->expandedCaseId = $caseId;
+
+        Notification::make()
+            ->title('Meeting note saved')
+            ->body('The case stays open.')
+            ->success()
+            ->send();
+    }
+
+    public function startEditCase(int $caseId, StudentCaseService $cases): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+
+        if (! $cases->canEditDetails($case, Auth::user())) {
+            Notification::make()
+                ->title('Not allowed')
+                ->body('You cannot edit this case.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->editCaseTitle = $case->title;
+        $this->editCaseSummary = (string) ($case->summary ?? '');
+        $this->editCaseClosingNote = (string) ($case->closing_note ?? '');
+        $this->showEditCaseForm = true;
+        $this->expandedCaseId = $caseId;
+    }
+
+    public function cancelEditCase(): void
+    {
+        $this->showEditCaseForm = false;
+    }
+
+    public function submitEditCase(int $caseId, StudentCaseService $cases): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+
+        try {
+            $cases->updateDetails(
+                $case,
+                Auth::user(),
+                $this->editCaseTitle,
+                $this->editCaseSummary,
+                $this->editCaseClosingNote,
+            );
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not save the case')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Please check the form.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->showEditCaseForm = false;
+        $this->invalidateCasesTab();
+        $this->expandedCaseId = $caseId;
+
+        Notification::make()
+            ->title('Case updated')
+            ->success()
+            ->send();
+    }
+
+    public function startCaseNoteEdit(int $caseId, int $noteId, StudentCaseService $cases): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+        $note = $case->notes()->whereKey($noteId)->firstOrFail();
+
+        if (! $cases->canEditNote($case, $note, Auth::user())) {
+            Notification::make()
+                ->title('Not allowed')
+                ->body('You cannot edit this note.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->editingCaseNoteId = $note->id;
+        $this->editingCaseNoteBody = $note->body;
+        $this->expandedCaseId = $caseId;
+    }
+
+    public function cancelCaseNoteEdit(): void
+    {
+        $this->editingCaseNoteId = null;
+        $this->editingCaseNoteBody = '';
+    }
+
+    public function submitCaseNoteEdit(int $caseId, StudentCaseService $cases): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+        $note = $case->notes()->whereKey((int) $this->editingCaseNoteId)->firstOrFail();
+
+        try {
+            $cases->updateNote($note, Auth::user(), $this->editingCaseNoteBody);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not save the note')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Please check the note.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->cancelCaseNoteEdit();
+        $this->invalidateCasesTab();
+        $this->expandedCaseId = $caseId;
+
+        Notification::make()
+            ->title('Note updated')
+            ->success()
+            ->send();
+    }
+
+    public function submitCaseReopen(int $caseId, StudentCaseService $cases): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+
+        try {
+            $cases->reopen($case, Auth::user());
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not reopen the case')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Please try again.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->invalidateCasesTab();
+        $this->expandedCaseId = $caseId;
+
+        Notification::make()
+            ->title('Case reopened')
+            ->body('The earlier closing note is kept in the case trail.')
             ->success()
             ->send();
     }
@@ -3760,7 +3942,15 @@ class StudentProfilePage extends Page
                     'closeMeetingStatus' => $this->closeMeetingStatus,
                     'closeMeetingCallingMode' => $this->closeMeetingCallingMode,
                     'closeMeetingResolutionMode' => $this->closeMeetingResolutionMode,
+                    'closeMeetingExistingCaseId' => $this->closeMeetingExistingCaseId,
                     'caseTypeOptions' => $this->closeMeetingCaseTypeOptions(),
+                    'openCasesForMeeting' => $this->showCloseMeetingModal && $this->record->activeEnrollment
+                        ? StudentCase::query()
+                            ->where('student_id', $this->record->id)
+                            ->where('status', \App\Enums\StudentCaseStatus::Open)
+                            ->orderByDesc('opened_at')
+                            ->get(['id', 'case_number', 'title'])
+                        : collect(),
                 ]),
             View::make('filament.pages.partials.log-call-modal')
                 ->viewData(fn (): array => [
@@ -3854,6 +4044,13 @@ class StudentProfilePage extends Page
                                     'openCaseSummary' => $this->openCaseSummary,
                                     'openCaseAssigneeId' => $this->openCaseAssigneeId,
                                     'openCaseHandoffNote' => $this->openCaseHandoffNote,
+                                    'caseUpdateBody' => $this->caseUpdateBody,
+                                    'editingCaseNoteId' => $this->editingCaseNoteId,
+                                    'editingCaseNoteBody' => $this->editingCaseNoteBody,
+                                    'showEditCaseForm' => $this->showEditCaseForm,
+                                    'editCaseTitle' => $this->editCaseTitle,
+                                    'editCaseSummary' => $this->editCaseSummary,
+                                    'editCaseClosingNote' => $this->editCaseClosingNote,
                                     'caseTypeOptions' => CampusVisitPurpose::options(),
                                 ]),
                         ]),

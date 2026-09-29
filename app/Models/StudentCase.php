@@ -71,6 +71,11 @@ class StudentCase extends Model
         return $this->hasMany(StudentCall::class)->orderByDesc('called_at');
     }
 
+    public function notes(): HasMany
+    {
+        return $this->hasMany(StudentCaseNote::class)->orderBy('id');
+    }
+
     public function isOpen(): bool
     {
         return $this->status === StudentCaseStatus::Open;

@@ -7,13 +7,16 @@ use App\Enums\CrmPermission;
 use App\Enums\NumberSequenceType;
 use App\Enums\RoleName;
 use App\Enums\StudentCaseStatus;
+use App\Enums\VisitMeetingAssignmentStatus;
 use App\Filament\Pages\MyMeetingsPage;
 use App\Filament\Pages\StudentProfilePage;
 use App\Models\Student;
 use App\Models\StudentCase;
 use App\Models\StudentCaseAssignment;
+use App\Models\StudentCaseNote;
 use App\Models\User;
 use App\Models\Visit;
+use App\Models\VisitMeetingAssignment;
 use App\Support\CrmAccess;
 use App\Support\CrmNavBadges;
 use Filament\Notifications\Notification;
@@ -60,12 +63,6 @@ class StudentCaseService
         if ($title === '') {
             throw ValidationException::withMessages([
                 'title' => 'Case title is required.',
-            ]);
-        }
-
-        if ($assignee->id !== $openedBy->id && blank($handoffNote)) {
-            throw ValidationException::withMessages([
-                'handoff_note' => 'Add a handoff note when assigning the case to another staff member.',
             ]);
         }
 
@@ -250,6 +247,190 @@ class StudentCaseService
         });
     }
 
+    public function addUpdate(StudentCase $case, User $author, string $body, bool $fromMeeting = false): StudentCaseNote
+    {
+        if (! $case->isOpen()) {
+            throw ValidationException::withMessages([
+                'case' => 'This case is already closed. Reopen it before adding a meeting note.',
+            ]);
+        }
+
+        if (! $this->canAddUpdate($case, $author, $fromMeeting)) {
+            throw ValidationException::withMessages([
+                'case' => 'You are not allowed to add a note on this case.',
+            ]);
+        }
+
+        $body = trim($body);
+
+        if ($body === '') {
+            throw ValidationException::withMessages([
+                'body' => 'Write what was spoken before saving.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($case, $author, $body): StudentCaseNote {
+            $note = StudentCaseNote::query()->create([
+                'student_case_id' => $case->id,
+                'user_id' => $author->id,
+                'kind' => StudentCaseNote::KIND_UPDATE,
+                'body' => $body,
+            ]);
+
+            $this->audit->log(
+                action: 'Case Note Added',
+                auditable: $case,
+                newValues: [
+                    'note_id' => $note->id,
+                    'body' => $body,
+                ],
+                user: $author,
+            );
+
+            return $note->fresh('author');
+        });
+    }
+
+    public function updateNote(StudentCaseNote $note, User $editor, string $body): StudentCaseNote
+    {
+        $note->loadMissing('studentCase');
+        $case = $note->studentCase;
+
+        if (! $case || ! $this->canEditNote($case, $note, $editor)) {
+            throw ValidationException::withMessages([
+                'body' => 'You are not allowed to edit this note.',
+            ]);
+        }
+
+        $body = trim($body);
+
+        if ($body === '') {
+            throw ValidationException::withMessages([
+                'body' => 'The note cannot be empty.',
+            ]);
+        }
+
+        $previous = $note->body;
+
+        return DB::transaction(function () use ($note, $case, $editor, $body, $previous): StudentCaseNote {
+            $note->update(['body' => $body]);
+
+            $this->audit->log(
+                action: 'Case Note Edited',
+                auditable: $case,
+                oldValues: ['body' => $previous],
+                newValues: [
+                    'note_id' => $note->id,
+                    'body' => $body,
+                ],
+                user: $editor,
+            );
+
+            return $note->fresh('author');
+        });
+    }
+
+    public function updateDetails(StudentCase $case, User $editor, string $title, ?string $summary, ?string $closingNote = null): StudentCase
+    {
+        if (! $this->canEditDetails($case, $editor)) {
+            throw ValidationException::withMessages([
+                'case' => 'You are not allowed to edit this case.',
+            ]);
+        }
+
+        $title = trim($title);
+        $summary = filled($summary) ? trim($summary) : null;
+
+        if ($title === '') {
+            throw ValidationException::withMessages([
+                'title' => 'Case title is required.',
+            ]);
+        }
+
+        $closingNote = $case->isOpen() ? $case->closing_note : (filled($closingNote) ? trim((string) $closingNote) : null);
+
+        if (! $case->isOpen() && blank($closingNote)) {
+            throw ValidationException::withMessages([
+                'closing_note' => 'A closing note is required.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($case, $editor, $title, $summary, $closingNote): StudentCase {
+            $previous = [
+                'title' => $case->title,
+                'summary' => $case->summary,
+                'closing_note' => $case->closing_note,
+            ];
+
+            $case->update([
+                'title' => $title,
+                'summary' => $summary,
+                'closing_note' => $closingNote,
+            ]);
+
+            $this->audit->log(
+                action: 'Case Edited',
+                auditable: $case,
+                oldValues: $previous,
+                newValues: [
+                    'title' => $title,
+                    'summary' => $summary,
+                    'closing_note' => $closingNote,
+                ],
+                user: $editor,
+            );
+
+            return $case->fresh(['closedBy', 'currentAssignee', 'openedBy']);
+        });
+    }
+
+    public function reopen(StudentCase $case, User $user): StudentCase
+    {
+        if ($case->isOpen()) {
+            throw ValidationException::withMessages([
+                'case' => 'This case is already open.',
+            ]);
+        }
+
+        if (! $this->canReopen($case, $user)) {
+            throw ValidationException::withMessages([
+                'case' => 'You are not allowed to reopen this case.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($case, $user): StudentCase {
+            $closingNote = $case->closing_note;
+
+            if (filled($closingNote)) {
+                StudentCaseNote::query()->create([
+                    'student_case_id' => $case->id,
+                    'user_id' => $user->id,
+                    'kind' => StudentCaseNote::KIND_REOPEN,
+                    'body' => $closingNote,
+                ]);
+            }
+
+            $case->update([
+                'status' => StudentCaseStatus::Open,
+                'closed_by_user_id' => null,
+                'closing_note' => null,
+                'closed_at' => null,
+            ]);
+
+            $this->audit->log(
+                action: 'Case Reopened',
+                auditable: $case,
+                oldValues: ['closing_note' => $closingNote],
+                newValues: ['status' => StudentCaseStatus::Open->value],
+                user: $user,
+            );
+
+            $this->flushNavBadges($case->current_assignee_user_id, $user->id);
+
+            return $case->fresh(['closedBy', 'currentAssignee', 'openedBy', 'notes.author']);
+        });
+    }
+
     /**
      * @return Collection<int, StudentCase>
      */
@@ -267,6 +448,7 @@ class StudentCaseService
                 'assignments.fromUser',
                 'assignments.assignedBy',
                 'calls.staff',
+                'notes.author',
             ])
             ->orderByRaw("CASE WHEN status = 'open' THEN 0 ELSE 1 END")
             ->orderByDesc('opened_at');
@@ -496,6 +678,73 @@ class StudentCaseService
         return $this->isCurrentAssignee($case, $viewer);
     }
 
+    public function canAddUpdate(StudentCase $case, ?User $viewer, bool $fromMeeting = false): bool
+    {
+        if (! $case->isOpen() || ! $viewer) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($viewer) || $this->isCurrentAssignee($case, $viewer)) {
+            return true;
+        }
+
+        if (! $fromMeeting) {
+            return false;
+        }
+
+        return VisitMeetingAssignment::query()
+            ->where('student_id', $case->student_id)
+            ->where('assigned_to_user_id', $viewer->id)
+            ->where('status', VisitMeetingAssignmentStatus::Closed)
+            ->where('closed_at', '>=', now()->subMinutes(5))
+            ->exists();
+    }
+
+    public function canEditDetails(StudentCase $case, ?User $viewer): bool
+    {
+        if (! $viewer) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($viewer)) {
+            return true;
+        }
+
+        if ($viewer->id === $case->current_assignee_user_id) {
+            return true;
+        }
+
+        return ! $case->isOpen() && $viewer->id === $case->closed_by_user_id;
+    }
+
+    public function canEditNote(StudentCase $case, StudentCaseNote $note, ?User $viewer): bool
+    {
+        if (! $viewer || ! $note->isMeetingUpdate() || $note->student_case_id !== $case->id) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($viewer)) {
+            return true;
+        }
+
+        return $viewer->id === $note->user_id
+            || $viewer->id === $case->current_assignee_user_id;
+    }
+
+    public function canReopen(StudentCase $case, ?User $viewer): bool
+    {
+        if ($case->isOpen() || ! $viewer) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($viewer)) {
+            return true;
+        }
+
+        return $viewer->id === $case->current_assignee_user_id
+            || $viewer->id === $case->closed_by_user_id;
+    }
+
     public function isCurrentAssignee(StudentCase $case, ?User $viewer): bool
     {
         return $viewer
@@ -512,10 +761,20 @@ class StudentCaseService
      *     detail: ?string,
      *     actor_name: ?string,
      *     status_label: ?string,
+     *     note_id: ?int,
      * }>
      */
     public function activityTrail(StudentCase $case): SupportCollection
     {
+        $case->loadMissing([
+            'assignments.fromUser',
+            'assignments.toUser',
+            'assignments.assignedBy',
+            'calls.staff',
+            'notes.author',
+            'closedBy',
+        ]);
+
         $items = collect();
 
         foreach ($case->assignments as $assignment) {
@@ -525,12 +784,32 @@ class StudentCaseService
                     ? 'Transferred'
                     : 'Case opened',
                 'occurred_at' => $assignment->created_at ?? now(),
-                'summary' => $assignment->note,
+                'summary' => $this->trailNote($assignment->note, $case->summary, $case->title),
                 'detail' => $assignment->fromUser
                     ? $assignment->fromUser->name.' → '.$assignment->toUser->name
                     : 'Assigned to '.$assignment->toUser->name,
                 'actor_name' => $assignment->assignedBy?->name,
                 'status_label' => null,
+                'note_id' => null,
+            ]);
+        }
+
+        foreach ($case->notes as $note) {
+            $items->push([
+                'type' => 'note',
+                'label' => $note->kind === StudentCaseNote::KIND_REOPEN
+                    ? 'Case reopened'
+                    : 'Meeting update',
+                'occurred_at' => $note->created_at ?? now(),
+                'summary' => $note->kind === StudentCaseNote::KIND_REOPEN
+                    ? 'Earlier closing note: '.$note->body
+                    : $note->body,
+                'detail' => $note->updated_at && $note->created_at && $note->updated_at->gt($note->created_at)
+                    ? 'Edited '.$note->updated_at->format('d M Y, h:i A')
+                    : null,
+                'actor_name' => $note->author?->name,
+                'status_label' => null,
+                'note_id' => $note->id,
             ]);
         }
 
@@ -543,6 +822,7 @@ class StudentCaseService
                 'detail' => $call->who_answered?->label(),
                 'actor_name' => $call->staff?->name,
                 'status_label' => $call->call_status->label(),
+                'note_id' => null,
             ]);
         }
 
@@ -551,10 +831,11 @@ class StudentCaseService
                 'type' => 'closed',
                 'label' => 'Case closed',
                 'occurred_at' => $case->closed_at,
-                'summary' => $case->closing_note,
+                'summary' => $this->trailNote($case->closing_note, $case->summary, $case->title),
                 'detail' => null,
                 'actor_name' => $case->closedBy?->name,
                 'status_label' => $case->status->label(),
+                'note_id' => null,
             ]);
         }
 
@@ -569,6 +850,29 @@ class StudentCaseService
     public static function activeStaffOptions(): array
     {
         return \App\Support\StaffOptions::assignableStaffOptions();
+    }
+
+    protected function trailNote(?string $note, ?string $summary, ?string $title): ?string
+    {
+        $note = trim((string) $note);
+
+        if ($note === '' || strcasecmp($note, 'Case opened.') === 0) {
+            return null;
+        }
+
+        if ($this->sameText($note, $summary) || $this->sameText($note, $title)) {
+            return null;
+        }
+
+        return $note;
+    }
+
+    protected function sameText(?string $left, ?string $right): bool
+    {
+        $left = preg_replace('/\s+/', ' ', trim((string) $left)) ?? '';
+        $right = preg_replace('/\s+/', ' ', trim((string) $right)) ?? '';
+
+        return $left !== '' && strcasecmp($left, $right) === 0;
     }
 
     protected function notifyAssignee(StudentCase $case, User $assignee, User $assignedBy): void

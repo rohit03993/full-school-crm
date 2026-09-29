@@ -9,7 +9,7 @@
                 <div class="flex items-start justify-between gap-3">
                     <div>
                         <p class="text-sm font-semibold text-gray-950 dark:text-white">Open case</p>
-                        <p class="mt-0.5 text-xs text-gray-600 dark:text-gray-300">Create a support case. Assign it to yourself or another staff member.</p>
+                        <p class="mt-0.5 text-xs text-gray-600 dark:text-gray-300">Write the story once. The assigned person sees it on the case.</p>
                     </div>
                     <button type="button" wire:click="cancelOpenCaseForm" class="text-xs font-semibold text-gray-500">Cancel</button>
                 </div>
@@ -29,8 +29,8 @@
                 </div>
 
                 <div>
-                    <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Details (optional)</label>
-                    <textarea wire:model="openCaseSummary" rows="2" class="fi-crm-input mt-1 block w-full" placeholder="Extra context for the assignee"></textarea>
+                    <label class="text-xs font-medium text-gray-600 dark:text-gray-300">What happened</label>
+                    <textarea wire:model="openCaseSummary" rows="3" class="fi-crm-input mt-1 block w-full" placeholder="What the parent or student said"></textarea>
                 </div>
 
                 <div>
@@ -41,11 +41,6 @@
                             <option value="{{ $id }}">{{ $name }}</option>
                         @endforeach
                     </x-crm.select>
-                </div>
-
-                <div>
-                    <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Handoff note</label>
-                    <textarea wire:model="openCaseHandoffNote" rows="2" class="fi-crm-input mt-1 block w-full" placeholder="What should the assignee do? Required if you assign someone else."></textarea>
                 </div>
 
                 <button type="submit" class="inline-flex rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500">
