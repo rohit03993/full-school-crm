@@ -106,7 +106,7 @@
                     @if ($isAdminReassign)
                         This case is with <strong>{{ $case->currentAssignee->name }}</strong>. You can correct the story, approve an edit, or close it if the reopen was a mistake. Only they can log calls.
                     @else
-                        This case is assigned to <strong>{{ $case->currentAssignee->name }}</strong>. Only they can log what was spoken, log calls, transfer, or close it.
+                        This case is assigned to <strong>{{ $case->currentAssignee->name }}</strong>. Only they can add a meeting note, log a call, transfer, or close it.
                     @endif
                 </div>
             @endif
@@ -236,7 +236,7 @@
                                 'bg-amber-50 text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-100 dark:ring-amber-500/30' => $openPanel !== 'note',
                             ])
                         >
-                            What was said
+                            Add meeting note
                         </button>
                     @endif
                     @if ($case->isOpen() && $canLogCall)
@@ -258,7 +258,7 @@
                                 'bg-white text-gray-800 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-white/5 dark:text-gray-100 dark:ring-white/15' => $openPanel !== 'transfer',
                             ])
                         >
-                            Give to someone else
+                            Transfer case
                         </button>
                     @endif
                     @if ($case->isOpen() && $canClose)
@@ -280,10 +280,10 @@
             @if ($openPanel === 'note')
                 <form wire:submit="submitCaseUpdate({{ $case->id }})" class="mt-3 space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-500/20 dark:bg-amber-500/5">
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-sm font-semibold text-gray-950 dark:text-white">What was said</p>
+                        <p class="text-sm font-semibold text-gray-950 dark:text-white">Add meeting note</p>
                         <button type="button" wire:click="openCaseAction({{ $case->id }}, 'note')" class="text-xs font-semibold text-gray-500">Cancel</button>
                     </div>
-                    <textarea wire:model="caseUpdateBody" rows="3" required class="fi-crm-input block w-full" placeholder="Write what was said in the meeting"></textarea>
+                    <textarea wire:model="caseUpdateBody" rows="3" required class="fi-crm-input block w-full" placeholder="Write the meeting note"></textarea>
                     <button type="submit" class="inline-flex min-h-11 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-500">
                         Save
                     </button>
@@ -293,7 +293,7 @@
             @if ($openPanel === 'transfer')
                 <form wire:submit="submitCaseTransfer({{ $case->id }})" class="mt-3 space-y-3 rounded-xl border border-gray-200 p-4 dark:border-white/10">
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-sm font-semibold text-gray-950 dark:text-white">Give to someone else</p>
+                        <p class="text-sm font-semibold text-gray-950 dark:text-white">Transfer case</p>
                         <button type="button" wire:click="openCaseAction({{ $case->id }}, 'transfer')" class="text-xs font-semibold text-gray-500">Cancel</button>
                     </div>
                     <div>
@@ -309,7 +309,7 @@
                     </div>
                     <div>
                         <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Why</label>
-                        <textarea wire:model="caseTransferNote" rows="2" required class="fi-crm-input mt-1 block w-full" placeholder="Why are you giving this case to them?"></textarea>
+                        <textarea wire:model="caseTransferNote" rows="2" required class="fi-crm-input mt-1 block w-full" placeholder="Why is this case being transferred?"></textarea>
                     </div>
                     <button type="submit" class="inline-flex min-h-11 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-500">
                         Save
