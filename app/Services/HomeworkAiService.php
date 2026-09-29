@@ -5,7 +5,10 @@ namespace App\Services;
 use App\Ai\Homework\HomeworkImproveOutcome;
 use App\Ai\Homework\HomeworkTextImprover;
 use App\Enums\LicenseFeature;
+use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Models\User;
+use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -38,14 +41,26 @@ class HomeworkAiService
         return max(1, min(100, (int) config('ai.homework.daily_limit', 10)));
     }
 
+    public function hasUnlimitedDailyUse(User $user): bool
+    {
+        if ($user->hasRole(RoleName::SuperAdmin->value)) {
+            return true;
+        }
+
+        return in_array(StaffJobRole::AcademicCoordinator->value, CrmAccess::jobRoleNamesFor($user), true);
+    }
+
     /**
-     * @return array{used: int, limit: int}
+     * @return array{used: int, limit: int|null, unlimited: bool}
      */
     public function usage(User $user): array
     {
+        $unlimited = $this->hasUnlimitedDailyUse($user);
+
         return [
             'used' => $this->usedToday($user),
-            'limit' => $this->dailyLimit(),
+            'limit' => $unlimited ? null : $this->dailyLimit(),
+            'unlimited' => $unlimited,
         ];
     }
 
@@ -55,7 +70,8 @@ class HomeworkAiService
     public function improve(User $user, string $title, string $description, array $context = []): HomeworkImproveOutcome
     {
         $used = $this->usedToday($user);
-        $limit = $this->dailyLimit();
+        $unlimited = $this->hasUnlimitedDailyUse($user);
+        $limit = $unlimited ? 0 : $this->dailyLimit();
 
         if (! $this->isAvailable()) {
             return HomeworkImproveOutcome::failed(
@@ -78,7 +94,7 @@ class HomeworkAiService
 
         RateLimiter::hit($burstKey, 60);
 
-        if ($used >= $limit) {
+        if (! $unlimited && $used >= $limit) {
             return HomeworkImproveOutcome::failed(
                 'AI improvements used today: '.$used.' / '.$limit.'. You can still type and save homework.',
                 $used,

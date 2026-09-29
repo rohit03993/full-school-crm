@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Filament\Pages\HomeworkReviewPage;
 use App\Models\AcademicSession;
 use App\Models\Batch;
@@ -223,6 +224,46 @@ class HomeworkAiImproveTest extends TestCase
         $this->assertSame(1, $first->usedToday);
         $this->assertFalse($second->ok);
         $this->assertStringContainsString('1 / 1', $second->message);
+    }
+
+    public function test_admin_and_academic_coordinator_are_not_stopped_by_the_daily_limit(): void
+    {
+        $this->useGemini();
+        config(['ai.homework.daily_limit' => 1]);
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [[
+                    'content' => [
+                        'parts' => [[
+                            'text' => '{"title":"Parabola – Exercise 1 and 2","description":"Complete Exercise 1 and Exercise 2 from the Parabola chapter."}',
+                        ]],
+                    ],
+                ]],
+            ]),
+        ]);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+
+        $coordinator = User::factory()->create(['is_active' => true]);
+        $coordinator->assignRole(StaffJobRole::AcademicCoordinator->value);
+
+        $service = app(HomeworkAiService::class);
+
+        $this->assertTrue($service->hasUnlimitedDailyUse($admin));
+        $this->assertTrue($service->hasUnlimitedDailyUse($coordinator));
+
+        $service->improve($admin, 'Parabola', 'Exercise 1 and 2');
+        $adminSecond = $service->improve($admin, 'Parabola', 'Exercise 1 and 2');
+
+        $service->improve($coordinator, 'Parabola', 'Exercise 1 and 2');
+        $coordinatorSecond = $service->improve($coordinator, 'Parabola', 'Exercise 1 and 2');
+
+        $this->assertTrue($adminSecond->ok, $adminSecond->message);
+        $this->assertTrue($coordinatorSecond->ok, $coordinatorSecond->message);
+        $this->assertTrue($service->usage($admin)['unlimited']);
+        $this->assertNull($service->usage($coordinator)['limit']);
     }
 
     public function test_button_stays_hidden_when_the_key_is_missing(): void

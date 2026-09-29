@@ -480,11 +480,14 @@ trait AddsHomeworkModal
     {
         $user = Auth::user();
         $service = app(HomeworkAiService::class);
-        $usage = $user ? $service->usage($user) : ['used' => 0, 'limit' => $service->dailyLimit()];
+        $usage = $user
+            ? $service->usage($user)
+            : ['used' => 0, 'limit' => $service->dailyLimit(), 'unlimited' => false];
 
         return [
             'usedToday' => $usage['used'],
-            'dailyLimit' => $usage['limit'],
+            'dailyLimit' => $usage['limit'] ?? $service->dailyLimit(),
+            'unlimited' => (bool) ($usage['unlimited'] ?? false),
             'maxTries' => $service->triesPerOpen(),
             'tries' => $this->homeworkAiTries,
             'message' => $this->homeworkAiMessage,

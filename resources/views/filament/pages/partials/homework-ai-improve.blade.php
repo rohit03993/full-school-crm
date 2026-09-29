@@ -4,7 +4,11 @@
 
 <div class="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-white/10 dark:bg-white/5">
     <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
-        AI improvements used today: {{ (int) $usedToday }} / {{ (int) $dailyLimit }}
+        @if (! empty($unlimited))
+            AI improvements used today: {{ (int) $usedToday }}. No daily limit.
+        @else
+            AI improvements used today: {{ (int) $usedToday }} / {{ (int) $dailyLimit }}
+        @endif
     </p>
 
     @if (filled($message))
