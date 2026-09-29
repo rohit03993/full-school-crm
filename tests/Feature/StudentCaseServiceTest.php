@@ -17,6 +17,7 @@ use App\Models\Enquiry;
 use App\Models\Student;
 use App\Models\StudentCase;
 use App\Models\StudentCaseNote;
+use App\Models\StudentCaseRevision;
 use App\Models\User;
 use App\Services\CallLogService;
 use App\Services\CrmPermissionSyncService;
@@ -455,6 +456,120 @@ class StudentCaseServiceTest extends TestCase
             'body' => 'Student returned with a medical note.',
         ]);
         $this->assertTrue($service->canAddUpdate($reopened, $accountant));
+    }
+
+    public function test_super_admin_can_close_a_case_reopened_by_mistake(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $service = app(StudentCaseService::class);
+
+        $case = $service->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::Fees,
+            'Fee dispute',
+            'Fee chart was not found.',
+            $accountant,
+            $counsellor,
+        );
+
+        $case = $service->close($case, $accountant, 'Fee chart found.');
+        $case = $service->reopen($case, $admin);
+
+        $this->assertTrue($service->canClose($case, $admin));
+        $this->assertFalse($service->canClose($case, $counsellor));
+
+        $closed = $service->close($case, $admin, 'Fee chart found.');
+
+        $this->assertSame(StudentCaseStatus::Closed, $closed->status);
+        $this->assertSame('Fee chart found.', $closed->closing_note);
+    }
+
+    public function test_direct_edit_keeps_old_and_new_remark_for_admin(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
+        $service = app(StudentCaseService::class);
+
+        $case = $service->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::Fees,
+            'Fee dispute',
+            'Old remark from the father.',
+            $accountant,
+            $counsellor,
+        );
+
+        $service->updateDetails($case, $accountant, 'Fee dispute', 'Updated remark after the meeting.');
+
+        $this->assertSame('Updated remark after the meeting.', $case->fresh()->summary);
+        $this->assertDatabaseHas('student_case_revisions', [
+            'student_case_id' => $case->id,
+            'status' => StudentCaseRevision::STATUS_APPLIED,
+            'old_summary' => 'Old remark from the father.',
+            'new_summary' => 'Updated remark after the meeting.',
+        ]);
+
+        $trail = $service->activityTrail($case->fresh());
+        $revision = $trail->firstWhere('type', 'revision');
+
+        $this->assertNotNull($revision);
+        $this->assertSame('Old remark from the father.', $revision['changes'][0]['old']);
+        $this->assertSame('Updated remark after the meeting.', $revision['changes'][0]['new']);
+    }
+
+    public function test_edit_request_waits_for_admin_and_does_not_change_the_remark(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $service = app(StudentCaseService::class);
+
+        $case = $service->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::Fees,
+            'Fee dispute',
+            'Old remark from the father.',
+            $accountant,
+            $counsellor,
+        );
+
+        $this->assertTrue($service->canRequestEdit($case, $accountant));
+        $this->assertFalse($service->canRequestEdit($case, $admin));
+
+        $revision = $service->requestEdit($case, $accountant, 'Fee dispute', 'Updated remark waiting for admin.');
+
+        $this->assertSame('Old remark from the father.', $case->fresh()->summary);
+        $this->assertSame(StudentCaseRevision::STATUS_PENDING, $revision->status);
+        $this->assertTrue($service->canReviewRevision($case, $admin));
+
+        $service->acceptRevision($revision, $admin);
+
+        $this->assertSame('Updated remark waiting for admin.', $case->fresh()->summary);
+        $this->assertSame(StudentCaseRevision::STATUS_ACCEPTED, $revision->fresh()->status);
+    }
+
+    public function test_rejected_edit_request_keeps_the_old_remark(): void
+    {
+        [$student, $counsellor, $accountant] = $this->createEnrolledStudentScenario();
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $service = app(StudentCaseService::class);
+
+        $case = $service->open(
+            $student->fresh(['activeEnrollment']),
+            CampusVisitPurpose::Fees,
+            'Fee dispute',
+            'Old remark from the father.',
+            $accountant,
+            $counsellor,
+        );
+
+        $revision = $service->requestEdit($case, $accountant, 'Fee dispute', 'This should not replace the remark.');
+        $service->rejectRevision($revision, $admin);
+
+        $this->assertSame('Old remark from the father.', $case->fresh()->summary);
+        $this->assertSame(StudentCaseRevision::STATUS_REJECTED, $revision->fresh()->status);
     }
 
     public function test_paginate_for_assignee_filters_by_status_and_search(): void

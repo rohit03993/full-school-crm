@@ -4,7 +4,10 @@
     $canLogCall = $caseService->canLogCall($case, $viewer);
     $canAddUpdate = $caseService->canAddUpdate($case, $viewer);
     $canEditDetails = $caseService->canEditDetails($case, $viewer);
+    $canRequestEdit = $caseService->canRequestEdit($case, $viewer);
+    $canReviewRevision = $caseService->canReviewRevision($case, $viewer);
     $canReopen = $caseService->canReopen($case, $viewer);
+    $earlierClosingNote = $case->notes->where('kind', \App\Models\StudentCaseNote::KIND_REOPEN)->sortByDesc('id')->first()?->body;
     $isAssignee = $caseService->isCurrentAssignee($case, $viewer);
     $canReassignAsAdmin = $caseService->canReassignAsAdmin($case, $viewer);
     $isAdminReassign = $canReassignAsAdmin && ! $isAssignee;
@@ -76,9 +79,16 @@
                                 <textarea wire:model="editCaseClosingNote" rows="2" required class="fi-crm-input mt-1 block w-full"></textarea>
                             </div>
                         @endif
-                        <button type="submit" class="inline-flex rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500">
-                            Save
-                        </button>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="submit" class="inline-flex rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500">
+                                Save now
+                            </button>
+                            @if ($canRequestEdit)
+                                <button type="button" wire:click="submitCaseEditRequest({{ $case->id }})" class="inline-flex rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-800 ring-1 ring-gray-300 hover:bg-gray-50 dark:bg-white/5 dark:text-gray-100 dark:ring-white/15">
+                                    Ask admin to approve
+                                </button>
+                            @endif
+                        </div>
                     </form>
                 @else
                     <button
@@ -94,7 +104,7 @@
             @if ($case->isOpen() && ! $isAssignee && $case->currentAssignee)
                 <div class="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20">
                     @if ($isAdminReassign)
-                        This case is with <strong>{{ $case->currentAssignee->name }}</strong>. You can correct the story or add what was spoken. Only they can log calls or close it.
+                        This case is with <strong>{{ $case->currentAssignee->name }}</strong>. You can correct the story, approve an edit, or close it if the reopen was a mistake. Only they can log calls.
                     @else
                         This case is assigned to <strong>{{ $case->currentAssignee->name }}</strong>. Only they can log what was spoken, log calls, transfer, or close it.
                     @endif
@@ -115,7 +125,7 @@
                                     'absolute -left-[1.35rem] top-1 flex h-3 w-3 rounded-full ring-2 ring-white dark:ring-gray-900',
                                     'bg-violet-500' => $item['type'] === 'assignment',
                                     'bg-sky-500' => $item['type'] === 'call',
-                                    'bg-amber-500' => $item['type'] === 'note',
+                                    'bg-amber-500' => $item['type'] === 'note' || $item['type'] === 'revision',
                                     'bg-gray-500' => $item['type'] === 'closed',
                                 ])></span>
 
@@ -123,7 +133,7 @@
                                     'rounded-xl px-3 py-2.5 ring-1',
                                     'bg-violet-50/80 ring-violet-200/70 dark:bg-violet-500/5 dark:ring-violet-500/20' => $item['type'] === 'assignment',
                                     'bg-sky-50/80 ring-sky-200/70 dark:bg-sky-500/5 dark:ring-sky-500/20' => $item['type'] === 'call',
-                                    'bg-amber-50/80 ring-amber-200/70 dark:bg-amber-500/5 dark:ring-amber-500/20' => $item['type'] === 'note',
+                                    'bg-amber-50/80 ring-amber-200/70 dark:bg-amber-500/5 dark:ring-amber-500/20' => $item['type'] === 'note' || $item['type'] === 'revision',
                                     'bg-gray-50 ring-gray-200 dark:bg-white/5 dark:ring-white/10' => $item['type'] === 'closed',
                                 ])>
                                     <div class="flex flex-wrap items-start justify-between gap-2">
@@ -175,6 +185,25 @@
                                                 Edit
                                             </button>
                                         @endif
+                                    @endif
+
+                                    @foreach ($item['changes'] ?? [] as $change)
+                                        <div class="mt-2 space-y-1 text-sm">
+                                            <p class="text-xs font-semibold text-gray-500 dark:text-gray-400">{{ $change['label'] }}</p>
+                                            <p class="text-gray-600 dark:text-gray-300"><span class="font-semibold">Old:</span> {{ filled($change['old']) ? $change['old'] : '—' }}</p>
+                                            <p class="text-gray-950 dark:text-white"><span class="font-semibold">Updated:</span> {{ filled($change['new']) ? $change['new'] : '—' }}</p>
+                                        </div>
+                                    @endforeach
+
+                                    @if ($canReviewRevision && ($item['revision_status'] ?? null) === 'pending' && ($item['revision_id'] ?? null))
+                                        <div class="mt-3 flex flex-wrap gap-2">
+                                            <button type="button" wire:click="acceptCaseRevision({{ $case->id }}, {{ $item['revision_id'] }})" class="inline-flex rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white">
+                                                Approve edit
+                                            </button>
+                                            <button type="button" wire:click="rejectCaseRevision({{ $case->id }}, {{ $item['revision_id'] }})" class="inline-flex rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 ring-1 ring-gray-300 dark:bg-white/5 dark:text-gray-100 dark:ring-white/15">
+                                                Reject
+                                            </button>
+                                        </div>
                                     @endif
                                 </div>
                             </li>
@@ -243,10 +272,18 @@
             @if ($case->isOpen() && $canClose)
                 <form wire:submit="submitCaseClose({{ $case->id }})" class="mt-4 space-y-3 rounded-xl border border-gray-200 p-4 dark:border-white/10">
                     <p class="text-sm font-semibold text-gray-950 dark:text-white">Close case</p>
+                    @if ($isAdminReassign)
+                        <p class="text-xs text-gray-600 dark:text-gray-300">Use this if the case was reopened by mistake.</p>
+                    @endif
                     <div>
                         <label class="text-xs font-medium text-gray-600 dark:text-gray-300">Closing note</label>
                         <textarea wire:model="caseClosingNote" rows="2" required class="fi-crm-input mt-1 block w-full" placeholder="Final resolution and outcome"></textarea>
                     </div>
+                    @if (filled($earlierClosingNote))
+                        <button type="button" wire:click="fillEarlierClosingNote({{ $case->id }})" class="text-xs font-semibold text-primary-600 dark:text-primary-400">
+                            Use the earlier closing note
+                        </button>
+                    @endif
                     <button type="submit" class="inline-flex rounded-lg bg-gray-800 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-700 dark:bg-gray-200 dark:text-gray-900">
                         Close case
                     </button>

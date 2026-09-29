@@ -14,6 +14,7 @@ use App\Models\Student;
 use App\Models\StudentCase;
 use App\Models\StudentCaseAssignment;
 use App\Models\StudentCaseNote;
+use App\Models\StudentCaseRevision;
 use App\Models\User;
 use App\Models\Visit;
 use App\Models\VisitMeetingAssignment;
@@ -326,6 +327,15 @@ class StudentCaseService
                 user: $editor,
             );
 
+            if ($this->textChanged($previous, $body)) {
+                $this->storeRevision($case, $editor, StudentCaseRevision::STATUS_APPLIED, [
+                    'note_changed' => true,
+                    'note_id' => $note->id,
+                    'old_note' => $previous,
+                    'new_note' => $body,
+                ]);
+            }
+
             return $note->fresh('author');
         });
     }
@@ -367,6 +377,8 @@ class StudentCaseService
                 'summary' => $summary,
                 'closing_note' => $closingNote,
             ]);
+
+            $this->storeRevision($case, $editor, StudentCaseRevision::STATUS_APPLIED, $this->revisionPayload($previous, $title, $summary, $closingNote));
 
             $this->audit->log(
                 action: 'Case Edited',
@@ -431,6 +443,139 @@ class StudentCaseService
         });
     }
 
+    public function requestEdit(StudentCase $case, User $requester, string $title, ?string $summary, ?string $closingNote = null): StudentCaseRevision
+    {
+        if (! $this->canRequestEdit($case, $requester)) {
+            throw ValidationException::withMessages([
+                'case' => 'You are not allowed to request an edit on this case.',
+            ]);
+        }
+
+        if ($this->pendingRevision($case)) {
+            throw ValidationException::withMessages([
+                'case' => 'An edit is already waiting for admin.',
+            ]);
+        }
+
+        $title = trim($title);
+        $summary = filled($summary) ? trim($summary) : null;
+        $closingNote = $case->isOpen() ? $case->closing_note : (filled($closingNote) ? trim((string) $closingNote) : $case->closing_note);
+
+        if ($title === '') {
+            throw ValidationException::withMessages([
+                'title' => 'Case title is required.',
+            ]);
+        }
+
+        $previous = [
+            'title' => $case->title,
+            'summary' => $case->summary,
+            'closing_note' => $case->closing_note,
+        ];
+        $payload = $this->revisionPayload($previous, $title, $summary, $closingNote);
+
+        if ($payload === []) {
+            throw ValidationException::withMessages([
+                'summary' => 'Change the remark before asking admin to approve it.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($case, $requester, $payload, $previous): StudentCaseRevision {
+            $revision = $this->storeRevision($case, $requester, StudentCaseRevision::STATUS_PENDING, $payload);
+
+            $this->audit->log(
+                action: 'Case Edit Requested',
+                auditable: $case,
+                oldValues: $previous,
+                newValues: $payload,
+                user: $requester,
+            );
+
+            return $revision->fresh('author');
+        });
+    }
+
+    public function acceptRevision(StudentCaseRevision $revision, User $reviewer): StudentCase
+    {
+        $revision->loadMissing('studentCase');
+        $case = $revision->studentCase;
+
+        if (! $case || ! $revision->isPending() || ! $this->canReviewRevision($case, $reviewer)) {
+            throw ValidationException::withMessages([
+                'case' => 'You are not allowed to approve this edit.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($revision, $case, $reviewer): StudentCase {
+            $updates = [];
+
+            if ($revision->title_changed) {
+                $updates['title'] = $revision->new_title;
+            }
+
+            if ($revision->summary_changed) {
+                $updates['summary'] = $revision->new_summary;
+            }
+
+            if ($revision->closing_note_changed) {
+                $updates['closing_note'] = $revision->new_closing_note;
+            }
+
+            if ($updates !== []) {
+                $case->update($updates);
+            }
+
+            if ($revision->note_changed && $revision->note_id) {
+                StudentCaseNote::query()
+                    ->whereKey($revision->note_id)
+                    ->where('student_case_id', $case->id)
+                    ->update(['body' => $revision->new_note]);
+            }
+
+            $revision->update([
+                'status' => StudentCaseRevision::STATUS_ACCEPTED,
+                'reviewed_by_user_id' => $reviewer->id,
+                'reviewed_at' => now(),
+            ]);
+
+            $this->audit->log(
+                action: 'Case Edit Approved',
+                auditable: $case,
+                newValues: ['revision_id' => $revision->id],
+                user: $reviewer,
+            );
+
+            return $case->fresh(['closedBy', 'currentAssignee', 'openedBy']);
+        });
+    }
+
+    public function rejectRevision(StudentCaseRevision $revision, User $reviewer): StudentCaseRevision
+    {
+        $revision->loadMissing('studentCase');
+        $case = $revision->studentCase;
+
+        if (! $case || ! $revision->isPending() || ! $this->canReviewRevision($case, $reviewer)) {
+            throw ValidationException::withMessages([
+                'case' => 'You are not allowed to reject this edit.',
+            ]);
+        }
+
+        $revision->update([
+            'status' => StudentCaseRevision::STATUS_REJECTED,
+            'reviewed_by_user_id' => $reviewer->id,
+            'reviewed_at' => now(),
+        ]);
+
+        $this->audit->log(
+            action: 'Case Edit Rejected',
+            auditable: $case,
+            newValues: ['revision_id' => $revision->id],
+            user: $reviewer,
+        );
+
+        return $revision->fresh('reviewer');
+    }
+
     /**
      * @return Collection<int, StudentCase>
      */
@@ -449,6 +594,8 @@ class StudentCaseService
                 'assignments.assignedBy',
                 'calls.staff',
                 'notes.author',
+                'revisions.author',
+                'revisions.reviewer',
             ])
             ->orderByRaw("CASE WHEN status = 'open' THEN 0 ELSE 1 END")
             ->orderByDesc('opened_at');
@@ -669,8 +816,23 @@ class StudentCaseService
 
     public function canClose(StudentCase $case, ?User $viewer): bool
     {
-        return $this->isCurrentAssignee($case, $viewer)
-            && CrmAccess::can($viewer, CrmPermission::CasesClose);
+        if (! $case->isOpen() || ! $viewer) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin($viewer)) {
+            return true;
+        }
+
+        if (! CrmAccess::can($viewer, CrmPermission::CasesClose)) {
+            return false;
+        }
+
+        if ($this->isCurrentAssignee($case, $viewer)) {
+            return true;
+        }
+
+        return $this->latestReopenNote($case)?->user_id === $viewer->id;
     }
 
     public function canLogCall(StudentCase $case, ?User $viewer): bool
@@ -731,6 +893,20 @@ class StudentCaseService
             || $viewer->id === $case->current_assignee_user_id;
     }
 
+    public function canRequestEdit(StudentCase $case, ?User $viewer): bool
+    {
+        if (! $case->isOpen() || ! $viewer || $this->isSuperAdmin($viewer)) {
+            return false;
+        }
+
+        return $viewer->id === $case->current_assignee_user_id;
+    }
+
+    public function canReviewRevision(StudentCase $case, ?User $viewer): bool
+    {
+        return $this->isSuperAdmin($viewer);
+    }
+
     public function canReopen(StudentCase $case, ?User $viewer): bool
     {
         if ($case->isOpen() || ! $viewer) {
@@ -772,6 +948,8 @@ class StudentCaseService
             'assignments.assignedBy',
             'calls.staff',
             'notes.author',
+            'revisions.author',
+            'revisions.reviewer',
             'closedBy',
         ]);
 
@@ -813,6 +991,34 @@ class StudentCaseService
             ]);
         }
 
+        foreach ($case->revisions as $revision) {
+            $items->push([
+                'type' => 'revision',
+                'label' => match ($revision->status) {
+                    StudentCaseRevision::STATUS_PENDING => 'Edit requested',
+                    StudentCaseRevision::STATUS_ACCEPTED => 'Edit approved',
+                    StudentCaseRevision::STATUS_REJECTED => 'Edit rejected',
+                    default => 'Remark updated',
+                },
+                'occurred_at' => $revision->created_at ?? now(),
+                'summary' => null,
+                'detail' => $revision->reviewer
+                    ? 'Checked by '.$revision->reviewer->name.($revision->reviewed_at ? ' · '.$revision->reviewed_at->format('d M Y, h:i A') : '')
+                    : null,
+                'actor_name' => $revision->author?->name,
+                'status_label' => match ($revision->status) {
+                    StudentCaseRevision::STATUS_PENDING => 'Waiting',
+                    StudentCaseRevision::STATUS_ACCEPTED => 'Approved',
+                    StudentCaseRevision::STATUS_REJECTED => 'Rejected',
+                    default => null,
+                },
+                'note_id' => null,
+                'revision_id' => $revision->id,
+                'revision_status' => $revision->status,
+                'changes' => $this->revisionChanges($revision),
+            ]);
+        }
+
         foreach ($case->calls as $call) {
             $items->push([
                 'type' => 'call',
@@ -850,6 +1056,106 @@ class StudentCaseService
     public static function activeStaffOptions(): array
     {
         return \App\Support\StaffOptions::assignableStaffOptions();
+    }
+
+    protected function latestReopenNote(StudentCase $case): ?StudentCaseNote
+    {
+        $case->loadMissing('notes');
+
+        return $case->notes
+            ->where('kind', StudentCaseNote::KIND_REOPEN)
+            ->sortByDesc('id')
+            ->first();
+    }
+
+    protected function pendingRevision(StudentCase $case): ?StudentCaseRevision
+    {
+        return $case->revisions()
+            ->where('status', StudentCaseRevision::STATUS_PENDING)
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * @param  array{title: ?string, summary: ?string, closing_note: ?string}  $previous
+     * @return array<string, mixed>
+     */
+    protected function revisionPayload(array $previous, string $title, ?string $summary, ?string $closingNote): array
+    {
+        $payload = [];
+
+        if ($this->textChanged($previous['title'] ?? null, $title)) {
+            $payload['title_changed'] = true;
+            $payload['old_title'] = $previous['title'];
+            $payload['new_title'] = $title;
+        }
+
+        if ($this->textChanged($previous['summary'] ?? null, $summary)) {
+            $payload['summary_changed'] = true;
+            $payload['old_summary'] = $previous['summary'];
+            $payload['new_summary'] = $summary;
+        }
+
+        if ($this->textChanged($previous['closing_note'] ?? null, $closingNote)) {
+            $payload['closing_note_changed'] = true;
+            $payload['old_closing_note'] = $previous['closing_note'];
+            $payload['new_closing_note'] = $closingNote;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function storeRevision(StudentCase $case, User $user, string $status, array $payload): ?StudentCaseRevision
+    {
+        $changed = ($payload['title_changed'] ?? false)
+            || ($payload['summary_changed'] ?? false)
+            || ($payload['closing_note_changed'] ?? false)
+            || ($payload['note_changed'] ?? false);
+
+        if (! $changed) {
+            return null;
+        }
+
+        return StudentCaseRevision::query()->create([
+            'student_case_id' => $case->id,
+            'user_id' => $user->id,
+            'status' => $status,
+            ...$payload,
+        ]);
+    }
+
+    /**
+     * @return list<array{label: string, old: ?string, new: ?string}>
+     */
+    protected function revisionChanges(StudentCaseRevision $revision): array
+    {
+        $changes = [];
+
+        if ($revision->title_changed) {
+            $changes[] = ['label' => 'Title', 'old' => $revision->old_title, 'new' => $revision->new_title];
+        }
+
+        if ($revision->summary_changed) {
+            $changes[] = ['label' => 'What happened', 'old' => $revision->old_summary, 'new' => $revision->new_summary];
+        }
+
+        if ($revision->closing_note_changed) {
+            $changes[] = ['label' => 'Closing note', 'old' => $revision->old_closing_note, 'new' => $revision->new_closing_note];
+        }
+
+        if ($revision->note_changed) {
+            $changes[] = ['label' => 'Meeting note', 'old' => $revision->old_note, 'new' => $revision->new_note];
+        }
+
+        return $changes;
+    }
+
+    protected function textChanged(?string $left, ?string $right): bool
+    {
+        return strcasecmp(trim((string) $left), trim((string) $right)) !== 0;
     }
 
     protected function trailNote(?string $note, ?string $summary, ?string $title): ?string

@@ -1191,8 +1191,109 @@ class StudentProfilePage extends Page
 
         Notification::make()
             ->title('Case updated')
+            ->body('The trail shows the old words and the new words.')
             ->success()
             ->send();
+    }
+
+    public function submitCaseEditRequest(int $caseId, StudentCaseService $cases): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+
+        try {
+            $cases->requestEdit(
+                $case,
+                Auth::user(),
+                $this->editCaseTitle,
+                $this->editCaseSummary,
+                $this->editCaseClosingNote,
+            );
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not send the edit')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Please check the form.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->showEditCaseForm = false;
+        $this->invalidateCasesTab();
+        $this->expandedCaseId = $caseId;
+
+        Notification::make()
+            ->title('Edit sent to admin')
+            ->body('The case text stays as it is until admin approves it.')
+            ->success()
+            ->send();
+    }
+
+    public function acceptCaseRevision(int $caseId, int $revisionId, StudentCaseService $cases): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+        $revision = $case->revisions()->whereKey($revisionId)->firstOrFail();
+
+        try {
+            $cases->acceptRevision($revision, Auth::user());
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not approve the edit')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Please try again.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->invalidateCasesTab();
+        $this->expandedCaseId = $caseId;
+
+        Notification::make()
+            ->title('Edit approved')
+            ->body('The case now uses the new words.')
+            ->success()
+            ->send();
+    }
+
+    public function rejectCaseRevision(int $caseId, int $revisionId, StudentCaseService $cases): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+        $revision = $case->revisions()->whereKey($revisionId)->firstOrFail();
+
+        try {
+            $cases->rejectRevision($revision, Auth::user());
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            Notification::make()
+                ->title('Could not reject the edit')
+                ->body(collect($exception->errors())->flatten()->first() ?? 'Please try again.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->invalidateCasesTab();
+        $this->expandedCaseId = $caseId;
+
+        Notification::make()
+            ->title('Edit rejected')
+            ->body('The case text was not changed.')
+            ->success()
+            ->send();
+    }
+
+    public function fillEarlierClosingNote(int $caseId): void
+    {
+        $case = StudentCase::query()->whereKey($caseId)->where('student_id', $this->record->id)->firstOrFail();
+        $note = $case->notes()->where('kind', \App\Models\StudentCaseNote::KIND_REOPEN)->latest('id')->first();
+
+        if (! $note) {
+            return;
+        }
+
+        $this->caseClosingNote = $note->body;
+        $this->expandedCaseId = $caseId;
     }
 
     public function startCaseNoteEdit(int $caseId, int $noteId, StudentCaseService $cases): void
