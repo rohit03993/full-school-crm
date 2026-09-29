@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Ai\Homework\GeminiHomeworkTextImprover;
+use App\Ai\Homework\HomeworkTextImprover;
+use App\Ai\Homework\MissingHomeworkTextImprover;
+use App\Ai\Homework\OpenAiHomeworkTextImprover;
 use App\Http\Responses\LogoutResponse;
 use App\Enums\LicenseFeature;
 use App\Models\Student;
@@ -25,6 +29,16 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(LogoutResponseContract::class, LogoutResponse::class);
+
+        $this->app->bind(HomeworkTextImprover::class, function (): HomeworkTextImprover {
+            return match ((string) config('ai.provider', 'gemini')) {
+                'gemini' => app(GeminiHomeworkTextImprover::class),
+                'openai' => app(OpenAiHomeworkTextImprover::class),
+                default => app(MissingHomeworkTextImprover::class, [
+                    'provider' => (string) config('ai.provider'),
+                ]),
+            };
+        });
     }
 
     public function boot(): void

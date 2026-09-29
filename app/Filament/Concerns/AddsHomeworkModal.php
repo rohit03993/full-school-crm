@@ -6,6 +6,7 @@ use App\Enums\HomeworkAssignmentStatus;
 use App\Models\Batch;
 use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
+use App\Services\HomeworkAiService;
 use App\Services\HomeworkCheckService;
 use App\Services\HomeworkSubmissionService;
 use Carbon\Carbon;
@@ -17,12 +18,28 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\View;
 use Filament\Support\Exceptions\Halt;
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 trait AddsHomeworkModal
 {
+    public ?string $homeworkAiOriginalTitle = null;
+
+    public ?string $homeworkAiOriginalDescription = null;
+
+    public ?string $homeworkAiSuggestedTitle = null;
+
+    public ?string $homeworkAiSuggestedDescription = null;
+
+    public bool $homeworkAiEditing = false;
+
+    public int $homeworkAiTries = 0;
+
+    public ?string $homeworkAiMessage = null;
+
     abstract protected function dateString(): string;
 
     protected function openHomeworkFromRequest(): void
@@ -147,6 +164,10 @@ trait AddsHomeworkModal
                 ->placeholder('Type the homework, or attach a file below.')
                 ->rows(4)
                 ->columnSpanFull(),
+            View::make('filament.pages.partials.homework-ai-improve')
+                ->viewData(fn (): array => $this->homeworkAiPanelData())
+                ->visible(fn (): bool => app(HomeworkAiService::class)->isAvailable())
+                ->columnSpanFull(),
             FileUpload::make('attachment')
                 ->label('PDF or image (optional)')
                 ->disk('public')
@@ -168,6 +189,8 @@ trait AddsHomeworkModal
      */
     protected function homeworkModalFillForm(array $arguments): array
     {
+        $this->resetHomeworkAiPreview();
+
         $existing = $this->homeworkModalExisting($arguments);
 
         return [
@@ -340,6 +363,167 @@ trait AddsHomeworkModal
         }
 
         return $batch->displayLabel().' · '.$subject->displayLabel();
+    }
+
+    public function improveHomeworkWithAi(): void
+    {
+        $this->askHomeworkAi(false);
+    }
+
+    public function retryHomeworkAi(): void
+    {
+        $this->askHomeworkAi(true);
+    }
+
+    public function editHomeworkAiSuggestion(): void
+    {
+        if ($this->homeworkAiSuggestedTitle === null && $this->homeworkAiSuggestedDescription === null) {
+            return;
+        }
+
+        $this->homeworkAiEditing = true;
+    }
+
+    public function useHomeworkAiSuggestion(): void
+    {
+        $title = trim((string) $this->homeworkAiSuggestedTitle);
+        $description = trim((string) $this->homeworkAiSuggestedDescription);
+
+        if ($title === '' && $description === '') {
+            $this->homeworkAiMessage = 'The suggestion is empty. Type homework in the boxes, or try again.';
+
+            return;
+        }
+
+        $schema = $this->getMountedActionSchema();
+
+        if ($schema === null) {
+            return;
+        }
+
+        $schema->fill(array_merge($this->homeworkModalState(), [
+            'title' => $title,
+            'description' => $description,
+        ]));
+
+        $this->homeworkAiSuggestedTitle = null;
+        $this->homeworkAiSuggestedDescription = null;
+        $this->homeworkAiEditing = false;
+        $this->homeworkAiMessage = 'Suggestion copied into Title and Homework details. Save when you are ready.';
+
+        Notification::make()
+            ->title('Suggestion copied')
+            ->body('Review the title and details, then save the homework.')
+            ->success()
+            ->send();
+    }
+
+    protected function askHomeworkAi(bool $retry): void
+    {
+        $user = Auth::user();
+        $service = app(HomeworkAiService::class);
+
+        if (! $user) {
+            return;
+        }
+
+        if ($retry) {
+            $title = trim((string) $this->homeworkAiOriginalTitle);
+            $description = trim((string) $this->homeworkAiOriginalDescription);
+        } else {
+            $state = $this->homeworkModalState();
+            $title = trim((string) ($state['title'] ?? ''));
+            $description = trim((string) ($state['description'] ?? ''));
+            $this->homeworkAiOriginalTitle = $title;
+            $this->homeworkAiOriginalDescription = $description;
+        }
+
+        if ($title === '' && $description === '') {
+            $this->homeworkAiMessage = 'Type a title or homework details first.';
+
+            return;
+        }
+
+        $maxTries = $service->triesPerOpen();
+
+        if ($this->homeworkAiTries >= $maxTries) {
+            $this->homeworkAiMessage = 'You have used all '.$maxTries.' AI tries for this homework. You can still edit the suggestion or save what you typed.';
+
+            return;
+        }
+
+        $this->homeworkAiTries++;
+
+        $outcome = $service->improve($user, $title, $description);
+
+        if (! $outcome->ok) {
+            if ($outcome->temporary) {
+                $this->homeworkAiTries = max(0, $this->homeworkAiTries - 1);
+            }
+
+            $this->homeworkAiMessage = $outcome->message;
+
+            return;
+        }
+
+        $this->homeworkAiSuggestedTitle = $outcome->title;
+        $this->homeworkAiSuggestedDescription = $outcome->description;
+        $this->homeworkAiEditing = false;
+        $this->homeworkAiMessage = null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function homeworkAiPanelData(): array
+    {
+        $user = Auth::user();
+        $service = app(HomeworkAiService::class);
+        $usage = $user ? $service->usage($user) : ['used' => 0, 'limit' => $service->dailyLimit()];
+
+        return [
+            'usedToday' => $usage['used'],
+            'dailyLimit' => $usage['limit'],
+            'maxTries' => $service->triesPerOpen(),
+            'tries' => $this->homeworkAiTries,
+            'message' => $this->homeworkAiMessage,
+            'editing' => $this->homeworkAiEditing,
+            'originalTitle' => (string) ($this->homeworkAiOriginalTitle ?? ''),
+            'originalDescription' => (string) ($this->homeworkAiOriginalDescription ?? ''),
+            'suggestedTitle' => $this->homeworkAiSuggestedTitle,
+            'suggestedDescription' => $this->homeworkAiSuggestedDescription,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function homeworkModalState(): array
+    {
+        $schema = $this->getMountedActionSchema();
+
+        if ($schema === null) {
+            return [];
+        }
+
+        $raw = $schema->getRawState();
+
+        if ($raw instanceof Arrayable) {
+            $raw = $raw->toArray();
+        }
+
+        return is_array($raw) ? $raw : [];
+    }
+
+    protected function resetHomeworkAiPreview(): void
+    {
+        $this->homeworkAiOriginalTitle = null;
+        $this->homeworkAiOriginalDescription = null;
+        $this->homeworkAiSuggestedTitle = null;
+        $this->homeworkAiSuggestedDescription = null;
+        $this->homeworkAiEditing = false;
+        $this->homeworkAiTries = 0;
+        $this->homeworkAiMessage = null;
     }
 
     protected function homeworkModalAttachmentPath(mixed $attachment): ?string
