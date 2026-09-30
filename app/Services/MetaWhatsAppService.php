@@ -347,6 +347,47 @@ class MetaWhatsAppService
     }
 
     /**
+     * @param  list<array<string, mixed>>  $components
+     * @return array{status: string, data?: array<string, mixed>, error?: string}
+     */
+    public function updateMessageTemplate(string $templateId, array $components): array
+    {
+        if (! filled($this->accessToken())) {
+            return ['status' => 'failed', 'error' => 'Access token is not configured.'];
+        }
+
+        $templateId = trim($templateId);
+
+        if ($templateId === '') {
+            return ['status' => 'failed', 'error' => 'WhatsApp template id is missing.'];
+        }
+
+        try {
+            $response = Http::timeout(60)
+                ->withToken((string) $this->accessToken())
+                ->acceptJson()
+                ->post($this->graphUrl($templateId), [
+                    'components' => $components,
+                ]);
+
+            $data = $response->json();
+
+            if ($response->successful() && is_array($data)) {
+                return ['status' => 'success', 'data' => $data];
+            }
+
+            return [
+                'status' => 'failed',
+                'error' => $this->parseApiError($data, $response->body()),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Meta WhatsApp template update failed', ['error' => $e->getMessage()]);
+
+            return ['status' => 'failed', 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
      * @return array{status: string, items?: list<array<string, mixed>>, error?: string}
      */
     public function fetchTemplates(): array

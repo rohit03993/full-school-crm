@@ -226,13 +226,23 @@ class WhatsAppTemplateParamMappingInferrer
      */
     public static function homeworkNotDoneDefaults(int $paramCount): array
     {
-        $defaults = [
-            0 => 'student.name',
-            1 => 'homework.class_section',
-            2 => 'homework.subject',
-            3 => 'homework.topic',
-            4 => 'institute.name',
-        ];
+        $defaults = $paramCount >= 7
+            ? [
+                0 => 'student.name',
+                1 => 'homework.class_section',
+                2 => 'homework.subject',
+                3 => 'homework.topic',
+                4 => 'homework.date',
+                5 => 'homework.link',
+                6 => 'institute.name',
+            ]
+            : [
+                0 => 'student.name',
+                1 => 'homework.class_section',
+                2 => 'homework.subject',
+                3 => 'homework.topic',
+                4 => 'institute.name',
+            ];
 
         $sources = [];
 

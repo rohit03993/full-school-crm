@@ -13,7 +13,18 @@ final class HomeworkNotDoneWhatsAppTemplate
     public const CATEGORY = 'UTILITY';
 
     public const BODY = <<<'TXT'
-Dear Parent, your child {{1}} of Class {{2}} has not completed the homework for {{3}}. Homework Topic: {{4}}. Please ensure the homework is completed. — {{5}}
+Dear Parent,
+
+Your child {{1}} of Class {{2}} has not completed the homework for {{3}}.
+
+Homework: {{4}}
+Date: {{5}}
+Open homework:
+{{6}}
+
+Please ensure the homework is completed.
+
+— {{7}}
 Thank you.
 TXT;
 
@@ -39,16 +50,48 @@ TXT;
                 'crm_source' => 'homework.subject',
             ],
             4 => [
-                'label' => 'Homework title, date, and that student’s own link',
-                'example' => 'Chapter 5 – Q1 to Q10 on 30 Sep 2026. Open: https://example.com/h/sampleToken',
+                'label' => 'Homework title',
+                'example' => 'Chapter 5 – Q1 to Q10',
                 'crm_source' => 'homework.topic',
             ],
             5 => [
+                'label' => 'Homework date',
+                'example' => '30 Sep 2026',
+                'crm_source' => 'homework.date',
+            ],
+            6 => [
+                'label' => 'That student’s own homework link',
+                'example' => 'https://example.com/h/sampleToken',
+                'crm_source' => 'homework.link',
+            ],
+            7 => [
                 'label' => 'Institute name',
                 'example' => 'B.D.M. Kanya Degree College',
                 'crm_source' => 'institute.name',
             ],
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function mappingSources(): array
+    {
+        return array_values(array_map(
+            static fn (array $variable): string => (string) $variable['crm_source'],
+            self::variables(),
+        ));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function exampleValues(): array
+    {
+        return array_values(array_map(
+            static fn (array $variable): string => (string) $variable['example'],
+            self::variables(),
+        ));
     }
 
     /**

@@ -187,6 +187,12 @@ class HomeworkCheckServiceTest extends TestCase
             'click_count' => 2,
         ]);
 
+        WhatsAppTemplate::query()->where('name', HomeworkNotDoneWhatsAppTemplate::NAME)->update([
+            'param_count' => 7,
+            'param_mappings' => HomeworkNotDoneWhatsAppTemplate::mappingSources(),
+            'body' => HomeworkNotDoneWhatsAppTemplate::BODY,
+        ]);
+
         $result = app(HomeworkCheckService::class)->mark(
             $teacher,
             $batch->id,
@@ -206,9 +212,10 @@ class HomeworkCheckServiceTest extends TestCase
         $this->assertNotNull($campaign);
         $this->assertSame('10 · Section A', $campaign->campaignVariable('class_section'));
         $this->assertSame('Mathematics', $campaign->campaignVariable('subject'));
+        $this->assertSame('Approved homework', $campaign->campaignVariable('topic'));
+        $this->assertSame($assignment->homeworkDateLabel(), $campaign->campaignVariable('date_label'));
         $this->assertSame($link->publicUrl(), $campaign->campaignVariable('homework_link'));
-        $this->assertStringContainsString('Approved homework on ', (string) $campaign->campaignVariable('topic'));
-        $this->assertStringContainsString($link->publicUrl(), (string) $campaign->campaignVariable('topic'));
+        $this->assertStringNotContainsString($link->publicUrl(), (string) $campaign->campaignVariable('topic'));
     }
 
     public function test_not_done_without_mobile_marks_failed(): void

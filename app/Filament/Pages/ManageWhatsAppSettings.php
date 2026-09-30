@@ -327,12 +327,12 @@ class ManageWhatsAppSettings extends Page
                         ->columnSpanFull(),
                     Select::make('homework_not_done_live_campaign_id')
                         ->label('Homework not done template')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(5))
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCounts([5, 7]))
                         ->searchable()
                         ->nullable()
                         ->native(false)
                         ->placeholder('Choose template…')
-                        ->helperText('Template homework_not_done (5 params). Map student.name, homework.class_section, homework.subject, homework.topic, institute.name. The topic blank includes the homework name, date, and that student’s own homework link.'),
+                        ->helperText('Template homework_not_done. The spaced sentence has 7 blanks: student.name, homework.class_section, homework.subject, homework.topic, homework.date, homework.link, institute.name.'),
                 ])
                 ->columns(2),
                         ]),

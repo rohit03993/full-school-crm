@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\WhatsAppTemplate;
+use App\Support\HomeworkNotDoneWhatsAppTemplate;
 use App\Support\MetaWhatsAppTemplateParser;
 use App\Support\WhatsAppTemplateParamMappingInferrer;
 
@@ -137,7 +138,16 @@ class MetaWhatsAppTemplateSyncService
             return [];
         }
 
-        $stored = $existing?->param_mappings ?? [];
+        $stored = array_values($existing?->param_mappings ?? []);
+
+        if (
+            $existing
+            && HomeworkNotDoneWhatsAppTemplate::looksLikeName((string) $existing->name)
+            && count($stored) !== $paramCount
+        ) {
+            return $inferredMappings;
+        }
+
         $sources = [];
 
         for ($i = 0; $i < $paramCount; $i++) {

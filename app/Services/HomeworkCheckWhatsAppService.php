@@ -65,6 +65,8 @@ class HomeworkCheckWhatsAppService
             $subjectName = trim((string) ($check->courseSubject?->name ?: $check->subject_name));
             $link = $assignment ? $this->studentLinks->publicUrlFor($assignment, $student) : '';
             $dateLabel = $this->dateLabel($check, $assignment);
+            $title = $this->titleForParent($check, $assignment);
+            $separateLines = (int) $template->param_count >= 7;
 
             $campaign = $this->campaigns->createCampaign([
                 'name' => 'Homework not done · '.$student->name.' · '.now()->format('d M H:i'),
@@ -72,10 +74,13 @@ class HomeworkCheckWhatsAppService
                 'student_ids' => [$student->id],
                 'campaign_variables' => [
                     'audience_source' => 'homework_check',
-                    'topic' => $this->topicForParent($check, $assignment, $dateLabel, $link),
+                    'topic' => $separateLines
+                        ? $title
+                        : $this->topicForParent($check, $assignment, $dateLabel, $link),
                     'subject' => $subjectName !== '' ? $subjectName : (string) $check->subject_name,
                     'class_section' => $classSection !== '' ? $classSection : 'Class',
                     'date' => $check->checked_on?->toDateString() ?? now()->toDateString(),
+                    'date_label' => $dateLabel,
                     'homework_link' => $link,
                     '_student_ids' => [$student->id],
                     '_homework_check_id' => $check->id,
@@ -144,23 +149,24 @@ class HomeworkCheckWhatsAppService
             : now()->timezone((string) config('app.timezone'))->format('d M Y');
     }
 
-    protected function topicForParent(
-        HomeworkCheck $check,
-        ?HomeworkAssignment $assignment,
-        string $dateLabel,
-        string $link,
-    ): string {
+    protected function titleForParent(HomeworkCheck $check, ?HomeworkAssignment $assignment): string
+    {
         $title = trim((string) $check->topic);
 
         if ($assignment && ($title === '' || $title === "Today's homework") && filled($assignment->title)) {
             $title = trim((string) $assignment->title);
         }
 
-        if ($title === '') {
-            $title = "Today's homework";
-        }
+        return $title !== '' ? $title : "Today's homework";
+    }
 
-        $line = $title;
+    protected function topicForParent(
+        HomeworkCheck $check,
+        ?HomeworkAssignment $assignment,
+        string $dateLabel,
+        string $link,
+    ): string {
+        $line = $this->titleForParent($check, $assignment);
 
         if ($dateLabel !== '') {
             $line .= ' on '.$dateLabel;

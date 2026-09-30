@@ -45,7 +45,7 @@ class WhatsAppSettingsService
             'homework_combined_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_combined_live_campaign_id'), 4),
             'homework_share_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_share_live_campaign_id'), 4),
             'homework_not_done_autosend_enabled' => (bool) Setting::getValue('whatsapp.homework_not_done_autosend_enabled', false),
-            'homework_not_done_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_not_done_live_campaign_id'), 5),
+            'homework_not_done_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_not_done_live_campaign_id'), [5, 7]),
             'activity_marks_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.activity_marks_live_campaign_id')),
             'attendance_autosend_enabled' => (bool) Setting::getValue('whatsapp.attendance_autosend_enabled', false),
             'attendance_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.attendance_autosend_live_campaign_id')),
@@ -414,7 +414,7 @@ class WhatsAppSettingsService
         return self::AUTOMATION_TEMPLATE_PREFIX.(int) $raw;
     }
 
-    public function formTemplateIdFromStored(mixed $stored, ?int $requiredParamCount = null): ?string
+    public function formTemplateIdFromStored(mixed $stored, int|array|null $requiredParamCount = null): ?string
     {
         if (! filled($stored)) {
             return null;
@@ -427,7 +427,7 @@ class WhatsAppSettingsService
         }
 
         // Stale IDs (wrong param count) must not stay selected — Filament blocks the whole Automations save.
-        if ($requiredParamCount !== null && (int) $template->param_count !== $requiredParamCount) {
+        if (! $this->paramCountMatches($template, $requiredParamCount)) {
             return null;
         }
 
@@ -445,7 +445,7 @@ class WhatsAppSettingsService
         $keysWithParamCount = [
             'homework_combined_live_campaign_id' => 4,
             'homework_share_live_campaign_id' => 4,
-            'homework_not_done_live_campaign_id' => 5,
+            'homework_not_done_live_campaign_id' => [5, 7],
         ];
 
         foreach ($keysWithParamCount as $key => $paramCount) {
@@ -473,7 +473,7 @@ class WhatsAppSettingsService
         return $data;
     }
 
-    protected function sanitizeSelectedTemplateId(mixed $value, ?int $requiredParamCount = null): ?int
+    protected function sanitizeSelectedTemplateId(mixed $value, int|array|null $requiredParamCount = null): ?int
     {
         if (! filled($value)) {
             return null;
@@ -494,11 +494,22 @@ class WhatsAppSettingsService
             return null;
         }
 
-        if ($requiredParamCount !== null && (int) $template->param_count !== $requiredParamCount) {
+        if (! $this->paramCountMatches($template, $requiredParamCount)) {
             return null;
         }
 
         return (int) $template->id;
+    }
+
+    protected function paramCountMatches(\App\Models\WhatsAppTemplate $template, int|array|null $requiredParamCount): bool
+    {
+        if ($requiredParamCount === null) {
+            return true;
+        }
+
+        $allowed = is_array($requiredParamCount) ? $requiredParamCount : [$requiredParamCount];
+
+        return in_array((int) $template->param_count, $allowed, true);
     }
 
     protected function activeTemplate(int $id): ?WhatsAppTemplate
@@ -523,9 +534,18 @@ class WhatsAppSettingsService
      */
     public function templateOptionsForParamCount(?int $paramCount = null): array
     {
+        return $this->templateOptionsForParamCounts($paramCount === null ? [] : [$paramCount]);
+    }
+
+    /**
+     * @param  list<int>  $paramCounts
+     * @return array<int, string>
+     */
+    public function templateOptionsForParamCounts(array $paramCounts): array
+    {
         return WhatsAppTemplate::query()
             ->where('is_active', true)
-            ->when($paramCount !== null, fn ($query) => $query->where('param_count', $paramCount))
+            ->when($paramCounts !== [], fn ($query) => $query->whereIn('param_count', $paramCounts))
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();

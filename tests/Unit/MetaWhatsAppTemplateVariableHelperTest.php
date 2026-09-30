@@ -95,12 +95,14 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
             'homework_not_done',
         );
 
-        $this->assertCount(5, $rows);
+        $this->assertCount(7, $rows);
         $this->assertSame('Student name', $rows[0]['label']);
         $this->assertSame('Class / section', $rows[1]['label']);
         $this->assertSame('Subject', $rows[2]['label']);
-        $this->assertSame('Homework topic', $rows[3]['label']);
-        $this->assertSame('Institute name', $rows[4]['label']);
+        $this->assertSame('Homework title', $rows[3]['label']);
+        $this->assertSame('Homework date', $rows[4]['label']);
+        $this->assertSame('homework.link', $rows[5]['source']);
+        $this->assertSame('Institute name', $rows[6]['label']);
     }
 
     public function test_homework_share_preset_name_uses_share_labels(): void

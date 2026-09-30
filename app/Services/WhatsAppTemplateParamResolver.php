@@ -50,6 +50,8 @@ class WhatsAppTemplateParamResolver
             'homework.class_section' => 'Homework class / section',
             'homework.subject' => 'Homework subject',
             'homework.topic' => 'Homework topic',
+            'homework.date' => 'Homework date',
+            'homework.link' => 'Student homework link',
         ];
     }
 
@@ -109,6 +111,8 @@ class WhatsAppTemplateParamResolver
             'homework.class_section' => (string) ($campaign?->campaignVariable('class_section') ?? ''),
             'homework.subject' => (string) ($campaign?->campaignVariable('subject') ?? ''),
             'homework.topic' => (string) ($campaign?->campaignVariable('topic') ?? ''),
+            'homework.date' => (string) ($campaign?->campaignVariable('date_label') ?: $campaign?->campaignVariable('date') ?? ''),
+            'homework.link', 'homework.portal_link' => (string) ($campaign?->campaignVariable('homework_link') ?? ''),
             default => '',
         };
     }

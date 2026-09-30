@@ -386,4 +386,54 @@ class MetaWhatsAppServiceTest extends TestCase
                 && $examples[3] === $link;
         });
     }
+
+    public function test_homework_not_done_wording_updates_the_existing_template_name(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.waba_id' => 'waba-1',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/waba-1/message_templates*' => Http::response([
+                'data' => [[
+                    'id' => '555',
+                    'name' => 'homework_not_done',
+                    'language' => 'en',
+                    'status' => 'APPROVED',
+                    'components' => [[
+                        'type' => 'BODY',
+                        'text' => 'Dear Parent, your child {{1}} of Class {{2}} has not completed the homework for {{3}}. Homework Topic: {{4}}. Please ensure the homework is completed. — {{5}}',
+                    ]],
+                ]],
+            ], 200),
+            'https://graph.facebook.com/v20.0/555' => Http::response([
+                'success' => true,
+            ], 200),
+        ]);
+
+        $result = app(\App\Services\HomeworkNotDoneTemplateUpdateService::class)->sendUpdatedWording();
+
+        $this->assertSame('success', $result['status'], $result['message']);
+        $this->assertDatabaseHas('meta_whatsapp_templates', [
+            'name' => 'homework_not_done',
+            'status' => 'PENDING',
+            'param_count' => 7,
+            'is_active' => false,
+        ]);
+
+        Http::assertSent(function ($request): bool {
+            if ($request->url() !== 'https://graph.facebook.com/v20.0/555') {
+                return false;
+            }
+
+            $text = (string) ($request->data()['components'][0]['text'] ?? '');
+
+            return str_contains($text, 'Homework: {{4}}')
+                && str_contains($text, 'Open homework:')
+                && str_contains($text, '{{6}}')
+                && ! array_key_exists('name', $request->data());
+        });
+    }
 }
