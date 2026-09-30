@@ -393,6 +393,81 @@ class HomeworkCheckService
     }
 
     /**
+     * Ticked students are one result. Everyone else in the class gets the other result.
+     * WhatsApp goes only to students marked Not Done.
+     *
+     * @param  list<int>  $selectedIds
+     * @return array{done: int, not_done: int, whatsappQueued: int, whatsappFailed: int, errors: list<string>}
+     */
+    public function applySelection(
+        User $teacher,
+        int $batchId,
+        int $courseSubjectId,
+        array $selectedIds,
+        string $choice,
+        string $topic,
+        ?string $checkedOn = null,
+    ): array {
+        if (! in_array($choice, ['done', 'not_done'], true)) {
+            throw ValidationException::withMessages([
+                'choice' => 'Choose whether the ticked students have done the homework.',
+            ]);
+        }
+
+        $classIds = $this->rosterForBatch($batchId, $courseSubjectId, null, $checkedOn)
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        $selected = collect($selectedIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => in_array($id, $classIds, true))
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($selected === []) {
+            throw ValidationException::withMessages([
+                'student_id' => 'Tick at least one student in this class.',
+            ]);
+        }
+
+        $rest = array_values(array_diff($classIds, $selected));
+        $notDoneIds = $choice === 'not_done' ? $selected : $rest;
+        $doneIds = $choice === 'done' ? $selected : $rest;
+
+        $doneResult = $this->markMany(
+            $teacher,
+            $batchId,
+            $doneIds,
+            $courseSubjectId,
+            $topic,
+            HomeworkCheckStatus::Done,
+            $checkedOn,
+        );
+        $notDoneResult = $this->markMany(
+            $teacher,
+            $batchId,
+            $notDoneIds,
+            $courseSubjectId,
+            $topic,
+            HomeworkCheckStatus::NotDone,
+            $checkedOn,
+        );
+
+        return [
+            'done' => $doneResult['marked'],
+            'not_done' => $notDoneResult['marked'],
+            'whatsappQueued' => $notDoneResult['whatsappQueued'],
+            'whatsappFailed' => $notDoneResult['whatsappFailed'],
+            'errors' => array_values(array_filter([
+                ...$doneResult['errors'],
+                ...$notDoneResult['errors'],
+            ])),
+        ];
+    }
+
+    /**
      * @return array{marked: int, whatsappQueued: int, whatsappFailed: int, errors: list<string>}
      */
     public function markRemainingDone(

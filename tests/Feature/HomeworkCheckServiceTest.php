@@ -302,6 +302,52 @@ class HomeworkCheckServiceTest extends TestCase
         ]);
     }
 
+    public function test_ticked_done_students_leave_the_rest_not_done_with_one_message_each(): void
+    {
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response([
+                'messages' => [['id' => 'wamid.HWBULKREST']],
+            ], 200),
+        ]);
+
+        [$teacher, $batch, $finished, $subject] = $this->seedClass();
+        $missing = Student::query()->create([
+            'name' => 'Aman Verma',
+            'mobile' => '9123456780',
+            'status' => StudentStatus::Enrolled,
+        ]);
+        BatchStudent::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $missing->id,
+            'is_active' => true,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $teacher->id,
+        ]);
+        $this->enableHomeworkNotDoneAutomation();
+
+        $result = app(HomeworkCheckService::class)->applySelection(
+            $teacher,
+            $batch->id,
+            $subject->id,
+            [$finished->id],
+            'done',
+            "Today's homework",
+            now()->toDateString(),
+        );
+
+        $this->assertSame(1, $result['done']);
+        $this->assertSame(1, $result['not_done']);
+        $this->assertSame(1, $result['whatsappQueued']);
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $finished->id,
+            'status' => 'done',
+        ]);
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $missing->id,
+            'status' => 'not_done',
+        ]);
+    }
+
     public function test_teacher_homework_list_hides_student_mobile(): void
     {
         [$admin, $batch, $student, $subject] = $this->seedClass(mobile: '9876543210');
@@ -745,10 +791,12 @@ class HomeworkCheckServiceTest extends TestCase
                 'check_date' => now()->toDateString(),
             ])
             ->set('selectedStudentIds', [$student->id])
-            ->call('requestMarkSelectedNotDone')
-            ->assertSet('confirmNotDoneOpen', true)
-            ->call('confirmMarkSelectedNotDone')
-            ->assertSet('confirmNotDoneOpen', false)
+            ->call('openBulkAsk')
+            ->assertSet('bulkStep', 'ask')
+            ->call('chooseBulk', 'not_done')
+            ->assertSet('bulkStep', 'confirm')
+            ->call('confirmBulk')
+            ->assertSet('bulkStep', '')
             ->assertNotified();
 
         $this->assertDatabaseHas('homework_checks', [
