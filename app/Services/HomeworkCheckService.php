@@ -236,10 +236,14 @@ class HomeworkCheckService
                     'homework_assignment_id' => 'Homework assignment does not belong to this class.',
                 ]);
             }
+        }
 
-            if ($topic === "Today's homework") {
-                $topic = $assignment->title;
-            }
+        if (! $assignment) {
+            $assignment = $this->approvedAssignmentFor($batchId, $courseSubjectId, $checkedOnDate);
+        }
+
+        if ($assignment && $topic === "Today's homework" && filled($assignment->title)) {
+            $topic = trim((string) $assignment->title);
         }
 
         if (! $batch->subjects()->where('course_subjects.id', $subject->id)->exists()) {
@@ -788,6 +792,20 @@ class HomeworkCheckService
             ->where('course_subject_id', $courseSubjectId)
             ->whereDate('homework_date', $this->normalizeCheckedOn($checkedOn))
             ->exists();
+    }
+
+    protected function approvedAssignmentFor(int $batchId, int $courseSubjectId, string $checkedOnDate): ?HomeworkAssignment
+    {
+        return HomeworkAssignment::query()
+            ->where('batch_id', $batchId)
+            ->where('course_subject_id', $courseSubjectId)
+            ->whereDate('homework_date', $checkedOnDate)
+            ->whereIn('status', [
+                HomeworkAssignmentStatus::Approved->value,
+                HomeworkAssignmentStatus::Sent->value,
+            ])
+            ->orderByDesc('id')
+            ->first();
     }
 
     public function homeworkReadyToMark(int $batchId, int $courseSubjectId, ?string $checkedOn): bool

@@ -332,7 +332,7 @@ class ManageWhatsAppSettings extends Page
                         ->nullable()
                         ->native(false)
                         ->placeholder('Choose template…')
-                        ->helperText('Template homework_not_done (5 params). Map student.name, homework.class_section, homework.subject, homework.topic, institute.name.'),
+                        ->helperText('Template homework_not_done (5 params). Map student.name, homework.class_section, homework.subject, homework.topic, institute.name. The topic blank includes the homework name, date, and that student’s own homework link.'),
                 ])
                 ->columns(2),
                         ]),

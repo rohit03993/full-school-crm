@@ -30,7 +30,7 @@ TXT;
             ],
             2 => [
                 'label' => 'Class / section',
-                'example' => 'Class 10 - A',
+                'example' => '10 · Section A',
                 'crm_source' => 'homework.class_section',
             ],
             3 => [
@@ -39,8 +39,8 @@ TXT;
                 'crm_source' => 'homework.subject',
             ],
             4 => [
-                'label' => 'Homework topic',
-                'example' => 'Chapter 5 – Q1 to Q10',
+                'label' => 'Homework title, date, and that student’s own link',
+                'example' => 'Chapter 5 – Q1 to Q10 on 30 Sep 2026. Open: https://example.com/h/sampleToken',
                 'crm_source' => 'homework.topic',
             ],
             5 => [

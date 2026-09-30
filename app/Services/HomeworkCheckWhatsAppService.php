@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\HomeworkAssignmentStatus;
 use App\Enums\LicenseFeature;
 use App\Enums\WhatsAppRecipientStatus;
+use App\Models\HomeworkAssignment;
 use App\Models\HomeworkCheck;
 use App\Models\Setting;
 use App\Models\User;
@@ -16,6 +18,7 @@ class HomeworkCheckWhatsAppService
     public function __construct(
         protected WhatsAppCampaignService $campaigns,
         protected WhatsAppSettingsService $settings,
+        protected HomeworkStudentLinkService $studentLinks,
     ) {}
 
     /**
@@ -48,15 +51,20 @@ class HomeworkCheckWhatsAppService
                 ];
             }
 
+            $check->loadMissing(['student', 'batch.course', 'courseSubject', 'homeworkAssignment']);
             $student = $check->student;
             $mobile = trim((string) ($check->parent_mobile ?: $student?->mobile));
 
-            if ($mobile === '') {
+            if ($mobile === '' || ! $student) {
                 return ['queued' => false, 'message' => 'Student has no parent mobile number on file.', 'campaign_id' => null];
             }
 
-            $batch = $check->batch?->loadMissing('course');
-            $classSection = $batch?->displayLabel() ?? 'Class';
+            $batch = $check->batch;
+            $assignment = $check->homeworkAssignment ?? $this->assignmentForCheck($check);
+            $classSection = $this->classSectionWithoutExtraClassWord($batch?->displayLabel() ?? '');
+            $subjectName = trim((string) ($check->courseSubject?->name ?: $check->subject_name));
+            $link = $assignment ? $this->studentLinks->publicUrlFor($assignment, $student) : '';
+            $dateLabel = $this->dateLabel($check, $assignment);
 
             $campaign = $this->campaigns->createCampaign([
                 'name' => 'Homework not done · '.$student->name.' · '.now()->format('d M H:i'),
@@ -64,10 +72,11 @@ class HomeworkCheckWhatsAppService
                 'student_ids' => [$student->id],
                 'campaign_variables' => [
                     'audience_source' => 'homework_check',
-                    'topic' => $check->topic,
-                    'subject' => $check->subject_name,
-                    'class_section' => $classSection,
+                    'topic' => $this->topicForParent($check, $assignment, $dateLabel, $link),
+                    'subject' => $subjectName !== '' ? $subjectName : (string) $check->subject_name,
+                    'class_section' => $classSection !== '' ? $classSection : 'Class',
                     'date' => $check->checked_on?->toDateString() ?? now()->toDateString(),
+                    'homework_link' => $link,
                     '_student_ids' => [$student->id],
                     '_homework_check_id' => $check->id,
                 ],
@@ -94,5 +103,73 @@ class HomeworkCheckWhatsAppService
 
             return ['queued' => false, 'message' => $exception->getMessage(), 'campaign_id' => null];
         }
+    }
+
+    protected function assignmentForCheck(HomeworkCheck $check): ?HomeworkAssignment
+    {
+        if (! $check->batch_id || ! $check->course_subject_id || ! $check->checked_on) {
+            return null;
+        }
+
+        return HomeworkAssignment::query()
+            ->where('batch_id', $check->batch_id)
+            ->where('course_subject_id', $check->course_subject_id)
+            ->whereDate('homework_date', $check->checked_on)
+            ->whereIn('status', [
+                HomeworkAssignmentStatus::Approved->value,
+                HomeworkAssignmentStatus::Sent->value,
+            ])
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    protected function classSectionWithoutExtraClassWord(string $label): string
+    {
+        $label = trim($label);
+        $stripped = preg_replace('/^class\s+/iu', '', $label);
+
+        return trim(is_string($stripped) ? $stripped : $label);
+    }
+
+    protected function dateLabel(HomeworkCheck $check, ?HomeworkAssignment $assignment): string
+    {
+        $fromHomework = $assignment?->homeworkDateLabel();
+
+        if (filled($fromHomework)) {
+            return (string) $fromHomework;
+        }
+
+        return $check->checked_on
+            ? $check->checked_on->timezone((string) config('app.timezone'))->format('d M Y')
+            : now()->timezone((string) config('app.timezone'))->format('d M Y');
+    }
+
+    protected function topicForParent(
+        HomeworkCheck $check,
+        ?HomeworkAssignment $assignment,
+        string $dateLabel,
+        string $link,
+    ): string {
+        $title = trim((string) $check->topic);
+
+        if ($assignment && ($title === '' || $title === "Today's homework") && filled($assignment->title)) {
+            $title = trim((string) $assignment->title);
+        }
+
+        if ($title === '') {
+            $title = "Today's homework";
+        }
+
+        $line = $title;
+
+        if ($dateLabel !== '') {
+            $line .= ' on '.$dateLabel;
+        }
+
+        if ($link !== '') {
+            $line .= '. Open: '.$link;
+        }
+
+        return $line;
     }
 }

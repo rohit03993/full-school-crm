@@ -18,11 +18,14 @@ use App\Models\BatchStaffAssignment;
 use App\Models\BatchStudent;
 use App\Models\Course;
 use App\Models\CourseSubject;
+use App\Models\HomeworkAssignment;
 use App\Models\HomeworkCheck;
+use App\Models\HomeworkStudentLink;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
+use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppLiveCampaign;
 use App\Services\HomeworkSubmissionService;
 use App\Models\WhatsAppTemplate;
@@ -161,6 +164,53 @@ class HomeworkCheckServiceTest extends TestCase
         ]);
     }
 
+    public function test_not_done_message_reuses_the_student_homework_link(): void
+    {
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response([
+                'messages' => [['id' => 'wamid.HWLINK']],
+            ], 200),
+        ]);
+
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $this->enableHomeworkNotDoneAutomation();
+
+        $assignment = HomeworkAssignment::query()
+            ->where('batch_id', $batch->id)
+            ->where('course_subject_id', $subject->id)
+            ->firstOrFail();
+
+        $link = HomeworkStudentLink::query()->create([
+            'homework_assignment_id' => $assignment->id,
+            'student_id' => $student->id,
+            'token' => 'sameTok1',
+            'click_count' => 2,
+        ]);
+
+        $result = app(HomeworkCheckService::class)->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            "Today's homework",
+            HomeworkCheckStatus::NotDone,
+        );
+
+        $this->assertTrue($result['whatsapp']['queued'], $result['whatsapp']['message']);
+        $this->assertSame('Approved homework', $result['check']->fresh()->topic);
+        $this->assertSame($assignment->id, $result['check']->fresh()->homework_assignment_id);
+        $this->assertSame(1, HomeworkStudentLink::query()->count());
+        $this->assertSame('sameTok1', HomeworkStudentLink::query()->first()->token);
+
+        $campaign = WhatsAppCampaign::query()->latest('id')->first();
+        $this->assertNotNull($campaign);
+        $this->assertSame('10 · Section A', $campaign->campaignVariable('class_section'));
+        $this->assertSame('Mathematics', $campaign->campaignVariable('subject'));
+        $this->assertSame($link->publicUrl(), $campaign->campaignVariable('homework_link'));
+        $this->assertStringContainsString('Approved homework on ', (string) $campaign->campaignVariable('topic'));
+        $this->assertStringContainsString($link->publicUrl(), (string) $campaign->campaignVariable('topic'));
+    }
+
     public function test_not_done_without_mobile_marks_failed(): void
     {
         Http::fake();
@@ -236,7 +286,7 @@ class HomeworkCheckServiceTest extends TestCase
         $this->assertSame(2, $result['whatsappQueued']);
         $this->assertDatabaseHas('homework_checks', [
             'student_id' => $student->id,
-            'topic' => "Today's homework",
+            'topic' => 'Approved homework',
             'status' => 'not_done',
         ]);
         $this->assertDatabaseHas('homework_checks', [
