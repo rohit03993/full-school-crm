@@ -85,7 +85,7 @@ class HomeworkCheckPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Subject fills automatically when you teach only one. Mark a student only after homework was given for that day.';
+        return 'Pick a class. You can check the last 7 days, not today.';
     }
 
     public function mount(): void
@@ -141,7 +141,6 @@ class HomeworkCheckPage extends Page
 
         return $schema->components([
             Section::make('Class & subject')
-                ->description('Choose class and date. Subject is auto-selected when you are assigned to only one subject for that class.')
                 ->schema([
                     Select::make('batch_id')
                         ->label('Class')
@@ -180,7 +179,7 @@ class HomeworkCheckPage extends Page
                         ->required()
                         ->minDate(fn (): string => $service->earliestCheckDate())
                         ->maxDate(fn (): string => $service->latestCheckDate())
-                        ->helperText('Last 7 days only. Homework given today can be checked from tomorrow.')
+                        ->helperText('Last 7 days. Not today.')
                         ->live()
                         ->visible(fn (): bool => filled($this->data['batch_id'] ?? null))
                         ->afterStateUpdated(function (): void {
@@ -188,10 +187,11 @@ class HomeworkCheckPage extends Page
                         }),
                     Textarea::make('topic')
                         ->label('Homework topic (optional)')
-                        ->helperText('Included in the WhatsApp as {{4}}. Defaults to “Today\'s homework”.')
+                        ->helperText('This title goes in the parent WhatsApp. Leave it blank to use the homework title.')
                         ->placeholder('e.g. Chapter 5 – Complete Questions 1 to 10')
                         ->rows(2)
                         ->columnSpanFull()
+                        ->extraFieldWrapperAttributes(['class' => 'crm-hw-topic'])
                         ->visible(fn (): bool => $this->homeworkListOpen()),
                     TextInput::make('student_search')
                         ->label('Filter students')

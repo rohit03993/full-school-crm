@@ -11,8 +11,10 @@ use App\Filament\Pages\CallQueuePage;
 use App\Filament\Pages\CallReportPage;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\FollowUpsPage;
+use App\Filament\Pages\HomeworkCheckPage;
 use App\Filament\Pages\MyLeadsPage;
 use App\Filament\Pages\StudentSearchPage;
+use App\Filament\Pages\SubmitHomeworkPage;
 use App\Filament\Resources\Enquiries\EnquiryResource;
 use App\Filament\Resources\HomeworkAssignments\HomeworkAssignmentResource;
 use App\Models\User;
@@ -32,7 +34,7 @@ final class CrmMobileBottomNav
 
         $tabs = match (self::profileFor($user)) {
             'calling' => self::callingTabs($currentPath, $dueCount),
-            'academic' => self::academicTabs($currentPath, $dueCount),
+            'academic' => self::academicTabs($user, $currentPath, $dueCount),
             'hybrid' => self::hybridTabs($currentPath, $dueCount),
             default => self::defaultTabs($currentPath, $dueCount),
         };
@@ -100,8 +102,20 @@ final class CrmMobileBottomNav
     /**
      * @return list<array{label: string, url: string, icon: string, active: bool, badge: ?int, visible: bool}>
      */
-    private static function academicTabs(string $currentPath, int $dueCount): array
+    private static function academicTabs(User $user, string $currentPath, int $dueCount): array
     {
+        $jobs = CrmAccess::jobRoleNamesFor($user);
+        $isTeacher = in_array(StaffJobRole::Teacher->value, $jobs, true);
+
+        if ($isTeacher) {
+            return [
+                self::tab('Home', Dashboard::getUrl(), 'heroicon-o-home', $currentPath, isHome: true),
+                self::tab('Give', SubmitHomeworkPage::getUrl(), 'heroicon-o-pencil-square', $currentPath, 'submit-homework-page', visible: SubmitHomeworkPage::canAccess()),
+                self::tab('Check', HomeworkCheckPage::getUrl(), 'heroicon-o-clipboard-document-check', $currentPath, 'homework-check-page', visible: HomeworkCheckPage::canAccess()),
+                self::tab('Attendance', AttendancePage::getUrl(), 'heroicon-o-calendar-days', $currentPath, 'attendance-page', visible: AttendancePage::canAccess()),
+            ];
+        }
+
         return [
             self::tab('Home', Dashboard::getUrl(), 'heroicon-o-home', $currentPath, isHome: true),
             self::tab('Search', StudentSearchPage::getUrl(), 'heroicon-o-magnifying-glass', $currentPath, 'student-search-page'),

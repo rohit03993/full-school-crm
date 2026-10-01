@@ -1,7 +1,24 @@
 <div class="crm-hw-shell mt-4 space-y-4">
+    <style>
+        @media (max-width: 1023px) {
+            .crm-hw-topic { display: none !important; }
+            .crm-hw-empty { padding: 14px 12px !important; }
+            .crm-hw-stats { gap: 6px; }
+            .crm-hw-stats > div { padding: 8px 6px; }
+            .crm-hw-stats > div p:first-child {
+                font-size: 9px;
+                letter-spacing: 0;
+            }
+            .crm-hw-stats > div p:last-child {
+                margin-top: 2px;
+                font-size: 16px;
+                line-height: 1.1;
+            }
+        }
+    </style>
     @if (! $rosterReady)
-        <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400">
-            Select a <strong>class</strong>. Subject will auto-fill if you teach only one; otherwise pick the subject, then the student list opens.
+        <div class="crm-hw-empty rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400">
+            Pick a class. The student list opens here.
         </div>
     @elseif (filled($checkDateBlocked ?? null))
         <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-4 py-8 text-center text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
@@ -33,9 +50,9 @@
             </div>
         @endif
 
-        <div class="grid gap-3 sm:grid-cols-4">
+        <div class="crm-hw-stats grid grid-cols-4 gap-2 sm:gap-3">
             <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-500/20 dark:bg-emerald-500/10">
-                <p class="text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Done % · {{ $subjectLabel }}</p>
+                <p class="text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Done %</p>
                 <p class="mt-1 text-2xl font-bold text-emerald-900 dark:text-emerald-200">{{ $summary['done_pct'] }}%</p>
             </div>
             <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
