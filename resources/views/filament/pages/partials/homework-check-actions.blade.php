@@ -223,10 +223,17 @@
                                 @endif
                                 Week {{ $student['not_done_week'] ?? 0 }}
                                 @if ($student['last_status'])
-                                    · {{ $student['last_status'] }}
-                                    @if (filled($student['parent_line'] ?? null))
-                                        · {{ $student['parent_line'] }}
-                                    @endif
+                                    ·
+                                    <span @class([
+                                        'font-semibold',
+                                        'text-emerald-700 dark:text-emerald-300' => ($student['status_key'] ?? null) === 'done',
+                                        'text-rose-700 dark:text-rose-300' => ($student['status_key'] ?? null) === 'not_done',
+                                    ])>
+                                        {{ $student['last_status'] }}
+                                        @if (filled($student['parent_line'] ?? null))
+                                            · {{ $student['parent_line'] }}
+                                        @endif
+                                    </span>
                                 @endif
                             </p>
                         </div>
@@ -301,10 +308,16 @@
                                 </td>
                                 <td class="crm-responsive-table__wide px-4 py-2 text-xs text-gray-500" data-label="{{ $checkDateLabel }}">
                                     @if ($student['last_status'])
-                                        {{ $student['last_status'] }}
-                                        @if (filled($student['parent_line'] ?? null))
-                                            · {{ $student['parent_line'] }}
-                                        @endif
+                                        <span @class([
+                                            'font-semibold',
+                                            'text-emerald-700 dark:text-emerald-300' => ($student['status_key'] ?? null) === 'done',
+                                            'text-rose-700 dark:text-rose-300' => ($student['status_key'] ?? null) === 'not_done',
+                                        ])>
+                                            {{ $student['last_status'] }}
+                                            @if (filled($student['parent_line'] ?? null))
+                                                · {{ $student['parent_line'] }}
+                                            @endif
+                                        </span>
                                         @if ($student['can_resend'] && $student['check_id'])
                                             <button
                                                 type="button"
