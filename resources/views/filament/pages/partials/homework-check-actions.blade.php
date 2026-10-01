@@ -193,7 +193,7 @@
                                         type="button"
                                         wire:click="markStudentDone({{ $student['id'] }})"
                                         wire:loading.attr="disabled"
-                                        wire:target="markStudentDone({{ $student['id'] }}),markStudentNotDone({{ $student['id'] }})"
+                                        wire:target="markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                         @class([
                                             'font-semibold',
                                             'bg-emerald-600 text-white' => ($student['status_key'] ?? null) === 'done',
@@ -202,9 +202,9 @@
                                     >Done</button>
                                     <button
                                         type="button"
-                                        wire:click="markStudentNotDone({{ $student['id'] }})"
+                                        wire:click="askSingleNotDone({{ $student['id'] }})"
                                         wire:loading.attr="disabled"
-                                        wire:target="markStudentDone({{ $student['id'] }}),markStudentNotDone({{ $student['id'] }})"
+                                        wire:target="markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                         @class([
                                             'font-semibold',
                                             'bg-rose-600 text-white' => ($student['status_key'] ?? null) === 'not_done',
@@ -340,7 +340,7 @@
                                             type="button"
                                             wire:click="markStudentDone({{ $student['id'] }})"
                                             wire:loading.attr="disabled"
-                                            wire:target="markStudentDone({{ $student['id'] }}),markStudentNotDone({{ $student['id'] }})"
+                                            wire:target="markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                             @class([
                                                 'h-8 px-2.5 text-xs font-semibold',
                                                 'bg-emerald-600 text-white' => ($student['status_key'] ?? null) === 'done',
@@ -351,9 +351,9 @@
                                         </button>
                                         <button
                                             type="button"
-                                            wire:click="markStudentNotDone({{ $student['id'] }})"
+                                            wire:click="askSingleNotDone({{ $student['id'] }})"
                                             wire:loading.attr="disabled"
-                                            wire:target="markStudentDone({{ $student['id'] }}),markStudentNotDone({{ $student['id'] }})"
+                                            wire:target="markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                             @class([
                                                 'h-8 px-2.5 text-xs font-semibold',
                                                 'bg-rose-600 text-white' => ($student['status_key'] ?? null) === 'not_done',
@@ -377,7 +377,7 @@
             </x-crm.responsive-table>
         </div>
 
-        @if (($selectedCount ?? 0) > 0 || in_array(($bulkStep ?? ''), ['ask', 'confirm'], true))
+        @if (($selectedCount ?? 0) > 0 || in_array(($bulkStep ?? ''), ['ask', 'confirm'], true) || is_array($singleNotDone ?? null))
             <style>
                 .crm-hw-check-dock {
                     position: fixed;
@@ -401,7 +401,34 @@
             </style>
             <div class="crm-hw-check-dock">
                 <div class="rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-lg dark:border-gray-700 dark:bg-gray-900">
-                    @if (($bulkStep ?? '') === 'ask')
+                    @if (is_array($singleNotDone ?? null))
+                        <p class="text-xs leading-5 text-gray-800 dark:text-gray-100">
+                            @if ($singleNotDone['will_message'])
+                                {{ $singleNotDone['name'] }}'s parent will get a WhatsApp that the homework is not done.
+                            @elseif ($singleNotDone['already_shared'])
+                                {{ $singleNotDone['name'] }} is already Not done. No new WhatsApp.
+                            @else
+                                {{ $singleNotDone['name'] }} has no mobile number, so no WhatsApp will go.
+                            @endif
+                            @if ($singleNotDone['open'] > 0)
+                                {{ $singleNotDone['open'] }} {{ $singleNotDone['open'] === 1 ? 'student still open will be marked Done' : 'students still open will be marked Done' }}. No message to them.
+                            @endif
+                            Are you sure?
+                        </p>
+                        <div class="mt-2 flex items-center gap-2">
+                            <button
+                                type="button"
+                                wire:click="confirmSingleNotDone"
+                                wire:loading.attr="disabled"
+                                wire:target="confirmSingleNotDone"
+                                class="h-8 flex-1 rounded-lg bg-rose-600 px-2 text-xs font-semibold text-white disabled:opacity-70"
+                            >
+                                <span wire:loading.remove wire:target="confirmSingleNotDone">Send and save</span>
+                                <span wire:loading wire:target="confirmSingleNotDone">Saving…</span>
+                            </button>
+                            <button type="button" wire:click="cancelSingleNotDone" class="h-8 rounded-lg px-2 text-xs font-semibold text-gray-700 ring-1 ring-gray-300 dark:text-gray-200 dark:ring-white/20">Cancel</button>
+                        </div>
+                    @elseif (($bulkStep ?? '') === 'ask')
                         <p class="text-xs font-semibold text-gray-950 dark:text-white">Did these {{ $selectedCount }} do the homework?</p>
                         <div class="mt-2 flex items-center gap-2">
                             <button type="button" wire:click="chooseBulk('not_done')" class="h-8 flex-1 rounded-lg bg-rose-600 px-2 text-xs font-semibold text-white">Not done</button>
@@ -411,16 +438,31 @@
                     @elseif (($bulkStep ?? '') === 'confirm' && is_array($bulkSummary ?? null))
                         <p class="text-xs leading-5 text-gray-800 dark:text-gray-100">
                             @if (($bulkChoice ?? '') === 'not_done')
-                                {{ $bulkSummary['ticked'] }} Not done, message to {{ $bulkSummary['messages'] }}. {{ $bulkSummary['done'] }} others marked Done.
+                                {{ $bulkSummary['not_done'] }} {{ $bulkSummary['not_done'] === 1 ? 'student is' : 'students are' }} Not done.
+                                @if ($bulkSummary['messages'] > 0)
+                                    Their parents will get a WhatsApp that the homework is not done.
+                                @else
+                                    No new WhatsApp will go.
+                                @endif
+                                @if ($bulkSummary['done'] > 0)
+                                    The other students will be marked Done. No message to them.
+                                @endif
                             @else
-                                {{ $bulkSummary['ticked'] }} Done, no message. {{ $bulkSummary['not_done'] }} others Not done, message to {{ $bulkSummary['messages'] }}.
+                                {{ $bulkSummary['done'] }} {{ $bulkSummary['done'] === 1 ? 'student is' : 'students are' }} Done. No message to them.
+                                {{ $bulkSummary['not_done'] }} {{ $bulkSummary['not_done'] === 1 ? 'student is' : 'students are' }} Not done.
+                                @if ($bulkSummary['messages'] > 0)
+                                    Their parents will get a WhatsApp that the homework is not done.
+                                @else
+                                    No new WhatsApp will go.
+                                @endif
                             @endif
                             @if ($bulkSummary['no_mobile'] > 0)
                                 {{ $bulkSummary['no_mobile'] }} have no mobile.
                             @endif
                             @if ($bulkSummary['already_shared'] > 0)
-                                {{ $bulkSummary['already_shared'] }} already messaged.
+                                {{ $bulkSummary['already_shared'] }} already messaged, so no second WhatsApp.
                             @endif
+                            Are you sure?
                         </p>
                         <div class="mt-2 flex items-center gap-2">
                             <button

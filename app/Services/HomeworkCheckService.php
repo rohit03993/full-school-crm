@@ -468,6 +468,64 @@ class HomeworkCheckService
     }
 
     /**
+     * One student is Not Done. Students with no mark yet become Done.
+     * Students already Done or Not Done stay as they are.
+     *
+     * @return array{done: int, whatsappQueued: bool, whatsappMessage: string}
+     */
+    public function markNotDoneAndCloseOpen(
+        User $teacher,
+        int $batchId,
+        int $studentId,
+        int $courseSubjectId,
+        string $topic,
+        ?string $checkedOn = null,
+    ): array {
+        $roster = $this->rosterForBatch($batchId, $courseSubjectId, null, $checkedOn);
+        $student = $roster->first(fn (array $row): bool => (int) $row['id'] === $studentId);
+
+        if (! is_array($student)) {
+            throw ValidationException::withMessages([
+                'student_id' => 'Student is not in this class.',
+            ]);
+        }
+
+        $openIds = $roster
+            ->filter(fn (array $row): bool => blank($row['last_status']) && (int) $row['id'] !== $studentId)
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
+        $notDoneResult = $this->mark(
+            $teacher,
+            $batchId,
+            $studentId,
+            $courseSubjectId,
+            $topic,
+            HomeworkCheckStatus::NotDone,
+            $checkedOn,
+        );
+        $doneResult = $openIds === []
+            ? ['marked' => 0]
+            : $this->markMany(
+                $teacher,
+                $batchId,
+                $openIds,
+                $courseSubjectId,
+                $topic,
+                HomeworkCheckStatus::Done,
+                $checkedOn,
+            );
+
+        return [
+            'done' => (int) $doneResult['marked'],
+            'whatsappQueued' => (bool) ($notDoneResult['whatsapp']['queued'] ?? false),
+            'whatsappMessage' => (string) ($notDoneResult['whatsapp']['message'] ?? ''),
+        ];
+    }
+
+    /**
      * @return array{marked: int, whatsappQueued: int, whatsappFailed: int, errors: list<string>}
      */
     public function markRemainingDone(

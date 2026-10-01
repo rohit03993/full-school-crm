@@ -81,6 +81,8 @@ class HomeworkCheckPage extends Page
 
     public string $bulkChoice = '';
 
+    public ?int $singleNotDoneStudentId = null;
+
     public function getSubheading(): ?string
     {
         return 'Subject fills automatically when you teach only one. Mark a student only after homework was given for that day.';
@@ -233,6 +235,7 @@ class HomeworkCheckPage extends Page
                         'bulkStep' => $this->bulkStep,
                         'bulkChoice' => $this->bulkChoice,
                         'bulkSummary' => $this->bulkStep === 'confirm' ? $this->bulkSummary() : null,
+                        'singleNotDone' => $this->singleNotDoneSummary(),
                         'checkDateLabel' => $this->checkDateLabel(),
                         'subjectLabel' => $this->subjectLabel(),
                         'summary' => $summary,
@@ -257,6 +260,7 @@ class HomeworkCheckPage extends Page
     {
         $this->bulkStep = '';
         $this->bulkChoice = '';
+        $this->singleNotDoneStudentId = null;
         $ids = $this->normalizedSelectedIds();
 
         if (in_array($studentId, $ids, true)) {
@@ -276,6 +280,7 @@ class HomeworkCheckPage extends Page
     {
         $this->bulkStep = '';
         $this->bulkChoice = '';
+        $this->singleNotDoneStudentId = null;
         $visibleIds = $this->rosterStudents()->pluck('id')->map(fn ($id): int => (int) $id)->all();
         $selected = $this->normalizedSelectedIds();
         $allVisibleSelected = $visibleIds !== [] && count(array_diff($visibleIds, $selected)) === 0;
@@ -379,6 +384,7 @@ class HomeworkCheckPage extends Page
         $this->selectedStudentIds = [];
         $this->bulkStep = '';
         $this->bulkChoice = '';
+        $this->singleNotDoneStudentId = null;
     }
 
     /**
@@ -423,12 +429,113 @@ class HomeworkCheckPage extends Page
 
     public function markStudentDone(int $studentId, HomeworkCheckService $service): void
     {
+        $this->singleNotDoneStudentId = null;
         $this->markOne($service, $studentId, HomeworkCheckStatus::Done);
     }
 
-    public function markStudentNotDone(int $studentId, HomeworkCheckService $service): void
+    public function askSingleNotDone(int $studentId): void
     {
-        $this->markOne($service, $studentId, HomeworkCheckStatus::NotDone);
+        if (! $this->rosterReady()) {
+            Notification::make()->title('Select class, subject and date first')->warning()->send();
+
+            return;
+        }
+
+        $inClass = $this->classRoster()->contains(
+            fn (array $row): bool => (int) $row['id'] === $studentId,
+        );
+
+        if (! $inClass) {
+            Notification::make()->title('Student is not in this class')->warning()->send();
+
+            return;
+        }
+
+        $this->bulkStep = '';
+        $this->bulkChoice = '';
+        $this->singleNotDoneStudentId = $studentId;
+    }
+
+    public function cancelSingleNotDone(): void
+    {
+        $this->singleNotDoneStudentId = null;
+    }
+
+    public function confirmSingleNotDone(HomeworkCheckService $service): void
+    {
+        $user = Auth::user();
+        $studentId = (int) $this->singleNotDoneStudentId;
+
+        if (! $user || ! $this->rosterReady() || $studentId < 1) {
+            Notification::make()->title('Choose the class, subject, and student first')->warning()->send();
+
+            return;
+        }
+
+        try {
+            $result = $service->markNotDoneAndCloseOpen(
+                $user,
+                (int) $this->data['batch_id'],
+                $studentId,
+                (int) $this->data['course_subject_id'],
+                (string) ($this->data['topic'] ?? ''),
+                $this->checkDate(),
+            );
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first() ?? 'Could not save.';
+            Notification::make()->title((string) $message)->warning()->send();
+
+            return;
+        }
+
+        $this->singleNotDoneStudentId = null;
+
+        $body = $result['whatsappQueued']
+            ? 'Homework not done. Message shared with parents.'
+            : ($result['whatsappMessage'] !== ''
+                ? $result['whatsappMessage']
+                : 'Homework not done. Message was not shared.');
+
+        if ($result['done'] > 0) {
+            $body .= ' '.$result['done'].' open '.($result['done'] === 1 ? 'student' : 'students').' marked Done. No message to them.';
+        }
+
+        Notification::make()
+            ->title('Marked Not done')
+            ->body($body)
+            ->success()
+            ->send();
+    }
+
+    /**
+     * @return array{name: string, open: int, will_message: bool, already_shared: bool, no_mobile: bool}|null
+     */
+    protected function singleNotDoneSummary(): ?array
+    {
+        $studentId = (int) $this->singleNotDoneStudentId;
+
+        if ($studentId < 1 || ! $this->rosterReady()) {
+            return null;
+        }
+
+        $class = $this->classRoster();
+        $student = $class->first(fn (array $row): bool => (int) $row['id'] === $studentId);
+
+        if (! is_array($student)) {
+            return null;
+        }
+
+        $alreadyShared = ($student['status_key'] ?? null) === 'not_done';
+
+        return [
+            'name' => (string) $student['name'],
+            'open' => $class->filter(
+                fn (array $row): bool => blank($row['last_status']) && (int) $row['id'] !== $studentId,
+            )->count(),
+            'will_message' => ! $alreadyShared && filled($student['mobile'] ?? null),
+            'already_shared' => $alreadyShared,
+            'no_mobile' => ! $alreadyShared && blank($student['mobile'] ?? null),
+        ];
     }
 
     public function resendWhatsApp(int $checkId, HomeworkCheckService $service): void

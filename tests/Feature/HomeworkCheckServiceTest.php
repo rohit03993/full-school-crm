@@ -348,6 +348,143 @@ class HomeworkCheckServiceTest extends TestCase
         ]);
     }
 
+    public function test_one_not_done_marks_open_students_done_and_keeps_an_earlier_not_done(): void
+    {
+        Http::fake();
+
+        [$teacher, $batch, $first, $subject] = $this->seedClass();
+        $second = Student::query()->create([
+            'name' => 'Aman Verma',
+            'mobile' => '9123456780',
+            'status' => StudentStatus::Enrolled,
+        ]);
+        $third = Student::query()->create([
+            'name' => 'Neha Gupta',
+            'mobile' => '9000000001',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        foreach ([$second, $third] as $student) {
+            BatchStudent::query()->create([
+                'batch_id' => $batch->id,
+                'student_id' => $student->id,
+                'is_active' => true,
+                'assigned_at' => now(),
+                'assigned_by_user_id' => $teacher->id,
+            ]);
+        }
+
+        $service = app(HomeworkCheckService::class);
+        $date = now()->toDateString();
+
+        $service->mark(
+            $teacher,
+            $batch->id,
+            $third->id,
+            $subject->id,
+            "Today's homework",
+            HomeworkCheckStatus::Done,
+            $date,
+        );
+
+        $this->assertDatabaseMissing('homework_checks', [
+            'student_id' => $first->id,
+        ]);
+        $this->assertDatabaseMissing('homework_checks', [
+            'student_id' => $second->id,
+        ]);
+
+        $service->markNotDoneAndCloseOpen(
+            $teacher,
+            $batch->id,
+            $first->id,
+            $subject->id,
+            "Today's homework",
+            $date,
+        );
+
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $first->id,
+            'status' => 'not_done',
+        ]);
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $second->id,
+            'status' => 'done',
+        ]);
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $third->id,
+            'status' => 'done',
+        ]);
+
+        $service->markNotDoneAndCloseOpen(
+            $teacher,
+            $batch->id,
+            $second->id,
+            $subject->id,
+            "Today's homework",
+            $date,
+        );
+
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $first->id,
+            'status' => 'not_done',
+        ]);
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $second->id,
+            'status' => 'not_done',
+        ]);
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $third->id,
+            'status' => 'done',
+        ]);
+    }
+
+    public function test_not_done_button_waits_until_the_teacher_confirms(): void
+    {
+        Http::fake();
+
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $other = Student::query()->create([
+            'name' => 'Aman Verma',
+            'mobile' => '9123456780',
+            'status' => StudentStatus::Enrolled,
+        ]);
+        BatchStudent::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $other->id,
+            'is_active' => true,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $teacher->id,
+        ]);
+
+        $this->actingAs($teacher);
+
+        $page = Livewire::test(HomeworkCheckPage::class)
+            ->fillForm([
+                'batch_id' => $batch->id,
+                'course_subject_id' => $subject->id,
+                'check_date' => now()->toDateString(),
+            ])
+            ->call('askSingleNotDone', $student->id)
+            ->assertSet('singleNotDoneStudentId', $student->id);
+
+        $this->assertDatabaseMissing('homework_checks', [
+            'student_id' => $student->id,
+        ]);
+
+        $page->call('confirmSingleNotDone')
+            ->assertSet('singleNotDoneStudentId', null);
+
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $student->id,
+            'status' => 'not_done',
+        ]);
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $other->id,
+            'status' => 'done',
+        ]);
+    }
+
     public function test_teacher_homework_list_hides_student_mobile(): void
     {
         [$admin, $batch, $student, $subject] = $this->seedClass(mobile: '9876543210');
