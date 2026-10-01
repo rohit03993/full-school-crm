@@ -1,4 +1,4 @@
-<div class="mt-4 space-y-4">
+<div class="crm-hw-shell mt-4 space-y-4">
     @if (! $rosterReady)
         <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400">
             Select a <strong>class</strong>. Subject will auto-fill if you teach only one; otherwise pick the subject, then the student list opens.
@@ -69,34 +69,87 @@
                 align-items: center;
                 gap: 8px;
             }
+            .crm-hw-phone-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 5px 10px;
+                border-top: 1px solid #f3f4f6;
+            }
+            .crm-hw-phone-main {
+                min-width: 0;
+                flex: 1;
+            }
+            .crm-hw-phone-top {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+            }
+            .crm-hw-phone-top .crm-person-name {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                font-size: 13px;
+                line-height: 1.2;
+            }
+            .crm-hw-phone-actions {
+                display: flex;
+                flex: 0 0 auto;
+                overflow: hidden;
+                border-radius: 6px;
+                border: 1px solid #e5e7eb;
+            }
+            .crm-hw-phone-actions button {
+                height: 22px !important;
+                min-height: 22px !important;
+                width: auto !important;
+                padding: 0 6px !important;
+                font-size: 10px !important;
+                line-height: 1 !important;
+            }
+            .crm-hw-phone-meta {
+                margin: 1px 0 0;
+                font-size: 10px;
+                line-height: 1.2;
+                color: #6b7280;
+            }
             @media (max-width: 1023px) {
-                .crm-hw-roster > table > tbody > tr {
-                    padding: 10px 12px;
+                .crm-hw-shell .grid.gap-3 {
                     gap: 8px;
-                    border-radius: 12px;
                 }
-                .crm-hw-roster > table > tbody > tr > td.crm-responsive-table__title {
-                    padding-bottom: 8px;
-                    font-size: 14px;
+                .crm-hw-shell .grid.gap-3 > div {
+                    padding: 8px 10px;
                 }
-                .crm-hw-roster > table > tbody > tr > td.crm-responsive-table__actions > * {
-                    width: auto;
+                .crm-hw-shell .grid.gap-3 > div p:last-child {
+                    margin-top: 0;
+                    font-size: 18px;
+                    line-height: 1.2;
                 }
-                .crm-hw-roster > table > tbody > tr > td.crm-responsive-table__actions button {
-                    min-height: 28px;
-                    width: auto;
-                    border-radius: 8px;
-                    font-size: 12px;
+                .crm-hw-head {
+                    gap: 8px;
+                    padding: 8px 10px;
+                }
+            }
+            .crm-hw-roster-desktop {
+                display: none;
+            }
+            @media (min-width: 1024px) {
+                .crm-hw-phone {
+                    display: none;
+                }
+                .crm-hw-roster-desktop {
+                    display: block;
                 }
             }
         </style>
         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+            <div class="crm-hw-head flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
                 <div>
                     <p class="text-sm font-semibold text-gray-950 dark:text-white">
                         {{ $subjectLabel }} · {{ $checkDateLabel }}
                     </p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                    <p class="hidden text-xs text-gray-500 dark:text-gray-400 lg:block">
                         Tick students. The bar stays on screen while you scroll.
                     </p>
                     @php
@@ -118,7 +171,72 @@
                 </button>
             </div>
 
-            <x-crm.responsive-table class="crm-hw-roster border-t border-gray-100 dark:border-gray-800">
+            <div class="crm-hw-phone">
+                @forelse ($students as $student)
+                    @php $ticked = in_array((int) $student['id'], $selectedStudentIds ?? [], true); @endphp
+                    <div class="crm-hw-phone-row" wire:key="hw-phone-{{ $student['id'] }}">
+                        <button
+                            type="button"
+                            wire:click="toggleStudent({{ (int) $student['id'] }})"
+                            aria-label="Tick {{ $student['name'] }}"
+                            @class([
+                                'crm-hw-tick inline-flex items-center justify-center border font-bold',
+                                'border-primary-600 bg-primary-600 text-white' => $ticked,
+                                'border-gray-300 bg-white text-transparent' => ! $ticked,
+                            ])
+                        >✓</button>
+                        <div class="crm-hw-phone-main">
+                            <div class="crm-hw-phone-top">
+                                <x-crm.person-name :student-id="$student['id']" :name="$student['name']" />
+                                <div class="crm-hw-phone-actions">
+                                    <button
+                                        type="button"
+                                        wire:click="markStudentDone({{ $student['id'] }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="markStudentDone({{ $student['id'] }}),markStudentNotDone({{ $student['id'] }})"
+                                        @class([
+                                            'font-semibold',
+                                            'bg-emerald-600 text-white' => ($student['status_key'] ?? null) === 'done',
+                                            'bg-white text-gray-600' => ($student['status_key'] ?? null) !== 'done',
+                                        ])
+                                    >Done</button>
+                                    <button
+                                        type="button"
+                                        wire:click="markStudentNotDone({{ $student['id'] }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="markStudentDone({{ $student['id'] }}),markStudentNotDone({{ $student['id'] }})"
+                                        @class([
+                                            'font-semibold',
+                                            'bg-rose-600 text-white' => ($student['status_key'] ?? null) === 'not_done',
+                                            'bg-white text-gray-600' => ($student['status_key'] ?? null) !== 'not_done',
+                                        ])
+                                    >Not done</button>
+                                </div>
+                            </div>
+                            <p class="crm-hw-phone-meta">
+                                @if ($student['link_tracked'] ?? false)
+                                    {{ ($student['link_opened'] ?? false) ? 'Opened' : 'Not opened' }}
+                                    @if (filled($student['link_opened_at'] ?? null))
+                                        {{ $student['link_opened_at'] }}
+                                    @endif
+                                    ·
+                                @endif
+                                Week {{ $student['not_done_week'] ?? 0 }}
+                                @if ($student['last_status'])
+                                    · {{ $student['last_status'] }}
+                                    @if (filled($student['parent_line'] ?? null))
+                                        · {{ $student['parent_line'] }}
+                                    @endif
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                @empty
+                    <p class="px-4 py-8 text-center text-sm text-gray-500">No students found for this class.</p>
+                @endforelse
+            </div>
+
+            <x-crm.responsive-table class="crm-hw-roster crm-hw-roster-desktop border-t border-gray-100 dark:border-gray-800">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-gray-50 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                         <tr>
