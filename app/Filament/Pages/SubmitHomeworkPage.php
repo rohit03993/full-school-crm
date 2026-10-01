@@ -98,7 +98,7 @@ class SubmitHomeworkPage extends Page
                 ])
                 ->columns(2),
             Section::make('My classes')
-                ->description('Only classes and subjects assigned to you.')
+                ->description('Homework you have given shows its status here. After admin approves it, or after it is sent to parents, you cannot change it.')
                 ->schema([
                     View::make('filament.pages.partials.submit-homework')
                         ->viewData(function () use ($service, $user): array {

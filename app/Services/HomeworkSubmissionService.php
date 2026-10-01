@@ -259,6 +259,16 @@ class HomeworkSubmissionService
             ->whereDate('homework_date', $date)
             ->first();
 
+        if (! $asAdmin && $existing) {
+            $blocked = $this->teacherEditBlockedMessage($existing);
+
+            if ($blocked !== null) {
+                throw ValidationException::withMessages([
+                    'homework_date' => $blocked,
+                ]);
+            }
+        }
+
         $filePath = $existing?->file_path;
 
         if (filled($data['file_path'] ?? null)) {
@@ -381,6 +391,12 @@ class HomeworkSubmissionService
         if ($assignment->status === HomeworkAssignmentStatus::Sent) {
             throw ValidationException::withMessages([
                 'delete' => 'This homework was already sent to parents and cannot be removed here.',
+            ]);
+        }
+
+        if (! $asAdmin && $assignment->status === HomeworkAssignmentStatus::Approved) {
+            throw ValidationException::withMessages([
+                'delete' => 'This homework is approved by admin. You cannot change it.',
             ]);
         }
 
@@ -945,11 +961,22 @@ class HomeworkSubmissionService
                     'subject' => (string) $label,
                     'assignment_id' => $assignment?->id,
                     'title' => $assignment?->title,
+                    'description' => $assignment?->description,
                     'status' => $status?->label(),
                     'status_key' => $status?->value,
+                    'status_line' => match ($status) {
+                        HomeworkAssignmentStatus::Submitted => 'Homework given · Waiting for admin',
+                        HomeworkAssignmentStatus::Approved => 'Homework given · Approved by admin',
+                        HomeworkAssignmentStatus::Sent => 'Homework given · Sent to parents',
+                        default => null,
+                    },
+                    'locked' => in_array($status, [
+                        HomeworkAssignmentStatus::Approved,
+                        HomeworkAssignmentStatus::Sent,
+                    ], true),
                     'closed' => $closure !== null,
                     'closure_label' => $closure?->label(),
-                    'can_remove' => $assignment !== null && $status !== HomeworkAssignmentStatus::Sent,
+                    'can_remove' => $assignment !== null && $status === HomeworkAssignmentStatus::Submitted,
                     'link_opened' => $stats['opened'],
                     'link_total' => $stats['total'],
                     'link_opened_people' => $stats['opened_people'],
@@ -1420,6 +1447,15 @@ class HomeworkSubmissionService
                 ],
             );
         }
+    }
+
+    public function teacherEditBlockedMessage(?HomeworkAssignment $assignment): ?string
+    {
+        return match ($assignment?->status) {
+            HomeworkAssignmentStatus::Approved => 'This homework is approved by admin. You cannot change it.',
+            HomeworkAssignmentStatus::Sent => 'This homework was sent to parents. You cannot change it.',
+            default => null,
+        };
     }
 
     protected function subjectClosure(int $batchId, int $subjectId, string $date): ?HomeworkSubjectClosure

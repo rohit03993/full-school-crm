@@ -24,10 +24,10 @@
     @endif
 
     <div class="flex min-w-0 flex-wrap gap-2 text-xs font-medium">
-        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 dark:bg-white/5 dark:text-gray-300">To add: {{ (int) ($counts['missing'] ?? 0) }}</span>
-        <span class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">Waiting: {{ (int) ($counts['submitted'] ?? 0) }}</span>
-        <span class="rounded-full bg-sky-100 px-2.5 py-1 text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">Approved: {{ (int) ($counts['approved'] ?? 0) }}</span>
-        <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">Sent: {{ (int) ($counts['sent'] ?? 0) }}</span>
+        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-gray-700 dark:bg-white/5 dark:text-gray-300">To add {{ (int) ($counts['missing'] ?? 0) }}</span>
+        <span class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">Waiting for admin {{ (int) ($counts['submitted'] ?? 0) }}</span>
+        <span class="rounded-full bg-sky-100 px-2.5 py-1 text-sky-800 dark:bg-sky-500/15 dark:text-sky-200">Approved by admin {{ (int) ($counts['approved'] ?? 0) }}</span>
+        <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">Sent to parents {{ (int) ($counts['sent'] ?? 0) }}</span>
     </div>
 
     @if (($desk['groups'] ?? []) === [])
@@ -50,24 +50,35 @@
                                     @foreach ($section['subjects'] as $subject)
                                         <li
                                             x-data="{ who: false }"
-                                            class="rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-white/5">
-                                            <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                                            @class([
+                                                'rounded-xl border px-3 py-3 text-sm',
+                                                'border-amber-200 bg-amber-50/40 dark:border-amber-500/20 dark:bg-amber-500/10' => ($subject['status_key'] ?? null) === 'submitted',
+                                                'border-sky-200 bg-sky-50/50 dark:border-sky-500/20 dark:bg-sky-500/10' => ($subject['status_key'] ?? null) === 'approved',
+                                                'border-emerald-200 bg-emerald-50/50 dark:border-emerald-500/20 dark:bg-emerald-500/10' => ($subject['status_key'] ?? null) === 'sent',
+                                                'border-rose-200 bg-rose-50/40 dark:border-rose-500/20 dark:bg-rose-500/10' => ($subject['closed'] ?? false) && blank($subject['status_key'] ?? null),
+                                                'border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/5' => blank($subject['status_key'] ?? null) && ! ($subject['closed'] ?? false),
+                                            ])>
+                                            <div class="flex min-w-0 flex-wrap items-start justify-between gap-2">
                                             <div class="min-w-0">
                                                 <p class="font-semibold text-gray-900 dark:text-gray-100">{{ $subject['subject'] }}</p>
                                                 @if ($subject['closed'] ?? false)
-                                                    <p class="mt-0.5 text-xs font-semibold text-rose-700 dark:text-rose-300">{{ $subject['closure_label'] ?? 'Closed for today' }}. You cannot add homework for this day.</p>
+                                                    <p class="mt-1 text-xs font-semibold text-rose-700 dark:text-rose-300">{{ $subject['closure_label'] ?? 'Closed for today' }}. You cannot add homework for this day.</p>
                                                 @elseif ($subject['status_key'])
-                                                    <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                                                        <span @class([
-                                                            'inline-flex rounded-full px-2 py-0.5 font-medium',
-                                                            'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200' => $subject['status_key'] === 'submitted',
-                                                            'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-200' => $subject['status_key'] === 'approved',
-                                                            'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200' => $subject['status_key'] === 'sent',
-                                                        ])>{{ $subject['status'] }}</span>
-                                                        @if ($subject['title'])
-                                                            <span class="ml-1">{{ $subject['title'] }}</span>
-                                                        @endif
-                                                    </p>
+                                                    <p @class([
+                                                        'mt-1 text-xs font-semibold',
+                                                        'text-amber-800 dark:text-amber-200' => $subject['status_key'] === 'submitted',
+                                                        'text-sky-800 dark:text-sky-200' => $subject['status_key'] === 'approved',
+                                                        'text-emerald-800 dark:text-emerald-200' => $subject['status_key'] === 'sent',
+                                                    ])>{{ $subject['status_line'] ?? $subject['status'] }}</p>
+                                                    @if (filled($subject['title'] ?? null))
+                                                        <p class="mt-1 text-sm font-medium text-gray-900 dark:text-gray-100">{{ $subject['title'] }}</p>
+                                                    @endif
+                                                    @if (filled($subject['description'] ?? null))
+                                                        <p class="mt-0.5 line-clamp-2 text-xs text-gray-600 dark:text-gray-300">{{ $subject['description'] }}</p>
+                                                    @endif
+                                                    @if ($subject['locked'] ?? false)
+                                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">You cannot change this.</p>
+                                                    @endif
                                                     @if ($subject['status_key'] === 'sent' && (int) ($subject['link_total'] ?? 0) > 0)
                                                         <p class="mt-1">
                                                             <button

@@ -71,6 +71,21 @@ trait AddsHomeworkModal
             return;
         }
 
+        if (! $this->homeworkModalSavesAsAdmin()) {
+            $existing = HomeworkAssignment::query()
+                ->where('batch_id', $batchId)
+                ->where('course_subject_id', $subjectId)
+                ->whereDate('homework_date', $this->dateString())
+                ->first();
+            $blocked = $service->teacherEditBlockedMessage($existing);
+
+            if ($blocked !== null) {
+                Notification::make()->title($blocked)->warning()->send();
+
+                return;
+            }
+        }
+
         $this->mountAction('addHomework', [
             'batchId' => $batchId,
             'subjectId' => $subjectId,

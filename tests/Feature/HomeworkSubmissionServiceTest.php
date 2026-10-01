@@ -1188,6 +1188,96 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertDontSee('Not done');
     }
 
+    public function test_teacher_sees_given_homework_and_cannot_change_it_after_approval_or_send(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+
+        $maths = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Exercise 1',
+        ]);
+
+        $revised = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Exercise 1 revised',
+        ]);
+
+        $this->assertSame('Exercise 1 revised', $revised->description);
+
+        $service->approve($data['admin'], (int) $maths->id);
+
+        $card = $service->teacherDeskForDate($data['mathTeacher'], now()->toDateString())['groups'][0]['sections'][0]['subjects'][0];
+        $this->assertSame('Homework given · Approved by admin', $card['status_line']);
+        $this->assertTrue($card['locked']);
+        $this->assertFalse($card['can_remove']);
+
+        try {
+            $service->submit($data['mathTeacher'], [
+                'batch_id' => $data['batch']->id,
+                'course_subject_id' => $data['maths']->id,
+                'homework_date' => now()->toDateString(),
+                'title' => 'Algebra',
+                'description' => 'Should not save',
+            ]);
+            $this->fail('Approved homework was changed by the teacher.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'This homework is approved by admin. You cannot change it.',
+                $exception->errors()['homework_date'][0],
+            );
+        }
+
+        try {
+            $service->deleteSubmission($data['mathTeacher'], (int) $maths->id);
+            $this->fail('Approved homework was removed by the teacher.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'This homework is approved by admin. You cannot change it.',
+                $exception->errors()['delete'][0],
+            );
+        }
+
+        $this->actingAs($data['mathTeacher']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(SubmitHomeworkPage::class)
+            ->assertSee('Homework given · Approved by admin')
+            ->assertSee('You cannot change this.')
+            ->assertDontSee('Update')
+            ->call('startAdd', $data['batch']->id, $data['maths']->id)
+            ->assertNotified('This homework is approved by admin. You cannot change it.');
+
+        $maths->forceFill(['status' => HomeworkAssignmentStatus::Sent])->save();
+
+        try {
+            $service->submit($data['mathTeacher'], [
+                'batch_id' => $data['batch']->id,
+                'course_subject_id' => $data['maths']->id,
+                'homework_date' => now()->toDateString(),
+                'title' => 'Algebra',
+                'description' => 'Should not save',
+            ]);
+            $this->fail('Sent homework was changed by the teacher.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'This homework was sent to parents. You cannot change it.',
+                $exception->errors()['homework_date'][0],
+            );
+        }
+
+        Livewire::test(SubmitHomeworkPage::class)
+            ->assertSee('Homework given · Sent to parents')
+            ->assertDontSee('Update')
+            ->assertDontSee('Remove');
+    }
+
     public function test_combined_send_without_approved_returns_error(): void
     {
         $data = $this->seedClass();
