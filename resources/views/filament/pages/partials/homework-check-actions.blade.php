@@ -217,29 +217,28 @@
                                     >Not done</button>
                                 </div>
                             </div>
-                            <p class="crm-hw-phone-meta">
-                                @if ($student['link_tracked'] ?? false)
-                                    {{ ($student['link_opened'] ?? false) ? 'Opened' : 'Not opened' }}
-                                    @if (filled($student['link_opened_at'] ?? null))
-                                        {{ $student['link_opened_at'] }}
-                                    @endif
-                                    ·
-                                @endif
-                                Week {{ $student['not_done_week'] ?? 0 }}
-                                @if ($student['last_status'])
-                                    ·
-                                    <span @class([
-                                        'font-semibold',
-                                        'text-emerald-700 dark:text-emerald-300' => ($student['status_key'] ?? null) === 'done',
-                                        'text-rose-700 dark:text-rose-300' => ($student['status_key'] ?? null) === 'not_done',
-                                    ])>
-                                        {{ $student['last_status'] }}
-                                        @if (filled($student['parent_line'] ?? null))
-                                            · {{ $student['parent_line'] }}
-                                        @endif
-                                    </span>
-                                @endif
-                            </p>
+                            @php
+                                $phoneBits = [];
+                                if ($student['link_opened'] ?? false) {
+                                    $phoneBits[] = filled($student['link_opened_at'] ?? null)
+                                        ? 'Opened '.$student['link_opened_at']
+                                        : 'Opened';
+                                }
+                                if (($student['not_done_week'] ?? 0) > 0) {
+                                    $phoneBits[] = 'Week '.$student['not_done_week'];
+                                }
+                                if (($student['status_key'] ?? null) === 'not_done') {
+                                    $phoneBits[] = match ($student['parent_line'] ?? null) {
+                                        'Message shared with parents' => 'Sent',
+                                        'Message was not shared' => 'Not sent',
+                                        'Message to parents is waiting' => 'Waiting',
+                                        default => 'Not done',
+                                    };
+                                }
+                            @endphp
+                            @if ($phoneBits !== [])
+                                <p class="crm-hw-phone-meta">{{ implode(' · ', $phoneBits) }}</p>
+                            @endif
                         </div>
                     </div>
                 @empty
