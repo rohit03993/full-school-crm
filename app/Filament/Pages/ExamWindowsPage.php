@@ -6,6 +6,7 @@ use App\Enums\CrmPermission;
 use App\Enums\ExamWindowStatus;
 use App\Enums\LicenseFeature;
 use App\Models\ExamWindow;
+use App\Services\ExamTestGroupService;
 use App\Services\ExamWindowService;
 use App\Support\ClassSectionLabel;
 use App\Support\CrmAccess;
@@ -18,8 +19,10 @@ use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
+use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\WithPagination;
 use UnitEnum;
 
@@ -126,6 +129,15 @@ class ExamWindowsPage extends Page
         }
 
         $windows = $query->paginate($this->perPage);
+        $user = Auth::user();
+        $groupService = app(ExamTestGroupService::class);
+        $keys = $windows->getCollection()
+            ->pluck('test_key')
+            ->filter(fn (mixed $key): bool => filled($key))
+            ->map(fn (mixed $key): string => (string) $key)
+            ->unique()
+            ->values()
+            ->all();
 
         return $schema->components([
             View::make('filament.pages.partials.exam-windows-list')
@@ -139,7 +151,35 @@ class ExamWindowsPage extends Page
                     'displayBatch' => fn (ExamWindow $window): string => $window->batch
                         ? ClassSectionLabel::forBatch($window->batch, includeSession: false, includeShift: false)
                         : '—',
+                    'canDeleteExams' => $user ? $groupService->userCanDeleteWindow($user) : false,
+                    'deleteEligibility' => $groupService->deleteEligibility($keys),
                 ]),
         ]);
+    }
+
+    public function deleteWindow(int $windowId): void
+    {
+        $user = Auth::user();
+        $window = ExamWindow::query()->find($windowId);
+
+        if (! $user || ! $window) {
+            return;
+        }
+
+        try {
+            app(ExamTestGroupService::class)->deleteWindow($user, $window);
+
+            Notification::make()
+                ->title('Exam deleted')
+                ->body('Teachers will no longer see this exam. Its marks sheet was removed too.')
+                ->success()
+                ->send();
+        } catch (ValidationException $exception) {
+            Notification::make()
+                ->title('Exam not deleted')
+                ->body(collect($exception->errors())->flatten()->first() ?: 'This exam cannot be deleted.')
+                ->danger()
+                ->send();
+        }
     }
 }

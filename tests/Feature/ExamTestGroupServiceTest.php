@@ -12,9 +12,13 @@ use App\Enums\ResultDeclarationStatus;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Enums\WhatsAppCampaignStatus;
+use App\Enums\ExamWindowStatus;
 use App\Models\ActivityAttendance;
 use App\Models\ActivitySession;
 use App\Models\ActivityType;
+use App\Models\CourseSubject;
+use App\Models\ExamWindow;
+use App\Models\ExamWindowSubject;
 use App\Models\Admission;
 use App\Models\Batch;
 use App\Models\BatchStudent;
@@ -50,6 +54,54 @@ class ExamTestGroupServiceTest extends TestCase
         $this->assertSame(1, $deleted);
         $this->assertDatabaseMissing('activity_sessions', ['id' => $drop->id]);
         $this->assertDatabaseHas('activity_sessions', ['id' => $keep->id]);
+    }
+
+    public function test_delete_also_removes_the_teacher_exam_card(): void
+    {
+        [$staff, $batch, $type] = $this->examContext();
+        $session = $this->createTestSession($type, $batch, $staff, 'mid-exam', 'mid exam', 'Physics');
+        $window = $this->createExamWindow($batch, $type, $staff, 'mid-exam', 'mid exam', $session->id);
+
+        app(ExamTestGroupService::class)->deleteGroup($staff, 'mid-exam');
+
+        $this->assertDatabaseMissing('activity_sessions', ['id' => $session->id]);
+        $this->assertDatabaseMissing('exam_windows', ['id' => $window->id]);
+        $this->assertDatabaseMissing('exam_window_subjects', ['exam_window_id' => $window->id]);
+    }
+
+    public function test_delete_removes_a_teacher_exam_card_whose_mark_sheet_is_already_gone(): void
+    {
+        [$staff, $batch, $type] = $this->examContext();
+        $window = $this->createExamWindow($batch, $type, $staff, 'old-test', 'test');
+
+        $deleted = app(ExamTestGroupService::class)->deleteGroup($staff, 'old-test');
+
+        $this->assertSame(1, $deleted);
+        $this->assertDatabaseMissing('exam_windows', ['id' => $window->id]);
+    }
+
+    public function test_deleting_one_class_card_does_not_remove_the_same_exam_on_another_class(): void
+    {
+        [$staff, $batch, $type] = $this->examContext();
+        $other = Batch::query()->create([
+            'name' => 'Class 11-B',
+            'course_id' => $batch->course_id,
+            'trainer_user_id' => $staff->id,
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'status' => BatchStatus::Active,
+        ]);
+        $dropSession = $this->createTestSession($type, $batch, $staff, 'mid-exam', 'mid exam', 'Physics');
+        $keepSession = $this->createTestSession($type, $other, $staff, 'mid-exam', 'mid exam', 'Physics');
+        $drop = $this->createExamWindow($batch, $type, $staff, 'mid-exam', 'mid exam', $dropSession->id);
+        $keep = $this->createExamWindow($other, $type, $staff, 'mid-exam', 'mid exam', $keepSession->id);
+
+        app(ExamTestGroupService::class)->deleteWindow($staff, $drop);
+
+        $this->assertDatabaseMissing('exam_windows', ['id' => $drop->id]);
+        $this->assertDatabaseMissing('activity_sessions', ['id' => $dropSession->id]);
+        $this->assertDatabaseHas('exam_windows', ['id' => $keep->id]);
+        $this->assertDatabaseHas('activity_sessions', ['id' => $keepSession->id]);
     }
 
     public function test_delete_is_blocked_after_whatsapp_to_parents(): void
@@ -444,6 +496,43 @@ class ExamTestGroupServiceTest extends TestCase
         ]);
 
         return [$staff, $batch, $type];
+    }
+
+    protected function createExamWindow(
+        Batch $batch,
+        ActivityType $type,
+        User $staff,
+        string $testKey,
+        string $testName,
+        ?int $sessionId = null,
+    ): ExamWindow {
+        $subject = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'Physics '.$testKey.' batch '.$batch->id,
+            'code' => strtoupper(substr(md5($testKey.$batch->id), 0, 6)),
+            'default_max_marks' => 100,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        $window = ExamWindow::query()->create([
+            'batch_id' => $batch->id,
+            'activity_type_id' => $type->id,
+            'test_name' => $testName,
+            'session_date' => now()->toDateString(),
+            'test_key' => $testKey,
+            'status' => ExamWindowStatus::Open,
+            'created_by_user_id' => $staff->id,
+        ]);
+
+        ExamWindowSubject::query()->create([
+            'exam_window_id' => $window->id,
+            'course_subject_id' => $subject->id,
+            'max_marks' => 100,
+            'activity_session_id' => $sessionId,
+        ]);
+
+        return $window;
     }
 
     protected function createTestSession(

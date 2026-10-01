@@ -59,12 +59,13 @@
                     $entered = $window->subjects->whereNotNull('marks_entered_at')->count();
                     $total = $window->subjects->count();
                 @endphp
-                <a
-                    href="{{ $detailUrl($window->id) }}"
-                    class="block rounded-xl border border-gray-200/80 bg-white p-4 shadow-sm transition hover:border-primary-300 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-primary-500/40 sm:p-5"
-                >
+                @php
+                    $mayDelete = ($canDeleteExams ?? false)
+                        && (($deleteEligibility[$window->test_key]['allowed'] ?? false) === true);
+                @endphp
+                <div class="rounded-xl border border-gray-200/80 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03] sm:p-5">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0 flex-1">
+                        <a href="{{ $detailUrl($window->id) }}" class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2">
                                 <p class="text-base font-bold text-gray-950 dark:text-white">{{ $window->test_name }}</p>
                                 <span class="inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 {{ $statusBadge }}">
@@ -83,10 +84,22 @@
                             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                                 Marks entered: <strong class="text-gray-700 dark:text-gray-300">{{ $entered }}/{{ $total }}</strong> subjects
                             </p>
+                        </a>
+                        <div class="flex shrink-0 items-center gap-3">
+                            @if ($mayDelete)
+                                <button
+                                    type="button"
+                                    wire:click="deleteWindow({{ (int) $window->id }})"
+                                    wire:confirm="Delete this exam? Teachers will no longer see it, and its marks will be removed. This cannot be undone."
+                                    class="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-500/30 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                >
+                                    Delete
+                                </button>
+                            @endif
+                            <a href="{{ $detailUrl($window->id) }}" class="text-xs font-semibold text-primary-600 dark:text-primary-400">Open →</a>
                         </div>
-                        <span class="text-xs font-semibold text-primary-600 dark:text-primary-400">Open →</span>
                     </div>
-                </a>
+                </div>
             @endforeach
         </div>
 

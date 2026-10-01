@@ -7,6 +7,7 @@ use App\Enums\WhatsAppCampaignStatus;
 use App\Models\ActivityAttendance;
 use App\Models\ActivitySession;
 use App\Models\ExamWindow;
+use App\Models\ExamWindowSubject;
 use App\Models\ResultDeclaration;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
@@ -27,6 +28,12 @@ class ExamTestGroupService
     public function userCanManage(User $user): bool
     {
         return CrmAccess::can($user, CrmPermission::MarksImport);
+    }
+
+    public function userCanDeleteWindow(User $user): bool
+    {
+        return $this->userCanManage($user)
+            || CrmAccess::can($user, CrmPermission::AcademicsManage);
     }
 
     /**
@@ -103,23 +110,29 @@ class ExamTestGroupService
         }
 
         $sessions = $this->marksWhatsApp->sessionsForMarksKey($groupKey);
+        $windowIds = $this->windowIdsForKey($groupKey);
+        $sessionIds = $sessions->pluck('id')
+            ->merge($this->sessionIdsForWindows($windowIds))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
 
-        if ($sessions->isEmpty()) {
+        if ($sessionIds === [] && $windowIds === []) {
             throw ValidationException::withMessages([
                 'exam' => 'Exam not found.',
             ]);
         }
 
-        $sessionIds = $sessions->pluck('id')->all();
         $deleted = 0;
 
-        DB::transaction(function () use ($sessionIds, $groupKey, $staff, &$deleted): void {
-            ActivityAttendance::query()
-                ->where('attendable_type', (new ActivitySession)->getMorphClass())
-                ->whereIn('attendable_id', $sessionIds)
-                ->delete();
+        DB::transaction(function () use ($sessionIds, $windowIds, $groupKey, $staff, &$deleted): void {
+            $deleted = $this->deleteSessions($sessionIds);
+            $deletedWindows = $this->deleteWindows($windowIds);
 
-            $deleted = ActivitySession::query()->whereIn('id', $sessionIds)->delete();
+            if ($deleted === 0) {
+                $deleted = $deletedWindows;
+            }
 
             if (Schema::hasTable('result_declarations')) {
                 ResultDeclaration::query()
@@ -134,6 +147,7 @@ class ExamTestGroupService
                 [
                     'group_key' => $groupKey,
                     'session_ids' => $sessionIds,
+                    'exam_window_ids' => $windowIds,
                 ],
                 null,
                 user: $staff,
@@ -141,6 +155,71 @@ class ExamTestGroupService
         });
 
         return $deleted;
+    }
+
+    public function deleteWindow(User $staff, ExamWindow $window): void
+    {
+        if (! $this->userCanDeleteWindow($staff)) {
+            throw ValidationException::withMessages([
+                'exam' => 'You do not have permission to delete exams.',
+            ]);
+        }
+
+        $groupKey = (string) $window->test_key;
+        $eligibility = $this->deleteEligibility([$groupKey])[$groupKey] ?? [
+            'allowed' => false,
+            'reason' => 'This exam cannot be deleted.',
+        ];
+
+        if (! ($eligibility['allowed'] ?? false)) {
+            throw ValidationException::withMessages([
+                'exam' => $eligibility['reason'] ?? 'This exam cannot be deleted.',
+            ]);
+        }
+
+        $window->loadMissing('subjects');
+        $sessionIds = collect($window->subjects->pluck('activity_session_id'))
+            ->merge(
+                ActivitySession::query()
+                    ->where('batch_id', $window->batch_id)
+                    ->where('metadata->test_key', $groupKey)
+                    ->pluck('id'),
+            )
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        DB::transaction(function () use ($sessionIds, $window, $groupKey, $staff): void {
+            $this->deleteSessions($sessionIds);
+
+            $batchId = (int) $window->batch_id;
+            $window->delete();
+
+            $otherWindows = Schema::hasTable('exam_windows')
+                && ExamWindow::query()->where('test_key', $groupKey)->exists();
+
+            if (! $otherWindows && Schema::hasTable('result_declarations')) {
+                ResultDeclaration::query()
+                    ->where('group_key', $groupKey)
+                    ->where('batch_id', $batchId)
+                    ->whereNull('declared_at')
+                    ->delete();
+            }
+
+            $this->audit->log(
+                'exam_window_deleted',
+                null,
+                [
+                    'group_key' => $groupKey,
+                    'exam_window_id' => $window->id,
+                    'batch_id' => $batchId,
+                    'session_ids' => $sessionIds,
+                ],
+                null,
+                user: $staff,
+            );
+        });
     }
 
     public function renameGroup(User $staff, string $groupKey, string $newName): void
@@ -200,6 +279,69 @@ class ExamTestGroupService
                 user: $staff,
             );
         });
+    }
+
+    /**
+     * @return list<int>
+     */
+    protected function windowIdsForKey(string $groupKey): array
+    {
+        if ($groupKey === '' || ! Schema::hasTable('exam_windows')) {
+            return [];
+        }
+
+        return ExamWindow::query()
+            ->where('test_key', $groupKey)
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+    }
+
+    /**
+     * @param  list<int>  $windowIds
+     * @return list<int>
+     */
+    protected function sessionIdsForWindows(array $windowIds): array
+    {
+        if ($windowIds === [] || ! Schema::hasTable('exam_window_subjects')) {
+            return [];
+        }
+
+        return ExamWindowSubject::query()
+            ->whereIn('exam_window_id', $windowIds)
+            ->whereNotNull('activity_session_id')
+            ->pluck('activity_session_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+    }
+
+    /**
+     * @param  list<int>  $sessionIds
+     */
+    protected function deleteSessions(array $sessionIds): int
+    {
+        if ($sessionIds === []) {
+            return 0;
+        }
+
+        ActivityAttendance::query()
+            ->where('attendable_type', (new ActivitySession)->getMorphClass())
+            ->whereIn('attendable_id', $sessionIds)
+            ->delete();
+
+        return ActivitySession::query()->whereIn('id', $sessionIds)->delete();
+    }
+
+    /**
+     * @param  list<int>  $windowIds
+     */
+    protected function deleteWindows(array $windowIds): int
+    {
+        if ($windowIds === [] || ! Schema::hasTable('exam_windows')) {
+            return 0;
+        }
+
+        return ExamWindow::query()->whereIn('id', $windowIds)->delete();
     }
 
     /**

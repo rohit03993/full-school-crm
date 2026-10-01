@@ -94,7 +94,7 @@ class ListActivitySessions extends ListRecords
 
             Notification::make()
                 ->title('Exam deleted')
-                ->body('This exam and its marks were removed. Other exams were not changed.')
+                ->body('This exam, its marks, and the teacher card were removed. Other exams were not changed.')
                 ->success()
                 ->send();
         } catch (ValidationException $exception) {
