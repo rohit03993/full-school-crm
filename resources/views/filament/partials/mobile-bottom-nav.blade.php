@@ -31,7 +31,7 @@
                         ])>
                             <x-filament::icon :icon="$tab['icon']" class="h-5 w-5" />
                         </span>
-                        <span class="w-full truncate text-center font-semibold leading-tight {{ $labelSize }}">{{ $tab['label'] }}</span>
+                        <span class="flex h-7 w-full items-center justify-center text-center font-semibold leading-[1.05] {{ $labelSize }}">{{ $tab['label'] }}</span>
                         @if (($tab['badge'] ?? null) > 0)
                             <span class="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warning-500 px-1 text-[9px] font-bold text-white">
                                 {{ $tab['badge'] > 9 ? '9+' : $tab['badge'] }}

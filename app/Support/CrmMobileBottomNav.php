@@ -110,8 +110,8 @@ final class CrmMobileBottomNav
         if ($isTeacher) {
             return [
                 self::tab('Home', Dashboard::getUrl(), 'heroicon-o-home', $currentPath, isHome: true),
-                self::tab('Give', SubmitHomeworkPage::getUrl(), 'heroicon-o-pencil-square', $currentPath, 'submit-homework-page', visible: SubmitHomeworkPage::canAccess()),
-                self::tab('Check', HomeworkCheckPage::getUrl(), 'heroicon-o-clipboard-document-check', $currentPath, 'homework-check-page', visible: HomeworkCheckPage::canAccess()),
+                self::tab('Give homework', SubmitHomeworkPage::getUrl(), 'heroicon-o-pencil-square', $currentPath, 'submit-homework-page', visible: SubmitHomeworkPage::canAccess()),
+                self::tab('Check homework', HomeworkCheckPage::getUrl(), 'heroicon-o-clipboard-document-check', $currentPath, 'homework-check-page', visible: HomeworkCheckPage::canAccess()),
                 self::tab('Attendance', AttendancePage::getUrl(), 'heroicon-o-calendar-days', $currentPath, 'attendance-page', visible: AttendancePage::canAccess()),
             ];
         }
