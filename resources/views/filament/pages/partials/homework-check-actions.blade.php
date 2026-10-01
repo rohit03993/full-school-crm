@@ -48,6 +48,48 @@
             </div>
         </div>
 
+        <style>
+            .crm-hw-tick {
+                box-sizing: border-box !important;
+                width: 16px !important;
+                height: 16px !important;
+                min-width: 16px !important;
+                max-width: 16px !important;
+                min-height: 16px !important;
+                max-height: 16px !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                flex: 0 0 16px !important;
+                border-radius: 4px !important;
+                font-size: 10px !important;
+                line-height: 1 !important;
+            }
+            .crm-hw-name {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            @media (max-width: 1023px) {
+                .crm-hw-roster > table > tbody > tr {
+                    padding: 10px 12px;
+                    gap: 8px;
+                    border-radius: 12px;
+                }
+                .crm-hw-roster > table > tbody > tr > td.crm-responsive-table__title {
+                    padding-bottom: 8px;
+                    font-size: 14px;
+                }
+                .crm-hw-roster > table > tbody > tr > td.crm-responsive-table__actions > * {
+                    width: auto;
+                }
+                .crm-hw-roster > table > tbody > tr > td.crm-responsive-table__actions button {
+                    min-height: 28px;
+                    width: auto;
+                    border-radius: 8px;
+                    font-size: 12px;
+                }
+            }
+        </style>
         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
                 <div>
@@ -76,7 +118,7 @@
                 </button>
             </div>
 
-            <x-crm.responsive-table class="border-t border-gray-100 dark:border-gray-800">
+            <x-crm.responsive-table class="crm-hw-roster border-t border-gray-100 dark:border-gray-800">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-gray-50 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                         <tr>
@@ -95,13 +137,13 @@
                             <tr wire:key="hw-roster-{{ $student['id'] }}">
                                 <td class="px-4 py-2 font-medium crm-responsive-table__title" data-label="Student">
                                     @php $ticked = in_array((int) $student['id'], $selectedStudentIds ?? [], true); @endphp
-                                    <div class="flex items-center gap-3">
+                                    <div class="crm-hw-name">
                                         <button
                                             type="button"
                                             wire:click="toggleStudent({{ (int) $student['id'] }})"
                                             aria-label="Tick {{ $student['name'] }}"
                                             @class([
-                                                'flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-sm font-bold',
+                                                'crm-hw-tick inline-flex items-center justify-center border font-bold',
                                                 'border-primary-600 bg-primary-600 text-white' => $ticked,
                                                 'border-gray-300 bg-white text-transparent dark:border-gray-500 dark:bg-gray-900' => ! $ticked,
                                             ])
