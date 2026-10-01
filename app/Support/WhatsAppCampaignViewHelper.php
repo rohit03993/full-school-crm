@@ -48,9 +48,13 @@ class WhatsAppCampaignViewHelper
             ['label' => 'Recipients', 'value' => (string) $total, 'tone' => 'text-gray-950 dark:text-white'],
             ['label' => 'Sent', 'value' => (string) $sent, 'tone' => 'text-success-600 dark:text-success-400'],
             ['label' => 'Failed', 'value' => (string) $failed, 'tone' => $failed > 0 ? 'text-danger-600 dark:text-danger-400' : 'text-gray-500 dark:text-gray-400'],
-            ['label' => 'Est. cost', 'value' => '₹'.number_format((float) $campaign->estimated_total_cost_inr, 2), 'tone' => 'text-primary-700 dark:text-primary-300'],
         ];
 
+        if (CrmAccess::canSeeMessageCost(auth()->user())) {
+            $cards[] = ['label' => 'Est. cost', 'value' => '₹'.number_format((float) $campaign->estimated_total_cost_inr, 2), 'tone' => 'text-primary-700 dark:text-primary-300'];
+        }
+
+        $columns = count($cards) === 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3';
         $cardHtml = collect($cards)->map(fn (array $card): string => '<div class="rounded-xl border border-gray-200 bg-white p-4 text-center shadow-sm dark:border-white/10 dark:bg-white/5">'
             .'<p class="text-3xl font-bold tabular-nums '.$card['tone'].'">'.e($card['value']).'</p>'
             .'<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">'.e($card['label']).'</p>'
@@ -64,7 +68,7 @@ class WhatsAppCampaignViewHelper
             .'</div>';
 
         return new HtmlString(
-            '<div class="grid grid-cols-2 gap-3 lg:grid-cols-4">'.$cardHtml.'</div>'.$meta
+            '<div class="grid grid-cols-2 gap-3 '.$columns.'">'.$cardHtml.'</div>'.$meta
         );
     }
 

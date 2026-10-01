@@ -36,6 +36,7 @@
 
         @if (! empty($lastCombinedSendResult))
             @php($sendResult = $lastCombinedSendResult)
+            @php($showMessageCost = \App\Support\CrmAccess::canSeeMessageCost(auth()->user()))
             @php($currency = $sendResult['currency'] ?? 'INR')
             @php($unitCost = (float) ($sendResult['unit_cost'] ?? 0))
             @php($totalCost = (float) ($sendResult['estimated_total_cost'] ?? 0))
@@ -47,14 +48,16 @@
                             {{ $sendResult['sent'] ?? 0 }} sent · {{ $sendResult['failed'] ?? 0 }} failed · {{ $sendResult['skipped'] ?? 0 }} skipped
                         </p>
                     </div>
-                    <div class="text-right">
-                        <p class="text-sm font-bold text-gray-900 dark:text-gray-100">
-                            Estimated total: {{ $currency }} {{ number_format($totalCost, 2) }}
-                        </p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ $currency }} {{ number_format($unitCost, 4) }} per successfully accepted message
-                        </p>
-                    </div>
+                    @if ($showMessageCost)
+                        <div class="text-right">
+                            <p class="text-sm font-bold text-gray-900 dark:text-gray-100">
+                                Estimated total: {{ $currency }} {{ number_format($totalCost, 2) }}
+                            </p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ $currency }} {{ number_format($unitCost, 4) }} per successfully accepted message
+                            </p>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="max-h-72 overflow-auto">
@@ -64,7 +67,9 @@
                                 <th class="px-4 py-2">Student</th>
                                 <th class="px-4 py-2">Mobile number</th>
                                 <th class="px-4 py-2">Result</th>
-                                <th class="px-4 py-2 text-right">Estimated cost</th>
+                                @if ($showMessageCost)
+                                    <th class="px-4 py-2 text-right">Estimated cost</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-white/5">
@@ -83,21 +88,25 @@
                                             <p class="mt-1 max-w-md text-xs text-rose-600 dark:text-rose-300">{{ $recipient['error'] }}</p>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-2.5 text-right text-gray-600 dark:text-gray-300">
-                                        {{ $currency }} {{ number_format((float) $recipient['estimated_cost'], 4) }}
-                                    </td>
+                                    @if ($showMessageCost)
+                                        <td class="px-4 py-2.5 text-right text-gray-600 dark:text-gray-300">
+                                            {{ $currency }} {{ number_format((float) $recipient['estimated_cost'], 4) }}
+                                        </td>
+                                    @endif
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="4" class="px-4 py-5 text-center text-gray-500">No recipient details available.</td>
+                                    <td colspan="{{ $showMessageCost ? 4 : 3 }}" class="px-4 py-5 text-center text-gray-500">No recipient details available.</td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
-                <p class="border-t border-gray-100 px-4 py-2 text-xs text-gray-500 dark:border-white/5 dark:text-gray-400">
-                    Costs are estimates from your configured Meta WhatsApp rates; final billing may differ.
-                </p>
+                @if ($showMessageCost)
+                    <p class="border-t border-gray-100 px-4 py-2 text-xs text-gray-500 dark:border-white/5 dark:text-gray-400">
+                        Costs are estimates from your configured Meta WhatsApp rates; final billing may differ.
+                    </p>
+                @endif
             </div>
         @endif
 

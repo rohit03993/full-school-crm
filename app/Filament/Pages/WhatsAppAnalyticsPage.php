@@ -9,6 +9,7 @@ use App\Enums\WhatsAppPricingCategory;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Services\WhatsAppAnalyticsService;
+use App\Support\CrmAccess;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
@@ -68,6 +69,10 @@ class WhatsAppAnalyticsPage extends Page
 
     public function getSubheading(): ?string
     {
+        if (! CrmAccess::canSeeMessageCost(auth()->user())) {
+            return 'How many messages were sent in this date range, and whether the CRM log matches Meta.';
+        }
+
         return CrmHint::text('meta_whatsapp.analytics');
     }
 

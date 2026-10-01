@@ -34,6 +34,7 @@ use App\Models\User;
 use App\Services\CrmPermissionSyncService;
 use App\Services\HomeworkCheckService;
 use App\Services\HomeworkSubmissionService;
+use App\Support\CrmAccess;
 use App\Services\MetaWhatsAppCostEstimator;
 use App\Support\BulkSendGuard;
 use App\Support\CombinedHomeworkWhatsAppTemplate;
@@ -81,6 +82,19 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertFalse(HomeworkCheckPage::shouldRegisterNavigation());
         $this->assertFalse(HomeworkAssignmentResource::shouldRegisterNavigation());
         $this->assertFalse(HomeworkAssignmentResource::canCreate());
+    }
+
+    public function test_only_the_admin_role_can_see_whatsapp_message_cost(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+
+        $coordinator = User::factory()->create(['is_active' => true]);
+        $coordinator->assignRole(RoleName::Staff->value);
+
+        $this->assertTrue(CrmAccess::canSeeMessageCost($admin));
+        $this->assertFalse(CrmAccess::canSeeMessageCost($coordinator));
+        $this->assertFalse(CrmAccess::canSeeMessageCost(null));
     }
 
     public function test_review_page_renders_with_and_without_send_summary(): void

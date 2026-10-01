@@ -9,6 +9,7 @@ use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Resources\HomeworkAssignments\HomeworkAssignmentResource;
 use App\Services\HomeworkSubmissionService;
 use App\Services\HomeworkWhatsAppService;
+use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use Carbon\Carbon;
@@ -375,13 +376,18 @@ class HomeworkReviewPage extends Page
             app(HomeworkWhatsAppService::class)->defaultCombinedTemplateName(),
         );
         $this->lastCombinedSendResult = $result;
-        $cost = number_format((float) ($result['estimated_total_cost'] ?? 0), 2);
-        $currency = (string) ($result['currency'] ?? 'INR');
+        $costNote = '';
+
+        if (CrmAccess::canSeeMessageCost($user)) {
+            $cost = number_format((float) ($result['estimated_total_cost'] ?? 0), 2);
+            $currency = (string) ($result['currency'] ?? 'INR');
+            $costNote = ' Estimated cost: '.$currency.' '.$cost.'.';
+        }
 
         if ($result['sent'] > 0 && ($result['failed'] ?? 0) === 0) {
             Notification::make()
                 ->title('Sent to parents')
-                ->body($result['sent'].' message(s) sent covering '.$result['subjects'].' subject(s). Estimated cost: '.$currency.' '.$cost.'.')
+                ->body($result['sent'].' message(s) sent covering '.$result['subjects'].' subject(s).'.$costNote)
                 ->success()
                 ->send();
 
@@ -391,7 +397,7 @@ class HomeworkReviewPage extends Page
         if ($result['sent'] > 0) {
             Notification::make()
                 ->title('Partially sent')
-                ->body($result['sent'].' sent, '.$result['failed'].' failed. Estimated cost: '.$currency.' '.$cost.'. See recipient details below.')
+                ->body($result['sent'].' sent, '.$result['failed'].' failed.'.$costNote.' See recipient details below.')
                 ->warning()
                 ->send();
 

@@ -54,6 +54,14 @@ class CrmAccess
     }
 
     /**
+     * WhatsApp rupee cost is only for the admin role. Staff may see how many messages went.
+     */
+    public static function canSeeMessageCost(?User $user): bool
+    {
+        return (bool) $user?->is_active && $user->hasRole(RoleName::SuperAdmin->value);
+    }
+
+    /**
      * Super Admin, accountant (collect / finance stats), or anyone with fee-structure access.
      */
     public static function canViewFees(?User $user): bool

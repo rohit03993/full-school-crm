@@ -6,6 +6,7 @@ use App\Enums\LicenseFeature;
 use App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource;
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Filament\Resources\WhatsAppLiveCampaigns\WhatsAppLiveCampaignResource;
+use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\FeatureGate;
@@ -113,7 +114,9 @@ class WhatsAppHubPage extends Page
         if (WhatsAppAnalyticsPage::canAccess()) {
             $cards[] = [
                 'title' => CrmMenuLabels::whatsAppUsage(),
-                'description' => 'Meta billed cost vs CRM message log coverage.',
+                'description' => CrmAccess::canSeeMessageCost(auth()->user())
+                    ? 'Meta billed cost vs CRM message log coverage.'
+                    : 'How many messages were sent, and whether the log matches.',
                 'url' => WhatsAppAnalyticsPage::getUrl(),
             ];
         }

@@ -6,6 +6,7 @@
     $displayCost = $metaOk ? (float) ($meta['total_cost'] ?? 0) : (float) ($local['total_cost_inr'] ?? 0);
     $displayVolume = $metaOk ? (int) ($meta['total_volume'] ?? 0) : (int) ($local['total_messages'] ?? 0);
     $currency = $metaOk ? (string) ($meta['currency'] ?? 'INR') : 'INR';
+    $showMessageCost = \App\Support\CrmAccess::canSeeMessageCost(auth()->user());
 @endphp
 
 <div class="crm-wa-analytics space-y-6">
@@ -13,7 +14,7 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
                 <h2 class="text-sm font-semibold text-gray-950 dark:text-white">Date range</h2>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Filter spend and message volume. Meta official cost loads when WABA ID is saved.</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $showMessageCost ? 'Filter spend and message volume. Meta official cost loads when WABA ID is saved.' : 'Filter message volume for this date range.' }}</p>
             </div>
 
             <div class="flex flex-wrap gap-2">
@@ -50,10 +51,12 @@
     </section>
 
     <section class="crm-meta-wa-log__stats">
-        <div class="crm-meta-wa-stat crm-meta-wa-stat--total">
-            <span class="crm-meta-wa-stat__value">{{ $this->formatMoney($displayCost, $currency) }}</span>
-            <span class="crm-meta-wa-stat__label">{{ $metaOk ? 'Meta billed cost' : 'Estimated cost' }}</span>
-        </div>
+        @if ($showMessageCost)
+            <div class="crm-meta-wa-stat crm-meta-wa-stat--total">
+                <span class="crm-meta-wa-stat__value">{{ $this->formatMoney($displayCost, $currency) }}</span>
+                <span class="crm-meta-wa-stat__label">{{ $metaOk ? 'Meta billed cost' : 'Estimated cost' }}</span>
+            </div>
+        @endif
         <div class="crm-meta-wa-stat crm-meta-wa-stat--out">
             <span class="crm-meta-wa-stat__value">{{ number_format($displayVolume) }}</span>
             <span class="crm-meta-wa-stat__label">{{ $metaOk ? 'Delivered (Meta)' : 'Logged outbound' }}</span>
@@ -71,7 +74,7 @@
     @if (($meta['status'] ?? '') === 'failed')
         <p class="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
             Meta pricing API: {{ $meta['error'] ?? 'Unavailable' }}.
-            Showing CRM estimates from Meta India rate card below.
+            {{ $showMessageCost ? 'Showing CRM estimates from Meta India rate card below.' : 'Showing the CRM message log below.' }}
         </p>
     @elseif ($metaOk)
         @php
@@ -80,21 +83,23 @@
         <div class="rounded-xl border border-sky-200/80 bg-sky-50/80 px-4 py-3 text-sm text-sky-950 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100">
             <p class="font-semibold">Meta vs CRM coverage</p>
             <p class="mt-1">
-                Meta delivered <strong>{{ number_format((int) ($gap['meta_volume'] ?? 0)) }}</strong>
-                (billed {{ $this->formatMoney((float) ($gap['meta_cost'] ?? 0), (string) ($gap['currency'] ?? 'INR')) }}).
-                CRM logged <strong>{{ number_format((int) ($gap['crm_volume'] ?? 0)) }}</strong>
-                (est. {{ $this->formatMoney((float) ($gap['crm_estimated_cost'] ?? 0)) }}).
+                Meta delivered <strong>{{ number_format((int) ($gap['meta_volume'] ?? 0)) }}</strong>@if ($showMessageCost) (billed {{ $this->formatMoney((float) ($gap['meta_cost'] ?? 0), (string) ($gap['currency'] ?? 'INR')) }})@endif.
+                CRM logged <strong>{{ number_format((int) ($gap['crm_volume'] ?? 0)) }}</strong>@if ($showMessageCost) (est. {{ $this->formatMoney((float) ($gap['crm_estimated_cost'] ?? 0)) }})@endif.
                 Coverage: <strong>{{ number_format((float) ($gap['coverage_percent'] ?? 0), 1) }}%</strong>.
             </p>
             @if (((int) ($gap['missing_from_crm'] ?? 0)) > 0)
                 <p class="mt-1 text-xs opacity-90">
                     {{ number_format((int) $gap['missing_from_crm']) }} Meta deliveries are not in the CRM message log
                     (older sends, external tools, or sends before logging was complete).
-                    Trust <strong>Meta billed cost</strong> for real spend. Use CRM source/campaign tables for feature breakdown of logged messages only.
+                    @if ($showMessageCost)
+                        Trust <strong>Meta billed cost</strong> for real spend. Use CRM source/campaign tables for feature breakdown of logged messages only.
+                    @else
+                        Use the source and campaign tables for a breakdown of logged messages only.
+                    @endif
                 </p>
             @else
                 <p class="mt-1 text-xs opacity-90">
-                    CRM log matches Meta volume for this range. Official spend still comes from Meta; CRM costs remain estimates.
+                    {{ $showMessageCost ? 'CRM log matches Meta volume for this range. Official spend still comes from Meta; CRM costs remain estimates.' : 'CRM log matches Meta volume for this range.' }}
                 </p>
             @endif
         </div>
@@ -102,7 +107,7 @@
 
     <div class="grid gap-6 lg:grid-cols-2">
         <section class="crm-wa-analytics__panel">
-            <h3 class="crm-wa-analytics__panel-title">{{ $metaOk ? 'Cost by category (Meta official)' : 'Cost by category (CRM estimate)' }}</h3>
+            <h3 class="crm-wa-analytics__panel-title">{{ $showMessageCost ? ($metaOk ? 'Cost by category (Meta official)' : 'Cost by category (CRM estimate)') : 'Messages by category' }}</h3>
             @php
                 $categoryRows = $metaOk ? ($meta['by_category'] ?? []) : ($local['by_category'] ?? []);
             @endphp
@@ -115,7 +120,9 @@
                             <tr class="text-left text-xs uppercase text-gray-500">
                                 <th class="py-2 pr-3">Category</th>
                                 <th class="py-2 pr-3">Volume</th>
-                                <th class="py-2">Cost</th>
+                                @if ($showMessageCost)
+                                    <th class="py-2">Cost</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody>
@@ -123,7 +130,9 @@
                                 <tr class="border-t border-gray-100 dark:border-white/10">
                                     <td class="crm-responsive-table__title py-2 pr-3 font-medium" data-label="">{{ $this->categoryLabel((string) $category) }}</td>
                                     <td class="py-2 pr-3 tabular-nums" data-label="Volume">{{ number_format((int) ($row['volume'] ?? $row['count'] ?? 0)) }}</td>
-                                    <td class="py-2 tabular-nums font-semibold" data-label="Cost">{{ $this->formatMoney((float) ($row['cost'] ?? $row['cost_inr'] ?? 0), $currency) }}</td>
+                                    @if ($showMessageCost)
+                                        <td class="py-2 tabular-nums font-semibold" data-label="Cost">{{ $this->formatMoney((float) ($row['cost'] ?? $row['cost_inr'] ?? 0), $currency) }}</td>
+                                    @endif
                                 </tr>
                             @endforeach
                         </tbody>
@@ -133,7 +142,7 @@
         </section>
 
         <section class="crm-wa-analytics__panel">
-            <h3 class="crm-wa-analytics__panel-title">Cost by source (CRM log only)</h3>
+            <h3 class="crm-wa-analytics__panel-title">{{ $showMessageCost ? 'Cost by source (CRM log only)' : 'Messages by source' }}</h3>
             @php $sourceRows = $data['by_source'] ?? []; @endphp
             @if ($sourceRows === [])
                 <p class="text-sm text-gray-500">No source breakdown yet.</p>
@@ -144,7 +153,9 @@
                             <tr class="text-left text-xs uppercase text-gray-500">
                                 <th class="py-2 pr-3">Source</th>
                                 <th class="py-2 pr-3">Messages</th>
-                                <th class="py-2">Est. cost</th>
+                                @if ($showMessageCost)
+                                    <th class="py-2">Est. cost</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody>
@@ -152,7 +163,9 @@
                                 <tr class="border-t border-gray-100 dark:border-white/10">
                                     <td class="crm-responsive-table__title py-2 pr-3 font-medium" data-label="">{{ $this->sourceLabel((string) $source) }}</td>
                                     <td class="py-2 pr-3 tabular-nums" data-label="Messages">{{ number_format((int) ($row['count'] ?? 0)) }}</td>
-                                    <td class="py-2 tabular-nums font-semibold" data-label="Est. cost">{{ $this->formatMoney((float) ($row['cost_inr'] ?? 0)) }}</td>
+                                    @if ($showMessageCost)
+                                        <td class="py-2 tabular-nums font-semibold" data-label="Est. cost">{{ $this->formatMoney((float) ($row['cost_inr'] ?? 0)) }}</td>
+                                    @endif
                                 </tr>
                             @endforeach
                         </tbody>
@@ -165,7 +178,7 @@
     <section class="crm-wa-analytics__panel">
         <div class="mb-4 flex items-center justify-between gap-3">
             <div>
-                <h3 class="crm-wa-analytics__panel-title">Staff usage (CRM estimate)</h3>
+                <h3 class="crm-wa-analytics__panel-title">{{ $showMessageCost ? 'Staff usage (CRM estimate)' : 'Staff usage' }}</h3>
                 <p class="mt-1 text-xs text-gray-500">Inbox, bulk campaigns, profile / fee notices, and test sends attributed to the staff member who clicked Send. Automatic alerts and OTP are excluded.</p>
             </div>
         </div>
@@ -179,7 +192,9 @@
                         <tr class="text-left text-xs uppercase text-gray-500">
                             <th class="py-2 pr-3">Staff</th>
                             <th class="py-2 pr-3">Messages</th>
-                            <th class="py-2">Est. cost</th>
+                            @if ($showMessageCost)
+                                <th class="py-2">Est. cost</th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody>
@@ -187,7 +202,9 @@
                             <tr class="border-t border-gray-100 dark:border-white/10">
                                 <td class="crm-responsive-table__title py-2 pr-3 font-medium" data-label="">{{ $row['name'] ?? '—' }}</td>
                                 <td class="py-2 pr-3 tabular-nums" data-label="Messages">{{ number_format((int) ($row['count'] ?? 0)) }}</td>
-                                <td class="py-2 tabular-nums font-semibold" data-label="Est. cost">{{ $this->formatMoney((float) ($row['cost_inr'] ?? 0)) }}</td>
+                                @if ($showMessageCost)
+                                    <td class="py-2 tabular-nums font-semibold" data-label="Est. cost">{{ $this->formatMoney((float) ($row['cost_inr'] ?? 0)) }}</td>
+                                @endif
                             </tr>
                         @endforeach
                     </tbody>
@@ -198,7 +215,7 @@
 
     <section class="crm-wa-analytics__panel">
         <div class="mb-4 flex items-center justify-between gap-3">
-            <h3 class="crm-wa-analytics__panel-title">Campaigns in range (CRM estimates)</h3>
+            <h3 class="crm-wa-analytics__panel-title">{{ $showMessageCost ? 'Campaigns in range (CRM estimates)' : 'Campaigns in range' }}</h3>
             <span class="text-xs text-gray-500">{{ $data['from'] ?? '' }} → {{ $data['to'] ?? '' }}</span>
         </div>
 
@@ -214,7 +231,9 @@
                             <th class="px-2 py-2">Batch</th>
                             <th class="px-2 py-2">Sent</th>
                             <th class="px-2 py-2">Failed</th>
-                            <th class="px-2 py-2">Est. cost</th>
+                            @if ($showMessageCost)
+                                <th class="px-2 py-2">Est. cost</th>
+                            @endif
                             <th class="px-2 py-2">When</th>
                         </tr>
                     </thead>
@@ -230,7 +249,9 @@
                                 <td class="px-2 py-2" data-label="Batch">{{ $campaign['batch'] ?? '—' }}</td>
                                 <td class="px-2 py-2 tabular-nums" data-label="Sent">{{ number_format((int) $campaign['sent_count']) }}</td>
                                 <td class="px-2 py-2 tabular-nums" data-label="Failed">{{ number_format((int) $campaign['failed_count']) }}</td>
-                                <td class="px-2 py-2 tabular-nums font-semibold" data-label="Est. cost">{{ $this->formatMoney((float) $campaign['estimated_total_cost_inr']) }}</td>
+                                @if ($showMessageCost)
+                                    <td class="px-2 py-2 tabular-nums font-semibold" data-label="Est. cost">{{ $this->formatMoney((float) $campaign['estimated_total_cost_inr']) }}</td>
+                                @endif
                                 <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-500" data-label="When">{{ $campaign['shot_at'] }}</td>
                             </tr>
                         @endforeach
