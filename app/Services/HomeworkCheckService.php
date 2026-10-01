@@ -175,6 +175,36 @@ class HomeworkCheckService
         return $date;
     }
 
+    public function earliestCheckDate(): string
+    {
+        return now()->subDays(7)->toDateString();
+    }
+
+    public function latestCheckDate(): string
+    {
+        return now()->subDay()->toDateString();
+    }
+
+    public function checkDateAllowed(string $date): bool
+    {
+        return $date >= $this->earliestCheckDate() && $date <= $this->latestCheckDate();
+    }
+
+    public function assertCheckDateInWindow(string $date): void
+    {
+        if ($date > $this->latestCheckDate()) {
+            throw ValidationException::withMessages([
+                'check_date' => "Today's homework cannot be checked today. Check it from tomorrow.",
+            ]);
+        }
+
+        if ($date < $this->earliestCheckDate()) {
+            throw ValidationException::withMessages([
+                'check_date' => 'You can check only the last 7 days of homework.',
+            ]);
+        }
+    }
+
     /**
      * @return array{
      *     check: HomeworkCheck,
@@ -216,6 +246,7 @@ class HomeworkCheckService
         }
 
         $checkedOnDate = $this->normalizeCheckedOn($checkedOn);
+        $this->assertCheckDateInWindow($checkedOnDate);
 
         if (! $this->homeworkReadyToMark($batchId, $courseSubjectId, $checkedOnDate)) {
             throw ValidationException::withMessages([
@@ -523,6 +554,50 @@ class HomeworkCheckService
             'whatsappQueued' => (bool) ($notDoneResult['whatsapp']['queued'] ?? false),
             'whatsappMessage' => (string) ($notDoneResult['whatsapp']['message'] ?? ''),
         ];
+    }
+
+    /**
+     * When at least one student is already Not Done, students with no mark become Done.
+     */
+    public function closeOpenStudentsWhenAnyNotDone(
+        User $teacher,
+        int $batchId,
+        int $courseSubjectId,
+        string $topic,
+        ?string $checkedOn = null,
+    ): int {
+        $checkedOnDate = $this->normalizeCheckedOn($checkedOn);
+        $this->assertCheckDateInWindow($checkedOnDate);
+
+        $roster = $this->rosterForBatch($batchId, $courseSubjectId, null, $checkedOnDate);
+        $hasNotDone = $roster->contains(
+            fn (array $row): bool => ($row['status_key'] ?? null) === 'not_done',
+        );
+
+        if (! $hasNotDone) {
+            return 0;
+        }
+
+        $openIds = $roster
+            ->filter(fn (array $row): bool => blank($row['last_status']))
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
+        if ($openIds === []) {
+            return 0;
+        }
+
+        return (int) $this->markMany(
+            $teacher,
+            $batchId,
+            $openIds,
+            $courseSubjectId,
+            $topic,
+            HomeworkCheckStatus::Done,
+            $checkedOnDate,
+        )['marked'];
     }
 
     /**
@@ -947,10 +1022,16 @@ class HomeworkCheckService
             return false;
         }
 
+        $date = $this->normalizeCheckedOn($checkedOn);
+
+        if (! $this->checkDateAllowed($date)) {
+            return false;
+        }
+
         return HomeworkAssignment::query()
             ->where('batch_id', $batchId)
             ->where('course_subject_id', $courseSubjectId)
-            ->whereDate('homework_date', $this->normalizeCheckedOn($checkedOn))
+            ->whereDate('homework_date', $date)
             ->whereIn('status', [
                 HomeworkAssignmentStatus::Approved->value,
                 HomeworkAssignmentStatus::Sent->value,

@@ -1160,11 +1160,8 @@ class HomeworkSubmissionServiceTest extends TestCase
             'course_subject_id' => $data['maths']->id,
             'check_date' => now()->toDateString(),
         ])->test(HomeworkCheckPage::class)
-            ->assertSee('Link opened 1 / 2')
-            ->assertSee('Opened')
-            ->assertSee('Not opened')
-            ->assertDontSee('Submit Not Done')
-            ->assertSee('Done');
+            ->assertSee('cannot be checked today')
+            ->assertDontSee('Not done');
     }
 
     public function test_combined_send_without_approved_returns_error(): void

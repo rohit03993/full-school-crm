@@ -69,6 +69,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             'Chapter 5 – Q1 to Q10',
             HomeworkCheckStatus::Done,
+        now()->subDay()->toDateString(),
         );
 
         $this->assertSame(HomeworkCheckStatus::Done, $result['check']->status);
@@ -96,6 +97,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             'Chapter 5',
             HomeworkCheckStatus::Done,
+        now()->subDay()->toDateString(),
         );
         $notDone = $service->mark(
             $teacher,
@@ -104,6 +106,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             'Chapter 5',
             HomeworkCheckStatus::NotDone,
+        now()->subDay()->toDateString(),
         );
 
         $this->assertSame($done['check']->id, $notDone['check']->id);
@@ -111,7 +114,7 @@ class HomeworkCheckServiceTest extends TestCase
         $this->assertSame(HomeworkCheckNotifyStatus::Sent, $notDone['check']->fresh()->notify_status);
         $this->assertSame(1, HomeworkCheck::query()->count());
 
-        $roster = $service->rosterForBatch($batch->id, $subject->id, null, now()->toDateString())->keyBy('id');
+        $roster = $service->rosterForBatch($batch->id, $subject->id, null, now()->subDay()->toDateString())->keyBy('id');
         $this->assertSame('not_done', $roster[$student->id]['status_key']);
         $this->assertSame('Message shared with parents', $roster[$student->id]['parent_line']);
 
@@ -127,6 +130,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             'Chapter 5',
             HomeworkCheckStatus::Done,
+        now()->subDay()->toDateString(),
         );
 
         $this->assertSame($done['check']->id, $backToDone['check']->id);
@@ -152,6 +156,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             'Chapter 5 – Q1 to Q10',
             HomeworkCheckStatus::NotDone,
+        now()->subDay()->toDateString(),
         );
 
         $this->assertSame(HomeworkCheckStatus::NotDone, $result['check']->status);
@@ -200,6 +205,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             "Today's homework",
             HomeworkCheckStatus::NotDone,
+        now()->subDay()->toDateString(),
         );
 
         $this->assertTrue($result['whatsapp']['queued'], $result['whatsapp']['message']);
@@ -232,6 +238,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             'Essay writing',
             HomeworkCheckStatus::NotDone,
+        now()->subDay()->toDateString(),
         );
 
         $this->assertFalse($result['whatsapp']['queued']);
@@ -254,6 +261,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             'Topic',
             HomeworkCheckStatus::Done,
+        now()->subDay()->toDateString(),
         );
     }
 
@@ -287,6 +295,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             '',
             HomeworkCheckStatus::NotDone,
+        now()->subDay()->toDateString(),
         );
 
         $this->assertSame(2, $result['marked']);
@@ -332,7 +341,7 @@ class HomeworkCheckServiceTest extends TestCase
             [$finished->id],
             'done',
             "Today's homework",
-            now()->toDateString(),
+            now()->subDay()->toDateString(),
         );
 
         $this->assertSame(1, $result['done']);
@@ -375,7 +384,7 @@ class HomeworkCheckServiceTest extends TestCase
         }
 
         $service = app(HomeworkCheckService::class);
-        $date = now()->toDateString();
+        $date = now()->subDay()->toDateString();
 
         $service->mark(
             $teacher,
@@ -463,7 +472,7 @@ class HomeworkCheckServiceTest extends TestCase
             ->fillForm([
                 'batch_id' => $batch->id,
                 'course_subject_id' => $subject->id,
-                'check_date' => now()->toDateString(),
+                'check_date' => now()->subDay()->toDateString(),
             ])
             ->call('askSingleNotDone', $student->id)
             ->assertSet('singleNotDoneStudentId', $student->id);
@@ -483,6 +492,93 @@ class HomeworkCheckServiceTest extends TestCase
             'student_id' => $other->id,
             'status' => 'done',
         ]);
+    }
+
+    public function test_today_and_dates_older_than_seven_days_cannot_be_checked(): void
+    {
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $service = app(HomeworkCheckService::class);
+        $this->approveHomework($batch->id, $subject->id, $teacher->id, now()->toDateString());
+        $old = now()->subDays(8)->toDateString();
+        $this->approveHomework($batch->id, $subject->id, $teacher->id, $old);
+
+        foreach ([now()->toDateString(), $old] as $date) {
+            $blocked = false;
+
+            try {
+                $service->mark(
+                    $teacher,
+                    $batch->id,
+                    $student->id,
+                    $subject->id,
+                    'Topic',
+                    HomeworkCheckStatus::Done,
+                    $date,
+                );
+            } catch (\Illuminate\Validation\ValidationException) {
+                $blocked = true;
+            }
+
+            $this->assertTrue($blocked, $date);
+        }
+    }
+
+    public function test_existing_not_done_marks_only_the_open_students_done(): void
+    {
+        Http::fake();
+
+        [$teacher, $batch, $first, $subject] = $this->seedClass();
+        $second = Student::query()->create([
+            'name' => 'Aman Verma',
+            'mobile' => '9123456780',
+            'status' => StudentStatus::Enrolled,
+        ]);
+        BatchStudent::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $second->id,
+            'is_active' => true,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $teacher->id,
+        ]);
+
+        $service = app(HomeworkCheckService::class);
+        $date = now()->subDay()->toDateString();
+
+        $service->mark(
+            $teacher,
+            $batch->id,
+            $first->id,
+            $subject->id,
+            'Topic',
+            HomeworkCheckStatus::NotDone,
+            $date,
+        );
+
+        $marked = $service->closeOpenStudentsWhenAnyNotDone(
+            $teacher,
+            $batch->id,
+            $subject->id,
+            'Topic',
+            $date,
+        );
+
+        $this->assertSame(1, $marked);
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $first->id,
+            'status' => 'not_done',
+        ]);
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $second->id,
+            'status' => 'done',
+        ]);
+
+        $this->assertSame(0, $service->closeOpenStudentsWhenAnyNotDone(
+            $teacher,
+            $batch->id,
+            $subject->id,
+            'Topic',
+            $date,
+        ));
     }
 
     public function test_teacher_homework_list_hides_student_mobile(): void
@@ -507,7 +603,7 @@ class HomeworkCheckServiceTest extends TestCase
             'description' => 'Page 12',
             'content_type' => \App\Enums\HomeworkContentType::Text,
             'status' => \App\Enums\HomeworkAssignmentStatus::Sent,
-            'homework_date' => now()->toDateString(),
+            'homework_date' => now()->subDay()->toDateString(),
             'published_at' => now(),
         ]);
 
@@ -517,7 +613,7 @@ class HomeworkCheckServiceTest extends TestCase
         Livewire::withQueryParams([
             'batch_id' => $batch->id,
             'course_subject_id' => $subject->id,
-            'check_date' => now()->toDateString(),
+            'check_date' => now()->subDay()->toDateString(),
         ])->test(HomeworkCheckPage::class)
             ->assertSee('Riya Sharma')
             ->assertDontSee('9876543210')
@@ -528,7 +624,7 @@ class HomeworkCheckServiceTest extends TestCase
         Livewire::withQueryParams([
             'batch_id' => $batch->id,
             'course_subject_id' => $subject->id,
-            'check_date' => now()->toDateString(),
+            'check_date' => now()->subDay()->toDateString(),
         ])->test(HomeworkCheckPage::class)
             ->assertSee('Riya Sharma')
             ->assertSee('9876543210')
@@ -550,7 +646,7 @@ class HomeworkCheckServiceTest extends TestCase
     {
         Http::fake();
 
-        [$teacher, $batch, $riya, $subject] = $this->seedClass();
+        [$teacher, $batch, $riya, $subject] = $this->seedClass(approvedHomework: false);
         $aman = Student::query()->create([
             'name' => 'Aman Verma',
             'mobile' => '9123456780',
@@ -572,7 +668,7 @@ class HomeworkCheckServiceTest extends TestCase
             'description' => 'Complete all questions',
             'content_type' => \App\Enums\HomeworkContentType::Text,
             'status' => \App\Enums\HomeworkAssignmentStatus::Sent,
-            'homework_date' => now()->toDateString(),
+            'homework_date' => now()->subDay()->toDateString(),
             'published_at' => now(),
         ]);
 
@@ -588,11 +684,11 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             'Algebra worksheet',
             HomeworkCheckStatus::NotDone,
-            now()->toDateString(),
+            now()->subDay()->toDateString(),
         );
 
         $roster = app(HomeworkCheckService::class)
-            ->rosterForBatch($batch->id, $subject->id, null, now()->toDateString())
+            ->rosterForBatch($batch->id, $subject->id, null, now()->subDay()->toDateString())
             ->keyBy('id');
 
         $this->assertTrue($roster[$riya->id]['link_tracked']);
@@ -605,7 +701,7 @@ class HomeworkCheckServiceTest extends TestCase
         $links->get($riya->id)->recordOpen();
 
         $afterOpen = app(HomeworkCheckService::class)
-            ->rosterForBatch($batch->id, $subject->id, null, now()->toDateString())
+            ->rosterForBatch($batch->id, $subject->id, null, now()->subDay()->toDateString())
             ->keyBy('id');
 
         $this->assertTrue($afterOpen[$riya->id]['link_opened']);
@@ -619,7 +715,7 @@ class HomeworkCheckServiceTest extends TestCase
         Livewire::withQueryParams([
             'batch_id' => $batch->id,
             'course_subject_id' => $subject->id,
-            'check_date' => now()->toDateString(),
+            'check_date' => now()->subDay()->toDateString(),
         ])->test(HomeworkCheckPage::class)
             ->assertSee('Link opened 1 / 2')
             ->assertSee('Not Done')
@@ -655,7 +751,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             'Chapter 1',
             HomeworkCheckStatus::NotDone,
-            now()->toDateString(),
+            now()->subDay()->toDateString(),
         );
 
         $result = app(HomeworkCheckService::class)->markRemainingDone(
@@ -663,7 +759,7 @@ class HomeworkCheckServiceTest extends TestCase
             $batch->id,
             $subject->id,
             'Chapter 1',
-            now()->toDateString(),
+            now()->subDay()->toDateString(),
         );
 
         $this->assertSame(1, $result['marked']);
@@ -673,7 +769,7 @@ class HomeworkCheckServiceTest extends TestCase
             ->latest('id')
             ->first();
         $this->assertNotNull($done);
-        $this->assertSame(now()->toDateString(), $done->checked_on?->toDateString());
+        $this->assertSame(now()->subDay()->toDateString(), $done->checked_on?->toDateString());
     }
 
     public function test_marks_can_be_saved_for_a_past_date(): void
@@ -724,6 +820,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             'Essay',
             HomeworkCheckStatus::NotDone,
+        now()->subDay()->toDateString(),
         );
 
         $this->assertSame(HomeworkCheckNotifyStatus::Failed, $failed['check']->notify_status);
@@ -755,7 +852,7 @@ class HomeworkCheckServiceTest extends TestCase
         Livewire::withQueryParams([
             'batch_id' => $batch->id,
             'course_subject_id' => $subject->id,
-            'check_date' => now()->toDateString(),
+            'check_date' => now()->subDay()->toDateString(),
         ])->test(HomeworkCheckPage::class)
             ->assertSee('No homework was given')
             ->assertDontSee($student->name)
@@ -769,14 +866,14 @@ class HomeworkCheckServiceTest extends TestCase
             'description' => 'Complete all questions',
             'content_type' => \App\Enums\HomeworkContentType::Text,
             'status' => \App\Enums\HomeworkAssignmentStatus::Sent,
-            'homework_date' => now()->toDateString(),
+            'homework_date' => now()->subDay()->toDateString(),
             'published_at' => now(),
         ]);
 
         Livewire::withQueryParams([
             'batch_id' => $batch->id,
             'course_subject_id' => $subject->id,
-            'check_date' => now()->toDateString(),
+            'check_date' => now()->subDay()->toDateString(),
         ])->test(HomeworkCheckPage::class)
             ->assertSee($student->name)
             ->assertSee('Done')
@@ -801,14 +898,14 @@ class HomeworkCheckServiceTest extends TestCase
             'description' => 'Page 1',
             'content_type' => \App\Enums\HomeworkContentType::Text,
             'status' => \App\Enums\HomeworkAssignmentStatus::Submitted,
-            'homework_date' => now()->toDateString(),
+            'homework_date' => now()->subDay()->toDateString(),
             'published_at' => now(),
         ]);
 
         Livewire::withQueryParams([
             'batch_id' => $batch->id,
             'course_subject_id' => $subject->id,
-            'check_date' => now()->toDateString(),
+            'check_date' => now()->subDay()->toDateString(),
         ])->test(HomeworkCheckPage::class)
             ->assertSee('waiting for admin approval')
             ->assertDontSee($student->name)
@@ -824,6 +921,7 @@ class HomeworkCheckServiceTest extends TestCase
                 $subject->id,
                 'Waiting homework',
                 HomeworkCheckStatus::Done,
+            now()->subDay()->toDateString(),
             );
         } catch (\Illuminate\Validation\ValidationException $exception) {
             $blocked = true;
@@ -843,7 +941,7 @@ class HomeworkCheckServiceTest extends TestCase
         Livewire::withQueryParams([
             'batch_id' => $batch->id,
             'course_subject_id' => $subject->id,
-            'check_date' => now()->toDateString(),
+            'check_date' => now()->subDay()->toDateString(),
         ])->test(HomeworkCheckPage::class)
             ->assertSee($student->name)
             ->assertSee('Not done')
@@ -887,6 +985,7 @@ class HomeworkCheckServiceTest extends TestCase
             $physics->id,
             'Laws of motion',
             HomeworkCheckStatus::NotDone,
+        now()->subDay()->toDateString(),
         );
         $service->mark(
             $teacher,
@@ -895,9 +994,10 @@ class HomeworkCheckServiceTest extends TestCase
             $maths->id,
             'Integrals',
             HomeworkCheckStatus::Done,
+        now()->subDay()->toDateString(),
         );
 
-        $grid = $service->multiSubjectGridForBatch($teacher, $batch->id, now()->toDateString());
+        $grid = $service->multiSubjectGridForBatch($teacher, $batch->id, now()->subDay()->toDateString());
 
         $subjectIds = collect($grid['subjects'])->pluck('id')->all();
         $this->assertContains($physics->id, $subjectIds);
@@ -925,7 +1025,7 @@ class HomeworkCheckServiceTest extends TestCase
             ->fillForm([
                 'batch_id' => $batch->id,
                 'course_subject_id' => $subject->id,
-                'check_date' => now()->toDateString(),
+                'check_date' => now()->subDay()->toDateString(),
             ])
             ->set('selectedStudentIds', [$student->id])
             ->call('openBulkAsk')
@@ -965,7 +1065,7 @@ class HomeworkCheckServiceTest extends TestCase
         ]);
 
         Livewire::test(HomeworkCheckPage::class)
-            ->set('data.check_date', now()->toDateString())
+            ->set('data.check_date', now()->subDay()->toDateString())
             ->set('data.batch_id', $batch->id)
             ->assertSet('data.course_subject_id', $subject->id);
 
@@ -985,7 +1085,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             'A',
             HomeworkCheckStatus::NotDone,
-            now()->toDateString(),
+            now()->subDay()->toDateString(),
         );
 
         $this->assertSame(1, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
@@ -997,7 +1097,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             'B',
             HomeworkCheckStatus::Done,
-            now()->toDateString(),
+            now()->subDay()->toDateString(),
         );
 
         $this->assertSame(0, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
@@ -1024,7 +1124,7 @@ class HomeworkCheckServiceTest extends TestCase
             $subject->id,
             '',
             HomeworkCheckStatus::Done,
-            now()->toDateString(),
+            now()->subDay()->toDateString(),
             $assignment->id,
         );
 
@@ -1043,7 +1143,7 @@ class HomeworkCheckServiceTest extends TestCase
             'description' => 'Class work',
             'content_type' => \App\Enums\HomeworkContentType::Text,
             'status' => \App\Enums\HomeworkAssignmentStatus::Approved,
-            'homework_date' => $date ?? now()->toDateString(),
+            'homework_date' => $date ?? now()->subDay()->toDateString(),
             'published_at' => now(),
             'approved_at' => now(),
         ]);

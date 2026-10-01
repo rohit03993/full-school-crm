@@ -95,7 +95,7 @@ class HomeworkCheckPage extends Page
         $batchId = request()->integer('batch_id');
         $subjectId = request()->integer('course_subject_id');
         $requestedDate = request()->query('check_date');
-        $date = now()->toDateString();
+        $date = $service->latestCheckDate();
 
         if (filled($requestedDate)) {
             $parsed = Carbon::parse((string) $requestedDate)->toDateString();
@@ -178,7 +178,9 @@ class HomeworkCheckPage extends Page
                         ->label('Check date')
                         ->native(false)
                         ->required()
-                        ->maxDate(now())
+                        ->minDate(fn (): string => $service->earliestCheckDate())
+                        ->maxDate(fn (): string => $service->latestCheckDate())
+                        ->helperText('Last 7 days only. Homework given today can be checked from tomorrow.')
                         ->live()
                         ->visible(fn (): bool => filled($this->data['batch_id'] ?? null))
                         ->afterStateUpdated(function (): void {
@@ -208,6 +210,7 @@ class HomeworkCheckPage extends Page
                 ->id('homeworkCheckForm'),
             View::make('filament.pages.partials.homework-check-actions')
                 ->viewData(function (): array {
+                    $this->closeOpenStudentsIfNeeded();
                     $students = $this->rosterStudents();
                     $summary = app(HomeworkCheckService::class)->daySummaryFromRoster($students);
                     $selected = $this->selectedStudentsPayload($students);
@@ -227,6 +230,7 @@ class HomeworkCheckPage extends Page
 
                     return [
                         'rosterReady' => $this->rosterReady(),
+                        'checkDateBlocked' => $this->checkDateBlockedMessage(),
                         'homeworkGiven' => $homeworkGiven,
                         'homeworkAwaitingApproval' => $homeworkAwaitingApproval,
                         'showStudentMobile' => $showStudentMobile,
@@ -649,9 +653,56 @@ class HomeworkCheckPage extends Page
         return 'No subjects found for this class.';
     }
 
-    protected function homeworkListOpen(): bool
+    protected function closeOpenStudentsIfNeeded(): void
+    {
+        $user = Auth::user();
+
+        if (! $user || $this->checkDateBlockedMessage() !== null || ! $this->homeworkListOpen()) {
+            return;
+        }
+
+        $marked = app(HomeworkCheckService::class)->closeOpenStudentsWhenAnyNotDone(
+            $user,
+            (int) $this->data['batch_id'],
+            (int) $this->data['course_subject_id'],
+            (string) ($this->data['topic'] ?? ''),
+            $this->checkDate(),
+        );
+
+        if ($marked < 1) {
+            return;
+        }
+
+        Notification::make()
+            ->title($marked.' open '.($marked === 1 ? 'student' : 'students').' marked Done')
+            ->body('No message was sent to them.')
+            ->success()
+            ->send();
+    }
+
+    protected function checkDateBlockedMessage(): ?string
     {
         if (! $this->rosterReady()) {
+            return null;
+        }
+
+        $service = app(HomeworkCheckService::class);
+        $date = (string) $this->checkDate();
+
+        if ($date > $service->latestCheckDate()) {
+            return "Today's homework cannot be checked today. It can be checked from tomorrow.";
+        }
+
+        if ($date < $service->earliestCheckDate()) {
+            return 'You can check only the last 7 days of homework.';
+        }
+
+        return null;
+    }
+
+    protected function homeworkListOpen(): bool
+    {
+        if (! $this->rosterReady() || $this->checkDateBlockedMessage() !== null) {
             return false;
         }
 
@@ -687,7 +738,7 @@ class HomeworkCheckPage extends Page
         $value = $this->data['check_date'] ?? null;
 
         if (! filled($value)) {
-            return now()->toDateString();
+            return app(HomeworkCheckService::class)->latestCheckDate();
         }
 
         return Carbon::parse((string) $value)->toDateString();

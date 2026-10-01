@@ -3,6 +3,10 @@
         <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-400">
             Select a <strong>class</strong>. Subject will auto-fill if you teach only one; otherwise pick the subject, then the student list opens.
         </div>
+    @elseif (filled($checkDateBlocked ?? null))
+        <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-4 py-8 text-center text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+            {{ $checkDateBlocked }}
+        </div>
     @elseif ($homeworkAwaitingApproval ?? false)
         <div class="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-4 py-8 text-center text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
             Homework for <strong>{{ $subjectLabel }}</strong> on <strong>{{ $checkDateLabel }}</strong> is waiting for admin approval. Student marks open after it is approved.
