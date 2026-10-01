@@ -98,6 +98,7 @@
                                 'px-4 py-3',
                                 'bg-primary-50/40 dark:bg-primary-500/10' => $isOpen,
                                 'border-l-4 border-rose-400' => $leftOut->isNotEmpty(),
+                                'ring-2 ring-inset ring-rose-500' => $sendConfirmBatchId === $batchId,
                             ])>
                                 <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
                                     <button
@@ -185,67 +186,6 @@
                                         @endif
                                     </div>
                                 </div>
-
-                                @if ($sendConfirmBatchId === $batchId && $missingSubjects !== [])
-                                    <div class="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 dark:border-rose-500/30 dark:bg-rose-500/10">
-                                        <p class="text-sm font-semibold text-rose-900 dark:text-rose-100">These subjects have no homework</p>
-                                        <p class="mt-1 text-xs text-rose-800 dark:text-rose-200">Choose one answer for each. After you send, that teacher cannot add homework for this day.</p>
-                                        <ul class="mt-3 space-y-3">
-                                            @foreach ($missingSubjects as $missing)
-                                                @php
-                                                    $chosen = $missingSubjectReasons[$missing['course_subject_id']] ?? $missingSubjectReasons[(string) $missing['course_subject_id']] ?? null;
-                                                @endphp
-                                                <li class="rounded-lg bg-white px-3 py-2 dark:bg-gray-900">
-                                                    <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $missing['subject'] }}</p>
-                                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ $missing['teacher'] }}</p>
-                                                    <div class="mt-2 flex flex-wrap gap-2">
-                                                        <button
-                                                            type="button"
-                                                            wire:click="setMissingReason({{ (int) $missing['course_subject_id'] }}, 'teacher_absent')"
-                                                            @class([
-                                                                'rounded-lg px-3 py-1.5 text-xs font-semibold',
-                                                                'bg-rose-600 text-white' => $chosen === 'teacher_absent',
-                                                                'border border-gray-300 bg-white text-gray-700 dark:border-white/15 dark:bg-transparent dark:text-gray-200' => $chosen !== 'teacher_absent',
-                                                            ])
-                                                        >
-                                                            Teacher was absent
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            wire:click="setMissingReason({{ (int) $missing['course_subject_id'] }}, 'no_homework')"
-                                                            @class([
-                                                                'rounded-lg px-3 py-1.5 text-xs font-semibold',
-                                                                'bg-rose-600 text-white' => $chosen === 'no_homework',
-                                                                'border border-gray-300 bg-white text-gray-700 dark:border-white/15 dark:bg-transparent dark:text-gray-200' => $chosen !== 'no_homework',
-                                                            ])
-                                                        >
-                                                            No homework today
-                                                        </button>
-                                                    </div>
-                                                </li>
-                                            @endforeach
-                                        </ul>
-                                        <div class="mt-3 flex flex-wrap gap-2">
-                                            <button
-                                                type="button"
-                                                wire:click="confirmClosedSend"
-                                                wire:loading.attr="disabled"
-                                                wire:target="confirmClosedSend,sendCombined"
-                                                class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70"
-                                            >
-                                                <span wire:loading.remove wire:target="confirmClosedSend,sendCombined">Send to parents</span>
-                                                <span wire:loading wire:target="confirmClosedSend,sendCombined">Sending… please wait</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                wire:click="cancelClosedSend"
-                                                class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/15 dark:bg-transparent dark:text-gray-200"
-                                            >
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </div>
-                                @endif
 
                                 @if ($isOpen)
                                     @if (($section['items'] ?? []) === [])
@@ -430,6 +370,113 @@
                     </div>
                 </section>
             @endforeach
+        </div>
+    @endif
+
+    @if ($sendConfirmBatchId > 0 && $missingSubjects !== [])
+        @php
+            $confirmCourse = '';
+            $confirmSection = '';
+
+            foreach ($desk['groups'] ?? [] as $courseRow) {
+                foreach ($courseRow['sections'] ?? [] as $sectionRow) {
+                    if ((int) ($sectionRow['batch_id'] ?? 0) !== $sendConfirmBatchId) {
+                        continue;
+                    }
+
+                    $confirmCourse = (string) ($courseRow['course_name'] ?? '');
+                    $confirmSection = filled($sectionRow['section'] ?? null) && $sectionRow['section'] !== '—'
+                        ? (string) $sectionRow['section']
+                        : (string) ($sectionRow['class_label'] ?? '');
+                    break 2;
+                }
+            }
+
+            $readyToSend = collect($missingSubjects)->every(function (array $missing) use ($missingSubjectReasons): bool {
+                $subjectId = $missing['course_subject_id'];
+
+                return filled($missingSubjectReasons[$subjectId] ?? $missingSubjectReasons[(string) $subjectId] ?? null);
+            });
+        @endphp
+        <div
+            class="fixed inset-0 z-50 flex items-end justify-center bg-gray-950/60 p-0 sm:items-center sm:p-6"
+            wire:click.self="cancelClosedSend"
+        >
+            <div class="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl dark:bg-gray-900 sm:rounded-2xl">
+                <div class="border-b border-rose-100 bg-rose-50 px-4 py-4 dark:border-rose-500/20 dark:bg-rose-500/10 sm:px-5">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-200">{{ $confirmCourse }} · {{ $confirmSection }}</p>
+                    <h3 class="mt-1 text-lg font-bold text-gray-950 dark:text-white">These subjects have no homework</h3>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">Choose one answer for each subject. After you send, that teacher cannot add homework for this day.</p>
+                </div>
+                <ul class="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-5">
+                    @foreach ($missingSubjects as $missing)
+                        @php
+                            $chosen = $missingSubjectReasons[$missing['course_subject_id']] ?? $missingSubjectReasons[(string) $missing['course_subject_id']] ?? null;
+                        @endphp
+                        <li @class([
+                            'rounded-xl border px-3 py-3',
+                            'border-emerald-300 bg-emerald-50/60 dark:border-emerald-500/30 dark:bg-emerald-500/10' => filled($chosen),
+                            'border-rose-300 bg-rose-50/40 dark:border-rose-500/30 dark:bg-rose-500/10' => blank($chosen),
+                        ])>
+                            <p class="text-base font-semibold text-gray-950 dark:text-white">{{ $missing['subject'] }}</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ $missing['teacher'] }}</p>
+                            <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <button
+                                    type="button"
+                                    wire:click="setMissingReason({{ (int) $missing['course_subject_id'] }}, 'teacher_absent')"
+                                    @class([
+                                        'rounded-xl px-3 py-3 text-sm font-semibold',
+                                        'bg-rose-600 text-white' => $chosen === 'teacher_absent',
+                                        'border border-gray-300 bg-white text-gray-800 dark:border-white/15 dark:bg-gray-900 dark:text-gray-100' => $chosen !== 'teacher_absent',
+                                    ])
+                                >
+                                    Teacher was absent
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="setMissingReason({{ (int) $missing['course_subject_id'] }}, 'no_homework')"
+                                    @class([
+                                        'rounded-xl px-3 py-3 text-sm font-semibold',
+                                        'bg-sky-600 text-white' => $chosen === 'no_homework',
+                                        'border border-gray-300 bg-white text-gray-800 dark:border-white/15 dark:bg-gray-900 dark:text-gray-100' => $chosen !== 'no_homework',
+                                    ])
+                                >
+                                    No homework today
+                                </button>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+                <div class="border-t border-gray-100 bg-white px-4 py-4 dark:border-white/10 dark:bg-gray-900 sm:px-5">
+                    @if (! $readyToSend)
+                        <p class="mb-3 text-sm font-semibold text-rose-700 dark:text-rose-300">Choose one answer for each subject. Then Send to parents will work.</p>
+                    @endif
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            wire:click="confirmClosedSend"
+                            wire:loading.attr="disabled"
+                            wire:target="confirmClosedSend,sendCombined"
+                            @disabled(! $readyToSend)
+                            @class([
+                                'rounded-xl px-4 py-3 text-sm font-semibold',
+                                'bg-primary-600 text-white hover:bg-primary-500' => $readyToSend,
+                                'cursor-not-allowed bg-gray-300 text-gray-500 dark:bg-white/10 dark:text-gray-400' => ! $readyToSend,
+                            ])
+                        >
+                            <span wire:loading.remove wire:target="confirmClosedSend,sendCombined">Send to parents</span>
+                            <span wire:loading wire:target="confirmClosedSend,sendCombined">Sending… please wait</span>
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="cancelClosedSend"
+                            class="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/15 dark:bg-transparent dark:text-gray-200"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     @endif
 </div>

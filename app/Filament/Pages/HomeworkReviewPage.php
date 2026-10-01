@@ -231,12 +231,16 @@ class HomeworkReviewPage extends Page
             return;
         }
 
-        $this->openClass($batchId);
+        $this->form->fill([
+            ...($this->data ?? []),
+            'batch_id' => $batchId,
+        ]);
 
         if ($this->pauseSendForMissingSubjects($batchId)) {
             return;
         }
 
+        $this->openClass($batchId);
         $this->sendCombined();
     }
 
@@ -305,14 +309,7 @@ class HomeworkReviewPage extends Page
         }
 
         $this->sendConfirmBatchId = $batchId;
-        $this->openBatchId = $batchId;
         $this->missingSubjectReasons = [];
-
-        Notification::make()
-            ->title('Some subjects have no homework')
-            ->body('Say what happened for each subject. Then the message can go to parents.')
-            ->warning()
-            ->send();
 
         return true;
     }
