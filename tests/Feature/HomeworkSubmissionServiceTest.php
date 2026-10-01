@@ -27,13 +27,16 @@ use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
 use App\Models\HomeworkStudentLink;
 use App\Models\MetaWhatsAppMessage;
+use App\Models\ParentMessageSend;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\CrmPermissionSyncService;
 use App\Services\HomeworkCheckService;
+use App\Filament\Pages\ParentMessageSendsPage;
 use App\Services\HomeworkSubmissionService;
+use App\Services\ParentMessageSendService;
 use App\Support\CrmAccess;
 use App\Services\MetaWhatsAppCostEstimator;
 use App\Support\BulkSendGuard;
@@ -1054,6 +1057,19 @@ class HomeworkSubmissionServiceTest extends TestCase
         $second = $service->combinedSend($data['admin'], $data['batch']->id, now()->toDateString());
 
         $this->assertSame(2, $second['sent'], (string) ($second['error'] ?? ''));
+
+        $sends = ParentMessageSend::query()->orderBy('id')->get();
+        $this->assertCount(2, $sends);
+        $this->assertFalse($sends[0]->is_resend);
+        $this->assertTrue($sends[1]->is_resend);
+        $this->assertSame($data['admin']->id, $sends[1]->sent_by_user_id);
+        $this->assertSame(ParentMessageSend::Homework, $sends[0]->kind);
+
+        $report = app(ParentMessageSendService::class)->staffReport(now()->startOfDay(), now()->endOfDay());
+        $this->assertSame($data['admin']->id, $report[0]['user_id']);
+        $this->assertSame(1, $report[0]['homework_sends']);
+        $this->assertSame(1, $report[0]['homework_resends']);
+        $this->assertSame(0, $report[0]['exam_sends']);
         $this->assertEqualsCanonicalizing(
             $tokens,
             HomeworkStudentLink::query()
@@ -1061,6 +1077,84 @@ class HomeworkSubmissionServiceTest extends TestCase
                 ->pluck('token')
                 ->all(),
         );
+    }
+
+    public function test_resend_warns_before_a_duplicate_homework_message(): void
+    {
+        $sequence = 0;
+
+        Http::fake([
+            'https://graph.facebook.com/*' => function () use (&$sequence) {
+                $sequence++;
+
+                return Http::response([
+                    'messages' => [['id' => 'wamid.DUP'.$sequence]],
+                ], 200);
+            },
+        ]);
+
+        $data = $this->seedClass();
+        $this->seedCombinedTemplate();
+        $service = app(HomeworkSubmissionService::class);
+
+        foreach (['maths' => $data['mathTeacher'], 'physics' => $data['physicsTeacher']] as $subject => $teacher) {
+            $assignment = $service->submit($teacher, [
+                'batch_id' => $data['batch']->id,
+                'course_subject_id' => $data[$subject]->id,
+                'homework_date' => now()->toDateString(),
+                'title' => $subject,
+                'description' => 'Today',
+            ]);
+            $service->approve($data['admin'], $assignment->id);
+        }
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('sendCombinedForBatch', $data['batch']->id)
+            ->assertSee('Resend');
+
+        $this->assertSame(1, ParentMessageSend::query()->count());
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('askDuplicateSend', $data['batch']->id)
+            ->assertSee('Do not send again')
+            ->assertSee('Send again anyway')
+            ->assertSet('duplicateSendBatchId', $data['batch']->id)
+            ->call('cancelDuplicateSend')
+            ->assertSet('duplicateSendBatchId', null);
+
+        $this->assertSame(1, ParentMessageSend::query()->count());
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('askDuplicateSend', $data['batch']->id)
+            ->call('confirmDuplicateSend');
+
+        $sends = ParentMessageSend::query()->orderBy('id')->get();
+        $this->assertCount(2, $sends);
+        $this->assertTrue($sends[1]->is_resend);
+        $this->assertSame($data['admin']->name, $sends[1]->sentBy->name);
+    }
+
+    public function test_parent_send_report_is_open_to_the_coordinator_and_closed_to_a_teacher(): void
+    {
+        $data = $this->seedClass();
+
+        $this->actingAs($data['mathTeacher']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->assertFalse(ParentMessageSendsPage::canAccess());
+
+        $coordinator = User::factory()->create(['is_active' => true]);
+        $coordinator->syncRoles([RoleName::Staff->value, StaffJobRole::AcademicCoordinator->value]);
+
+        $this->actingAs($coordinator);
+        $this->assertTrue(ParentMessageSendsPage::canAccess());
+
+        Livewire::test(ParentMessageSendsPage::class)
+            ->assertSee('Homework resends')
+            ->assertSee('Exam mark resends')
+            ->assertDontSee('₹');
     }
 
     public function test_desk_shows_who_opened_unique_homework_links(): void

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\ConfirmsDuplicateExamSend;
 use App\Enums\BatchStatus;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
@@ -36,6 +37,7 @@ use UnitEnum;
 
 class BulkActivityMarksImportPage extends Page
 {
+    use ConfirmsDuplicateExamSend;
     use WithFileUploads;
 
     protected static bool $shouldRegisterNavigation = false;
@@ -606,6 +608,10 @@ class BulkActivityMarksImportPage extends Page
                     'examMarksAutomationsUrl' => ManageWhatsAppSettings::getUrl(['automation' => 'exam-marks']),
                     'canSendWhatsApp' => FeatureGate::enabled(LicenseFeature::WhatsApp)
                         && CrmAccess::canSendExamMarksWhatsApp(Auth::user()),
+                    'showDuplicateExamWarning' => $this->showDuplicateExamWarning,
+                    'sendReportUrl' => ParentMessageSendsPage::canAccess()
+                        ? ParentMessageSendsPage::getUrl()
+                        : null,
                     'whatsappSendHistory' => filled($this->importResult['test_key'] ?? null)
                         ? app(ActivityMarksWhatsAppService::class)->classSheetSendHistory((string) $this->importResult['test_key'])
                         : [

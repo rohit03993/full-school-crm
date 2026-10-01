@@ -62,20 +62,57 @@
 
             <button
                 type="button"
-                wire:click="queueWhatsAppCampaign"
                 @if ($whatsappSendHistory['has_prior_class_send'] ?? false)
-                    wire:confirm="Parents already received these marks. Send the same message again?"
+                    wire:click="askDuplicateExamSend"
+                @else
+                    wire:click="queueWhatsAppCampaign"
                 @endif
                 wire:loading.attr="disabled"
-                wire:target="queueWhatsAppCampaign"
+                wire:target="queueWhatsAppCampaign,askDuplicateExamSend,confirmDuplicateExamSend"
                 class="justify-self-start rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70"
             >
-                <span wire:loading.remove wire:target="queueWhatsAppCampaign">{{ $whatsappSendHistory['button_label'] }}</span>
-                <span wire:loading wire:target="queueWhatsAppCampaign">Sending… please wait. Do not click again.</span>
+                <span wire:loading.remove wire:target="queueWhatsAppCampaign,askDuplicateExamSend,confirmDuplicateExamSend">{{ $whatsappSendHistory['button_label'] }}</span>
+                <span wire:loading wire:target="queueWhatsAppCampaign,askDuplicateExamSend,confirmDuplicateExamSend">Sending… please wait. Do not click again.</span>
             </button>
+            @if (filled($sendReportUrl ?? null))
+                <a href="{{ $sendReportUrl }}" class="text-sm font-semibold text-primary-600 hover:underline dark:text-primary-400">Who sent these messages</a>
+            @endif
             <p class="text-xs text-gray-500 dark:text-gray-400">
                 One click starts the send. Wait until the progress page opens.
             </p>
         </div>
     </div>
+
+    @if ($showDuplicateExamWarning ?? false)
+        <div
+            class="fixed inset-0 z-50 flex items-end justify-center bg-gray-950/60 p-0 sm:items-center sm:p-6"
+            wire:click.self="cancelDuplicateExamSend"
+        >
+            <div class="w-full max-w-lg overflow-hidden rounded-t-2xl bg-white shadow-2xl dark:bg-gray-900 sm:rounded-2xl">
+                <div class="border-b border-amber-100 bg-amber-50 px-4 py-4 dark:border-amber-500/20 dark:bg-amber-500/10 sm:px-5">
+                    <h3 class="text-lg font-bold text-gray-950 dark:text-white">These marks were already sent</h3>
+                    <p class="mt-2 text-sm text-gray-700 dark:text-gray-200">Sending again is a duplicate. Parents may get the same marks twice. Do not send again unless a parent did not receive it.</p>
+                </div>
+                <div class="flex flex-wrap gap-2 px-4 py-4 sm:px-5">
+                    <button
+                        type="button"
+                        wire:click="cancelDuplicateExamSend"
+                        class="rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-700 dark:bg-white dark:text-gray-900"
+                    >
+                        Go back
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="confirmDuplicateExamSend"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmDuplicateExamSend,queueWhatsAppCampaign"
+                        class="rounded-xl border border-amber-400 bg-white px-4 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-50 dark:border-amber-500/40 dark:bg-transparent dark:text-amber-200"
+                    >
+                        <span wire:loading.remove wire:target="confirmDuplicateExamSend,queueWhatsAppCampaign">Send again anyway</span>
+                        <span wire:loading wire:target="confirmDuplicateExamSend,queueWhatsAppCampaign">Sending… please wait</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 @endif

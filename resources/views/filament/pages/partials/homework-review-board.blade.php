@@ -13,12 +13,13 @@
             @if ($canSend)
                 <button
                     type="button"
-                    wire:click="sendCombined"
                     @if (($summary['approved'] ?? 0) === 0 && ($summary['sent'] ?? 0) > 0)
-                        wire:confirm="Parents already received this homework. Send the same message again?"
+                        wire:click="askDuplicateSend({{ (int) $batchId }})"
+                    @else
+                        wire:click="sendCombined"
                     @endif
                     wire:loading.attr="disabled"
-                    wire:target="sendCombined,sendCombinedForBatch"
+                    wire:target="sendCombined,sendCombinedForBatch,askDuplicateSend,confirmDuplicateSend"
                     @disabled($summary['approved'] === 0 && $summary['sent'] === 0)
                     class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70"
                 >

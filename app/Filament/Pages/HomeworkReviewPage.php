@@ -3,10 +3,13 @@
 namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
+use App\Enums\HomeworkAssignmentStatus;
 use App\Enums\LicenseFeature;
 use App\Filament\Concerns\AddsHomeworkModal;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Filament\Resources\HomeworkAssignments\HomeworkAssignmentResource;
+use App\Models\Batch;
+use App\Models\HomeworkAssignment;
 use App\Services\HomeworkSubmissionService;
 use App\Services\HomeworkWhatsAppService;
 use App\Support\CrmAccess;
@@ -62,6 +65,8 @@ class HomeworkReviewPage extends Page
 
     public ?int $sendConfirmBatchId = null;
 
+    public ?int $duplicateSendBatchId = null;
+
     /** @var array<int|string, string> */
     public array $missingSubjectReasons = [];
 
@@ -108,6 +113,7 @@ class HomeworkReviewPage extends Page
                             $this->lastCombinedSendResult = null;
                             $this->openBatchId = null;
                             $this->sendConfirmBatchId = null;
+                            $this->duplicateSendBatchId = null;
                             $this->missingSubjectReasons = [];
                         }),
                     Hidden::make('batch_id'),
@@ -130,6 +136,11 @@ class HomeworkReviewPage extends Page
                                 'canEnter' => $service->canEnterHomework($date),
                                 'canSend' => $service->canSendHomework($date),
                                 'sendConfirmBatchId' => (int) ($this->sendConfirmBatchId ?? 0),
+                                'duplicateSendBatchId' => (int) ($this->duplicateSendBatchId ?? 0),
+                                'duplicateSendLabel' => $this->duplicateSendLabel(),
+                                'sendReportUrl' => ParentMessageSendsPage::canAccess()
+                                    ? ParentMessageSendsPage::getUrl()
+                                    : null,
                                 'missingSubjects' => (int) ($this->sendConfirmBatchId ?? 0) > 0
                                     ? $service->missingSubjectsForBatch((int) $this->sendConfirmBatchId, $date)
                                     : [],
@@ -203,6 +214,17 @@ class HomeworkReviewPage extends Page
         ]);
     }
 
+    protected function duplicateSendLabel(): string
+    {
+        $batchId = (int) ($this->duplicateSendBatchId ?? 0);
+
+        if ($batchId < 1) {
+            return 'This class';
+        }
+
+        return Batch::query()->find($batchId)?->displayLabel() ?? 'This class';
+    }
+
     public function openClass(int $batchId): void
     {
         if ($batchId < 1) {
@@ -224,6 +246,59 @@ class HomeworkReviewPage extends Page
         }
 
         $this->openBatchId = (int) $this->openBatchId === $batchId ? null : $batchId;
+    }
+
+    public function askDuplicateSend(int $batchId): void
+    {
+        if ($batchId < 1) {
+            return;
+        }
+
+        $this->form->fill([
+            ...($this->data ?? []),
+            'batch_id' => $batchId,
+        ]);
+
+        if ($this->pauseSendForMissingSubjects($batchId)) {
+            return;
+        }
+
+        $alreadySent = HomeworkAssignment::query()
+            ->where('batch_id', $batchId)
+            ->whereDate('homework_date', $this->dateString())
+            ->where('status', HomeworkAssignmentStatus::Sent->value)
+            ->exists();
+
+        if (! $alreadySent) {
+            $this->openClass($batchId);
+            $this->sendCombined();
+
+            return;
+        }
+
+        $this->duplicateSendBatchId = $batchId;
+    }
+
+    public function cancelDuplicateSend(): void
+    {
+        $this->duplicateSendBatchId = null;
+    }
+
+    public function confirmDuplicateSend(): void
+    {
+        $batchId = (int) ($this->duplicateSendBatchId ?? 0);
+        $this->duplicateSendBatchId = null;
+
+        if ($batchId < 1) {
+            return;
+        }
+
+        $this->form->fill([
+            ...($this->data ?? []),
+            'batch_id' => $batchId,
+        ]);
+        $this->openClass($batchId);
+        $this->sendCombined();
     }
 
     public function sendCombinedForBatch(int $batchId): void

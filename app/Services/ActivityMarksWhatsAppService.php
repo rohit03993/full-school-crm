@@ -6,6 +6,7 @@ use App\Enums\WhatsAppCampaignStatus;
 use App\Enums\WhatsAppRecipientStatus;
 use App\Models\ActivityAttendance;
 use App\Models\ActivitySession;
+use App\Models\ParentMessageSend;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
@@ -369,7 +370,7 @@ class ActivityMarksWhatsAppService
         };
         $submit = $priorStatus === 'sent' ? 'Resend now' : 'Send now';
         $warning = match ($priorStatus) {
-            'sent' => "This parent already received this test on WhatsApp on {$prior['at']} {$sourcePhrase}.\n\nSend again with the current marks?\n\n",
+            'sent' => "This parent already received this test on WhatsApp on {$prior['at']} {$sourcePhrase}.\n\nSending again is a duplicate. Do not send again unless this parent did not receive it.\n\n",
             'queued' => "A WhatsApp for this test is already queued for this parent ({$prior['at']} {$sourcePhrase}). Send another anyway?\n\n",
             default => '',
         };
@@ -472,6 +473,8 @@ class ActivityMarksWhatsAppService
                 ->firstOrFail()
                 ->ensureParamMappings();
 
+            $isResend = $this->examMarksAlreadySent($marksKey, $onlyStudentId);
+
             $campaign = $this->createMarksCampaign(
                 $creator,
                 $template,
@@ -481,10 +484,44 @@ class ActivityMarksWhatsAppService
                 $onlyStudentId,
             );
 
-            return $this->campaigns->queueCampaign($campaign, $creator, wait: false);
+            $campaign = $this->campaigns->queueCampaign($campaign, $creator, wait: false);
+
+            if ((int) $campaign->total_recipients > 0) {
+                $label = $testName;
+
+                if ($onlyStudentId) {
+                    $studentName = Student::query()->whereKey($onlyStudentId)->value('name');
+                    $label .= filled($studentName) ? ' · '.$studentName : '';
+                }
+
+                app(ParentMessageSendService::class)->record([
+                    'kind' => ParentMessageSend::ExamMarks,
+                    'is_resend' => $isResend,
+                    'batch_id' => $this->sessionsForMarksKey($marksKey)->first()?->batch_id,
+                    'test_key' => $marksKey,
+                    'label' => $label,
+                    'sent_by_user_id' => $creator->id,
+                    'parent_count' => (int) $campaign->total_recipients,
+                    'whatsapp_campaign_id' => $campaign->id,
+                ]);
+            }
+
+            return $campaign;
         } finally {
             $guard->release($lockKey);
         }
+    }
+
+    protected function examMarksAlreadySent(string $marksKey, ?int $onlyStudentId): bool
+    {
+        if ($onlyStudentId) {
+            $student = Student::query()->find($onlyStudentId);
+            $prior = $student ? $this->lastSendForStudent($student, $marksKey) : null;
+
+            return in_array((string) ($prior['status'] ?? ''), ['sent', 'queued'], true);
+        }
+
+        return (bool) ($this->classSheetSendHistory($marksKey)['has_prior_class_send'] ?? false);
     }
 
     protected function marksSendAlreadyRunning(string $marksKey, ?int $onlyStudentId): bool

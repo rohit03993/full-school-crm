@@ -24,6 +24,7 @@ use App\Models\BatchStudent;
 use App\Models\Course;
 use App\Models\Enquiry;
 use App\Models\Enrollment;
+use App\Models\ParentMessageSend;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
@@ -101,6 +102,12 @@ class StudentProfileExamMarksWhatsAppTest extends TestCase
         );
 
         $this->assertSame(WhatsAppCampaignStatus::Queued, $queued->status);
+        $logged = ParentMessageSend::query()->first();
+        $this->assertNotNull($logged);
+        $this->assertSame(ParentMessageSend::ExamMarks, $logged->kind);
+        $this->assertFalse($logged->is_resend);
+        $this->assertSame($staff->id, $logged->sent_by_user_id);
+        $this->assertSame(1, $logged->parent_count);
         $this->assertSame(1, $queued->recipients()->count());
         $this->assertSame([$studentA->id], $queued->recipients()->pluck('student_id')->all());
         $queuedPreview = $service->previewForStudent($studentA->fresh(), $groupKey);

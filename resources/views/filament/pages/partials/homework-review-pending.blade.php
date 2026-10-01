@@ -13,6 +13,9 @@
     $empty = (int) ($counts['empty'] ?? 0);
     $left = (int) ($counts['left'] ?? 0);
     $sendConfirmBatchId = (int) ($sendConfirmBatchId ?? 0);
+    $duplicateSendBatchId = (int) ($duplicateSendBatchId ?? 0);
+    $duplicateSendLabel = $duplicateSendLabel ?? 'This class';
+    $sendReportUrl = $sendReportUrl ?? null;
     $missingSubjects = $missingSubjects ?? [];
     $missingSubjectReasons = $missingSubjectReasons ?? [];
 @endphp
@@ -28,6 +31,9 @@
         <div class="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs font-semibold">
             <a href="{{ $checkUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">Check completion</a>
             <a href="{{ $historyUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">History</a>
+            @if (filled($sendReportUrl))
+                <a href="{{ $sendReportUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">Send report</a>
+            @endif
         </div>
     </div>
 
@@ -163,14 +169,13 @@
                                         @elseif ($canSend && $hasSent && $leftOut->isEmpty())
                                             <button
                                                 type="button"
-                                                wire:click="sendCombinedForBatch({{ $batchId }})"
-                                                wire:confirm="Parents already received this homework. Send the same message again?"
+                                                wire:click="askDuplicateSend({{ $batchId }})"
                                                 wire:loading.attr="disabled"
-                                                wire:target="sendCombinedForBatch,sendCombined"
+                                                wire:target="askDuplicateSend,confirmDuplicateSend,sendCombinedForBatch,sendCombined"
                                                 class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/15 dark:bg-transparent dark:text-gray-200 dark:hover:bg-white/5 disabled:cursor-wait disabled:opacity-70"
                                             >
-                                                <span wire:loading.remove wire:target="sendCombinedForBatch,sendCombined">Resend</span>
-                                                <span wire:loading wire:target="sendCombinedForBatch,sendCombined">Sending… please wait</span>
+                                                <span wire:loading.remove wire:target="askDuplicateSend,confirmDuplicateSend,sendCombinedForBatch,sendCombined">Resend</span>
+                                                <span wire:loading wire:target="askDuplicateSend,confirmDuplicateSend,sendCombinedForBatch,sendCombined">Sending… please wait</span>
                                             </button>
                                         @elseif ($canSend && $hasSent && $leftOut->isNotEmpty())
                                             <button
@@ -475,6 +480,40 @@
                             Cancel
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($duplicateSendBatchId > 0)
+        <div
+            class="fixed inset-0 z-50 flex items-end justify-center bg-gray-950/60 p-0 sm:items-center sm:p-6"
+            wire:click.self="cancelDuplicateSend"
+        >
+            <div class="w-full max-w-lg overflow-hidden rounded-t-2xl bg-white shadow-2xl dark:bg-gray-900 sm:rounded-2xl">
+                <div class="border-b border-amber-100 bg-amber-50 px-4 py-4 dark:border-amber-500/20 dark:bg-amber-500/10 sm:px-5">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">{{ $duplicateSendLabel }}</p>
+                    <h3 class="mt-1 text-lg font-bold text-gray-950 dark:text-white">This homework was already sent</h3>
+                    <p class="mt-2 text-sm text-gray-700 dark:text-gray-200">Sending again is a duplicate. Parents may get the same homework twice. Do not send again unless a parent did not receive it.</p>
+                </div>
+                <div class="flex flex-wrap gap-2 px-4 py-4 sm:px-5">
+                    <button
+                        type="button"
+                        wire:click="cancelDuplicateSend"
+                        class="rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-700 dark:bg-white dark:text-gray-900"
+                    >
+                        Go back
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="confirmDuplicateSend"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmDuplicateSend,sendCombined"
+                        class="rounded-xl border border-amber-400 bg-white px-4 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-50 dark:border-amber-500/40 dark:bg-transparent dark:text-amber-200"
+                    >
+                        <span wire:loading.remove wire:target="confirmDuplicateSend,sendCombined">Send again anyway</span>
+                        <span wire:loading wire:target="confirmDuplicateSend,sendCombined">Sending… please wait</span>
+                    </button>
                 </div>
             </div>
         </div>

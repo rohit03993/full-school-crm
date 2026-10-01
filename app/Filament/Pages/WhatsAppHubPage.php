@@ -111,6 +111,14 @@ class WhatsAppHubPage extends Page
             ];
         }
 
+        if (ParentMessageSendsPage::canAccess()) {
+            $cards[] = [
+                'title' => CrmMenuLabels::parentMessageSends(),
+                'description' => 'Who sent homework and exam marks, and how many times they pressed Resend.',
+                'url' => ParentMessageSendsPage::getUrl(),
+            ];
+        }
+
         if (WhatsAppAnalyticsPage::canAccess()) {
             $cards[] = [
                 'title' => CrmMenuLabels::whatsAppUsage(),

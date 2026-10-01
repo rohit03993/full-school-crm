@@ -15,6 +15,7 @@ use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
 use App\Models\HomeworkCheck;
 use App\Models\HomeworkSubjectClosure;
+use App\Models\ParentMessageSend;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\BulkSendGuard;
@@ -1150,6 +1151,11 @@ class HomeworkSubmissionService
         $result = $this->whatsapp->notifyCombined($batch, $dateLabel, $assignments, $templateName, $admin);
 
         if ($result['sent'] > 0) {
+            $isResend = $assignments->isNotEmpty()
+                && $assignments->every(
+                    fn (HomeworkAssignment $assignment): bool => $assignment->status === HomeworkAssignmentStatus::Sent,
+                );
+
             HomeworkAssignment::query()
                 ->whereIn('id', $assignments->pluck('id'))
                 ->update([
@@ -1159,6 +1165,16 @@ class HomeworkSubmissionService
                     'whatsapp_sent_count' => $result['sent'],
                     'whatsapp_failed_count' => $result['failed'],
                 ]);
+
+            app(ParentMessageSendService::class)->record([
+                'kind' => ParentMessageSend::Homework,
+                'is_resend' => $isResend,
+                'batch_id' => $batch->id,
+                'homework_date' => $date,
+                'label' => $batch->displayLabel(),
+                'sent_by_user_id' => $admin->id,
+                'parent_count' => (int) $result['sent'],
+            ]);
         }
 
         return [...$result, 'subjects' => $assignments->count()];

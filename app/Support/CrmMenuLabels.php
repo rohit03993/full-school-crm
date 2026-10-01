@@ -120,6 +120,11 @@ final class CrmMenuLabels
         return 'Usage & cost';
     }
 
+    public static function parentMessageSends(): string
+    {
+        return 'Parent send report';
+    }
+
     public static function whatsAppTemplates(): string
     {
         return 'Templates';

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\ConfirmsDuplicateExamSend;
 use App\Filament\Pages\BulkActivityMarksImportPage;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
@@ -35,6 +36,8 @@ use Livewire\Attributes\Computed;
 
 class TestMarksReviewPage extends Page
 {
+    use ConfirmsDuplicateExamSend;
+
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $title = 'Exam mark sheet';
@@ -702,6 +705,10 @@ class TestMarksReviewPage extends Page
                     'examMarksAutomationsUrl' => ManageWhatsAppSettings::getUrl(['automation' => 'exam-marks']),
                     'canSendWhatsApp' => FeatureGate::enabled(LicenseFeature::WhatsApp)
                         && CrmAccess::canSendExamMarksWhatsApp(Auth::user()),
+                    'showDuplicateExamWarning' => $this->showDuplicateExamWarning,
+                    'sendReportUrl' => ParentMessageSendsPage::canAccess()
+                        ? ParentMessageSendsPage::getUrl()
+                        : null,
                     'whatsappSendHistory' => filled($this->groupKey)
                         ? app(ActivityMarksWhatsAppService::class)->classSheetSendHistory((string) $this->groupKey)
                         : [
