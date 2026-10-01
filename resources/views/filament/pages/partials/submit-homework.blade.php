@@ -54,7 +54,9 @@
                                             <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
                                             <div class="min-w-0">
                                                 <p class="font-semibold text-gray-900 dark:text-gray-100">{{ $subject['subject'] }}</p>
-                                                @if ($subject['status_key'])
+                                                @if ($subject['closed'] ?? false)
+                                                    <p class="mt-0.5 text-xs font-semibold text-rose-700 dark:text-rose-300">{{ $subject['closure_label'] ?? 'Closed for today' }}. You cannot add homework for this day.</p>
+                                                @elseif ($subject['status_key'])
                                                     <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                                                         <span @class([
                                                             'inline-flex rounded-full px-2 py-0.5 font-medium',
@@ -82,7 +84,7 @@
                                                 @endif
                                             </div>
                                             <div class="flex min-w-0 flex-wrap gap-2">
-                                                @if ($canEnter && ($subject['assignment_id'] === null || $subject['can_remove']))
+                                                @if ($canEnter && ! ($subject['closed'] ?? false) && ($subject['assignment_id'] === null || $subject['can_remove']))
                                                     <button
                                                         type="button"
                                                         wire:click="startAdd({{ (int) $section['batch_id'] }}, {{ (int) $subject['course_subject_id'] }})"

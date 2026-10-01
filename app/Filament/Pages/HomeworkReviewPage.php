@@ -59,6 +59,11 @@ class HomeworkReviewPage extends Page
 
     public ?int $openBatchId = null;
 
+    public ?int $sendConfirmBatchId = null;
+
+    /** @var array<int|string, string> */
+    public array $missingSubjectReasons = [];
+
     public static function getNavigationLabel(): string
     {
         return CrmMenuLabels::homeworkReview();
@@ -66,7 +71,7 @@ class HomeworkReviewPage extends Page
 
     public function getSubheading(): ?string
     {
-        return 'Tap a class, open the homework, then approve and send one WhatsApp to parents.';
+        return 'Tap a class. If a subject is still missing, say what happened. Then send one WhatsApp to parents.';
     }
 
     public function mount(): void
@@ -101,12 +106,14 @@ class HomeworkReviewPage extends Page
                         ->afterStateUpdated(function (): void {
                             $this->lastCombinedSendResult = null;
                             $this->openBatchId = null;
+                            $this->sendConfirmBatchId = null;
+                            $this->missingSubjectReasons = [];
                         }),
                     Hidden::make('batch_id'),
                 ])
                 ->columns(2),
             Section::make('Classes')
-                ->description('Open a class to read each subject. Waiting = check it. Ready = send. Sent = parents already have it.')
+                ->description('A red line means a teacher has not submitted. Open the class, then send. You will be asked about each missing subject before parents get the message.')
                 ->schema([
                     View::make('filament.pages.partials.homework-review-pending')
                         ->viewData(function (): array {
@@ -121,6 +128,11 @@ class HomeworkReviewPage extends Page
                                 'isToday' => $date === now()->toDateString(),
                                 'canEnter' => $service->canEnterHomework($date),
                                 'canSend' => $service->canSendHomework($date),
+                                'sendConfirmBatchId' => (int) ($this->sendConfirmBatchId ?? 0),
+                                'missingSubjects' => (int) ($this->sendConfirmBatchId ?? 0) > 0
+                                    ? $service->missingSubjectsForBatch((int) $this->sendConfirmBatchId, $date)
+                                    : [],
+                                'missingSubjectReasons' => $this->missingSubjectReasons,
                                 'windowNote' => $service->homeworkWindowNote($date),
                                 'checkUrl' => HomeworkCheckPage::getUrl(),
                                 'historyUrl' => HomeworkAssignmentResource::getUrl('index'),
@@ -220,7 +232,89 @@ class HomeworkReviewPage extends Page
         }
 
         $this->openClass($batchId);
+
+        if ($this->pauseSendForMissingSubjects($batchId)) {
+            return;
+        }
+
         $this->sendCombined();
+    }
+
+    public function setMissingReason(int $subjectId, string $reason): void
+    {
+        if (! in_array($reason, ['teacher_absent', 'no_homework'], true)) {
+            return;
+        }
+
+        $this->missingSubjectReasons[$subjectId] = $reason;
+    }
+
+    public function cancelClosedSend(): void
+    {
+        $this->sendConfirmBatchId = null;
+        $this->missingSubjectReasons = [];
+    }
+
+    public function confirmClosedSend(): void
+    {
+        $user = Auth::user();
+        $batchId = (int) ($this->sendConfirmBatchId ?? 0);
+
+        if (! $user || $batchId < 1) {
+            return;
+        }
+
+        try {
+            app(HomeworkSubmissionService::class)->closeMissingSubjects(
+                $user,
+                $batchId,
+                $this->dateString(),
+                $this->missingSubjectReasons,
+            );
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first() ?? 'Choose what happened for each subject.';
+            Notification::make()->title((string) $message)->warning()->send();
+
+            return;
+        }
+
+        $this->sendConfirmBatchId = null;
+        $this->missingSubjectReasons = [];
+        $this->openClass($batchId);
+        $this->sendCombined();
+    }
+
+    protected function pauseSendForMissingSubjects(int $batchId): bool
+    {
+        if ($batchId < 1) {
+            return false;
+        }
+
+        $service = app(HomeworkSubmissionService::class);
+
+        if (! $service->canSendHomework($this->dateString())) {
+            return false;
+        }
+
+        $missing = $service->missingSubjectsForBatch($batchId, $this->dateString());
+
+        if ($missing === []) {
+            $this->sendConfirmBatchId = null;
+
+            return false;
+        }
+
+        $this->sendConfirmBatchId = $batchId;
+        $this->openBatchId = $batchId;
+        $this->missingSubjectReasons = [];
+
+        Notification::make()
+            ->title('Some subjects have no homework')
+            ->body('Say what happened for each subject. Then the message can go to parents.')
+            ->warning()
+            ->send();
+
+        return true;
     }
 
     public function approve(int $assignmentId): void
@@ -268,6 +362,12 @@ class HomeworkReviewPage extends Page
         $user = Auth::user();
 
         if (! $user) {
+            return;
+        }
+
+        $batchId = (int) ($this->data['batch_id'] ?? 0);
+
+        if ($this->pauseSendForMissingSubjects($batchId)) {
             return;
         }
 

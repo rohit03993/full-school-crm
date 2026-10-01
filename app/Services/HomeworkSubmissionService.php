@@ -14,6 +14,7 @@ use App\Models\BatchStudent;
 use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
 use App\Models\HomeworkCheck;
+use App\Models\HomeworkSubjectClosure;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\BulkSendGuard;
@@ -205,6 +206,12 @@ class HomeworkSubmissionService
         if (! $this->canEnterHomework($date)) {
             throw ValidationException::withMessages([
                 'homework_date' => $this->homeworkEntryClosedMessage($date),
+            ]);
+        }
+
+        if ($this->subjectClosure($batchId, $subjectId, $date)) {
+            throw ValidationException::withMessages([
+                'homework_date' => 'This subject is closed for the day. Parents were already sent the message, so homework cannot be added now.',
             ]);
         }
 
@@ -556,6 +563,11 @@ class HomeworkSubmissionService
             ->get()
             ->groupBy('batch_id');
 
+        $closuresByBatch = HomeworkSubjectClosure::query()
+            ->whereDate('homework_date', $date)
+            ->get()
+            ->groupBy('batch_id');
+
         $linkStatsByAssignment = $this->studentLinks->statsByAssignmentId(
             $assignmentsByBatch->flatten(1)->pluck('id'),
         );
@@ -566,6 +578,7 @@ class HomeworkSubmissionService
             'ready' => 0,
             'sent' => 0,
             'empty' => 0,
+            'left' => 0,
         ];
 
         foreach ($batches as $batch) {
@@ -580,6 +593,9 @@ class HomeworkSubmissionService
             $homeworkBySubject = $batchAssignments->keyBy(
                 fn (HomeworkAssignment $assignment): int => (int) $assignment->course_subject_id,
             );
+            $closuresBySubject = $closuresByBatch
+                ->get($batchId, collect())
+                ->keyBy(fn (HomeworkSubjectClosure $closure): int => (int) $closure->course_subject_id);
             $teachersBySubject = $batch->staffAssignments
                 ->filter(fn (BatchStaffAssignment $row): bool => $row->isSubjectTeacher() && filled($row->course_subject_id))
                 ->keyBy(fn (BatchStaffAssignment $row): int => (int) $row->course_subject_id);
@@ -588,11 +604,13 @@ class HomeworkSubmissionService
             $submitted = 0;
             $approved = 0;
             $sent = 0;
+            $leftOut = 0;
 
             foreach ($batch->activeSubjects as $subject) {
                 $subjectId = (int) $subject->id;
                 /** @var HomeworkAssignment|null $assignment */
                 $assignment = $homeworkBySubject->get($subjectId);
+                $closure = $closuresBySubject->get($subjectId);
                 $status = $assignment?->status;
                 $teacherName = (string) ($teachersBySubject->get($subjectId)?->user?->name ?? '');
 
@@ -602,6 +620,8 @@ class HomeworkSubmissionService
                     $approved++;
                 } elseif ($status === HomeworkAssignmentStatus::Sent) {
                     $sent++;
+                } elseif ($assignment === null && $closure === null) {
+                    $leftOut++;
                 }
 
                 $stats = $assignment
@@ -624,6 +644,8 @@ class HomeworkSubmissionService
                         : null,
                     'status' => $status?->label() ?? '',
                     'status_key' => $status?->value,
+                    'closure_reason' => $closure?->reason,
+                    'closure_label' => $closure?->label(),
                     'submitted_at' => $assignment?->submitted_at?->timezone((string) config('app.timezone'))->format('h:i A'),
                     'link_opened' => $stats['opened'],
                     'link_total' => $stats['total'],
@@ -646,16 +668,25 @@ class HomeworkSubmissionService
             if ($submitted > 0) {
                 $priority = 1;
                 $counts['waiting'] += $submitted;
-            } elseif ($approved > 0) {
+            } elseif ($leftOut > 0) {
                 $priority = 2;
+                if ($approved > 0) {
+                    $counts['ready'] += $approved;
+                } elseif ($sent > 0) {
+                    $counts['sent'] += $sent;
+                }
+            } elseif ($approved > 0) {
+                $priority = 3;
                 $counts['ready'] += $approved;
             } elseif ($sent > 0) {
-                $priority = 3;
+                $priority = 4;
                 $counts['sent'] += $sent;
             } else {
-                $priority = 4;
+                $priority = 5;
                 $counts['empty']++;
             }
+
+            $counts['left'] += $leftOut;
 
             $grouped[$courseName] ??= [
                 'course_name' => $courseName,
@@ -670,6 +701,7 @@ class HomeworkSubmissionService
                 'submitted' => $submitted,
                 'approved' => $approved,
                 'sent' => $sent,
+                'left' => $leftOut,
                 'items' => $items,
             ];
         }
@@ -855,6 +887,12 @@ class HomeworkSubmissionService
             ->get()
             ->groupBy('batch_id');
 
+        $closuresByBatch = HomeworkSubjectClosure::query()
+            ->whereDate('homework_date', $date)
+            ->whereIn('batch_id', $assignedBatchIds)
+            ->get()
+            ->groupBy('batch_id');
+
         $linkStatsByAssignment = $this->studentLinks->statsByAssignmentId(
             $homeworkByBatch->flatten(1)->pluck('id'),
         );
@@ -875,15 +913,19 @@ class HomeworkSubmissionService
             $batchId = (int) $batch->id;
             /** @var Collection<int, HomeworkAssignment> $batchHomework */
             $batchHomework = $homeworkByBatch->get($batchId, collect())->keyBy('course_subject_id');
+            $batchClosures = $closuresByBatch->get($batchId, collect());
 
             $subjects = [];
 
             foreach ($subjectOptions as $subjectId => $label) {
                 /** @var HomeworkAssignment|null $assignment */
                 $assignment = $batchHomework->get((int) $subjectId) ?? $batchHomework->get((string) $subjectId);
+                $closure = $batchClosures->first(
+                    fn (HomeworkSubjectClosure $row): bool => (int) $row->course_subject_id === (int) $subjectId,
+                );
                 $status = $assignment?->status;
 
-                if ($assignment === null) {
+                if ($assignment === null && $closure === null) {
                     $counts['missing']++;
                 } else {
                     match ($status) {
@@ -905,6 +947,8 @@ class HomeworkSubmissionService
                     'title' => $assignment?->title,
                     'status' => $status?->label(),
                     'status_key' => $status?->value,
+                    'closed' => $closure !== null,
+                    'closure_label' => $closure?->label(),
                     'can_remove' => $assignment !== null && $status !== HomeworkAssignmentStatus::Sent,
                     'link_opened' => $stats['opened'],
                     'link_total' => $stats['total'],
@@ -1275,5 +1319,115 @@ class HomeworkSubmissionService
                 }
                 : null,
         ];
+    }
+
+    /**
+     * Subjects on this class and date that still have no homework and were not closed.
+     *
+     * @return list<array{course_subject_id: int, subject: string, teacher: string, teacher_user_id: ?int}>
+     */
+    public function missingSubjectsForBatch(int $batchId, string $date): array
+    {
+        $date = $this->normalizeDate($date);
+
+        $batch = Batch::query()
+            ->with(['activeSubjects', 'staffAssignments.user'])
+            ->find($batchId);
+
+        if ($batch === null) {
+            return [];
+        }
+
+        $submittedIds = HomeworkAssignment::query()
+            ->where('batch_id', $batchId)
+            ->whereDate('homework_date', $date)
+            ->whereNotNull('course_subject_id')
+            ->pluck('course_subject_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $closedIds = HomeworkSubjectClosure::query()
+            ->where('batch_id', $batchId)
+            ->whereDate('homework_date', $date)
+            ->pluck('course_subject_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $teachersBySubject = $batch->staffAssignments
+            ->filter(fn (BatchStaffAssignment $assignment): bool => $assignment->course_subject_id !== null)
+            ->groupBy(fn (BatchStaffAssignment $assignment): int => (int) $assignment->course_subject_id);
+
+        $missing = [];
+
+        foreach ($batch->activeSubjects as $subject) {
+            $subjectId = (int) $subject->id;
+
+            if (in_array($subjectId, $submittedIds, true) || in_array($subjectId, $closedIds, true)) {
+                continue;
+            }
+
+            /** @var BatchStaffAssignment|null $teacherAssignment */
+            $teacherAssignment = $teachersBySubject->get($subjectId)?->first();
+
+            $missing[] = [
+                'course_subject_id' => $subjectId,
+                'subject' => (string) $subject->name,
+                'teacher' => (string) ($teacherAssignment?->user?->name ?? 'No teacher set'),
+                'teacher_user_id' => $teacherAssignment?->user_id ? (int) $teacherAssignment->user_id : null,
+            ];
+        }
+
+        return $missing;
+    }
+
+    /**
+     * Save the coordinator's answer for every missing subject, then the send can continue.
+     *
+     * @param  array<int|string, string>  $reasonsBySubjectId
+     */
+    public function closeMissingSubjects(User $admin, int $batchId, string $date, array $reasonsBySubjectId): void
+    {
+        $missing = $this->missingSubjectsForBatch($batchId, $date);
+
+        foreach ($missing as $row) {
+            $reason = $reasonsBySubjectId[$row['course_subject_id']]
+                ?? $reasonsBySubjectId[(string) $row['course_subject_id']]
+                ?? null;
+
+            if (! in_array($reason, [HomeworkSubjectClosure::TeacherAbsent, HomeworkSubjectClosure::NoHomework], true)) {
+                throw ValidationException::withMessages([
+                    'reason' => 'Choose what happened for '.$row['subject'].'.',
+                ]);
+            }
+        }
+
+        $date = $this->normalizeDate($date);
+
+        foreach ($missing as $row) {
+            $reason = $reasonsBySubjectId[$row['course_subject_id']]
+                ?? $reasonsBySubjectId[(string) $row['course_subject_id']];
+
+            HomeworkSubjectClosure::query()->updateOrCreate(
+                [
+                    'batch_id' => $batchId,
+                    'course_subject_id' => $row['course_subject_id'],
+                    'homework_date' => $date,
+                ],
+                [
+                    'reason' => $reason,
+                    'teacher_user_id' => $row['teacher_user_id'],
+                    'closed_by_user_id' => $admin->id,
+                ],
+            );
+        }
+    }
+
+    protected function subjectClosure(int $batchId, int $subjectId, string $date): ?HomeworkSubjectClosure
+    {
+        return HomeworkSubjectClosure::query()
+            ->where('batch_id', $batchId)
+            ->where('course_subject_id', $subjectId)
+            ->whereDate('homework_date', $date)
+            ->first();
     }
 }

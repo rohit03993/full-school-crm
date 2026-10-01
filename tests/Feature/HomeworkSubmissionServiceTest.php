@@ -820,14 +820,38 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('Open homework')
             ->call('approve', $maths->id)
             ->assertSee('Send to parents')
+            ->assertSee('Not submitted: Physics')
             ->assertDontSee('Resend')
             ->call('sendCombinedForBatch', $data['batch']->id)
+            ->assertSee('These subjects have no homework')
+            ->assertSee('Teacher was absent')
+            ->assertDontSee('Resend')
+            ->call('confirmClosedSend')
+            ->assertNotified('Choose what happened for Physics.')
+            ->call('setMissingReason', $data['physics']->id, 'no_homework')
+            ->call('confirmClosedSend')
             ->assertSee('Resend')
             ->assertDontSee('Remove');
 
         $maths->refresh();
 
         $this->assertSame(HomeworkAssignmentStatus::Sent, $maths->status);
+
+        try {
+            $service->submit($data['physicsTeacher'], [
+                'batch_id' => $data['batch']->id,
+                'course_subject_id' => $data['physics']->id,
+                'homework_date' => now()->toDateString(),
+                'title' => 'Too late',
+                'description' => 'Optics',
+            ]);
+            $this->fail('A closed subject still accepted homework.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'This subject is closed for the day. Parents were already sent the message, so homework cannot be added now.',
+                $exception->errors()['homework_date'][0],
+            );
+        }
         $this->assertSame($data['admin']->id, $maths->approved_by_user_id);
         $this->assertSame($data['admin']->id, $maths->combined_sent_by_user_id);
     }
