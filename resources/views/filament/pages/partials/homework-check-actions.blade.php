@@ -55,7 +55,7 @@
                         {{ $subjectLabel }} · {{ $checkDateLabel }}
                     </p>
                     <p class="text-xs text-gray-500 dark:text-gray-400">
-                        Tick the students, then continue. The screen will ask if those students did the homework. Everyone else in the class gets the other mark. Only Not done sends a parent message.
+                        Tick students. The bar stays on screen while you scroll.
                     </p>
                     @php
                         $linkTrackedStudents = collect($students)->where('link_tracked', true);
@@ -70,84 +70,11 @@
                 <button
                     type="button"
                     wire:click="toggleSelectAll"
-                    class="min-h-11 shrink-0 rounded-lg bg-gray-100 px-3 text-sm font-bold text-gray-800 touch-manipulation dark:bg-white/10 dark:text-gray-100"
+                    class="h-8 shrink-0 rounded-lg bg-gray-100 px-2.5 text-xs font-semibold text-gray-800 dark:bg-white/10 dark:text-gray-100"
                 >
                     Select all
                 </button>
             </div>
-
-            @if (($bulkStep ?? '') === 'ask')
-                <div class="border-b border-gray-100 bg-gray-50 px-4 py-4 dark:border-gray-800 dark:bg-gray-950">
-                    <p class="text-base font-bold text-gray-950 dark:text-white">Did these {{ $selectedCount }} ticked students do the homework?</p>
-                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                        <button
-                            type="button"
-                            wire:click="chooseBulk('not_done')"
-                            class="min-h-14 rounded-xl bg-rose-600 px-4 text-base font-bold text-white touch-manipulation"
-                        >
-                            These students have not done it
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="chooseBulk('done')"
-                            class="min-h-14 rounded-xl bg-emerald-600 px-4 text-base font-bold text-white touch-manipulation"
-                        >
-                            These students have done it
-                        </button>
-                    </div>
-                    <button type="button" wire:click="cancelBulk" class="mt-3 min-h-11 text-sm font-semibold text-gray-600 underline dark:text-gray-300">
-                        Back to the list
-                    </button>
-                </div>
-            @endif
-
-            @if (($bulkStep ?? '') === 'confirm' && is_array($bulkSummary ?? null))
-                <div class="border-b border-amber-200 bg-amber-50 px-4 py-4 dark:border-amber-500/30 dark:bg-amber-500/10">
-                    <p class="text-base font-bold text-gray-950 dark:text-white">
-                        @if (($bulkChoice ?? '') === 'not_done')
-                            {{ $bulkSummary['ticked'] }} ticked students have not done it.
-                        @else
-                            {{ $bulkSummary['ticked'] }} ticked students have done it.
-                        @endif
-                    </p>
-                    <ul class="mt-2 space-y-1 text-sm text-gray-800 dark:text-gray-100">
-                        @if (($bulkChoice ?? '') === 'not_done')
-                            <li>{{ $bulkSummary['ticked'] }} ticked student{{ $bulkSummary['ticked'] === 1 ? '' : 's' }} will be marked Not done.</li>
-                            <li>{{ $bulkSummary['messages'] }} parent message{{ $bulkSummary['messages'] === 1 ? '' : 's' }} will be sent to them.</li>
-                            <li>{{ $bulkSummary['done'] }} other student{{ $bulkSummary['done'] === 1 ? '' : 's' }} in this class will be marked Done. No message to them.</li>
-                        @else
-                            <li>{{ $bulkSummary['ticked'] }} ticked student{{ $bulkSummary['ticked'] === 1 ? '' : 's' }} will be marked Done. No message to them.</li>
-                            <li>{{ $bulkSummary['not_done'] }} other student{{ $bulkSummary['not_done'] === 1 ? '' : 's' }} in this class will be marked Not done.</li>
-                            <li>{{ $bulkSummary['messages'] }} parent message{{ $bulkSummary['messages'] === 1 ? '' : 's' }} will be sent to those other students.</li>
-                        @endif
-                        @if ($bulkSummary['no_mobile'] > 0)
-                            <li>{{ $bulkSummary['no_mobile'] }} have no mobile number, so no message can go.</li>
-                        @endif
-                        @if ($bulkSummary['already_shared'] > 0)
-                            <li>{{ $bulkSummary['already_shared'] }} were already Not done, so no second message.</li>
-                        @endif
-                    </ul>
-                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                        <button
-                            type="button"
-                            wire:click="confirmBulk"
-                            wire:loading.attr="disabled"
-                            wire:target="confirmBulk"
-                            class="min-h-14 rounded-xl bg-primary-600 px-4 text-base font-bold text-white touch-manipulation disabled:opacity-70"
-                        >
-                            <span wire:loading.remove wire:target="confirmBulk">Save and send</span>
-                            <span wire:loading wire:target="confirmBulk">Saving…</span>
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="backToBulkAsk"
-                            class="min-h-14 rounded-xl bg-white px-4 text-base font-bold text-gray-800 ring-1 ring-gray-300 touch-manipulation dark:bg-gray-900 dark:text-gray-100 dark:ring-white/20"
-                        >
-                            Change the answer
-                        </button>
-                    </div>
-                </div>
-            @endif
 
             <x-crm.responsive-table class="border-t border-gray-100 dark:border-gray-800">
                 <table class="w-full text-left text-sm">
@@ -174,7 +101,7 @@
                                             wire:click="toggleStudent({{ (int) $student['id'] }})"
                                             aria-label="Tick {{ $student['name'] }}"
                                             @class([
-                                                'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border-2 text-lg font-bold touch-manipulation',
+                                                'flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-sm font-bold',
                                                 'border-primary-600 bg-primary-600 text-white' => $ticked,
                                                 'border-gray-300 bg-white text-transparent dark:border-gray-500 dark:bg-gray-900' => ! $ticked,
                                             ])
@@ -242,9 +169,9 @@
                                             wire:loading.attr="disabled"
                                             wire:target="markStudentDone({{ $student['id'] }}),markStudentNotDone({{ $student['id'] }})"
                                             @class([
-                                                'min-h-10 px-3 py-1.5 text-xs font-extrabold uppercase touch-manipulation',
+                                                'h-8 px-2.5 text-xs font-semibold',
                                                 'bg-emerald-600 text-white' => ($student['status_key'] ?? null) === 'done',
-                                                'bg-white text-gray-500 hover:bg-emerald-50 dark:bg-gray-900 dark:text-gray-300' => ($student['status_key'] ?? null) !== 'done',
+                                                'bg-white text-gray-600 hover:bg-emerald-50 dark:bg-gray-900 dark:text-gray-300' => ($student['status_key'] ?? null) !== 'done',
                                             ])
                                         >
                                             Done
@@ -255,9 +182,9 @@
                                             wire:loading.attr="disabled"
                                             wire:target="markStudentDone({{ $student['id'] }}),markStudentNotDone({{ $student['id'] }})"
                                             @class([
-                                                'min-h-10 px-3 py-1.5 text-xs font-extrabold uppercase touch-manipulation',
+                                                'h-8 px-2.5 text-xs font-semibold',
                                                 'bg-rose-600 text-white' => ($student['status_key'] ?? null) === 'not_done',
-                                                'bg-white text-gray-500 hover:bg-rose-50 dark:bg-gray-900 dark:text-gray-300' => ($student['status_key'] ?? null) !== 'not_done',
+                                                'bg-white text-gray-600 hover:bg-rose-50 dark:bg-gray-900 dark:text-gray-300' => ($student['status_key'] ?? null) !== 'not_done',
                                             ])
                                         >
                                             Not done
@@ -277,20 +204,74 @@
             </x-crm.responsive-table>
         </div>
 
-        @if (($selectedCount ?? 0) > 0 && ($bulkStep ?? '') === '')
-            <div class="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white px-4 py-3 shadow-2xl dark:border-gray-700 dark:bg-gray-900" style="padding-bottom: max(0.75rem, env(safe-area-inset-bottom));">
-                <div class="mx-auto flex max-w-3xl items-center gap-3">
-                    <p class="min-w-0 flex-1 text-sm font-bold text-gray-950 dark:text-white">{{ $selectedCount }} selected</p>
-                    <button
-                        type="button"
-                        wire:click="openBulkAsk"
-                        class="min-h-12 flex-1 rounded-xl bg-primary-600 px-4 text-base font-bold text-white touch-manipulation"
-                    >
-                        Continue
-                    </button>
+        @if (($selectedCount ?? 0) > 0 || in_array(($bulkStep ?? ''), ['ask', 'confirm'], true))
+            <style>
+                .crm-hw-check-dock {
+                    position: fixed;
+                    z-index: 40;
+                    left: 0.5rem;
+                    right: 0.5rem;
+                    bottom: 0.75rem;
+                }
+                @media (max-width: 1023px) {
+                    .fi-body:has(.fi-mobile-bottom-nav) .crm-hw-check-dock {
+                        bottom: calc(4.25rem + env(safe-area-inset-bottom) + 0.35rem);
+                    }
+                }
+                @media (min-width: 1024px) {
+                    .crm-hw-check-dock {
+                        left: auto;
+                        right: 1.25rem;
+                        width: 24rem;
+                    }
+                }
+            </style>
+            <div class="crm-hw-check-dock">
+                <div class="rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                    @if (($bulkStep ?? '') === 'ask')
+                        <p class="text-xs font-semibold text-gray-950 dark:text-white">Did these {{ $selectedCount }} do the homework?</p>
+                        <div class="mt-2 flex items-center gap-2">
+                            <button type="button" wire:click="chooseBulk('not_done')" class="h-8 flex-1 rounded-lg bg-rose-600 px-2 text-xs font-semibold text-white">Not done</button>
+                            <button type="button" wire:click="chooseBulk('done')" class="h-8 flex-1 rounded-lg bg-emerald-600 px-2 text-xs font-semibold text-white">Done</button>
+                            <button type="button" wire:click="cancelBulk" class="h-8 rounded-lg px-2 text-xs font-semibold text-gray-600 dark:text-gray-300">Cancel</button>
+                        </div>
+                    @elseif (($bulkStep ?? '') === 'confirm' && is_array($bulkSummary ?? null))
+                        <p class="text-xs leading-5 text-gray-800 dark:text-gray-100">
+                            @if (($bulkChoice ?? '') === 'not_done')
+                                {{ $bulkSummary['ticked'] }} Not done, message to {{ $bulkSummary['messages'] }}. {{ $bulkSummary['done'] }} others marked Done.
+                            @else
+                                {{ $bulkSummary['ticked'] }} Done, no message. {{ $bulkSummary['not_done'] }} others Not done, message to {{ $bulkSummary['messages'] }}.
+                            @endif
+                            @if ($bulkSummary['no_mobile'] > 0)
+                                {{ $bulkSummary['no_mobile'] }} have no mobile.
+                            @endif
+                            @if ($bulkSummary['already_shared'] > 0)
+                                {{ $bulkSummary['already_shared'] }} already messaged.
+                            @endif
+                        </p>
+                        <div class="mt-2 flex items-center gap-2">
+                            <button
+                                type="button"
+                                wire:click="confirmBulk"
+                                wire:loading.attr="disabled"
+                                wire:target="confirmBulk"
+                                class="h-8 flex-1 rounded-lg bg-primary-600 px-2 text-xs font-semibold text-white disabled:opacity-70"
+                            >
+                                <span wire:loading.remove wire:target="confirmBulk">Save and send</span>
+                                <span wire:loading wire:target="confirmBulk">Saving…</span>
+                            </button>
+                            <button type="button" wire:click="backToBulkAsk" class="h-8 rounded-lg px-2 text-xs font-semibold text-gray-700 ring-1 ring-gray-300 dark:text-gray-200 dark:ring-white/20">Back</button>
+                        </div>
+                    @else
+                        <div class="flex items-center gap-2">
+                            <p class="min-w-0 flex-1 text-sm font-semibold text-gray-950 dark:text-white">{{ $selectedCount }} selected</p>
+                            <button type="button" wire:click="clearBulkSelection" class="h-8 rounded-lg px-2 text-xs font-semibold text-gray-600 dark:text-gray-300">Clear</button>
+                            <button type="button" wire:click="openBulkAsk" class="h-8 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white">Continue</button>
+                        </div>
+                    @endif
                 </div>
             </div>
-            <div class="h-20"></div>
+            <div class="h-24"></div>
         @endif
     @endif
 </div>

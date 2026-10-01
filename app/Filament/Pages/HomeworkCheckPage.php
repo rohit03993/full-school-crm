@@ -374,7 +374,7 @@ class HomeworkCheckPage extends Page
             ->send();
     }
 
-    protected function clearBulkSelection(): void
+    public function clearBulkSelection(): void
     {
         $this->selectedStudentIds = [];
         $this->bulkStep = '';
