@@ -147,6 +147,7 @@ class HomeworkReviewPage extends Page
                                 'missingSubjectReasons' => $this->missingSubjectReasons,
                                 'windowNote' => $service->homeworkWindowNote($date),
                                 'checkUrl' => HomeworkCheckPage::getUrl(),
+                                'teacherScoresUrl' => TeacherHomeworkReportPage::getUrl(),
                                 'historyUrl' => HomeworkAssignmentResource::getUrl('index'),
                             ];
                         })

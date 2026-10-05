@@ -6,6 +6,7 @@ use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Filament\Concerns\AddsHomeworkModal;
 use App\Services\HomeworkSubmissionService;
+use App\Services\TeacherHomeworkScoreService;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
@@ -124,6 +125,24 @@ class SubmitHomeworkPage extends Page
     public function content(Schema $schema): Schema
     {
         return $schema->components([
+            View::make('filament.pages.partials.teacher-homework-score-card')
+                ->viewData(function (): array {
+                    $user = Auth::user();
+
+                    if (! $user) {
+                        return ['score' => null, 'period' => '', 'reportUrl' => null];
+                    }
+
+                    $service = app(TeacherHomeworkScoreService::class);
+                    [$from, $to] = $service->defaultRange();
+                    $report = $service->report($from, $to, (int) $user->id);
+
+                    return [
+                        'score' => $report['teachers'][0] ?? null,
+                        'period' => $report['period_label'],
+                        'reportUrl' => TeacherHomeworkReportPage::getUrl(),
+                    ];
+                }),
             Form::make([EmbeddedSchema::make('form')])
                 ->id('submitHomeworkForm'),
         ]);

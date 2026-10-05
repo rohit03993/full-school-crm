@@ -8,6 +8,7 @@ use App\Filament\Concerns\RequiresCrmPermission;
 use App\Enums\StaffJobRole;
 use App\Filament\Pages\BulkStaffImportPage;
 use App\Filament\Pages\StaffActivityPage;
+use App\Filament\Pages\TeacherHomeworkReportPage;
 use App\Filament\Resources\Staff\Pages\CreateStaff;
 use App\Filament\Resources\Staff\Pages\EditStaff;
 use App\Filament\Resources\Staff\Pages\ListStaff;
@@ -15,10 +16,13 @@ use App\Filament\Support\CrmTable;
 use App\Models\User;
 use App\Services\FaceVerify\FaceVerifyGateService;
 use App\Services\StaffEmployeeCodeService;
+use App\Services\TeacherHomeworkScoreService;
 use App\Support\BiometricPinCollision;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
+use App\Support\FeatureGate;
+use App\Enums\LicenseFeature;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
@@ -27,6 +31,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -102,6 +107,28 @@ class StaffResource extends Resource
         return $schema
             ->columns(1)
             ->components([
+                View::make('filament.pages.partials.teacher-homework-score-card')
+                    ->visible(function (string $operation, ?User $record): bool {
+                        return $operation === 'edit'
+                            && $record instanceof User
+                            && FeatureGate::enabled(LicenseFeature::Homework)
+                            && in_array(StaffJobRole::Teacher->value, CrmAccess::jobRoleNamesFor($record), true);
+                    })
+                    ->viewData(function (?User $record): array {
+                        if (! $record instanceof User) {
+                            return ['score' => null, 'period' => '', 'reportUrl' => null];
+                        }
+
+                        $service = app(TeacherHomeworkScoreService::class);
+                        [$from, $to] = $service->defaultRange();
+                        $report = $service->report($from, $to, (int) $record->id);
+
+                        return [
+                            'score' => $report['teachers'][0] ?? null,
+                            'period' => $report['period_label'],
+                            'reportUrl' => TeacherHomeworkReportPage::getUrl(['teacher' => $record->id]),
+                        ];
+                    }),
                 Section::make('Account')
                     ->columns(2)
                     ->schema([

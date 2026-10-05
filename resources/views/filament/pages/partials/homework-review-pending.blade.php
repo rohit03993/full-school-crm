@@ -30,6 +30,9 @@
         </p>
         <div class="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs font-semibold">
             <a href="{{ $checkUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">Check completion</a>
+            @if (filled($teacherScoresUrl ?? null))
+                <a href="{{ $teacherScoresUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">Teacher scores</a>
+            @endif
             <a href="{{ $historyUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">History</a>
             @if (filled($sendReportUrl))
                 <a href="{{ $sendReportUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">Send report</a>
