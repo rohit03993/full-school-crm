@@ -486,7 +486,7 @@ class HomeworkSubmissionService
             $grouped[$courseName]['sections'][$batchId]['items'][] = [
                 'assignment_id' => (int) $assignment->id,
                 'teacher' => $assignment->submittedBy?->name ?? $assignment->createdBy?->name ?? '—',
-                'subject' => $assignment->courseSubject?->displayLabel() ?? '—',
+                'subject' => $assignment->teacherSubjectLabel(),
                 'title' => (string) ($assignment->title ?? ''),
                 'submitted_at' => $assignment->submitted_at?->timezone((string) config('app.timezone'))->format('h:i A'),
             ];
@@ -666,13 +666,18 @@ class HomeworkSubmissionService
                 $givenBy = (string) ($assignment?->submittedBy?->name
                     ?? $assignment?->createdBy?->name
                     ?? '');
+                $subjectLabel = (string) $subject->name;
+
+                if ($assignment && $givenBy !== '') {
+                    $subjectLabel .= ' ('.$givenBy.')';
+                }
 
                 $items[] = [
                     'course_subject_id' => $subjectId,
                     'assignment_id' => $assignment?->id,
                     'teacher' => ($assignment && $givenBy !== '') ? $givenBy : $teacherName,
                     'submitted_by' => $givenBy,
-                    'subject' => (string) $subject->name,
+                    'subject' => $subjectLabel,
                     'title' => (string) ($assignment?->title ?? ''),
                     'description' => (string) ($assignment?->description ?? ''),
                     'has_file' => (bool) ($assignment?->hasFile() ?? false),
@@ -1167,7 +1172,7 @@ class HomeworkSubmissionService
                 HomeworkAssignmentStatus::Approved->value,
                 HomeworkAssignmentStatus::Sent->value,
             ])
-            ->with(['courseSubject', 'submittedBy'])
+            ->with(['courseSubject', 'submittedBy', 'createdBy'])
             ->orderBy('course_subject_id')
             ->get();
 
@@ -1256,6 +1261,8 @@ class HomeworkSubmissionService
             ->with([
                 'batch',
                 'courseSubject',
+                'submittedBy',
+                'createdBy',
                 'studentLinks' => fn ($query) => $query->where('student_id', $student->id),
             ])
             ->whereIn('batch_id', $batchIds)
@@ -1305,7 +1312,7 @@ class HomeworkSubmissionService
                 $usedCheckIds[$check->id] = true;
             }
 
-            $subjectLabel = $assignment->courseSubject?->displayLabel() ?? (string) $assignment->title;
+            $subjectLabel = $assignment->teacherSubjectLabel();
 
             $days[$date]['subjects'][] = $this->profileSubjectRow(
                 $subjectLabel,

@@ -154,10 +154,51 @@ class HomeworkCheckService
         }
 
         return $subjects
-            ->mapWithKeys(fn (CourseSubject $subject): array => [
-                $subject->id => $subject->displayLabel(),
-            ])
+            ->mapWithKeys(function (CourseSubject $subject) use ($user): array {
+                $label = $subject->name;
+
+                if (! $this->userCanManageHomeworkDesk($user) && filled($user->name)) {
+                    $label .= ' ('.$user->name.')';
+                }
+
+                return [$subject->id => $label];
+            })
             ->all();
+    }
+
+    /**
+     * One line per homework for this class and date.
+     * A teacher only gets the homework they saved. The admin gets every teacher's homework.
+     *
+     * @return array<int, string>
+     */
+    public function checkChoicesFor(User $user, int $batchId, string $date): array
+    {
+        $date = $this->normalizeCheckedOn($date);
+
+        $query = HomeworkAssignment::query()
+            ->with(['courseSubject', 'submittedBy', 'createdBy'])
+            ->where('batch_id', $batchId)
+            ->whereDate('homework_date', $date)
+            ->whereNotNull('course_subject_id');
+
+        if (! $this->userCanManageHomeworkDesk($user)) {
+            $query->where(function ($rows) use ($user): void {
+                $rows->where('submitted_by_user_id', $user->id)
+                    ->orWhere(function ($own) use ($user): void {
+                        $own->whereNull('submitted_by_user_id')
+                            ->where('created_by_user_id', $user->id);
+                    });
+            });
+        }
+
+        $choices = [];
+
+        foreach ($query->orderBy('course_subject_id')->orderBy('id')->get() as $assignment) {
+            $choices[(int) $assignment->id] = $assignment->teacherSubjectLabel();
+        }
+
+        return $choices;
     }
 
     public function normalizeCheckedOn(?string $checkedOn): string
@@ -270,7 +311,18 @@ class HomeworkCheckService
         }
 
         if (! $assignment) {
-            $assignment = $this->approvedAssignmentFor($batchId, $courseSubjectId, $checkedOnDate);
+            $onlyUserId = $this->userCanManageHomeworkDesk($teacher) ? null : (int) $teacher->id;
+            $assignment = $this->approvedAssignmentFor($batchId, $courseSubjectId, $checkedOnDate, $onlyUserId);
+        }
+
+        if ($assignment && ! $this->userCanManageHomeworkDesk($teacher)) {
+            $ownerId = (int) ($assignment->submitted_by_user_id ?: $assignment->created_by_user_id);
+
+            if ($ownerId !== (int) $teacher->id) {
+                throw ValidationException::withMessages([
+                    'course_subject_id' => 'You can check only the homework you gave.',
+                ]);
+            }
         }
 
         if ($assignment && $topic === "Today's homework" && filled($assignment->title)) {
@@ -295,13 +347,17 @@ class HomeworkCheckService
             ]);
         }
 
-        $existing = HomeworkCheck::query()
+        $existingQuery = HomeworkCheck::query()
             ->where('student_id', $student->id)
             ->where('batch_id', $batch->id)
             ->where('course_subject_id', $subject->id)
-            ->whereDate('checked_on', $checkedOnDate)
-            ->orderByDesc('id')
-            ->first();
+            ->whereDate('checked_on', $checkedOnDate);
+
+        if ($assignment) {
+            $existingQuery->where('homework_assignment_id', $assignment->id);
+        }
+
+        $existing = $existingQuery->orderByDesc('id')->first();
 
         if ($existing && $existing->status === $status) {
             return [
@@ -319,7 +375,7 @@ class HomeworkCheckService
 
         $checkAttributes = [
             'homework_assignment_id' => $assignment?->id ?? $existing?->homework_assignment_id,
-            'subject_name' => $subject->displayLabel(),
+            'subject_name' => $assignment?->teacherSubjectLabel() ?? $subject->name,
             'topic' => $topic,
             'status' => $status,
             'parent_mobile' => filled($student->mobile) ? (string) $student->mobile : null,
@@ -438,6 +494,7 @@ class HomeworkCheckService
         string $choice,
         string $topic,
         ?string $checkedOn = null,
+        ?int $homeworkAssignmentId = null,
     ): array {
         if (! in_array($choice, ['done', 'not_done'], true)) {
             throw ValidationException::withMessages([
@@ -445,7 +502,7 @@ class HomeworkCheckService
             ]);
         }
 
-        $classIds = $this->rosterForBatch($batchId, $courseSubjectId, null, $checkedOn)
+        $classIds = $this->rosterForBatch($batchId, $courseSubjectId, null, $checkedOn, $homeworkAssignmentId)
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
             ->all();
@@ -475,6 +532,7 @@ class HomeworkCheckService
             $topic,
             HomeworkCheckStatus::Done,
             $checkedOn,
+            $homeworkAssignmentId,
         );
         $notDoneResult = $this->markMany(
             $teacher,
@@ -484,6 +542,7 @@ class HomeworkCheckService
             $topic,
             HomeworkCheckStatus::NotDone,
             $checkedOn,
+            $homeworkAssignmentId,
         );
 
         return [
@@ -511,8 +570,9 @@ class HomeworkCheckService
         int $courseSubjectId,
         string $topic,
         ?string $checkedOn = null,
+        ?int $homeworkAssignmentId = null,
     ): array {
-        $roster = $this->rosterForBatch($batchId, $courseSubjectId, null, $checkedOn);
+        $roster = $this->rosterForBatch($batchId, $courseSubjectId, null, $checkedOn, $homeworkAssignmentId);
         $student = $roster->first(fn (array $row): bool => (int) $row['id'] === $studentId);
 
         if (! is_array($student)) {
@@ -536,6 +596,7 @@ class HomeworkCheckService
             $topic,
             HomeworkCheckStatus::NotDone,
             $checkedOn,
+            $homeworkAssignmentId,
         );
         $doneResult = $openIds === []
             ? ['marked' => 0]
@@ -547,6 +608,7 @@ class HomeworkCheckService
                 $topic,
                 HomeworkCheckStatus::Done,
                 $checkedOn,
+                $homeworkAssignmentId,
             );
 
         return [
@@ -565,11 +627,12 @@ class HomeworkCheckService
         int $courseSubjectId,
         string $topic,
         ?string $checkedOn = null,
+        ?int $homeworkAssignmentId = null,
     ): int {
         $checkedOnDate = $this->normalizeCheckedOn($checkedOn);
         $this->assertCheckDateInWindow($checkedOnDate);
 
-        $roster = $this->rosterForBatch($batchId, $courseSubjectId, null, $checkedOnDate);
+        $roster = $this->rosterForBatch($batchId, $courseSubjectId, null, $checkedOnDate, $homeworkAssignmentId);
         $hasNotDone = $roster->contains(
             fn (array $row): bool => ($row['status_key'] ?? null) === 'not_done',
         );
@@ -597,6 +660,7 @@ class HomeworkCheckService
             $topic,
             HomeworkCheckStatus::Done,
             $checkedOnDate,
+            $homeworkAssignmentId,
         )['marked'];
     }
 
@@ -698,6 +762,7 @@ class HomeworkCheckService
         ?int $courseSubjectId = null,
         ?string $search = null,
         ?string $checkedOn = null,
+        ?int $homeworkAssignmentId = null,
     ): Collection {
         $checkedOnDate = $this->normalizeCheckedOn($checkedOn);
 
@@ -718,6 +783,7 @@ class HomeworkCheckService
                 ->where('batch_id', $batchId)
                 ->where('course_subject_id', $courseSubjectId)
                 ->whereDate('checked_on', $checkedOnDate)
+                ->when($homeworkAssignmentId, fn ($query) => $query->where('homework_assignment_id', $homeworkAssignmentId))
                 ->orderByDesc('id')
                 ->get()
                 ->unique('student_id')
@@ -1002,9 +1068,10 @@ class HomeworkCheckService
             ->exists();
     }
 
-    protected function approvedAssignmentFor(int $batchId, int $courseSubjectId, string $checkedOnDate): ?HomeworkAssignment
+    protected function approvedAssignmentFor(int $batchId, int $courseSubjectId, string $checkedOnDate, ?int $onlyUserId = null): ?HomeworkAssignment
     {
         return HomeworkAssignment::query()
+            ->with(['courseSubject', 'submittedBy', 'createdBy'])
             ->where('batch_id', $batchId)
             ->where('course_subject_id', $courseSubjectId)
             ->whereDate('homework_date', $checkedOnDate)
@@ -1012,8 +1079,59 @@ class HomeworkCheckService
                 HomeworkAssignmentStatus::Approved->value,
                 HomeworkAssignmentStatus::Sent->value,
             ])
+            ->when($onlyUserId, function ($query) use ($onlyUserId): void {
+                $query->where(function ($rows) use ($onlyUserId): void {
+                    $rows->where('submitted_by_user_id', $onlyUserId)
+                        ->orWhere(function ($own) use ($onlyUserId): void {
+                            $own->whereNull('submitted_by_user_id')
+                                ->where('created_by_user_id', $onlyUserId);
+                        });
+                });
+            })
             ->orderByDesc('id')
             ->first();
+    }
+
+    /**
+     * @return array{subject_id: int, assignment_id: ?int}
+     */
+    public function resolveCheckSelection(User $user, int $batchId, int $selectedId, string $date): array
+    {
+        $choices = $this->checkChoicesFor($user, $batchId, $date);
+
+        if (isset($choices[$selectedId])) {
+            $assignment = HomeworkAssignment::query()->find($selectedId);
+
+            return [
+                'subject_id' => (int) ($assignment?->course_subject_id ?? 0),
+                'assignment_id' => $assignment ? (int) $assignment->id : null,
+            ];
+        }
+
+        return [
+            'subject_id' => $selectedId,
+            'assignment_id' => null,
+        ];
+    }
+
+    public function assignmentReadyToMark(int $assignmentId, ?string $checkedOn): bool
+    {
+        $date = $this->normalizeCheckedOn($checkedOn);
+
+        if (! $this->checkDateAllowed($date)) {
+            return false;
+        }
+
+        $assignment = HomeworkAssignment::query()->find($assignmentId);
+
+        if (! $assignment || $assignment->homework_date?->toDateString() !== $date) {
+            return false;
+        }
+
+        return in_array($assignment->status, [
+            HomeworkAssignmentStatus::Approved,
+            HomeworkAssignmentStatus::Sent,
+        ], true);
     }
 
     public function homeworkReadyToMark(int $batchId, int $courseSubjectId, ?string $checkedOn): bool

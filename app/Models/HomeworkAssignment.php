@@ -120,6 +120,14 @@ class HomeworkAssignment extends Model
         return $this->belongsTo(User::class, 'submitted_by_user_id');
     }
 
+    public function teacherSubjectLabel(): string
+    {
+        $name = trim((string) ($this->courseSubject?->name ?: $this->title ?: 'Homework'));
+        $teacher = trim((string) ($this->submittedBy?->name ?: $this->createdBy?->name ?: ''));
+
+        return $teacher !== '' ? $name.' ('.$teacher.')' : $name;
+    }
+
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by_user_id');

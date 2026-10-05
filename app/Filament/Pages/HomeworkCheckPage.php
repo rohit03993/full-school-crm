@@ -106,9 +106,12 @@ class HomeworkCheckPage extends Page
         }
 
         if ($batchId > 0 && $user && $service->userCanAccessBatch($user, $batchId)) {
-            $subjects = $service->subjectOptionsForBatch($user, $batchId);
+            $choices = $service->checkChoicesFor($user, $batchId, $date);
+            $subjects = $choices !== []
+                ? $choices
+                : $service->subjectOptionsForBatch($user, $batchId);
 
-            if ($subjectId > 0 && ! array_key_exists($subjectId, $subjects)) {
+            if ($subjectId > 0 && ! array_key_exists($subjectId, $subjects) && $choices === []) {
                 $subjectId = 0;
             }
 
@@ -162,7 +165,11 @@ class HomeworkCheckPage extends Page
                                 return [];
                             }
 
-                            return $service->subjectOptionsForBatch($user, $batchId);
+                            $choices = $service->checkChoicesFor($user, $batchId, (string) $this->checkDate());
+
+                            return $choices !== []
+                                ? $choices
+                                : $service->subjectOptionsForBatch($user, $batchId);
                         })
                         ->searchable()
                         ->required()
@@ -348,14 +355,16 @@ class HomeworkCheckPage extends Page
         }
 
         try {
+            $target = $this->selectedCheckTarget();
             $result = $service->applySelection(
                 $user,
                 (int) $this->data['batch_id'],
-                (int) $this->data['course_subject_id'],
+                $target['subject_id'],
                 $this->normalizedSelectedIds(),
                 $this->bulkChoice,
                 (string) ($this->data['topic'] ?? ''),
                 $this->checkDate(),
+                $target['assignment_id'],
             );
         } catch (ValidationException $exception) {
             $message = collect($exception->errors())->flatten()->first() ?? 'Could not save.';
@@ -423,11 +432,14 @@ class HomeworkCheckPage extends Page
             return collect();
         }
 
+        $target = $this->selectedCheckTarget();
+
         return app(HomeworkCheckService::class)->rosterForBatch(
             (int) $this->data['batch_id'],
-            (int) $this->data['course_subject_id'],
+            $target['subject_id'],
             null,
             $this->checkDate(),
+            $target['assignment_id'],
         );
     }
 
@@ -477,13 +489,15 @@ class HomeworkCheckPage extends Page
         }
 
         try {
+            $target = $this->selectedCheckTarget();
             $result = $service->markNotDoneAndCloseOpen(
                 $user,
                 (int) $this->data['batch_id'],
                 $studentId,
-                (int) $this->data['course_subject_id'],
+                $target['subject_id'],
                 (string) ($this->data['topic'] ?? ''),
                 $this->checkDate(),
+                $target['assignment_id'],
             );
         } catch (ValidationException $exception) {
             $message = collect($exception->errors())->flatten()->first() ?? 'Could not save.';
@@ -591,15 +605,16 @@ class HomeworkCheckPage extends Page
         }
 
         try {
+            $target = $this->selectedCheckTarget();
             $result = $service->mark(
                 $user,
                 (int) $this->data['batch_id'],
                 $studentId,
-                (int) $this->data['course_subject_id'],
+                $target['subject_id'],
                 (string) ($this->data['topic'] ?? ''),
                 $status,
                 $this->checkDate(),
-                null,
+                $target['assignment_id'],
             );
         } catch (ValidationException $exception) {
             $message = collect($exception->errors())->flatten()->first() ?? 'Could not save.';
@@ -627,7 +642,10 @@ class HomeworkCheckPage extends Page
             return;
         }
 
-        $options = $service->subjectOptionsForBatch($user, (int) $this->data['batch_id']);
+        $choices = $service->checkChoicesFor($user, (int) $this->data['batch_id'], (string) $this->checkDate());
+        $options = $choices !== []
+            ? $choices
+            : $service->subjectOptionsForBatch($user, (int) $this->data['batch_id']);
 
         if (count($options) === 1) {
             $this->data['course_subject_id'] = (int) array_key_first($options);
@@ -640,10 +658,17 @@ class HomeworkCheckPage extends Page
             return null;
         }
 
-        $options = $service->subjectOptionsForBatch($user, (int) $this->data['batch_id']);
+        $choices = $service->checkChoicesFor($user, (int) $this->data['batch_id'], (string) $this->checkDate());
+        $options = $choices !== []
+            ? $choices
+            : $service->subjectOptionsForBatch($user, (int) $this->data['batch_id']);
+
+        if ($choices === []) {
+            return 'No homework to check for this date.';
+        }
 
         if (count($options) === 1) {
-            return 'Auto-selected — you are assigned to only this subject for this class.';
+            return 'Auto-selected — this is the homework you can check for this class.';
         }
 
         if (count($options) > 1) {
@@ -661,12 +686,14 @@ class HomeworkCheckPage extends Page
             return;
         }
 
+        $target = $this->selectedCheckTarget();
         $marked = app(HomeworkCheckService::class)->closeOpenStudentsWhenAnyNotDone(
             $user,
             (int) $this->data['batch_id'],
-            (int) $this->data['course_subject_id'],
+            $target['subject_id'],
             (string) ($this->data['topic'] ?? ''),
             $this->checkDate(),
+            $target['assignment_id'],
         );
 
         if ($marked < 1) {
@@ -706,9 +733,18 @@ class HomeworkCheckPage extends Page
             return false;
         }
 
+        $target = $this->selectedCheckTarget();
+
+        if ($target['assignment_id']) {
+            return app(HomeworkCheckService::class)->assignmentReadyToMark(
+                $target['assignment_id'],
+                $this->checkDate(),
+            );
+        }
+
         return app(HomeworkCheckService::class)->homeworkReadyToMark(
             (int) $this->data['batch_id'],
-            (int) $this->data['course_subject_id'],
+            $target['subject_id'],
             $this->checkDate(),
         );
     }
@@ -749,6 +785,27 @@ class HomeworkCheckPage extends Page
         return Carbon::parse($this->checkDate())->format('d M Y');
     }
 
+    /**
+     * @return array{subject_id: int, assignment_id: ?int}
+     */
+    protected function selectedCheckTarget(): array
+    {
+        $user = Auth::user();
+        $batchId = (int) ($this->data['batch_id'] ?? 0);
+        $selectedId = (int) ($this->data['course_subject_id'] ?? 0);
+
+        if (! $user || $batchId < 1 || $selectedId < 1) {
+            return ['subject_id' => $selectedId, 'assignment_id' => null];
+        }
+
+        return app(HomeworkCheckService::class)->resolveCheckSelection(
+            $user,
+            $batchId,
+            $selectedId,
+            (string) $this->checkDate(),
+        );
+    }
+
     protected function subjectLabel(): string
     {
         $user = Auth::user();
@@ -759,7 +816,9 @@ class HomeworkCheckPage extends Page
             return 'Subject';
         }
 
-        $options = app(HomeworkCheckService::class)->subjectOptionsForBatch($user, $batchId);
+        $service = app(HomeworkCheckService::class);
+        $choices = $service->checkChoicesFor($user, $batchId, (string) $this->checkDate());
+        $options = $choices !== [] ? $choices : $service->subjectOptionsForBatch($user, $batchId);
 
         return (string) ($options[$subjectId] ?? $options[(string) $subjectId] ?? 'Subject');
     }
@@ -853,11 +912,14 @@ class HomeworkCheckPage extends Page
             return collect();
         }
 
+        $target = $this->selectedCheckTarget();
+
         return app(HomeworkCheckService::class)->rosterForBatch(
             (int) $this->data['batch_id'],
-            (int) $this->data['course_subject_id'],
+            $target['subject_id'],
             $this->data['student_search'] ?? null,
             $this->checkDate(),
+            $target['assignment_id'],
         );
     }
 }

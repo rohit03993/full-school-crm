@@ -290,11 +290,11 @@ class CourseSubjectAndStaffAssignmentTest extends TestCase
 
         $options = app(HomeworkCheckService::class);
         $this->assertSame(
-            [$chemistry->id => 'Chemistry (CHEM)'],
+            [$chemistry->id => 'Chemistry (Umakant Sir)'],
             $options->subjectOptionsForBatch($umakant, $batch->id),
         );
         $this->assertSame(
-            [$chemistry->id => 'Chemistry (CHEM)'],
+            [$chemistry->id => 'Chemistry (Atul Sir)'],
             $options->subjectOptionsForBatch($atul, $batch->id),
         );
         $this->assertArrayNotHasKey($physics->id, $options->subjectOptionsForBatch($umakant, $batch->id));

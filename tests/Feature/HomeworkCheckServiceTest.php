@@ -1064,12 +1064,89 @@ class HomeworkCheckServiceTest extends TestCase
             'course_subject_id' => $subject->id,
         ]);
 
+        $assignmentId = \App\Models\HomeworkAssignment::query()
+            ->where('batch_id', $batch->id)
+            ->where('course_subject_id', $subject->id)
+            ->value('id');
+
         Livewire::test(HomeworkCheckPage::class)
             ->set('data.check_date', now()->subDay()->toDateString())
             ->set('data.batch_id', $batch->id)
-            ->assertSet('data.course_subject_id', $subject->id);
+            ->assertSet('data.course_subject_id', $assignmentId);
 
         unset($student);
+    }
+
+    public function test_two_teachers_check_only_their_own_homework(): void
+    {
+        Http::fake();
+
+        [$admin, $batch, $student, $subject] = $this->seedClass(approvedHomework: false);
+        $first = User::factory()->create(['name' => 'Kuldeep Rana', 'is_active' => true]);
+        $second = User::factory()->create(['name' => 'Sunil Rana', 'is_active' => true]);
+        $first->assignRole(StaffJobRole::Teacher->value);
+        $second->assignRole(StaffJobRole::Teacher->value);
+
+        foreach ([$first, $second] as $teacher) {
+            BatchStaffAssignment::query()->create([
+                'batch_id' => $batch->id,
+                'user_id' => $teacher->id,
+                'role' => BatchStaffRole::SubjectTeacher,
+                'course_subject_id' => $subject->id,
+            ]);
+        }
+
+        $date = now()->subDay()->toDateString();
+        $firstHomework = HomeworkAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'created_by_user_id' => $first->id,
+            'submitted_by_user_id' => $first->id,
+            'approved_by_user_id' => $admin->id,
+            'title' => 'Organic',
+            'description' => 'Page 1',
+            'content_type' => \App\Enums\HomeworkContentType::Text,
+            'status' => \App\Enums\HomeworkAssignmentStatus::Approved,
+            'homework_date' => $date,
+            'published_at' => now(),
+            'approved_at' => now(),
+        ]);
+        $secondHomework = HomeworkAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'course_subject_id' => $subject->id,
+            'created_by_user_id' => $second->id,
+            'submitted_by_user_id' => $second->id,
+            'approved_by_user_id' => $admin->id,
+            'title' => 'Inorganic',
+            'description' => 'Page 2',
+            'content_type' => \App\Enums\HomeworkContentType::Text,
+            'status' => \App\Enums\HomeworkAssignmentStatus::Approved,
+            'homework_date' => $date,
+            'published_at' => now(),
+            'approved_at' => now(),
+        ]);
+
+        $checks = app(HomeworkCheckService::class);
+        $checks->mark($first, $batch->id, $student->id, $subject->id, 'Organic', HomeworkCheckStatus::Done, $date, (int) $firstHomework->id);
+        $checks->mark($second, $batch->id, $student->id, $subject->id, 'Inorganic', HomeworkCheckStatus::NotDone, $date, (int) $secondHomework->id);
+
+        $this->assertSame(2, HomeworkCheck::query()->count());
+        $this->assertDatabaseHas('homework_checks', [
+            'homework_assignment_id' => $firstHomework->id,
+            'status' => 'done',
+        ]);
+        $this->assertDatabaseHas('homework_checks', [
+            'homework_assignment_id' => $secondHomework->id,
+            'status' => 'not_done',
+        ]);
+        $this->assertSame(
+            [(int) $firstHomework->id => 'Mathematics (Kuldeep Rana)'],
+            $checks->checkChoicesFor($first, $batch->id, $date),
+        );
+        $this->assertSame(
+            [(int) $secondHomework->id => 'Mathematics (Sunil Rana)'],
+            $checks->checkChoicesFor($second, $batch->id, $date),
+        );
     }
 
     public function test_not_done_count_this_week(): void
