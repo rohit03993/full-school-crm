@@ -163,7 +163,12 @@ class StudentSearchService
         ));
 
         $query = Student::query()
-            ->with(['activeEnrollment', 'latestEnquiry'])
+            ->with([
+                'activeEnrollment',
+                'latestEnquiry',
+                'activeBatchStudent.batch.course',
+                'activeBatchStudent.batch.academicSession',
+            ])
             ->where(function ($query) use ($like, $digits, $roll, $words): void {
                 $query->whereRaw('LOWER(name) LIKE ?', [$like]);
 

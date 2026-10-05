@@ -376,7 +376,12 @@ class StudentResource extends Resource
 
     public static function getGlobalSearchEloquentQuery(): Builder
     {
-        return Student::query()->with(['activeEnrollment', 'latestEnquiry']);
+        return Student::query()->with([
+            'activeEnrollment',
+            'latestEnquiry',
+            'activeBatchStudent.batch.course',
+            'activeBatchStudent.batch.academicSession',
+        ]);
     }
 
     public static function getGlobalSearchResultTitle(Model $record): string
@@ -403,8 +408,14 @@ class StudentResource extends Resource
             default => $record->status?->label() ?? 'Person',
         };
 
+        $batch = $record->activeBatchStudent?->batch;
+        $class = $batch
+            ? ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false)
+            : 'No class yet';
+
         return array_filter([
             'Type' => $kind,
+            'Class' => $class,
             'Roll' => filled($record->activeEnrollment?->enrollment_number)
                 ? (string) $record->activeEnrollment->enrollment_number
                 : null,
