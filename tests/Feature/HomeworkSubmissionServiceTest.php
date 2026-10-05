@@ -296,12 +296,12 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->firstWhere('course_subject_id', $data['physics']->id);
 
         $this->assertSame('Khushi Coordinator', $physicsRow['submitted_by']);
-        $this->assertSame($data['physicsTeacher']->name, $physicsRow['teacher']);
+        $this->assertSame('Khushi Coordinator', $physicsRow['teacher']);
 
         Livewire::test(HomeworkReviewPage::class)
             ->call('toggleDeskSection', $data['batch']->id)
-            ->assertSee($data['physicsTeacher']->name)
-            ->assertSee('Added by Khushi Coordinator');
+            ->assertSee('Khushi Coordinator')
+            ->assertDontSee('Added by');
     }
 
     public function test_coordinator_adds_homework_from_review_desk_popup(): void
@@ -740,6 +740,10 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertEqualsCanonicalizing(
             [$data['mathTeacher']->name, $secondTeacher->name],
             $mathItems->pluck('submitted_by')->all(),
+        );
+        $this->assertEqualsCanonicalizing(
+            [$data['mathTeacher']->name, $secondTeacher->name],
+            $mathItems->pluck('teacher')->all(),
         );
     }
 

@@ -663,13 +663,15 @@ class HomeworkSubmissionService
                     ? ($linkStatsByAssignment[(int) $assignment->id] ?? $this->studentLinks->emptyStats())
                     : $this->studentLinks->emptyStats();
 
+                $givenBy = (string) ($assignment?->submittedBy?->name
+                    ?? $assignment?->createdBy?->name
+                    ?? '');
+
                 $items[] = [
                     'course_subject_id' => $subjectId,
                     'assignment_id' => $assignment?->id,
-                    'teacher' => $teacherName,
-                    'submitted_by' => (string) ($assignment?->submittedBy?->name
-                        ?? $assignment?->createdBy?->name
-                        ?? ''),
+                    'teacher' => ($assignment && $givenBy !== '') ? $givenBy : $teacherName,
+                    'submitted_by' => $givenBy,
                     'subject' => (string) $subject->name,
                     'title' => (string) ($assignment?->title ?? ''),
                     'description' => (string) ($assignment?->description ?? ''),
