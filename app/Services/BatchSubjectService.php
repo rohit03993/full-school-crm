@@ -49,13 +49,19 @@ class BatchSubjectService
             ->map(function (CourseSubject $subject) use ($teacherBySubject): array {
                 $teacher = $teacherBySubject->get($subject->id);
 
+                $userIds = array_values(array_map(
+                    'intval',
+                    $teacher['user_ids'] ?? (filled($teacher['user_id'] ?? null) ? [$teacher['user_id']] : []),
+                ));
+
                 return [
                     'course_subject_id' => $subject->id,
                     'name' => $subject->name,
                     'code' => $subject->code,
                     'default_max_marks' => $subject->default_max_marks,
                     'is_active' => $subject->is_active,
-                    'user_id' => $teacher['user_id'] ?? null,
+                    'user_id' => $userIds[0] ?? null,
+                    'user_ids' => $userIds,
                 ];
             })
             ->values()
@@ -100,10 +106,10 @@ class BatchSubjectService
                 $subject = $this->resolveCatalogueSubject($batch, $subjectData, $source);
                 $selectedIds[$subject->id] = ['sort_order' => $index + 1];
 
-                if (filled($source['user_id'] ?? null)) {
+                foreach ($this->teacherIdsFromRow($source) as $teacherId) {
                     $teacherRows[] = [
                         'course_subject_id' => $subject->id,
-                        'user_id' => (int) $source['user_id'],
+                        'user_id' => $teacherId,
                     ];
                 }
             }
@@ -138,6 +144,26 @@ class BatchSubjectService
                 'is_active' => true,
                 'user_id' => null,
             ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return list<int>
+     */
+    protected function teacherIdsFromRow(array $row): array
+    {
+        $ids = $row['user_ids'] ?? null;
+
+        if (! is_array($ids)) {
+            $ids = filled($row['user_id'] ?? null) ? [$row['user_id']] : [];
+        }
+
+        return collect($ids)
+            ->filter(fn (mixed $id): bool => filled($id))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
             ->values()
             ->all();
     }

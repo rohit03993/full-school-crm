@@ -295,7 +295,7 @@ class HomeworkWhatsAppService
     {
         return $assignments
             ->map(function (HomeworkAssignment $assignment) use ($student): ?string {
-                $label = $assignment->courseSubject?->displayLabel()
+                $label = $assignment->courseSubject?->name
                     ?? $assignment->title
                     ?? 'Homework';
 

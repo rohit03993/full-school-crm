@@ -582,7 +582,7 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame('Class 11 JEE', $desk['groups'][0]['course_name']);
         $this->assertSame(['A', 'B'], array_column($desk['groups'][0]['sections'], 'section'));
         $this->assertSame(1, $desk['groups'][0]['sections'][0]['priority']);
-        $this->assertSame(4, $desk['groups'][0]['sections'][1]['priority']);
+        $this->assertSame(5, $desk['groups'][0]['sections'][1]['priority']);
 
         $sectionA = collect($desk['groups'][0]['sections'][0]['items'])->keyBy('course_subject_id');
         $this->assertCount(3, $sectionA);

@@ -69,17 +69,24 @@ class BatchStaffAssignmentService
         $lead = $batch->staffAssignments->first(fn (BatchStaffAssignment $row): bool => $row->isLeadTeacher());
 
         $assignedBySubject = $batch->staffAssignments
-            ->filter(fn (BatchStaffAssignment $row): bool => $row->isSubjectTeacher())
-            ->keyBy('course_subject_id');
+            ->filter(fn (BatchStaffAssignment $row): bool => $row->isSubjectTeacher() && filled($row->course_subject_id))
+            ->groupBy(fn (BatchStaffAssignment $row): int => (int) $row->course_subject_id);
 
         $subjectRows = $batch->activeSubjects
             ->map(function (CourseSubject $subject) use ($assignedBySubject): array {
-                $assignment = $assignedBySubject->get($subject->id);
+                $userIds = $assignedBySubject
+                    ->get($subject->id, collect())
+                    ->pluck('user_id')
+                    ->map(fn (mixed $id): int => (int) $id)
+                    ->unique()
+                    ->values()
+                    ->all();
 
                 return [
                     'course_subject_id' => $subject->id,
                     'subject_name' => $subject->displayLabel(),
-                    'user_id' => $assignment?->user_id,
+                    'user_id' => $userIds[0] ?? null,
+                    'user_ids' => $userIds,
                 ];
             })
             ->values()
@@ -283,7 +290,7 @@ class BatchStaffAssignmentService
             ->all();
 
         $normalized = [];
-        $seenSubjects = [];
+        $seenPairs = [];
 
         foreach ($rows as $row) {
             $subjectId = (int) ($row['course_subject_id'] ?? 0);
@@ -299,11 +306,13 @@ class BatchStaffAssignmentService
                 ]);
             }
 
-            if (isset($seenSubjects[$subjectId])) {
+            $pair = $subjectId.'-'.$userId;
+
+            if (isset($seenPairs[$pair])) {
                 continue;
             }
 
-            $seenSubjects[$subjectId] = true;
+            $seenPairs[$pair] = true;
             $this->assertActiveStaff($userId, 'subject_teacher_assignments');
 
             $normalized[] = [

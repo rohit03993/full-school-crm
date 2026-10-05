@@ -8,6 +8,7 @@ use App\Enums\CourseStatus;
 use App\Enums\DurationType;
 use App\Enums\ProgrammeCategory;
 use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Models\AcademicSession;
 use App\Models\Batch;
 use App\Models\Course;
@@ -15,6 +16,7 @@ use App\Models\User;
 use App\Services\BatchStaffAssignmentService;
 use App\Services\BatchSubjectService;
 use App\Services\CourseSubjectService;
+use App\Services\HomeworkCheckService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
@@ -224,6 +226,80 @@ class CourseSubjectAndStaffAssignmentTest extends TestCase
         ]);
     }
 
+    public function test_one_subject_can_have_several_teachers_and_each_sees_only_that_subject(): void
+    {
+        $course = $this->createCourse();
+        $session = AcademicSession::query()->create([
+            'name' => '2025–26',
+            'code' => '2025-26-multi',
+            'starts_on' => '2025-04-01',
+            'ends_on' => '2026-03-31',
+            'is_current' => false,
+            'is_active' => true,
+        ]);
+
+        app(CourseSubjectService::class)->sync($course, [
+            ['name' => 'Chemistry', 'code' => 'CHEM'],
+            ['name' => 'Physics', 'code' => 'PHY'],
+        ]);
+
+        $chemistry = $course->subjects()->where('name', 'Chemistry')->firstOrFail();
+        $physics = $course->subjects()->where('name', 'Physics')->firstOrFail();
+        $umakant = $this->createTeacher('Umakant Sir');
+        $atul = $this->createTeacher('Atul Sir');
+        $physicsTeacher = $this->createTeacher('Ashish Sir');
+
+        $batch = Batch::query()->create([
+            'name' => 'Class 11 JEE - A',
+            'section' => 'A',
+            'course_id' => $course->id,
+            'academic_session_id' => $session->id,
+            'status' => BatchStatus::Active,
+        ]);
+
+        app(BatchSubjectService::class)->sync($batch, [
+            [
+                'course_subject_id' => $chemistry->id,
+                'name' => 'Chemistry',
+                'code' => 'CHEM',
+                'user_ids' => [$umakant->id, $atul->id],
+            ],
+            [
+                'course_subject_id' => $physics->id,
+                'name' => 'Physics',
+                'code' => 'PHY',
+                'user_ids' => [$physicsTeacher->id],
+            ],
+        ]);
+
+        $this->assertSame(1, $batch->subjects()->where('name', 'Chemistry')->count());
+        $this->assertDatabaseHas('batch_staff_assignments', [
+            'batch_id' => $batch->id,
+            'course_subject_id' => $chemistry->id,
+            'user_id' => $umakant->id,
+        ]);
+        $this->assertDatabaseHas('batch_staff_assignments', [
+            'batch_id' => $batch->id,
+            'course_subject_id' => $chemistry->id,
+            'user_id' => $atul->id,
+        ]);
+
+        $state = app(BatchSubjectService::class)->formStateForBatch($batch->fresh());
+        $chemistryRow = collect($state['section_subjects'])->firstWhere('name', 'Chemistry');
+        $this->assertEqualsCanonicalizing([$umakant->id, $atul->id], $chemistryRow['user_ids']);
+
+        $options = app(HomeworkCheckService::class);
+        $this->assertSame(
+            [$chemistry->id => 'Chemistry (CHEM)'],
+            $options->subjectOptionsForBatch($umakant, $batch->id),
+        );
+        $this->assertSame(
+            [$chemistry->id => 'Chemistry (CHEM)'],
+            $options->subjectOptionsForBatch($atul, $batch->id),
+        );
+        $this->assertArrayNotHasKey($physics->id, $options->subjectOptionsForBatch($umakant, $batch->id));
+    }
+
     private function createStaff(string $name): User
     {
         $user = User::factory()->create([
@@ -231,6 +307,17 @@ class CourseSubjectAndStaffAssignmentTest extends TestCase
             'is_active' => true,
         ]);
         $user->assignRole(RoleName::Staff->value);
+
+        return $user;
+    }
+
+    private function createTeacher(string $name): User
+    {
+        $user = User::factory()->create([
+            'name' => $name,
+            'is_active' => true,
+        ]);
+        $user->assignRole(StaffJobRole::Teacher->value);
 
         return $user;
     }

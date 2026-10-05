@@ -152,9 +152,16 @@ final class CommonCourseSubjects
             }
 
             $key = self::keyForName($name);
+            $savedIds = $row['user_ids'] ?? null;
+
+            if (! is_array($savedIds)) {
+                $savedIds = filled($row['user_id'] ?? null) ? [$row['user_id']] : [];
+            }
+
             $stateByName[$key !== null ? 'preset:'.$key : 'name:'.$name] = [
                 'course_subject_id' => $row['course_subject_id'] ?? null,
-                'user_id' => $row['user_id'] ?? null,
+                'user_id' => $savedIds[0] ?? ($row['user_id'] ?? null),
+                'user_ids' => array_values($savedIds),
             ];
         }
 
@@ -170,6 +177,7 @@ final class CommonCourseSubjects
                     ...$row,
                     'course_subject_id' => $state['course_subject_id'] ?? null,
                     'user_id' => $state['user_id'] ?? null,
+                    'user_ids' => $state['user_ids'] ?? [],
                 ];
             })
             ->values()

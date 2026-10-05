@@ -1075,32 +1075,37 @@ class HomeworkCheckServiceTest extends TestCase
     public function test_not_done_count_this_week(): void
     {
         Http::fake();
+        \Illuminate\Support\Carbon::setTestNow('2026-10-07 10:00:00');
 
         [$teacher, $batch, $student, $subject] = $this->seedClass();
 
-        app(HomeworkCheckService::class)->mark(
-            $teacher,
-            $batch->id,
-            $student->id,
-            $subject->id,
-            'A',
-            HomeworkCheckStatus::NotDone,
-            now()->subDay()->toDateString(),
-        );
+        try {
+            app(HomeworkCheckService::class)->mark(
+                $teacher,
+                $batch->id,
+                $student->id,
+                $subject->id,
+                'A',
+                HomeworkCheckStatus::NotDone,
+                now()->subDay()->toDateString(),
+            );
 
-        $this->assertSame(1, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
+            $this->assertSame(1, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
 
-        app(HomeworkCheckService::class)->mark(
-            $teacher,
-            $batch->id,
-            $student->id,
-            $subject->id,
-            'B',
-            HomeworkCheckStatus::Done,
-            now()->subDay()->toDateString(),
-        );
+            app(HomeworkCheckService::class)->mark(
+                $teacher,
+                $batch->id,
+                $student->id,
+                $subject->id,
+                'B',
+                HomeworkCheckStatus::Done,
+                now()->subDay()->toDateString(),
+            );
 
-        $this->assertSame(0, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
+            $this->assertSame(0, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
+        } finally {
+            \Illuminate\Support\Carbon::setTestNow();
+        }
     }
 
     public function test_mark_can_link_portal_homework_assignment(): void

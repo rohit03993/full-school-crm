@@ -615,7 +615,7 @@ class HomeworkSubmissionService
                 ->keyBy(fn (HomeworkSubjectClosure $closure): int => (int) $closure->course_subject_id);
             $teachersBySubject = $batch->staffAssignments
                 ->filter(fn (BatchStaffAssignment $row): bool => $row->isSubjectTeacher() && filled($row->course_subject_id))
-                ->keyBy(fn (BatchStaffAssignment $row): int => (int) $row->course_subject_id);
+                ->groupBy(fn (BatchStaffAssignment $row): int => (int) $row->course_subject_id);
 
             $items = [];
             $submitted = 0;
@@ -629,7 +629,12 @@ class HomeworkSubmissionService
                 $assignment = $homeworkBySubject->get($subjectId);
                 $closure = $closuresBySubject->get($subjectId);
                 $status = $assignment?->status;
-                $teacherName = (string) ($teachersBySubject->get($subjectId)?->user?->name ?? '');
+                $teacherName = $teachersBySubject
+                    ->get($subjectId, collect())
+                    ->map(fn (BatchStaffAssignment $row): string => (string) ($row->user?->name ?? ''))
+                    ->filter()
+                    ->unique()
+                    ->implode(', ');
 
                 if ($status === HomeworkAssignmentStatus::Submitted) {
                     $submitted++;
@@ -1409,14 +1414,19 @@ class HomeworkSubmissionService
                 continue;
             }
 
-            /** @var BatchStaffAssignment|null $teacherAssignment */
-            $teacherAssignment = $teachersBySubject->get($subjectId)?->first();
+            $teacherRows = $teachersBySubject->get($subjectId, collect());
+            $teacherNames = $teacherRows
+                ->map(fn (BatchStaffAssignment $row): string => (string) ($row->user?->name ?? ''))
+                ->filter()
+                ->unique()
+                ->implode(', ');
+            $firstTeacherId = $teacherRows->first()?->user_id;
 
             $missing[] = [
                 'course_subject_id' => $subjectId,
                 'subject' => (string) $subject->name,
-                'teacher' => (string) ($teacherAssignment?->user?->name ?? 'No teacher set'),
-                'teacher_user_id' => $teacherAssignment?->user_id ? (int) $teacherAssignment->user_id : null,
+                'teacher' => $teacherNames !== '' ? $teacherNames : 'No teacher set',
+                'teacher_user_id' => $firstTeacherId ? (int) $firstTeacherId : null,
             ];
         }
 

@@ -60,9 +60,10 @@ class BatchSubjectsFormSchema
                         ->minValue(1)
                         ->maxValue(1000)
                         ->placeholder('100'),
-                    Select::make('user_id')
-                        ->label('Teacher')
+                    Select::make('user_ids')
+                        ->label('Teachers')
                         ->options(fn (): array => StaffOptions::facultyOptions())
+                        ->multiple()
                         ->searchable()
                         ->native(false)
                         ->placeholder('Not assigned'),
@@ -72,7 +73,7 @@ class BatchSubjectsFormSchema
                 ->defaultItems(0)
                 ->addActionLabel('Add another subject')
                 ->reorderable()
-                ->helperText('Assign a staff teacher beside each selected subject. Teacher is optional and can be added later.'),
+                ->helperText('Pick every teacher for that subject. A teacher sees only the subjects you assign here. Teacher is optional and can be added later.'),
         ];
     }
 }
