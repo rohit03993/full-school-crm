@@ -55,16 +55,23 @@ class TeacherHomeworkScoreTest extends TestCase
             $report = app(TeacherHomeworkScoreService::class)->report('2026-10-03', '2026-10-04', null, true);
             $rows = collect($report['teachers'])->keyBy('name');
 
-            $this->assertSame(1, $rows['Kuldeep Rana']['expected']);
+            $this->assertSame(['2026-10-01', '2026-10-05'], app(TeacherHomeworkScoreService::class)->defaultRange());
+            $this->assertSame(
+                ['2025-10-05', '2026-10-05'],
+                app(TeacherHomeworkScoreService::class)->normalizeRange('2025-10-05', '2026-10-05'),
+            );
+            $this->assertSame('Kuldeep Rana', $report['teachers'][0]['name']);
+            $this->assertSame(2, $rows['Kuldeep Rana']['expected']);
             $this->assertSame(1, $rows['Kuldeep Rana']['given']);
-            $this->assertSame(0, $rows['Kuldeep Rana']['missed']);
-            $this->assertSame(75, $rows['Kuldeep Rana']['score']);
+            $this->assertSame(1, $rows['Kuldeep Rana']['missed']);
+            $this->assertSame(50, $rows['Kuldeep Rana']['score']);
             $this->assertSame(1, $rows['Kuldeep Rana']['lines'][0]['done']);
             $this->assertSame(1, $rows['Kuldeep Rana']['lines'][0]['unmarked']);
+            $this->assertTrue($rows['Kuldeep Rana']['lines'][0]['lowers']);
 
-            $this->assertSame(1, $rows['Sunil Rana']['expected']);
+            $this->assertSame(2, $rows['Sunil Rana']['expected']);
             $this->assertSame(0, $rows['Sunil Rana']['given']);
-            $this->assertSame(1, $rows['Sunil Rana']['missed']);
+            $this->assertSame(2, $rows['Sunil Rana']['missed']);
             $this->assertSame(0, $rows['Sunil Rana']['score']);
             $this->assertSame('Missed', $rows['Sunil Rana']['lines'][0]['state']);
         } finally {

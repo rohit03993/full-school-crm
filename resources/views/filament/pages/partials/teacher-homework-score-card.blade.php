@@ -6,7 +6,7 @@
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $period }}</p>
             </div>
             <p class="text-3xl font-bold text-gray-950 dark:text-white">
-                {{ $score['score'] === null ? '—' : $score['score'] }}
+                {{ $score['score'] === null ? '—' : $score['score'].'%' }}
             </p>
         </div>
         @if (filled($score['note'] ?? null))

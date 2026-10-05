@@ -27,7 +27,7 @@ class TeacherHomeworkScoreService
     public function defaultRange(): array
     {
         return [
-            now()->subDays(6)->toDateString(),
+            now()->startOfMonth()->toDateString(),
             now()->toDateString(),
         ];
     }
@@ -60,7 +60,7 @@ class TeacherHomeworkScoreService
             $start = $end;
         }
 
-        $earliest = Carbon::parse($end)->subDays(91)->toDateString();
+        $earliest = Carbon::parse($end)->subDays(366)->toDateString();
 
         if ($start < $earliest) {
             $start = $earliest;
@@ -105,7 +105,7 @@ class TeacherHomeworkScoreService
             }
 
             if ($leftScore !== $rightScore) {
-                return $leftScore <=> $rightScore;
+                return $rightScore <=> $leftScore;
             }
 
             return strnatcasecmp((string) $left['name'], (string) $right['name']);
@@ -252,12 +252,6 @@ class TeacherHomeworkScoreService
             $classLabels[$classLabel] = $classLabel;
 
             foreach ($context['dates'] as $date) {
-                $dayKey = (int) $batch->id.'|'.$date;
-
-                if (! isset($context['homework_days'][$dayKey])) {
-                    continue;
-                }
-
                 $ownedKey = (int) $teacher->id.'|'.(int) $batch->id.'|'.(int) $subject->id.'|'.$date;
                 /** @var HomeworkAssignment|null $assignment */
                 $assignment = $context['owned'][$ownedKey] ?? null;
@@ -272,7 +266,8 @@ class TeacherHomeworkScoreService
                             'class' => $batch->displayLabel(),
                             'label' => $subject->name.' ('.$teacher->name.')',
                             'state' => 'Missed',
-                            'note' => null,
+                            'note' => 'Not given. This lowers the score.',
+                            'lowers' => true,
                             'counts_open' => false,
                             'done' => 0,
                             'not_done' => 0,
@@ -305,6 +300,8 @@ class TeacherHomeworkScoreService
                 }
 
                 $marked = min($done + $notDone, $studentTotal);
+                $unmarked = $isReady ? max(0, $studentTotal - $marked) : null;
+                $lowers = $isReady && $unmarked > 0;
 
                 if ($isWaiting) {
                     $waiting++;
@@ -325,11 +322,14 @@ class TeacherHomeworkScoreService
                         'state' => 'Given',
                         'note' => $isWaiting
                             ? 'Waiting for approval'
-                            : ($opensTomorrow ? 'Check opens tomorrow' : null),
+                            : ($opensTomorrow
+                                ? 'Check opens tomorrow'
+                                : ($lowers ? 'Students still unmarked. This lowers the score.' : null)),
+                        'lowers' => $lowers,
                         'counts_open' => $isReady && $studentTotal > 0,
                         'done' => $done,
                         'not_done' => $notDone,
-                        'unmarked' => $isReady ? max(0, $studentTotal - $marked) : null,
+                        'unmarked' => $unmarked,
                     ];
                 }
             }
@@ -340,6 +340,10 @@ class TeacherHomeworkScoreService
         });
 
         $parts = $this->scoreParts($given, $given + $missed, $markedStudents, $readyStudents);
+        $causes = array_values(array_filter(
+            $lines,
+            fn (array $line): bool => (bool) ($line['lowers'] ?? false),
+        ));
         $weight = 0;
         $points = 0.0;
 
@@ -374,6 +378,7 @@ class TeacherHomeworkScoreService
             'score' => $weight > 0 ? (int) round($points / $weight * 100) : null,
             'note' => $note,
             'parts' => $parts,
+            'causes' => $causes,
             'lines' => $lines,
         ];
     }
@@ -389,6 +394,9 @@ class TeacherHomeworkScoreService
     ): array {
         $givenApplicable = $expected > 0;
         $checkedApplicable = $readyStudents > 0;
+        $missed = max(0, $expected - $given);
+        $givenPercent = $givenApplicable ? (int) round($given / $expected * 100) : null;
+        $checkedPercent = $checkedApplicable ? (int) round($markedStudents / $readyStudents * 100) : null;
 
         return [
             [
@@ -396,18 +404,30 @@ class TeacherHomeworkScoreService
                 'label' => 'Homework given',
                 'weight' => self::GIVEN_WEIGHT,
                 'applicable' => $givenApplicable,
+                'percent' => $givenPercent,
                 'score' => $givenApplicable ? round($given / $expected * self::GIVEN_WEIGHT, 1) : 0,
-                'summary' => $givenApplicable ? $given.' of '.$expected : 'No homework day',
+                'summary' => $givenApplicable ? $given.' of '.$expected.' days · '.$givenPercent.'%' : 'No subject days',
+                'cause' => ! $givenApplicable
+                    ? 'No subject is assigned.'
+                    : ($missed > 0
+                        ? $missed.' missed '.($missed === 1 ? 'day' : 'days').' lowered this half.'
+                        : 'Every assigned day was given.'),
             ],
             [
                 'key' => 'checked',
                 'label' => 'Homework checked',
                 'weight' => self::CHECKED_WEIGHT,
                 'applicable' => $checkedApplicable,
+                'percent' => $checkedPercent,
                 'score' => $checkedApplicable ? round($markedStudents / $readyStudents * self::CHECKED_WEIGHT, 1) : 0,
                 'summary' => $checkedApplicable
-                    ? $markedStudents.' of '.$readyStudents.' students'
+                    ? $markedStudents.' of '.$readyStudents.' students · '.$checkedPercent.'%'
                     : ($given > 0 ? 'Not in the score yet' : 'No homework to check'),
+                'cause' => $checkedApplicable
+                    ? ($markedStudents < $readyStudents
+                        ? 'Unmarked students lowered this half.'
+                        : 'Every ready student was marked.')
+                    : ($given > 0 ? 'Today and unapproved homework are not checked yet.' : 'Nothing is ready to check.'),
             ],
         ];
     }

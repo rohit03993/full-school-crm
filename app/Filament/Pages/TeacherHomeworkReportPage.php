@@ -67,7 +67,7 @@ class TeacherHomeworkReportPage extends Page
     public function getSubheading(): ?string
     {
         if ($this->canSeeAllTeachers() && $this->teacherId === null) {
-            return 'Lowest score first. Every day in the range counts, including Sunday.';
+            return 'Highest percentage first. This month opens first. A missed homework day lowers the percentage.';
         }
 
         return 'Homework given and homework checked for this teacher.';
