@@ -6,6 +6,7 @@ use App\Enums\CrmPermission;
 use App\Enums\HomeworkCheckStatus;
 use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
+use App\Services\HomeworkCheckReportService;
 use App\Services\HomeworkCheckService;
 use App\Services\HomeworkSubmissionService;
 use App\Support\CrmAccess;
@@ -83,8 +84,14 @@ class HomeworkCheckPage extends Page
 
     public ?int $singleNotDoneStudentId = null;
 
+    public string $reportDate = '';
+
     public function getSubheading(): ?string
     {
+        if ($this->showingAllClasses()) {
+            return 'Every class is listed. Change the date if you want another day. Today opens first.';
+        }
+
         return 'Pick a class. You can check the last 7 days, not today.';
     }
 
@@ -122,6 +129,8 @@ class HomeworkCheckPage extends Page
             $batchId = 0;
             $subjectId = 0;
         }
+
+        $this->reportDate = now()->toDateString();
 
         $this->form->fill([
             'batch_id' => $batchId > 0 ? $batchId : null,
@@ -213,9 +222,14 @@ class HomeworkCheckPage extends Page
     public function content(Schema $schema): Schema
     {
         return $schema->components([
+            View::make('filament.pages.partials.homework-check-all-classes')
+                ->visible(fn (): bool => $this->showingAllClasses())
+                ->viewData(fn (): array => app(HomeworkCheckReportService::class)->presentation($this->reportDate)),
             Form::make([EmbeddedSchema::make('form')])
-                ->id('homeworkCheckForm'),
+                ->id('homeworkCheckForm')
+                ->hidden(fn (): bool => $this->showingAllClasses()),
             View::make('filament.pages.partials.homework-check-actions')
+                ->visible(fn (): bool => ! $this->showingAllClasses())
                 ->viewData(function (): array {
                     $this->closeOpenStudentsIfNeeded();
                     $students = $this->rosterStudents();
@@ -255,9 +269,36 @@ class HomeworkCheckPage extends Page
                         'selectedWithMobile' => $selected['with_mobile'],
                         'selectedWithoutMobile' => $selected['without_mobile'],
                         'otherSubjectsToday' => $this->otherSubjectsToday(),
+                        'showAllClassesLink' => $this->canManageHomeworkDesk(),
                     ];
                 }),
         ]);
+    }
+
+    public function updatedReportDate(): void
+    {
+        $this->reportDate = app(HomeworkCheckReportService::class)->normalizeDate($this->reportDate);
+    }
+
+    public function showAllClasses(): void
+    {
+        $this->clearBulkSelection();
+        $this->data['batch_id'] = null;
+        $this->data['course_subject_id'] = null;
+    }
+
+    protected function showingAllClasses(): bool
+    {
+        return $this->canManageHomeworkDesk()
+            && ! filled($this->data['batch_id'] ?? null);
+    }
+
+    protected function canManageHomeworkDesk(): bool
+    {
+        $user = Auth::user();
+
+        return $user !== null
+            && app(HomeworkCheckService::class)->userCanManageHomeworkDesk($user);
     }
 
     public function updatedDataBatchId(mixed $value): void

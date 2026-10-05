@@ -4,9 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
-use App\Filament\Pages\HomeworkCheckPage;
 use App\Services\HomeworkCheckReportService;
-use App\Services\HomeworkCheckService;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
 use Filament\Widgets\Widget;
@@ -35,7 +33,7 @@ class HomeworkCheckReportWidget extends Widget
 
     public function mount(): void
     {
-        $this->reportDate = now()->subDay()->toDateString();
+        $this->reportDate = now()->toDateString();
     }
 
     public function updatedReportDate(): void
@@ -48,36 +46,6 @@ class HomeworkCheckReportWidget extends Widget
      */
     protected function getViewData(): array
     {
-        $report = app(HomeworkCheckReportService::class)->forDate($this->reportDate);
-        $checks = app(HomeworkCheckService::class);
-        $inWindow = $report['date'] >= $checks->earliestCheckDate()
-            && $report['date'] <= $checks->latestCheckDate();
-
-        $classes = [];
-
-        foreach ($report['classes'] as $class) {
-            $lines = [];
-
-            foreach ($class['lines'] as $line) {
-                $line['check_url'] = ($inWindow && $line['counts_open'])
-                    ? HomeworkCheckPage::getUrl([
-                        'batch_id' => $class['batch_id'],
-                        'course_subject_id' => $line['assignment_id'],
-                        'check_date' => $report['date'],
-                    ])
-                    : null;
-                $lines[] = $line;
-            }
-
-            $class['lines'] = $lines;
-            $classes[] = $class;
-        }
-
-        return [
-            'dateLabel' => $report['date_label'],
-            'isToday' => $report['is_today'],
-            'maxDate' => now()->toDateString(),
-            'classes' => $classes,
-        ];
+        return app(HomeworkCheckReportService::class)->presentation($this->reportDate);
     }
 }

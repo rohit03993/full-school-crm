@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\BatchStatus;
 use App\Enums\HomeworkAssignmentStatus;
 use App\Enums\HomeworkCheckStatus;
+use App\Filament\Pages\HomeworkCheckPage;
 use App\Models\Batch;
 use App\Models\BatchStudent;
 use App\Models\HomeworkAssignment;
@@ -85,18 +86,64 @@ class HomeworkCheckReportService
         ];
     }
 
+    /**
+     * The same list the Dashboard and Homework Check show.
+     * Open is added only when that homework can be ticked.
+     *
+     * @return array{
+     *     dateLabel: string,
+     *     isToday: bool,
+     *     maxDate: string,
+     *     classes: list<array<string, mixed>>
+     * }
+     */
+    public function presentation(?string $date): array
+    {
+        $report = $this->forDate($date);
+        $checks = app(HomeworkCheckService::class);
+        $inWindow = $report['date'] >= $checks->earliestCheckDate()
+            && $report['date'] <= $checks->latestCheckDate();
+
+        $classes = [];
+
+        foreach ($report['classes'] as $class) {
+            $lines = [];
+
+            foreach ($class['lines'] as $line) {
+                $line['check_url'] = ($inWindow && $line['counts_open'])
+                    ? HomeworkCheckPage::getUrl([
+                        'batch_id' => $class['batch_id'],
+                        'course_subject_id' => $line['assignment_id'],
+                        'check_date' => $report['date'],
+                    ])
+                    : null;
+                $lines[] = $line;
+            }
+
+            $class['lines'] = $lines;
+            $classes[] = $class;
+        }
+
+        return [
+            'dateLabel' => $report['date_label'],
+            'isToday' => $report['is_today'],
+            'maxDate' => now()->toDateString(),
+            'classes' => $classes,
+        ];
+    }
+
     public function normalizeDate(?string $date): string
     {
         $today = now()->toDateString();
 
         if (! filled($date)) {
-            return now()->subDay()->toDateString();
+            return now()->toDateString();
         }
 
         try {
             $day = Carbon::parse($date)->toDateString();
         } catch (\Throwable) {
-            return now()->subDay()->toDateString();
+            return now()->toDateString();
         }
 
         return $day > $today ? $today : $day;

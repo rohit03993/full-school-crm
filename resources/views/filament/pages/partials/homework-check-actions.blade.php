@@ -1,4 +1,13 @@
 <div class="crm-hw-shell mt-4 space-y-4">
+    @if ($showAllClassesLink ?? false)
+        <button
+            type="button"
+            wire:click="showAllClasses"
+            class="text-sm font-semibold text-primary-600 hover:underline dark:text-primary-400"
+        >
+            All classes
+        </button>
+    @endif
     <style>
         @media (max-width: 1023px) {
             .crm-hw-topic { display: none !important; }

@@ -11,6 +11,7 @@ use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Pages\HomeworkCheckPage;
 use App\Filament\Widgets\HomeworkCheckReportWidget;
 use App\Models\AcademicSession;
 use App\Models\Batch;
@@ -46,6 +47,32 @@ class HomeworkCheckReportTest extends TestCase
             ->assertDontSee('Homework check');
     }
 
+    public function test_admin_homework_check_opens_on_every_class_for_today(): void
+    {
+        Carbon::setTestNow('2026-10-05 12:00:00');
+
+        try {
+            $admin = User::factory()->create(['is_active' => true]);
+            $admin->assignRole(RoleName::SuperAdmin->value);
+            $this->actingAs($admin);
+            Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+            Livewire::test(HomeworkCheckPage::class)
+                ->assertSee('Every class for 5 Oct 2026.')
+                ->assertDontSee('Pick a class. The student list opens here.');
+
+            $coordinator = User::factory()->create(['is_active' => true]);
+            $coordinator->assignRole(StaffJobRole::AcademicCoordinator->value);
+            $this->actingAs($coordinator);
+
+            Livewire::test(HomeworkCheckPage::class)
+                ->assertSee('Every class for 5 Oct 2026.')
+                ->assertDontSee('Pick a class. The student list opens here.');
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
     public function test_coordinator_sees_each_teachers_counts_for_one_date(): void
     {
         Carbon::setTestNow('2026-10-05 12:00:00');
@@ -65,7 +92,9 @@ class HomeworkCheckReportTest extends TestCase
             $this->saveCheck($sunilHomework, $rahul, HomeworkCheckStatus::NotDone);
 
             Livewire::test(HomeworkCheckReportWidget::class)
-                ->assertSee('Homework check')
+                ->assertSee('Every class')
+                ->assertSee('Every class for 5 Oct 2026.')
+                ->set('reportDate', '2026-10-04')
                 ->assertSee('Every class for 4 Oct 2026.')
                 ->assertSee('Class 10 · Section A')
                 ->assertSee('Chemistry (Kuldeep Rana)')
@@ -97,7 +126,6 @@ class HomeworkCheckReportTest extends TestCase
             $this->saveHomework($batch, $subject, $first, HomeworkAssignmentStatus::Approved, '2026-10-05');
 
             Livewire::test(HomeworkCheckReportWidget::class)
-                ->set('reportDate', '2026-10-05')
                 ->assertSee('Counts stay closed today.')
                 ->assertSee('Chemistry (Kuldeep Rana)')
                 ->assertSee('Check opens tomorrow')
