@@ -254,11 +254,18 @@ class HomeworkSubmissionService
             ]);
         }
 
-        $existing = HomeworkAssignment::query()
+        $existingQuery = HomeworkAssignment::query()
             ->where('batch_id', $batchId)
             ->where('course_subject_id', $subjectId)
-            ->whereDate('homework_date', $date)
-            ->first();
+            ->whereDate('homework_date', $date);
+
+        if (! $asAdmin) {
+            $existingQuery->where('submitted_by_user_id', $user->id);
+        } elseif (filled($data['assignment_id'] ?? null)) {
+            $existingQuery->whereKey((int) $data['assignment_id']);
+        }
+
+        $existing = $existingQuery->first();
 
         if (! $asAdmin && $existing) {
             $blocked = $this->teacherEditBlockedMessage($existing);
@@ -607,7 +614,7 @@ class HomeworkSubmissionService
 
             /** @var Collection<int, HomeworkAssignment> $batchAssignments */
             $batchAssignments = $assignmentsByBatch->get($batchId, collect());
-            $homeworkBySubject = $batchAssignments->keyBy(
+            $homeworkBySubject = $batchAssignments->groupBy(
                 fn (HomeworkAssignment $assignment): int => (int) $assignment->course_subject_id,
             );
             $closuresBySubject = $closuresByBatch
@@ -625,16 +632,22 @@ class HomeworkSubmissionService
 
             foreach ($batch->activeSubjects as $subject) {
                 $subjectId = (int) $subject->id;
-                /** @var HomeworkAssignment|null $assignment */
-                $assignment = $homeworkBySubject->get($subjectId);
+                $subjectHomework = $homeworkBySubject->get($subjectId, collect());
+
+                if ($subjectHomework->isEmpty()) {
+                    $subjectHomework = collect([null]);
+                }
+
                 $closure = $closuresBySubject->get($subjectId);
-                $status = $assignment?->status;
                 $teacherName = $teachersBySubject
                     ->get($subjectId, collect())
                     ->map(fn (BatchStaffAssignment $row): string => (string) ($row->user?->name ?? ''))
                     ->filter()
                     ->unique()
                     ->implode(', ');
+
+                foreach ($subjectHomework as $assignment) {
+                $status = $assignment?->status;
 
                 if ($status === HomeworkAssignmentStatus::Submitted) {
                     $submitted++;
@@ -674,6 +687,7 @@ class HomeworkSubmissionService
                     'link_opened_people' => $stats['opened_people'],
                     'link_not_opened_people' => $stats['not_opened_people'],
                 ];
+                }
             }
 
             usort($items, function (array $left, array $right): int {
@@ -787,7 +801,7 @@ class HomeworkSubmissionService
             ->whereDate('homework_date', $date)
             ->with(['courseSubject', 'submittedBy', 'approvedBy', 'createdBy', 'combinedSentBy'])
             ->get()
-            ->keyBy('course_subject_id');
+            ->groupBy(fn (HomeworkAssignment $assignment): int => (int) $assignment->course_subject_id);
 
         $rows = [];
         $submitted = 0;
@@ -796,33 +810,49 @@ class HomeworkSubmissionService
         $missing = 0;
 
         foreach ($subjectOptions as $subjectId => $label) {
-            /** @var HomeworkAssignment|null $assignment */
-            $assignment = $assignments->get($subjectId);
+            $subjectRows = $assignments->get((int) $subjectId, collect());
 
-            if ($assignment === null) {
+            if ($subjectRows->isEmpty()) {
                 $missing++;
-            } else {
+                $rows[] = [
+                    'course_subject_id' => (int) $subjectId,
+                    'subject' => (string) $label,
+                    'assignment_id' => null,
+                    'status' => null,
+                    'status_key' => null,
+                    'status_color' => null,
+                    'title' => null,
+                    'has_file' => false,
+                    'public_url' => null,
+                    'teacher' => null,
+                    'sent_by' => null,
+                ];
+
+                continue;
+            }
+
+            foreach ($subjectRows as $assignment) {
                 match ($assignment->status) {
                     HomeworkAssignmentStatus::Submitted => $submitted++,
                     HomeworkAssignmentStatus::Approved => $approved++,
                     HomeworkAssignmentStatus::Sent => $sent++,
                     default => null,
                 };
-            }
 
-            $rows[] = [
-                'course_subject_id' => (int) $subjectId,
-                'subject' => (string) $label,
-                'assignment_id' => $assignment?->id,
-                'status' => $assignment?->status?->label(),
-                'status_key' => $assignment?->status?->value,
-                'status_color' => $assignment?->status?->color(),
-                'title' => $assignment?->title,
-                'has_file' => (bool) $assignment?->hasFile(),
-                'public_url' => $assignment ? $assignment->publicUrl() : null,
-                'teacher' => $assignment?->submittedBy?->name ?? $assignment?->createdBy?->name,
-                'sent_by' => $assignment?->combinedSentBy?->name,
-            ];
+                $rows[] = [
+                    'course_subject_id' => (int) $subjectId,
+                    'subject' => (string) $label,
+                    'assignment_id' => $assignment->id,
+                    'status' => $assignment->status?->label(),
+                    'status_key' => $assignment->status?->value,
+                    'status_color' => $assignment->status?->color(),
+                    'title' => $assignment->title,
+                    'has_file' => (bool) $assignment->hasFile(),
+                    'public_url' => $assignment->publicUrl(),
+                    'teacher' => $assignment->submittedBy?->name ?? $assignment->createdBy?->name,
+                    'sent_by' => $assignment->combinedSentBy?->name,
+                ];
+            }
         }
 
         return [
@@ -934,14 +964,17 @@ class HomeworkSubmissionService
             $section = filled($batch->section) ? (string) $batch->section : '—';
             $batchId = (int) $batch->id;
             /** @var Collection<int, HomeworkAssignment> $batchHomework */
-            $batchHomework = $homeworkByBatch->get($batchId, collect())->keyBy('course_subject_id');
+            $batchHomework = $homeworkByBatch->get($batchId, collect());
             $batchClosures = $closuresByBatch->get($batchId, collect());
 
             $subjects = [];
 
             foreach ($subjectOptions as $subjectId => $label) {
                 /** @var HomeworkAssignment|null $assignment */
-                $assignment = $batchHomework->get((int) $subjectId) ?? $batchHomework->get((string) $subjectId);
+                $assignment = $batchHomework->first(
+                    fn (HomeworkAssignment $row): bool => (int) $row->course_subject_id === (int) $subjectId
+                        && (int) $row->submitted_by_user_id === (int) $user->id,
+                );
                 $closure = $batchClosures->first(
                     fn (HomeworkSubjectClosure $row): bool => (int) $row->course_subject_id === (int) $subjectId,
                 );
@@ -1047,7 +1080,8 @@ class HomeworkSubmissionService
                 return collect();
             }
 
-            $query->whereIn('course_subject_id', $subjectIds);
+            $query->whereIn('course_subject_id', $subjectIds)
+                ->where('submitted_by_user_id', $user->id);
         }
 
         return $query->orderBy('course_subject_id')->get();
@@ -1131,7 +1165,7 @@ class HomeworkSubmissionService
                 HomeworkAssignmentStatus::Approved->value,
                 HomeworkAssignmentStatus::Sent->value,
             ])
-            ->with('courseSubject')
+            ->with(['courseSubject', 'submittedBy'])
             ->orderBy('course_subject_id')
             ->get();
 

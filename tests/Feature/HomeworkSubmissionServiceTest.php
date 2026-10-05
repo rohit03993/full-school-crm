@@ -685,6 +685,64 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertNull($physicsDesk['groups'][0]['sections'][0]['subjects'][0]['assignment_id']);
     }
 
+    public function test_two_teachers_on_one_subject_each_keep_their_own_homework(): void
+    {
+        $data = $this->seedClass();
+        $secondTeacher = User::factory()->create([
+            'name' => 'Atul Sir',
+            'is_active' => true,
+        ]);
+        $secondTeacher->assignRole(StaffJobRole::Teacher->value);
+        BatchStaffAssignment::query()->create([
+            'batch_id' => $data['batch']->id,
+            'user_id' => $secondTeacher->id,
+            'role' => BatchStaffRole::SubjectTeacher,
+            'course_subject_id' => $data['maths']->id,
+        ]);
+
+        $service = app(HomeworkSubmissionService::class);
+        $first = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Ex 5.2',
+        ]);
+        $service->approve($data['admin'], (int) $first->id);
+
+        $second = $service->submit($secondTeacher, [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Geometry',
+            'description' => 'Ex 6.1',
+        ]);
+
+        $this->assertNotSame($first->id, $second->id);
+        $this->assertSame('Ex 5.2', $first->fresh()->description);
+        $this->assertSame(HomeworkAssignmentStatus::Approved, $first->fresh()->status);
+        $this->assertSame('Ex 6.1', $second->description);
+        $this->assertSame($secondTeacher->id, $second->submitted_by_user_id);
+
+        $firstDesk = $service->teacherDeskForDate($data['mathTeacher'], now()->toDateString());
+        $this->assertSame($first->id, $firstDesk['groups'][0]['sections'][0]['subjects'][0]['assignment_id']);
+        $this->assertSame('approved', $firstDesk['groups'][0]['sections'][0]['subjects'][0]['status_key']);
+
+        $secondDesk = $service->teacherDeskForDate($secondTeacher, now()->toDateString());
+        $this->assertSame($second->id, $secondDesk['groups'][0]['sections'][0]['subjects'][0]['assignment_id']);
+        $this->assertSame('submitted', $secondDesk['groups'][0]['sections'][0]['subjects'][0]['status_key']);
+
+        $review = $service->deskForDate(now()->toDateString());
+        $mathItems = collect($review['groups'][0]['sections'][0]['items'])
+            ->where('course_subject_id', $data['maths']->id)
+            ->values();
+        $this->assertCount(2, $mathItems);
+        $this->assertEqualsCanonicalizing(
+            [$data['mathTeacher']->name, $secondTeacher->name],
+            $mathItems->pluck('submitted_by')->all(),
+        );
+    }
+
     public function test_teacher_desk_page_shows_assigned_class_without_picking_first(): void
     {
         $data = $this->seedClass();

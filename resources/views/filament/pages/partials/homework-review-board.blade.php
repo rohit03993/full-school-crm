@@ -161,7 +161,7 @@
                                     @if ($canEnter && in_array($row['status_key'], ['submitted', 'approved'], true))
                                         <button
                                             type="button"
-                                            wire:click="startAdd({{ (int) $batchId }}, {{ (int) $row['course_subject_id'] }})"
+                                            wire:click="startAdd({{ (int) $batchId }}, {{ (int) $row['course_subject_id'] }}, {{ (int) ($row['assignment_id'] ?? 0) }})"
                                             class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 dark:border-white/10 dark:text-gray-100 dark:hover:bg-white/5"
                                         >
                                             Edit

@@ -53,7 +53,7 @@ trait AddsHomeworkModal
         }
     }
 
-    public function startAdd(int $batchId, int $subjectId): void
+    public function startAdd(int $batchId, int $subjectId, int $assignmentId = 0): void
     {
         if ($batchId < 1 || $subjectId < 1) {
             return;
@@ -76,6 +76,7 @@ trait AddsHomeworkModal
                 ->where('batch_id', $batchId)
                 ->where('course_subject_id', $subjectId)
                 ->whereDate('homework_date', $this->dateString())
+                ->where('submitted_by_user_id', Auth::id())
                 ->first();
             $blocked = $service->teacherEditBlockedMessage($existing);
 
@@ -89,6 +90,7 @@ trait AddsHomeworkModal
         $this->mountAction('addHomework', [
             'batchId' => $batchId,
             'subjectId' => $subjectId,
+            'assignmentId' => $assignmentId,
         ]);
     }
 
@@ -243,6 +245,7 @@ trait AddsHomeworkModal
             $assignment = app(HomeworkSubmissionService::class)->submit($user, [
                 'batch_id' => $batchId,
                 'course_subject_id' => $subjectId,
+                'assignment_id' => (int) ($arguments['assignmentId'] ?? 0),
                 'homework_date' => $this->dateString(),
                 'title' => (string) ($data['title'] ?? ''),
                 'description' => (string) ($data['description'] ?? ''),
@@ -352,11 +355,20 @@ trait AddsHomeworkModal
             return null;
         }
 
-        return HomeworkAssignment::query()
+        $assignmentId = (int) ($arguments['assignmentId'] ?? 0);
+
+        $query = HomeworkAssignment::query()
             ->where('batch_id', $batchId)
             ->where('course_subject_id', $subjectId)
-            ->whereDate('homework_date', $this->dateString())
-            ->first();
+            ->whereDate('homework_date', $this->dateString());
+
+        if ($assignmentId > 0) {
+            $query->whereKey($assignmentId);
+        } elseif (! $this->homeworkModalSavesAsAdmin()) {
+            $query->where('submitted_by_user_id', Auth::id());
+        }
+
+        return $query->first();
     }
 
     /**

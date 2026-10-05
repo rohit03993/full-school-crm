@@ -293,11 +293,24 @@ class HomeworkWhatsAppService
      */
     protected function buildSubjectLinksBlock(Collection $assignments, ?Student $student = null): string
     {
+        $nameCounts = $assignments->countBy(
+            fn (HomeworkAssignment $assignment): string => (string) (
+                $assignment->courseSubject?->name
+                ?? $assignment->title
+                ?? 'Homework'
+            ),
+        );
+
         return $assignments
-            ->map(function (HomeworkAssignment $assignment) use ($student): ?string {
+            ->map(function (HomeworkAssignment $assignment) use ($student, $nameCounts): ?string {
                 $label = $assignment->courseSubject?->name
                     ?? $assignment->title
                     ?? 'Homework';
+                $teacherName = $assignment->submittedBy?->name;
+
+                if (($nameCounts[$label] ?? 0) > 1 && filled($teacherName)) {
+                    $label .= ' - '.$teacherName;
+                }
 
                 $link = $student
                     ? $this->studentLinks->publicUrlFor($assignment, $student)
