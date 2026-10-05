@@ -60,18 +60,26 @@ class TeacherHomeworkScoreTest extends TestCase
                 ['2025-10-05', '2026-10-05'],
                 app(TeacherHomeworkScoreService::class)->normalizeRange('2025-10-05', '2026-10-05'),
             );
+            $this->assertSame(2, $report['day_count']);
             $this->assertSame('Kuldeep Rana', $report['teachers'][0]['name']);
+            $this->assertSame(2, $rows['Kuldeep Rana']['day_count']);
             $this->assertSame(2, $rows['Kuldeep Rana']['expected']);
             $this->assertSame(1, $rows['Kuldeep Rana']['given']);
             $this->assertSame(1, $rows['Kuldeep Rana']['missed']);
+            $this->assertSame(1, $rows['Kuldeep Rana']['subject_given']);
+            $this->assertSame(1, $rows['Kuldeep Rana']['subject_missed']);
             $this->assertSame(50, $rows['Kuldeep Rana']['score']);
+            $this->assertSame('2 days · 1 of 2 subjects', $rows['Kuldeep Rana']['parts'][0]['summary']);
             $this->assertSame(1, $rows['Kuldeep Rana']['lines'][0]['done']);
             $this->assertSame(1, $rows['Kuldeep Rana']['lines'][0]['unmarked']);
             $this->assertTrue($rows['Kuldeep Rana']['lines'][0]['lowers']);
+            $this->assertCount(2, $rows['Kuldeep Rana']['days']);
 
             $this->assertSame(2, $rows['Sunil Rana']['expected']);
             $this->assertSame(0, $rows['Sunil Rana']['given']);
             $this->assertSame(2, $rows['Sunil Rana']['missed']);
+            $this->assertSame(0, $rows['Sunil Rana']['subject_given']);
+            $this->assertSame(2, $rows['Sunil Rana']['subject_missed']);
             $this->assertSame(0, $rows['Sunil Rana']['score']);
             $this->assertSame('Missed', $rows['Sunil Rana']['lines'][0]['state']);
         } finally {
@@ -95,6 +103,47 @@ class TeacherHomeworkScoreTest extends TestCase
             $this->assertSame(100, $row['score']);
             $this->assertSame('Check opens tomorrow', $row['lines'][0]['note']);
             $this->assertFalse($row['parts'][1]['applicable']);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_two_subjects_on_one_date_still_count_as_one_day(): void
+    {
+        Carbon::setTestNow('2026-10-05 12:00:00');
+
+        try {
+            [$batch, $subject, $kuldeep] = $this->seedClass();
+            CourseSubject::query()->create([
+                'course_id' => $batch->course_id,
+                'name' => 'Physics',
+                'code' => 'PHY',
+                'default_max_marks' => 100,
+                'sort_order' => 2,
+                'is_active' => true,
+            ]);
+            $physics = CourseSubject::query()->where('code', 'PHY')->firstOrFail();
+            BatchStaffAssignment::query()->create([
+                'batch_id' => $batch->id,
+                'user_id' => $kuldeep->id,
+                'role' => BatchStaffRole::SubjectTeacher,
+                'course_subject_id' => $physics->id,
+            ]);
+            $this->saveHomework($batch, $subject, $kuldeep, HomeworkAssignmentStatus::Approved, '2026-10-05');
+
+            $report = app(TeacherHomeworkScoreService::class)->report('2026-10-05', '2026-10-05', (int) $kuldeep->id, true);
+            $row = $report['teachers'][0];
+
+            $this->assertSame(1, $report['day_count']);
+            $this->assertSame(1, $row['day_count']);
+            $this->assertSame(1, $row['subject_given']);
+            $this->assertSame(1, $row['subject_missed']);
+            $this->assertSame(2, $row['subject_expected']);
+            $this->assertSame(50, $row['score']);
+            $this->assertSame('1 day · 1 of 2 subjects', $row['parts'][0]['summary']);
+            $this->assertCount(1, $row['days']);
+            $this->assertSame(1, $row['days'][0]['subjects_given']);
+            $this->assertSame(2, $row['days'][0]['subjects_expected']);
         } finally {
             Carbon::setTestNow();
         }

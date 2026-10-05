@@ -114,6 +114,7 @@ class TeacherHomeworkScoreService
         return [
             'from' => $start,
             'to' => $end,
+            'day_count' => count($context['dates']),
             'period_label' => Carbon::parse($start)->format('j M Y').' – '.Carbon::parse($end)->format('j M Y'),
             'teachers' => $rows,
         ];
@@ -229,14 +230,18 @@ class TeacherHomeworkScoreService
     protected function scoreTeacher(User $teacher, array $context, bool $withLines): array
     {
         $today = now()->toDateString();
-        $given = 0;
-        $missed = 0;
         $waiting = 0;
         $ready = 0;
         $readyStudents = 0;
         $markedStudents = 0;
+        $subjectGiven = 0;
+        $subjectMissed = 0;
+        $dayCredit = 0.0;
+        $fullDays = 0;
         $classLabels = [];
+        $days = [];
         $lines = [];
+        $slots = [];
         /** @var Collection<int, BatchStaffAssignment> $subjects */
         $subjects = $context['staff']->get((int) $teacher->id, collect());
 
@@ -250,71 +255,82 @@ class TeacherHomeworkScoreService
 
             $classLabel = $batch->displayLabel().' · '.$subject->name;
             $classLabels[$classLabel] = $classLabel;
+            $slots[] = $slot;
+        }
 
+        if ($slots !== []) {
             foreach ($context['dates'] as $date) {
-                $ownedKey = (int) $teacher->id.'|'.(int) $batch->id.'|'.(int) $subject->id.'|'.$date;
-                /** @var HomeworkAssignment|null $assignment */
-                $assignment = $context['owned'][$ownedKey] ?? null;
+                $dayGiven = 0;
+                $daySubjects = [];
 
-                if ($assignment === null) {
-                    $missed++;
+                foreach ($slots as $slot) {
+                    $batch = $slot->batch;
+                    $subject = $slot->courseSubject;
+                    $ownedKey = (int) $teacher->id.'|'.(int) $batch->id.'|'.(int) $subject->id.'|'.$date;
+                    /** @var HomeworkAssignment|null $assignment */
+                    $assignment = $context['owned'][$ownedKey] ?? null;
 
-                    if ($withLines) {
-                        $lines[] = [
+                    if ($assignment === null) {
+                        $subjectMissed++;
+                        $row = [
                             'sort' => $date,
                             'date' => Carbon::parse($date)->format('j M Y'),
                             'class' => $batch->displayLabel(),
                             'label' => $subject->name.' ('.$teacher->name.')',
                             'state' => 'Missed',
-                            'note' => 'Not given. This lowers the score.',
+                            'note' => 'Not given',
                             'lowers' => true,
                             'counts_open' => false,
                             'done' => 0,
                             'not_done' => 0,
                             'unmarked' => null,
                         ];
+
+                        if ($withLines) {
+                            $daySubjects[] = $row;
+                            $lines[] = $row;
+                        }
+
+                        continue;
                     }
 
-                    continue;
-                }
+                    $subjectGiven++;
+                    $dayGiven++;
+                    $isWaiting = $assignment->status === HomeworkAssignmentStatus::Submitted;
+                    $isReady = in_array($assignment->status, [
+                        HomeworkAssignmentStatus::Approved,
+                        HomeworkAssignmentStatus::Sent,
+                    ], true) && $date < $today;
+                    $opensTomorrow = ! $isWaiting && $date >= $today;
+                    $studentTotal = count($context['roster'][(int) $batch->id] ?? []);
+                    $done = 0;
+                    $notDone = 0;
 
-                $given++;
-                $isWaiting = $assignment->status === HomeworkAssignmentStatus::Submitted;
-                $isReady = in_array($assignment->status, [
-                    HomeworkAssignmentStatus::Approved,
-                    HomeworkAssignmentStatus::Sent,
-                ], true) && $date < $today;
-                $opensTomorrow = ! $isWaiting && $date >= $today;
-                $studentTotal = count($context['roster'][(int) $batch->id] ?? []);
-                $done = 0;
-                $notDone = 0;
-
-                if ($isReady) {
-                    foreach ($context['marked'][(int) $assignment->id] ?? [] as $status) {
-                        if ($status === HomeworkCheckStatus::Done) {
-                            $done++;
-                        } elseif ($status === HomeworkCheckStatus::NotDone) {
-                            $notDone++;
+                    if ($isReady) {
+                        foreach ($context['marked'][(int) $assignment->id] ?? [] as $status) {
+                            if ($status === HomeworkCheckStatus::Done) {
+                                $done++;
+                            } elseif ($status === HomeworkCheckStatus::NotDone) {
+                                $notDone++;
+                            }
                         }
                     }
-                }
 
-                $marked = min($done + $notDone, $studentTotal);
-                $unmarked = $isReady ? max(0, $studentTotal - $marked) : null;
-                $lowers = $isReady && $unmarked > 0;
+                    $marked = min($done + $notDone, $studentTotal);
+                    $unmarked = $isReady ? max(0, $studentTotal - $marked) : null;
+                    $lowers = $isReady && $unmarked > 0;
 
-                if ($isWaiting) {
-                    $waiting++;
-                }
+                    if ($isWaiting) {
+                        $waiting++;
+                    }
 
-                if ($isReady && $studentTotal > 0) {
-                    $ready++;
-                    $readyStudents += $studentTotal;
-                    $markedStudents += $marked;
-                }
+                    if ($isReady && $studentTotal > 0) {
+                        $ready++;
+                        $readyStudents += $studentTotal;
+                        $markedStudents += $marked;
+                    }
 
-                if ($withLines) {
-                    $lines[] = [
+                    $row = [
                         'sort' => $date,
                         'date' => Carbon::parse($date)->format('j M Y'),
                         'class' => $batch->displayLabel(),
@@ -324,22 +340,45 @@ class TeacherHomeworkScoreService
                             ? 'Waiting for approval'
                             : ($opensTomorrow
                                 ? 'Check opens tomorrow'
-                                : ($lowers ? 'Students still unmarked. This lowers the score.' : null)),
+                                : ($lowers ? 'Students still unmarked' : null)),
                         'lowers' => $lowers,
                         'counts_open' => $isReady && $studentTotal > 0,
                         'done' => $done,
                         'not_done' => $notDone,
                         'unmarked' => $unmarked,
                     ];
+
+                    if ($withLines) {
+                        $daySubjects[] = $row;
+                        $lines[] = $row;
+                    }
+                }
+
+                $dayExpected = count($slots);
+                $dayCredit += $dayGiven / $dayExpected;
+
+                if ($dayGiven === $dayExpected) {
+                    $fullDays++;
+                }
+
+                if ($withLines) {
+                    $days[] = [
+                        'sort' => $date,
+                        'date' => Carbon::parse($date)->format('j M Y'),
+                        'subjects_given' => $dayGiven,
+                        'subjects_expected' => $dayExpected,
+                        'percent' => (int) round($dayGiven / $dayExpected * 100),
+                        'subjects' => $daySubjects,
+                    ];
                 }
             }
         }
 
-        usort($lines, function (array $left, array $right): int {
-            return strcmp((string) $right['sort'], (string) $left['sort']);
-        });
+        $dayCount = $slots === [] ? 0 : count($context['dates']);
+        usort($days, fn (array $left, array $right): int => strcmp((string) $right['sort'], (string) $left['sort']));
+        usort($lines, fn (array $left, array $right): int => strcmp((string) $right['sort'], (string) $left['sort']));
 
-        $parts = $this->scoreParts($given, $given + $missed, $markedStudents, $readyStudents);
+        $parts = $this->scoreParts($dayCount, $dayCredit, $subjectGiven, $subjectMissed, $markedStudents, $readyStudents);
         $causes = array_values(array_filter(
             $lines,
             fn (array $line): bool => (bool) ($line['lowers'] ?? false),
@@ -368,9 +407,13 @@ class TeacherHomeworkScoreService
             'user_id' => (int) $teacher->id,
             'name' => (string) $teacher->name,
             'classes' => implode(', ', array_values($classLabels)),
-            'given' => $given,
-            'missed' => $missed,
-            'expected' => $given + $missed,
+            'day_count' => $dayCount,
+            'given' => $fullDays,
+            'missed' => max(0, $dayCount - $fullDays),
+            'expected' => $dayCount,
+            'subject_given' => $subjectGiven,
+            'subject_missed' => $subjectMissed,
+            'subject_expected' => $subjectGiven + $subjectMissed,
             'waiting' => $waiting,
             'ready' => $ready,
             'checked_students' => $markedStudents,
@@ -379,6 +422,7 @@ class TeacherHomeworkScoreService
             'note' => $note,
             'parts' => $parts,
             'causes' => $causes,
+            'days' => $days,
             'lines' => $lines,
         ];
     }
@@ -387,16 +431,20 @@ class TeacherHomeworkScoreService
      * @return list<array{key: string, label: string, weight: int, applicable: bool, score: float, summary: string}>
      */
     protected function scoreParts(
-        int $given,
-        int $expected,
+        int $dayCount,
+        float $dayCredit,
+        int $subjectGiven,
+        int $subjectMissed,
         int $markedStudents,
         int $readyStudents,
     ): array {
-        $givenApplicable = $expected > 0;
+        $givenApplicable = $dayCount > 0;
         $checkedApplicable = $readyStudents > 0;
-        $missed = max(0, $expected - $given);
-        $givenPercent = $givenApplicable ? (int) round($given / $expected * 100) : null;
+        $subjectExpected = $subjectGiven + $subjectMissed;
+        $givenPercent = $givenApplicable ? (int) round($dayCredit / $dayCount * 100) : null;
         $checkedPercent = $checkedApplicable ? (int) round($markedStudents / $readyStudents * 100) : null;
+        $dayWord = $dayCount === 1 ? 'day' : 'days';
+        $missedWord = $subjectMissed === 1 ? 'subject was' : 'subjects were';
 
         return [
             [
@@ -405,13 +453,15 @@ class TeacherHomeworkScoreService
                 'weight' => self::GIVEN_WEIGHT,
                 'applicable' => $givenApplicable,
                 'percent' => $givenPercent,
-                'score' => $givenApplicable ? round($given / $expected * self::GIVEN_WEIGHT, 1) : 0,
-                'summary' => $givenApplicable ? $given.' of '.$expected.' days · '.$givenPercent.'%' : 'No subject days',
+                'score' => $givenApplicable ? round($dayCredit / $dayCount * self::GIVEN_WEIGHT, 1) : 0,
+                'summary' => $givenApplicable
+                    ? $dayCount.' '.$dayWord.' · '.$subjectGiven.' of '.$subjectExpected.' subjects'
+                    : 'No subject assigned',
                 'cause' => ! $givenApplicable
                     ? 'No subject is assigned.'
-                    : ($missed > 0
-                        ? $missed.' missed '.($missed === 1 ? 'day' : 'days').' lowered this half.'
-                        : 'Every assigned day was given.'),
+                    : ($subjectMissed > 0
+                        ? $subjectMissed.' '.$missedWord.' not given. Each missed subject lowers that day.'
+                        : 'Every subject was given on every day.'),
             ],
             [
                 'key' => 'checked',
@@ -422,12 +472,12 @@ class TeacherHomeworkScoreService
                 'score' => $checkedApplicable ? round($markedStudents / $readyStudents * self::CHECKED_WEIGHT, 1) : 0,
                 'summary' => $checkedApplicable
                     ? $markedStudents.' of '.$readyStudents.' students · '.$checkedPercent.'%'
-                    : ($given > 0 ? 'Not in the score yet' : 'No homework to check'),
+                    : ($subjectGiven > 0 ? 'Not in the score yet' : 'No homework to check'),
                 'cause' => $checkedApplicable
                     ? ($markedStudents < $readyStudents
                         ? 'Unmarked students lowered this half.'
                         : 'Every ready student was marked.')
-                    : ($given > 0 ? 'Today and unapproved homework are not checked yet.' : 'Nothing is ready to check.'),
+                    : ($subjectGiven > 0 ? 'Today and unapproved homework are not checked yet.' : 'Nothing is ready to check.'),
             ],
         ];
     }
