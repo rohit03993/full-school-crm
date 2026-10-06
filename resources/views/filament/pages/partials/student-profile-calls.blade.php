@@ -63,6 +63,14 @@
                             ])>{{ $recording->friendlyStatus() }}</span>
                         </div>
 
+                        @if ($recording->isPending() && $recording->progressNote() !== '')
+                            <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ $recording->progressNote() }}</p>
+                        @endif
+
+                        @if ($recording->isPending() && filled($recording->processing_error))
+                            <p class="mt-2 text-sm text-danger-700 dark:text-danger-300">{{ \Illuminate\Support\Str::limit($recording->processing_error, 280) }}</p>
+                        @endif
+
                         @if ($recording->short_summary)
                             <p class="mt-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ $recording->short_summary }}</p>
                         @endif

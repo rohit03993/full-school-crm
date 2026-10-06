@@ -55,7 +55,9 @@ class CallRecording extends Model
     {
         return match ($this->processing_status) {
             'CREATED', 'UPLOAD_PENDING' => 'Uploading...',
-            'UPLOADED', 'QUEUED', 'PROCESSING_AUDIO', 'RETRY_PENDING' => 'Processing...',
+            'QUEUED', 'UPLOADED' => 'Waiting to start',
+            'RETRY_PENDING' => 'Waiting to try again',
+            'PROCESSING_AUDIO' => 'Preparing audio...',
             'TRANSCRIBING' => 'Transcribing...',
             'TRANSCRIPT_READY', 'ANALYZING' => 'Generating AI summary...',
             'AI_READY', 'CRM_SYNCED', 'COMPLETED' => 'Completed',
@@ -64,6 +66,38 @@ class CallRecording extends Model
                 : 'Processing failed.',
             default => 'Processing...',
         };
+    }
+
+    public function progressNote(): string
+    {
+        if (! $this->isPending()) {
+            return '';
+        }
+
+        $minutes = $this->created_at === null ? 0 : (int) abs($this->created_at->diffInMinutes(now()));
+        $waited = $minutes < 1 ? 'just now' : $minutes.' min ago';
+        $estimate = $this->estimateMinutes();
+
+        return match ($this->processing_status) {
+            'PROCESSING_AUDIO' => 'The audio is being prepared. Started '.$waited.'. About '.$estimate.' min in total.',
+            'TRANSCRIBING' => 'Speech is being written down. Started '.$waited.'. About '.$estimate.' min in total.',
+            'TRANSCRIPT_READY', 'ANALYZING' => 'The summary is being written. Started '.$waited.'. About '.$estimate.' min in total.',
+            'RETRY_PENDING' => 'This recording is waiting to try again. Started '.$waited.'.',
+            default => $minutes >= 2
+                ? 'Uploaded '.$waited.'. Work has not started. After it starts, a short call usually finishes in about '.$estimate.' min.'
+                : 'Uploaded '.$waited.'. Waiting for work to start. About '.$estimate.' min after it starts.',
+        };
+    }
+
+    private function estimateMinutes(): int
+    {
+        $seconds = (int) ($this->duration_seconds ?? 0);
+
+        if ($seconds <= 0) {
+            return 2;
+        }
+
+        return max(2, (int) ceil($seconds / 60) + 1);
     }
 
     public function canRetry(): bool
