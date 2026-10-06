@@ -59,7 +59,11 @@ class CallIntelligenceClient
             return;
         }
 
-        $response = $this->request()->get($this->url('/api/calls/'.$recording->public_id));
+        try {
+            $response = $this->request()->get($this->url('/api/calls/'.$recording->public_id));
+        } catch (ConnectionException) {
+            return;
+        }
 
         if (! $response->successful()) {
             return;

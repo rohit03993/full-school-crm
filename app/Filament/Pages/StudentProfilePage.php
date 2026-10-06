@@ -4217,6 +4217,8 @@ class StudentProfilePage extends Page
                                     'callsTabLoaded' => $this->callsTabLoaded,
                                     'calls' => $this->calls,
                                     'callRecordings' => $this->callRecordings,
+                                    'callAudio' => $this->callAudio,
+                                    'callAudioDirection' => $this->callAudioDirection,
                                     'callIntelligenceEnabled' => app(CallIntelligenceClient::class)->enabled(),
                                 ]),
                         ]),

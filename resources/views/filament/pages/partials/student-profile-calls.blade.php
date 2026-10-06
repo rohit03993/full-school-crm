@@ -16,7 +16,7 @@
                             <input type="file" wire:model="callAudio" accept=".mp4,.m4a,.mp3,.wav,.aac,.ogg,.webm,.3gp,.amr,audio/*,video/mp4,video/3gpp" class="sr-only">
                         </label>
                         <p class="min-w-0 text-sm text-gray-700 dark:text-gray-200">
-                            @if ($callAudio)
+                            @if (is_object($callAudio ?? null) && method_exists($callAudio, 'getClientOriginalName'))
                                 {{ $callAudio->getClientOriginalName() }}
                             @else
                                 No file chosen yet.
@@ -28,13 +28,13 @@
                     <div class="flex flex-wrap gap-2">
                         <button type="button" wire:click="$set('callAudioDirection', 'outgoing')" @class([
                             'min-h-11 rounded-xl px-4 text-sm font-semibold',
-                            'bg-primary-600 text-white' => $callAudioDirection === 'outgoing',
-                            'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200' => $callAudioDirection !== 'outgoing',
+                            'bg-primary-600 text-white' => ($callAudioDirection ?? 'outgoing') === 'outgoing',
+                            'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200' => ($callAudioDirection ?? 'outgoing') !== 'outgoing',
                         ])>Outgoing</button>
                         <button type="button" wire:click="$set('callAudioDirection', 'incoming')" @class([
                             'min-h-11 rounded-xl px-4 text-sm font-semibold',
-                            'bg-primary-600 text-white' => $callAudioDirection === 'incoming',
-                            'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200' => $callAudioDirection !== 'incoming',
+                            'bg-primary-600 text-white' => ($callAudioDirection ?? 'outgoing') === 'incoming',
+                            'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200' => ($callAudioDirection ?? 'outgoing') !== 'incoming',
                         ])>Incoming</button>
                     </div>
 
@@ -54,7 +54,7 @@
                         'bg-gray-50 ring-gray-200 dark:bg-white/5 dark:ring-white/10' => $recording->processing_status !== 'FAILED',
                     ]) wire:key="call-recording-{{ $recording->id }}">
                         <div class="flex flex-wrap items-start justify-between gap-2">
-                            <p class="text-sm font-semibold text-gray-950 dark:text-white">{{ $recording->created_at?->timezone(config('app.timezone'))->format('d M Y, h:i A') }}</p>
+                            <p class="text-sm font-semibold text-gray-950 dark:text-white">{{ $recording->created_at?->timezone(config('app.timezone'))?->format('d M Y, h:i A') }}</p>
                             <span @class([
                                 'rounded-full px-3 py-1 text-xs font-bold',
                                 'bg-danger-500/15 text-danger-700 dark:text-danger-300' => $recording->processing_status === 'FAILED',
