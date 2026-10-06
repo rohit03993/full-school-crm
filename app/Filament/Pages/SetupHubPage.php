@@ -159,6 +159,14 @@ class SetupHubPage extends Page
             ];
         }
 
+        if (CallIntelligenceSettings::canAccess()) {
+            $cards[] = [
+                'title' => 'Call AI',
+                'description' => 'Turn call transcripts and summaries on, and connect the processing server.',
+                'url' => CallIntelligenceSettings::getUrl(),
+            ];
+        }
+
         return $schema->components([
             View::make('filament.pages.partials.crm-hub')
                 ->viewData([
