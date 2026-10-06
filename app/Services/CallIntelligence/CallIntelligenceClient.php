@@ -37,12 +37,13 @@ class CallIntelligenceClient
             'call_direction' => $direction === 'incoming' ? 'incoming' : 'outgoing',
             'audio_mime_type' => $file->getMimeType() ?: $file->getClientMimeType(),
             'processing_status' => 'UPLOAD_PENDING',
+            'follow_up_required' => false,
         ]);
 
         try {
             $this->send($recording, $file);
         } catch (RuntimeException $exception) {
-            $recording->update([
+            CallRecording::query()->whereKey($recording->id)->update([
                 'processing_status' => 'FAILED',
                 'processing_error' => $exception->getMessage(),
             ]);
@@ -113,7 +114,7 @@ class CallIntelligenceClient
             'transcript_text' => $payload['transcript_text'] ?? $recording->transcript_text,
             'transcript_json' => $payload['transcript_json'] ?? $recording->transcript_json,
             'ai_analysis_json' => $analysis ?? $recording->ai_analysis_json,
-            'follow_up_required' => $analysis === null ? $recording->follow_up_required : $followUp,
+            'follow_up_required' => $analysis === null ? (bool) $recording->follow_up_required : $followUp,
             'follow_up_reason' => $followUp ? ($analysis['follow_up_reason'] ?? null) : null,
             'suggested_follow_up_date' => $followUp ? ($analysis['suggested_follow_up_date'] ?? null) : null,
             'suggested_follow_up_time' => $followUp ? ($analysis['suggested_follow_up_time'] ?? null) : null,

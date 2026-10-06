@@ -74,4 +74,28 @@ class CallIntelligenceCallbackTest extends TestCase
         $this->assertFalse($recording->follow_up_required);
         $this->assertNull($recording->suggested_follow_up_date);
     }
+
+    public function test_a_queued_recording_can_be_saved_before_the_summary_exists(): void
+    {
+        $student = Student::query()->create([
+            'name' => 'Rahul',
+            'mobile' => '9876543210',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        $recording = CallRecording::query()->create([
+            'public_id' => '550e8400-e29b-41d4-a716-446655440001',
+            'student_id' => $student->id,
+            'phone_number' => '9876543210',
+            'processing_status' => 'UPLOAD_PENDING',
+        ]);
+
+        app(\App\Services\CallIntelligence\CallIntelligenceClient::class)->applyPayload($recording, [
+            'status' => 'QUEUED',
+        ]);
+
+        $recording->refresh();
+        $this->assertSame('QUEUED', $recording->processing_status);
+        $this->assertFalse($recording->follow_up_required);
+    }
 }

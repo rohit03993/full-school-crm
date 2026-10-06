@@ -80,28 +80,35 @@
                             @endif
                         @endif
 
-                        @if (in_array($recording->processing_status, ['COMPLETED', 'AI_READY', 'CRM_SYNCED'], true))
+                        @if (filled($recording->transcript_text) || $recording->handed_off || in_array($recording->processing_status, ['COMPLETED', 'AI_READY', 'CRM_SYNCED'], true))
                             <div class="mt-3 space-y-2" x-data>
-                                <audio x-ref="audio" controls preload="none" class="w-full" src="{{ route('admin.call-recordings.audio', $recording) }}"></audio>
-                                <div class="flex flex-wrap gap-2">
-                                    @foreach ([0.75, 1, 1.25, 1.5, 2] as $speed)
-                                        <button type="button" class="rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold dark:bg-white/10" x-on:click="$refs.audio.playbackRate = {{ $speed }}">{{ $speed }}x</button>
-                                    @endforeach
-                                </div>
+                                @if ($recording->handed_off || in_array($recording->processing_status, ['COMPLETED', 'AI_READY', 'CRM_SYNCED'], true))
+                                    <audio x-ref="audio" controls preload="none" class="w-full" src="{{ route('admin.call-recordings.audio', $recording) }}"></audio>
+                                    <div class="flex flex-wrap gap-2">
+                                        @foreach ([0.75, 1, 1.25, 1.5, 2] as $speed)
+                                            <button type="button" class="rounded-md bg-gray-100 px-2 py-1 text-xs font-semibold dark:bg-white/10" x-on:click="$refs.audio.playbackRate = {{ $speed }}">{{ $speed }}x</button>
+                                        @endforeach
+                                    </div>
+                                @endif
 
                                 @if (filled($recording->transcript_text))
                                     <button type="button" class="text-sm font-semibold text-primary-600" x-on:click="navigator.clipboard.writeText(@js($recording->transcript_text))">Copy transcript</button>
+                                    @if (is_array($recording->transcript_json['segments'] ?? null) && $recording->transcript_json['segments'] !== [])
+                                        @foreach ($recording->transcript_json['segments'] as $segment)
+                                            <div class="pt-2">
+                                                <button type="button" class="text-xs font-semibold text-primary-700" x-on:click="$refs.audio.currentTime = {{ (float) ($segment['start'] ?? 0) }}; $refs.audio.play()">
+                                                    {{ $recording->clock((float) ($segment['start'] ?? 0)) }} {{ $segment['speaker'] ?? 'Speaker' }}
+                                                </button>
+                                                <p class="text-sm text-gray-800 dark:text-gray-100">{{ $segment['text'] ?? '' }}</p>
+                                            </div>
+                                        @endforeach
+                                    @else
+                                        <p class="whitespace-pre-line text-sm text-gray-800 dark:text-gray-100">{{ $recording->transcript_text }}</p>
+                                    @endif
                                 @endif
-
-                                @foreach (($recording->transcript_json['segments'] ?? []) as $segment)
-                                    <div class="pt-2">
-                                        <button type="button" class="text-xs font-semibold text-primary-700" x-on:click="$refs.audio.currentTime = {{ (float) ($segment['start'] ?? 0) }}; $refs.audio.play()">
-                                            {{ $recording->clock((float) ($segment['start'] ?? 0)) }} {{ $segment['speaker'] ?? 'Speaker' }}
-                                        </button>
-                                        <p class="text-sm text-gray-800 dark:text-gray-100">{{ $segment['text'] ?? '' }}</p>
-                                    </div>
-                                @endforeach
                             </div>
+                        @elseif ($recording->isPending())
+                            <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">The summary will appear on this card when it is ready. Leave this tab open.</p>
                         @endif
 
                         @if (is_array($recording->ai_analysis_json) && $recording->ai_analysis_json !== [])
