@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\BackupDownloadController;
 use App\Http\Controllers\Admin\BackupRestoreChunkController;
+use App\Http\Controllers\Admin\CallRecordingAudioController;
 use App\Http\Controllers\Admin\CertificateDownloadController;
 use App\Http\Controllers\Admin\ConsolidatedMarksheetDownloadController;
 use App\Http\Controllers\Admin\DocumentDownloadController;
@@ -79,6 +80,9 @@ Route::middleware(['web', 'auth'])->prefix('admin')->group(function () {
         ->name('admin.documents.download');
     Route::get('documents/{document}/preview', [DocumentDownloadController::class, 'preview'])
         ->name('admin.documents.preview');
+
+    Route::get('call-recordings/{callRecording}/audio', CallRecordingAudioController::class)
+        ->name('admin.call-recordings.audio');
 
     Route::get('whatsapp-messages/{message}/media', [MetaWhatsAppMediaController::class, 'show'])
         ->name('admin.whatsapp-messages.media');

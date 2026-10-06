@@ -31,6 +31,7 @@ use App\Filament\Forms\ConvertToAdmissionFormSchema;
 use App\Filament\Forms\EnquiryFormSchema;
 use App\Filament\Forms\StudentProfileFormSchema;
 use App\Models\Admission;
+use App\Models\CallRecording;
 use App\Models\Document;
 use App\Models\Enquiry;
 use App\Models\FeeMiscChargeAdjustmentRequest;
@@ -53,6 +54,7 @@ use App\Services\ReportService;
 use App\Enums\ReportType;
 use App\Services\BatchService;
 use App\Services\BatchStaffAssignmentService;
+use App\Services\CallIntelligence\CallIntelligenceClient;
 use App\Services\CallLogService;
 use App\Services\ConvertToAdmissionPresenter;
 use App\Services\CourseFeeSyncService;
@@ -234,6 +236,15 @@ class StudentProfilePage extends Page
      * @var Collection<int, StudentCall>
      */
     public Collection $calls;
+
+    /**
+     * @var Collection<int, CallRecording>
+     */
+    public Collection $callRecordings;
+
+    public mixed $callAudio = null;
+
+    public string $callAudioDirection = 'outgoing';
 
     /**
      * @var Collection<int, StudentCase>
@@ -432,6 +443,7 @@ class StudentProfilePage extends Page
         $this->visits = new Collection;
         $this->leadTimeline = collect();
         $this->calls = new Collection;
+        $this->callRecordings = new Collection;
         $this->cases = new Collection;
         $this->certificates = new Collection;
         $this->parentFeeNotices = new Collection;
@@ -1446,6 +1458,73 @@ class StudentProfilePage extends Page
             ->orderByDesc('id')
             ->limit(CrmPagination::PER_PAGE)
             ->get();
+
+        $this->refreshCallRecordings();
+    }
+
+    public function refreshCallRecordings(?CallIntelligenceClient $client = null): void
+    {
+        abort_unless($this->userCanViewCallLog(), 403);
+
+        $client ??= app(CallIntelligenceClient::class);
+        $this->callRecordings = $this->record->callRecordings()->latest()->limit(20)->get();
+
+        if ($client->enabled()) {
+            foreach ($this->callRecordings as $recording) {
+                if ($recording->isPending()) {
+                    $client->refresh($recording);
+                }
+            }
+
+            $this->callRecordings = $this->record->callRecordings()->latest()->limit(20)->get();
+        }
+    }
+
+    public function uploadCallRecording(CallIntelligenceClient $client): void
+    {
+        abort_unless($this->userCanViewCallLog(), 403);
+        abort_unless($client->enabled(), 403);
+
+        $this->validate([
+            'callAudio' => ['required', 'file', 'max:102400'],
+            'callAudioDirection' => ['required', 'in:outgoing,incoming'],
+        ]);
+
+        try {
+            $client->upload($this->record, $this->callAudio, $this->callAudioDirection);
+            $this->callAudio = null;
+            $this->refreshCallRecordings($client);
+            Notification::make()
+                ->title('Recording uploaded')
+                ->body('Processing continues in the background. This page will update.')
+                ->success()
+                ->send();
+        } catch (\Throwable $exception) {
+            Notification::make()
+                ->title('Upload failed')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function retryCallRecording(int $recordingId, CallIntelligenceClient $client): void
+    {
+        abort_unless($this->userCanViewCallLog(), 403);
+
+        $recording = $this->record->callRecordings()->whereKey($recordingId)->firstOrFail();
+
+        try {
+            $client->retry($recording);
+            $this->refreshCallRecordings($client);
+            Notification::make()->title('Retry started')->success()->send();
+        } catch (\Throwable $exception) {
+            Notification::make()
+                ->title('Retry failed')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+        }
     }
 
     public function loadCertificatesTab(): void
@@ -4137,6 +4216,8 @@ class StudentProfilePage extends Page
                                 ->viewData(fn (): array => [
                                     'callsTabLoaded' => $this->callsTabLoaded,
                                     'calls' => $this->calls,
+                                    'callRecordings' => $this->callRecordings,
+                                    'callIntelligenceEnabled' => app(CallIntelligenceClient::class)->enabled(),
                                 ]),
                         ]),
                     'cases' => Tab::make('Cases')

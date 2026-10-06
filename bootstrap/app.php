@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'campaign/t1/api/v2',
             'api/face-verify/approve',
             'api/face-verify/camera-punch',
+            'api/call-intelligence/result',
             'iclock/*',
             'iclock',
         ]);

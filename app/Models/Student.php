@@ -70,6 +70,11 @@ class Student extends Model
         return $this->hasMany(StudentCall::class);
     }
 
+    public function callRecordings(): HasMany
+    {
+        return $this->hasMany(CallRecording::class);
+    }
+
     public function whatsappMessages(): HasMany
     {
         return $this->hasMany(WhatsAppCampaignRecipient::class);

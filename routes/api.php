@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AisensyCampaignTriggerController;
+use App\Http\Controllers\Api\CallIntelligenceResultController;
 use App\Http\Controllers\Api\FaceVerifyApproveController;
 use App\Http\Controllers\Api\FaceVerifyCameraPunchController;
 use Illuminate\Support\Facades\Route;
@@ -13,3 +14,6 @@ Route::post('face-verify/approve', FaceVerifyApproveController::class)
 
 Route::post('face-verify/camera-punch', FaceVerifyCameraPunchController::class)
     ->name('api.face-verify.camera-punch');
+
+Route::post('call-intelligence/result', CallIntelligenceResultController::class)
+    ->name('api.call-intelligence.result');

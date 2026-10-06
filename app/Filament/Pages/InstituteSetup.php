@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Filament\Pages\ClassSectionsPage;
 use App\Filament\Resources\AcademicSessions\AcademicSessionResource;
@@ -10,6 +11,7 @@ use App\Models\AcademicSession;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
+use App\Support\FeatureGate;
 use App\Support\InstituteOnboarding;
 use App\Support\InstituteSettings;
 use App\Support\InstituteTerminology;
@@ -84,7 +86,7 @@ class InstituteSetup extends Page
     {
         $courseLabel = InstituteTerminology::label('course');
 
-        return [
+        $links = [
             [
                 'label' => 'Setup Guide',
                 'description' => 'Step-by-step install and customize instructions.',
@@ -158,6 +160,17 @@ class InstituteSetup extends Page
                 'icon' => 'heroicon-o-globe-alt',
             ],
         ];
+
+        if (FeatureGate::enabled(LicenseFeature::Calls)) {
+            $links[] = [
+                'label' => 'Call AI',
+                'description' => 'Turn call transcripts and summaries on, and connect the processing server.',
+                'url' => CallIntelligenceSettings::getUrl(),
+                'icon' => 'heroicon-o-microphone',
+            ];
+        }
+
+        return $links;
     }
 
     /**
