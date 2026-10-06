@@ -15,6 +15,7 @@ class CallRecording extends Model
         'call_direction',
         'audio_mime_type',
         'processing_status',
+        'handed_off',
         'duration_seconds',
         'transcript_text',
         'transcript_json',
@@ -34,6 +35,7 @@ class CallRecording extends Model
             'transcript_json' => 'array',
             'ai_analysis_json' => 'array',
             'follow_up_required' => 'boolean',
+            'handed_off' => 'boolean',
             'suggested_follow_up_date' => 'date',
             'duration_seconds' => 'integer',
         ];
@@ -62,6 +64,11 @@ class CallRecording extends Model
                 : 'Processing failed.',
             default => 'Processing...',
         };
+    }
+
+    public function canRetry(): bool
+    {
+        return $this->handed_off && $this->processing_status === 'FAILED';
     }
 
     public function isPending(): bool

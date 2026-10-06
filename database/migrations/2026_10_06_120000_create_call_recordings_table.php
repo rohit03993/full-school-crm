@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('call_direction', 20)->default('outgoing');
             $table->string('audio_mime_type')->nullable();
             $table->string('processing_status', 40)->default('UPLOAD_PENDING');
+            $table->boolean('handed_off')->default(false);
             $table->unsignedInteger('duration_seconds')->nullable();
             $table->longText('transcript_text')->nullable();
             $table->json('transcript_json')->nullable();

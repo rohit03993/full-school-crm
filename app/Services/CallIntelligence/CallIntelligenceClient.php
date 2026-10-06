@@ -5,6 +5,8 @@ namespace App\Services\CallIntelligence;
 use App\Models\CallRecording;
 use App\Models\Student;
 use App\Support\IndianMobileNumber;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -117,15 +119,19 @@ class CallIntelligenceClient
 
     private function send(CallRecording $recording, UploadedFile $file): void
     {
-        $created = $this->request()->post($this->url('/api/calls'), [
-            'call_id' => $recording->public_id,
-            'phone_number' => $recording->phone_number,
-            'call_direction' => strtoupper((string) $recording->call_direction),
-            'recorded_at' => now()->toIso8601String(),
-        ]);
+        try {
+            $created = $this->request()->post($this->url('/api/calls'), [
+                'call_id' => $recording->public_id,
+                'phone_number' => $recording->phone_number,
+                'call_direction' => strtoupper((string) $recording->call_direction),
+                'recorded_at' => now()->toIso8601String(),
+            ]);
+        } catch (ConnectionException) {
+            throw new RuntimeException('This CRM could not reach the Call AI server. Check the processing address in Setup → Call AI.');
+        }
 
         if (! $created->successful()) {
-            throw new RuntimeException('The recording could not be registered.');
+            throw new RuntimeException($this->failureMessage($created, 'The recording could not be registered.'));
         }
 
         $handle = fopen($file->getRealPath(), 'r');
@@ -138,15 +144,38 @@ class CallIntelligenceClient
             $uploaded = $this->request()
                 ->attach('audio', $handle, $file->getClientOriginalName())
                 ->post($this->url('/api/calls/'.$recording->public_id.'/audio'));
+        } catch (ConnectionException) {
+            throw new RuntimeException('The file reached the school site, but the Call AI server did not accept it. Check the processing address in Setup → Call AI.');
         } finally {
             fclose($handle);
         }
 
         if (! $uploaded->successful()) {
-            throw new RuntimeException('The recording could not be sent for processing.');
+            throw new RuntimeException($this->failureMessage($uploaded, 'The recording could not be sent for processing.'));
         }
 
+        $recording->update(['handed_off' => true]);
         $this->applyPayload($recording, $uploaded->json() ?? []);
+    }
+
+    private function failureMessage(Response $response, string $fallback): string
+    {
+        $status = $response->status();
+        $detail = trim((string) $response->json('message'));
+
+        if ($status === 401) {
+            return 'The Call AI server refused this school. Check the school code and both secrets in Setup → Call AI.';
+        }
+
+        if ($status === 404) {
+            return 'The processing address was reached, but the upload link was not found. Check Setup → Call AI.';
+        }
+
+        if ($detail !== '') {
+            return $fallback.' '.$detail;
+        }
+
+        return $fallback.' The server replied '.$status.'.';
     }
 
     private function request(): \Illuminate\Http\Client\PendingRequest
