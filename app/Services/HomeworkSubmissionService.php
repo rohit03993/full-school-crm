@@ -527,8 +527,8 @@ class HomeworkSubmissionService
     }
 
     /**
-     * Full coordinator desk for one date: every active class/section, every class subject,
-     * assigned subject teacher (blank if none), and that day's homework if it exists.
+     * Full coordinator desk for one date: every active class/section and every class subject.
+     * Each teacher who gave homework has a line. Each teacher who has not given it yet has a pending line.
      *
      * @return array{
      *     date: string,
@@ -632,68 +632,65 @@ class HomeworkSubmissionService
 
             foreach ($batch->activeSubjects as $subject) {
                 $subjectId = (int) $subject->id;
-                $subjectHomework = $homeworkBySubject->get($subjectId, collect());
-
-                if ($subjectHomework->isEmpty()) {
-                    $subjectHomework = collect([null]);
-                }
-
+                /** @var Collection<int, HomeworkAssignment> $subjectHomework */
+                $subjectHomework = $homeworkBySubject->get($subjectId, collect())->values();
                 $closure = $closuresBySubject->get($subjectId);
-                $teacherName = $teachersBySubject
+                $teacherRows = $teachersBySubject
                     ->get($subjectId, collect())
-                    ->map(fn (BatchStaffAssignment $row): string => (string) ($row->user?->name ?? ''))
-                    ->filter()
-                    ->unique()
-                    ->implode(', ');
+                    ->unique(fn (BatchStaffAssignment $row): int => (int) $row->user_id)
+                    ->values();
+                $givenUserIds = $subjectHomework
+                    ->map(fn (HomeworkAssignment $assignment): int => (int) ($assignment->submitted_by_user_id ?: $assignment->created_by_user_id))
+                    ->filter(fn (int $id): bool => $id > 0)
+                    ->all();
 
                 foreach ($subjectHomework as $assignment) {
-                $status = $assignment?->status;
+                    $status = $assignment->status;
 
-                if ($status === HomeworkAssignmentStatus::Submitted) {
-                    $submitted++;
-                } elseif ($status === HomeworkAssignmentStatus::Approved) {
-                    $approved++;
-                } elseif ($status === HomeworkAssignmentStatus::Sent) {
-                    $sent++;
-                } elseif ($assignment === null && $closure === null) {
+                    if ($status === HomeworkAssignmentStatus::Submitted) {
+                        $submitted++;
+                    } elseif ($status === HomeworkAssignmentStatus::Approved) {
+                        $approved++;
+                    } elseif ($status === HomeworkAssignmentStatus::Sent) {
+                        $sent++;
+                    }
+
+                    $items[] = $this->deskReviewItem(
+                        $subject,
+                        $assignment,
+                        $closure,
+                        $linkStatsByAssignment[(int) $assignment->id] ?? $this->studentLinks->emptyStats(),
+                    );
+                }
+
+                $pendingTeachers = $closure === null
+                    ? $teacherRows->filter(
+                        fn (BatchStaffAssignment $row): bool => ! in_array((int) $row->user_id, $givenUserIds, true),
+                    )
+                    : collect();
+
+                if ($subjectHomework->isEmpty() && $pendingTeachers->isEmpty()) {
+                    if ($closure === null) {
+                        $leftOut++;
+                    }
+
+                    $items[] = $this->deskReviewItem(
+                        $subject,
+                        null,
+                        $closure,
+                        $this->studentLinks->emptyStats(),
+                    );
+                }
+
+                foreach ($pendingTeachers as $teacherRow) {
                     $leftOut++;
-                }
-
-                $stats = $assignment
-                    ? ($linkStatsByAssignment[(int) $assignment->id] ?? $this->studentLinks->emptyStats())
-                    : $this->studentLinks->emptyStats();
-
-                $givenBy = (string) ($assignment?->submittedBy?->name
-                    ?? $assignment?->createdBy?->name
-                    ?? '');
-                $subjectLabel = (string) $subject->name;
-
-                if ($assignment && $givenBy !== '') {
-                    $subjectLabel .= ' ('.$givenBy.')';
-                }
-
-                $items[] = [
-                    'course_subject_id' => $subjectId,
-                    'assignment_id' => $assignment?->id,
-                    'teacher' => ($assignment && $givenBy !== '') ? $givenBy : $teacherName,
-                    'submitted_by' => $givenBy,
-                    'subject' => $subjectLabel,
-                    'title' => (string) ($assignment?->title ?? ''),
-                    'description' => (string) ($assignment?->description ?? ''),
-                    'has_file' => (bool) ($assignment?->hasFile() ?? false),
-                    'public_url' => ($assignment && filled($assignment->public_token))
-                        ? route('homework.public.show', ['token' => $assignment->public_token])
-                        : null,
-                    'status' => $status?->label() ?? '',
-                    'status_key' => $status?->value,
-                    'closure_reason' => $closure?->reason,
-                    'closure_label' => $closure?->label(),
-                    'submitted_at' => $assignment?->submitted_at?->timezone((string) config('app.timezone'))->format('h:i A'),
-                    'link_opened' => $stats['opened'],
-                    'link_total' => $stats['total'],
-                    'link_opened_people' => $stats['opened_people'],
-                    'link_not_opened_people' => $stats['not_opened_people'],
-                ];
+                    $items[] = $this->deskReviewItem(
+                        $subject,
+                        null,
+                        null,
+                        $this->studentLinks->emptyStats(),
+                        (string) ($teacherRow->user?->name ?? ''),
+                    );
                 }
             }
 
@@ -1525,6 +1522,69 @@ class HomeworkSubmissionService
             HomeworkAssignmentStatus::Sent => 'This homework was sent to parents. You cannot change it.',
             default => null,
         };
+    }
+
+    /**
+     * @param  array{opened: int, total: int, opened_people: list<array{name: string, at: ?string}>, not_opened_people: list<string>}  $stats
+     * @return array{
+     *     course_subject_id: int,
+     *     assignment_id: ?int,
+     *     teacher: string,
+     *     submitted_by: string,
+     *     subject: string,
+     *     title: string,
+     *     description: string,
+     *     has_file: bool,
+     *     public_url: ?string,
+     *     status: string,
+     *     status_key: ?string,
+     *     closure_reason: ?string,
+     *     closure_label: ?string,
+     *     submitted_at: ?string,
+     *     link_opened: int,
+     *     link_total: int,
+     *     link_opened_people: list<array{name: string, at: ?string}>,
+     *     link_not_opened_people: list<string>
+     * }
+     */
+    private function deskReviewItem(
+        CourseSubject $subject,
+        ?HomeworkAssignment $assignment,
+        ?HomeworkSubjectClosure $closure,
+        array $stats,
+        string $pendingTeacher = '',
+    ): array {
+        $givenBy = (string) ($assignment?->submittedBy?->name
+            ?? $assignment?->createdBy?->name
+            ?? '');
+        $subjectLabel = (string) $subject->name;
+
+        if ($assignment && $givenBy !== '') {
+            $subjectLabel .= ' ('.$givenBy.')';
+        }
+
+        return [
+            'course_subject_id' => (int) $subject->id,
+            'assignment_id' => $assignment?->id,
+            'teacher' => ($assignment && $givenBy !== '') ? $givenBy : $pendingTeacher,
+            'submitted_by' => $givenBy,
+            'subject' => $subjectLabel,
+            'title' => (string) ($assignment?->title ?? ''),
+            'description' => (string) ($assignment?->description ?? ''),
+            'has_file' => (bool) ($assignment?->hasFile() ?? false),
+            'public_url' => ($assignment && filled($assignment->public_token))
+                ? route('homework.public.show', ['token' => $assignment->public_token])
+                : null,
+            'status' => $assignment?->status?->label() ?? '',
+            'status_key' => $assignment?->status?->value,
+            'closure_reason' => $closure?->reason,
+            'closure_label' => $closure?->label(),
+            'submitted_at' => $assignment?->submitted_at?->timezone((string) config('app.timezone'))->format('h:i A'),
+            'link_opened' => $stats['opened'],
+            'link_total' => $stats['total'],
+            'link_opened_people' => $stats['opened_people'],
+            'link_not_opened_people' => $stats['not_opened_people'],
+        ];
     }
 
     protected function subjectClosure(int $batchId, int $subjectId, string $date): ?HomeworkSubjectClosure

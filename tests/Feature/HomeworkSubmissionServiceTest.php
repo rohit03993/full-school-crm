@@ -747,6 +747,48 @@ class HomeworkSubmissionServiceTest extends TestCase
         );
     }
 
+    public function test_desk_shows_a_pending_line_for_the_teacher_who_has_not_given_homework(): void
+    {
+        $data = $this->seedClass();
+        $secondTeacher = User::factory()->create([
+            'name' => 'Umakanth Sir',
+            'is_active' => true,
+        ]);
+        $secondTeacher->assignRole(StaffJobRole::Teacher->value);
+        BatchStaffAssignment::query()->create([
+            'batch_id' => $data['batch']->id,
+            'user_id' => $secondTeacher->id,
+            'role' => BatchStaffRole::SubjectTeacher,
+            'course_subject_id' => $data['maths']->id,
+        ]);
+
+        $service = app(HomeworkSubmissionService::class);
+        $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Ex 5.2',
+        ]);
+
+        $mathItems = collect($service->deskForDate(now()->toDateString())['groups'][0]['sections'][0]['items'])
+            ->where('course_subject_id', $data['maths']->id)
+            ->values();
+
+        $this->assertCount(2, $mathItems);
+
+        $given = $mathItems->first(fn (array $item): bool => $item['status_key'] === 'submitted');
+        $pending = $mathItems->first(fn (array $item): bool => $item['status_key'] === null);
+
+        $this->assertSame($data['mathTeacher']->name, $given['teacher']);
+        $this->assertSame($data['mathTeacher']->name, $given['submitted_by']);
+        $this->assertNotNull($given['assignment_id']);
+        $this->assertSame('Umakanth Sir', $pending['teacher']);
+        $this->assertSame('', $pending['submitted_by']);
+        $this->assertNull($pending['assignment_id']);
+        $this->assertSame('Mathematics', $pending['subject']);
+    }
+
     public function test_teacher_desk_page_shows_assigned_class_without_picking_first(): void
     {
         $data = $this->seedClass();
