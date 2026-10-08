@@ -436,4 +436,55 @@ class MetaWhatsAppServiceTest extends TestCase
                 && ! array_key_exists('name', $request->data());
         });
     }
+
+    public function test_homework_combined_wording_updates_the_existing_template_name(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.waba_id' => 'waba-1',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/waba-1/message_templates*' => Http::response([
+                'data' => [[
+                    'id' => '777',
+                    'name' => 'homework_combined',
+                    'language' => 'en',
+                    'status' => 'APPROVED',
+                    'components' => [[
+                        'type' => 'BODY',
+                        'text' => "Dear Parent,\nToday's homework for your ward {{1}} (Roll No: {{2}}) has been assigned for {{3}}.\n\nPlease open each subject below to view or download. No login is required:\n{{4}}\n\nKindly ensure it is completed on time. Thank you.",
+                    ]],
+                ]],
+            ], 200),
+            'https://graph.facebook.com/v20.0/777' => Http::response([
+                'success' => true,
+            ], 200),
+        ]);
+
+        $result = app(\App\Services\HomeworkCombinedTemplateUpdateService::class)->sendUpdatedWording();
+
+        $this->assertSame('success', $result['status'], $result['message']);
+        $this->assertDatabaseHas('meta_whatsapp_templates', [
+            'name' => 'homework_combined',
+            'status' => 'PENDING',
+            'param_count' => 9,
+            'is_active' => false,
+        ]);
+        $this->assertDatabaseMissing('meta_whatsapp_templates', [
+            'name' => 'homework_subject_lines_2',
+        ]);
+
+        Http::assertSent(function ($request): bool {
+            if ($request->url() !== 'https://graph.facebook.com/v20.0/777') {
+                return false;
+            }
+
+            $text = (string) ($request->data()['components'][0]['text'] ?? '');
+
+            return str_contains($text, "{{4}}\n{{5}}\n{{6}}")
+                && ! array_key_exists('name', $request->data());
+        });
+    }
 }

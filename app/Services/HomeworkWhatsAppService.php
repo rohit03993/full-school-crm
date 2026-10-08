@@ -179,11 +179,15 @@ class HomeworkWhatsAppService
 
         $this->studentLinks->ensureForAssignments($assignments, $students);
 
-        $sampleBlock = $this->buildSubjectLinksBlock($assignments, $students->first());
+        $sampleLines = $this->subjectLinkLines($assignments, $students->first());
 
-        if ($sampleBlock === '') {
+        if ($sampleLines === []) {
             return [...$empty, 'template' => $resolved, 'error' => 'None of the selected homework has a shareable link.'];
         }
+
+        $subjectSlots = $this->approvedSubjectSlots($resolved);
+        $sendTemplate = $resolved;
+        $expectedParamCount = $subjectSlots > 1 ? 3 + $subjectSlots : 4;
 
         $sent = 0;
         $failed = 0;
@@ -209,22 +213,22 @@ class HomeworkWhatsAppService
             }
 
             $roll = (string) ($student->activeEnrollment?->enrollment_number ?? '');
-
-            $params = [
+            $params = $this->combinedMessageParams(
                 (string) ($student->name ?? 'Student'),
                 $roll !== '' ? $roll : '—',
                 $dateLabel,
-                $this->buildSubjectLinksBlock($assignments, $student),
-            ];
+                $this->subjectLinkLines($assignments, $student),
+                $subjectSlots,
+            );
 
             // One student's failure must not stop the rest of the class.
             try {
                 $result = $this->whatsapp->send(
                     $phone,
                     $params,
-                    $resolved,
+                    $sendTemplate,
                     $name,
-                    4,
+                    $expectedParamCount,
                     logContext: [
                         'student_id' => $student->id,
                         'message_source' => WhatsAppMessageSource::Homework->value,
@@ -277,7 +281,7 @@ class HomeworkWhatsAppService
             'error' => $sent === 0 && $failed === 0
                 ? ($lastError ?? 'No WhatsApp messages were sent.')
                 : ($failed > 0 ? $lastError : null),
-            'template' => $resolved,
+            'template' => $sendTemplate,
             'currency' => (string) $estimate['currency'],
             'unit_cost' => $unitCost,
             'estimated_total_cost' => round($unitCost * $sent, 4),
@@ -286,12 +290,13 @@ class HomeworkWhatsAppService
     }
 
     /**
-     * Meta rejects newlines/tabs inside template parameters (#132018), so subjects are joined
-     * on one line with " | " instead of line breaks.
+     * One line per subject. The current 4-box template still joins these with " | ".
+     * The line templates put each line in its own box, so the new line is in the template text.
      *
      * @param  Collection<int, HomeworkAssignment>  $assignments
+     * @return list<string>
      */
-    protected function buildSubjectLinksBlock(Collection $assignments, ?Student $student = null): string
+    protected function subjectLinkLines(Collection $assignments, ?Student $student = null): array
     {
         return $assignments
             ->map(function (HomeworkAssignment $assignment) use ($student): ?string {
@@ -317,7 +322,50 @@ class HomeworkWhatsAppService
                 return $safeLabel.': '.$link;
             })
             ->filter()
-            ->implode(' | ');
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<string>  $lines
+     * @return list<string>
+     */
+    protected function combinedMessageParams(string $name, string $roll, string $dateLabel, array $lines, int $subjectSlots): array
+    {
+        $params = [$name, $roll, $dateLabel];
+
+        if ($subjectSlots <= 1) {
+            $params[] = implode(' | ', $lines);
+
+            return $params;
+        }
+
+        if (count($lines) > $subjectSlots) {
+            $head = array_slice($lines, 0, $subjectSlots - 1);
+            $tail = implode(' | ', array_slice($lines, $subjectSlots - 1));
+            $lines = [...$head, $tail];
+        }
+
+        $params = [...$params, ...$lines];
+
+        while (count($params) < 3 + $subjectSlots) {
+            $params[] = '—';
+        }
+
+        return $params;
+    }
+
+    protected function approvedSubjectSlots(string $templateName): int
+    {
+        $template = MetaWhatsAppTemplate::query()
+            ->where('name', $templateName)
+            ->where('is_active', true)
+            ->whereRaw('UPPER(status) = ?', ['APPROVED'])
+            ->first();
+
+        $slots = $template ? (int) $template->param_count - 3 : 1;
+
+        return $slots > 1 ? $slots : 1;
     }
 
     /**

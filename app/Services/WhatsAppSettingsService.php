@@ -42,7 +42,7 @@ class WhatsAppSettingsService
                 Setting::getValue('whatsapp.fee_reminder_overdue_live_campaign_id')
                     ?: Setting::getValue('whatsapp.fee_reminder_live_campaign_id'),
             ),
-            'homework_combined_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_combined_live_campaign_id'), 4),
+            'homework_combined_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_combined_live_campaign_id'), [4, 3 + CombinedHomeworkWhatsAppTemplate::SUBJECT_SLOTS]),
             'homework_share_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_share_live_campaign_id'), 4),
             'homework_not_done_autosend_enabled' => (bool) Setting::getValue('whatsapp.homework_not_done_autosend_enabled', false),
             'homework_not_done_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.homework_not_done_live_campaign_id'), [5, 7]),
@@ -443,7 +443,7 @@ class WhatsAppSettingsService
     protected function sanitizeAutomationTemplateSelections(array $data): array
     {
         $keysWithParamCount = [
-            'homework_combined_live_campaign_id' => 4,
+            'homework_combined_live_campaign_id' => [4, 3 + CombinedHomeworkWhatsAppTemplate::SUBJECT_SLOTS],
             'homework_share_live_campaign_id' => 4,
             'homework_not_done_live_campaign_id' => [5, 7],
         ];

@@ -1196,6 +1196,56 @@ class HomeworkSubmissionServiceTest extends TestCase
         );
     }
 
+    public function test_combined_send_puts_each_subject_on_its_own_line_when_that_template_is_approved(): void
+    {
+        $sequence = 0;
+
+        Http::fake([
+            'https://graph.facebook.com/*' => function () use (&$sequence) {
+                $sequence++;
+
+                return Http::response([
+                    'messages' => [['id' => 'wamid.LINE'.$sequence]],
+                ], 200);
+            },
+        ]);
+
+        $data = $this->seedClass();
+        $this->seedCombinedTemplate();
+        MetaWhatsAppTemplate::query()
+            ->where('name', CombinedHomeworkWhatsAppTemplate::NAME)
+            ->update([
+                'param_count' => 3 + CombinedHomeworkWhatsAppTemplate::SUBJECT_SLOTS,
+                'body' => CombinedHomeworkWhatsAppTemplate::BODY,
+            ]);
+
+        $service = app(HomeworkSubmissionService::class);
+
+        foreach (['maths' => $data['mathTeacher'], 'physics' => $data['physicsTeacher']] as $subject => $teacher) {
+            $assignment = $service->submit($teacher, [
+                'batch_id' => $data['batch']->id,
+                'course_subject_id' => $data[$subject]->id,
+                'homework_date' => now()->toDateString(),
+                'title' => $subject,
+                'description' => 'Today',
+            ]);
+            $service->approve($data['admin'], $assignment->id);
+        }
+
+        $result = $service->combinedSend($data['admin'], $data['batch']->id, now()->toDateString());
+
+        $this->assertSame(2, $result['sent'], (string) ($result['error'] ?? ''));
+        $this->assertSame(CombinedHomeworkWhatsAppTemplate::NAME, $result['template']);
+
+        $bodies = MetaWhatsAppMessage::query()->pluck('body_preview');
+        $this->assertCount(2, $bodies);
+        $this->assertTrue($bodies->every(function (string $body): bool {
+            return str_contains($body, "Mathematics")
+                && str_contains($body, "Physics")
+                && ! str_contains($body, ' | ');
+        }));
+    }
+
     public function test_combined_send_gives_each_student_a_unique_link_and_reuses_it_on_resend(): void
     {
         $sequence = 0;

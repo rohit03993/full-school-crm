@@ -298,12 +298,12 @@ class ManageWhatsAppSettings extends Page
                         ->columnSpanFull(),
                     Select::make('homework_combined_live_campaign_id')
                         ->label('Combined daily homework (all subjects)')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(4))
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCounts([4, 3 + \App\Support\CombinedHomeworkWhatsAppTemplate::SUBJECT_SLOTS]))
                         ->searchable()
                         ->nullable()
                         ->native(false)
                         ->placeholder('Choose template…')
-                        ->helperText('Used on Homework Review → Send to parents. Template homework_combined (4 params).'),
+                        ->helperText('Used on Homework Review → Send to parents. Template homework_combined. After WhatsApp approves the update, each subject is on its own line.'),
                     Select::make('homework_share_live_campaign_id')
                         ->label('Single-subject homework share')
                         ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(4))
