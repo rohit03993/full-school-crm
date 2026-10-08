@@ -63,9 +63,19 @@ trait InteractsWithStudentWhatsAppInbox
         $this->messageThread = [];
     }
 
+    public function updatedMetaReplyText(): void
+    {
+        $this->afterWhatsAppComposerChanged();
+    }
+
     public function updatedSendWhatsAppTemplateId(): void
     {
         $this->refreshWhatsAppTemplateComposer();
+        $this->afterWhatsAppComposerChanged();
+    }
+
+    protected function afterWhatsAppComposerChanged(): void
+    {
     }
 
     public function updatedSendWhatsAppTemplateParams($value, $key = null): void
@@ -201,12 +211,14 @@ trait InteractsWithStudentWhatsAppInbox
     public function enableMetaReplyAttachment(): void
     {
         $this->showMetaReplyAttachment = true;
+        $this->afterWhatsAppComposerChanged();
     }
 
     public function clearMetaReplyAttachment(): void
     {
         $this->metaReplyAttachment = null;
         $this->showMetaReplyAttachment = false;
+        $this->afterWhatsAppComposerChanged();
     }
 
     public function refreshThreadMedia(): void
@@ -276,6 +288,7 @@ trait InteractsWithStudentWhatsAppInbox
         $this->showMetaReplyAttachment = false;
         $this->sendWhatsAppTemplateId = null;
         $this->refreshWhatsAppTemplateComposer();
+        $this->afterWhatsAppComposerChanged();
     }
 
     public function sendMetaReply(): void

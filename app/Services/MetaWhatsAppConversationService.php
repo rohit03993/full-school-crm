@@ -244,13 +244,14 @@ class MetaWhatsAppConversationService
     public function inboxChangeStamp(): string
     {
         $messages = Schema::hasTable('meta_whatsapp_messages')
-            ? (string) MetaWhatsAppMessage::query()->max('updated_at')
-            : '';
+            ? MetaWhatsAppMessage::query()->selectRaw('MAX(id) as max_id, MAX(updated_at) as max_updated')->first()
+            : null;
         $campaigns = Schema::hasTable('whatsapp_campaign_recipients')
-            ? (string) WhatsAppCampaignRecipient::query()->max('updated_at')
-            : '';
+            ? WhatsAppCampaignRecipient::query()->selectRaw('MAX(id) as max_id, MAX(updated_at) as max_updated')->first()
+            : null;
 
-        return $messages.'|'.$campaigns;
+        return ($messages?->max_id ?? '').'|'.($messages?->max_updated ?? '')
+            .'|'.($campaigns?->max_id ?? '').'|'.($campaigns?->max_updated ?? '');
     }
 
     /**

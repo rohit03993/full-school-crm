@@ -4,7 +4,6 @@ namespace App\Filament\Pages;
 
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
-use App\Filament\Concerns\InteractsWithStudentWhatsAppInbox;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Models\Student;
 use App\Services\MetaWhatsAppConversationService;
@@ -18,14 +17,12 @@ use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View as ViewContract;
-use Livewire\WithFileUploads;
+use Livewire\Attributes\On;
 use UnitEnum;
 
 class WhatsAppInboxPage extends Page
 {
-    use InteractsWithStudentWhatsAppInbox;
     use RequiresCrmPermission;
-    use WithFileUploads;
 
     protected static function requiredCrmPermission(): CrmPermission
     {
@@ -90,9 +87,10 @@ class WhatsAppInboxPage extends Page
 
     public ?string $inboxChangeStamp = null;
 
+    public bool $composerLocked = false;
+
     public function mount(): void
     {
-        $this->initializeWhatsAppInboxState();
         $this->loadInbox();
 
         $studentId = request()->query('student');
@@ -166,39 +164,21 @@ class WhatsAppInboxPage extends Page
 
     public function pollInbox(): void
     {
-        if ($this->inboxPollShouldSkip()) {
+        if ($this->composerLocked) {
+            $this->skipRender();
+
             return;
         }
 
         $stamp = app(MetaWhatsAppConversationService::class)->inboxChangeStamp();
 
         if ($stamp === $this->inboxChangeStamp) {
+            $this->skipRender();
+
             return;
         }
 
         $this->loadInbox();
-
-        if (filled($this->selectedPhone) || filled($this->selectedStudentId)) {
-            $this->messagesTabLoaded = false;
-            $this->loadMessagesTab();
-        }
-    }
-
-    protected function inboxPollShouldSkip(): bool
-    {
-        if (trim($this->metaReplyText) !== '') {
-            return true;
-        }
-
-        if ($this->metaReplyAttachment !== null || $this->showMetaReplyAttachment) {
-            return true;
-        }
-
-        if ($this->sendWhatsAppTemplateId) {
-            return true;
-        }
-
-        return false;
     }
 
     public function loadInbox(): void
@@ -237,9 +217,6 @@ class WhatsAppInboxPage extends Page
                 ? Student::query()->find($studentId)
                 : ($this->selectedPhone ? $thread->findStudentByPhone($this->selectedPhone) : null);
             $this->selectedStudentId = $student?->id;
-
-            $this->resetMessagesTab();
-            $this->loadMessagesTab();
         } catch (\Throwable $exception) {
             report($exception);
 
@@ -255,36 +232,38 @@ class WhatsAppInboxPage extends Page
     {
         $this->selectedPhone = null;
         $this->selectedStudentId = null;
-        $this->resetMessagesTab();
+        $this->composerLocked = false;
         $this->loadInbox();
     }
 
-    protected function whatsAppMessageStudent(): ?Student
+    #[On('whatsapp-chat-opened')]
+    public function rememberOpenChat(?string $phone = null, mixed $studentId = null): void
     {
-        if ($this->selectedStudentId) {
-            return Student::query()->find($this->selectedStudentId);
-        }
-
-        if (filled($this->selectedPhone)) {
-            return app(StudentWhatsAppThreadService::class)->findStudentByPhone($this->selectedPhone);
-        }
-
-        return null;
+        $this->selectedPhone = filled($phone) ? $phone : null;
+        $this->selectedStudentId = is_numeric($studentId) ? (int) $studentId : null;
+        $this->skipRender();
     }
 
-    protected function whatsAppInboxPhone(): ?string
+    #[On('whatsapp-chat-closed')]
+    public function rememberClosedChat(): void
     {
-        return $this->selectedPhone;
+        $this->selectedPhone = null;
+        $this->selectedStudentId = null;
+        $this->composerLocked = false;
+        $this->skipRender();
     }
 
-    protected function afterWhatsAppMessageSent(): void
+    #[On('whatsapp-composer-lock')]
+    public function rememberComposerLock(bool $locked = false): void
+    {
+        $this->composerLocked = $locked;
+        $this->skipRender();
+    }
+
+    #[On('whatsapp-inbox-refresh-list')]
+    public function refreshInboxList(): void
     {
         $this->loadInbox();
-    }
-
-    protected function whatsAppInboxCompactLayout(): bool
-    {
-        return true;
     }
 
     public function content(Schema $schema): Schema
@@ -301,15 +280,6 @@ class WhatsAppInboxPage extends Page
                     'conversations' => $this->visibleConversations(),
                     'selectedStudentId' => $this->selectedStudentId,
                     'selectedPhone' => $this->selectedPhone,
-                    'chatStudent' => $this->whatsAppMessageStudent(),
-                    'chatContact' => filled($this->selectedPhone)
-                        ? app(\App\Services\WhatsAppInboxContactResolver::class)->resolve((string) $this->selectedPhone)
-                        : \App\Support\WhatsAppInboxContact::unknown(),
-                    'metaRoutingActive' => $this->metaRoutingActive,
-                    'metaSessionOpen' => $this->metaSessionOpen,
-                    'messagesViewData' => ((filled($this->selectedPhone) || $this->selectedStudentId) && $this->messagesTabLoaded)
-                        ? $this->whatsAppMessagesViewData()
-                        : null,
                 ]),
         ]);
     }

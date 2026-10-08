@@ -6,6 +6,7 @@ use App\Enums\MetaWhatsAppMessageDirection;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Filament\Pages\WhatsAppInboxPage;
+use App\Livewire\WhatsAppInboxThread;
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Student;
@@ -89,12 +90,19 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertSet('selectedStudentId', $student->id)
             ->assertSee('Dear Parent, attendance update for Kapil.')
             ->assertSeeHtml('crm-wa-global-inbox__shell--chat-open')
+            ->assertStatus(200);
+
+        Livewire::test(WhatsAppInboxThread::class)
+            ->call('openChat', '918320936486', $student->id)
+            ->assertSet('selectedStudentId', $student->id)
+            ->assertSet('selectedPhone', '918320936486')
+            ->assertSee('Dear Parent, attendance update for Kapil.')
             ->assertSeeHtml('crm-wa-global-inbox__back')
             ->assertSeeHtml('crm-wa-inbox__compose')
             ->call('clearConversation')
             ->assertSet('selectedStudentId', null)
             ->assertSet('selectedPhone', null)
-            ->assertDontSeeHtml('crm-wa-global-inbox__shell--chat-open')
+            ->assertSee('Select a chat')
             ->assertStatus(200);
 
         Http::assertNothingSent();
@@ -218,10 +226,9 @@ class WhatsAppInboxPageTest extends TestCase
             ->call('selectConversation', '919811000401', $failed->id)
             ->assertSet('listFilter', 'failed')
             ->assertSeeHtml('crm-wa-global-inbox__shell--chat-open')
-            ->assertSeeHtml('crm-wa-global-inbox__back')
             ->assertSee('Failed Parent')
             ->call('clearConversation')
-            ->assertDontSeeHtml('crm-wa-global-inbox__shell--chat-open')
+            ->assertSet('selectedPhone', null)
             ->assertSee('Failed Parent')
             ->assertStatus(200);
     }
@@ -247,6 +254,8 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertSee('crm-wa-global-inbox__list-head', false)
             ->assertSee('crm-wa-global-inbox__filters', false)
             ->assertSee('pollInbox', false)
+            ->assertSee('Select a chat', false)
+            ->assertSee('whatsapp-inbox-thread', false)
             ->assertSee('crm-pwa-install-banner--admin', false);
     }
 
@@ -279,8 +288,7 @@ class WhatsAppInboxPageTest extends TestCase
             ->call('selectConversation', '919811000201', $student->id)
             ->assertSee('School already messaged this parent.')
             ->assertDontSee('Can you send the timetable?')
-            ->assertSet('listFilter', 'all')
-            ->assertSet('metaReplyText', '');
+            ->assertSet('listFilter', 'all');
 
         MetaWhatsAppMessage::query()->create([
             'wamid' => 'wamid.POLL-IN',
@@ -296,7 +304,6 @@ class WhatsAppInboxPageTest extends TestCase
         $component
             ->call('pollInbox')
             ->assertSet('listFilter', 'all')
-            ->assertSet('metaReplyText', '')
             ->assertSee('Can you send the timetable?')
             ->assertStatus(200);
     }
@@ -326,8 +333,8 @@ class WhatsAppInboxPageTest extends TestCase
 
         $this->actingAs($admin);
 
-        $component = Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', '919811000202', $student->id)
+        $component = Livewire::test(WhatsAppInboxThread::class)
+            ->call('openChat', '919811000202', $student->id)
             ->set('metaReplyText', 'Draft reply still typing')
             ->assertSee('Please call me back.')
             ->assertDontSee('New inbound while typing');
@@ -344,12 +351,10 @@ class WhatsAppInboxPageTest extends TestCase
         ]);
 
         $component
-            ->call('pollInbox')
+            ->call('pollThread')
             ->assertSet('metaReplyText', 'Draft reply still typing')
             ->assertDontSee('New inbound while typing')
             ->assertSee('Please call me back.')
-            ->call('setListFilter', 'pending')
-            ->assertSet('listFilter', 'pending')
             ->assertStatus(200);
     }
 
@@ -414,8 +419,10 @@ class WhatsAppInboxPageTest extends TestCase
         Livewire::test(WhatsAppInboxPage::class)
             ->assertSee('Rohit Pal')
             ->assertSee('Staff')
-            ->assertDontSee('Unknown contact')
-            ->call('selectConversation', '918109432345')
+            ->assertDontSee('Unknown contact');
+
+        Livewire::test(WhatsAppInboxThread::class)
+            ->call('openChat', '918109432345')
             ->assertSee('Rohit Pal')
             ->assertSee('Staff')
             ->assertSet('metaSessionOpen', true)
@@ -464,8 +471,8 @@ class WhatsAppInboxPageTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', '919876543210', $student->id)
+        Livewire::test(WhatsAppInboxThread::class)
+            ->call('openChat', '919876543210', $student->id)
             ->assertSet('selectedStudentId', $student->id)
             ->assertSet('metaSessionOpen', true)
             ->assertSee('Amit Verma')
@@ -521,8 +528,10 @@ class WhatsAppInboxPageTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', '919876543210', $student->id)
+        Livewire::test(WhatsAppInboxThread::class)
+            ->call('openChat', '919876543210', $student->id)
+            ->assertSee('Loading photo')
+            ->call('refreshThreadMedia')
             ->assertSee('crm-wa-bubble__image', false)
             ->assertStatus(200);
     }
@@ -558,8 +567,8 @@ class WhatsAppInboxPageTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', '919876543210', $student->id)
+        Livewire::test(WhatsAppInboxThread::class)
+            ->call('openChat', '919876543210', $student->id)
             ->assertSee('crm-wa-bubble__image', false)
             ->assertStatus(200);
     }
@@ -626,8 +635,8 @@ class WhatsAppInboxPageTest extends TestCase
 
         $this->actingAs($admin);
 
-        Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', '918109462946', $student->id)
+        Livewire::test(WhatsAppInboxThread::class)
+            ->call('openChat', '918109462946', $student->id)
             ->set('sendWhatsAppTemplateId', $template->id)
             ->assertSet('sendWhatsAppTemplateParamCount', 4)
             ->assertSee('Send template')
@@ -690,8 +699,8 @@ class WhatsAppInboxPageTest extends TestCase
 
         $this->actingAs($admin);
 
-        $component = Livewire::test(WhatsAppInboxPage::class)
-            ->call('selectConversation', '918109462946', $student->id)
+        $component = Livewire::test(WhatsAppInboxThread::class)
+            ->call('openChat', '918109462946', $student->id)
             ->set('sendWhatsAppTemplateId', $template->id)
             ->set('sendWhatsAppTemplateParams', [
                 0 => 'Amit Verma',

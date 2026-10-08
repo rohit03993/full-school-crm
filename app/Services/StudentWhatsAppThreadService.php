@@ -18,6 +18,11 @@ use Illuminate\Support\Facades\Schema;
 
 class StudentWhatsAppThreadService
 {
+    protected ?Collection $threadTemplatesByName = null;
+
+    /** @var array<int, WhatsAppCampaignRecipient|null>|null */
+    protected ?array $threadRecipientsById = null;
+
     public function __construct(
         protected MetaWhatsAppService $meta,
         protected WhatsAppTemplateParamResolver $paramResolver,
@@ -29,6 +34,7 @@ class StudentWhatsAppThreadService
      */
     public function threadForStudent(Student $student, int $limit = 50, bool $downloadPendingMedia = true): Collection
     {
+        $this->rememberThreadTemplates();
         $phone = $this->normalizePhone((string) $student->mobile);
         $metaSupported = $this->metaMessagesSupported();
 
@@ -205,6 +211,7 @@ class StudentWhatsAppThreadService
      */
     public function threadForPhone(string $phone, int $limit = 50, bool $downloadPendingMedia = true): Collection
     {
+        $this->rememberThreadTemplates();
         $phone = $this->normalizePhone($phone);
 
         if ($phone === '' || ! $this->metaMessagesSupported()) {
@@ -266,6 +273,9 @@ class StudentWhatsAppThreadService
      */
     protected function mapMetaMessageRows(Collection $rows, bool $downloadPendingMedia = true): Collection
     {
+        $this->rememberThreadTemplates();
+        $this->rememberThreadRecipients($rows);
+
         if ($downloadPendingMedia && $rows->isNotEmpty()) {
             $this->media->syncPendingDownloads($rows);
             $rows = MetaWhatsAppMessage::query()
@@ -444,7 +454,10 @@ class StudentWhatsAppThreadService
             return null;
         }
 
-        $recipient = WhatsAppCampaignRecipient::query()->find($recipientId);
+        $recipientId = (int) $recipientId;
+        $recipient = $this->threadRecipientsById !== null
+            ? ($this->threadRecipientsById[$recipientId] ?? null)
+            : WhatsAppCampaignRecipient::query()->find($recipientId);
 
         if (! $recipient) {
             return null;
@@ -522,8 +535,65 @@ class StudentWhatsAppThreadService
         return filled($metaTemplate?->body) ? (string) $metaTemplate->body : null;
     }
 
+    protected function rememberThreadTemplates(): void
+    {
+        if ($this->threadTemplatesByName !== null) {
+            return;
+        }
+
+        $this->threadTemplatesByName = MetaWhatsAppTemplate::query()
+            ->where('is_active', true)
+            ->orderByDesc('synced_at')
+            ->get()
+            ->groupBy('name');
+    }
+
+    /**
+     * @param  Collection<int, MetaWhatsAppMessage>  $rows
+     */
+    protected function rememberThreadRecipients(Collection $rows): void
+    {
+        $ids = $rows
+            ->pluck('whatsapp_campaign_recipient_id')
+            ->filter()
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        $this->threadRecipientsById = [];
+
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        $found = WhatsAppCampaignRecipient::query()
+            ->whereIn('id', $ids->all())
+            ->get()
+            ->keyBy(fn (WhatsAppCampaignRecipient $recipient): int => (int) $recipient->id);
+
+        foreach ($ids as $id) {
+            $this->threadRecipientsById[$id] = $found->get($id);
+        }
+    }
+
     protected function metaTemplate(string $name, string $language): ?MetaWhatsAppTemplate
     {
+        if ($this->threadTemplatesByName !== null) {
+            $matches = $this->threadTemplatesByName->get($name, collect());
+
+            if ($language !== '') {
+                $match = $matches->first(
+                    fn (MetaWhatsAppTemplate $template): bool => (string) $template->language === $language
+                );
+
+                if ($match) {
+                    return $match;
+                }
+            }
+
+            return $matches->first();
+        }
+
         $query = MetaWhatsAppTemplate::query()
             ->where('name', $name)
             ->where('is_active', true);
