@@ -64,7 +64,7 @@ class ParentMessageSendService
 
         $rows = ParentMessageSend::query()
             ->whereBetween('sent_at', [$from, $to])
-            ->get(['id', 'sent_by_user_id', 'kind', 'is_resend', 'batch_id']);
+            ->get(['id', 'sent_by_user_id', 'kind', 'is_resend', 'batch_id', 'homework_date', 'sent_at']);
 
         if ($rows->isEmpty()) {
             return [];
@@ -73,7 +73,7 @@ class ParentMessageSendService
         $names = User::query()
             ->whereIn('id', $rows->pluck('sent_by_user_id')->filter()->all())
             ->pluck('name', 'id');
-        $firstHomeworkSendIdByBatch = $this->firstHomeworkSendIdByBatch();
+        $firstHomeworkSendIdByClassDay = $this->firstHomeworkSendIdByClassDay();
 
         $byStaff = [];
 
@@ -91,7 +91,7 @@ class ParentMessageSendService
             ];
 
             $isResend = $row->kind === ParentMessageSend::Homework
-                ? $this->homeworkClickIsResend($row, $firstHomeworkSendIdByBatch)
+                ? $this->homeworkClickIsResend($row, $firstHomeworkSendIdByClassDay)
                 : (bool) $row->is_resend;
 
             $bucket = match (true) {
@@ -131,7 +131,7 @@ class ParentMessageSendService
             return new LengthAwarePaginator([], 0, $perPage, $page);
         }
 
-        $firstHomeworkSendIdByBatch = $this->firstHomeworkSendIdByBatch();
+        $firstHomeworkSendIdByClassDay = $this->firstHomeworkSendIdByClassDay();
 
         return ParentMessageSend::query()
             ->with('sentBy')
@@ -139,9 +139,9 @@ class ParentMessageSendService
             ->orderByDesc('sent_at')
             ->orderByDesc('id')
             ->paginate($perPage, ['*'], 'page', $page)
-            ->through(function (ParentMessageSend $send) use ($firstHomeworkSendIdByBatch): array {
+            ->through(function (ParentMessageSend $send) use ($firstHomeworkSendIdByClassDay): array {
                 $isResend = $send->kind === ParentMessageSend::Homework
-                    ? $this->homeworkClickIsResend($send, $firstHomeworkSendIdByBatch)
+                    ? $this->homeworkClickIsResend($send, $firstHomeworkSendIdByClassDay)
                     : (bool) $send->is_resend;
 
                 return [
@@ -156,11 +156,11 @@ class ParentMessageSendService
     }
 
     /**
-     * The first homework click for a class stays First send. Every later click for that same class is a Resend.
+     * The first click for a class on one homework day stays First send. A second click for that same class and same homework day is a Resend.
      *
-     * @param  array<int, int>  $firstHomeworkSendIdByBatch
+     * @param  array<string, int>  $firstHomeworkSendIdByClassDay
      */
-    public function homeworkClickIsResend(ParentMessageSend $send, array $firstHomeworkSendIdByBatch): bool
+    public function homeworkClickIsResend(ParentMessageSend $send, array $firstHomeworkSendIdByClassDay): bool
     {
         $batchId = (int) ($send->batch_id ?? 0);
 
@@ -168,27 +168,44 @@ class ParentMessageSendService
             return (bool) $send->is_resend;
         }
 
-        $firstId = $firstHomeworkSendIdByBatch[$batchId] ?? null;
+        $firstId = $firstHomeworkSendIdByClassDay[$this->homeworkDayKey($send)] ?? null;
 
         return $firstId !== null && (int) $send->id !== (int) $firstId;
     }
 
     /**
-     * @return array<int, int>
+     * @return array<string, int>
      */
-    public function firstHomeworkSendIdByBatch(): array
+    public function firstHomeworkSendIdByClassDay(): array
     {
         if (! Schema::hasTable('parent_message_sends')) {
             return [];
         }
 
-        return ParentMessageSend::query()
+        $rows = ParentMessageSend::query()
             ->where('kind', ParentMessageSend::Homework)
             ->whereNotNull('batch_id')
-            ->selectRaw('batch_id, MIN(id) as first_id')
-            ->groupBy('batch_id')
-            ->pluck('first_id', 'batch_id')
-            ->map(fn (mixed $id): int => (int) $id)
-            ->all();
+            ->selectRaw('batch_id, COALESCE(DATE(homework_date), DATE(sent_at)) as homework_day, MIN(id) as first_id')
+            ->groupByRaw('batch_id, COALESCE(DATE(homework_date), DATE(sent_at))')
+            ->get();
+
+        $firstIds = [];
+
+        foreach ($rows as $row) {
+            $day = substr((string) $row->homework_day, 0, 10);
+            $firstIds[(int) $row->batch_id.'|'.$day] = (int) $row->first_id;
+        }
+
+        return $firstIds;
+    }
+
+    public function homeworkDayKey(ParentMessageSend $send): string
+    {
+        $batchId = (int) ($send->batch_id ?? 0);
+        $day = $send->homework_date?->toDateString()
+            ?: $send->sent_at?->timezone((string) config('app.timezone'))->toDateString()
+            ?: '';
+
+        return $batchId.'|'.$day;
     }
 }

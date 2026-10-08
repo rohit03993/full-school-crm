@@ -27,7 +27,7 @@
                 <input type="date" wire:model.live="dateTo" class="fi-crm-input mt-2 block w-full" />
             </label>
         </div>
-        <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">Each number is a click, not a parent. One class with 40 parents is still 1 send.</p>
+        <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">Each number is a click, not a parent. One class with 40 parents is still 1 send. A resend is a second click for the same class on the same homework day. The next day’s homework is a new send.</p>
     </section>
 
     <section class="grid grid-cols-2 gap-3 lg:grid-cols-4">

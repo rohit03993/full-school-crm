@@ -1194,14 +1194,11 @@ class HomeworkSubmissionService
         $result = $this->whatsapp->notifyCombined($batch, $dateLabel, $assignments, $templateName, $admin);
 
         if ($result['sent'] > 0) {
-            $classWasMessagedBefore = ParentMessageSend::query()
+            $isResend = ParentMessageSend::query()
                 ->where('kind', ParentMessageSend::Homework)
                 ->where('batch_id', $batch->id)
+                ->whereDate('homework_date', $date)
                 ->exists();
-            $isResend = $classWasMessagedBefore
-                || ($assignments->isNotEmpty() && $assignments->every(
-                    fn (HomeworkAssignment $assignment): bool => $assignment->status === HomeworkAssignmentStatus::Sent,
-                ));
 
             HomeworkAssignment::query()
                 ->whereIn('id', $assignments->pluck('id'))

@@ -1321,7 +1321,7 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame($data['admin']->name, $sends[1]->sentBy->name);
     }
 
-    public function test_sending_the_same_class_again_counts_as_a_resend_even_on_a_new_homework(): void
+    public function test_a_new_days_homework_is_a_first_send_and_a_second_click_that_day_is_a_resend(): void
     {
         $sequence = 0;
 
@@ -1361,16 +1361,28 @@ class HomeworkSubmissionServiceTest extends TestCase
         $service->combinedSend($data['admin'], $data['batch']->id, now()->toDateString());
 
         $latest = ParentMessageSend::query()->orderByDesc('id')->first();
-        $this->assertTrue($latest->is_resend);
+        $this->assertFalse($latest->is_resend);
 
         $report = app(ParentMessageSendService::class);
         $staff = $report->staffReport(now()->subDay()->startOfDay(), now()->endOfDay());
-        $this->assertSame(1, $staff[0]['homework_sends']);
+        $this->assertSame(2, $staff[0]['homework_sends']);
+        $this->assertSame(0, $staff[0]['homework_resends']);
+
+        $clicks = $report->recent(now()->subDay()->startOfDay(), now()->endOfDay());
+        $this->assertSame('First send', $clicks[0]['repeat']);
+        $this->assertSame('First send', $clicks[1]['repeat']);
+
+        $service->combinedSend($data['admin'], $data['batch']->id, now()->toDateString());
+
+        $secondToday = ParentMessageSend::query()->orderByDesc('id')->first();
+        $this->assertTrue($secondToday->is_resend);
+
+        $staff = $report->staffReport(now()->subDay()->startOfDay(), now()->endOfDay());
+        $this->assertSame(2, $staff[0]['homework_sends']);
         $this->assertSame(1, $staff[0]['homework_resends']);
 
         $clicks = $report->recent(now()->subDay()->startOfDay(), now()->endOfDay());
         $this->assertSame('Resend', $clicks[0]['repeat']);
-        $this->assertSame('First send', $clicks[1]['repeat']);
     }
 
     public function test_each_click_list_pages_through_every_send(): void
