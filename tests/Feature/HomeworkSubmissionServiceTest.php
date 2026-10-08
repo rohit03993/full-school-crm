@@ -1321,6 +1321,58 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame($data['admin']->name, $sends[1]->sentBy->name);
     }
 
+    public function test_sending_the_same_class_again_counts_as_a_resend_even_on_a_new_homework(): void
+    {
+        $sequence = 0;
+
+        Http::fake([
+            'https://graph.facebook.com/*' => function () use (&$sequence) {
+                $sequence++;
+
+                return Http::response([
+                    'messages' => [['id' => 'wamid.AGAIN'.$sequence]],
+                ], 200);
+            },
+        ]);
+
+        $data = $this->seedClass();
+        $this->seedCombinedTemplate();
+
+        ParentMessageSend::query()->create([
+            'kind' => ParentMessageSend::Homework,
+            'is_resend' => false,
+            'batch_id' => $data['batch']->id,
+            'homework_date' => now()->subDay()->toDateString(),
+            'label' => $data['batch']->displayLabel(),
+            'sent_by_user_id' => $data['admin']->id,
+            'parent_count' => 2,
+            'sent_at' => now()->subDay(),
+        ]);
+
+        $service = app(HomeworkSubmissionService::class);
+        $maths = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Ex 5.2',
+        ]);
+        $service->approve($data['admin'], $maths->id);
+        $service->combinedSend($data['admin'], $data['batch']->id, now()->toDateString());
+
+        $latest = ParentMessageSend::query()->orderByDesc('id')->first();
+        $this->assertTrue($latest->is_resend);
+
+        $report = app(ParentMessageSendService::class);
+        $staff = $report->staffReport(now()->subDay()->startOfDay(), now()->endOfDay());
+        $this->assertSame(1, $staff[0]['homework_sends']);
+        $this->assertSame(1, $staff[0]['homework_resends']);
+
+        $clicks = $report->recent(now()->subDay()->startOfDay(), now()->endOfDay());
+        $this->assertSame('Resend', $clicks[0]['repeat']);
+        $this->assertSame('First send', $clicks[1]['repeat']);
+    }
+
     public function test_parent_send_report_is_open_to_the_coordinator_and_closed_to_a_teacher(): void
     {
         $data = $this->seedClass();

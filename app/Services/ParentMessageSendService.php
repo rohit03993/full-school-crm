@@ -62,9 +62,7 @@ class ParentMessageSendService
 
         $rows = ParentMessageSend::query()
             ->whereBetween('sent_at', [$from, $to])
-            ->selectRaw('sent_by_user_id, kind, is_resend, COUNT(*) as send_count')
-            ->groupBy('sent_by_user_id', 'kind', 'is_resend')
-            ->get();
+            ->get(['id', 'sent_by_user_id', 'kind', 'is_resend', 'batch_id']);
 
         if ($rows->isEmpty()) {
             return [];
@@ -73,6 +71,7 @@ class ParentMessageSendService
         $names = User::query()
             ->whereIn('id', $rows->pluck('sent_by_user_id')->filter()->all())
             ->pluck('name', 'id');
+        $firstHomeworkSendIdByBatch = $this->firstHomeworkSendIdByBatch();
 
         $byStaff = [];
 
@@ -89,16 +88,20 @@ class ParentMessageSendService
                 'exam_resends' => 0,
             ];
 
+            $isResend = $row->kind === ParentMessageSend::Homework
+                ? $this->homeworkClickIsResend($row, $firstHomeworkSendIdByBatch)
+                : (bool) $row->is_resend;
+
             $bucket = match (true) {
-                $row->kind === ParentMessageSend::Homework && (bool) $row->is_resend => 'homework_resends',
+                $row->kind === ParentMessageSend::Homework && $isResend => 'homework_resends',
                 $row->kind === ParentMessageSend::Homework => 'homework_sends',
-                $row->kind === ParentMessageSend::ExamMarks && (bool) $row->is_resend => 'exam_resends',
+                $row->kind === ParentMessageSend::ExamMarks && $isResend => 'exam_resends',
                 $row->kind === ParentMessageSend::ExamMarks => 'exam_sends',
                 default => null,
             };
 
             if ($bucket !== null) {
-                $byStaff[$key][$bucket] += (int) $row->send_count;
+                $byStaff[$key][$bucket]++;
             }
         }
 
@@ -123,6 +126,8 @@ class ParentMessageSendService
             return [];
         }
 
+        $firstHomeworkSendIdByBatch = $this->firstHomeworkSendIdByBatch();
+
         return ParentMessageSend::query()
             ->with('sentBy')
             ->whereBetween('sent_at', [$from, $to])
@@ -130,16 +135,57 @@ class ParentMessageSendService
             ->orderByDesc('id')
             ->limit($limit)
             ->get()
-            ->map(function (ParentMessageSend $send): array {
+            ->map(function (ParentMessageSend $send) use ($firstHomeworkSendIdByBatch): array {
+                $isResend = $send->kind === ParentMessageSend::Homework
+                    ? $this->homeworkClickIsResend($send, $firstHomeworkSendIdByBatch)
+                    : (bool) $send->is_resend;
+
                 return [
                     'at' => $send->sent_at?->timezone((string) config('app.timezone'))->format('d M Y, h:i A') ?? '—',
                     'name' => (string) ($send->sentBy?->name ?? 'Unknown staff'),
                     'kind' => $send->kindLabel(),
                     'place' => (string) $send->label,
-                    'repeat' => $send->is_resend ? 'Resend' : 'First send',
+                    'repeat' => $isResend ? 'Resend' : 'First send',
                     'parents' => (int) $send->parent_count,
                 ];
             })
+            ->all();
+    }
+
+    /**
+     * The first homework click for a class stays First send. Every later click for that same class is a Resend.
+     *
+     * @param  array<int, int>  $firstHomeworkSendIdByBatch
+     */
+    public function homeworkClickIsResend(ParentMessageSend $send, array $firstHomeworkSendIdByBatch): bool
+    {
+        $batchId = (int) ($send->batch_id ?? 0);
+
+        if ($batchId < 1) {
+            return (bool) $send->is_resend;
+        }
+
+        $firstId = $firstHomeworkSendIdByBatch[$batchId] ?? null;
+
+        return $firstId !== null && (int) $send->id !== (int) $firstId;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    public function firstHomeworkSendIdByBatch(): array
+    {
+        if (! Schema::hasTable('parent_message_sends')) {
+            return [];
+        }
+
+        return ParentMessageSend::query()
+            ->where('kind', ParentMessageSend::Homework)
+            ->whereNotNull('batch_id')
+            ->selectRaw('batch_id, MIN(id) as first_id')
+            ->groupBy('batch_id')
+            ->pluck('first_id', 'batch_id')
+            ->map(fn (mixed $id): int => (int) $id)
             ->all();
     }
 }
