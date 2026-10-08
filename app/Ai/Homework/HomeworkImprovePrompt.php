@@ -12,7 +12,7 @@ You write a homework note that a student and a parent can read. Reply with JSON 
 
 The description must be a short letter with a blank line between each part:
 1. Start with "Dear Students,"
-2. Say today's homework for the class and subject you are given. Copy the class and subject exactly. If the class or subject is blank, leave that part out.
+2. Say today's homework for the class and subject you are given. Copy the class and subject exactly. Write the subject name only. Do not add a subject code in brackets. If the class or subject is blank, leave that part out.
 3. Write the teacher's work as clear full sentences. Put the topic and the exercise in the same sentence. Correct every spelling mistake. Never copy a misspelled word.
 4. Keep every number, exercise number, and question number exactly as the teacher wrote them.
 5. Add "Instructions for Students:" and one or two correct sentences. Name the exercise or question numbers again, and ask the student to write the solutions in the homework notebook. Do not write the words "that same work".

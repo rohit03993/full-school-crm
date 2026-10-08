@@ -55,7 +55,7 @@ trait AddsHomeworkModal
         }
     }
 
-    public function startAdd(int $batchId, int $subjectId, int $assignmentId = 0): void
+    public function startAdd(int $batchId, int $subjectId, int $assignmentId = 0, int $teacherUserId = 0): void
     {
         if ($batchId < 1 || $subjectId < 1) {
             return;
@@ -93,6 +93,7 @@ trait AddsHomeworkModal
             'batchId' => $batchId,
             'subjectId' => $subjectId,
             'assignmentId' => $assignmentId,
+            'teacherUserId' => $teacherUserId,
         ]);
     }
 
@@ -540,34 +541,46 @@ trait AddsHomeworkModal
 
         $batchId = (int) ($state['batch_id'] ?? $arguments['batchId'] ?? 0);
         $subjectId = (int) ($state['course_subject_id'] ?? $arguments['subjectId'] ?? 0);
+        $teacherUserId = (int) ($arguments['teacherUserId'] ?? 0);
         $batch = $batchId > 0 ? Batch::query()->find($batchId) : null;
         $subject = $subjectId > 0 ? CourseSubject::query()->find($subjectId) : null;
         $school = SiteContent::institute()['name'] ?? '';
 
         return [
             'class_label' => $batch?->displayLabel() ?? '',
-            'subject_label' => $subject?->displayLabel() ?? '',
+            'subject_label' => (string) ($subject?->name ?? ''),
             'school_name' => is_string($school) ? $school : '',
-            'teacher_name' => $this->homeworkAiTeacherName($batchId, $subjectId),
+            'teacher_name' => $this->homeworkAiTeacherName($batchId, $subjectId, $teacherUserId),
         ];
     }
 
-    protected function homeworkAiTeacherName(int $batchId, int $subjectId): string
+    protected function homeworkAiTeacherName(int $batchId, int $subjectId, int $teacherUserId = 0): string
     {
         if ($batchId < 1 || $subjectId < 1) {
             return '';
         }
 
-        return BatchStaffAssignment::query()
+        $query = BatchStaffAssignment::query()
             ->where('batch_id', $batchId)
             ->where('course_subject_id', $subjectId)
             ->where('role', BatchStaffRole::SubjectTeacher)
-            ->with('user:id,name')
-            ->get()
+            ->with('user:id,name');
+
+        if ($teacherUserId > 0) {
+            $query->where('user_id', $teacherUserId);
+        }
+
+        $names = $query->get()
             ->map(fn (BatchStaffAssignment $row): string => trim((string) ($row->user?->name ?? '')))
             ->filter()
             ->unique()
-            ->implode(', ');
+            ->values();
+
+        if ($teacherUserId > 0) {
+            return (string) ($names->first() ?? '');
+        }
+
+        return $names->count() === 1 ? (string) $names->first() : '';
     }
 
     /**

@@ -690,6 +690,7 @@ class HomeworkSubmissionService
                         null,
                         $this->studentLinks->emptyStats(),
                         (string) ($teacherRow->user?->name ?? ''),
+                        (int) ($teacherRow->user_id ?? 0),
                     );
                 }
             }
@@ -1598,10 +1599,14 @@ class HomeworkSubmissionService
         ?HomeworkSubjectClosure $closure,
         array $stats,
         string $pendingTeacher = '',
+        int $pendingTeacherUserId = 0,
     ): array {
         $givenBy = (string) ($assignment?->submittedBy?->name
             ?? $assignment?->createdBy?->name
             ?? '');
+        $teacherUserId = $assignment
+            ? (int) ($assignment->submitted_by_user_id ?: $assignment->created_by_user_id)
+            : $pendingTeacherUserId;
         $subjectLabel = (string) $subject->name;
 
         if ($assignment && $givenBy !== '') {
@@ -1612,6 +1617,7 @@ class HomeworkSubmissionService
             'course_subject_id' => (int) $subject->id,
             'assignment_id' => $assignment?->id,
             'teacher' => ($assignment && $givenBy !== '') ? $givenBy : $pendingTeacher,
+            'teacher_user_id' => $teacherUserId,
             'submitted_by' => $givenBy,
             'subject' => $subjectLabel,
             'title' => (string) ($assignment?->title ?? ''),

@@ -57,9 +57,19 @@ class HomeworkAiImproveTest extends TestCase
             'name' => 'Sunil Rana',
             'is_active' => true,
         ]);
+        $otherTeacher = User::factory()->create([
+            'name' => 'Parul',
+            'is_active' => true,
+        ]);
         BatchStaffAssignment::query()->create([
             'batch_id' => $data['batch']->id,
             'user_id' => $teacher->id,
+            'role' => BatchStaffRole::SubjectTeacher,
+            'course_subject_id' => $data['maths']->id,
+        ]);
+        BatchStaffAssignment::query()->create([
+            'batch_id' => $data['batch']->id,
+            'user_id' => $otherTeacher->id,
             'role' => BatchStaffRole::SubjectTeacher,
             'course_subject_id' => $data['maths']->id,
         ]);
@@ -67,7 +77,7 @@ class HomeworkAiImproveTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
         Livewire::test(HomeworkReviewPage::class)
-            ->call('startAdd', $data['batch']->id, $data['maths']->id)
+            ->call('startAdd', $data['batch']->id, $data['maths']->id, 0, $teacher->id)
             ->setActionData([
                 'title' => 'Parabola',
                 'description' => 'Exercise 1 and 2',
@@ -88,8 +98,10 @@ class HomeworkAiImproveTest extends TestCase
                 && str_contains($request->url(), 'gemini-3.5-flash-lite')
                 && str_contains($body, 'Exercise 1 and 2')
                 && str_contains($body, 'Dear Students')
-                && str_contains($body, 'Mathematics (MATH)')
+                && str_contains($body, 'Mathematics')
+                && ! str_contains($body, '(MATH)')
                 && str_contains($body, 'Sunil Rana')
+                && ! str_contains($body, 'Parul')
                 && str_contains($body, 'Do not add a test')
                 && ! str_contains($body, 'temperature')
                 && ! str_contains($body, 'test-gemini-key');
