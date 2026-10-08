@@ -54,8 +54,9 @@ class MetaWhatsAppConversationService
 
         $resolvedContacts = $this->contacts->resolveMany($phones);
         $lastOutboundFailed = $this->lastOutboundFailedByPhone($latestMeta);
+        $campaignSentPreviews = $this->campaignSentPreviews($latestMeta);
 
-        $conversations = collect();
+        $metaRows = [];
         $seenStudentIds = [];
         $seenPhones = [];
 
@@ -74,15 +75,16 @@ class MetaWhatsAppConversationService
                 $seenStudentIds[$student->id] = true;
             }
 
-            $conversations->push($this->conversationFromMetaMessage(
-                $message,
-                $contact,
-                $phone,
-                (bool) ($lastOutboundFailed[$phone] ?? $lastOutboundFailed[(string) $message->phone] ?? false),
-            ));
+            $metaRows[] = [
+                'message' => $message,
+                'contact' => $contact,
+                'phone' => $phone,
+                'student' => $student,
+                'failed' => (bool) ($lastOutboundFailed[$phone] ?? $lastOutboundFailed[(string) $message->phone] ?? false),
+            ];
         }
 
-        WhatsAppCampaignRecipient::query()
+        $campaignRecipients = WhatsAppCampaignRecipient::query()
             ->with(['student:id,name,mobile,status', 'campaign.template'])
             ->whereNotNull('student_id')
             ->when($seenStudentIds !== [], fn ($query) => $query->whereNotIn('student_id', array_keys($seenStudentIds)))
@@ -90,29 +92,59 @@ class MetaWhatsAppConversationService
             ->limit(max(200, $limit))
             ->get()
             ->unique('student_id')
-            ->each(function (WhatsAppCampaignRecipient $recipient) use ($conversations, &$seenPhones): void {
-                $student = $recipient->student;
+            ->filter(fn (WhatsAppCampaignRecipient $recipient): bool => $recipient->student !== null)
+            ->values();
 
-                if (! $student) {
-                    return;
-                }
+        $campaignPhones = $campaignRecipients
+            ->map(fn (WhatsAppCampaignRecipient $recipient): string => $this->thread->normalizePhoneForStorage((string) $recipient->student?->mobile))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $campaignContacts = $this->contacts->resolveMany($campaignPhones);
 
-                $phone = $this->thread->normalizePhoneForStorage((string) $student->mobile);
+        $sessions = $this->openSessionsFor($metaRows, $campaignRecipients);
 
-                if ($phone !== '' && isset($seenPhones[$phone])) {
-                    return;
-                }
+        $conversations = collect();
 
-                if ($phone !== '') {
-                    $seenPhones[$phone] = true;
-                }
+        foreach ($metaRows as $row) {
+            $conversations->push($this->conversationFromMetaMessage(
+                $row['message'],
+                $row['contact'],
+                $row['phone'],
+                $row['failed'],
+                $this->sessionIsOpen($row['student'], $row['phone'], $sessions),
+                $campaignSentPreviews,
+            ));
+        }
 
-                $contact = $phone !== ''
-                    ? $this->contacts->resolve($phone)
-                    : $this->contactFromStudentOnly($student);
+        foreach ($campaignRecipients as $recipient) {
+            $student = $recipient->student;
 
-                $conversations->push($this->conversationFromCampaignRecipient($recipient, $contact));
-            });
+            if (! $student) {
+                continue;
+            }
+
+            $phone = $this->thread->normalizePhoneForStorage((string) $student->mobile);
+
+            if ($phone !== '' && isset($seenPhones[$phone])) {
+                continue;
+            }
+
+            if ($phone !== '') {
+                $seenPhones[$phone] = true;
+            }
+
+            $contact = $phone !== ''
+                ? ($campaignContacts->get($phone) ?? WhatsAppInboxContact::unknown())
+                : $this->contactFromStudentOnly($student);
+
+            $conversations->push($this->conversationFromCampaignRecipient(
+                $recipient,
+                $contact,
+                $this->sessionIsOpen($student, $phone, $sessions),
+            ));
+        }
 
         return $this->filterAndSort($conversations, $search, $limit);
     }
@@ -122,28 +154,39 @@ class MetaWhatsAppConversationService
      */
     protected function conversationsFromCampaignsOnly(?string $search, int $limit): Collection
     {
-        $conversations = WhatsAppCampaignRecipient::query()
+        $recipients = WhatsAppCampaignRecipient::query()
             ->with(['student:id,name,mobile,status', 'campaign.template'])
             ->whereNotNull('student_id')
             ->orderByDesc('updated_at')
             ->limit(max(200, $limit))
             ->get()
             ->unique('student_id')
-            ->map(function (WhatsAppCampaignRecipient $recipient): ?MetaWhatsAppConversation {
+            ->filter(fn (WhatsAppCampaignRecipient $recipient): bool => $recipient->student !== null)
+            ->values();
+
+        $phones = $recipients
+            ->map(fn (WhatsAppCampaignRecipient $recipient): string => $this->thread->normalizePhoneForStorage((string) $recipient->student?->mobile))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $contacts = $this->contacts->resolveMany($phones);
+        $sessions = $this->openSessionsFor([], $recipients);
+
+        $conversations = $recipients
+            ->map(function (WhatsAppCampaignRecipient $recipient) use ($contacts, $sessions): MetaWhatsAppConversation {
                 $student = $recipient->student;
-
-                if (! $student) {
-                    return null;
-                }
-
-                $phone = $this->thread->normalizePhoneForStorage((string) $student->mobile);
+                $phone = $this->thread->normalizePhoneForStorage((string) $student?->mobile);
                 $contact = $phone !== ''
-                    ? $this->contacts->resolve($phone)
+                    ? ($contacts->get($phone) ?? WhatsAppInboxContact::unknown())
                     : $this->contactFromStudentOnly($student);
 
-                return $this->conversationFromCampaignRecipient($recipient, $contact);
+                return $this->conversationFromCampaignRecipient(
+                    $recipient,
+                    $contact,
+                    $this->sessionIsOpen($student, $phone, $sessions),
+                );
             })
-            ->filter()
             ->values();
 
         return $this->filterAndSort($conversations, $search, $limit);
@@ -198,11 +241,120 @@ class MetaWhatsAppConversationService
         return $map;
     }
 
+    public function inboxChangeStamp(): string
+    {
+        $messages = Schema::hasTable('meta_whatsapp_messages')
+            ? (string) MetaWhatsAppMessage::query()->max('updated_at')
+            : '';
+        $campaigns = Schema::hasTable('whatsapp_campaign_recipients')
+            ? (string) WhatsAppCampaignRecipient::query()->max('updated_at')
+            : '';
+
+        return $messages.'|'.$campaigns;
+    }
+
+    /**
+     * @param  list<array{student: ?Student, phone: string}>  $metaRows
+     * @param  Collection<int, WhatsAppCampaignRecipient>  $campaignRecipients
+     * @return array{phones: array<string, true>, students: array<int, true>}
+     */
+    protected function openSessionsFor(array $metaRows, Collection $campaignRecipients): array
+    {
+        $phones = [];
+        $studentIds = [];
+
+        foreach ($metaRows as $row) {
+            $this->collectSessionKeys($row['student'] ?? null, (string) ($row['phone'] ?? ''), $phones, $studentIds);
+        }
+
+        foreach ($campaignRecipients as $recipient) {
+            $student = $recipient->student;
+            $phone = $student
+                ? $this->thread->normalizePhoneForStorage((string) $student->mobile)
+                : '';
+            $this->collectSessionKeys($student, $phone, $phones, $studentIds);
+        }
+
+        return $this->thread->openSessionLookup($phones, $studentIds);
+    }
+
+    /**
+     * @param  list<string>  $phones
+     * @param  list<int>  $studentIds
+     */
+    protected function collectSessionKeys(?Student $student, string $phone, array &$phones, array &$studentIds): void
+    {
+        if ($student) {
+            $studentPhone = $this->thread->normalizePhoneForStorage((string) $student->mobile);
+
+            if ($studentPhone === '') {
+                return;
+            }
+
+            $phones[] = $studentPhone;
+            $studentIds[] = $student->id;
+
+            return;
+        }
+
+        if ($phone !== '') {
+            $phones[] = $phone;
+        }
+    }
+
+    /**
+     * @param  array{phones: array<string, true>, students: array<int, true>}  $sessions
+     */
+    protected function sessionIsOpen(?Student $student, string $phone, array $sessions): bool
+    {
+        if ($student) {
+            $studentPhone = $this->thread->normalizePhoneForStorage((string) $student->mobile);
+
+            if ($studentPhone === '') {
+                return false;
+            }
+
+            return isset($sessions['phones'][$studentPhone]) || isset($sessions['students'][$student->id]);
+        }
+
+        return $phone !== '' && isset($sessions['phones'][$phone]);
+    }
+
+    /**
+     * @param  Collection<int, MetaWhatsAppMessage>  $latestMeta
+     * @return array<int, ?string>
+     */
+    protected function campaignSentPreviews(Collection $latestMeta): array
+    {
+        $ids = $latestMeta
+            ->pluck('whatsapp_campaign_recipient_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return WhatsAppCampaignRecipient::query()
+            ->whereIn('id', $ids)
+            ->get(['id', 'message_sent'])
+            ->mapWithKeys(fn (WhatsAppCampaignRecipient $recipient): array => [
+                (int) $recipient->id => $recipient->message_sent,
+            ])
+            ->all();
+    }
+
+    /**
+     * @param  array<int, ?string>|null  $campaignSentPreviews
+     */
     protected function conversationFromMetaMessage(
         MetaWhatsAppMessage $message,
         WhatsAppInboxContact $contact,
         ?string $normalizedPhone = null,
         bool $lastSendFailed = false,
+        bool $sessionOpen = false,
+        ?array $campaignSentPreviews = null,
     ): MetaWhatsAppConversation {
         $messageType = Schema::hasColumn('meta_whatsapp_messages', 'message_type')
             ? (string) ($message->message_type ?? 'text')
@@ -212,9 +364,10 @@ class MetaWhatsAppConversationService
             : '';
         $rawPreview = (string) ($message->body_preview ?? '');
         if (str_contains($rawPreview, '{{') && filled($message->whatsapp_campaign_recipient_id)) {
-            $messageSent = WhatsAppCampaignRecipient::query()
-                ->whereKey($message->whatsapp_campaign_recipient_id)
-                ->value('message_sent');
+            $recipientId = (int) $message->whatsapp_campaign_recipient_id;
+            $messageSent = $campaignSentPreviews === null
+                ? WhatsAppCampaignRecipient::query()->whereKey($recipientId)->value('message_sent')
+                : ($campaignSentPreviews[$recipientId] ?? null);
             if (is_string($messageSent) && $messageSent !== '' && ! str_contains($messageSent, '{{')) {
                 $rawPreview = $messageSent;
             }
@@ -250,9 +403,7 @@ class MetaWhatsAppConversationService
             preview: $preview,
             lastDirection: $direction,
             lastAt: $lastAt,
-            sessionOpen: $student
-                ? $this->thread->sessionOpenForStudent($student)
-                : $this->thread->sessionOpenForPhone($phone),
+            sessionOpen: $sessionOpen,
             needsReply: $direction === 'inbound',
             lastSendFailed: $lastSendFailed,
             isLinked: $contact->isLinked(),
@@ -265,6 +416,7 @@ class MetaWhatsAppConversationService
     protected function conversationFromCampaignRecipient(
         WhatsAppCampaignRecipient $recipient,
         WhatsAppInboxContact $contact,
+        bool $sessionOpen = false,
     ): MetaWhatsAppConversation {
         $preview = trim((string) ($recipient->message_sent ?? ''));
 
@@ -283,7 +435,7 @@ class MetaWhatsAppConversationService
             preview: $preview,
             lastDirection: 'outbound',
             lastAt: $recipient->updated_at ?? $recipient->created_at,
-            sessionOpen: $student ? $this->thread->sessionOpenForStudent($student) : false,
+            sessionOpen: $sessionOpen,
             needsReply: false,
             lastSendFailed: $recipient->status === WhatsAppRecipientStatus::Failed,
             isLinked: $contact->isLinked(),

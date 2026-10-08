@@ -27,7 +27,7 @@ class StudentWhatsAppThreadService
     /**
      * @return Collection<int, StudentWhatsAppThreadItem>
      */
-    public function threadForStudent(Student $student, int $limit = 50): Collection
+    public function threadForStudent(Student $student, int $limit = 50, bool $downloadPendingMedia = true): Collection
     {
         $phone = $this->normalizePhone((string) $student->mobile);
         $metaSupported = $this->metaMessagesSupported();
@@ -59,7 +59,7 @@ class StudentWhatsAppThreadService
             ));
 
         $metaMessages = $metaSupported
-            ? $this->loadMetaMessages($student, $phone, $limit)
+            ? $this->loadMetaMessages($student, $phone, $limit, $downloadPendingMedia)
             : collect();
 
         return $campaignMessages
@@ -109,9 +109,101 @@ class StudentWhatsAppThreadService
     }
 
     /**
+     * Same 24-hour rule as sessionOpenForPhone(), for many chats in one query.
+     *
+     * @param  list<string>  $phones
+     * @param  list<int>  $studentIds
+     * @return array{phones: array<string, true>, students: array<int, true>}
+     */
+    public function openSessionLookup(array $phones, array $studentIds): array
+    {
+        $empty = ['phones' => [], 'students' => []];
+
+        if (! $this->metaMessagesSupported() || ! $this->meta->isConfigured()) {
+            return $empty;
+        }
+
+        $phones = array_values(array_unique(array_filter($phones, fn (string $phone): bool => $phone !== '')));
+        $studentIds = array_values(array_unique(array_filter($studentIds)));
+
+        if ($phones === [] && $studentIds === []) {
+            return $empty;
+        }
+
+        $rows = MetaWhatsAppMessage::query()
+            ->where('direction', MetaWhatsAppMessageDirection::Inbound->value)
+            ->where('created_at', '>=', now()->subHours(24))
+            ->where(function ($query) use ($phones, $studentIds): void {
+                if ($phones !== []) {
+                    $query->whereIn('phone', $phones);
+                }
+
+                if ($studentIds !== []) {
+                    if ($phones === []) {
+                        $query->whereIn('student_id', $studentIds);
+                    } else {
+                        $query->orWhereIn('student_id', $studentIds);
+                    }
+                }
+            })
+            ->get(['phone', 'student_id']);
+
+        $openPhones = [];
+        $openStudents = [];
+
+        foreach ($rows as $row) {
+            $phone = $this->normalizePhone((string) $row->phone);
+
+            if ($phone !== '') {
+                $openPhones[$phone] = true;
+            }
+
+            if ($row->student_id) {
+                $openStudents[(int) $row->student_id] = true;
+            }
+        }
+
+        return ['phones' => $openPhones, 'students' => $openStudents];
+    }
+
+    public function downloadNextPendingMedia(?Student $student, ?string $phone = null): void
+    {
+        if (! $this->metaMessagesSupported()) {
+            return;
+        }
+
+        $phone = $this->normalizePhone((string) ($phone ?: $student?->mobile ?: ''));
+
+        if ($student) {
+            $query = MetaWhatsAppMessage::query()->orderByDesc('created_at')->limit(50);
+
+            if ($phone !== '') {
+                $query->where(function ($inner) use ($student, $phone): void {
+                    $inner->where('student_id', $student->id)
+                        ->orWhere('phone', $phone);
+                });
+            } else {
+                $query->where('student_id', $student->id);
+            }
+
+            $rows = $query->get();
+        } elseif ($phone !== '') {
+            $rows = MetaWhatsAppMessage::query()
+                ->where('phone', $phone)
+                ->orderByDesc('created_at')
+                ->limit(50)
+                ->get();
+        } else {
+            return;
+        }
+
+        $this->media->syncPendingDownloads($rows, 1, 6, true);
+    }
+
+    /**
      * @return Collection<int, StudentWhatsAppThreadItem>
      */
-    public function threadForPhone(string $phone, int $limit = 50): Collection
+    public function threadForPhone(string $phone, int $limit = 50, bool $downloadPendingMedia = true): Collection
     {
         $phone = $this->normalizePhone($phone);
 
@@ -119,7 +211,7 @@ class StudentWhatsAppThreadService
             return collect();
         }
 
-        return $this->loadMetaMessagesByPhone($phone, $limit)
+        return $this->loadMetaMessagesByPhone($phone, $limit, $downloadPendingMedia)
             ->filter(fn (StudentWhatsAppThreadItem $item): bool => $item->at !== null)
             ->sortBy(fn (StudentWhatsAppThreadItem $item) => $item->at?->timestamp ?? 0)
             ->values()
@@ -134,7 +226,7 @@ class StudentWhatsAppThreadService
     /**
      * @return Collection<int, StudentWhatsAppThreadItem>
      */
-    protected function loadMetaMessages(Student $student, string $phone, int $limit): Collection
+    protected function loadMetaMessages(Student $student, string $phone, int $limit, bool $downloadPendingMedia = true): Collection
     {
         $metaQuery = MetaWhatsAppMessage::query()
             ->with('sentBy:id,name')
@@ -150,13 +242,13 @@ class StudentWhatsAppThreadService
             $metaQuery->where('student_id', $student->id);
         }
 
-        return $this->mapMetaMessageRows($metaQuery->get());
+        return $this->mapMetaMessageRows($metaQuery->get(), $downloadPendingMedia);
     }
 
     /**
      * @return Collection<int, StudentWhatsAppThreadItem>
      */
-    protected function loadMetaMessagesByPhone(string $phone, int $limit): Collection
+    protected function loadMetaMessagesByPhone(string $phone, int $limit, bool $downloadPendingMedia = true): Collection
     {
         $rows = MetaWhatsAppMessage::query()
             ->with('sentBy:id,name')
@@ -165,16 +257,16 @@ class StudentWhatsAppThreadService
             ->limit($limit)
             ->get();
 
-        return $this->mapMetaMessageRows($rows);
+        return $this->mapMetaMessageRows($rows, $downloadPendingMedia);
     }
 
     /**
      * @param  Collection<int, MetaWhatsAppMessage>  $rows
      * @return Collection<int, StudentWhatsAppThreadItem>
      */
-    protected function mapMetaMessageRows(Collection $rows): Collection
+    protected function mapMetaMessageRows(Collection $rows, bool $downloadPendingMedia = true): Collection
     {
-        if ($rows->isNotEmpty()) {
+        if ($downloadPendingMedia && $rows->isNotEmpty()) {
             $this->media->syncPendingDownloads($rows);
             $rows = MetaWhatsAppMessage::query()
                 ->with('sentBy:id,name')

@@ -7,6 +7,7 @@ use App\Enums\StudentStatus;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Enums\WhatsAppRecipientStatus;
 use App\Models\MetaWhatsAppMessage;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
@@ -14,6 +15,7 @@ use App\Models\WhatsAppCampaignRecipient;
 use App\Models\WhatsAppTemplate;
 use App\Services\MetaWhatsAppConversationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 use Tests\TestCase;
 
 class MetaWhatsAppConversationServiceTest extends TestCase
@@ -336,6 +338,52 @@ class MetaWhatsAppConversationServiceTest extends TestCase
         $this->assertSame('student', $byName['No Mobile Enrolled']->contactKind);
         $this->assertSame('lead', $byName['No Mobile Lead']->contactKind);
         $this->assertSame('Hello', $byName['Normal Chat']->preview);
+    }
+
+    public function test_24h_badge_follows_the_latest_parent_message(): void
+    {
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-token'), 'meta_whatsapp');
+
+        $open = Student::query()->create([
+            'name' => 'Open Window',
+            'mobile' => '9811000401',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        $closed = Student::query()->create([
+            'name' => 'Closed Window',
+            'mobile' => '9811000402',
+            'status' => StudentStatus::Enrolled,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919811000401',
+            'student_id' => $open->id,
+            'body_preview' => 'Recent parent message',
+            'status' => 'received',
+            'status_at' => now()->subHour(),
+        ]);
+
+        $old = MetaWhatsAppMessage::query()->create([
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919811000402',
+            'student_id' => $closed->id,
+            'body_preview' => 'Old parent message',
+            'status' => 'received',
+            'status_at' => now()->subDays(3),
+        ]);
+        $old->forceFill([
+            'created_at' => now()->subDays(3),
+            'updated_at' => now()->subDays(3),
+        ])->save();
+
+        $byPhone = app(MetaWhatsAppConversationService::class)->recentConversations()->keyBy('phone');
+
+        $this->assertTrue($byPhone['919811000401']->sessionOpen);
+        $this->assertFalse($byPhone['919811000402']->sessionOpen);
     }
 
     /**

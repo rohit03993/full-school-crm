@@ -166,7 +166,7 @@ class MetaWhatsAppMediaService
      *
      * @param  iterable<MetaWhatsAppMessage>  $messages
      */
-    public function syncPendingDownloads(iterable $messages, int $limit = 10, int $timeoutSeconds = 12): int
+    public function syncPendingDownloads(iterable $messages, int $limit = 10, int $timeoutSeconds = 12, bool $allowShortTimeout = false): int
     {
         if (! $this->meta->isConfigured()) {
             return 0;
@@ -200,7 +200,7 @@ class MetaWhatsAppMediaService
                 $message = $message->fresh() ?? $message;
             }
 
-            if ($this->downloadInboundMedia($message, $timeoutSeconds) !== null) {
+            if ($this->downloadInboundMedia($message, $timeoutSeconds, $allowShortTimeout) !== null) {
                 $synced++;
             }
         }
@@ -208,7 +208,7 @@ class MetaWhatsAppMediaService
         return $synced;
     }
 
-    public function downloadInboundMedia(MetaWhatsAppMessage $message, int $timeoutSeconds = 30): ?MetaWhatsAppMessage
+    public function downloadInboundMedia(MetaWhatsAppMessage $message, int $timeoutSeconds = 30, bool $allowShortTimeout = false): ?MetaWhatsAppMessage
     {
         $mediaId = (string) ($message->media_id ?? '');
 
@@ -243,7 +243,9 @@ class MetaWhatsAppMediaService
                 return null;
             }
 
-            $binaryResponse = Http::timeout(max($timeoutSeconds, 20))
+            $binaryTimeout = $allowShortTimeout ? max(1, $timeoutSeconds) : max($timeoutSeconds, 20);
+
+            $binaryResponse = Http::timeout($binaryTimeout)
                 ->withToken((string) $this->meta->accessToken())
                 ->get($downloadUrl);
 

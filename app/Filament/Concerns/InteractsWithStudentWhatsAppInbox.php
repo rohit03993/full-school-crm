@@ -215,6 +215,13 @@ trait InteractsWithStudentWhatsAppInbox
             return;
         }
 
+        $student = $this->whatsAppMessageStudent();
+        $phone = $this->whatsAppInboxPhone();
+
+        if ($student || filled($phone)) {
+            app(StudentWhatsAppThreadService::class)->downloadNextPendingMedia($student, $phone);
+        }
+
         $this->messagesTabLoaded = false;
         $this->loadMessagesTab();
     }
@@ -235,13 +242,13 @@ trait InteractsWithStudentWhatsAppInbox
             $resolver = app(WhatsAppProviderResolver::class);
 
             if ($student) {
-                $this->messageThread = $threadService->threadForStudent($student)
+                $this->messageThread = $threadService->threadForStudent($student, downloadPendingMedia: false)
                     ->map(fn (StudentWhatsAppThreadItem $item): array => $item->toArray())
                     ->values()
                     ->all();
                 $this->metaSessionOpen = $threadService->sessionOpenForStudent($student);
             } else {
-                $this->messageThread = $threadService->threadForPhone((string) $phone)
+                $this->messageThread = $threadService->threadForPhone((string) $phone, downloadPendingMedia: false)
                     ->map(fn (StudentWhatsAppThreadItem $item): array => $item->toArray())
                     ->values()
                     ->all();

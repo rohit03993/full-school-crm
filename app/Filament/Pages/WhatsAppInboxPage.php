@@ -88,24 +88,27 @@ class WhatsAppInboxPage extends Page
     /** @var 'all'|'pending'|'failed' */
     public string $listFilter = 'all';
 
+    public ?string $inboxChangeStamp = null;
+
     public function mount(): void
     {
         $this->initializeWhatsAppInboxState();
+        $this->loadInbox();
 
         $studentId = request()->query('student');
 
-        if (is_numeric($studentId)) {
-            $student = Student::query()->find((int) $studentId);
+        if (! is_numeric($studentId)) {
+            return;
+        }
 
-            if ($student) {
-                $this->selectConversation(
-                    app(StudentWhatsAppThreadService::class)->normalizePhoneForStorage((string) $student->mobile)
-                        ?: (string) $student->id,
-                    $student->id,
-                );
-            }
-        } else {
-            $this->loadInbox();
+        $student = Student::query()->find((int) $studentId);
+
+        if ($student) {
+            $this->selectConversation(
+                app(StudentWhatsAppThreadService::class)->normalizePhoneForStorage((string) $student->mobile)
+                    ?: (string) $student->id,
+                $student->id,
+            );
         }
     }
 
@@ -167,6 +170,12 @@ class WhatsAppInboxPage extends Page
             return;
         }
 
+        $stamp = app(MetaWhatsAppConversationService::class)->inboxChangeStamp();
+
+        if ($stamp === $this->inboxChangeStamp) {
+            return;
+        }
+
         $this->loadInbox();
 
         if (filled($this->selectedPhone) || filled($this->selectedStudentId)) {
@@ -197,11 +206,13 @@ class WhatsAppInboxPage extends Page
         $this->inboxLoaded = true;
 
         try {
-            $this->conversations = app(MetaWhatsAppConversationService::class)
+            $service = app(MetaWhatsAppConversationService::class);
+            $this->conversations = $service
                 ->recentConversations($this->search, 500)
                 ->map(fn (MetaWhatsAppConversation $conversation): array => $conversation->toArray())
                 ->values()
                 ->all();
+            $this->inboxChangeStamp = $service->inboxChangeStamp();
         } catch (\Throwable $exception) {
             report($exception);
             $this->conversations = [];
@@ -229,7 +240,6 @@ class WhatsAppInboxPage extends Page
 
             $this->resetMessagesTab();
             $this->loadMessagesTab();
-            $this->loadInbox();
         } catch (\Throwable $exception) {
             report($exception);
 

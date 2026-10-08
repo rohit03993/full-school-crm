@@ -116,24 +116,18 @@ class WhatsAppInboxContactResolver
             return [];
         }
 
+        $wanted = array_fill_keys($tenDigits, true);
         $map = [];
 
         Student::query()
             ->whereNotNull('mobile')
             ->where('mobile', '!=', '')
-            ->where(function ($query) use ($tenDigits): void {
-                foreach ($tenDigits as $ten) {
-                    $query->orWhere('mobile', $ten)
-                        ->orWhere('mobile', '91'.$ten)
-                        ->orWhere('mobile', 'like', '%'.$ten);
-                }
-            })
             ->orderByDesc('id')
             ->get(['id', 'name', 'mobile', 'status'])
-            ->each(function (Student $student) use (&$map): void {
+            ->each(function (Student $student) use (&$map, $wanted): void {
                 $ten = $this->tenDigit((string) $student->mobile);
 
-                if ($ten === '' || isset($map[$ten])) {
+                if ($ten === '' || ! isset($wanted[$ten]) || isset($map[$ten])) {
                     return;
                 }
 
@@ -155,25 +149,19 @@ class WhatsAppInboxContactResolver
             return [];
         }
 
+        $wanted = array_fill_keys($tenDigits, true);
         $map = [];
 
         User::query()
             ->where('is_active', true)
             ->whereNotNull('mobile')
             ->where('mobile', '!=', '')
-            ->where(function ($query) use ($tenDigits): void {
-                foreach ($tenDigits as $ten) {
-                    $query->orWhere('mobile', $ten)
-                        ->orWhere('mobile', '91'.$ten)
-                        ->orWhere('mobile', 'like', '%'.$ten);
-                }
-            })
             ->orderByDesc('id')
             ->get(['id', 'name', 'mobile'])
-            ->each(function (User $user) use (&$map): void {
+            ->each(function (User $user) use (&$map, $wanted): void {
                 $ten = $this->tenDigit((string) $user->mobile);
 
-                if ($ten === '' || isset($map[$ten])) {
+                if ($ten === '' || ! isset($wanted[$ten]) || isset($map[$ten])) {
                     return;
                 }
 
@@ -184,16 +172,9 @@ class WhatsAppInboxContactResolver
             ->with(['user:id,name,mobile,is_active'])
             ->whereNotNull('mobile')
             ->where('mobile', '!=', '')
-            ->where(function ($query) use ($tenDigits): void {
-                foreach ($tenDigits as $ten) {
-                    $query->orWhere('mobile', $ten)
-                        ->orWhere('mobile', '91'.$ten)
-                        ->orWhere('mobile', 'like', '%'.$ten);
-                }
-            })
             ->orderByDesc('id')
             ->get()
-            ->each(function (StaffProfile $profile) use (&$map): void {
+            ->each(function (StaffProfile $profile) use (&$map, $wanted): void {
                 $user = $profile->user;
 
                 if (! $user || ! $user->is_active) {
@@ -202,7 +183,7 @@ class WhatsAppInboxContactResolver
 
                 $ten = $this->tenDigit((string) $profile->mobile);
 
-                if ($ten === '' || isset($map[$ten])) {
+                if ($ten === '' || ! isset($wanted[$ten]) || isset($map[$ten])) {
                     return;
                 }
 
