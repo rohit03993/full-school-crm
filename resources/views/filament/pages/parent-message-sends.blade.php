@@ -133,9 +133,50 @@
                 </tbody>
             </table>
         </div>
-        @if ($recentRows->hasPages())
-            <div class="border-t border-gray-100 px-4 py-3 dark:border-white/10">
-                {{ $recentRows->links() }}
+        @if ($recentRows->total() > 0)
+            @php
+                $currentPage = $recentRows->currentPage();
+                $lastPage = $recentRows->lastPage();
+                $pageFrom = max(1, $currentPage - 2);
+                $pageTo = min($lastPage, $currentPage + 2);
+            @endphp
+            <div class="flex flex-col gap-3 border-t border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
+                <p class="text-sm text-gray-500 dark:text-gray-400">{{ $recentRows->firstItem() }}–{{ $recentRows->lastItem() }} of {{ $recentRows->total() }} clicks</p>
+                @if ($recentRows->hasPages())
+                    <div class="flex flex-wrap items-center gap-1">
+                        <button
+                            type="button"
+                            wire:click="previousPage"
+                            @disabled($recentRows->onFirstPage())
+                            class="inline-flex h-9 items-center rounded-lg bg-white px-3 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-300 disabled:ring-gray-100 dark:bg-gray-900 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/5 dark:disabled:bg-white/5 dark:disabled:text-gray-600"
+                        >Previous</button>
+                        @if ($pageFrom > 1)
+                            <button type="button" wire:click="gotoPage(1)" class="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-white px-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/5">1</button>
+                            @if ($pageFrom > 2)
+                                <span class="px-1 text-sm text-gray-400">…</span>
+                            @endif
+                        @endif
+                        @for ($pageNumber = $pageFrom; $pageNumber <= $pageTo; $pageNumber++)
+                            @if ($pageNumber === $currentPage)
+                                <span class="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-primary-600 px-2 text-sm font-semibold text-white" aria-current="page">{{ $pageNumber }}</span>
+                            @else
+                                <button type="button" wire:click="gotoPage({{ $pageNumber }})" class="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-white px-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/5">{{ $pageNumber }}</button>
+                            @endif
+                        @endfor
+                        @if ($pageTo < $lastPage)
+                            @if ($pageTo < $lastPage - 1)
+                                <span class="px-1 text-sm text-gray-400">…</span>
+                            @endif
+                            <button type="button" wire:click="gotoPage({{ $lastPage }})" class="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-white px-2 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/5">{{ $lastPage }}</button>
+                        @endif
+                        <button
+                            type="button"
+                            wire:click="nextPage"
+                            @disabled(! $recentRows->hasMorePages())
+                            class="inline-flex h-9 items-center rounded-lg bg-white px-3 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-300 disabled:ring-gray-100 dark:bg-gray-900 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/5 dark:disabled:bg-white/5 dark:disabled:text-gray-600"
+                        >Next</button>
+                    </div>
+                @endif
             </div>
         @endif
     </section>
