@@ -18,7 +18,7 @@ The description must be a short letter with a blank line between each part:
 5. Add "Instructions for Students:" and one or two correct sentences. Name the exercise or question numbers again, and ask the student to write the solutions in the homework notebook. Do not write the words "that same work".
 6. End with these lines:
 Warm regards,
-Subject Teacher
+Then the teacher name you are given, on its own line. Copy that name exactly. Do not write "Subject Teacher" when a teacher name is given. If no teacher name is given, write "Subject Teacher".
 Then the school name, if a school name is given.
 
 The title should look like "Topic – Exercise 1.1" when the teacher wrote a topic and an exercise. Do not start the title with the subject name.
@@ -31,17 +31,19 @@ PROMPT;
     }
 
     /**
-     * @param  array{class_label?: string, subject_label?: string, school_name?: string}  $context
+     * @param  array{class_label?: string, subject_label?: string, school_name?: string, teacher_name?: string}  $context
      */
     public static function user(string $title, string $description, array $context = []): string
     {
         $school = trim((string) ($context['school_name'] ?? ''));
         $class = trim((string) ($context['class_label'] ?? ''));
         $subject = trim((string) ($context['subject_label'] ?? ''));
+        $teacher = trim((string) ($context['teacher_name'] ?? ''));
 
         return "School: ".($school !== '' ? $school : '(not given)')
             ."\nClass: ".($class !== '' ? $class : '(not given)')
             ."\nSubject: ".($subject !== '' ? $subject : '(not given)')
+            ."\nTeacher name: ".($teacher !== '' ? $teacher : '(not given)')
             ."\n\nTeacher title:\n".$title
             ."\n\nTeacher details:\n".$description;
     }

@@ -65,7 +65,7 @@ class HomeworkAiService
     }
 
     /**
-     * @param  array{class_label?: string, subject_label?: string, school_name?: string}  $context
+     * @param  array{class_label?: string, subject_label?: string, school_name?: string, teacher_name?: string}  $context
      */
     public function improve(User $user, string $title, string $description, array $context = []): HomeworkImproveOutcome
     {
@@ -158,8 +158,8 @@ class HomeworkAiService
     }
 
     /**
-     * @param  array{class_label?: string, subject_label?: string, school_name?: string}  $context
-     * @return array{class_label: string, subject_label: string, school_name: string}
+     * @param  array{class_label?: string, subject_label?: string, school_name?: string, teacher_name?: string}  $context
+     * @return array{class_label: string, subject_label: string, school_name: string, teacher_name: string}
      */
     private function cleanContext(array $context): array
     {
@@ -167,6 +167,7 @@ class HomeworkAiService
             'class_label' => $this->clean((string) ($context['class_label'] ?? ''), 200),
             'subject_label' => $this->clean((string) ($context['subject_label'] ?? ''), 200),
             'school_name' => $this->clean((string) ($context['school_name'] ?? ''), 200),
+            'teacher_name' => $this->clean((string) ($context['teacher_name'] ?? ''), 200),
         ];
     }
 

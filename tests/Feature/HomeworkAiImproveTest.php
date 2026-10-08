@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\BatchStaffRole;
 use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\RoleName;
@@ -9,6 +10,7 @@ use App\Enums\StaffJobRole;
 use App\Filament\Pages\HomeworkReviewPage;
 use App\Models\AcademicSession;
 use App\Models\Batch;
+use App\Models\BatchStaffAssignment;
 use App\Models\Course;
 use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
@@ -51,6 +53,16 @@ class HomeworkAiImproveTest extends TestCase
         ]);
 
         $data = $this->seedClass();
+        $teacher = User::factory()->create([
+            'name' => 'Sunil Rana',
+            'is_active' => true,
+        ]);
+        BatchStaffAssignment::query()->create([
+            'batch_id' => $data['batch']->id,
+            'user_id' => $teacher->id,
+            'role' => BatchStaffRole::SubjectTeacher,
+            'course_subject_id' => $data['maths']->id,
+        ]);
         $this->actingAs($data['admin']);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
@@ -77,6 +89,7 @@ class HomeworkAiImproveTest extends TestCase
                 && str_contains($body, 'Exercise 1 and 2')
                 && str_contains($body, 'Dear Students')
                 && str_contains($body, 'Mathematics (MATH)')
+                && str_contains($body, 'Sunil Rana')
                 && str_contains($body, 'Do not add a test')
                 && ! str_contains($body, 'temperature')
                 && ! str_contains($body, 'test-gemini-key');

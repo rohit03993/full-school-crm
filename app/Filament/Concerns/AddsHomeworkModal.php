@@ -2,8 +2,10 @@
 
 namespace App\Filament\Concerns;
 
+use App\Enums\BatchStaffRole;
 use App\Enums\HomeworkAssignmentStatus;
 use App\Models\Batch;
+use App\Models\BatchStaffAssignment;
 use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
 use App\Services\HomeworkAiService;
@@ -527,7 +529,7 @@ trait AddsHomeworkModal
     }
 
     /**
-     * @return array{class_label: string, subject_label: string, school_name: string}
+     * @return array{class_label: string, subject_label: string, school_name: string, teacher_name: string}
      */
     protected function homeworkAiContext(): array
     {
@@ -546,7 +548,26 @@ trait AddsHomeworkModal
             'class_label' => $batch?->displayLabel() ?? '',
             'subject_label' => $subject?->displayLabel() ?? '',
             'school_name' => is_string($school) ? $school : '',
+            'teacher_name' => $this->homeworkAiTeacherName($batchId, $subjectId),
         ];
+    }
+
+    protected function homeworkAiTeacherName(int $batchId, int $subjectId): string
+    {
+        if ($batchId < 1 || $subjectId < 1) {
+            return '';
+        }
+
+        return BatchStaffAssignment::query()
+            ->where('batch_id', $batchId)
+            ->where('course_subject_id', $subjectId)
+            ->where('role', BatchStaffRole::SubjectTeacher)
+            ->with('user:id,name')
+            ->get()
+            ->map(fn (BatchStaffAssignment $row): string => trim((string) ($row->user?->name ?? '')))
+            ->filter()
+            ->unique()
+            ->implode(', ');
     }
 
     /**
