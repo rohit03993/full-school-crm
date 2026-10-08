@@ -18,6 +18,7 @@
     $sendReportUrl = $sendReportUrl ?? null;
     $missingSubjects = $missingSubjects ?? [];
     $missingSubjectReasons = $missingSubjectReasons ?? [];
+    $sendCooldownMinutes = $sendCooldownMinutes ?? [];
 @endphp
 
 <div class="space-y-3">
@@ -45,14 +46,6 @@
             {{ $windowNote }}
         </div>
     @endif
-
-    <div
-        wire:loading
-        wire:target="sendCombinedForBatch,sendCombined"
-        class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100"
-    >
-        Messages are going to parents. Please wait. Do not click again.
-    </div>
 
     <div class="flex min-w-0 flex-wrap gap-2 text-xs font-medium">
         <span class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">Waiting {{ $waiting }} · check</span>
@@ -102,6 +95,9 @@
                                 $sectionTitle = filled($section['section']) && $section['section'] !== '—'
                                     ? (string) $section['section']
                                     : (string) $section['class_label'];
+                                $waitMinutes = (int) ($sendCooldownMinutes[$batchId] ?? 0);
+                                $sendTarget = 'sendCombinedForBatch('.$batchId.')';
+                                $resendTarget = 'askDuplicateSend('.$batchId.')';
                             @endphp
                             <div @class([
                                 'px-4 py-3',
@@ -158,38 +154,46 @@
                                                 @endif
                                             </span>
                                         @endif
-                                        @if ($canSend && $hasReady)
+                                        @if ($canSend && $waitMinutes > 0)
+                                            <button
+                                                type="button"
+                                                disabled
+                                                class="cursor-not-allowed rounded-lg border border-gray-300 bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400"
+                                            >
+                                                Please wait {{ $waitMinutes }} min
+                                            </button>
+                                        @elseif ($canSend && $hasReady)
                                             <button
                                                 type="button"
                                                 wire:click="sendCombinedForBatch({{ $batchId }})"
                                                 wire:loading.attr="disabled"
-                                                wire:target="sendCombinedForBatch,sendCombined"
+                                                wire:target="{{ $sendTarget }}"
                                                 class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70"
                                             >
-                                                <span wire:loading.remove wire:target="sendCombinedForBatch,sendCombined">Send to parents</span>
-                                                <span wire:loading wire:target="sendCombinedForBatch,sendCombined">Sending… please wait</span>
+                                                <span wire:loading.remove wire:target="{{ $sendTarget }}">Send to parents</span>
+                                                <span wire:loading wire:target="{{ $sendTarget }}">Sending… please wait</span>
                                             </button>
                                         @elseif ($canSend && $hasSent && $leftOut->isEmpty())
                                             <button
                                                 type="button"
                                                 wire:click="askDuplicateSend({{ $batchId }})"
                                                 wire:loading.attr="disabled"
-                                                wire:target="askDuplicateSend,confirmDuplicateSend,sendCombinedForBatch,sendCombined"
+                                                wire:target="{{ $resendTarget }}"
                                                 class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/15 dark:bg-transparent dark:text-gray-200 dark:hover:bg-white/5 disabled:cursor-wait disabled:opacity-70"
                                             >
-                                                <span wire:loading.remove wire:target="askDuplicateSend,confirmDuplicateSend,sendCombinedForBatch,sendCombined">Resend</span>
-                                                <span wire:loading wire:target="askDuplicateSend,confirmDuplicateSend,sendCombinedForBatch,sendCombined">Sending… please wait</span>
+                                                <span wire:loading.remove wire:target="{{ $resendTarget }}">Resend</span>
+                                                <span wire:loading wire:target="{{ $resendTarget }}">Sending… please wait</span>
                                             </button>
                                         @elseif ($canSend && $hasSent && $leftOut->isNotEmpty())
                                             <button
                                                 type="button"
                                                 wire:click="sendCombinedForBatch({{ $batchId }})"
                                                 wire:loading.attr="disabled"
-                                                wire:target="sendCombinedForBatch,sendCombined"
+                                                wire:target="{{ $sendTarget }}"
                                                 class="rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-500/40 dark:bg-transparent dark:text-rose-200 dark:hover:bg-rose-500/10 disabled:cursor-wait disabled:opacity-70"
                                             >
-                                                <span wire:loading.remove wire:target="sendCombinedForBatch,sendCombined">Send to parents</span>
-                                                <span wire:loading wire:target="sendCombinedForBatch,sendCombined">Sending… please wait</span>
+                                                <span wire:loading.remove wire:target="{{ $sendTarget }}">Send to parents</span>
+                                                <span wire:loading wire:target="{{ $sendTarget }}">Sending… please wait</span>
                                             </button>
                                         @endif
                                     </div>

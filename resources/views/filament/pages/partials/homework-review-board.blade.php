@@ -3,6 +3,7 @@
         @php($summary = $board['summary'])
         @php($canEnter = (bool) ($canEnter ?? false))
         @php($canSend = (bool) ($canSend ?? false))
+        @php($sendCooldownMinutes = (int) ($sendCooldownMinutes ?? 0))
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex flex-wrap gap-2 text-xs font-medium">
                 <span class="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">Submitted: {{ $summary['submitted'] }}</span>
@@ -10,21 +11,35 @@
                 <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">Sent: {{ $summary['sent'] }}</span>
                 <span class="rounded-full bg-gray-100 px-2.5 py-1 text-gray-600 dark:bg-white/5 dark:text-gray-300">No homework: {{ $summary['missing'] }}</span>
             </div>
-            @if ($canSend)
+            @if ($canSend && $sendCooldownMinutes > 0)
+                <button
+                    type="button"
+                    disabled
+                    class="cursor-not-allowed rounded-lg border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-bold text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400"
+                >
+                    Please wait {{ $sendCooldownMinutes }} min
+                </button>
+            @elseif ($canSend)
                 <button
                     type="button"
                     @if (($summary['approved'] ?? 0) === 0 && ($summary['sent'] ?? 0) > 0)
                         wire:click="askDuplicateSend({{ (int) $batchId }})"
+                        wire:target="askDuplicateSend({{ (int) $batchId }})"
                     @else
                         wire:click="sendCombined"
+                        wire:target="sendCombined"
                     @endif
                     wire:loading.attr="disabled"
-                    wire:target="sendCombined,sendCombinedForBatch,askDuplicateSend,confirmDuplicateSend"
                     @disabled($summary['approved'] === 0 && $summary['sent'] === 0)
                     class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white hover:bg-primary-500 disabled:cursor-wait disabled:opacity-70"
                 >
-                    <span wire:loading.remove wire:target="sendCombined,sendCombinedForBatch">{{ ($summary['approved'] ?? 0) > 0 ? 'Send combined to parents' : 'Resend' }}</span>
-                    <span wire:loading wire:target="sendCombined,sendCombinedForBatch">Sending… please wait</span>
+                    @if (($summary['approved'] ?? 0) === 0 && ($summary['sent'] ?? 0) > 0)
+                        <span wire:loading.remove wire:target="askDuplicateSend({{ (int) $batchId }})">Resend</span>
+                        <span wire:loading wire:target="askDuplicateSend({{ (int) $batchId }})">Sending… please wait</span>
+                    @else
+                        <span wire:loading.remove wire:target="sendCombined">Send combined to parents</span>
+                        <span wire:loading wire:target="sendCombined">Sending… please wait</span>
+                    @endif
                 </button>
             @endif
         </div>

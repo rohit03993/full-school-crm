@@ -951,7 +951,7 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertNotified('Choose what happened for Physics.')
             ->call('setMissingReason', $data['physics']->id, 'no_homework')
             ->call('confirmClosedSend')
-            ->assertSee('Resend')
+            ->assertSee('Please wait 5 min')
             ->assertDontSee('Remove');
 
         $maths->refresh();
@@ -1344,12 +1344,15 @@ class HomeworkSubmissionServiceTest extends TestCase
 
         $this->actingAs($data['admin']);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->travelTo(now()->startOfDay()->addHours(12));
 
         Livewire::test(HomeworkReviewPage::class)
             ->call('sendCombinedForBatch', $data['batch']->id)
-            ->assertSee('Resend');
+            ->assertSee('Please wait 5 min');
 
         $this->assertSame(1, ParentMessageSend::query()->count());
+
+        $this->travel(6)->minutes();
 
         Livewire::test(HomeworkReviewPage::class)
             ->call('askDuplicateSend', $data['batch']->id)
@@ -1369,6 +1372,48 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertCount(2, $sends);
         $this->assertTrue($sends[1]->is_resend);
         $this->assertSame($data['admin']->name, $sends[1]->sentBy->name);
+    }
+
+    public function test_the_same_class_cannot_be_sent_again_for_five_minutes(): void
+    {
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response([
+                'messages' => [['id' => 'wamid.WAIT']],
+            ], 200),
+        ]);
+
+        $this->travelTo(now()->startOfDay()->addHours(12));
+
+        $data = $this->seedClass();
+        $this->seedCombinedTemplate();
+        $service = app(HomeworkSubmissionService::class);
+
+        foreach (['maths' => $data['mathTeacher'], 'physics' => $data['physicsTeacher']] as $subject => $teacher) {
+            $assignment = $service->submit($teacher, [
+                'batch_id' => $data['batch']->id,
+                'course_subject_id' => $data[$subject]->id,
+                'homework_date' => now()->toDateString(),
+                'title' => $subject,
+                'description' => 'Today',
+            ]);
+            $service->approve($data['admin'], $assignment->id);
+        }
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('sendCombinedForBatch', $data['batch']->id)
+            ->assertSee('Please wait 5 min');
+
+        $this->assertSame(1, ParentMessageSend::query()->count());
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('askDuplicateSend', $data['batch']->id)
+            ->assertNotified('Please wait')
+            ->assertSet('duplicateSendBatchId', null);
+
+        $this->assertSame(1, ParentMessageSend::query()->count());
     }
 
     public function test_a_new_days_homework_is_a_first_send_and_a_second_click_that_day_is_a_resend(): void

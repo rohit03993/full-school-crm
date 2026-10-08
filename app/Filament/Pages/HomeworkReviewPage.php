@@ -27,6 +27,7 @@ use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use UnitEnum;
 
@@ -69,6 +70,8 @@ class HomeworkReviewPage extends Page
 
     /** @var array<int|string, string> */
     public array $missingSubjectReasons = [];
+
+    protected const PARENT_SEND_COOLDOWN_MINUTES = 5;
 
     public static function getNavigationLabel(): string
     {
@@ -127,9 +130,11 @@ class HomeworkReviewPage extends Page
                             $date = $this->dateString();
 
                             $service = app(HomeworkSubmissionService::class);
+                            $desk = $service->deskForDate($date);
 
                             return [
-                                'desk' => $service->deskForDate($date),
+                                'desk' => $desk,
+                                'sendCooldownMinutes' => $this->sendCooldownMinutesByBatch($desk),
                                 'openBatchId' => (int) ($this->openBatchId ?? 0),
                                 'dateLabel' => Carbon::parse($date)->format('d M Y'),
                                 'isToday' => $date === now()->toDateString(),
@@ -205,6 +210,7 @@ class HomeworkReviewPage extends Page
                     return [
                         'ready' => (bool) $ready,
                         'batchId' => $batchId,
+                        'sendCooldownMinutes' => $this->sendCooldownMinutes($batchId),
                         'board' => $board,
                         'dateLabel' => Carbon::parse($date)->format('d M Y'),
                         'canEnter' => $service->canEnterHomework($date),
@@ -255,6 +261,10 @@ class HomeworkReviewPage extends Page
             return;
         }
 
+        if ($this->blockIfSendCoolingDown($batchId)) {
+            return;
+        }
+
         $this->form->fill([
             ...($this->data ?? []),
             'batch_id' => $batchId,
@@ -294,6 +304,10 @@ class HomeworkReviewPage extends Page
             return;
         }
 
+        if ($this->blockIfSendCoolingDown($batchId)) {
+            return;
+        }
+
         $this->form->fill([
             ...($this->data ?? []),
             'batch_id' => $batchId,
@@ -305,6 +319,10 @@ class HomeworkReviewPage extends Page
     public function sendCombinedForBatch(int $batchId): void
     {
         if ($batchId < 1) {
+            return;
+        }
+
+        if ($this->blockIfSendCoolingDown($batchId)) {
             return;
         }
 
@@ -342,6 +360,10 @@ class HomeworkReviewPage extends Page
         $batchId = (int) ($this->sendConfirmBatchId ?? 0);
 
         if (! $user || $batchId < 1) {
+            return;
+        }
+
+        if ($this->blockIfSendCoolingDown($batchId)) {
             return;
         }
 
@@ -469,6 +491,18 @@ class HomeworkReviewPage extends Page
             return;
         }
 
+        if ($batchId > 0 && $this->blockIfSendCoolingDown($batchId)) {
+            return;
+        }
+
+        $claimedCooldown = $batchId > 0 && $this->claimSendCooldown($batchId);
+
+        if ($batchId > 0 && ! $claimedCooldown) {
+            $this->blockIfSendCoolingDown($batchId);
+
+            return;
+        }
+
         try {
             $result = app(HomeworkSubmissionService::class)->combinedSend(
                 $user,
@@ -477,6 +511,10 @@ class HomeworkReviewPage extends Page
                 app(HomeworkWhatsAppService::class)->defaultCombinedTemplateName(),
             );
         } catch (ValidationException $exception) {
+            if ($claimedCooldown) {
+                $this->releaseSendCooldown($batchId);
+            }
+
             $message = collect($exception->errors())->flatten()->first() ?? 'Could not send to parents.';
             Notification::make()
                 ->title((string) $message)
@@ -487,6 +525,10 @@ class HomeworkReviewPage extends Page
 
             return;
         } catch (\Throwable $exception) {
+            if ($claimedCooldown) {
+                $this->releaseSendCooldown($batchId);
+            }
+
             report($exception);
             Notification::make()
                 ->title('Could not send to parents')
@@ -497,6 +539,11 @@ class HomeworkReviewPage extends Page
 
             return;
         }
+
+        if (($result['sent'] ?? 0) < 1) {
+            $this->releaseSendCooldown($batchId);
+        }
+
         $this->lastCombinedSendResult = $result;
         $costNote = '';
 
@@ -539,5 +586,86 @@ class HomeworkReviewPage extends Page
         $value = $this->data['homework_date'] ?? null;
 
         return filled($value) ? Carbon::parse((string) $value)->toDateString() : now()->toDateString();
+    }
+
+    /**
+     * @param  array<string, mixed>  $desk
+     * @return array<int, int>
+     */
+    protected function sendCooldownMinutesByBatch(array $desk): array
+    {
+        $minutes = [];
+
+        foreach ($desk['groups'] ?? [] as $group) {
+            foreach ($group['sections'] ?? [] as $section) {
+                $batchId = (int) ($section['batch_id'] ?? 0);
+                $left = $this->sendCooldownMinutes($batchId);
+
+                if ($left > 0) {
+                    $minutes[$batchId] = $left;
+                }
+            }
+        }
+
+        return $minutes;
+    }
+
+    protected function sendCooldownMinutes(int $batchId): int
+    {
+        if ($batchId < 1) {
+            return 0;
+        }
+
+        $until = Cache::get($this->sendCooldownCacheKey($batchId));
+
+        if (! is_numeric($until)) {
+            return 0;
+        }
+
+        $left = (int) $until - now()->getTimestamp();
+
+        if ($left < 1) {
+            return 0;
+        }
+
+        return (int) max(1, (int) ceil($left / 60));
+    }
+
+    protected function blockIfSendCoolingDown(int $batchId): bool
+    {
+        $minutes = $this->sendCooldownMinutes($batchId);
+
+        if ($minutes < 1) {
+            return false;
+        }
+
+        Notification::make()
+            ->title('Please wait')
+            ->body('This class was just clicked. You can send it again in '.$minutes.' '.($minutes === 1 ? 'minute' : 'minutes').'. Nothing new was sent.')
+            ->warning()
+            ->send();
+
+        return true;
+    }
+
+    protected function claimSendCooldown(int $batchId): bool
+    {
+        $until = now()->addMinutes(self::PARENT_SEND_COOLDOWN_MINUTES)->getTimestamp();
+
+        return Cache::add(
+            $this->sendCooldownCacheKey($batchId),
+            $until,
+            now()->addMinutes(self::PARENT_SEND_COOLDOWN_MINUTES),
+        );
+    }
+
+    protected function releaseSendCooldown(int $batchId): void
+    {
+        Cache::forget($this->sendCooldownCacheKey($batchId));
+    }
+
+    protected function sendCooldownCacheKey(int $batchId): string
+    {
+        return 'homework-parent-send:'.$batchId.':'.$this->dateString();
     }
 }
