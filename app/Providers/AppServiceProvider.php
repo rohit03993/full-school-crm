@@ -6,6 +6,7 @@ use App\Ai\Homework\GeminiHomeworkTextImprover;
 use App\Ai\Homework\HomeworkTextImprover;
 use App\Ai\Homework\MissingHomeworkTextImprover;
 use App\Ai\Homework\OpenAiHomeworkTextImprover;
+use App\Livewire\WhatsAppInboxThread;
 use App\Http\Responses\LogoutResponse;
 use App\Enums\LicenseFeature;
 use App\Models\Student;
@@ -23,6 +24,7 @@ use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -47,6 +49,8 @@ class AppServiceProvider extends ServiceProvider
         app(StaffDailySessionService::class)->applyWorkingDayLifetime();
 
         CrmLivewireErrors::register();
+
+        Livewire::component('whatsapp-inbox-thread', WhatsAppInboxThread::class);
 
         Event::listen(Login::class, function (Login $event): void {
             app(StaffLoginSessionService::class)->handleLoginEvent($event);

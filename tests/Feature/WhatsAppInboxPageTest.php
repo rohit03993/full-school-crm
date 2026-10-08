@@ -26,6 +26,14 @@ class WhatsAppInboxPageTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_inbox_thread_name_is_registered_for_the_server(): void
+    {
+        $finder = app('livewire.finder');
+        $registered = (new \ReflectionProperty($finder, 'classComponents'))->getValue($finder);
+
+        $this->assertSame(WhatsAppInboxThread::class, $registered['whatsapp-inbox-thread'] ?? null);
+    }
+
     public function test_selecting_conversation_loads_messages_without_error(): void
     {
         Http::fake();
