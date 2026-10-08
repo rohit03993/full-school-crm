@@ -3,18 +3,17 @@
         <p class="text-sm text-gray-500 dark:text-gray-400">Opening chat…</p>
     </div>
 
-    <div wire:loading.remove wire:target="openChatFromList,openChat">
-        @if (! $chatOpen)
-            <div class="crm-wa-global-inbox__placeholder crm-wa-global-inbox__placeholder--desktop">
-                <div class="crm-wa-global-inbox__placeholder-icon">
-                    <x-filament::icon icon="heroicon-o-chat-bubble-left-right" class="h-8 w-8" />
-                </div>
-                <p class="text-base font-semibold text-gray-900 dark:text-white">Select a chat</p>
-                <p class="mt-2 max-w-sm text-sm text-gray-500 dark:text-gray-400">
-                    Pick a conversation to read messages or reply within the 24-hour window.
-                </p>
+    @if (! $chatOpen)
+        <div wire:loading.remove wire:target="openChatFromList,openChat" class="crm-wa-global-inbox__placeholder crm-wa-global-inbox__placeholder--desktop">
+            <div class="crm-wa-global-inbox__placeholder-icon">
+                <x-filament::icon icon="heroicon-o-chat-bubble-left-right" class="h-8 w-8" />
             </div>
-        @else
+            <p class="text-base font-semibold text-gray-900 dark:text-white">Select a chat</p>
+            <p class="mt-2 max-w-sm text-sm text-gray-500 dark:text-gray-400">
+                Pick a conversation to read messages or reply within the 24-hour window.
+            </p>
+        </div>
+    @else
             @php
                 $chatContact = $chatContact ?? \App\Support\WhatsAppInboxContact::unknown();
                 $headerName = $chatContact->isLinked()
@@ -23,7 +22,7 @@
                 $headerTags = $chatContact->tagLabels();
                 $headerInitial = strtoupper(substr($headerName, 0, 1));
             @endphp
-            <div class="crm-wa-global-inbox__chat-head">
+            <div wire:loading.remove wire:target="openChatFromList,openChat" class="crm-wa-global-inbox__chat-head">
                 <button
                     type="button"
                     wire:click="clearConversation"
@@ -83,10 +82,9 @@
             @if ($messagesViewData)
                 @include('filament.pages.partials.student-profile-messages', $messagesViewData)
             @else
-                <div class="crm-wa-global-inbox__placeholder">
+                <div wire:loading.remove wire:target="openChatFromList,openChat" class="crm-wa-global-inbox__placeholder">
                     <p class="text-sm text-gray-500 dark:text-gray-400">Loading conversation…</p>
                 </div>
             @endif
-        @endif
-    </div>
+    @endif
 </section>

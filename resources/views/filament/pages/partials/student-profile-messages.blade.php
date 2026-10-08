@@ -1,4 +1,10 @@
-<div @class(['crm-wa-inbox', 'crm-wa-inbox--compact' => $compactInbox ?? false])>
+<div
+    @class(['crm-wa-inbox', 'crm-wa-inbox--compact' => $compactInbox ?? false])
+    @if ($compactInbox ?? false)
+        wire:loading.remove
+        wire:target="openChatFromList,openChat"
+    @endif
+>
     @php
         $lastThreadKey = $messageThread === []
             ? 'empty'
