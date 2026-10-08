@@ -78,6 +78,7 @@ class HomeworkAiImproveTest extends TestCase
                 && str_contains($body, 'Dear Students')
                 && str_contains($body, 'Mathematics (MATH)')
                 && str_contains($body, 'Do not add a test')
+                && ! str_contains($body, 'temperature')
                 && ! str_contains($body, 'test-gemini-key');
         });
     }

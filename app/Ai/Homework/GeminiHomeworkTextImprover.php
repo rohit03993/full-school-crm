@@ -42,7 +42,6 @@ final class GeminiHomeworkTextImprover implements HomeworkTextImprover
                         ],
                     ],
                     'generationConfig' => [
-                        'temperature' => 0.4,
                         'responseMimeType' => 'application/json',
                         'responseSchema' => [
                             'type' => 'OBJECT',
