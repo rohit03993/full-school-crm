@@ -1373,6 +1373,43 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertSame('First send', $clicks[1]['repeat']);
     }
 
+    public function test_each_click_list_pages_through_every_send(): void
+    {
+        $data = $this->seedClass();
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        foreach (range(1, 16) as $number) {
+            ParentMessageSend::query()->create([
+                'kind' => ParentMessageSend::Homework,
+                'is_resend' => $number !== 1,
+                'batch_id' => $data['batch']->id,
+                'homework_date' => now()->toDateString(),
+                'label' => sprintf('Send A%02d', $number),
+                'sent_by_user_id' => $data['admin']->id,
+                'parent_count' => 2,
+                'sent_at' => now()->subMinutes(20 - $number),
+            ]);
+        }
+
+        $report = app(ParentMessageSendService::class);
+        $pageOne = $report->recent(now()->startOfDay(), now()->endOfDay(), 15, 1);
+        $pageTwo = $report->recent(now()->startOfDay(), now()->endOfDay(), 15, 2);
+
+        $this->assertSame(16, $pageOne->total());
+        $this->assertCount(15, $pageOne->items());
+        $this->assertCount(1, $pageTwo->items());
+        $this->assertSame('Send A01', $pageTwo->items()[0]['place']);
+        $this->assertSame('First send', $pageTwo->items()[0]['repeat']);
+
+        Livewire::test(ParentMessageSendsPage::class)
+            ->assertSee('Send A16')
+            ->assertDontSee('Send A01')
+            ->call('gotoPage', 2)
+            ->assertSee('Send A01')
+            ->assertSee('First send');
+    }
+
     public function test_parent_send_report_is_open_to_the_coordinator_and_closed_to_a_teacher(): void
     {
         $data = $this->seedClass();

@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\ParentMessageSend;
 use App\Models\User;
+use App\Support\CrmPagination;
 use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
 
 class ParentMessageSendService
@@ -118,12 +120,15 @@ class ParentMessageSendService
     }
 
     /**
-     * @return list<array{at: string, name: string, kind: string, place: string, repeat: string, parents: int}>
+     * @return LengthAwarePaginator<int, array{at: string, name: string, kind: string, place: string, repeat: string, parents: int}>
      */
-    public function recent(Carbon $from, Carbon $to, int $limit = 40): array
+    public function recent(Carbon $from, Carbon $to, ?int $perPage = null, ?int $page = null): LengthAwarePaginator
     {
+        $perPage = $perPage ?? CrmPagination::PER_PAGE;
+        $page = max(1, $page ?? 1);
+
         if (! Schema::hasTable('parent_message_sends')) {
-            return [];
+            return new LengthAwarePaginator([], 0, $perPage, $page);
         }
 
         $firstHomeworkSendIdByBatch = $this->firstHomeworkSendIdByBatch();
@@ -133,9 +138,8 @@ class ParentMessageSendService
             ->whereBetween('sent_at', [$from, $to])
             ->orderByDesc('sent_at')
             ->orderByDesc('id')
-            ->limit($limit)
-            ->get()
-            ->map(function (ParentMessageSend $send) use ($firstHomeworkSendIdByBatch): array {
+            ->paginate($perPage, ['*'], 'page', $page)
+            ->through(function (ParentMessageSend $send) use ($firstHomeworkSendIdByBatch): array {
                 $isResend = $send->kind === ParentMessageSend::Homework
                     ? $this->homeworkClickIsResend($send, $firstHomeworkSendIdByBatch)
                     : (bool) $send->is_resend;
@@ -148,8 +152,7 @@ class ParentMessageSendService
                     'repeat' => $isResend ? 'Resend' : 'First send',
                     'parents' => (int) $send->parent_count,
                 ];
-            })
-            ->all();
+            });
     }
 
     /**

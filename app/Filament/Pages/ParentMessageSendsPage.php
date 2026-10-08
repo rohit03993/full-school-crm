@@ -8,15 +8,20 @@ use App\Services\ParentMessageSendService;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
+use App\Support\CrmPagination;
 use App\Support\FeatureGate;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Livewire\WithPagination;
 use UnitEnum;
 
 class ParentMessageSendsPage extends Page
 {
+    use WithPagination;
+
     protected static bool $shouldRegisterNavigation = false;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedChatBubbleLeftRight;
@@ -58,13 +63,23 @@ class ParentMessageSendsPage extends Page
         $this->dateFrom = now()->subDays(29)->toDateString();
     }
 
+    public function updatedDateFrom(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedDateTo(): void
+    {
+        $this->resetPage();
+    }
+
     public function getSubheading(): ?string
     {
         return 'Who clicked Send, and who clicked Resend, for homework and exam marks. Counts only.';
     }
 
     /**
-     * @return array{staff: list<array<string, mixed>>, recent: list<array<string, mixed>>}
+     * @return array{staff: list<array<string, mixed>>, recent: LengthAwarePaginator<int, array<string, mixed>>}
      */
     public function report(): array
     {
@@ -79,7 +94,7 @@ class ParentMessageSendsPage extends Page
 
         return [
             'staff' => $service->staffReport($from, $to),
-            'recent' => $service->recent($from, $to),
+            'recent' => $service->recent($from, $to, CrmPagination::PER_PAGE, $this->getPage()),
         ];
     }
 }

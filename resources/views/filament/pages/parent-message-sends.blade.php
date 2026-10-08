@@ -54,8 +54,11 @@
     </section>
 
     <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
-        <div class="border-b border-gray-100 px-4 py-3 dark:border-white/5">
+        <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/5">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Each click</h3>
+            @if ($recentRows->total() > 0)
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{ $recentRows->firstItem() }}–{{ $recentRows->lastItem() }} of {{ $recentRows->total() }}</p>
+            @endif
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
@@ -87,5 +90,10 @@
                 </tbody>
             </table>
         </div>
+        @if ($recentRows->hasPages())
+            <div class="border-t border-gray-100 px-4 py-3 dark:border-white/10">
+                {{ $recentRows->links() }}
+            </div>
+        @endif
     </section>
 </div>
