@@ -413,8 +413,8 @@
             <div class="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl dark:bg-gray-900 sm:rounded-2xl">
                 <div class="border-b border-rose-100 bg-rose-50 px-4 py-4 dark:border-rose-500/20 dark:bg-rose-500/10 sm:px-5">
                     <p class="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-200">{{ $confirmCourse }} · {{ $confirmSection }}</p>
-                    <h3 class="mt-1 text-lg font-bold text-gray-950 dark:text-white">These subjects have no homework</h3>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">Choose one answer for each subject. After you send, that teacher cannot add homework for this day.</p>
+                    <h3 class="mt-1 text-lg font-bold text-gray-950 dark:text-white">A teacher has not given homework</h3>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">Choose one answer for each subject. Nothing is sent until you do. After you send, that teacher cannot add homework for this day.</p>
                 </div>
                 <ul class="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-5">
                     @foreach ($missingSubjects as $missing)

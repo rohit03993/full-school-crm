@@ -1426,13 +1426,12 @@ class HomeworkSubmissionService
             return [];
         }
 
-        $submittedIds = HomeworkAssignment::query()
+        $assignments = HomeworkAssignment::query()
             ->where('batch_id', $batchId)
             ->whereDate('homework_date', $date)
             ->whereNotNull('course_subject_id')
-            ->pluck('course_subject_id')
-            ->map(fn (mixed $id): int => (int) $id)
-            ->all();
+            ->get()
+            ->groupBy(fn (HomeworkAssignment $assignment): int => (int) $assignment->course_subject_id);
 
         $closedIds = HomeworkSubjectClosure::query()
             ->where('batch_id', $batchId)
@@ -1442,7 +1441,7 @@ class HomeworkSubmissionService
             ->all();
 
         $teachersBySubject = $batch->staffAssignments
-            ->filter(fn (BatchStaffAssignment $assignment): bool => $assignment->course_subject_id !== null)
+            ->filter(fn (BatchStaffAssignment $assignment): bool => $assignment->isSubjectTeacher() && $assignment->course_subject_id !== null)
             ->groupBy(fn (BatchStaffAssignment $assignment): int => (int) $assignment->course_subject_id);
 
         $missing = [];
@@ -1450,27 +1449,72 @@ class HomeworkSubmissionService
         foreach ($batch->activeSubjects as $subject) {
             $subjectId = (int) $subject->id;
 
-            if (in_array($subjectId, $submittedIds, true) || in_array($subjectId, $closedIds, true)) {
+            if (in_array($subjectId, $closedIds, true)) {
                 continue;
             }
 
-            $teacherRows = $teachersBySubject->get($subjectId, collect());
-            $teacherNames = $teacherRows
+            /** @var Collection<int, HomeworkAssignment> $subjectHomework */
+            $subjectHomework = $assignments->get($subjectId, collect());
+            $givenUserIds = $subjectHomework
+                ->map(fn (HomeworkAssignment $assignment): int => (int) ($assignment->submitted_by_user_id ?: $assignment->created_by_user_id))
+                ->filter(fn (int $id): bool => $id > 0)
+                ->all();
+            $teacherRows = $teachersBySubject
+                ->get($subjectId, collect())
+                ->unique(fn (BatchStaffAssignment $row): int => (int) $row->user_id)
+                ->values();
+            $pendingTeachers = $teacherRows->filter(
+                fn (BatchStaffAssignment $row): bool => ! in_array((int) $row->user_id, $givenUserIds, true),
+            );
+
+            if ($subjectHomework->isNotEmpty() && $pendingTeachers->isEmpty()) {
+                continue;
+            }
+
+            $namedTeachers = $pendingTeachers->isNotEmpty() ? $pendingTeachers : $teacherRows;
+            $teacherNames = $namedTeachers
                 ->map(fn (BatchStaffAssignment $row): string => (string) ($row->user?->name ?? ''))
                 ->filter()
                 ->unique()
                 ->implode(', ');
-            $firstTeacherId = $teacherRows->first()?->user_id;
 
             $missing[] = [
                 'course_subject_id' => $subjectId,
                 'subject' => (string) $subject->name,
                 'teacher' => $teacherNames !== '' ? $teacherNames : 'No teacher set',
-                'teacher_user_id' => $firstTeacherId ? (int) $firstTeacherId : null,
+                'teacher_user_id' => $namedTeachers->first()?->user_id ? (int) $namedTeachers->first()->user_id : null,
             ];
         }
 
         return $missing;
+    }
+
+    /**
+     * Homework the teacher already gave, still waiting for a check. These must not go to parents yet.
+     *
+     * @return list<array{subject: string, teacher: string}>
+     */
+    public function waitingSubjectsForBatch(int $batchId, string $date): array
+    {
+        $date = $this->normalizeDate($date);
+
+        return HomeworkAssignment::query()
+            ->where('batch_id', $batchId)
+            ->whereDate('homework_date', $date)
+            ->where('status', HomeworkAssignmentStatus::Submitted->value)
+            ->with(['courseSubject', 'submittedBy', 'createdBy'])
+            ->orderBy('course_subject_id')
+            ->get()
+            ->map(function (HomeworkAssignment $assignment): array {
+                $teacher = (string) ($assignment->submittedBy?->name ?? $assignment->createdBy?->name ?? '');
+
+                return [
+                    'subject' => (string) ($assignment->courseSubject?->name ?? 'Subject'),
+                    'teacher' => $teacher,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**

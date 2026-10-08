@@ -944,7 +944,7 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('Not submitted: Physics')
             ->assertDontSee('Resend')
             ->call('sendCombinedForBatch', $data['batch']->id)
-            ->assertSee('These subjects have no homework')
+            ->assertSee('A teacher has not given homework')
             ->assertSee('Teacher was absent')
             ->assertDontSee('Resend')
             ->call('confirmClosedSend')
@@ -975,6 +975,86 @@ class HomeworkSubmissionServiceTest extends TestCase
         }
         $this->assertSame($data['admin']->id, $maths->approved_by_user_id);
         $this->assertSame($data['admin']->id, $maths->combined_sent_by_user_id);
+    }
+
+    public function test_send_to_parents_warns_and_does_not_send_while_homework_is_waiting(): void
+    {
+        Http::fake();
+
+        $data = $this->seedClass();
+        $this->seedCombinedTemplate();
+        $service = app(HomeworkSubmissionService::class);
+
+        $maths = $service->submit($data['mathTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Algebra',
+            'description' => 'Ex 5.2',
+        ]);
+        $service->approve($data['admin'], $maths->id);
+
+        $service->submit($data['physicsTeacher'], [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['physics']->id,
+            'homework_date' => now()->toDateString(),
+            'title' => 'Optics',
+            'description' => 'Chapter 9',
+        ]);
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('sendCombinedForBatch', $data['batch']->id)
+            ->assertNotified('Homework is still waiting to be checked')
+            ->assertDontSee('A teacher has not given homework');
+
+        $this->assertSame(HomeworkAssignmentStatus::Approved, $maths->fresh()->status);
+        Http::assertNothingSent();
+    }
+
+    public function test_send_to_parents_asks_when_another_teacher_on_the_subject_has_not_given_homework(): void
+    {
+        Http::fake();
+
+        $data = $this->seedClass();
+        $this->seedCombinedTemplate();
+        $service = app(HomeworkSubmissionService::class);
+
+        foreach (['maths' => $data['mathTeacher'], 'physics' => $data['physicsTeacher']] as $subjectKey => $teacher) {
+            $assignment = $service->submit($teacher, [
+                'batch_id' => $data['batch']->id,
+                'course_subject_id' => $data[$subjectKey]->id,
+                'homework_date' => now()->toDateString(),
+                'title' => 'Ready',
+                'description' => 'Done',
+            ]);
+            $service->approve($data['admin'], $assignment->id);
+        }
+
+        $otherPhysicsTeacher = User::factory()->create([
+            'name' => 'Extra Physics Teacher',
+            'is_active' => true,
+        ]);
+        $otherPhysicsTeacher->assignRole(StaffJobRole::Teacher->value);
+
+        BatchStaffAssignment::query()->create([
+            'batch_id' => $data['batch']->id,
+            'user_id' => $otherPhysicsTeacher->id,
+            'role' => BatchStaffRole::SubjectTeacher,
+            'course_subject_id' => $data['physics']->id,
+        ]);
+
+        $this->actingAs($data['admin']);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(HomeworkReviewPage::class)
+            ->call('sendCombinedForBatch', $data['batch']->id)
+            ->assertSee('A teacher has not given homework')
+            ->assertSee('Extra Physics Teacher');
+
+        Http::assertNothingSent();
     }
 
     public function test_approving_one_subject_does_not_approve_the_other(): void

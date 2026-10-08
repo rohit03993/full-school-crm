@@ -372,12 +372,36 @@ class HomeworkReviewPage extends Page
         }
 
         $service = app(HomeworkSubmissionService::class);
+        $date = $this->dateString();
 
-        if (! $service->canSendHomework($this->dateString())) {
+        if (! $service->canSendHomework($date)) {
             return false;
         }
 
-        $missing = $service->missingSubjectsForBatch($batchId, $this->dateString());
+        $waiting = $service->waitingSubjectsForBatch($batchId, $date);
+
+        if ($waiting !== []) {
+            $lines = collect($waiting)
+                ->map(function (array $row): string {
+                    $teacher = trim((string) ($row['teacher'] ?? ''));
+
+                    return $teacher !== ''
+                        ? $row['subject'].' · '.$teacher
+                        : (string) $row['subject'];
+                })
+                ->join(', ');
+
+            Notification::make()
+                ->title('Homework is still waiting to be checked')
+                ->body($lines.'. Approve or remove it before sending to parents. Nothing was sent.')
+                ->warning()
+                ->persistent()
+                ->send();
+
+            return true;
+        }
+
+        $missing = $service->missingSubjectsForBatch($batchId, $date);
 
         if ($missing === []) {
             $this->sendConfirmBatchId = null;
@@ -445,12 +469,34 @@ class HomeworkReviewPage extends Page
             return;
         }
 
-        $result = app(HomeworkSubmissionService::class)->combinedSend(
-            $user,
-            (int) ($this->data['batch_id'] ?? 0),
-            $this->dateString(),
-            app(HomeworkWhatsAppService::class)->defaultCombinedTemplateName(),
-        );
+        try {
+            $result = app(HomeworkSubmissionService::class)->combinedSend(
+                $user,
+                (int) ($this->data['batch_id'] ?? 0),
+                $this->dateString(),
+                app(HomeworkWhatsAppService::class)->defaultCombinedTemplateName(),
+            );
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first() ?? 'Could not send to parents.';
+            Notification::make()
+                ->title((string) $message)
+                ->body('Nothing was sent.')
+                ->warning()
+                ->persistent()
+                ->send();
+
+            return;
+        } catch (\Throwable $exception) {
+            report($exception);
+            Notification::make()
+                ->title('Could not send to parents')
+                ->body('Nothing was sent. Please try again.')
+                ->danger()
+                ->persistent()
+                ->send();
+
+            return;
+        }
         $this->lastCombinedSendResult = $result;
         $costNote = '';
 
