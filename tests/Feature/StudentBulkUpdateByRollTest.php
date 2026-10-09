@@ -46,6 +46,7 @@ class StudentBulkUpdateByRollTest extends TestCase
         );
 
         $this->assertSame('ready', $preview[0]['status']);
+        $this->assertSame([], $preview[0]['warnings']);
         $this->assertTrue($preview[0]['update_only']);
         $this->assertSame($student->id, $preview[0]['existing_student']['id']);
         $this->assertSame('error', $preview[1]['status']);

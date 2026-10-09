@@ -405,14 +405,18 @@
             ];
         @endphp
 
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            @foreach ([
+        <div @class([
+            'grid grid-cols-2 gap-3',
+            'sm:grid-cols-4' => $updateByRoll,
+            'sm:grid-cols-5' => ! $updateByRoll,
+        ])>
+            @foreach (array_values(array_filter([
                 ['key' => 'ready', 'label' => 'Ready', 'value' => $readyCount, 'tone' => 'text-emerald-600 dark:text-emerald-400'],
-                ['key' => 'no_mobile', 'label' => 'No mobile', 'value' => $noMobileCount, 'tone' => 'text-amber-600 dark:text-amber-400'],
+                $updateByRoll ? null : ['key' => 'no_mobile', 'label' => 'No mobile', 'value' => $noMobileCount, 'tone' => 'text-amber-600 dark:text-amber-400'],
                 ['key' => 'duplicate', 'label' => 'Duplicates', 'value' => $duplicateCount, 'tone' => 'text-amber-600 dark:text-amber-400'],
                 ['key' => 'error', 'label' => 'Errors', 'value' => $errorCount, 'tone' => 'text-danger-600 dark:text-danger-400'],
-                ['key' => 'all', 'label' => 'Will import', 'value' => $importableCount, 'tone' => 'text-primary-600 dark:text-primary-400'],
-            ] as $stat)
+                ['key' => 'all', 'label' => $updateByRoll ? 'Will update' : 'Will import', 'value' => $importableCount, 'tone' => 'text-primary-600 dark:text-primary-400'],
+            ])) as $stat)
                 <button
                     type="button"
                     wire:click="setPreviewStatusFilter('{{ $stat['key'] }}')"
@@ -524,6 +528,8 @@
                                 <td class="px-4 py-3 font-mono text-gray-700 dark:text-gray-300">
                                     @if (filled($row['data']['mobile'] ?? null))
                                         {{ $row['data']['mobile'] }}
+                                    @elseif ($updateByRoll)
+                                        <span class="text-gray-400">—</span>
                                     @else
                                         <span class="text-amber-600 dark:text-amber-400">—</span>
                                     @endif
@@ -655,15 +661,19 @@
                 </p>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 p-4 sm:grid-cols-6 sm:p-6">
-                @foreach ([
+            <div @class([
+                'grid grid-cols-2 gap-3 p-4 sm:p-6',
+                'sm:grid-cols-5' => $updateByRoll,
+                'sm:grid-cols-6' => ! $updateByRoll,
+            ])>
+                @foreach (array_values(array_filter([
                     ['Created', $importResult['created'] ?? 0, 'text-emerald-700 dark:text-emerald-300', 'bg-emerald-50 dark:bg-emerald-500/10'],
                     ['Updated', $importResult['updated'] ?? 0, 'text-primary-700 dark:text-primary-300', 'bg-primary-50 dark:bg-primary-500/10'],
-                    ['No mobile', $importResult['without_mobile'] ?? 0, 'text-amber-700 dark:text-amber-300', 'bg-amber-50 dark:bg-amber-500/10'],
+                    $updateByRoll ? null : ['No mobile', $importResult['without_mobile'] ?? 0, 'text-amber-700 dark:text-amber-300', 'bg-amber-50 dark:bg-amber-500/10'],
                     ['Skipped', $importResult['skipped'] ?? 0, 'text-gray-700 dark:text-gray-300', 'bg-gray-50 dark:bg-white/5'],
                     ['File rejected', $importResult['preview_rejected'] ?? 0, 'text-amber-700 dark:text-amber-300', 'bg-amber-50 dark:bg-amber-500/10'],
                     ['Failed', $importResult['failed'] ?? 0, 'text-danger-700 dark:text-danger-300', 'bg-danger-50 dark:bg-danger-500/10'],
-                ] as [$label, $value, $tone, $bg])
+                ])) as [$label, $value, $tone, $bg])
                     <div @class(['rounded-xl px-3 py-4', $bg])>
                         <dt class="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ $label }}</dt>
                         <dd @class(['mt-1 text-3xl font-bold', $tone])>{{ $value }}</dd>

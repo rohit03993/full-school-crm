@@ -130,7 +130,7 @@ class StudentBulkImportService
         foreach ($rows as $index => $row) {
             $rowNumber = $index + 2;
             $data = $this->mapRow($columnMapping, $row);
-            $warnings = $this->mobileImportWarnings($data);
+            $warnings = $updateByRoll ? [] : $this->mobileImportWarnings($data);
             $errors = $updateByRoll
                 ? $this->validateUpdateRowData($data)
                 : $this->validateRowData($data, requireBatchFromSpreadsheet: $fixedBatch === null);
