@@ -109,7 +109,7 @@ trait AddsHomeworkModal
 
                 return $label !== ''
                     ? $label
-                    : 'Pick the class and subject, then type or speak the homework, or attach a file.';
+                    : 'Pick the class and subject, then type the homework or attach a file.';
             })
             ->modalSubmitActionLabel(fn (): string => $this->homeworkModalSavesAsAdmin()
                 ? 'Save homework'
@@ -182,13 +182,8 @@ trait AddsHomeworkModal
                 ->maxLength(255),
             Textarea::make('description')
                 ->label('Homework details')
-                ->placeholder('Type the homework, tap Speak, or attach a file below.')
+                ->placeholder('Type the homework, or attach a file below.')
                 ->rows(4)
-                ->extraInputAttributes([
-                    'data-homework-speech' => 'description',
-                ])
-                ->columnSpanFull(),
-            View::make('filament.pages.partials.homework-speech')
                 ->columnSpanFull(),
             View::make('filament.pages.partials.homework-ai-improve')
                 ->viewData(fn (): array => $this->homeworkAiPanelData())

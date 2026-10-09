@@ -310,16 +310,6 @@ class HomeworkAiImproveTest extends TestCase
             ->assertDontSee('Improve with AI');
     }
 
-    public function test_speak_button_still_targets_the_homework_details_box(): void
-    {
-        $html = view('filament.pages.partials.homework-speech')->render();
-
-        $this->assertStringContainsString('Speak', $html);
-        $this->assertStringContainsString('interimResults = true', $html);
-        $this->assertStringContainsString('textarea[data-homework-speech=description]', $html);
-        $this->assertStringContainsString('data-speech-wire=""', $html);
-    }
-
     public function test_openai_provider_is_used_when_the_setting_says_openai(): void
     {
         config([
