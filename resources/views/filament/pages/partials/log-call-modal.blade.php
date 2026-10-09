@@ -129,11 +129,16 @@
                     <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Call notes</label>
                     <textarea
                         wire:model="logCallForm.call_notes"
+                        data-device-speech="call-notes"
                         rows="4"
                         class="fi-crm-input mt-2 block min-h-[6.5rem] w-full resize-y"
                         placeholder="What was discussed on the call…"
                         @if ($logCallForm['call_connected'] ?? true) required minlength="10" @endif
                     ></textarea>
+                    @include('filament.pages.partials.homework-speech', [
+                        'speechSelector' => 'textarea[data-device-speech=call-notes]',
+                        'speechWire' => 'logCallForm.call_notes',
+                    ])
                     @if ($logCallForm['call_connected'] ?? true)
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">At least 10 characters required.</p>
                     @endif

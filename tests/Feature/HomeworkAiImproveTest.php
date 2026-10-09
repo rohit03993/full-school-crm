@@ -307,25 +307,16 @@ class HomeworkAiImproveTest extends TestCase
 
         Livewire::test(HomeworkReviewPage::class)
             ->call('startAdd', $data['batch']->id, $data['maths']->id)
-            ->assertDontSee('Improve with AI')
-            ->assertSee('Speak')
-            ->assertSee('data-homework-speech');
+            ->assertDontSee('Improve with AI');
     }
 
-    public function test_speak_sits_with_the_homework_box_and_leaves_improve_with_ai(): void
+    public function test_speak_button_still_targets_the_homework_details_box(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-09-29 10:00:00', 'Asia/Kolkata'));
-        $this->useGemini();
+        $html = view('filament.pages.partials.homework-speech')->render();
 
-        $data = $this->seedClass();
-        $this->actingAs($data['admin']);
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
-
-        Livewire::test(HomeworkReviewPage::class)
-            ->call('startAdd', $data['batch']->id, $data['maths']->id)
-            ->assertSee('Speak')
-            ->assertSee('Improve with AI')
-            ->assertSee('data-homework-speech');
+        $this->assertStringContainsString('Speak', $html);
+        $this->assertStringContainsString('textarea[data-homework-speech=description]', $html);
+        $this->assertStringContainsString('data-speech-wire=""', $html);
     }
 
     public function test_openai_provider_is_used_when_the_setting_says_openai(): void

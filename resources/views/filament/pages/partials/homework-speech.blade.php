@@ -1,5 +1,12 @@
+@php
+    $speechSelector = $speechSelector ?? 'textarea[data-homework-speech=description]';
+    $speechWire = $speechWire ?? '';
+@endphp
+
 <div
-    class="flex flex-wrap items-center gap-2"
+    class="mt-2 flex flex-wrap items-center gap-2"
+    data-speech-selector="{{ $speechSelector }}"
+    data-speech-wire="{{ $speechWire }}"
     x-data="{
         listening: false,
         supported: true,
@@ -10,7 +17,7 @@
             const Speech = window.SpeechRecognition || window.webkitSpeechRecognition
             this.supported = typeof Speech === 'function'
             if (! this.supported) {
-                this.message = 'Speech is not available in this browser. Type the homework.'
+                this.message = 'Speech is not available in this browser. You can still type.'
             }
         },
         toggle() {
@@ -24,7 +31,7 @@
             const Speech = window.SpeechRecognition || window.webkitSpeechRecognition
             if (typeof Speech !== 'function') {
                 this.supported = false
-                this.message = 'Speech is not available in this browser. Type the homework.'
+                this.message = 'Speech is not available in this browser. You can still type.'
                 return
             }
             const recognition = new Speech()
@@ -39,7 +46,7 @@
                 wrote = true
                 const last = event.results[event.results.length - 1]
                 const said = last && last[0] ? last[0].transcript : ''
-                this.writeIntoHomework(said)
+                this.writeSpokenText(said)
             }
             recognition.onerror = (event) => {
                 this.listening = false
@@ -54,7 +61,7 @@
                     this.message = 'Allow the microphone, then tap Speak again.'
                     return
                 }
-                this.message = 'Speech could not be read. You can still type the homework.'
+                this.message = 'Speech could not be read. You can still type.'
             }
             recognition.onend = () => {
                 this.listening = false
@@ -69,7 +76,7 @@
                 recognition.start()
             } catch (error) {
                 this.listening = false
-                this.message = 'Speech could not be read. You can still type the homework.'
+                this.message = 'Speech could not be read. You can still type.'
             }
         },
         stop() {
@@ -78,25 +85,41 @@
             }
             this.listening = false
         },
-        writeIntoHomework(said) {
+        writeSpokenText(said) {
             const clean = (said || '').trim()
-            const box = document.querySelector('textarea[data-homework-speech=description]')
+            const selector = this.$el.getAttribute('data-speech-selector')
+            const box = selector ? document.querySelector(selector) : null
             if (! box || clean === '') {
                 return
             }
-            let alpine = null
-            try {
-                alpine = window.Alpine ? window.Alpine.$data(box) : null
-            } catch (error) {
-                alpine = null
+            let current = String(box.value || '')
+            const ownsAlpine = box.hasAttribute('x-data')
+            if (ownsAlpine) {
+                try {
+                    const alpine = window.Alpine ? window.Alpine.$data(box) : null
+                    if (alpine && alpine.state) {
+                        current = String(alpine.state)
+                    }
+                } catch (error) {
+                    current = String(box.value || '')
+                }
             }
-            const current = String((alpine && alpine.state) ? alpine.state : (box.value || '')).trim()
+            current = current.trim()
             const next = current === '' ? clean : (current + ' ' + clean)
-            if (alpine) {
-                alpine.state = next
-            } else {
-                box.value = next
-                box.dispatchEvent(new Event('input', { bubbles: true }))
+            if (ownsAlpine) {
+                try {
+                    const alpine = window.Alpine ? window.Alpine.$data(box) : null
+                    if (alpine) {
+                        alpine.state = next
+                    }
+                } catch (error) {
+                }
+            }
+            box.value = next
+            box.dispatchEvent(new Event('input', { bubbles: true }))
+            const wirePath = this.$el.getAttribute('data-speech-wire') || ''
+            if (wirePath !== '') {
+                this.$wire.set(wirePath, next)
             }
         },
     }"
