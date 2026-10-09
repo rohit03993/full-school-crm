@@ -7,16 +7,38 @@
     ];
 
     $singleBatchMode = ($importMode ?? 'spreadsheet') === 'single_batch';
-    $requiredColumns = $singleBatchMode
-        ? ['Roll number', 'Student name']
-        : ['Roll number', 'Student name', 'Batch name'];
-    $optionalColumns = ['Primary mobile', "Father's name", 'Date of birth', 'Gender'];
+    $updateByRoll = ($importMode ?? 'spreadsheet') === 'update_by_roll';
+    $requiredColumns = $updateByRoll
+        ? ['Roll number']
+        : ($singleBatchMode
+            ? ['Roll number', 'Student name']
+            : ['Roll number', 'Student name', 'Batch name']);
+    $optionalColumns = $updateByRoll
+        ? ['Address', 'City', 'State', 'Pincode', 'Student name', "Father's name", 'Primary mobile', 'Alternate mobile', 'Email', 'Date of birth', 'Gender']
+        : ['Primary mobile', "Father's name", 'Date of birth', 'Gender'];
+    $mappingLabels = $updateByRoll
+        ? $fieldLabels
+        : array_intersect_key($fieldLabels, array_flip([
+            'roll_number',
+            'name',
+            'father_name',
+            'mobile',
+            'date_of_birth',
+            'gender',
+            'batch_section',
+            'skip',
+        ]));
 @endphp
 
 <div class="mx-auto max-w-4xl space-y-5 pb-24 lg:pb-8">
     <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-        <p class="font-semibold">Migration import only</p>
-        <p class="mt-1">Use this screen to bring in existing students from a spreadsheet. For new students, use Search Student → Convert to Admission so enquiry and call history stay intact.</p>
+        @if ($updateByRoll)
+            <p class="font-semibold">Update students already in the CRM</p>
+            <p class="mt-1">Find each row by roll number and save only the filled cells. A new student is not created. A blank cell keeps the old value.</p>
+        @else
+            <p class="font-semibold">Migration import only</p>
+            <p class="mt-1">Use this screen to bring in existing students from a spreadsheet. For new students, use Search Student → Convert to Admission so enquiry and call history stay intact.</p>
+        @endif
     </div>
 
     @if (filled($importError ?? null))
@@ -105,9 +127,11 @@
                             </svg>
                         </span>
                         <div>
-                            <h2 class="text-lg font-bold text-gray-950 dark:text-white">Import enrolled students</h2>
+                            <h2 class="text-lg font-bold text-gray-950 dark:text-white">{{ $updateByRoll ? 'Update existing students' : 'Import enrolled students' }}</h2>
                             <p class="mt-1 max-w-xl text-sm text-gray-600 dark:text-gray-400">
-                                @if ($singleBatchMode)
+                                @if ($updateByRoll)
+                                    Upload a spreadsheet with roll number and the details you want to change, such as address. Each row updates that student. Blank cells are left as they are. New students are not created.
+                                @elseif ($singleBatchMode)
                                     Upload a spreadsheet with roll number and student name. Every row will be enrolled into the batch you select below.
                                 @else
                                     Upload a spreadsheet with roll number, student name, and batch name (e.g. Class (Course) column). Course and session come from the matched CRM batch — create batches under Academics first.
@@ -156,8 +180,21 @@
                                 <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">No batch column needed — pick the CRM batch below.</span>
                             </span>
                         </label>
+                        <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 transition hover:border-primary-300 dark:border-white/10 dark:bg-white/5 dark:hover:border-primary-500/40">
+                            <input
+                                type="radio"
+                                wire:model.live="importMode"
+                                value="update_by_roll"
+                                class="mt-1 text-primary-600 focus:ring-primary-500"
+                            >
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-950 dark:text-white">Update existing students by roll number</span>
+                                <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">Find each student by roll number and update only the columns in the sheet, such as address.</span>
+                            </span>
+                        </label>
                     </fieldset>
 
+                    @unless ($updateByRoll)
                     <x-crm.select-input
                         label="Limit batch lookup to session (optional)"
                         for="import-session"
@@ -169,8 +206,14 @@
                             <option value="{{ $id }}">{{ $label }}</option>
                         @endforeach
                     </x-crm.select-input>
+                    @endunless
 
-                    @if ($singleBatchMode)
+                    @if ($updateByRoll)
+                        <div class="rounded-xl border border-primary-200 bg-primary-50/60 px-4 py-3 text-sm text-primary-950 dark:border-primary-500/30 dark:bg-primary-500/10 dark:text-primary-100">
+                            <p class="font-semibold">Roll number must already be in the CRM</p>
+                            <p class="mt-1">A row with an unknown roll number is not added. Only filled columns are saved. Address, city, mobile, name, and the other optional columns can be updated together.</p>
+                        </div>
+                    @elseif ($singleBatchMode)
                         <x-crm.select-input
                             label="Assign all students to batch"
                             for="import-batch"
@@ -292,7 +335,9 @@
                             @endif
                             @php
                                 $mappedField = $columnMapping[$index] ?? 'skip';
-                                $isRequired = in_array($mappedField, ['roll_number', 'name'], true);
+                                $isRequired = $updateByRoll
+                                    ? $mappedField === 'roll_number'
+                                    : in_array($mappedField, ['roll_number', 'name'], true);
                             @endphp
                             <tr class="transition hover:bg-gray-50/80 dark:hover:bg-white/[0.02]">
                                 <td class="crm-responsive-table__title px-4 py-3 font-medium text-gray-950 dark:text-white" data-label="">{{ $header }}</td>
@@ -303,7 +348,7 @@
                                             wire:model="columnMapping.{{ $index }}"
                                             class="min-w-[14rem]"
                                         >
-                                            @foreach ($fieldLabels as $fieldKey => $fieldLabel)
+                                            @foreach ($mappingLabels as $fieldKey => $fieldLabel)
                                                 <option value="{{ $fieldKey }}">{{ $fieldLabel }}</option>
                                             @endforeach
                                         </x-crm.select>
@@ -437,7 +482,11 @@
             <div class="border-b border-gray-100 px-4 py-4 dark:border-white/10 sm:px-6">
                 <h2 class="text-lg font-bold text-gray-950 dark:text-white">Review rows before import</h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Each row is matched to a CRM batch by name. Course and session are taken from that batch. Invalid or missing mobiles still import without a number.
+                    @if ($updateByRoll)
+                        Each row is matched by roll number. Only the filled columns are written onto that student.
+                    @else
+                        Each row is matched to a CRM batch by name. Course and session are taken from that batch. Invalid or missing mobiles still import without a number.
+                    @endif
                 </p>
             </div>
 
@@ -449,10 +498,17 @@
                             <th class="px-4 py-3">Roll</th>
                             <th class="px-4 py-3">Name</th>
                             <th class="px-4 py-3">Mobile</th>
-                            <th class="px-4 py-3">CRM batch</th>
-                            <th class="px-4 py-3">Course</th>
+                            @if ($updateByRoll)
+                                <th class="px-4 py-3">Address</th>
+                                <th class="px-4 py-3">City</th>
+                            @else
+                                <th class="px-4 py-3">CRM batch</th>
+                                <th class="px-4 py-3">Course</th>
+                            @endif
                             <th class="px-4 py-3">Status</th>
-                            <th class="px-4 py-3">If duplicate</th>
+                            @unless ($updateByRoll)
+                                <th class="px-4 py-3">If duplicate</th>
+                            @endunless
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-white/10">
@@ -464,7 +520,7 @@
                             ])>
                                 <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ $row['row_number'] }}</td>
                                 <td class="px-4 py-3 font-mono font-semibold text-gray-950 dark:text-white">{{ $row['data']['roll_number'] ?? '—' }}</td>
-                                <td class="px-4 py-3 text-gray-950 dark:text-white">{{ $row['data']['name'] ?? '—' }}</td>
+                                <td class="px-4 py-3 text-gray-950 dark:text-white">{{ filled($row['data']['name'] ?? null) ? $row['data']['name'] : ($row['existing_student']['name'] ?? '—') }}</td>
                                 <td class="px-4 py-3 font-mono text-gray-700 dark:text-gray-300">
                                     @if (filled($row['data']['mobile'] ?? null))
                                         {{ $row['data']['mobile'] }}
@@ -472,6 +528,10 @@
                                         <span class="text-amber-600 dark:text-amber-400">—</span>
                                     @endif
                                 </td>
+                                @if ($updateByRoll)
+                                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ filled($row['data']['address'] ?? null) ? $row['data']['address'] : '—' }}</td>
+                                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ filled($row['data']['city'] ?? null) ? $row['data']['city'] : '—' }}</td>
+                                @else
                                 <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
                                     @if ($row['resolved_batch']['name'] ?? null)
                                         <span class="font-medium text-gray-950 dark:text-white">{{ $row['resolved_batch']['name'] }}</span>
@@ -482,9 +542,13 @@
                                 <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
                                     {{ $row['resolved_batch']['course_name'] ?? '—' }}
                                 </td>
+                                @endif
                                 <td class="px-4 py-3">
                                     @if ($row['status'] === 'ready')
-                                        <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Ready</span>
+                                        <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">{{ ! empty($row['update_only']) ? 'Will update' : 'Ready' }}</span>
+                                        @if (! empty($row['update_only']) && filled($row['existing_student']['name'] ?? null))
+                                            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">CRM: {{ $row['existing_student']['name'] }}</p>
+                                        @endif
                                         @if (! empty($row['warnings'] ?? []))
                                             <p class="mt-1.5 text-xs text-amber-600 dark:text-amber-400">{{ implode(' ', $row['warnings']) }}</p>
                                         @endif
@@ -503,6 +567,7 @@
                                         <p class="mt-1.5 text-xs text-danger-600 dark:text-danger-400">{{ implode(' ', $row['errors'] ?? []) }}</p>
                                     @endif
                                 </td>
+                                @unless ($updateByRoll)
                                 <td class="px-4 py-3">
                                     @if ($row['status'] === 'duplicate')
                                         <x-crm.select wire:model.live="duplicateResolutions.{{ $row['row_number'] }}" class="min-w-[12rem] text-xs">
@@ -514,10 +579,11 @@
                                         <span class="text-xs text-gray-400">—</span>
                                     @endif
                                 </td>
+                                @endunless
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                                <td colspan="{{ $updateByRoll ? 7 : 8 }}" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                                     No rows match this filter.
                                 </td>
                             </tr>
@@ -541,7 +607,7 @@
                     @if ($isImporting ?? false)
                         <span>Importing {{ $importProgressPercent ?? 0 }}%…</span>
                     @else
-                        <span wire:loading.remove wire:target="runImport">Import {{ $importableCount }} student{{ $importableCount === 1 ? '' : 's' }}</span>
+                        <span wire:loading.remove wire:target="runImport">{{ $updateByRoll ? 'Update' : 'Import' }} {{ $importableCount }} student{{ $importableCount === 1 ? '' : 's' }}</span>
                         <span wire:loading wire:target="runImport">Starting import…</span>
                     @endif
                 </button>

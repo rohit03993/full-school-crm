@@ -6,6 +6,7 @@ use App\Enums\CrmPermission;
 use App\Enums\StudentImportDuplicateResolution;
 use App\Support\CrmAccess;
 use App\Exports\StudentImportTemplateExport;
+use App\Exports\StudentUpdateByRollTemplateExport;
 use App\Models\AcademicSession;
 use App\Models\Batch;
 use App\Models\StudentImportBatch;
@@ -144,6 +145,13 @@ class BulkStudentImportPage extends Page
 
     public function downloadTemplate(): BinaryFileResponse
     {
+        if ($this->importMode === 'update_by_roll') {
+            return Excel::download(
+                new StudentUpdateByRollTemplateExport,
+                'student-update-by-roll-template.xlsx',
+            );
+        }
+
         return Excel::download(
             new StudentImportTemplateExport,
             'student-import-template.xlsx',
@@ -180,7 +188,7 @@ class BulkStudentImportPage extends Page
 
     public function updatedImportMode(): void
     {
-        if ($this->importMode === 'spreadsheet') {
+        if ($this->importMode !== 'single_batch') {
             $this->selectedBatchId = null;
         }
     }
@@ -192,7 +200,7 @@ class BulkStudentImportPage extends Page
         $this->validate([
             'academicSessionId' => 'nullable|exists:academic_sessions,id',
             'uploadFile' => 'required|file|mimes:csv,txt,xlsx,xls|max:10240',
-            'importMode' => 'required|in:spreadsheet,single_batch',
+            'importMode' => 'required|in:spreadsheet,single_batch,update_by_roll',
             'selectedBatchId' => 'required_if:importMode,single_batch|nullable|exists:batches,id',
         ]);
 
@@ -208,7 +216,10 @@ class BulkStudentImportPage extends Page
         $this->originalFilename = $this->uploadFile->getClientOriginalName();
         $this->fileHeaders = $parsed['headers'];
         $this->fileRows = $parsed['rows'];
-        $this->columnMapping = $mapper->guess($this->fileHeaders);
+        $this->columnMapping = $mapper->guess(
+            $this->fileHeaders,
+            $this->importMode === 'update_by_roll',
+        );
         $this->duplicateResolutions = [];
         $this->importResult = null;
         $this->importError = null;
@@ -226,12 +237,13 @@ class BulkStudentImportPage extends Page
 
         $this->validate([
             'academicSessionId' => 'nullable|exists:academic_sessions,id',
-            'importMode' => 'required|in:spreadsheet,single_batch',
+            'importMode' => 'required|in:spreadsheet,single_batch,update_by_roll',
             'selectedBatchId' => 'required_if:importMode,single_batch|nullable|exists:batches,id',
         ]);
 
-        $requireBatchColumn = $this->importMode !== 'single_batch';
-        $missing = app(StudentImportColumnMapper::class)->missingRequiredFields($this->columnMapping, $requireBatchColumn);
+        $updateByRoll = $this->importMode === 'update_by_roll';
+        $requireBatchColumn = $this->importMode === 'spreadsheet';
+        $missing = app(StudentImportColumnMapper::class)->missingRequiredFields($this->columnMapping, $requireBatchColumn, $updateByRoll);
 
         if ($missing !== []) {
             Notification::make()
@@ -261,6 +273,7 @@ class BulkStudentImportPage extends Page
                 $rows,
                 filled($this->academicSessionId) ? (int) $this->academicSessionId : null,
                 $this->importMode === 'single_batch' ? (int) $this->selectedBatchId : null,
+                $updateByRoll,
             );
 
             foreach ($preview as $row) {

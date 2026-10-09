@@ -31,6 +31,24 @@ class StudentImportColumnMapper
         StudentImportFields::GENDER => [
             'gender', 'sex',
         ],
+        StudentImportFields::ADDRESS => [
+            'address', 'student address', 'home address', 'residential address', 'full address',
+        ],
+        StudentImportFields::CITY => [
+            'city', 'town',
+        ],
+        StudentImportFields::STATE => [
+            'state',
+        ],
+        StudentImportFields::PINCODE => [
+            'pincode', 'pin code', 'zip', 'postal code',
+        ],
+        StudentImportFields::EMAIL => [
+            'email', 'e-mail', 'email address',
+        ],
+        StudentImportFields::ALTERNATE_MOBILE => [
+            'alternate mobile', 'alt mobile', 'secondary mobile', 'other mobile',
+        ],
         StudentImportFields::BATCH_SECTION => [
             'batch', 'section', 'batch section', 'class section', 'class course',
             'class (course)', 'batch name', 'class batch', 'programme batch', 'division', 'group',
@@ -41,10 +59,11 @@ class StudentImportColumnMapper
      * @param  list<string|null>  $headers
      * @return array<int, string> column index => field key
      */
-    public function guess(array $headers): array
+    public function guess(array $headers, bool $includeProfileFields = false): array
     {
         $mapping = [];
         $usedFields = [];
+        $skippedFields = $includeProfileFields ? [] : StudentImportFields::profileOnly();
 
         foreach ($headers as $index => $header) {
             $normalized = $this->normalizeHeader($header);
@@ -55,7 +74,7 @@ class StudentImportColumnMapper
                 continue;
             }
 
-            $field = $this->matchField($normalized, $usedFields);
+            $field = $this->matchField($normalized, $usedFields, $skippedFields);
             $mapping[$index] = $field;
 
             if ($field !== StudentImportFields::SKIP) {
@@ -70,16 +89,18 @@ class StudentImportColumnMapper
      * @param  array<int, string>  $columnMapping
      * @return list<string>
      */
-    public function missingRequiredFields(array $columnMapping, bool $requireBatchColumn = true): array
+    public function missingRequiredFields(array $columnMapping, bool $requireBatchColumn = true, bool $updateByRoll = false): array
     {
         $mapped = array_values(array_filter(
             $columnMapping,
             fn (string $field): bool => $field !== StudentImportFields::SKIP,
         ));
 
-        $required = $requireBatchColumn
-            ? StudentImportFields::required()
-            : StudentImportFields::requiredWithoutBatchColumn();
+        $required = $updateByRoll
+            ? StudentImportFields::requiredForUpdate()
+            : ($requireBatchColumn
+                ? StudentImportFields::required()
+                : StudentImportFields::requiredWithoutBatchColumn());
 
         return array_values(array_diff($required, $mapped));
     }
@@ -95,11 +116,12 @@ class StudentImportColumnMapper
 
     /**
      * @param  list<string>  $usedFields
+     * @param  list<string>  $skippedFields
      */
-    protected function matchField(string $normalizedHeader, array $usedFields): string
+    protected function matchField(string $normalizedHeader, array $usedFields, array $skippedFields = []): string
     {
         foreach ($this->aliases as $field => $aliases) {
-            if (in_array($field, $usedFields, true)) {
+            if (in_array($field, $usedFields, true) || in_array($field, $skippedFields, true)) {
                 continue;
             }
 

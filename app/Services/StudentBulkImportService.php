@@ -55,6 +55,7 @@ class StudentBulkImportService
         array $rows,
         ?int $academicSessionScopeId = null,
         ?int $fixedBatchId = null,
+        bool $updateByRoll = false,
     ): array {
         $fixedBatch = null;
 
@@ -116,11 +117,23 @@ class StudentBulkImportService
                     return $student ? [$mobileKey => $student] : [];
                 });
 
+        $studentsByRoll = (! $updateByRoll || $rollKeys === [])
+            ? collect()
+            : Enrollment::query()
+                ->with('student')
+                ->where('is_active', true)
+                ->whereIn('enrollment_number', array_values(array_unique($rollKeys)))
+                ->get()
+                ->filter(fn (Enrollment $enrollment): bool => $enrollment->student !== null)
+                ->keyBy(fn (Enrollment $enrollment): string => strtoupper(trim((string) $enrollment->enrollment_number)));
+
         foreach ($rows as $index => $row) {
             $rowNumber = $index + 2;
             $data = $this->mapRow($columnMapping, $row);
             $warnings = $this->mobileImportWarnings($data);
-            $errors = $this->validateRowData($data, requireBatchFromSpreadsheet: $fixedBatch === null);
+            $errors = $updateByRoll
+                ? $this->validateUpdateRowData($data)
+                : $this->validateRowData($data, requireBatchFromSpreadsheet: $fixedBatch === null);
             $data = $this->stripImportMeta($data);
 
             $rollKey = strtoupper(trim((string) ($data[StudentImportFields::ROLL_NUMBER] ?? '')));
@@ -136,21 +149,43 @@ class StudentBulkImportService
                 $seenMobiles[$mobileKey] = $rowNumber;
             }
 
-            if ($rollKey !== '' && $existingRolls->has($rollKey)) {
+            $matchedStudent = $updateByRoll && $rollKey !== ''
+                ? $studentsByRoll->get($rollKey)?->student
+                : null;
+
+            if (! $updateByRoll && $rollKey !== '' && $existingRolls->has($rollKey)) {
                 $errors[] = 'Roll number is already assigned to another student.';
             }
 
-            $existingStudent = $mobileKey !== ''
-                ? $existingStudentsByMobile->get($mobileKey)
-                : null;
+            if ($updateByRoll && $rollKey !== '' && $matchedStudent === null) {
+                $errors[] = 'No student found with this roll number.';
+            }
+
+            if ($updateByRoll && $matchedStudent !== null && ! $this->updateRowHasChanges($data)) {
+                $errors[] = 'Add at least one detail to update, such as address.';
+            }
+
+            $existingStudent = $updateByRoll
+                ? $matchedStudent
+                : ($mobileKey !== '' ? $existingStudentsByMobile->get($mobileKey) : null);
+
+            if (
+                $updateByRoll
+                && $matchedStudent !== null
+                && $mobileKey !== ''
+                && $existingStudentsByMobile->has($mobileKey)
+                && (int) $existingStudentsByMobile->get($mobileKey)->id !== (int) $matchedStudent->id
+            ) {
+                $errors[] = 'This mobile number already belongs to another student.';
+            }
 
             $resolvedBatch = null;
             $batchLabel = trim((string) ($data[StudentImportFields::BATCH_SECTION] ?? ''));
 
-            if ($fixedBatch && $errors === []) {
+            if (! $updateByRoll && $fixedBatch && $errors === []) {
                 $resolvedBatch = $fixedBatch;
                 $data[StudentImportFields::BATCH_SECTION] = $fixedBatch->name;
-            } elseif ($batchLabel !== '' && $errors === []) {
+            } elseif (! $updateByRoll && $batchLabel !== '' && $errors === []) {
                 $resolvedBatch = $this->batchResolver->resolve($batchLabel, $academicSessionScopeId);
 
                 if (! $resolvedBatch) {
@@ -169,7 +204,7 @@ class StudentBulkImportService
 
             if ($errors !== []) {
                 $status = 'error';
-            } elseif ($existingStudent) {
+            } elseif (! $updateByRoll && $existingStudent) {
                 $status = 'duplicate';
             }
 
@@ -187,6 +222,7 @@ class StudentBulkImportService
                     'session_id' => $resolvedBatch->academic_session_id,
                     'session_name' => $resolvedBatch->academicSession?->name,
                 ] : null,
+                'update_only' => $updateByRoll && $matchedStudent !== null && $errors === [],
                 'existing_student' => $existingStudent ? [
                     'id' => $existingStudent->id,
                     'name' => $existingStudent->name,
@@ -195,6 +231,10 @@ class StudentBulkImportService
                     'roll_number' => $existingStudent->activeEnrollment?->enrollment_number,
                 ] : null,
             ];
+        }
+
+        if ($updateByRoll) {
+            return $preview;
         }
 
         return $this->applyDuplicateMobileImportPolicy($preview);
@@ -373,6 +413,22 @@ class StudentBulkImportService
             $rowBatch = $resolvedBatchId ? $batchesById->get($resolvedBatchId) : null;
 
             try {
+                if (! empty($item['update_only'])) {
+                    if (! $existingStudent) {
+                        throw ValidationException::withMessages([
+                            'roll_number' => 'No student found with this roll number.',
+                        ]);
+                    }
+
+                    DB::transaction(function () use ($existingStudent, $data): void {
+                        $this->applyMappedStudentUpdate($existingStudent, $data);
+                    });
+
+                    $chunk['updated']++;
+
+                    continue;
+                }
+
                 if (! $rowBatch) {
                     throw ValidationException::withMessages([
                         'batch' => 'Batch could not be resolved for this row. Preview the file again.',
@@ -833,6 +889,127 @@ class StudentBulkImportService
      * @param  array<string, mixed>  $data
      * @return list<string>
      */
+    protected function validateUpdateRowData(array $data): array
+    {
+        $errors = [];
+
+        if (blank($data[StudentImportFields::ROLL_NUMBER] ?? null)) {
+            $errors[] = 'Roll number is required.';
+        }
+
+        $roll = (string) ($data[StudentImportFields::ROLL_NUMBER] ?? '');
+
+        if ($roll !== '' && strlen($roll) > 50) {
+            $errors[] = 'Roll number must be 50 characters or fewer.';
+        }
+
+        $email = trim((string) ($data[StudentImportFields::EMAIL] ?? ''));
+
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            $errors[] = 'Email is not valid.';
+        }
+
+        $pincode = trim((string) ($data[StudentImportFields::PINCODE] ?? ''));
+
+        if ($pincode !== '' && ! preg_match('/^\d{4,10}$/', $pincode)) {
+            $errors[] = 'Pincode must be 4 to 10 digits.';
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function updateRowHasChanges(array $data): bool
+    {
+        foreach (StudentImportFields::updatable() as $field) {
+            if (filled($data[$field] ?? null)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Write only the sheet columns that have a value. Blank cells stay as they are.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function applyMappedStudentUpdate(Student $student, array $data): void
+    {
+        $attributes = [];
+
+        if (filled($data[StudentImportFields::NAME] ?? null)) {
+            $attributes['name'] = trim((string) $data[StudentImportFields::NAME]);
+        }
+
+        if (filled($data[StudentImportFields::FATHER_NAME] ?? null)) {
+            $attributes['father_name'] = trim((string) $data[StudentImportFields::FATHER_NAME]);
+        }
+
+        if (filled($data[StudentImportFields::ADDRESS] ?? null)) {
+            $attributes['address'] = trim((string) $data[StudentImportFields::ADDRESS]);
+        }
+
+        if (filled($data[StudentImportFields::CITY] ?? null)) {
+            $attributes['city'] = trim((string) $data[StudentImportFields::CITY]);
+        }
+
+        if (filled($data[StudentImportFields::STATE] ?? null)) {
+            $attributes['state'] = trim((string) $data[StudentImportFields::STATE]);
+        }
+
+        if (filled($data[StudentImportFields::PINCODE] ?? null)) {
+            $attributes['pincode'] = trim((string) $data[StudentImportFields::PINCODE]);
+        }
+
+        if (filled($data[StudentImportFields::EMAIL] ?? null)) {
+            $attributes['email'] = strtolower(trim((string) $data[StudentImportFields::EMAIL]));
+        }
+
+        if (filled($data[StudentImportFields::ALTERNATE_MOBILE] ?? null)) {
+            $attributes['alternate_mobile'] = trim((string) $data[StudentImportFields::ALTERNATE_MOBILE]);
+        }
+
+        $dateOfBirth = $this->parseOptionalDate($data[StudentImportFields::DATE_OF_BIRTH] ?? null);
+
+        if ($dateOfBirth) {
+            $attributes['date_of_birth'] = $dateOfBirth;
+        }
+
+        $gender = filled($data[StudentImportFields::GENDER] ?? null)
+            ? $this->parseGender((string) $data[StudentImportFields::GENDER])
+            : null;
+
+        if ($gender) {
+            $attributes['gender'] = $gender;
+        }
+
+        $mobile = $this->resolvedImportMobile($data);
+
+        if ($mobile !== null) {
+            $taken = Student::query()
+                ->where('mobile', $mobile)
+                ->whereKeyNot($student->id)
+                ->exists();
+
+            if ($taken) {
+                throw ValidationException::withMessages([
+                    'mobile' => 'This mobile number already belongs to another student.',
+                ]);
+            }
+
+            $attributes['mobile'] = $mobile;
+            $attributes['mobile_import_note'] = null;
+        }
+
+        if ($attributes !== []) {
+            $student->update($attributes);
+        }
+    }
+
     protected function validateRowData(array $data, bool $requireBatchFromSpreadsheet = true): array
     {
         $errors = [];
