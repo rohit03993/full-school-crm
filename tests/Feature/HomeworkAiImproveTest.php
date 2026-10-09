@@ -315,6 +315,7 @@ class HomeworkAiImproveTest extends TestCase
         $html = view('filament.pages.partials.homework-speech')->render();
 
         $this->assertStringContainsString('Speak', $html);
+        $this->assertStringContainsString('interimResults = true', $html);
         $this->assertStringContainsString('textarea[data-homework-speech=description]', $html);
         $this->assertStringContainsString('data-speech-wire=""', $html);
     }

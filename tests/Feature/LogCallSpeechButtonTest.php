@@ -23,6 +23,7 @@ class LogCallSpeechButtonTest extends TestCase
         $this->assertStringContainsString('Log student call', $html);
         $this->assertStringContainsString('data-device-speech="call-notes"', $html);
         $this->assertStringContainsString('Speak', $html);
+        $this->assertStringContainsString('interimResults = true', $html);
         $this->assertStringContainsString('logCallForm.call_notes', $html);
         $this->assertStringContainsString('Save call log', $html);
         $this->assertStringContainsString('At least 10 characters required.', $html);
