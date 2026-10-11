@@ -950,6 +950,10 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->call('confirmClosedSend')
             ->assertNotified('Choose what happened for Physics.')
             ->call('setMissingReason', $data['physics']->id, 'no_homework')
+            ->call('confirmNoHomeworkNote', $data['physics']->id)
+            ->assertNotified('Write why there is no homework')
+            ->set('missingSubjectNotes.'.$data['physics']->id, 'Chapter was already finished in class.')
+            ->call('confirmNoHomeworkNote', $data['physics']->id)
             ->call('confirmClosedSend')
             ->assertSee('Please wait 5 min')
             ->assertDontSee('Remove');
@@ -975,6 +979,12 @@ class HomeworkSubmissionServiceTest extends TestCase
         }
         $this->assertSame($data['admin']->id, $maths->approved_by_user_id);
         $this->assertSame($data['admin']->id, $maths->combined_sent_by_user_id);
+        $this->assertDatabaseHas('homework_subject_closures', [
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['physics']->id,
+            'reason' => 'no_homework',
+            'reason_note' => 'Chapter was already finished in class.',
+        ]);
     }
 
     public function test_send_to_parents_warns_and_does_not_send_while_homework_is_waiting(): void

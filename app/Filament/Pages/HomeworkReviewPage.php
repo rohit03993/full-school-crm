@@ -71,6 +71,12 @@ class HomeworkReviewPage extends Page
     /** @var array<int|string, string> */
     public array $missingSubjectReasons = [];
 
+    /** @var array<int|string, string> */
+    public array $missingSubjectNotes = [];
+
+    /** @var array<int|string, bool> */
+    public array $noHomeworkAsking = [];
+
     protected const PARENT_SEND_COOLDOWN_MINUTES = 5;
 
     public static function getNavigationLabel(): string
@@ -117,7 +123,7 @@ class HomeworkReviewPage extends Page
                             $this->openBatchId = null;
                             $this->sendConfirmBatchId = null;
                             $this->duplicateSendBatchId = null;
-                            $this->missingSubjectReasons = [];
+                            $this->clearMissingSubjectAnswers();
                         }),
                     Hidden::make('batch_id'),
                 ])
@@ -150,6 +156,8 @@ class HomeworkReviewPage extends Page
                                     ? $service->missingSubjectsForBatch((int) $this->sendConfirmBatchId, $date)
                                     : [],
                                 'missingSubjectReasons' => $this->missingSubjectReasons,
+                                'missingSubjectNotes' => $this->missingSubjectNotes,
+                                'noHomeworkAsking' => $this->noHomeworkAsking,
                                 'windowNote' => $service->homeworkWindowNote($date),
                                 'checkUrl' => HomeworkCheckPage::getUrl(),
                                 'teacherScoresUrl' => TeacherHomeworkReportPage::getUrl(),
@@ -345,13 +353,49 @@ class HomeworkReviewPage extends Page
             return;
         }
 
+        if ($reason === 'no_homework') {
+            unset($this->missingSubjectReasons[$subjectId]);
+            $this->noHomeworkAsking[$subjectId] = true;
+
+            return;
+        }
+
         $this->missingSubjectReasons[$subjectId] = $reason;
+        unset($this->missingSubjectNotes[$subjectId], $this->noHomeworkAsking[$subjectId]);
+    }
+
+    public function confirmNoHomeworkNote(int $subjectId): void
+    {
+        $note = trim((string) ($this->missingSubjectNotes[$subjectId] ?? ''));
+
+        if ($note === '') {
+            Notification::make()->title('Write why there is no homework')->warning()->send();
+
+            return;
+        }
+
+        if (mb_strlen($note) > 500) {
+            Notification::make()->title('Keep the reason under 500 characters')->warning()->send();
+
+            return;
+        }
+
+        $this->missingSubjectNotes[$subjectId] = $note;
+        $this->missingSubjectReasons[$subjectId] = 'no_homework';
+        unset($this->noHomeworkAsking[$subjectId]);
     }
 
     public function cancelClosedSend(): void
     {
         $this->sendConfirmBatchId = null;
+        $this->clearMissingSubjectAnswers();
+    }
+
+    protected function clearMissingSubjectAnswers(): void
+    {
         $this->missingSubjectReasons = [];
+        $this->missingSubjectNotes = [];
+        $this->noHomeworkAsking = [];
     }
 
     public function confirmClosedSend(): void
@@ -373,6 +417,7 @@ class HomeworkReviewPage extends Page
                 $batchId,
                 $this->dateString(),
                 $this->missingSubjectReasons,
+                $this->missingSubjectNotes,
             );
         } catch (ValidationException $exception) {
             $message = collect($exception->errors())->flatten()->first() ?? 'Choose what happened for each subject.';
@@ -382,7 +427,7 @@ class HomeworkReviewPage extends Page
         }
 
         $this->sendConfirmBatchId = null;
-        $this->missingSubjectReasons = [];
+        $this->clearMissingSubjectAnswers();
         $this->openClass($batchId);
         $this->sendCombined();
     }
@@ -432,7 +477,7 @@ class HomeworkReviewPage extends Page
         }
 
         $this->sendConfirmBatchId = $batchId;
-        $this->missingSubjectReasons = [];
+        $this->clearMissingSubjectAnswers();
 
         return true;
     }

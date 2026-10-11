@@ -16,6 +16,7 @@ class HomeworkSubjectClosure extends Model
         'course_subject_id',
         'homework_date',
         'reason',
+        'reason_note',
         'teacher_user_id',
         'closed_by_user_id',
     ];

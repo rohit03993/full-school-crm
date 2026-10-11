@@ -1020,6 +1020,7 @@ class HomeworkSubmissionService
                     ], true),
                     'closed' => $closure !== null,
                     'closure_label' => $closure?->label(),
+                    'closure_note' => $closure?->reason_note,
                     'can_remove' => $assignment !== null && $status === HomeworkAssignmentStatus::Submitted,
                     'link_opened' => $stats['opened'],
                     'link_total' => $stats['total'],
@@ -1523,10 +1524,12 @@ class HomeworkSubmissionService
      * Save the coordinator's answer for every missing subject, then the send can continue.
      *
      * @param  array<int|string, string>  $reasonsBySubjectId
+     * @param  array<int|string, string>  $notesBySubjectId
      */
-    public function closeMissingSubjects(User $admin, int $batchId, string $date, array $reasonsBySubjectId): void
+    public function closeMissingSubjects(User $admin, int $batchId, string $date, array $reasonsBySubjectId, array $notesBySubjectId = []): void
     {
         $missing = $this->missingSubjectsForBatch($batchId, $date);
+        $notes = [];
 
         foreach ($missing as $row) {
             $reason = $reasonsBySubjectId[$row['course_subject_id']]
@@ -1538,6 +1541,24 @@ class HomeworkSubmissionService
                     'reason' => 'Choose what happened for '.$row['subject'].'.',
                 ]);
             }
+
+            $note = trim((string) ($notesBySubjectId[$row['course_subject_id']]
+                ?? $notesBySubjectId[(string) $row['course_subject_id']]
+                ?? ''));
+
+            if ($reason === HomeworkSubjectClosure::NoHomework && $note === '') {
+                throw ValidationException::withMessages([
+                    'reason' => 'Write why there is no homework for '.$row['subject'].'.',
+                ]);
+            }
+
+            if (mb_strlen($note) > 500) {
+                throw ValidationException::withMessages([
+                    'reason' => 'Keep the reason for '.$row['subject'].' under 500 characters.',
+                ]);
+            }
+
+            $notes[$row['course_subject_id']] = $reason === HomeworkSubjectClosure::NoHomework ? $note : null;
         }
 
         $date = $this->normalizeDate($date);
@@ -1554,6 +1575,7 @@ class HomeworkSubmissionService
                 ],
                 [
                     'reason' => $reason,
+                    'reason_note' => $notes[$row['course_subject_id']] ?? null,
                     'teacher_user_id' => $row['teacher_user_id'],
                     'closed_by_user_id' => $admin->id,
                 ],
@@ -1586,6 +1608,7 @@ class HomeworkSubmissionService
      *     status_key: ?string,
      *     closure_reason: ?string,
      *     closure_label: ?string,
+     *     closure_note: ?string,
      *     submitted_at: ?string,
      *     link_opened: int,
      *     link_total: int,
@@ -1630,6 +1653,7 @@ class HomeworkSubmissionService
             'status_key' => $assignment?->status?->value,
             'closure_reason' => $closure?->reason,
             'closure_label' => $closure?->label(),
+            'closure_note' => $closure?->reason_note,
             'submitted_at' => $assignment?->submitted_at?->timezone((string) config('app.timezone'))->format('h:i A'),
             'link_opened' => $stats['opened'],
             'link_total' => $stats['total'],

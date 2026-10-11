@@ -63,6 +63,9 @@
                                                 <p class="font-semibold text-gray-900 dark:text-gray-100">{{ $subject['subject'] }}</p>
                                                 @if ($subject['closed'] ?? false)
                                                     <p class="mt-1 text-xs font-semibold text-rose-700 dark:text-rose-300">{{ $subject['closure_label'] ?? 'Closed for today' }}. You cannot add homework for this day.</p>
+                                                    @if (filled($subject['closure_note'] ?? null))
+                                                        <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">{{ $subject['closure_note'] }}</p>
+                                                    @endif
                                                 @elseif ($subject['status_key'])
                                                     <p @class([
                                                         'mt-1 text-xs font-semibold',
