@@ -11,6 +11,7 @@ use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Student;
 use App\Models\User;
+use App\Models\WhatsAppInboxView;
 use App\Models\Setting;
 use App\Models\WhatsAppCampaign;
 use App\Services\MetaWhatsAppMediaService;
@@ -239,6 +240,112 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertSet('selectedPhone', null)
             ->assertSee('Failed Parent')
             ->assertStatus(200);
+    }
+
+    public function test_opening_a_chat_records_who_saw_it_without_clearing_reply_or_failed(): void
+    {
+        Http::fake();
+
+        $admin = User::factory()->create([
+            'name' => 'Sunil Sharma',
+            'is_active' => true,
+        ]);
+        $admin->assignRole(Role::findOrCreate(RoleName::SuperAdmin->value));
+
+        $waiting = Student::query()->create([
+            'name' => 'Waiting Parent',
+            'mobile' => '9811000101',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $failed = Student::query()->create([
+            'name' => 'Failed Parent',
+            'mobile' => '9811000401',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $waitingMessage = MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.SEEN-WAIT',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919811000101',
+            'student_id' => $waiting->id,
+            'body_preview' => 'Please call me back',
+            'message_type' => 'text',
+            'status' => 'received',
+            'status_at' => now()->subMinute(),
+        ]);
+
+        $failedMessage = MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.SEEN-FAIL',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '919811000401',
+            'student_id' => $failed->id,
+            'body_preview' => 'This send did not go',
+            'message_type' => 'text',
+            'status' => 'failed',
+            'status_at' => now(),
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(WhatsAppInboxThread::class)
+            ->call('openChat', '919811000101', $waiting->id)
+            ->assertSee('Seen by Sunil Sharma')
+            ->call('openChat', '919811000101', $waiting->id);
+
+        $this->assertSame(1, WhatsAppInboxView::query()->where('phone', '919811000101')->count());
+        $this->assertDatabaseHas('whatsapp_inbox_views', [
+            'phone' => '919811000101',
+            'user_id' => $admin->id,
+            'meta_whatsapp_message_id' => $waitingMessage->id,
+        ]);
+        $this->assertSame('received', $waitingMessage->fresh()->status);
+
+        Livewire::test(WhatsAppInboxPage::class)
+            ->assertSee('Waiting Parent')
+            ->assertSee('Failed Parent')
+            ->assertSee('Seen by Sunil Sharma')
+            ->assertSeeHtml('crm-wa-global-inbox__badge">Reply')
+            ->assertSeeHtml('crm-wa-global-inbox__badge--failed')
+            ->call('setListFilter', 'pending')
+            ->assertSee('Waiting Parent')
+            ->assertDontSee('Failed Parent');
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.SEEN-WAIT-NEW',
+            'direction' => MetaWhatsAppMessageDirection::Inbound->value,
+            'phone' => '919811000101',
+            'student_id' => $waiting->id,
+            'body_preview' => 'I wrote again',
+            'message_type' => 'text',
+            'status' => 'received',
+            'status_at' => now(),
+        ]);
+
+        Livewire::test(WhatsAppInboxPage::class)
+            ->assertSee('I wrote again')
+            ->assertDontSee('Seen by Sunil Sharma')
+            ->call('setListFilter', 'pending')
+            ->assertSee('Waiting Parent');
+
+        Livewire::test(WhatsAppInboxThread::class)
+            ->call('openChat', '919811000401', $failed->id)
+            ->assertSee('Seen by Sunil Sharma');
+
+        $this->assertSame('failed', $failedMessage->fresh()->status);
+        $this->assertDatabaseHas('whatsapp_inbox_views', [
+            'phone' => '919811000401',
+            'user_id' => $admin->id,
+            'meta_whatsapp_message_id' => $failedMessage->id,
+        ]);
+
+        Livewire::test(WhatsAppInboxPage::class)
+            ->assertSee('Failed Parent')
+            ->assertSeeHtml('crm-wa-global-inbox__badge--failed')
+            ->call('setListFilter', 'failed')
+            ->assertSee('Failed Parent')
+            ->assertSee('Seen by Sunil Sharma')
+            ->assertDontSee('Waiting Parent');
     }
 
     public function test_inbox_hides_page_back_and_long_hint_but_keeps_chats_and_filters(): void

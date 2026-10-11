@@ -8,6 +8,7 @@ use App\Models\MetaWhatsAppMessage;
 use App\Models\Student;
 use App\Services\StudentWhatsAppThreadService;
 use App\Services\WhatsAppInboxContactResolver;
+use App\Services\WhatsAppInboxViewService;
 use App\Support\WhatsAppInboxContact;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\View\View;
@@ -90,7 +91,11 @@ class WhatsAppInboxThread extends Component
                 ->body('Please refresh the page. If this continues, run migrations on the server.')
                 ->danger()
                 ->send();
+
+            return;
         }
+
+        $this->rememberStaffSawThisChat();
     }
 
     public function clearConversation(): void
@@ -121,6 +126,27 @@ class WhatsAppInboxThread extends Component
         $this->messagesTabLoaded = false;
         $this->loadMessagesTab();
         $this->threadChangeStamp = $stamp;
+        $this->rememberStaffSawThisChat();
+    }
+
+    protected function rememberStaffSawThisChat(): void
+    {
+        try {
+            $phone = (string) ($this->selectedPhone ?? '');
+            $userId = auth()->id();
+
+            if ($phone === '' || ! is_numeric($userId)) {
+                return;
+            }
+
+            $saved = app(WhatsAppInboxViewService::class)->recordOpen($phone, (int) $userId);
+
+            if ($saved) {
+                $this->dispatch('whatsapp-inbox-refresh-list');
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     protected function guardInboxAccess(): void
@@ -220,6 +246,18 @@ class WhatsAppInboxThread extends Component
     {
         $phone = $this->selectedPhone;
         $chatOpen = filled($phone) || filled($this->selectedStudentId);
+        $viewService = app(WhatsAppInboxViewService::class);
+        $seenBy = [];
+
+        if (filled($phone)) {
+            try {
+                $seenBy = $viewService->seenByPhone([
+                    (string) $phone => $viewService->latestMessageId((string) $phone),
+                ])[(string) $phone] ?? [];
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
 
         return view('livewire.whatsapp-inbox-thread', [
             'chatOpen' => $chatOpen,
@@ -227,6 +265,7 @@ class WhatsAppInboxThread extends Component
             'chatContact' => filled($phone)
                 ? app(WhatsAppInboxContactResolver::class)->resolve((string) $phone)
                 : WhatsAppInboxContact::unknown(),
+            'seenBy' => $seenBy,
             'selectedPhone' => $phone,
             'metaRoutingActive' => $this->metaRoutingActive,
             'metaSessionOpen' => $this->metaSessionOpen,

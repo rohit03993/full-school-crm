@@ -8,6 +8,7 @@ readonly class MetaWhatsAppConversation
 {
     /**
      * @param  list<string>  $contactTags
+     * @param  list<array{name: string, label: string}>  $seenBy
      */
     public function __construct(
         public ?int $studentId,
@@ -24,6 +25,8 @@ readonly class MetaWhatsAppConversation
         public string $contactKind = 'unknown',
         public array $contactTags = [],
         public ?int $staffUserId = null,
+        public ?int $lastMessageId = null,
+        public array $seenBy = [],
     ) {}
 
     /**
@@ -47,7 +50,34 @@ readonly class MetaWhatsAppConversation
             'contact_kind' => $this->contactKind,
             'contact_tags' => $this->contactTags,
             'staff_user_id' => $this->staffUserId,
+            'last_message_id' => $this->lastMessageId,
+            'seen_by' => $this->seenBy,
         ];
+    }
+
+    /**
+     * @param  list<array{name: string, label: string}>  $seenBy
+     */
+    public function withSeenBy(array $seenBy): self
+    {
+        return new self(
+            studentId: $this->studentId,
+            studentName: $this->studentName,
+            phone: $this->phone,
+            phoneDisplay: $this->phoneDisplay,
+            preview: $this->preview,
+            lastDirection: $this->lastDirection,
+            lastAt: $this->lastAt,
+            sessionOpen: $this->sessionOpen,
+            needsReply: $this->needsReply,
+            lastSendFailed: $this->lastSendFailed,
+            isLinked: $this->isLinked,
+            contactKind: $this->contactKind,
+            contactTags: $this->contactTags,
+            staffUserId: $this->staffUserId,
+            lastMessageId: $this->lastMessageId,
+            seenBy: $seenBy,
+        );
     }
 
     public function lastAtLabel(): string

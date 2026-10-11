@@ -10,6 +10,7 @@ use App\Enums\WhatsAppRecipientStatus;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Student;
 use App\Models\WhatsAppCampaignRecipient;
+use App\Models\WhatsAppInboxView;
 use App\Support\MetaWhatsAppConversation;
 use App\Support\MetaWhatsAppInboundMessageParser;
 use App\Support\WhatsAppInboxContact;
@@ -146,7 +147,7 @@ class MetaWhatsAppConversationService
             ));
         }
 
-        return $this->filterAndSort($conversations, $search, $limit);
+        return $this->attachSeenBy($this->filterAndSort($conversations, $search, $limit));
     }
 
     /**
@@ -189,7 +190,7 @@ class MetaWhatsAppConversationService
             })
             ->values();
 
-        return $this->filterAndSort($conversations, $search, $limit);
+        return $this->attachSeenBy($this->filterAndSort($conversations, $search, $limit));
     }
 
     /**
@@ -250,8 +251,13 @@ class MetaWhatsAppConversationService
             ? WhatsAppCampaignRecipient::query()->selectRaw('MAX(id) as max_id, MAX(updated_at) as max_updated')->first()
             : null;
 
+        $views = Schema::hasTable('whatsapp_inbox_views')
+            ? WhatsAppInboxView::query()->selectRaw('MAX(id) as max_id, MAX(seen_at) as max_seen')->first()
+            : null;
+
         return ($messages?->max_id ?? '').'|'.($messages?->max_updated ?? '')
-            .'|'.($campaigns?->max_id ?? '').'|'.($campaigns?->max_updated ?? '');
+            .'|'.($campaigns?->max_id ?? '').'|'.($campaigns?->max_updated ?? '')
+            .'|'.($views?->max_id ?? '').'|'.($views?->max_seen ?? '');
     }
 
     /**
@@ -411,6 +417,7 @@ class MetaWhatsAppConversationService
             contactKind: $contact->kind->value,
             contactTags: $contact->tagLabels(),
             staffUserId: $contact->staff?->id,
+            lastMessageId: $message->id,
         );
     }
 
@@ -462,6 +469,44 @@ class MetaWhatsAppConversationService
             tags: [$kind],
             student: $student,
         );
+    }
+
+    /**
+     * Seen lines belong to the current last message only.
+     * An older look does not cover a newer parent message or a newer failed send.
+     *
+     * @param  Collection<int, MetaWhatsAppConversation>  $conversations
+     * @return Collection<int, MetaWhatsAppConversation>
+     */
+    protected function attachSeenBy(Collection $conversations): Collection
+    {
+        try {
+            $lastMessageIdByPhone = [];
+
+            foreach ($conversations as $conversation) {
+                if ($conversation->phone === '') {
+                    continue;
+                }
+
+                $lastMessageIdByPhone[$conversation->phone] = $conversation->lastMessageId;
+            }
+
+            $seenByPhone = app(WhatsAppInboxViewService::class)->seenByPhone($lastMessageIdByPhone);
+
+            return $conversations->map(function (MetaWhatsAppConversation $conversation) use ($seenByPhone): MetaWhatsAppConversation {
+                $seenBy = $seenByPhone[$conversation->phone] ?? [];
+
+                if ($seenBy === []) {
+                    return $conversation;
+                }
+
+                return $conversation->withSeenBy($seenBy);
+            })->values();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return $conversations;
+        }
     }
 
     /**

@@ -171,6 +171,21 @@
                                         <span class="crm-wa-global-inbox__badge crm-wa-global-inbox__badge--open">24h</span>
                                     @endif
                                 </span>
+                                @php
+                                    $seenBy = $conversation['seen_by'] ?? [];
+                                    $seenShown = array_slice($seenBy, 0, 3);
+                                    $seenExtra = count($seenBy) - count($seenShown);
+                                @endphp
+                                @if ($seenShown !== [])
+                                    <span class="crm-wa-global-inbox__item-phone crm-wa-global-inbox__seen">
+                                        @foreach ($seenShown as $seen)
+                                            {{ $seen['label'] }}@if (! $loop->last)<br>@endif
+                                        @endforeach
+                                        @if ($seenExtra > 0)
+                                            <br>and {{ $seenExtra }} more
+                                        @endif
+                                    </span>
+                                @endif
                             </span>
                         </button>
                     @endforeach

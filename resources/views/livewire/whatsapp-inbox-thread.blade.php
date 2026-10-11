@@ -56,6 +56,12 @@
                             · {{ ($metaSessionOpen ?? false) ? '24h open' : 'Templates only' }}
                         @endif
                     </p>
+                    @foreach (array_slice($seenBy ?? [], 0, 3) as $seen)
+                        <p class="crm-wa-global-inbox__chat-phone crm-wa-global-inbox__seen">{{ $seen['label'] }}</p>
+                    @endforeach
+                    @if (count($seenBy ?? []) > 3)
+                        <p class="crm-wa-global-inbox__chat-phone crm-wa-global-inbox__seen">and {{ count($seenBy) - 3 }} more</p>
+                    @endif
                 </div>
 
                 @if ($chatStudent)
