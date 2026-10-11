@@ -69,7 +69,7 @@ readonly class MetaWhatsAppConversation
             lastDirection: $this->lastDirection,
             lastAt: $this->lastAt,
             sessionOpen: $this->sessionOpen,
-            needsReply: $this->needsReply,
+            needsReply: $seenBy === [] && $this->needsReply,
             lastSendFailed: $this->lastSendFailed,
             isLinked: $this->isLinked,
             contactKind: $this->contactKind,

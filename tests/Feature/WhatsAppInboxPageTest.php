@@ -242,7 +242,7 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertStatus(200);
     }
 
-    public function test_opening_a_chat_records_who_saw_it_without_clearing_reply_or_failed(): void
+    public function test_opening_a_chat_marks_it_read_and_keeps_failed(): void
     {
         Http::fake();
 
@@ -288,6 +288,13 @@ class WhatsAppInboxPageTest extends TestCase
 
         $this->actingAs($admin);
 
+        Livewire::test(WhatsAppInboxPage::class)
+            ->assertSee('Waiting Parent')
+            ->assertSeeHtml('crm-wa-global-inbox__badge">Reply')
+            ->call('setListFilter', 'pending')
+            ->assertSee('Waiting Parent')
+            ->assertSee('1 unread');
+
         Livewire::test(WhatsAppInboxThread::class)
             ->call('openChat', '919811000101', $waiting->id)
             ->assertSee('Seen by Sunil Sharma')
@@ -305,10 +312,12 @@ class WhatsAppInboxPageTest extends TestCase
             ->assertSee('Waiting Parent')
             ->assertSee('Failed Parent')
             ->assertSee('Seen by Sunil Sharma')
-            ->assertSeeHtml('crm-wa-global-inbox__badge">Reply')
+            ->assertDontSeeHtml('crm-wa-global-inbox__badge">Reply')
             ->assertSeeHtml('crm-wa-global-inbox__badge--failed')
             ->call('setListFilter', 'pending')
-            ->assertSee('Waiting Parent')
+            ->assertSee('0 unread')
+            ->assertSee('No unread chats')
+            ->assertDontSee('Waiting Parent')
             ->assertDontSee('Failed Parent');
 
         MetaWhatsAppMessage::query()->create([

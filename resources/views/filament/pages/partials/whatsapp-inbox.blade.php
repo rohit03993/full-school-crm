@@ -27,13 +27,13 @@
                     <p class="crm-wa-global-inbox__list-sub">
                         @if ($inboxLoaded)
                             @if (($listFilter ?? 'all') === 'pending')
-                                {{ (int) ($pendingReplyCount ?? 0) }} waiting for a reply
+                                {{ (int) ($pendingReplyCount ?? 0) }} unread
                             @elseif (($listFilter ?? 'all') === 'failed')
                                 {{ (int) ($failedSendCount ?? 0) }} last school send{{ ((int) ($failedSendCount ?? 0)) === 1 ? '' : 's' }} failed
                             @else
                                 {{ (int) ($totalConversationCount ?? count($conversations)) }} conversation{{ ((int) ($totalConversationCount ?? count($conversations))) === 1 ? '' : 's' }}
                                 @if ((int) ($pendingReplyCount ?? 0) > 0)
-                                    · {{ (int) $pendingReplyCount }} waiting
+                                    · {{ (int) $pendingReplyCount }} unread
                                 @endif
                                 @if ((int) ($failedSendCount ?? 0) > 0)
                                     · {{ (int) $failedSendCount }} failed
@@ -107,9 +107,9 @@
                 @elseif ($conversations === [])
                     <div class="crm-wa-global-inbox__empty">
                         @if (($listFilter ?? 'all') === 'pending')
-                            <p class="font-medium text-gray-800 dark:text-gray-200">No chats waiting for a reply</p>
+                            <p class="font-medium text-gray-800 dark:text-gray-200">No unread chats</p>
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                The last message in every chat is from the school.
+                                A staff member has opened every parent message.
                             </p>
                         @elseif (($listFilter ?? 'all') === 'failed')
                             <p class="font-medium text-gray-800 dark:text-gray-200">No failed sends</p>
