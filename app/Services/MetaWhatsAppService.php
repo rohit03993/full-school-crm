@@ -470,6 +470,95 @@ class MetaWhatsAppService
         return filled($fromEnv) ? trim((string) $fromEnv) : null;
     }
 
+    public function appId(): ?string
+    {
+        $fromSettings = Setting::getValue('meta_whatsapp.app_id');
+
+        if (filled($fromSettings)) {
+            return trim((string) $fromSettings);
+        }
+
+        $fromEnv = config('meta_whatsapp.app_id');
+
+        return filled($fromEnv) ? trim((string) $fromEnv) : null;
+    }
+
+    /**
+     * Upload the sample photo or video Meta reviews when a template is created.
+     * The handle is not the file parents receive. Each send uploads its own file later.
+     *
+     * @return array{status: string, handle?: string, error?: string}
+     */
+    public function uploadTemplateSample(string $absolutePath, string $mimeType, string $fileName): array
+    {
+        if (! filled($this->accessToken())) {
+            return ['status' => 'failed', 'error' => 'Access token is not configured.'];
+        }
+
+        $appId = $this->appId();
+
+        if (blank($appId)) {
+            return ['status' => 'failed', 'error' => 'Meta App ID is missing. Open WhatsApp setup and save the App ID from Meta → App settings → Basic.'];
+        }
+
+        if (! is_file($absolutePath)) {
+            return ['status' => 'failed', 'error' => 'The sample file could not be read. Choose it again.'];
+        }
+
+        $bytes = file_get_contents($absolutePath);
+
+        if ($bytes === false || $bytes === '') {
+            return ['status' => 'failed', 'error' => 'The sample file is empty. Choose it again.'];
+        }
+
+        $token = (string) $this->accessToken();
+
+        try {
+            $sessionResponse = Http::timeout(60)
+                ->withToken($token)
+                ->acceptJson()
+                ->post($this->graphUrl($appId.'/uploads'), [
+                    'file_name' => $fileName,
+                    'file_length' => strlen($bytes),
+                    'file_type' => $mimeType,
+                ]);
+
+            $sessionData = $sessionResponse->json();
+            $sessionId = is_array($sessionData) ? trim((string) ($sessionData['id'] ?? '')) : '';
+
+            if (! $sessionResponse->successful() || $sessionId === '') {
+                return [
+                    'status' => 'failed',
+                    'error' => $this->parseApiError($sessionData, $sessionResponse->body()),
+                ];
+            }
+
+            $uploadResponse = Http::timeout(120)
+                ->withHeaders([
+                    'Authorization' => 'OAuth '.$token,
+                    'file_offset' => '0',
+                ])
+                ->withBody($bytes, $mimeType)
+                ->post($this->graphUrl($sessionId));
+
+            $uploadData = $uploadResponse->json();
+            $handle = is_array($uploadData) ? trim((string) ($uploadData['h'] ?? '')) : '';
+
+            if (! $uploadResponse->successful() || $handle === '') {
+                return [
+                    'status' => 'failed',
+                    'error' => $this->parseApiError($uploadData, $uploadResponse->body()),
+                ];
+            }
+
+            return ['status' => 'success', 'handle' => $handle];
+        } catch (\Throwable $exception) {
+            Log::error('Meta WhatsApp template sample upload failed', ['error' => $exception->getMessage()]);
+
+            return ['status' => 'failed', 'error' => $exception->getMessage()];
+        }
+    }
+
     public function wabaId(): ?string
     {
         $fromSettings = Setting::getValue('meta_whatsapp.waba_id');

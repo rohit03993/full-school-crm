@@ -99,6 +99,62 @@ class MetaWhatsAppTemplateBuilderTest extends TestCase
         }
     }
 
+    public function test_builds_image_header_with_sample_handle(): void
+    {
+        $payload = MetaWhatsAppTemplateBuilder::buildCreatePayload(
+            'admission_poster',
+            'en',
+            'MARKETING',
+            'Admissions are open for {{1}}.',
+            null,
+            null,
+            'Class 11',
+            true,
+            null,
+            'IMAGE',
+            '4::sample-handle',
+        );
+
+        $this->assertSame('HEADER', $payload['components'][0]['type']);
+        $this->assertSame('IMAGE', $payload['components'][0]['format']);
+        $this->assertSame(['4::sample-handle'], $payload['components'][0]['example']['header_handle']);
+        $this->assertSame('BODY', $payload['components'][1]['type']);
+    }
+
+    public function test_image_header_requires_a_sample_handle(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('sample JPG');
+
+        MetaWhatsAppTemplateBuilder::buildCreatePayload(
+            'admission_poster',
+            'en',
+            'MARKETING',
+            'Admissions are open.',
+            null,
+            null,
+            null,
+            true,
+            null,
+            'IMAGE',
+            null,
+        );
+    }
+
+    public function test_text_header_stays_plain_text(): void
+    {
+        $payload = MetaWhatsAppTemplateBuilder::buildCreatePayload(
+            'holiday_notice',
+            'en',
+            'UTILITY',
+            'School will remain closed tomorrow.',
+            'Holiday notice',
+        );
+
+        $this->assertSame('TEXT', $payload['components'][0]['format']);
+        $this->assertSame('Holiday notice', $payload['components'][0]['text']);
+    }
+
     public function test_normalizes_template_name(): void
     {
         $this->assertSame('parent_check_in', MetaWhatsAppTemplateBuilder::normalizeName('Parent Check In'));

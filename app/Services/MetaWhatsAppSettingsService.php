@@ -26,6 +26,7 @@ class MetaWhatsAppSettingsService
             'access_token' => '',
             'verify_token' => Setting::getValue('meta_whatsapp.verify_token', config('meta_whatsapp.verify_token')),
             'app_secret' => '',
+            'app_id' => Setting::getValue('meta_whatsapp.app_id', config('meta_whatsapp.app_id')),
             'default_language' => $this->meta->defaultLanguage(),
             'enabled' => (bool) Setting::getValue('meta_whatsapp.enabled', false),
             'test_phone' => Setting::getValue('meta_whatsapp.test_phone'),
@@ -106,6 +107,7 @@ class MetaWhatsAppSettingsService
         $accessToken = trim((string) ($data['access_token'] ?? ''));
         $verifyToken = trim((string) ($data['verify_token'] ?? ''));
         $appSecret = trim((string) ($data['app_secret'] ?? ''));
+        $appId = trim((string) ($data['app_id'] ?? ''));
 
         if ($phoneNumberId === '') {
             return ['ok' => false, 'message' => 'Phone number ID is required.'];
@@ -136,6 +138,10 @@ class MetaWhatsAppSettingsService
 
         if ($appSecret !== '') {
             Setting::setValue('meta_whatsapp.app_secret', Crypt::encryptString($appSecret), 'meta_whatsapp');
+        }
+
+        if (array_key_exists('app_id', $data)) {
+            Setting::setValue('meta_whatsapp.app_id', $appId, 'meta_whatsapp');
         }
 
         Setting::flushValueCache();

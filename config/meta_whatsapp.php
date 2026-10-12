@@ -26,6 +26,8 @@ return [
 
     'app_secret' => env('META_WHATSAPP_APP_SECRET'),
 
+    'app_id' => env('META_WHATSAPP_APP_ID'),
+
     /*
     |--------------------------------------------------------------------------
     | Login OTP (WhatsApp template)

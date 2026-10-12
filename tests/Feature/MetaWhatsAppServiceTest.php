@@ -487,4 +487,47 @@ class MetaWhatsAppServiceTest extends TestCase
                 && ! array_key_exists('name', $request->data());
         });
     }
+
+    public function test_template_sample_upload_returns_the_review_handle(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+            'meta_whatsapp.app_id' => '999',
+        ]);
+
+        $path = tempnam(sys_get_temp_dir(), 'wa');
+        file_put_contents($path, 'sample-bytes');
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/999/uploads' => Http::response(['id' => 'upload:abc'], 200),
+            'https://graph.facebook.com/v20.0/upload:abc' => Http::response(['h' => '4::sample-handle'], 200),
+        ]);
+
+        $result = app(MetaWhatsAppService::class)->uploadTemplateSample($path, 'image/jpeg', 'poster.jpg');
+
+        @unlink($path);
+
+        $this->assertSame('success', $result['status']);
+        $this->assertSame('4::sample-handle', $result['handle']);
+    }
+
+    public function test_template_sample_upload_asks_for_the_meta_app_id(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+            'meta_whatsapp.app_id' => null,
+        ]);
+
+        $path = tempnam(sys_get_temp_dir(), 'wa');
+        file_put_contents($path, 'sample-bytes');
+
+        $result = app(MetaWhatsAppService::class)->uploadTemplateSample($path, 'image/jpeg', 'poster.jpg');
+
+        @unlink($path);
+
+        $this->assertSame('failed', $result['status']);
+        $this->assertStringContainsString('App ID', (string) ($result['error'] ?? ''));
+    }
 }

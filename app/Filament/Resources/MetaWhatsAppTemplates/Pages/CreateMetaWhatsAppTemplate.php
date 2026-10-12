@@ -71,6 +71,8 @@ class CreateMetaWhatsAppTemplate extends CreateRecord
             throw ValidationException::withMessages([
                 'data.body_text' => $message,
                 'body_text' => $message,
+                'data.header_sample' => $message,
+                'header_sample' => $message,
             ]);
         } catch (Throwable $exception) {
             report($exception);

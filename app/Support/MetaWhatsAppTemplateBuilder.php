@@ -28,6 +28,8 @@ class MetaWhatsAppTemplateBuilder
         ?string $bodyExamplesCsv = null,
         bool $allowCategoryChange = true,
         ?array $bodyExamples = null,
+        ?string $headerFormat = null,
+        ?string $headerSampleHandle = null,
     ): array {
         $name = self::normalizeName($name);
         $language = trim($language);
@@ -53,8 +55,27 @@ class MetaWhatsAppTemplateBuilder
         self::assertBodyVariablesNotAtEdges($bodyText);
 
         $components = [];
+        $headerFormat = strtoupper(trim((string) $headerFormat));
 
-        if (filled($headerText)) {
+        if (in_array($headerFormat, ['IMAGE', 'VIDEO'], true)) {
+            $handle = trim((string) $headerSampleHandle);
+
+            if ($handle === '') {
+                throw new InvalidArgumentException(
+                    $headerFormat === 'VIDEO'
+                        ? 'Upload a sample MP4 video so Meta can review this template.'
+                        : 'Upload a sample JPG or PNG so Meta can review this template.'
+                );
+            }
+
+            $components[] = [
+                'type' => 'HEADER',
+                'format' => $headerFormat,
+                'example' => [
+                    'header_handle' => [$handle],
+                ],
+            ];
+        } elseif (filled($headerText)) {
             $components[] = [
                 'type' => 'HEADER',
                 'format' => 'TEXT',

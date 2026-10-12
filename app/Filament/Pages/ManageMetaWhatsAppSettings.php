@@ -156,6 +156,9 @@ class ManageMetaWhatsAppSettings extends Page
                     TextInput::make('verify_token')
                         ->label('Webhook verify token')
                         ->helperText('Choose any secret string — Meta will send it back during webhook verification.'),
+                    TextInput::make('app_id')
+                        ->label('Meta App ID')
+                        ->helperText('From Meta app → Settings → Basic. Needed when a template header is a photo or a video.'),
                     TextInput::make('app_secret')
                         ->label('Replace app secret')
                         ->password()
