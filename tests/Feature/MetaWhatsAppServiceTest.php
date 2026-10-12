@@ -500,8 +500,8 @@ class MetaWhatsAppServiceTest extends TestCase
         file_put_contents($path, 'sample-bytes');
 
         Http::fake([
-            'https://graph.facebook.com/v20.0/999/uploads' => Http::response(['id' => 'upload:abc'], 200),
-            'https://graph.facebook.com/v20.0/upload:abc' => Http::response(['h' => '4::sample-handle'], 200),
+            'https://graph.facebook.com/v20.0/999/uploads*' => Http::response(['id' => 'upload:abc'], 200),
+            'https://graph.facebook.com/v20.0/upload:abc*' => Http::response(['h' => '4::sample-handle'], 200),
         ]);
 
         $result = app(MetaWhatsAppService::class)->uploadTemplateSample($path, 'image/jpeg', 'poster.jpg');
@@ -520,6 +520,10 @@ class MetaWhatsAppServiceTest extends TestCase
             'meta_whatsapp.app_id' => null,
         ]);
 
+        Http::fake([
+            'https://graph.facebook.com/v20.0/debug_token*' => Http::response(['error' => ['message' => 'no app']], 400),
+        ]);
+
         $path = tempnam(sys_get_temp_dir(), 'wa');
         file_put_contents($path, 'sample-bytes');
 
@@ -529,5 +533,33 @@ class MetaWhatsAppServiceTest extends TestCase
 
         $this->assertSame('failed', $result['status']);
         $this->assertStringContainsString('App ID', (string) ($result['error'] ?? ''));
+    }
+
+    public function test_template_sample_upload_reads_the_app_id_from_the_saved_token(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+            'meta_whatsapp.app_id' => null,
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/debug_token*' => Http::response([
+                'data' => ['app_id' => '999', 'is_valid' => true],
+            ], 200),
+            'https://graph.facebook.com/v20.0/999/uploads*' => Http::response(['id' => 'upload:abc'], 200),
+            'https://graph.facebook.com/v20.0/upload:abc*' => Http::response(['h' => '4::sample-handle'], 200),
+        ]);
+
+        $path = tempnam(sys_get_temp_dir(), 'wa');
+        file_put_contents($path, 'sample-bytes');
+
+        $result = app(MetaWhatsAppService::class)->uploadTemplateSample($path, 'image/jpeg', 'poster.jpg');
+
+        @unlink($path);
+
+        $this->assertSame('success', $result['status']);
+        $this->assertSame('4::sample-handle', $result['handle']);
+        $this->assertSame('999', Setting::getValue('meta_whatsapp.app_id'));
     }
 }

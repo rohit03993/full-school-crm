@@ -472,6 +472,17 @@ class MetaWhatsAppService
 
     public function appId(): ?string
     {
+        $saved = $this->storedAppId();
+
+        if (filled($saved)) {
+            return $saved;
+        }
+
+        return $this->discoverAppId();
+    }
+
+    public function storedAppId(): ?string
+    {
         $fromSettings = Setting::getValue('meta_whatsapp.app_id');
 
         if (filled($fromSettings)) {
@@ -481,6 +492,42 @@ class MetaWhatsAppService
         $fromEnv = config('meta_whatsapp.app_id');
 
         return filled($fromEnv) ? trim((string) $fromEnv) : null;
+    }
+
+    /**
+     * The same access token that sends messages also belongs to one Meta app.
+     * Meta's token check returns that app id. Save it so the next photo template does not ask again.
+     */
+    public function discoverAppId(): ?string
+    {
+        $token = $this->accessToken();
+
+        if (blank($token)) {
+            return null;
+        }
+
+        try {
+            $response = Http::timeout(20)
+                ->withToken((string) $token)
+                ->acceptJson()
+                ->get($this->graphUrl('debug_token'), [
+                    'input_token' => $token,
+                ]);
+
+            $appId = trim((string) data_get($response->json(), 'data.app_id', ''));
+
+            if (! $response->successful() || $appId === '' || ! ctype_digit($appId)) {
+                return null;
+            }
+
+            Setting::setValue('meta_whatsapp.app_id', $appId, 'meta_whatsapp');
+
+            return $appId;
+        } catch (\Throwable $exception) {
+            Log::warning('Meta WhatsApp app id lookup failed', ['error' => $exception->getMessage()]);
+
+            return null;
+        }
     }
 
     /**
@@ -498,7 +545,7 @@ class MetaWhatsAppService
         $appId = $this->appId();
 
         if (blank($appId)) {
-            return ['status' => 'failed', 'error' => 'Meta App ID is missing. Open WhatsApp setup and save the App ID from Meta → App settings → Basic.'];
+            return ['status' => 'failed', 'error' => 'WhatsApp is connected, but Meta did not share the App ID for this token. Open WhatsApp setup, find Meta App ID under Meta webhook, and paste it from Meta → Settings → Basic.'];
         }
 
         if (! is_file($absolutePath)) {
