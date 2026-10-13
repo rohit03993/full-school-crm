@@ -143,6 +143,7 @@ class RunWhatsAppCampaign extends Command
 
             $languageCode = data_get($template->provider_meta, 'meta_language');
             $languageCode = is_string($languageCode) && $languageCode !== '' ? $languageCode : null;
+            $headerMedia = data_get($campaign->campaign_variables, '_header');
 
             $result = $whatsapp->send(
                 $recipient->phone,
@@ -152,6 +153,7 @@ class RunWhatsAppCampaign extends Command
                 $expectedParamCount,
                 $languageCode,
                 $this->outboundLogContext($campaign, $recipient, $sender),
+                is_array($headerMedia) ? $headerMedia : null,
             );
 
             $recipient->template_params = $templateParams;

@@ -32,4 +32,17 @@ class MetaWhatsAppTemplateParserTest extends TestCase
         $this->assertSame(2, $parsed['param_count']);
         $this->assertSame(['student_name', 'roll_number'], $parsed['body_variables']);
     }
+
+    public function test_reads_image_header_format(): void
+    {
+        $format = MetaWhatsAppTemplateParser::headerFormat([
+            ['type' => 'HEADER', 'format' => 'IMAGE'],
+            ['type' => 'BODY', 'text' => 'Hello {{1}}'],
+        ]);
+
+        $this->assertSame('IMAGE', $format);
+        $this->assertNull(MetaWhatsAppTemplateParser::headerFormat([
+            ['type' => 'BODY', 'text' => 'Hello'],
+        ]));
+    }
 }

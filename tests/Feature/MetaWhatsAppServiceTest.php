@@ -145,6 +145,41 @@ class MetaWhatsAppServiceTest extends TestCase
         });
     }
 
+    public function test_send_template_puts_the_chosen_image_in_the_header(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.phone_number_id' => '1234567890',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/1234567890/messages' => Http::response([
+                'messages' => [['id' => 'wamid.IMAGE1']],
+            ], 200),
+        ]);
+
+        $result = app(MetaWhatsAppService::class)->sendTemplate(
+            '9811223344',
+            'image_test',
+            ['Chandani gupta'],
+            'en',
+            1,
+            [],
+            ['type' => 'image', 'id' => 'media-99'],
+        );
+
+        $this->assertSame('success', $result['status']);
+
+        Http::assertSent(function ($request): bool {
+            $components = $request->data()['template']['components'] ?? [];
+
+            return ($components[0]['type'] ?? '') === 'header'
+                && ($components[0]['parameters'][0]['image']['id'] ?? '') === 'media-99'
+                && ($components[1]['parameters'][0]['text'] ?? '') === 'Chandani gupta';
+        });
+    }
+
     public function test_send_template_persists_staff_sender_from_log_context(): void
     {
         config([

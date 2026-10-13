@@ -91,6 +91,7 @@ use App\Support\StudentWhatsAppThreadItem;
 use App\Support\StudentWhatsAppTemplateComposer;
 use App\Services\FaceVerify\FaceVerifyClient;
 use App\Services\VisitMeetingAssignmentService;
+use App\Services\MetaWhatsAppMediaService;
 use App\Services\WhatsAppCampaignService;
 use App\Services\FeeReminderWhatsAppService;
 use App\Services\WhatsAppTemplateCatalog;
@@ -331,6 +332,10 @@ class StudentProfilePage extends Page
     public int $homeworkNotDoneThisWeek = 0;
 
     public ?int $sendWhatsAppTemplateId = null;
+
+    public ?TemporaryUploadedFile $sendWhatsAppHeaderFile = null;
+
+    public ?string $sendWhatsAppTemplateHeaderFormat = null;
 
     /** @var array<int, string> */
     public array $sendWhatsAppTemplateParams = [];
@@ -1610,6 +1615,8 @@ class StudentProfilePage extends Page
         $this->sendWhatsAppTemplateParamCount = 0;
         $this->sendWhatsAppTemplatePreview = null;
         $this->sendWhatsAppSelectedTemplateName = null;
+        $this->sendWhatsAppHeaderFile = null;
+        $this->sendWhatsAppTemplateHeaderFormat = null;
 
         if (! $this->sendWhatsAppTemplateId) {
             return;
@@ -1620,6 +1627,8 @@ class StudentProfilePage extends Page
         if (! $template) {
             return;
         }
+
+        $this->sendWhatsAppTemplateHeaderFormat = app(WhatsAppTemplateCatalog::class)->headerFormatForName((string) $template->name);
 
         $compose = app(StudentWhatsAppTemplateComposer::class)->compose(
             $template,
@@ -1679,6 +1688,8 @@ class StudentProfilePage extends Page
                 'sendWhatsAppTemplateParamCount' => $this->sendWhatsAppTemplateParamCount,
                 'sendWhatsAppTemplatePreview' => $this->sendWhatsAppTemplatePreview,
                 'sendWhatsAppSelectedTemplateName' => $this->sendWhatsAppSelectedTemplateName,
+                'sendWhatsAppTemplateHeaderFormat' => $this->sendWhatsAppTemplateHeaderFormat,
+                'sendWhatsAppHeaderFile' => $this->sendWhatsAppHeaderFile,
             ];
         } catch (\Throwable $exception) {
             report($exception);
@@ -1700,6 +1711,8 @@ class StudentProfilePage extends Page
                 'sendWhatsAppTemplateParamCount' => 0,
                 'sendWhatsAppTemplatePreview' => null,
                 'sendWhatsAppSelectedTemplateName' => null,
+                'sendWhatsAppTemplateHeaderFormat' => null,
+                'sendWhatsAppHeaderFile' => null,
             ];
         }
     }
@@ -1902,12 +1915,28 @@ class StudentProfilePage extends Page
             }
         }
 
+        $preparedHeader = app(MetaWhatsAppMediaService::class)->headerMediaForTemplateSend(
+            $this->sendWhatsAppHeaderFile,
+            $this->sendWhatsAppTemplateHeaderFormat,
+        );
+
+        if (($preparedHeader['status'] ?? '') !== 'success') {
+            Notification::make()
+                ->title('Choose the template file')
+                ->body((string) ($preparedHeader['error'] ?? 'Choose a photo or video before sending.'))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $recipient = app(WhatsAppCampaignService::class)->sendSingle(
             $this->record,
             $template,
             Auth::user(),
             $this->sendWhatsAppTemplateParams,
             wait: false,
+            headerMedia: $preparedHeader['header'] ?? null,
         );
 
         Notification::make()
@@ -1925,6 +1954,7 @@ class StudentProfilePage extends Page
         $this->messagesTabLoaded = false;
         $this->loadMessagesTab();
         $this->sendWhatsAppTemplateId = null;
+        $this->sendWhatsAppHeaderFile = null;
         $this->refreshWhatsAppTemplateComposer();
     }
 

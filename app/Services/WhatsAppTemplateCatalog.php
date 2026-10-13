@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\WhatsAppTemplate;
+use App\Support\MetaWhatsAppTemplateParser;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -67,6 +68,30 @@ class WhatsAppTemplateCatalog
     public function findSelectableTemplate(int $id): ?WhatsAppTemplate
     {
         return $this->baseQuery()->whereKey($id)->first();
+    }
+
+    public function headerFormatForName(string $name): ?string
+    {
+        $meta = MetaWhatsAppTemplate::query()
+            ->where('name', $name)
+            ->where(function ($query): void {
+                $query->where('is_active', true)
+                    ->orWhereRaw('UPPER(status) = ?', ['APPROVED']);
+            })
+            ->orderByDesc('synced_at')
+            ->first();
+
+        if (! $meta) {
+            return null;
+        }
+
+        $stored = strtoupper(trim((string) data_get($meta->provider_meta, 'header_format', '')));
+
+        if (in_array($stored, ['IMAGE', 'VIDEO', 'DOCUMENT', 'TEXT'], true)) {
+            return $stored;
+        }
+
+        return MetaWhatsAppTemplateParser::headerFormat(is_array($meta->components) ? $meta->components : []);
     }
 
     /**

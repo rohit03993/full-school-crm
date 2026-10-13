@@ -168,7 +168,7 @@ class WhatsAppCampaignService
         }
     }
 
-    public function sendSingle(Student $student, WhatsAppTemplate $template, User $sender, array $manualParams = [], bool $wait = true): WhatsAppCampaignRecipient
+    public function sendSingle(Student $student, WhatsAppTemplate $template, User $sender, array $manualParams = [], bool $wait = true, ?array $headerMedia = null): WhatsAppCampaignRecipient
     {
         $dispatch = app(WhatsAppDispatchService::class);
 
@@ -176,10 +176,21 @@ class WhatsAppCampaignService
             throw new \RuntimeException($dispatch->configurationError());
         }
 
-        $campaignVariables = null;
+        $campaignVariables = [];
 
         if ($manualParams !== []) {
-            $campaignVariables = ['_manual' => array_values($manualParams)];
+            $campaignVariables['_manual'] = array_values($manualParams);
+        }
+
+        if (is_array($headerMedia) && filled($headerMedia['id'] ?? null)) {
+            $campaignVariables['_header'] = [
+                'type' => strtolower((string) ($headerMedia['type'] ?? 'image')),
+                'id' => (string) $headerMedia['id'],
+            ];
+        }
+
+        if ($campaignVariables === []) {
+            $campaignVariables = null;
         }
 
         $campaign = WhatsAppCampaign::query()->create([

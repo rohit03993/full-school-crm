@@ -173,7 +173,7 @@
                                         type="button"
                                         wire:click="sendWhatsAppMessage"
                                         wire:loading.attr="disabled"
-                                        wire:target="sendWhatsAppMessage"
+                                        wire:target="sendWhatsAppMessage,sendWhatsAppHeaderFile"
                                         class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--template"
                                     >
                                         <span wire:loading.remove wire:target="sendWhatsAppMessage">Send template</span>
@@ -183,6 +183,41 @@
                             </div>
 
                             @if ($sendWhatsAppTemplateId)
+                                @if (in_array($sendWhatsAppTemplateHeaderFormat ?? null, ['IMAGE', 'VIDEO', 'DOCUMENT'], true))
+                                    <div class="crm-wa-inbox__field">
+                                        <label class="crm-wa-inbox__label" for="wa-header-{{ ($compactInbox ?? false) ? 'inbox' : 'profile' }}">
+                                            @if (($sendWhatsAppTemplateHeaderFormat ?? '') === 'VIDEO')
+                                                Video for this send
+                                            @elseif (($sendWhatsAppTemplateHeaderFormat ?? '') === 'DOCUMENT')
+                                                PDF for this send
+                                            @else
+                                                Image for this send
+                                            @endif
+                                            <span class="crm-wa-inbox__required" aria-hidden="true">*</span>
+                                        </label>
+                                        <input
+                                            id="wa-header-{{ ($compactInbox ?? false) ? 'inbox' : 'profile' }}"
+                                            type="file"
+                                            wire:model="sendWhatsAppHeaderFile"
+                                            @if (($sendWhatsAppTemplateHeaderFormat ?? '') === 'VIDEO')
+                                                accept="video/mp4"
+                                            @elseif (($sendWhatsAppTemplateHeaderFormat ?? '') === 'DOCUMENT')
+                                                accept="application/pdf"
+                                            @else
+                                                accept="image/jpeg,image/png"
+                                            @endif
+                                            class="crm-wa-inbox__input"
+                                            required
+                                        />
+                                        <p class="crm-wa-inbox__hint" wire:loading wire:target="sendWhatsAppHeaderFile">Uploading the file…</p>
+                                        @if ($sendWhatsAppHeaderFile)
+                                            <p class="crm-wa-inbox__hint">{{ $sendWhatsAppHeaderFile->getClientOriginalName() }}</p>
+                                        @else
+                                            <p class="crm-wa-inbox__hint">This file is the one the parent receives. It can be different from the sample used to approve the template.</p>
+                                        @endif
+                                    </div>
+                                @endif
+
                                 @if ($sendWhatsAppTemplateParamCount > 0)
                                     <div class="crm-wa-inbox__param-grid">
                                         @foreach ($sendWhatsAppTemplateFields as $field)

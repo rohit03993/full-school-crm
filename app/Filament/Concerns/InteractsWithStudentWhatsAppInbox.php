@@ -6,6 +6,7 @@ use App\Enums\LicenseFeature;
 use App\Enums\WhatsAppMessageSource;
 use App\Models\Student;
 use App\Services\MetaWhatsAppInboxService;
+use App\Services\MetaWhatsAppMediaService;
 use App\Support\StudentWhatsAppTemplateComposer;
 use App\Services\StudentWhatsAppThreadService;
 use App\Services\WhatsAppCampaignService;
@@ -38,6 +39,10 @@ trait InteractsWithStudentWhatsAppInbox
     public string $whatsappProviderLabel = '';
 
     public ?int $sendWhatsAppTemplateId = null;
+
+    public ?TemporaryUploadedFile $sendWhatsAppHeaderFile = null;
+
+    public ?string $sendWhatsAppTemplateHeaderFormat = null;
 
     /** @var list<string|null> */
     public array $sendWhatsAppTemplateParams = [];
@@ -92,6 +97,8 @@ trait InteractsWithStudentWhatsAppInbox
         $this->sendWhatsAppTemplateParamCount = 0;
         $this->sendWhatsAppTemplatePreview = null;
         $this->sendWhatsAppSelectedTemplateName = null;
+        $this->sendWhatsAppHeaderFile = null;
+        $this->sendWhatsAppTemplateHeaderFormat = null;
 
         if (! $this->sendWhatsAppTemplateId || ! $student) {
             return;
@@ -102,6 +109,8 @@ trait InteractsWithStudentWhatsAppInbox
         if (! $template) {
             return;
         }
+
+        $this->sendWhatsAppTemplateHeaderFormat = app(WhatsAppTemplateCatalog::class)->headerFormatForName((string) $template->name);
 
         $compose = app(StudentWhatsAppTemplateComposer::class)->compose(
             $template,
@@ -164,6 +173,8 @@ trait InteractsWithStudentWhatsAppInbox
                 'sendWhatsAppTemplateParamCount' => $this->sendWhatsAppTemplateParamCount,
                 'sendWhatsAppTemplatePreview' => $this->sendWhatsAppTemplatePreview,
                 'sendWhatsAppSelectedTemplateName' => $this->sendWhatsAppSelectedTemplateName,
+                'sendWhatsAppTemplateHeaderFormat' => $this->sendWhatsAppTemplateHeaderFormat,
+                'sendWhatsAppHeaderFile' => $this->sendWhatsAppHeaderFile,
             ];
         } catch (\Throwable $exception) {
             report($exception);
@@ -187,6 +198,8 @@ trait InteractsWithStudentWhatsAppInbox
                 'sendWhatsAppTemplateParamCount' => 0,
                 'sendWhatsAppTemplatePreview' => null,
                 'sendWhatsAppSelectedTemplateName' => null,
+                'sendWhatsAppTemplateHeaderFormat' => null,
+                'sendWhatsAppHeaderFile' => null,
             ];
         }
     }
@@ -442,12 +455,28 @@ trait InteractsWithStudentWhatsAppInbox
             }
         }
 
+        $preparedHeader = app(MetaWhatsAppMediaService::class)->headerMediaForTemplateSend(
+            $this->sendWhatsAppHeaderFile,
+            $this->sendWhatsAppTemplateHeaderFormat,
+        );
+
+        if (($preparedHeader['status'] ?? '') !== 'success') {
+            Notification::make()
+                ->title('Choose the template file')
+                ->body((string) ($preparedHeader['error'] ?? 'Choose a photo or video before sending.'))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $recipient = app(WhatsAppCampaignService::class)->sendSingle(
             $student,
             $template,
             Auth::user(),
             $this->sendWhatsAppTemplateParams,
             wait: false,
+            headerMedia: $preparedHeader['header'] ?? null,
         );
 
         Notification::make()

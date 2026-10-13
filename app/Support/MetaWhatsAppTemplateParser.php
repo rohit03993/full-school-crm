@@ -47,4 +47,24 @@ class MetaWhatsAppTemplateParser
             'body_variables' => $bodyVariables,
         ];
     }
+
+    /**
+     * IMAGE, VIDEO, DOCUMENT, or TEXT when the template has a header. Null when it does not.
+     *
+     * @param  list<array<string, mixed>>  $components
+     */
+    public static function headerFormat(array $components): ?string
+    {
+        foreach ($components as $component) {
+            if (! is_array($component) || strtoupper((string) ($component['type'] ?? '')) !== 'HEADER') {
+                continue;
+            }
+
+            $format = strtoupper(trim((string) ($component['format'] ?? '')));
+
+            return in_array($format, ['IMAGE', 'VIDEO', 'DOCUMENT', 'TEXT'], true) ? $format : null;
+        }
+
+        return null;
+    }
 }

@@ -46,6 +46,7 @@ class WhatsAppDispatchService
         int $expectedParamCount = 0,
         ?string $languageCode = null,
         array $logContext = [],
+        ?array $headerMedia = null,
     ): array {
         if (! $this->isConfigured()) {
             return [
@@ -65,7 +66,7 @@ class WhatsAppDispatchService
             ];
         }
 
-        return $this->sendViaMeta($phone, $templateName, $templateParams, $languageCode, $expectedParamCount, $logContext);
+        return $this->sendViaMeta($phone, $templateName, $templateParams, $languageCode, $expectedParamCount, $logContext, $headerMedia);
     }
 
     /**
@@ -79,6 +80,7 @@ class WhatsAppDispatchService
         ?string $languageCode,
         int $expectedParamCount,
         array $logContext = [],
+        ?array $headerMedia = null,
     ): array {
         $metaTemplate = $this->resolveMetaTemplate($templateName, $languageCode);
 
@@ -101,6 +103,7 @@ class WhatsAppDispatchService
             $metaTemplate->language,
             $paramCount,
             $logContext,
+            $headerMedia,
         );
 
         $result['provider'] = WhatsAppProvider::Meta->value;

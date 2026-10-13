@@ -27,6 +27,7 @@ class MetaWhatsAppService
         string $languageCode = 'en',
         int $expectedParamCount = 0,
         array $logContext = [],
+        ?array $headerMedia = null,
     ): array {
         if (! $this->isConfigured()) {
             return ['status' => 'failed', 'error' => 'WhatsApp is not configured. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').' and save credentials.'];
@@ -45,6 +46,15 @@ class MetaWhatsAppService
         $bodyParams = self::normalizeBodyParams($bodyParams, $expectedParamCount);
         $parameterNames = $this->resolveNamedBodyParameterNames($templateName, $languageCode);
         $components = $this->buildBodyComponents($bodyParams, $parameterNames);
+        $headerComponent = $this->buildHeaderMediaComponent($headerMedia);
+
+        if ($headerMedia !== null && $headerComponent === null) {
+            return ['status' => 'failed', 'error' => 'The photo or video for this template is missing.'];
+        }
+
+        if ($headerComponent !== null) {
+            array_unshift($components, $headerComponent);
+        }
 
         $payload = [
             'messaging_product' => 'whatsapp',
@@ -181,6 +191,34 @@ class MetaWhatsAppService
             [
                 'type' => 'body',
                 'parameters' => $parameters,
+            ],
+        ];
+    }
+
+    /**
+     * @param  array{type?: string, id?: string}|null  $headerMedia
+     * @return array<string, mixed>|null
+     */
+    public function buildHeaderMediaComponent(?array $headerMedia): ?array
+    {
+        if ($headerMedia === null) {
+            return null;
+        }
+
+        $type = strtolower(trim((string) ($headerMedia['type'] ?? '')));
+        $id = trim((string) ($headerMedia['id'] ?? ''));
+
+        if (! in_array($type, ['image', 'video', 'document'], true) || $id === '') {
+            return null;
+        }
+
+        return [
+            'type' => 'header',
+            'parameters' => [
+                [
+                    'type' => $type,
+                    $type => ['id' => $id],
+                ],
             ],
         ];
     }

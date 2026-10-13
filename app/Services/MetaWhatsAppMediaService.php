@@ -349,6 +349,59 @@ class MetaWhatsAppMediaService
         }
     }
 
+    /**
+     * Turn the file chosen on a send screen into the header Meta expects.
+     * A word template returns no header. An image or video template must have a file.
+     *
+     * @return array{status: string, header?: array{type: string, id: string}|null, error?: string}
+     */
+    public function headerMediaForTemplateSend(?UploadedFile $file, ?string $headerFormat): array
+    {
+        $format = strtoupper(trim((string) $headerFormat));
+
+        if (! in_array($format, ['IMAGE', 'VIDEO', 'DOCUMENT'], true)) {
+            return ['status' => 'success', 'header' => null];
+        }
+
+        $kind = match ($format) {
+            'VIDEO' => 'video',
+            'DOCUMENT' => 'PDF',
+            default => 'image',
+        };
+
+        if (! $file) {
+            return ['status' => 'failed', 'error' => 'Choose a '.$kind.' for this template before sending.'];
+        }
+
+        $upload = $this->uploadOutboundFile($file);
+
+        if (($upload['status'] ?? '') !== 'success' || blank($upload['media_id'] ?? null)) {
+            return [
+                'status' => 'failed',
+                'error' => (string) ($upload['error'] ?? 'WhatsApp could not accept the file.'),
+            ];
+        }
+
+        $uploadedType = (string) ($upload['message_type'] ?? '');
+        $expectedType = match ($format) {
+            'VIDEO' => 'video',
+            'DOCUMENT' => 'document',
+            default => 'image',
+        };
+
+        if ($uploadedType !== $expectedType) {
+            return ['status' => 'failed', 'error' => 'This template needs a '.$kind.'. The chosen file is a different type.'];
+        }
+
+        return [
+            'status' => 'success',
+            'header' => [
+                'type' => $expectedType,
+                'id' => (string) $upload['media_id'],
+            ],
+        ];
+    }
+
     public function storeOutboundCopy(MetaWhatsAppMessage $message, UploadedFile $file): void
     {
         $bytes = $this->readUploadedFileBytes($file);

@@ -53,6 +53,7 @@ class MetaWhatsAppTemplateSyncService
             $language = trim((string) ($item['language'] ?? 'en'));
             $components = is_array($item['components'] ?? null) ? $item['components'] : [];
             $parsed = MetaWhatsAppTemplateParser::parse($components);
+            $headerFormat = MetaWhatsAppTemplateParser::headerFormat($components);
             $bodyVariables = $parsed['body_variables'];
             $paramCount = (int) $parsed['param_count'];
 
@@ -76,6 +77,7 @@ class MetaWhatsAppTemplateSyncService
                         'category' => $item['category'] ?? null,
                         'id' => $item['id'] ?? null,
                         'rejected_reason' => $item['rejected_reason'] ?? null,
+                        'header_format' => $headerFormat,
                     ],
                     'param_mappings' => $paramMappings,
                     'is_active' => $status === 'APPROVED',
@@ -99,6 +101,7 @@ class MetaWhatsAppTemplateSyncService
                             'body_variables' => $bodyVariables,
                             'meta_language' => $language,
                             'source' => 'meta',
+                            'header_format' => $headerFormat,
                         ],
                         'is_active' => true,
                         'synced_at' => now(),
