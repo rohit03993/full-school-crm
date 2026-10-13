@@ -13,12 +13,13 @@
     <section class="crm-wa-analytics__filters rounded-2xl border border-gray-200/70 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-900/60">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-                <h2 class="text-sm font-semibold text-gray-950 dark:text-white">Date range</h2>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $showMessageCost ? 'Filter spend and message volume. Meta official cost loads when WABA ID is saved.' : 'Filter message volume for this date range.' }}</p>
+                <h2 class="text-sm font-semibold text-gray-950 dark:text-white">Dates</h2>
+                <p class="mt-1 text-sm font-medium text-gray-950 dark:text-white">Showing {{ $this->rangeLabel() }}</p>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Pick a quick range, or choose a from date and a to date. The tables below follow these dates.</p>
             </div>
 
             <div class="flex flex-wrap gap-2">
-                @foreach (['today' => 'Today', '7d' => '7 days', '30d' => '30 days', '90d' => '90 days', 'all' => 'All time', 'custom' => 'Custom'] as $key => $label)
+                @foreach (['today' => 'Today', '7d' => '7 days', '30d' => '30 days', '90d' => '90 days', 'all' => 'All time'] as $key => $label)
                     <button
                         type="button"
                         wire:click="applyPreset('{{ $key }}')"
@@ -33,21 +34,16 @@
             </div>
         </div>
 
-        @if ($datePreset === 'custom')
-            <div class="mt-4 grid gap-3 sm:grid-cols-3">
-                <label class="block text-sm">
-                    <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">From</span>
-                    <input type="date" wire:model.live="dateFrom" class="crm-wa-analytics__date-input" />
-                </label>
-                <label class="block text-sm">
-                    <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">To</span>
-                    <input type="date" wire:model.live="dateTo" class="crm-wa-analytics__date-input" />
-                </label>
-                <div class="flex items-end">
-                    <button type="button" wire:click="refreshAnalytics" class="crm-wa-analytics__apply-btn">Apply</button>
-                </div>
-            </div>
-        @endif
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">From date</span>
+                <input type="date" wire:model.live="dateFrom" class="crm-wa-analytics__date-input" />
+            </label>
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">To date</span>
+                <input type="date" wire:model.live="dateTo" class="crm-wa-analytics__date-input" />
+            </label>
+        </div>
     </section>
 
     <section class="crm-meta-wa-log__stats">
@@ -102,8 +98,61 @@
                     {{ $showMessageCost ? 'CRM log matches Meta volume for this range. Official spend still comes from Meta; CRM costs remain estimates.' : 'CRM log matches Meta volume for this range.' }}
                 </p>
             @endif
+            @if ($showMessageCost)
+                <p class="mt-1 text-xs opacity-90">A message that failed after Meta accepted it is not added to the CRM estimate. Meta’s own bill is the real charge.</p>
+            @endif
         </div>
     @endif
+
+    <section class="crm-wa-analytics__panel">
+        <div class="mb-4">
+            <h3 class="crm-wa-analytics__panel-title">Day by day</h3>
+            <p class="mt-1 text-xs text-gray-500">One row is one date, newest first. Meta billed is the real WhatsApp charge for that day. Failed messages stay in the CRM count, but their rupee is not added.</p>
+        </div>
+        @php $dayRows = $data['by_day'] ?? []; @endphp
+        @if ($dayRows === [])
+            <p class="text-sm text-gray-500">No messages in these dates.</p>
+        @else
+            <x-crm.responsive-table>
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs uppercase text-gray-500">
+                            <th class="py-2 pr-3">Date</th>
+                            @if ($metaOk)
+                                <th class="py-2 pr-3">Meta messages</th>
+                                @if ($showMessageCost)
+                                    <th class="py-2 pr-3">Meta billed</th>
+                                @endif
+                            @endif
+                            <th class="py-2 pr-3">CRM messages</th>
+                            <th class="py-2 pr-3">Failed</th>
+                            @if ($showMessageCost)
+                                <th class="py-2">CRM estimate</th>
+                            @endif
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($dayRows as $day)
+                            <tr class="border-t border-gray-100 dark:border-white/10">
+                                <td class="crm-responsive-table__title py-2 pr-3 font-medium whitespace-nowrap" data-label="">{{ $day['date_label'] }}</td>
+                                @if ($metaOk)
+                                    <td class="py-2 pr-3 tabular-nums" data-label="Meta messages">{{ number_format((int) ($day['meta_volume'] ?? 0)) }}</td>
+                                    @if ($showMessageCost)
+                                        <td class="py-2 pr-3 tabular-nums font-semibold" data-label="Meta billed">{{ $this->formatMoney((float) ($day['meta_cost'] ?? 0), $currency) }}</td>
+                                    @endif
+                                @endif
+                                <td class="py-2 pr-3 tabular-nums" data-label="CRM messages">{{ number_format((int) ($day['crm_messages'] ?? 0)) }}</td>
+                                <td class="py-2 pr-3 tabular-nums" data-label="Failed">{{ number_format((int) ($day['crm_failed'] ?? 0)) }}</td>
+                                @if ($showMessageCost)
+                                    <td class="py-2 tabular-nums font-semibold" data-label="CRM estimate">{{ $this->formatMoney((float) ($day['crm_cost_inr'] ?? 0)) }}</td>
+                                @endif
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </x-crm.responsive-table>
+        @endif
+    </section>
 
     <div class="grid gap-6 lg:grid-cols-2">
         <section class="crm-wa-analytics__panel">

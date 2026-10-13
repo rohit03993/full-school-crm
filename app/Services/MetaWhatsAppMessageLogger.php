@@ -221,12 +221,22 @@ class MetaWhatsAppMessageLogger
             return;
         }
 
-        $message->update([
+        $updates = [
             'status' => $status->value,
             'status_detail' => $detail,
             'payload' => $payload ?? $message->payload,
             'status_at' => now(),
-        ]);
+        ];
+
+        if ($status === MetaWhatsAppMessageStatus::Failed) {
+            $updates['estimated_cost_inr'] = 0;
+        }
+
+        $message->update($updates);
+
+        if ($status === MetaWhatsAppMessageStatus::Failed) {
+            app(WhatsAppAnalyticsService::class)->markUndelivered($message->fresh() ?? $message, $detail);
+        }
     }
 
     /**

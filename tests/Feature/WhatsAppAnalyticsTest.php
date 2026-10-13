@@ -230,6 +230,8 @@ class WhatsAppAnalyticsTest extends TestCase
 
         Livewire::test(WhatsAppAnalyticsPage::class)
             ->assertSuccessful()
+            ->assertSee('Day by day')
+            ->assertSee('From date')
             ->assertSee('Cost by source')
             ->assertSee('Staff usage');
     }
@@ -258,5 +260,125 @@ class WhatsAppAnalyticsTest extends TestCase
         $this->assertSame(20.0, $gap['coverage_percent']);
         $this->assertSame(11.5, $gap['meta_cost']);
         $this->assertSame(2.3, $gap['crm_estimated_cost']);
+    }
+
+    public function test_failed_delivery_clears_the_campaign_rupee(): void
+    {
+        $student = Student::query()->create([
+            'name' => 'Chandani',
+            'mobile' => '8320936486',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'image_test',
+            'param_count' => 1,
+            'body' => 'Hi {{1}}',
+            'is_active' => true,
+        ]);
+
+        $campaign = WhatsAppCampaign::query()->create([
+            'whatsapp_template_id' => $template->id,
+            'name' => 'image_test — Chandani',
+            'status' => 'completed',
+            'total_recipients' => 1,
+            'sent_count' => 1,
+            'failed_count' => 0,
+            'estimated_total_cost_inr' => 0.8631,
+            'shot_at' => now(),
+        ]);
+
+        $message = MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.FAIL1',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '918320936486',
+            'student_id' => $student->id,
+            'body_preview' => 'Hi Chandani',
+            'message_type' => 'image',
+            'conversation_category' => 'MARKETING',
+            'message_source' => WhatsAppMessageSource::Campaign->value,
+            'estimated_cost_inr' => 0.8631,
+            'status' => 'sent',
+            'status_at' => now(),
+        ]);
+
+        $recipient = WhatsAppCampaignRecipient::query()->create([
+            'whatsapp_campaign_id' => $campaign->id,
+            'student_id' => $student->id,
+            'phone' => '918320936486',
+            'wamid' => 'wamid.FAIL1',
+            'meta_whatsapp_message_id' => $message->id,
+            'status' => 'sent',
+            'estimated_cost_inr' => 0.8631,
+        ]);
+
+        $message->update(['whatsapp_campaign_recipient_id' => $recipient->id]);
+
+        app(\App\Services\MetaWhatsAppMessageLogger::class)->applyWebhookStatus(
+            'wamid.FAIL1',
+            \App\Enums\MetaWhatsAppMessageStatus::Failed,
+            'Message undeliverable',
+        );
+
+        $message->refresh();
+        $recipient->refresh();
+        $campaign->refresh();
+
+        $this->assertSame('failed', $message->status);
+        $this->assertSame(0.0, (float) $message->estimated_cost_inr);
+        $this->assertSame('failed', $recipient->status->value);
+        $this->assertSame(0.0, (float) $recipient->estimated_cost_inr);
+        $this->assertSame(0, (int) $campaign->sent_count);
+        $this->assertSame(1, (int) $campaign->failed_count);
+        $this->assertSame(0.0, (float) $campaign->estimated_total_cost_inr);
+    }
+
+    public function test_day_by_day_skips_the_rupee_on_a_failed_message(): void
+    {
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.DAYOK',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '918320936481',
+            'body_preview' => 'Reached',
+            'message_type' => 'text',
+            'conversation_category' => 'UTILITY',
+            'message_source' => WhatsAppMessageSource::Campaign->value,
+            'estimated_cost_inr' => 0.115,
+            'status' => 'delivered',
+            'status_at' => Carbon::parse('2026-10-12 10:00:00'),
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.DAYFAIL',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '918320936482',
+            'body_preview' => 'Blocked',
+            'message_type' => 'image',
+            'conversation_category' => 'MARKETING',
+            'message_source' => WhatsAppMessageSource::Campaign->value,
+            'estimated_cost_inr' => 0.8631,
+            'status' => 'failed',
+            'status_at' => Carbon::parse('2026-10-13 13:15:00'),
+        ]);
+
+        $days = app(WhatsAppAnalyticsService::class)->dailyBreakdown(
+            Carbon::parse('2026-10-01'),
+            Carbon::parse('2026-10-31'),
+            [[
+                'start' => Carbon::parse('2026-10-13 00:00:00')->timestamp,
+                'volume' => 4,
+                'cost' => 1.73,
+            ]],
+        );
+
+        $byDate = collect($days)->keyBy('date');
+
+        $this->assertEquals(0.115, $byDate['2026-10-12']['crm_cost_inr']);
+        $this->assertSame(0, $byDate['2026-10-12']['crm_failed']);
+        $this->assertEquals(0.0, $byDate['2026-10-13']['crm_cost_inr']);
+        $this->assertSame(1, $byDate['2026-10-13']['crm_failed']);
+        $this->assertSame(4, $byDate['2026-10-13']['meta_volume']);
+        $this->assertEquals(1.73, $byDate['2026-10-13']['meta_cost']);
+        $this->assertSame('2026-10-13', $days[0]['date']);
     }
 }

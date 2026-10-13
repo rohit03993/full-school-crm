@@ -38,10 +38,12 @@ class WhatsAppCampaignViewHelper
 
     public static function renderStatsDashboard(WhatsAppCampaign $campaign): HtmlString
     {
+        app(\App\Services\WhatsAppAnalyticsService::class)->settleFailedDeliveryCosts($campaign);
+        $campaign->refresh();
+
         $total = (int) $campaign->total_recipients;
         $sent = (int) $campaign->sent_count;
         $failed = (int) $campaign->failed_count;
-        $pending = max(0, $total - $sent - $failed);
         $successRate = $total > 0 ? (int) round(($sent / $total) * 100) : 0;
 
         $cards = [
@@ -64,7 +66,8 @@ class WhatsAppCampaignViewHelper
             .'<span><strong>'.e($campaign->template?->name ?? '—').'</strong> template</span>'
             .'<span>'.e($campaign->course?->name ?? '—').'</span>'
             .($campaign->batch ? '<span>'.e($campaign->batch->name).'</span>' : '')
-            .'<span>'.$successRate.'% delivered</span>'
+            .'<span>'.$successRate.'% sent</span>'
+            .'<span>Failed sends are not charged.</span>'
             .'</div>';
 
         return new HtmlString(

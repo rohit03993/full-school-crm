@@ -83,6 +83,48 @@ class WhatsAppAnalyticsPage extends Page
         }
     }
 
+    public function updatedDateFrom(): void
+    {
+        $this->matchPresetFromDates();
+    }
+
+    public function updatedDateTo(): void
+    {
+        $this->matchPresetFromDates();
+    }
+
+    public function rangeLabel(): string
+    {
+        $from = Carbon::parse($this->dateFrom ?: now()->toDateString())->startOfDay();
+        $to = Carbon::parse($this->dateTo ?: now()->toDateString())->startOfDay();
+
+        if ($from->greaterThan($to)) {
+            [$from, $to] = [$to, $from];
+        }
+
+        if ($from->isSameDay($to)) {
+            return $from->format('l, d M Y');
+        }
+
+        return $from->format('d M Y').' to '.$to->format('d M Y');
+    }
+
+    protected function matchPresetFromDates(): void
+    {
+        $today = now()->toDateString();
+        $from = (string) $this->dateFrom;
+        $to = (string) $this->dateTo;
+
+        $this->datePreset = match (true) {
+            $from === $today && $to === $today => 'today',
+            $from === now()->subDays(6)->toDateString() && $to === $today => '7d',
+            $from === now()->subDays(29)->toDateString() && $to === $today => '30d',
+            $from === now()->subDays(89)->toDateString() && $to === $today => '90d',
+            $from === now()->subYears(10)->toDateString() && $to === $today => 'all',
+            default => 'custom',
+        };
+    }
+
     public function applyPreset(string $preset): void
     {
         $this->datePreset = $preset;
