@@ -186,6 +186,9 @@ class WhatsAppCampaignService
             $campaignVariables['_header'] = [
                 'type' => strtolower((string) ($headerMedia['type'] ?? 'image')),
                 'id' => (string) $headerMedia['id'],
+                'path' => $headerMedia['path'] ?? null,
+                'mime' => $headerMedia['mime'] ?? null,
+                'filename' => $headerMedia['filename'] ?? null,
             ];
         }
 

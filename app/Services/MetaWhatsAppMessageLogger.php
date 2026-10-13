@@ -58,7 +58,13 @@ class MetaWhatsAppMessageLogger
             'template_name' => $templateName !== '' ? $templateName : null,
             'language' => $language !== '' ? $language : null,
             'body_preview' => WhatsAppInboxBodyPreview::clip($preview),
-            'message_type' => 'text',
+            'message_type' => filled($context['header_media_path'] ?? null)
+                ? (string) ($context['header_media_type'] ?? 'image')
+                : 'text',
+            'media_id' => $context['header_media_id'] ?? null,
+            'media_path' => $context['header_media_path'] ?? null,
+            'media_mime_type' => $context['header_media_mime'] ?? null,
+            'media_filename' => $context['header_media_filename'] ?? null,
             'conversation_category' => $context['conversation_category'] ?? $estimate['category'],
             'message_source' => $messageSource,
             'estimated_cost_inr' => $context['estimated_cost_inr'] ?? $estimate['cost_inr'],

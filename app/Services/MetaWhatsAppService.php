@@ -106,7 +106,7 @@ class MetaWhatsAppService
                     is_array($data) ? $data : null,
                     $logContext['student_id'] ?? null,
                     null,
-                    $logContext,
+                    $this->outboundLogContext($logContext, $headerMedia),
                 );
 
                 return [
@@ -129,7 +129,7 @@ class MetaWhatsAppService
                 is_array($data) ? $data : null,
                 $logContext['student_id'] ?? null,
                 null,
-                $logContext,
+                $this->outboundLogContext($logContext, $headerMedia),
             );
 
             return [
@@ -151,7 +151,7 @@ class MetaWhatsAppService
                 null,
                 $logContext['student_id'] ?? null,
                 null,
-                $logContext,
+                $this->outboundLogContext($logContext, $headerMedia),
             );
 
             return ['status' => 'failed', 'error' => $e->getMessage()];
@@ -221,6 +221,26 @@ class MetaWhatsAppService
                 ],
             ],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $logContext
+     * @param  array<string, mixed>|null  $headerMedia
+     * @return array<string, mixed>
+     */
+    protected function outboundLogContext(array $logContext, ?array $headerMedia): array
+    {
+        if (! is_array($headerMedia) || blank($headerMedia['path'] ?? null)) {
+            return $logContext;
+        }
+
+        $logContext['header_media_type'] = (string) ($headerMedia['type'] ?? 'image');
+        $logContext['header_media_id'] = $headerMedia['id'] ?? null;
+        $logContext['header_media_path'] = $headerMedia['path'];
+        $logContext['header_media_mime'] = $headerMedia['mime'] ?? null;
+        $logContext['header_media_filename'] = $headerMedia['filename'] ?? null;
+
+        return $logContext;
     }
 
     /**

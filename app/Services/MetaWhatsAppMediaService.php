@@ -368,14 +368,27 @@ class MetaWhatsAppMediaService
             'DOCUMENT' => 'PDF',
             default => 'image',
         };
+        $expectedType = match ($format) {
+            'VIDEO' => 'video',
+            'DOCUMENT' => 'document',
+            default => 'image',
+        };
 
         if (! $file) {
             return ['status' => 'failed', 'error' => 'Choose a '.$kind.' for this template before sending.'];
         }
 
+        $stored = $this->storeHeaderCopy($file, $expectedType);
+
+        if ($stored === null) {
+            return ['status' => 'failed', 'error' => 'The file could not be saved for the chat history. Choose it again.'];
+        }
+
         $upload = $this->uploadOutboundFile($file);
 
         if (($upload['status'] ?? '') !== 'success' || blank($upload['media_id'] ?? null)) {
+            Storage::disk(self::DISK)->delete($stored['path']);
+
             return [
                 'status' => 'failed',
                 'error' => (string) ($upload['error'] ?? 'WhatsApp could not accept the file.'),
@@ -383,13 +396,10 @@ class MetaWhatsAppMediaService
         }
 
         $uploadedType = (string) ($upload['message_type'] ?? '');
-        $expectedType = match ($format) {
-            'VIDEO' => 'video',
-            'DOCUMENT' => 'document',
-            default => 'image',
-        };
 
         if ($uploadedType !== $expectedType) {
+            Storage::disk(self::DISK)->delete($stored['path']);
+
             return ['status' => 'failed', 'error' => 'This template needs a '.$kind.'. The chosen file is a different type.'];
         }
 
@@ -398,7 +408,37 @@ class MetaWhatsAppMediaService
             'header' => [
                 'type' => $expectedType,
                 'id' => (string) $upload['media_id'],
+                ...$stored,
             ],
+        ];
+    }
+
+    /**
+     * Keep a copy of the template photo or video on the school server.
+     * The inbox reads this copy when someone opens the old chat.
+     *
+     * @return array{path: string, mime: string, filename: string}|null
+     */
+    public function storeHeaderCopy(UploadedFile $file, string $messageType): ?array
+    {
+        $bytes = $this->readUploadedFileBytes($file);
+
+        if ($bytes === null || $bytes === '') {
+            return null;
+        }
+
+        if (! Storage::disk(self::DISK)->exists(self::DIRECTORY)) {
+            Storage::disk(self::DISK)->makeDirectory(self::DIRECTORY);
+        }
+
+        $extension = $file->getClientOriginalExtension() ?: $this->extensionForMime((string) $file->getMimeType(), $messageType);
+        $path = self::DIRECTORY.'/header-'.Str::random(16).'.'.$extension;
+        Storage::disk(self::DISK)->put($path, $bytes);
+
+        return [
+            'path' => $path,
+            'mime' => (string) ($file->getMimeType() ?: ''),
+            'filename' => $file->getClientOriginalName(),
         ];
     }
 

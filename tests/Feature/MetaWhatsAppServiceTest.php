@@ -166,7 +166,7 @@ class MetaWhatsAppServiceTest extends TestCase
             'en',
             1,
             [],
-            ['type' => 'image', 'id' => 'media-99'],
+            ['type' => 'image', 'id' => 'media-99', 'path' => 'whatsapp-media/header-test.jpg', 'mime' => 'image/jpeg', 'filename' => 'poster.jpg'],
         );
 
         $this->assertSame('success', $result['status']);
@@ -178,6 +178,14 @@ class MetaWhatsAppServiceTest extends TestCase
                 && ($components[0]['parameters'][0]['image']['id'] ?? '') === 'media-99'
                 && ($components[1]['parameters'][0]['text'] ?? '') === 'Chandani gupta';
         });
+
+        $this->assertDatabaseHas('meta_whatsapp_messages', [
+            'wamid' => 'wamid.IMAGE1',
+            'message_type' => 'image',
+            'media_id' => 'media-99',
+            'media_path' => 'whatsapp-media/header-test.jpg',
+            'media_filename' => 'poster.jpg',
+        ]);
     }
 
     public function test_send_template_persists_staff_sender_from_log_context(): void
