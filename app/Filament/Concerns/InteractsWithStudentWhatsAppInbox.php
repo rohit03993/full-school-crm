@@ -6,6 +6,7 @@ use App\Enums\LicenseFeature;
 use App\Enums\WhatsAppMessageSource;
 use App\Models\Student;
 use App\Services\MetaWhatsAppInboxService;
+use App\Services\WhatsAppCampusVisitFlowService;
 use App\Services\MetaWhatsAppMediaService;
 use App\Support\StudentWhatsAppTemplateComposer;
 use App\Services\StudentWhatsAppThreadService;
@@ -342,6 +343,49 @@ trait InteractsWithStudentWhatsAppInbox
         Notification::make()
             ->title('Reply sent')
             ->body('Your message was delivered via Meta WhatsApp.')
+            ->success()
+            ->send();
+    }
+
+    public function sendCampusVisitForm(): void
+    {
+        $student = $this->whatsAppMessageStudent();
+        $phone = $this->whatsAppInboxPhone() ?: $student?->mobile;
+
+        if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
+            Notification::make()->title('WhatsApp module is not enabled')->warning()->send();
+
+            return;
+        }
+
+        if (blank($phone)) {
+            return;
+        }
+
+        $result = app(WhatsAppCampusVisitFlowService::class)->sendForm(
+            (string) $phone,
+            Auth::user(),
+            $student?->id,
+            WhatsAppMessageSource::Inbox,
+        );
+
+        if ($result['status'] !== 'success') {
+            Notification::make()
+                ->title('Could not send the visit form')
+                ->body((string) ($result['error'] ?? 'Unknown error'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->resetMessagesTab();
+        $this->loadMessagesTab();
+        $this->afterWhatsAppMessageSent();
+
+        Notification::make()
+            ->title('Visit form sent')
+            ->body('The parent can tap Book visit in the chat.')
             ->success()
             ->send();
     }

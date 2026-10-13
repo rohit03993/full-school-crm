@@ -43,14 +43,7 @@ class MetaWhatsAppInboundMessageParser
                 'media_filename' => null,
                 'caption' => null,
             ],
-            'interactive' => [
-                'message_type' => 'interactive',
-                'body_preview' => (string) data_get($message, 'interactive.button_reply.title', data_get($message, 'interactive.list_reply.title', '[interactive message]')),
-                'media_id' => null,
-                'media_mime_type' => null,
-                'media_filename' => null,
-                'caption' => null,
-            ],
+            'interactive' => self::interactiveMessage($message),
             default => [
                 'message_type' => $type !== '' ? $type : 'unknown',
                 'body_preview' => self::typeLabel($type),
@@ -184,6 +177,81 @@ class MetaWhatsAppInboundMessageParser
         return [
             'message_type' => 'reaction',
             'body_preview' => $emoji !== '' ? $emoji.' reaction' : 'Reaction',
+            'media_id' => null,
+            'media_mime_type' => null,
+            'media_filename' => null,
+            'caption' => null,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $message
+     * @return array<string, mixed>|null
+     */
+    public static function flowResponse(array $message): ?array
+    {
+        if ((string) data_get($message, 'interactive.type') !== 'nfm_reply') {
+            return null;
+        }
+
+        $raw = data_get($message, 'interactive.nfm_reply.response_json');
+
+        if (is_array($raw)) {
+            return $raw;
+        }
+
+        if (! is_string($raw) || trim($raw) === '') {
+            return null;
+        }
+
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $message
+     * @return array{
+     *     message_type: string,
+     *     body_preview: string,
+     *     media_id: ?string,
+     *     media_mime_type: ?string,
+     *     media_filename: ?string,
+     *     caption: ?string
+     * }
+     */
+    protected static function interactiveMessage(array $message): array
+    {
+        $response = self::flowResponse($message);
+
+        if ($response !== null) {
+            $date = trim((string) ($response['visit_date'] ?? ''));
+            $note = trim((string) ($response['note'] ?? ''));
+            $parts = array_values(array_filter([
+                'Campus visit form',
+                $date !== '' ? $date : null,
+                $note !== '' ? $note : null,
+            ]));
+
+            return [
+                'message_type' => 'interactive',
+                'body_preview' => implode(' · ', $parts),
+                'media_id' => null,
+                'media_mime_type' => null,
+                'media_filename' => null,
+                'caption' => null,
+            ];
+        }
+
+        $title = (string) data_get(
+            $message,
+            'interactive.button_reply.title',
+            data_get($message, 'interactive.list_reply.title', '[interactive message]'),
+        );
+
+        return [
+            'message_type' => 'interactive',
+            'body_preview' => $title,
             'media_id' => null,
             'media_mime_type' => null,
             'media_filename' => null,

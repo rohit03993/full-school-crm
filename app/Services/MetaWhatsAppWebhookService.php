@@ -167,6 +167,14 @@ class MetaWhatsAppWebhookService
                 if (MetaWhatsAppInboundMessageParser::isMediaType($parsed['message_type'])) {
                     DownloadMetaWhatsAppMediaJob::dispatch($record->id)->afterResponse();
                 }
+
+                app(WhatsAppCampusVisitFlowService::class)->handleInbound(
+                    $from,
+                    $parsed,
+                    $message,
+                    $wamid !== '' ? $wamid : null,
+                    $record,
+                );
             } catch (\Throwable $exception) {
                 Log::error('Meta WhatsApp inbound message failed', [
                     'wamid' => $wamid,

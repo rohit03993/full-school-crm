@@ -260,6 +260,16 @@
 
                 @if ($canComposeReply)
                     <section class="crm-wa-inbox__composer crm-wa-inbox__composer--reply" aria-label="Quick reply">
+                        <button
+                            type="button"
+                            wire:click="sendCampusVisitForm"
+                            wire:loading.attr="disabled"
+                            wire:target="sendCampusVisitForm"
+                            class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--full"
+                        >
+                            <span wire:loading.remove wire:target="sendCampusVisitForm">Send visit form</span>
+                            <span wire:loading wire:target="sendCampusVisitForm">Sending…</span>
+                        </button>
                         @if ($hasAttachment)
                             <div class="crm-wa-inbox__attach-chip">
                                 <x-filament::icon icon="heroicon-o-paper-clip" class="h-4 w-4 shrink-0" />
