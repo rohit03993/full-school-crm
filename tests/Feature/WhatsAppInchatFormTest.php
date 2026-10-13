@@ -106,6 +106,92 @@ class WhatsAppInchatFormTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_a_new_number_gets_the_education_form_and_a_student_in_class_does_not(): void
+    {
+        $this->configureWhatsApp();
+        $this->makeForm(WhatsAppInchatAudience::EducationLead, 'admission', '801', 'Admission enquiry');
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/1234567890/messages' => Http::response([
+                'messages' => [['id' => 'wamid.ADMISSION']],
+            ], 200),
+        ]);
+
+        $this->postWebhook($this->textPayload('wamid.NEW1', '919876508888', 'admission'));
+
+        Http::assertSent(function ($request): bool {
+            return data_get($request->data(), 'interactive.action.parameters.flow_id') === '801';
+        });
+
+        $course = $this->createEnquiry('9876509999');
+        $enquiry = \App\Models\Enquiry::query()->whereHas('student', fn ($query) => $query->where('mobile', '9876509999'))->first();
+        $this->enroll($enquiry->student_id, $enquiry->id, $course->id, '9876509999');
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/1234567890/messages' => Http::response([
+                'messages' => [['id' => 'wamid.SHOULDNOT']],
+            ], 200),
+        ]);
+
+        $this->postWebhook($this->textPayload('wamid.ENROLLED1', '919876509999', 'admission'));
+
+        Http::assertNothingSent();
+    }
+
+    public function test_a_finished_education_form_creates_one_enquiry(): void
+    {
+        $this->configureWhatsApp();
+        $form = $this->makeForm(WhatsAppInchatAudience::EducationLead, 'admission', '801', 'Admission enquiry');
+        $field = WhatsAppInchatFormField::query()->where('whatsapp_inchat_form_id', $form->id)->first();
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/1234567890/messages' => Http::response([
+                'messages' => [['id' => 'wamid.LEADTHANKS']],
+            ], 200),
+        ]);
+
+        $payload = $this->flowReplyPayload('wamid.LEAD1', '919876501010', [
+            'flow_token' => $form->flow_token,
+            $field->answerKey() => 'Aarav Sharma',
+        ]);
+
+        $this->postWebhook($payload);
+        $this->postWebhook($payload);
+
+        $this->assertDatabaseCount('enquiries', 1);
+        $this->assertDatabaseHas('students', [
+            'name' => 'Aarav Sharma',
+            'mobile' => '9876501010',
+        ]);
+        $this->assertDatabaseHas('enquiries', [
+            'lead_source' => 'whatsapp',
+        ]);
+    }
+
+    public function test_an_existing_enquiry_is_not_created_again(): void
+    {
+        $this->configureWhatsApp();
+        $this->createEnquiry('9876502020');
+        $form = $this->makeForm(WhatsAppInchatAudience::EducationLead, 'admission', '801', 'Admission enquiry');
+        $field = WhatsAppInchatFormField::query()->where('whatsapp_inchat_form_id', $form->id)->first();
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/1234567890/messages' => Http::response([
+                'messages' => [['id' => 'wamid.LEADAGAIN']],
+            ], 200),
+        ]);
+
+        $this->postWebhook($this->flowReplyPayload('wamid.LEAD2', '919876502020', [
+            'flow_token' => $form->flow_token,
+            $field->answerKey() => 'Aarav Sharma',
+        ]));
+
+        $this->assertDatabaseCount('enquiries', 1);
+        $this->assertDatabaseHas('visits', [
+            'remarks' => 'whatsapp_lead:wamid.LEAD2',
+        ]);
+    }
+
     protected function makeForm(WhatsAppInchatAudience $audience, string $word, string $flowId, string $name): WhatsAppInchatForm
     {
         $form = WhatsAppInchatForm::query()->create([

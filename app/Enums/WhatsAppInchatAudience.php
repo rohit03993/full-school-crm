@@ -7,6 +7,7 @@ enum WhatsAppInchatAudience: string
     case VisitingLead = 'visiting_lead';
     case ExistingStudent = 'existing_student';
     case Anyone = 'anyone';
+    case EducationLead = 'education_lead';
 
     public function label(): string
     {
@@ -14,6 +15,7 @@ enum WhatsAppInchatAudience: string
             self::VisitingLead => 'Visiting lead',
             self::ExistingStudent => 'Existing student',
             self::Anyone => 'Anyone',
+            self::EducationLead => 'Education lead',
         };
     }
 

@@ -2,8 +2,12 @@
 
 namespace App\Services;
 
+use App\Enums\CampusVisitPurpose;
+use App\Enums\Gender;
+use App\Enums\LeadSource;
 use App\Enums\LicenseFeature;
 use App\Enums\MetaWhatsAppMessageStatus;
+use App\Enums\VisitStatus;
 use App\Enums\WhatsAppInchatAudience;
 use App\Enums\WhatsAppInchatFieldType;
 use App\Enums\WhatsAppMessageSource;
@@ -13,8 +17,11 @@ use App\Models\Enquiry;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\Student;
 use App\Models\User;
+use App\Models\Visit;
 use App\Models\WhatsAppInchatForm;
 use App\Models\WhatsAppInchatFormField;
+use App\Support\CrmCacheInvalidator;
+use App\Support\DefaultCourse;
 use App\Support\FeatureGate;
 use App\Support\MetaWhatsAppInboundMessageParser;
 use App\Support\WhatsAppCampusVisitFlowJson;
@@ -22,6 +29,7 @@ use App\Support\WhatsAppInchatFlowJson;
 use App\Support\WhatsAppInboxBodyPreview;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class WhatsAppInchatFormService
 {
@@ -292,6 +300,9 @@ class WhatsAppInchatFormService
             $audiences[] = WhatsAppInchatAudience::ExistingStudent->value;
         } elseif ($student && $student->enquiries()->exists()) {
             $audiences[] = WhatsAppInchatAudience::VisitingLead->value;
+            $audiences[] = WhatsAppInchatAudience::EducationLead->value;
+        } else {
+            $audiences[] = WhatsAppInchatAudience::EducationLead->value;
         }
 
         return WhatsAppInchatForm::query()
@@ -375,6 +386,14 @@ class WhatsAppInchatFormService
             $audience = WhatsAppInchatAudience::VisitingLead;
         }
 
+        if ($audience !== WhatsAppInchatAudience::ExistingStudent) {
+            $educationLead = $this->publishedForm($word, WhatsAppInchatAudience::EducationLead);
+
+            if ($educationLead) {
+                return $educationLead;
+            }
+        }
+
         $specific = $this->publishedForm($word, $audience);
 
         if ($specific || $audience === WhatsAppInchatAudience::Anyone) {
@@ -420,6 +439,10 @@ class WhatsAppInchatFormService
             $record->update([
                 'body_preview' => WhatsAppInboxBodyPreview::clip($summary),
             ]);
+        }
+
+        if ($form->audience === WhatsAppInchatAudience::EducationLead) {
+            $this->recordEducationLead($phone, $form, $response, $summary, $wamid);
         }
 
         if (filled($wamid) && MetaWhatsAppMessage::query()->where('status_detail', 'inchat:'.$wamid)->exists()) {
@@ -507,6 +530,117 @@ class WhatsAppInchatFormService
         }
 
         return $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     */
+    protected function recordEducationLead(string $phone, WhatsAppInchatForm $form, array $response, string $summary, ?string $wamid): void
+    {
+        $marker = filled($wamid) ? 'whatsapp_lead:'.$wamid : null;
+
+        if ($marker && Visit::query()->where('remarks', $marker)->exists()) {
+            return;
+        }
+
+        $student = $this->studentForPhone($phone);
+
+        if ($student && $student->activeEnrollment()->exists()) {
+            return;
+        }
+
+        $enquiry = $student
+            ? Enquiry::query()->where('student_id', $student->id)->latest('id')->first()
+            : null;
+
+        if ($enquiry && $student) {
+            $this->addLeadAnswers($student, $enquiry, $summary, $marker);
+
+            return;
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+        $tenDigit = strlen($digits) === 12 && str_starts_with($digits, '91')
+            ? substr($digits, 2)
+            : $digits;
+
+        try {
+            app(EnquiryService::class)->create([
+                'name' => $this->childName($form, $response),
+                'father_name' => 'Not given',
+                'date_of_birth' => '2000-01-01',
+                'gender' => Gender::Other->value,
+                'mobile' => $tenDigit,
+                'course_id' => $this->courseIdFromAnswers($form, $response),
+                'discussion_summary' => $summary."\nDate of birth was not collected on WhatsApp. Please update the student.",
+                'remarks' => $marker,
+                'visit_status' => VisitStatus::FollowUpRequired->value,
+            ], null, LeadSource::WhatsApp);
+        } catch (ValidationException $exception) {
+            Log::warning('WhatsApp education lead was not saved', [
+                'phone' => $phone,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    protected function addLeadAnswers(Student $student, Enquiry $enquiry, string $summary, ?string $marker): void
+    {
+        Visit::query()->create([
+            'student_id' => $student->id,
+            'enquiry_id' => $enquiry->id,
+            'visit_date' => now()->toDateString(),
+            'discussion_summary' => $summary,
+            'remarks' => $marker,
+            'status' => VisitStatus::FollowUpRequired,
+            'campus_purpose' => CampusVisitPurpose::General,
+        ]);
+
+        $enquiry->update([
+            'latest_visit_status' => VisitStatus::FollowUpRequired,
+        ]);
+
+        CrmCacheInvalidator::afterVisitOrFollowUpChange($enquiry->meeting_with_user_id);
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     */
+    protected function childName(WhatsAppInchatForm $form, array $response): string
+    {
+        foreach ($form->fields as $field) {
+            if ($field->field_type !== WhatsAppInchatFieldType::ShortText) {
+                continue;
+            }
+
+            $value = $this->displayAnswer($field, $response[$field->answerKey()] ?? '');
+
+            if ($value !== '') {
+                return mb_substr($value, 0, 120);
+            }
+        }
+
+        return 'WhatsApp lead';
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     */
+    protected function courseIdFromAnswers(WhatsAppInchatForm $form, array $response): int
+    {
+        foreach ($form->fields as $field) {
+            if ($field->field_type !== WhatsAppInchatFieldType::CourseList) {
+                continue;
+            }
+
+            $value = trim((string) ($response[$field->answerKey()] ?? ''));
+
+            if (ctype_digit($value) && Course::query()->whereKey((int) $value)->exists()) {
+                return (int) $value;
+            }
+        }
+
+        return DefaultCourse::undecided()->id;
     }
 
     protected function studentForPhone(string $phone): ?Student

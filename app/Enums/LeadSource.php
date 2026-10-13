@@ -16,6 +16,7 @@ enum LeadSource: string
     case BulkImport = 'bulk_import';
     case DirectAdmission = 'direct_admission';
     case Other = 'other';
+    case WhatsApp = 'whatsapp';
 
     public function label(): string
     {
@@ -32,6 +33,7 @@ enum LeadSource: string
             self::BulkImport => 'Bulk Import',
             self::DirectAdmission => 'Direct admission',
             self::Other => 'Other',
+            self::WhatsApp => 'WhatsApp',
         };
     }
 

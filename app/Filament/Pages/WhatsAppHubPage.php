@@ -105,8 +105,8 @@ class WhatsAppHubPage extends Page
 
         if (ManageWhatsAppInchatForms::canAccess()) {
             $cards[] = [
-                'title' => 'In-chat forms',
-                'description' => 'Build a form for a visiting lead, an existing student, or anyone. A word in the chat opens it.',
+                'title' => 'Education lead form',
+                'description' => 'A word such as admission opens a form for a new parent. Students already in a class are not included.',
                 'url' => ManageWhatsAppInchatForms::getUrl(),
             ];
         }
