@@ -7,6 +7,7 @@ use App\Enums\WhatsAppMessageSource;
 use App\Models\Student;
 use App\Services\MetaWhatsAppInboxService;
 use App\Services\WhatsAppCampusVisitFlowService;
+use App\Services\WhatsAppInchatFormService;
 use App\Services\MetaWhatsAppMediaService;
 use App\Support\StudentWhatsAppTemplateComposer;
 use App\Services\StudentWhatsAppThreadService;
@@ -28,6 +29,8 @@ trait InteractsWithStudentWhatsAppInbox
     public array $messageThread = [];
 
     public string $metaReplyText = '';
+
+    public ?string $sendInchatFormId = null;
 
     public ?TemporaryUploadedFile $metaReplyAttachment = null;
 
@@ -386,6 +389,67 @@ trait InteractsWithStudentWhatsAppInbox
         Notification::make()
             ->title('Visit form sent')
             ->body('The parent can tap Book visit in the chat.')
+            ->success()
+            ->send();
+    }
+
+    public function sendSelectedInchatForm(): void
+    {
+        $student = $this->whatsAppMessageStudent();
+        $phone = $this->whatsAppInboxPhone() ?: $student?->mobile;
+        $formId = (int) $this->sendInchatFormId;
+
+        if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
+            Notification::make()->title('WhatsApp module is not enabled')->warning()->send();
+
+            return;
+        }
+
+        if (blank($phone) || $formId < 1) {
+            Notification::make()->title('Choose a form')->warning()->send();
+
+            return;
+        }
+
+        $forms = app(WhatsAppInchatFormService::class);
+        $form = $forms->formForChat($student, $formId);
+
+        if (! $form) {
+            Notification::make()
+                ->title('Could not send the form')
+                ->body('This form is not for this chat.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $result = $forms->sendForm(
+            $form,
+            (string) $phone,
+            Auth::user(),
+            $student?->id,
+            WhatsAppMessageSource::Inbox,
+        );
+
+        if ($result['status'] !== 'success') {
+            Notification::make()
+                ->title('Could not send the form')
+                ->body((string) ($result['error'] ?? 'Unknown error'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->sendInchatFormId = null;
+        $this->resetMessagesTab();
+        $this->loadMessagesTab();
+        $this->afterWhatsAppMessageSent();
+
+        Notification::make()
+            ->title('Form sent')
+            ->body('The parent can tap the button in the chat.')
             ->success()
             ->send();
     }

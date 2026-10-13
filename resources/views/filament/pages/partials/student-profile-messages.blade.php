@@ -270,6 +270,33 @@
                             <span wire:loading.remove wire:target="sendCampusVisitForm">Send visit form</span>
                             <span wire:loading wire:target="sendCampusVisitForm">Sending…</span>
                         </button>
+                        @php
+                            $inchatFormOptions = app(\App\Services\WhatsAppInchatFormService::class)
+                                ->optionsForChat($record ?? null);
+                        @endphp
+                        @if ($inchatFormOptions !== [])
+                            <label class="crm-wa-inbox__label" for="wa-inchat-form-{{ ($compactInbox ?? false) ? 'inbox' : 'profile' }}">Send a form</label>
+                            <select
+                                id="wa-inchat-form-{{ ($compactInbox ?? false) ? 'inbox' : 'profile' }}"
+                                wire:model.live="sendInchatFormId"
+                                class="crm-wa-inbox__input"
+                            >
+                                <option value="">Choose a form…</option>
+                                @foreach ($inchatFormOptions as $formId => $formLabel)
+                                    <option value="{{ $formId }}">{{ $formLabel }}</option>
+                                @endforeach
+                            </select>
+                            <button
+                                type="button"
+                                wire:click="sendSelectedInchatForm"
+                                wire:loading.attr="disabled"
+                                wire:target="sendSelectedInchatForm"
+                                class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--full"
+                            >
+                                <span wire:loading.remove wire:target="sendSelectedInchatForm">Send a form</span>
+                                <span wire:loading wire:target="sendSelectedInchatForm">Sending…</span>
+                            </button>
+                        @endif
                         @if ($hasAttachment)
                             <div class="crm-wa-inbox__attach-chip">
                                 <x-filament::icon icon="heroicon-o-paper-clip" class="h-4 w-4 shrink-0" />

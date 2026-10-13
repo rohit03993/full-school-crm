@@ -14,6 +14,7 @@ use App\Enums\DocumentType;
 use App\Enums\FeeMiscChargeAdjustmentType;
 use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
+use App\Enums\WhatsAppMessageSource;
 use App\Services\SectionCoursePlanService;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
@@ -84,6 +85,8 @@ use App\Services\StudentCounterService;
 use App\Services\StudentProfileDeleteService;
 use App\Services\StudentUpdateService;
 use App\Services\MetaWhatsAppInboxService;
+use App\Services\WhatsAppCampusVisitFlowService;
+use App\Services\WhatsAppInchatFormService;
 use App\Services\StudentWhatsAppThreadService;
 use App\Services\ParentFeeNoticeService;
 use App\Services\WhatsAppProviderResolver;
@@ -313,6 +316,8 @@ class StudentProfilePage extends Page
     public array $messageThread = [];
 
     public string $metaReplyText = '';
+
+    public ?string $sendInchatFormId = null;
 
     public ?TemporaryUploadedFile $metaReplyAttachment = null;
 
@@ -1809,6 +1814,89 @@ class StudentProfilePage extends Page
         Notification::make()
             ->title('Reply sent')
             ->body('Your message was delivered via Meta WhatsApp.')
+            ->success()
+            ->send();
+    }
+
+    public function sendCampusVisitForm(): void
+    {
+        if (! $this->licensed(LicenseFeature::WhatsApp) || blank($this->record->mobile)) {
+            return;
+        }
+
+        $result = app(WhatsAppCampusVisitFlowService::class)->sendForm(
+            (string) $this->record->mobile,
+            Auth::user(),
+            $this->record->id,
+            WhatsAppMessageSource::Profile,
+        );
+
+        if ($result['status'] !== 'success') {
+            Notification::make()
+                ->title('Could not send the visit form')
+                ->body((string) ($result['error'] ?? 'Unknown error'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->messagesTabLoaded = false;
+        $this->loadMessagesTab();
+
+        Notification::make()
+            ->title('Visit form sent')
+            ->success()
+            ->send();
+    }
+
+    public function sendSelectedInchatForm(): void
+    {
+        $formId = (int) $this->sendInchatFormId;
+
+        if (! $this->licensed(LicenseFeature::WhatsApp) || blank($this->record->mobile) || $formId < 1) {
+            Notification::make()->title('Choose a form')->warning()->send();
+
+            return;
+        }
+
+        $forms = app(WhatsAppInchatFormService::class);
+        $form = $forms->formForChat($this->record, $formId);
+
+        if (! $form) {
+            Notification::make()
+                ->title('Could not send the form')
+                ->body('This form is not for this chat.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $result = $forms->sendForm(
+            $form,
+            (string) $this->record->mobile,
+            Auth::user(),
+            $this->record->id,
+            WhatsAppMessageSource::Profile,
+        );
+
+        if ($result['status'] !== 'success') {
+            Notification::make()
+                ->title('Could not send the form')
+                ->body((string) ($result['error'] ?? 'Unknown error'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->sendInchatFormId = null;
+        $this->messagesTabLoaded = false;
+        $this->loadMessagesTab();
+
+        Notification::make()
+            ->title('Form sent')
             ->success()
             ->send();
     }

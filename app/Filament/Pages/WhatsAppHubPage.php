@@ -103,6 +103,14 @@ class WhatsAppHubPage extends Page
             ];
         }
 
+        if (ManageWhatsAppInchatForms::canAccess()) {
+            $cards[] = [
+                'title' => 'In-chat forms',
+                'description' => 'Build a form for a visiting lead, an existing student, or anyone. A word in the chat opens it.',
+                'url' => ManageWhatsAppInchatForms::getUrl(),
+            ];
+        }
+
         if (ManageWhatsAppSettings::canAccess()) {
             $cards[] = [
                 'title' => CrmMenuLabels::whatsAppAutomations(),

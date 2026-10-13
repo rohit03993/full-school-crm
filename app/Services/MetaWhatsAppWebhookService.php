@@ -175,6 +175,14 @@ class MetaWhatsAppWebhookService
                     $wamid !== '' ? $wamid : null,
                     $record,
                 );
+
+                app(WhatsAppInchatFormService::class)->handleInbound(
+                    $from,
+                    $parsed,
+                    $message,
+                    $wamid !== '' ? $wamid : null,
+                    $record,
+                );
             } catch (\Throwable $exception) {
                 Log::error('Meta WhatsApp inbound message failed', [
                     'wamid' => $wamid,

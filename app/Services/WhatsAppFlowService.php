@@ -181,6 +181,125 @@ class WhatsAppFlowService
     }
 
     /**
+     * @return array{status: string, flow_id?: string, error?: string}
+     */
+    public function publishNamedFlow(string $flowName, string $json, ?string $existingFlowId = null): array
+    {
+        $listed = $this->listFlows();
+
+        if ($listed['status'] !== 'success') {
+            return [
+                'status' => 'failed',
+                'error' => (string) ($listed['error'] ?? 'WhatsApp did not return the form list.'),
+            ];
+        }
+
+        $flowId = filled($existingFlowId) ? trim((string) $existingFlowId) : null;
+
+        if ($flowId === null || $flowId === '') {
+            $flowId = $this->flowIdNamed($listed['items'] ?? [], $flowName);
+        }
+
+        if ($flowId === null) {
+            $created = $this->createNamedDraft($flowName);
+
+            if ($created['status'] !== 'success') {
+                return $created;
+            }
+
+            $flowId = $created['flow_id'] ?? null;
+        }
+
+        if ($flowId === null || $flowId === '') {
+            return ['status' => 'failed', 'error' => 'WhatsApp did not return a form id.'];
+        }
+
+        $uploaded = $this->uploadFlowJson($flowId, $json);
+
+        if ($uploaded['status'] !== 'success') {
+            return $uploaded;
+        }
+
+        $published = $this->publishFlow($flowId);
+
+        if ($published['status'] !== 'success') {
+            return $published;
+        }
+
+        return ['status' => 'success', 'flow_id' => $flowId];
+    }
+
+    /**
+     * @return array{status: string, error?: string, message_id?: string, response?: mixed}
+     */
+    public function sendInteractiveFlow(
+        string $phone,
+        string $flowId,
+        string $flowToken,
+        string $screenId,
+        string $header,
+        string $body,
+        string $buttonLabel,
+    ): array {
+        if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
+            return ['status' => 'failed', 'error' => 'WhatsApp module is not enabled.'];
+        }
+
+        if (! $this->meta->isConfigured()) {
+            return ['status' => 'failed', 'error' => 'WhatsApp is not configured. Open Connection & Setup and save credentials.'];
+        }
+
+        $destination = $this->meta->destinationE164($phone);
+
+        if ($destination === null) {
+            return ['status' => 'failed', 'error' => 'Invalid Indian mobile number.'];
+        }
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $destination,
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'flow',
+                'header' => [
+                    'type' => 'text',
+                    'text' => mb_substr(trim($header), 0, 60),
+                ],
+                'body' => [
+                    'text' => mb_substr(trim($body), 0, 1024),
+                ],
+                'action' => [
+                    'name' => 'flow',
+                    'parameters' => [
+                        'flow_message_version' => '3',
+                        'flow_token' => $flowToken,
+                        'flow_id' => $flowId,
+                        'flow_cta' => mb_substr(trim($buttonLabel), 0, 20) ?: 'Open form',
+                        'flow_action' => 'navigate',
+                        'flow_action_payload' => [
+                            'screen' => $screenId,
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        try {
+            $response = Http::timeout(30)
+                ->withToken((string) $this->meta->accessToken())
+                ->acceptJson()
+                ->post($this->meta->graphUrl($this->meta->phoneNumberId().'/messages'), $payload);
+
+            return $this->messageResult($response);
+        } catch (\Throwable $exception) {
+            Log::error('WhatsApp in-chat form send failed', ['error' => $exception->getMessage()]);
+
+            return ['status' => 'failed', 'error' => $exception->getMessage()];
+        }
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $items
      */
     protected function existingFlowId(array $items): ?string
@@ -198,6 +317,63 @@ class WhatsAppFlowService
         }
 
         return null;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     */
+    protected function flowIdNamed(array $items, string $name): ?string
+    {
+        foreach ($items as $item) {
+            if ((string) ($item['name'] ?? '') !== $name) {
+                continue;
+            }
+
+            $id = trim((string) ($item['id'] ?? ''));
+
+            if ($id !== '') {
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{status: string, flow_id?: string, error?: string}
+     */
+    protected function createNamedDraft(string $name): array
+    {
+        try {
+            $response = Http::timeout(30)
+                ->withToken((string) $this->meta->accessToken())
+                ->acceptJson()
+                ->post($this->meta->graphUrl($this->meta->wabaId().'/flows'), [
+                    'name' => $name,
+                    'categories' => ['OTHER'],
+                ]);
+
+            $data = $response->json();
+
+            if (! $response->successful() || ! is_array($data)) {
+                return [
+                    'status' => 'failed',
+                    'error' => $this->meta->parseApiError($data, $response->body()),
+                ];
+            }
+
+            $flowId = trim((string) ($data['id'] ?? ''));
+
+            if ($flowId === '') {
+                return ['status' => 'failed', 'error' => 'WhatsApp did not return a form id.'];
+            }
+
+            return ['status' => 'success', 'flow_id' => $flowId];
+        } catch (\Throwable $exception) {
+            Log::error('WhatsApp in-chat form create failed', ['error' => $exception->getMessage()]);
+
+            return ['status' => 'failed', 'error' => $exception->getMessage()];
+        }
     }
 
     /**
@@ -240,12 +416,12 @@ class WhatsAppFlowService
     /**
      * @return array{status: string, error?: string}
      */
-    protected function uploadFlowJson(string $flowId): array
+    protected function uploadFlowJson(string $flowId, ?string $json = null): array
     {
         try {
             $response = Http::timeout(60)
                 ->withToken((string) $this->meta->accessToken())
-                ->attach('file', WhatsAppCampusVisitFlowJson::encoded(), 'flow.json')
+                ->attach('file', $json ?? WhatsAppCampusVisitFlowJson::encoded(), 'flow.json')
                 ->post($this->meta->graphUrl($flowId.'/assets'), [
                     'name' => 'flow.json',
                     'asset_type' => 'FLOW_JSON',
