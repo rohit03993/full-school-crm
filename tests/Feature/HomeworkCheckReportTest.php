@@ -100,7 +100,7 @@ class HomeworkCheckReportTest extends TestCase
                 ->assertSee('Chemistry (Kuldeep Rana)')
                 ->assertSee('Done 1')
                 ->assertSee('Not done 0')
-                ->assertSee('Not marked 1')
+                ->assertSee('Not checked 1')
                 ->assertSee('Chemistry (Sunil Rana)')
                 ->assertSee('Done 0')
                 ->assertSee('Not done 1')

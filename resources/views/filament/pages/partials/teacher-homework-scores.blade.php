@@ -109,7 +109,7 @@
                                                 @if ($subject['state'] === 'Missed')
                                                     Missed
                                                 @elseif ($subject['counts_open'])
-                                                    Done {{ $subject['done'] }} · Not done {{ $subject['not_done'] }} · Not marked {{ $subject['unmarked'] }}
+                                                    Done {{ $subject['done'] }} · Not done {{ $subject['not_done'] }} · Not checked {{ $subject['unmarked'] }}
                                                 @else
                                                     {{ $subject['note'] ?? 'Given' }}
                                                 @endif

@@ -52,7 +52,7 @@
                     ])>
                         <p class="font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">{{ $subjectRow['label'] }}</p>
                         <p class="mt-1 text-gray-500">
-                            Done {{ $subjectRow['done'] }} · ND {{ $subjectRow['not_done'] }} · Not checked {{ $subjectRow['unmarked'] }}
+                            Done {{ $subjectRow['done'] }} · Not done {{ $subjectRow['not_done'] }} · Not checked {{ $subjectRow['unmarked'] }}
                         </p>
                     </div>
                 @endforeach
@@ -224,28 +224,36 @@
                                         type="button"
                                         wire:click="markStudentNotChecked({{ $student['id'] }})"
                                         wire:loading.attr="disabled"
+                                        @disabled(($student['status_key'] ?? null) === 'not_done')
+                                        title="{{ ($student['status_key'] ?? null) === 'not_done' ? 'Not done is final.' : 'No mark yet' }}"
                                         wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                         @class([
                                             'font-semibold',
                                             'bg-gray-700 text-white' => blank($student['status_key'] ?? null),
-                                            'bg-white text-gray-600' => filled($student['status_key'] ?? null),
+                                            'cursor-not-allowed bg-gray-100 text-gray-400' => ($student['status_key'] ?? null) === 'not_done',
+                                            'bg-white text-gray-600' => filled($student['status_key'] ?? null) && ($student['status_key'] ?? null) !== 'not_done',
                                         ])
                                     >Not checked</button>
                                     <button
                                         type="button"
                                         wire:click="markStudentDone({{ $student['id'] }})"
                                         wire:loading.attr="disabled"
+                                        @disabled(($student['status_key'] ?? null) === 'not_done')
+                                        title="{{ ($student['status_key'] ?? null) === 'not_done' ? 'Not done is final.' : 'Mark done. No WhatsApp.' }}"
                                         wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                         @class([
                                             'font-semibold',
                                             'bg-emerald-600 text-white' => ($student['status_key'] ?? null) === 'done',
-                                            'bg-white text-gray-600' => ($student['status_key'] ?? null) !== 'done',
+                                            'cursor-not-allowed bg-gray-100 text-gray-400' => ($student['status_key'] ?? null) === 'not_done',
+                                            'bg-white text-gray-600' => ($student['status_key'] ?? null) !== 'done' && ($student['status_key'] ?? null) !== 'not_done',
                                         ])
                                     >Done</button>
                                     <button
                                         type="button"
                                         wire:click="askSingleNotDone({{ $student['id'] }})"
                                         wire:loading.attr="disabled"
+                                        @disabled(($student['status_key'] ?? null) === 'not_done')
+                                        title="{{ ($student['status_key'] ?? null) === 'not_done' ? 'Not done is final.' : 'Parents will get a WhatsApp.' }}"
                                         wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                         @class([
                                             'font-semibold',
@@ -384,11 +392,14 @@
                                             type="button"
                                             wire:click="markStudentNotChecked({{ $student['id'] }})"
                                             wire:loading.attr="disabled"
+                                            @disabled(($student['status_key'] ?? null) === 'not_done')
+                                            title="{{ ($student['status_key'] ?? null) === 'not_done' ? 'Not done is final.' : 'No mark yet' }}"
                                             wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                             @class([
                                                 'h-8 px-2.5 text-xs font-semibold',
                                                 'bg-gray-700 text-white' => blank($student['status_key'] ?? null),
-                                                'bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300' => filled($student['status_key'] ?? null),
+                                                'cursor-not-allowed bg-gray-100 text-gray-400' => ($student['status_key'] ?? null) === 'not_done',
+                                                'bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300' => filled($student['status_key'] ?? null) && ($student['status_key'] ?? null) !== 'not_done',
                                             ])
                                         >
                                             Not checked
@@ -397,11 +408,14 @@
                                             type="button"
                                             wire:click="markStudentDone({{ $student['id'] }})"
                                             wire:loading.attr="disabled"
+                                            @disabled(($student['status_key'] ?? null) === 'not_done')
+                                            title="{{ ($student['status_key'] ?? null) === 'not_done' ? 'Not done is final.' : 'Mark done. No WhatsApp.' }}"
                                             wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                             @class([
                                                 'h-8 px-2.5 text-xs font-semibold',
                                                 'bg-emerald-600 text-white' => ($student['status_key'] ?? null) === 'done',
-                                                'bg-white text-gray-600 hover:bg-emerald-50 dark:bg-gray-900 dark:text-gray-300' => ($student['status_key'] ?? null) !== 'done',
+                                                'cursor-not-allowed bg-gray-100 text-gray-400' => ($student['status_key'] ?? null) === 'not_done',
+                                                'bg-white text-gray-600 hover:bg-emerald-50 dark:bg-gray-900 dark:text-gray-300' => ($student['status_key'] ?? null) !== 'done' && ($student['status_key'] ?? null) !== 'not_done',
                                             ])
                                         >
                                             Done
@@ -410,6 +424,8 @@
                                             type="button"
                                             wire:click="askSingleNotDone({{ $student['id'] }})"
                                             wire:loading.attr="disabled"
+                                            @disabled(($student['status_key'] ?? null) === 'not_done')
+                                            title="{{ ($student['status_key'] ?? null) === 'not_done' ? 'Not done is final.' : 'Parents will get a WhatsApp.' }}"
                                             wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                             @class([
                                                 'h-8 px-2.5 text-xs font-semibold',
@@ -506,8 +522,8 @@
                             @if ($bulkSummary['no_mobile'] > 0)
                                 {{ $bulkSummary['no_mobile'] }} have no mobile.
                             @endif
-                            @if ($bulkSummary['already_shared'] > 0)
-                                {{ $bulkSummary['already_shared'] }} already messaged, so no second WhatsApp.
+                            @if (($bulkSummary['locked'] ?? 0) > 0)
+                                {{ $bulkSummary['locked'] }} already Not done. That mark stays. Parents were already told.
                             @endif
                         </p>
                         <div class="mt-2 flex items-center gap-2">

@@ -340,7 +340,7 @@ class TeacherHomeworkScoreService
                             ? 'Waiting for approval'
                             : ($opensTomorrow
                                 ? 'Check opens tomorrow'
-                                : ($lowers ? 'Students still unmarked' : null)),
+                                : ($lowers ? 'Students still not checked' : null)),
                         'lowers' => $lowers,
                         'counts_open' => $isReady && $studentTotal > 0,
                         'done' => $done,
