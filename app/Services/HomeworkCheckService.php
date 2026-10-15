@@ -361,7 +361,7 @@ class HomeworkCheckService
 
         if ($existing && $existing->status === HomeworkCheckStatus::NotDone && $status !== HomeworkCheckStatus::NotDone) {
             throw ValidationException::withMessages([
-                'status' => $student->name.' is Not done. Parents were told, so this mark cannot be changed.',
+                'status' => $student->name.' is Not done. This mark cannot be changed.',
             ]);
         }
 

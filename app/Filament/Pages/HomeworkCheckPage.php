@@ -442,18 +442,23 @@ class HomeworkCheckPage extends Page
     {
         $target = $this->selectedCheckTarget();
         $cleared = 0;
+        $locked = 0;
 
         try {
             foreach ($this->normalizedSelectedIds() as $studentId) {
-                if ($service->clearMark(
+                $result = $service->clearMark(
                     $user,
                     (int) $this->data['batch_id'],
                     $studentId,
                     $target['subject_id'],
                     $this->checkDate(),
                     $target['assignment_id'],
-                )) {
+                );
+
+                if ($result === 'cleared') {
                     $cleared++;
+                } elseif ($result === 'locked') {
+                    $locked++;
                 }
             }
         } catch (ValidationException $exception) {
@@ -465,9 +470,15 @@ class HomeworkCheckPage extends Page
 
         $this->clearBulkSelection();
 
+        $body = $cleared.' student'.($cleared === 1 ? '' : 's').' set to Not checked. No WhatsApp was sent.';
+
+        if ($locked > 0) {
+            $body .= ' '.$locked.' already Not done. That mark stays.';
+        }
+
         Notification::make()
             ->title('Back to Not checked')
-            ->body($cleared.' student'.($cleared === 1 ? '' : 's').' set to Not checked. No WhatsApp was sent.')
+            ->body($body)
             ->success()
             ->send();
     }
@@ -481,7 +492,7 @@ class HomeworkCheckPage extends Page
     }
 
     /**
-     * @return array{ticked: int, done: int, not_done: int, messages: int, no_mobile: int, already_shared: int}
+     * @return array{ticked: int, done: int, not_done: int, messages: int, no_mobile: int, already_shared: int, locked: int}
      */
     protected function bulkSummary(): array
     {
@@ -491,9 +502,11 @@ class HomeworkCheckPage extends Page
             $class->pluck('id')->map(fn ($id): int => (int) $id)->all(),
         ));
         $selected = $class->whereIn('id', $selectedIds)->values();
-        $notDone = $this->bulkChoice === 'not_done' ? $selected : collect();
-        $done = $this->bulkChoice === 'done' ? $selected : collect();
-        $freshNotDone = $notDone->filter(fn (array $row): bool => ($row['status_key'] ?? null) !== 'not_done');
+        $locked = $selected->filter(fn (array $row): bool => ($row['status_key'] ?? null) === 'not_done')->values();
+        $canChange = $selected->reject(fn (array $row): bool => ($row['status_key'] ?? null) === 'not_done')->values();
+        $notDone = $this->bulkChoice === 'not_done' ? $canChange : collect();
+        $done = $this->bulkChoice === 'done' ? $canChange : collect();
+        $freshNotDone = $notDone;
 
         return [
             'ticked' => $selected->count(),
@@ -501,7 +514,8 @@ class HomeworkCheckPage extends Page
             'not_done' => $notDone->count(),
             'messages' => $freshNotDone->filter(fn (array $row): bool => filled($row['mobile'] ?? null))->count(),
             'no_mobile' => $freshNotDone->filter(fn (array $row): bool => blank($row['mobile'] ?? null))->count(),
-            'already_shared' => $notDone->filter(fn (array $row): bool => ($row['status_key'] ?? null) === 'not_done')->count(),
+            'already_shared' => $locked->count(),
+            'locked' => $locked->count(),
         ];
     }
 
@@ -539,6 +553,20 @@ class HomeworkCheckPage extends Page
             return;
         }
 
+        $alreadyNotDone = $this->classRoster()->contains(
+            fn (array $row): bool => (int) $row['id'] === $studentId && ($row['status_key'] ?? null) === 'not_done',
+        );
+
+        if ($alreadyNotDone) {
+            Notification::make()
+                ->title('Not done cannot be changed')
+                ->body('This mark stays.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         try {
             $target = $this->selectedCheckTarget();
             $cleared = $service->clearMark(
@@ -556,11 +584,21 @@ class HomeworkCheckPage extends Page
             return;
         }
 
-        Notification::make()
-            ->title($cleared ? 'Back to Not checked' : 'Already Not checked')
-            ->body('No WhatsApp was sent.')
-            ->success()
-            ->send();
+        $note = Notification::make()
+            ->title(match ($cleared) {
+                'locked' => 'Not done cannot be changed',
+                'cleared' => 'Back to Not checked',
+                default => 'Already Not checked',
+            })
+            ->body($cleared === 'locked' ? 'This mark stays.' : 'No WhatsApp was sent.');
+
+        if ($cleared === 'locked') {
+            $note->warning();
+        } else {
+            $note->success();
+        }
+
+        $note->send();
     }
 
     public function askSingleNotDone(int $studentId): void
