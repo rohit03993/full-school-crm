@@ -34,6 +34,7 @@ use App\Support\HomeworkNotDoneWhatsAppTemplate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -123,18 +124,25 @@ class HomeworkCheckServiceTest extends TestCase
         $this->assertSame('Not Done', $row['check_status'] ?? null);
         $this->assertSame('Message shared with parents', $row['check_note'] ?? null);
 
-        $backToDone = $service->mark(
-            $teacher,
-            $batch->id,
-            $student->id,
-            $subject->id,
-            'Chapter 5',
-            HomeworkCheckStatus::Done,
-        now()->subDay()->toDateString(),
-        );
+        $blocked = false;
 
-        $this->assertSame($done['check']->id, $backToDone['check']->id);
-        $this->assertSame(HomeworkCheckStatus::Done, $backToDone['check']->fresh()->status);
+        try {
+            $service->mark(
+                $teacher,
+                $batch->id,
+                $student->id,
+                $subject->id,
+                'Chapter 5',
+                HomeworkCheckStatus::Done,
+                now()->subDay()->toDateString(),
+            );
+        } catch (ValidationException $exception) {
+            $blocked = true;
+            $this->assertStringContainsString('cannot be changed', $exception->errors()['status'][0]);
+        }
+
+        $this->assertTrue($blocked);
+        $this->assertSame(HomeworkCheckStatus::NotDone, $notDone['check']->fresh()->status);
         $this->assertSame(1, HomeworkCheck::query()->count());
     }
 
@@ -490,6 +498,56 @@ class HomeworkCheckServiceTest extends TestCase
             'student_id' => $student->id,
         ]);
         Http::assertNothingSent();
+    }
+
+    public function test_not_done_cannot_be_changed_back(): void
+    {
+        Http::fake();
+
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $service = app(HomeworkCheckService::class);
+        $date = now()->subDay()->toDateString();
+
+        $service->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            'Topic',
+            HomeworkCheckStatus::NotDone,
+            $date,
+        );
+
+        $this->assertSame('locked', $service->clearMark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            $date,
+        ));
+
+        $blocked = false;
+
+        try {
+            $service->mark(
+                $teacher,
+                $batch->id,
+                $student->id,
+                $subject->id,
+                'Topic',
+                HomeworkCheckStatus::Done,
+                $date,
+            );
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $blocked = true;
+            $this->assertStringContainsString('cannot be changed', $exception->errors()['status'][0]);
+        }
+
+        $this->assertTrue($blocked);
+        $this->assertDatabaseHas('homework_checks', [
+            'student_id' => $student->id,
+            'status' => 'not_done',
+        ]);
     }
 
     public function test_today_and_dates_older_than_seven_days_cannot_be_checked(): void
@@ -1158,17 +1216,24 @@ class HomeworkCheckServiceTest extends TestCase
 
             $this->assertSame(1, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
 
-            app(HomeworkCheckService::class)->mark(
-                $teacher,
-                $batch->id,
-                $student->id,
-                $subject->id,
-                'B',
-                HomeworkCheckStatus::Done,
-                now()->subDay()->toDateString(),
-            );
+            $blocked = false;
 
-            $this->assertSame(0, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
+            try {
+                app(HomeworkCheckService::class)->mark(
+                    $teacher,
+                    $batch->id,
+                    $student->id,
+                    $subject->id,
+                    'B',
+                    HomeworkCheckStatus::Done,
+                    now()->subDay()->toDateString(),
+                );
+            } catch (ValidationException) {
+                $blocked = true;
+            }
+
+            $this->assertTrue($blocked);
+            $this->assertSame(1, app(HomeworkCheckService::class)->notDoneCountThisWeek($student->id));
         } finally {
             \Illuminate\Support\Carbon::setTestNow();
         }

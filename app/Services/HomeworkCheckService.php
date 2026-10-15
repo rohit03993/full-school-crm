@@ -359,6 +359,12 @@ class HomeworkCheckService
 
         $existing = $existingQuery->orderByDesc('id')->first();
 
+        if ($existing && $existing->status === HomeworkCheckStatus::NotDone && $status !== HomeworkCheckStatus::NotDone) {
+            throw ValidationException::withMessages([
+                'status' => $student->name.' is Not done. Parents were told, so this mark cannot be changed.',
+            ]);
+        }
+
         if ($existing && $existing->status === $status) {
             return [
                 'check' => $existing,
@@ -426,6 +432,7 @@ class HomeworkCheckService
 
     /**
      * Remove this student's mark for the day. No WhatsApp is sent.
+     * @return 'cleared'|'open'|'locked'
      */
     public function clearMark(
         User $teacher,
@@ -434,7 +441,7 @@ class HomeworkCheckService
         int $courseSubjectId,
         ?string $checkedOn = null,
         ?int $homeworkAssignmentId = null,
-    ): bool {
+    ): string {
         if (! FeatureGate::enabled(LicenseFeature::Homework)) {
             throw ValidationException::withMessages([
                 'status' => 'Homework feature is not enabled on your licence.',
@@ -463,12 +470,16 @@ class HomeworkCheckService
         $existing = $query->orderByDesc('id')->first();
 
         if (! $existing) {
-            return false;
+            return 'open';
+        }
+
+        if ($existing->status === HomeworkCheckStatus::NotDone) {
+            return 'locked';
         }
 
         $existing->delete();
 
-        return true;
+        return 'cleared';
     }
 
     /**
