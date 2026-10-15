@@ -91,7 +91,7 @@ class DashboardAnalyticsWidget extends Widget
             'mixRows' => $this->mixRows($pulse, $attention),
             'funnelSteps' => $this->funnelSteps($attention),
             'showAnalytics' => $this->showAnalytics,
-            'poll' => '30s',
+            'poll' => '60s',
         ];
     }
 

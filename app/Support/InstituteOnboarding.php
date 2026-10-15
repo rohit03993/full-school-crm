@@ -29,6 +29,6 @@ class InstituteOnboarding
 
     public static function reset(): void
     {
-        Setting::query()->whereIn('key', [self::COMPLETED_KEY, self::COMPLETED_AT_KEY])->delete();
+        Setting::forgetValue(self::COMPLETED_KEY, self::COMPLETED_AT_KEY);
     }
 }

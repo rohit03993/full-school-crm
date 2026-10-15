@@ -148,7 +148,7 @@ class MeetingForOptions
         $normalized = self::normalizeList($items);
 
         if ($normalized === []) {
-            Setting::query()->where('key', self::SETTING_KEY)->delete();
+            Setting::forgetValue(self::SETTING_KEY);
 
             return;
         }

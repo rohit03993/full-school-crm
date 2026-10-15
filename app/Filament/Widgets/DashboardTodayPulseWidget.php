@@ -51,7 +51,7 @@ class DashboardTodayPulseWidget extends Widget
         return [
             'heading' => 'Today',
             'subheading' => $data['as_of_label'],
-            'poll' => '15s',
+            'poll' => '60s',
             'tiles' => $this->visibleTiles($this->mergedTiles($packs, $data, $attention, $user)),
         ];
     }

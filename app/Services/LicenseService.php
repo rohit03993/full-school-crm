@@ -214,7 +214,7 @@ class LicenseService
 
     public function ensureDefaultLicense(): void
     {
-        if (! Setting::query()->where('key', self::PAYLOAD_KEY)->exists()) {
+        if (! Setting::hasKey(self::PAYLOAD_KEY)) {
             $this->bootstrapFullLicense('Auto-created default license');
 
             return;

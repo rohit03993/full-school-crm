@@ -9,6 +9,7 @@ use App\Ai\Homework\OpenAiHomeworkTextImprover;
 use App\Livewire\WhatsAppInboxThread;
 use App\Http\Responses\LogoutResponse;
 use App\Enums\LicenseFeature;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Services\HomeworkAssignmentService;
 use App\Support\CrmLivewireErrors;
@@ -22,6 +23,7 @@ use Filament\Tables\Table;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
@@ -58,6 +60,11 @@ class AppServiceProvider extends ServiceProvider
         });
         Event::listen(Logout::class, function (Logout $event): void {
             app(StaffLoginSessionService::class)->handleLogoutEvent($event);
+        });
+
+        // A queue worker lives for many jobs; settings saved meanwhile must be seen by the next job.
+        Queue::before(function (): void {
+            Setting::flushValueCache();
         });
 
         try {

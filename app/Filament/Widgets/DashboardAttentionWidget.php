@@ -57,7 +57,7 @@ class DashboardAttentionWidget extends Widget
         return [
             'heading' => 'Needs attention',
             'subheading' => 'Tap a tile to open the work queue',
-            'poll' => '15s',
+            'poll' => '60s',
             'tiles' => $this->visibleTiles($this->mergedTiles($packs, $data, $user)),
         ];
     }

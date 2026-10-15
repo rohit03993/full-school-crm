@@ -69,7 +69,7 @@ class InstituteTerminology
             $value = trim((string) ($labels[$key] ?? ''));
 
             if ($value === '') {
-                Setting::query()->where('key', 'crm.label.'.$key)->delete();
+                Setting::forgetValue('crm.label.'.$key);
 
                 continue;
             }
