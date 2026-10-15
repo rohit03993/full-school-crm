@@ -222,9 +222,20 @@
                                 <div class="crm-hw-phone-actions">
                                     <button
                                         type="button"
+                                        wire:click="markStudentNotChecked({{ $student['id'] }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
+                                        @class([
+                                            'font-semibold',
+                                            'bg-gray-700 text-white' => blank($student['status_key'] ?? null),
+                                            'bg-white text-gray-600' => filled($student['status_key'] ?? null),
+                                        ])
+                                    >Not checked</button>
+                                    <button
+                                        type="button"
                                         wire:click="markStudentDone({{ $student['id'] }})"
                                         wire:loading.attr="disabled"
-                                        wire:target="markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
+                                        wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                         @class([
                                             'font-semibold',
                                             'bg-emerald-600 text-white' => ($student['status_key'] ?? null) === 'done',
@@ -235,7 +246,7 @@
                                         type="button"
                                         wire:click="askSingleNotDone({{ $student['id'] }})"
                                         wire:loading.attr="disabled"
-                                        wire:target="markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
+                                        wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                         @class([
                                             'font-semibold',
                                             'bg-rose-600 text-white' => ($student['status_key'] ?? null) === 'not_done',
@@ -371,9 +382,22 @@
                                     <div class="inline-flex overflow-hidden rounded-lg ring-1 ring-gray-200 dark:ring-white/10">
                                         <button
                                             type="button"
+                                            wire:click="markStudentNotChecked({{ $student['id'] }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
+                                            @class([
+                                                'h-8 px-2.5 text-xs font-semibold',
+                                                'bg-gray-700 text-white' => blank($student['status_key'] ?? null),
+                                                'bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300' => filled($student['status_key'] ?? null),
+                                            ])
+                                        >
+                                            Not checked
+                                        </button>
+                                        <button
+                                            type="button"
                                             wire:click="markStudentDone({{ $student['id'] }})"
                                             wire:loading.attr="disabled"
-                                            wire:target="markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
+                                            wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                             @class([
                                                 'h-8 px-2.5 text-xs font-semibold',
                                                 'bg-emerald-600 text-white' => ($student['status_key'] ?? null) === 'done',
@@ -386,7 +410,7 @@
                                             type="button"
                                             wire:click="askSingleNotDone({{ $student['id'] }})"
                                             wire:loading.attr="disabled"
-                                            wire:target="markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
+                                            wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                             @class([
                                                 'h-8 px-2.5 text-xs font-semibold',
                                                 'bg-rose-600 text-white' => ($student['status_key'] ?? null) === 'not_done',
@@ -466,7 +490,9 @@
                         </div>
                     @elseif (($bulkStep ?? '') === 'confirm' && is_array($bulkSummary ?? null))
                         <p class="text-sm leading-5 text-gray-800 dark:text-gray-100">
-                            @if (($bulkChoice ?? '') === 'not_done')
+                            @if (($bulkChoice ?? '') === 'not_checked')
+                                These {{ $bulkSummary['ticked'] }} {{ $bulkSummary['ticked'] === 1 ? 'student' : 'students' }} will go back to Not checked. No WhatsApp. Students you did not tick stay as they are.
+                            @elseif (($bulkChoice ?? '') === 'not_done')
                                 These {{ $bulkSummary['not_done'] }} {{ $bulkSummary['not_done'] === 1 ? 'student' : 'students' }} will be marked Not done.
                                 @if ($bulkSummary['messages'] > 0)
                                     Their parents will get a WhatsApp.
@@ -493,10 +519,15 @@
                                 @class([
                                     'h-11 flex-1 rounded-lg px-2 text-sm font-semibold text-white disabled:opacity-70',
                                     'bg-rose-600' => ($bulkChoice ?? '') === 'not_done',
-                                    'bg-emerald-600' => ($bulkChoice ?? '') !== 'not_done',
+                                    'bg-gray-700' => ($bulkChoice ?? '') === 'not_checked',
+                                    'bg-emerald-600' => ($bulkChoice ?? '') === 'done',
                                 ])
                             >
-                                <span wire:loading.remove wire:target="confirmBulk">{{ ($bulkChoice ?? '') === 'not_done' ? 'Send to parents' : 'Mark done' }}</span>
+                                <span wire:loading.remove wire:target="confirmBulk">{{ match ($bulkChoice ?? '') {
+                                    'not_done' => 'Send to parents',
+                                    'not_checked' => 'Set not checked',
+                                    default => 'Mark done',
+                                } }}</span>
                                 <span wire:loading wire:target="confirmBulk">Saving…</span>
                             </button>
                             <button type="button" wire:click="cancelBulk" class="h-11 rounded-lg px-3 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 dark:text-gray-200 dark:ring-white/20">Cancel</button>
@@ -505,6 +536,7 @@
                         <div class="flex items-center gap-2">
                             <p class="min-w-0 flex-1 text-sm font-semibold text-gray-950 dark:text-white">{{ $selectedCount }} selected</p>
                             <button type="button" wire:click="clearBulkSelection" class="h-11 rounded-lg px-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Clear</button>
+                            <button type="button" wire:click="chooseBulk('not_checked')" class="h-11 rounded-lg bg-gray-700 px-3 text-sm font-semibold text-white">Not checked</button>
                             <button type="button" wire:click="chooseBulk('done')" class="h-11 rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white">Mark done</button>
                             <button type="button" wire:click="chooseBulk('not_done')" class="h-11 rounded-lg bg-rose-600 px-3 text-sm font-semibold text-white">Mark not done</button>
                         </div>

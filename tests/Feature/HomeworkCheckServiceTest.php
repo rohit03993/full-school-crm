@@ -458,6 +458,40 @@ class HomeworkCheckServiceTest extends TestCase
         ]);
     }
 
+    public function test_not_checked_button_clears_a_done_mark_without_whatsapp(): void
+    {
+        Http::fake();
+
+        [$teacher, $batch, $student, $subject] = $this->seedClass();
+        $date = now()->subDay()->toDateString();
+
+        app(HomeworkCheckService::class)->mark(
+            $teacher,
+            $batch->id,
+            $student->id,
+            $subject->id,
+            'Topic',
+            HomeworkCheckStatus::Done,
+            $date,
+        );
+
+        $this->actingAs($teacher);
+
+        Livewire::test(HomeworkCheckPage::class)
+            ->fillForm([
+                'batch_id' => $batch->id,
+                'course_subject_id' => $subject->id,
+                'check_date' => $date,
+            ])
+            ->assertSee('Not checked')
+            ->call('markStudentNotChecked', $student->id);
+
+        $this->assertDatabaseMissing('homework_checks', [
+            'student_id' => $student->id,
+        ]);
+        Http::assertNothingSent();
+    }
+
     public function test_today_and_dates_older_than_seven_days_cannot_be_checked(): void
     {
         [$teacher, $batch, $student, $subject] = $this->seedClass();

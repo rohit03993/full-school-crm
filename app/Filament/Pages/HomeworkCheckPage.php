@@ -359,7 +359,7 @@ class HomeworkCheckPage extends Page
 
     public function chooseBulk(string $choice): void
     {
-        if (! in_array($choice, ['done', 'not_done'], true)) {
+        if (! in_array($choice, ['done', 'not_done', 'not_checked'], true)) {
             return;
         }
 
@@ -388,8 +388,14 @@ class HomeworkCheckPage extends Page
     {
         $user = Auth::user();
 
-        if (! $user || ! $this->rosterReady() || ! in_array($this->bulkChoice, ['done', 'not_done'], true)) {
+        if (! $user || ! $this->rosterReady() || ! in_array($this->bulkChoice, ['done', 'not_done', 'not_checked'], true)) {
             Notification::make()->title('Choose the class, subject, and an answer first')->warning()->send();
+
+            return;
+        }
+
+        if ($this->bulkChoice === 'not_checked') {
+            $this->confirmBulkNotChecked($service, $user);
 
             return;
         }
@@ -428,6 +434,40 @@ class HomeworkCheckPage extends Page
         Notification::make()
             ->title('Class homework saved')
             ->body($body)
+            ->success()
+            ->send();
+    }
+
+    protected function confirmBulkNotChecked(HomeworkCheckService $service, \App\Models\User $user): void
+    {
+        $target = $this->selectedCheckTarget();
+        $cleared = 0;
+
+        try {
+            foreach ($this->normalizedSelectedIds() as $studentId) {
+                if ($service->clearMark(
+                    $user,
+                    (int) $this->data['batch_id'],
+                    $studentId,
+                    $target['subject_id'],
+                    $this->checkDate(),
+                    $target['assignment_id'],
+                )) {
+                    $cleared++;
+                }
+            }
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first() ?? 'Could not save.';
+            Notification::make()->title((string) $message)->warning()->send();
+
+            return;
+        }
+
+        $this->clearBulkSelection();
+
+        Notification::make()
+            ->title('Back to Not checked')
+            ->body($cleared.' student'.($cleared === 1 ? '' : 's').' set to Not checked. No WhatsApp was sent.')
             ->success()
             ->send();
     }
@@ -486,6 +526,41 @@ class HomeworkCheckPage extends Page
     {
         $this->singleNotDoneStudentId = null;
         $this->markOne($service, $studentId, HomeworkCheckStatus::Done);
+    }
+
+    public function markStudentNotChecked(int $studentId, HomeworkCheckService $service): void
+    {
+        $user = Auth::user();
+        $this->singleNotDoneStudentId = null;
+
+        if (! $user || ! $this->rosterReady()) {
+            Notification::make()->title('Select class, subject and date first')->warning()->send();
+
+            return;
+        }
+
+        try {
+            $target = $this->selectedCheckTarget();
+            $cleared = $service->clearMark(
+                $user,
+                (int) $this->data['batch_id'],
+                $studentId,
+                $target['subject_id'],
+                $this->checkDate(),
+                $target['assignment_id'],
+            );
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first() ?? 'Could not save.';
+            Notification::make()->title((string) $message)->warning()->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title($cleared ? 'Back to Not checked' : 'Already Not checked')
+            ->body('No WhatsApp was sent.')
+            ->success()
+            ->send();
     }
 
     public function askSingleNotDone(int $studentId): void

@@ -425,6 +425,53 @@ class HomeworkCheckService
     }
 
     /**
+     * Remove this student's mark for the day. No WhatsApp is sent.
+     */
+    public function clearMark(
+        User $teacher,
+        int $batchId,
+        int $studentId,
+        int $courseSubjectId,
+        ?string $checkedOn = null,
+        ?int $homeworkAssignmentId = null,
+    ): bool {
+        if (! FeatureGate::enabled(LicenseFeature::Homework)) {
+            throw ValidationException::withMessages([
+                'status' => 'Homework feature is not enabled on your licence.',
+            ]);
+        }
+
+        if (! $this->userCanAccessBatch($teacher, $batchId) || ! $this->userCanAccessSubject($teacher, $batchId, $courseSubjectId)) {
+            throw ValidationException::withMessages([
+                'student_id' => 'You cannot change this class.',
+            ]);
+        }
+
+        $checkedOnDate = $this->normalizeCheckedOn($checkedOn);
+        $this->assertCheckDateInWindow($checkedOnDate);
+
+        $query = HomeworkCheck::query()
+            ->where('student_id', $studentId)
+            ->where('batch_id', $batchId)
+            ->where('course_subject_id', $courseSubjectId)
+            ->whereDate('checked_on', $checkedOnDate);
+
+        if ($homeworkAssignmentId) {
+            $query->where('homework_assignment_id', $homeworkAssignmentId);
+        }
+
+        $existing = $query->orderByDesc('id')->first();
+
+        if (! $existing) {
+            return false;
+        }
+
+        $existing->delete();
+
+        return true;
+    }
+
+    /**
      * @param  list<int>  $studentIds
      * @return array{marked: int, whatsappQueued: int, whatsappFailed: int, errors: list<string>}
      */
