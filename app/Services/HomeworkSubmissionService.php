@@ -229,12 +229,6 @@ class HomeworkSubmissionService
             ]);
         }
 
-        if ($this->subjectClosure($batchId, $subjectId, $date)) {
-            throw ValidationException::withMessages([
-                'homework_date' => 'This subject is closed for the day. Parents were already sent the message, so homework cannot be added now.',
-            ]);
-        }
-
         if (! $this->scope->userCanAccessBatch($user, $batchId)) {
             throw ValidationException::withMessages([
                 'batch_id' => 'You are not assigned to this class.',
@@ -295,6 +289,12 @@ class HomeworkSubmissionService
             count($teachers) === 1 => (int) array_key_first($teachers),
             default => (int) $user->id,
         };
+
+        if ($this->closureFor($batchId, $subjectId, $date, $ownerId)) {
+            throw ValidationException::withMessages([
+                'homework_date' => 'This subject is closed for the day. Parents were already sent the message, so homework cannot be added now.',
+            ]);
+        }
 
         if (! $asAdmin && $existing) {
             $blocked = $this->teacherEditBlockedMessage($existing);
@@ -651,7 +651,7 @@ class HomeworkSubmissionService
             );
             $closuresBySubject = $closuresByBatch
                 ->get($batchId, collect())
-                ->keyBy(fn (HomeworkSubjectClosure $closure): int => (int) $closure->course_subject_id);
+                ->groupBy(fn (HomeworkSubjectClosure $closure): int => (int) $closure->course_subject_id);
             $teachersBySubject = $batch->staffAssignments
                 ->filter(fn (BatchStaffAssignment $row): bool => $row->isSubjectTeacher() && filled($row->course_subject_id))
                 ->groupBy(fn (BatchStaffAssignment $row): int => (int) $row->course_subject_id);
@@ -666,7 +666,8 @@ class HomeworkSubmissionService
                 $subjectId = (int) $subject->id;
                 /** @var Collection<int, HomeworkAssignment> $subjectHomework */
                 $subjectHomework = $homeworkBySubject->get($subjectId, collect())->values();
-                $closure = $closuresBySubject->get($subjectId);
+                /** @var Collection<int, HomeworkSubjectClosure> $subjectClosures */
+                $subjectClosures = $closuresBySubject->get($subjectId, collect());
                 $teacherRows = $teachersBySubject
                     ->get($subjectId, collect())
                     ->unique(fn (BatchStaffAssignment $row): int => (int) $row->user_id)
@@ -690,18 +691,18 @@ class HomeworkSubmissionService
                     $items[] = $this->deskReviewItem(
                         $subject,
                         $assignment,
-                        $closure,
+                        null,
                         $linkStatsByAssignment[(int) $assignment->id] ?? $this->studentLinks->emptyStats(),
                     );
                 }
 
-                $pendingTeachers = $closure === null
-                    ? $teacherRows->filter(
-                        fn (BatchStaffAssignment $row): bool => ! in_array((int) $row->user_id, $givenUserIds, true),
-                    )
-                    : collect();
+                $teachersWithout = $teacherRows->filter(
+                    fn (BatchStaffAssignment $row): bool => ! in_array((int) $row->user_id, $givenUserIds, true),
+                );
 
-                if ($subjectHomework->isEmpty() && $pendingTeachers->isEmpty()) {
+                if ($subjectHomework->isEmpty() && $teachersWithout->isEmpty()) {
+                    $closure = $subjectClosures->first();
+
                     if ($closure === null) {
                         $leftOut++;
                     }
@@ -714,15 +715,23 @@ class HomeworkSubmissionService
                     );
                 }
 
-                foreach ($pendingTeachers as $teacherRow) {
-                    $leftOut++;
+                foreach ($teachersWithout as $teacherRow) {
+                    $teacherId = (int) ($teacherRow->user_id ?? 0);
+                    $closure = $subjectClosures->first(
+                        fn (HomeworkSubjectClosure $row): bool => $row->covers($teacherId),
+                    );
+
+                    if ($closure === null) {
+                        $leftOut++;
+                    }
+
                     $items[] = $this->deskReviewItem(
                         $subject,
                         null,
-                        null,
+                        $closure,
                         $this->studentLinks->emptyStats(),
                         (string) ($teacherRow->user?->name ?? ''),
-                        (int) ($teacherRow->user_id ?? 0),
+                        $teacherId,
                     );
                 }
             }
@@ -1013,7 +1022,8 @@ class HomeworkSubmissionService
                         && (int) $row->submitted_by_user_id === (int) $user->id,
                 );
                 $closure = $batchClosures->first(
-                    fn (HomeworkSubjectClosure $row): bool => (int) $row->course_subject_id === (int) $subjectId,
+                    fn (HomeworkSubjectClosure $row): bool => (int) $row->course_subject_id === (int) $subjectId
+                        && $row->covers((int) $user->id),
                 );
                 $status = $assignment?->status;
 
@@ -1445,9 +1455,10 @@ class HomeworkSubmissionService
     }
 
     /**
-     * Subjects on this class and date that still have no homework and were not closed.
+     * Teachers on this class and date who still have not given homework and have no reason saved.
+     * A subject with no teacher set appears once, with teacher_user_id null.
      *
-     * @return list<array{course_subject_id: int, subject: string, teacher: string, teacher_user_id: ?int}>
+     * @return list<array{key: string, course_subject_id: int, subject: string, teacher: string, teacher_user_id: ?int}>
      */
     public function missingSubjectsForBatch(int $batchId, string $date): array
     {
@@ -1468,12 +1479,11 @@ class HomeworkSubmissionService
             ->get()
             ->groupBy(fn (HomeworkAssignment $assignment): int => (int) $assignment->course_subject_id);
 
-        $closedIds = HomeworkSubjectClosure::query()
+        $closuresBySubject = HomeworkSubjectClosure::query()
             ->where('batch_id', $batchId)
             ->whereDate('homework_date', $date)
-            ->pluck('course_subject_id')
-            ->map(fn (mixed $id): int => (int) $id)
-            ->all();
+            ->get()
+            ->groupBy(fn (HomeworkSubjectClosure $closure): int => (int) $closure->course_subject_id);
 
         $teachersBySubject = $batch->staffAssignments
             ->filter(fn (BatchStaffAssignment $assignment): bool => $assignment->isSubjectTeacher() && $assignment->course_subject_id !== null)
@@ -1483,11 +1493,8 @@ class HomeworkSubmissionService
 
         foreach ($batch->activeSubjects as $subject) {
             $subjectId = (int) $subject->id;
-
-            if (in_array($subjectId, $closedIds, true)) {
-                continue;
-            }
-
+            /** @var Collection<int, HomeworkSubjectClosure> $subjectClosures */
+            $subjectClosures = $closuresBySubject->get($subjectId, collect());
             /** @var Collection<int, HomeworkAssignment> $subjectHomework */
             $subjectHomework = $assignments->get($subjectId, collect());
             $givenUserIds = $subjectHomework
@@ -1498,30 +1505,44 @@ class HomeworkSubmissionService
                 ->get($subjectId, collect())
                 ->unique(fn (BatchStaffAssignment $row): int => (int) $row->user_id)
                 ->values();
-            $pendingTeachers = $teacherRows->filter(
-                fn (BatchStaffAssignment $row): bool => ! in_array((int) $row->user_id, $givenUserIds, true),
-            );
 
-            if ($subjectHomework->isNotEmpty() && $pendingTeachers->isEmpty()) {
+            if ($teacherRows->isEmpty()) {
+                if ($subjectHomework->isEmpty() && $subjectClosures->isEmpty()) {
+                    $missing[] = $this->missingRow($subjectId, (string) $subject->name, 'No teacher set', null);
+                }
+
                 continue;
             }
 
-            $namedTeachers = $pendingTeachers->isNotEmpty() ? $pendingTeachers : $teacherRows;
-            $teacherNames = $namedTeachers
-                ->map(fn (BatchStaffAssignment $row): string => (string) ($row->user?->name ?? ''))
-                ->filter()
-                ->unique()
-                ->implode(', ');
+            foreach ($teacherRows as $row) {
+                $teacherId = (int) $row->user_id;
 
-            $missing[] = [
-                'course_subject_id' => $subjectId,
-                'subject' => (string) $subject->name,
-                'teacher' => $teacherNames !== '' ? $teacherNames : 'No teacher set',
-                'teacher_user_id' => $namedTeachers->first()?->user_id ? (int) $namedTeachers->first()->user_id : null,
-            ];
+                if (in_array($teacherId, $givenUserIds, true)
+                    || $subjectClosures->contains(fn (HomeworkSubjectClosure $closure): bool => $closure->covers($teacherId))) {
+                    continue;
+                }
+
+                $missing[] = $this->missingRow($subjectId, (string) $subject->name, (string) ($row->user?->name ?? ''), $teacherId);
+            }
         }
 
         return $missing;
+    }
+
+    /**
+     * One teacher who still owes homework for a subject. The key tells the send popup's answers apart.
+     *
+     * @return array{key: string, course_subject_id: int, subject: string, teacher: string, teacher_user_id: ?int}
+     */
+    protected function missingRow(int $subjectId, string $subject, string $teacher, ?int $teacherUserId): array
+    {
+        return [
+            'key' => $subjectId.'_'.($teacherUserId ?? 0),
+            'course_subject_id' => $subjectId,
+            'subject' => $subject,
+            'teacher' => $teacher,
+            'teacher_user_id' => $teacherUserId,
+        ];
     }
 
     /**
@@ -1553,62 +1574,62 @@ class HomeworkSubmissionService
     }
 
     /**
-     * Save the coordinator's answer for every missing subject, then the send can continue.
+     * Save the coordinator's answer for every teacher who has not given homework, then the send can continue.
      *
-     * @param  array<int|string, string>  $reasonsBySubjectId
-     * @param  array<int|string, string>  $notesBySubjectId
+     * @param  array<string, string>  $reasonsByKey  missing row key => reason
+     * @param  array<string, string>  $notesByKey  missing row key => note
      */
-    public function closeMissingSubjects(User $admin, int $batchId, string $date, array $reasonsBySubjectId, array $notesBySubjectId = []): void
+    public function closeMissingSubjects(User $admin, int $batchId, string $date, array $reasonsByKey, array $notesByKey = []): void
     {
         $missing = $this->missingSubjectsForBatch($batchId, $date);
-        $notes = [];
+        $answers = [];
 
         foreach ($missing as $row) {
-            $reason = $reasonsBySubjectId[$row['course_subject_id']]
-                ?? $reasonsBySubjectId[(string) $row['course_subject_id']]
-                ?? null;
+            $label = filled($row['teacher_user_id']) && filled($row['teacher'])
+                ? $row['subject'].' · '.$row['teacher']
+                : $row['subject'];
+            $reason = $reasonsByKey[$row['key']] ?? null;
 
             if (! in_array($reason, [HomeworkSubjectClosure::TeacherAbsent, HomeworkSubjectClosure::NoHomework], true)) {
                 throw ValidationException::withMessages([
-                    'reason' => 'Choose what happened for '.$row['subject'].'.',
+                    'reason' => 'Choose what happened for '.$label.'.',
                 ]);
             }
 
-            $note = trim((string) ($notesBySubjectId[$row['course_subject_id']]
-                ?? $notesBySubjectId[(string) $row['course_subject_id']]
-                ?? ''));
+            $note = trim((string) ($notesByKey[$row['key']] ?? ''));
 
             if ($reason === HomeworkSubjectClosure::NoHomework && $note === '') {
                 throw ValidationException::withMessages([
-                    'reason' => 'Write why there is no homework for '.$row['subject'].'.',
+                    'reason' => 'Write why there is no homework for '.$label.'.',
                 ]);
             }
 
             if (mb_strlen($note) > 500) {
                 throw ValidationException::withMessages([
-                    'reason' => 'Keep the reason for '.$row['subject'].' under 500 characters.',
+                    'reason' => 'Keep the reason for '.$label.' under 500 characters.',
                 ]);
             }
 
-            $notes[$row['course_subject_id']] = $reason === HomeworkSubjectClosure::NoHomework ? $note : null;
+            $answers[$row['key']] = [
+                'reason' => $reason,
+                'note' => $reason === HomeworkSubjectClosure::NoHomework ? $note : null,
+            ];
         }
 
         $date = $this->normalizeDate($date);
 
         foreach ($missing as $row) {
-            $reason = $reasonsBySubjectId[$row['course_subject_id']]
-                ?? $reasonsBySubjectId[(string) $row['course_subject_id']];
-
             HomeworkSubjectClosure::query()->updateOrCreate(
                 [
                     'batch_id' => $batchId,
                     'course_subject_id' => $row['course_subject_id'],
                     'homework_date' => $date,
+                    'teacher_user_id' => $row['teacher_user_id'],
                 ],
                 [
-                    'reason' => $reason,
-                    'reason_note' => $notes[$row['course_subject_id']] ?? null,
-                    'teacher_user_id' => $row['teacher_user_id'],
+                    'reason' => $answers[$row['key']]['reason'],
+                    'reason_note' => $answers[$row['key']]['note'],
+                    'whole_subject' => false,
                     'closed_by_user_id' => $admin->id,
                 ],
             );
@@ -1695,12 +1716,13 @@ class HomeworkSubmissionService
         ];
     }
 
-    protected function subjectClosure(int $batchId, int $subjectId, string $date): ?HomeworkSubjectClosure
+    protected function closureFor(int $batchId, int $subjectId, string $date, int $teacherUserId): ?HomeworkSubjectClosure
     {
         return HomeworkSubjectClosure::query()
             ->where('batch_id', $batchId)
             ->where('course_subject_id', $subjectId)
             ->whereDate('homework_date', $date)
-            ->first();
+            ->get()
+            ->first(fn (HomeworkSubjectClosure $closure): bool => $closure->covers($teacherUserId));
     }
 }

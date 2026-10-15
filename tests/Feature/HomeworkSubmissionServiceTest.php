@@ -26,6 +26,7 @@ use App\Models\Course;
 use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
 use App\Models\HomeworkStudentLink;
+use App\Models\HomeworkSubjectClosure;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\ParentMessageSend;
 use App\Models\MetaWhatsAppTemplate;
@@ -933,6 +934,7 @@ class HomeworkSubmissionServiceTest extends TestCase
 
         $this->actingAs($data['admin']);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $physicsKey = $data['physics']->id.'_'.$data['physicsTeacher']->id;
 
         Livewire::test(HomeworkReviewPage::class)
             ->assertDontSee('Add subject')
@@ -949,12 +951,12 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('Teacher was absent')
             ->assertDontSee('Resend')
             ->call('confirmClosedSend')
-            ->assertNotified('Choose what happened for Physics.')
-            ->call('setMissingReason', $data['physics']->id, 'no_homework')
-            ->call('confirmNoHomeworkNote', $data['physics']->id)
+            ->assertNotified('Choose what happened for Physics · '.$data['physicsTeacher']->name.'.')
+            ->call('setMissingReason', $physicsKey, 'no_homework')
+            ->call('confirmNoHomeworkNote', $physicsKey)
             ->assertNotified('Write why there is no homework')
-            ->set('missingSubjectNotes.'.$data['physics']->id, 'Chapter was already finished in class.')
-            ->call('confirmNoHomeworkNote', $data['physics']->id)
+            ->set('missingSubjectNotes.'.$physicsKey, 'Chapter was already finished in class.')
+            ->call('confirmNoHomeworkNote', $physicsKey)
             ->call('confirmClosedSend')
             ->assertSee('Please wait 5 min')
             ->assertDontSee('Remove');
@@ -983,6 +985,7 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertDatabaseHas('homework_subject_closures', [
             'batch_id' => $data['batch']->id,
             'course_subject_id' => $data['physics']->id,
+            'teacher_user_id' => $data['physicsTeacher']->id,
             'reason' => 'no_homework',
             'reason_note' => 'Chapter was already finished in class.',
         ]);
@@ -1066,6 +1069,93 @@ class HomeworkSubmissionServiceTest extends TestCase
             ->assertSee('Extra Physics Teacher');
 
         Http::assertNothingSent();
+    }
+
+    public function test_each_teacher_of_a_subject_keeps_their_own_reason_and_line(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+        $date = now()->toDateString();
+
+        foreach (['maths' => $data['mathTeacher'], 'physics' => $data['physicsTeacher']] as $subjectKey => $teacher) {
+            $assignment = $service->submit($teacher, [
+                'batch_id' => $data['batch']->id,
+                'course_subject_id' => $data[$subjectKey]->id,
+                'homework_date' => $date,
+                'title' => 'Ready',
+                'description' => 'Done',
+            ]);
+            $service->approve($data['admin'], $assignment->id);
+        }
+
+        $extra = User::factory()->create(['name' => 'Extra Physics Teacher', 'is_active' => true]);
+        $extra->assignRole(StaffJobRole::Teacher->value);
+        BatchStaffAssignment::query()->create([
+            'batch_id' => $data['batch']->id,
+            'user_id' => $extra->id,
+            'role' => BatchStaffRole::SubjectTeacher,
+            'course_subject_id' => $data['physics']->id,
+        ]);
+
+        $missing = $service->missingSubjectsForBatch($data['batch']->id, $date);
+        $this->assertCount(1, $missing);
+        $this->assertSame($extra->id, $missing[0]['teacher_user_id']);
+
+        $service->closeMissingSubjects($data['admin'], $data['batch']->id, $date, [
+            $missing[0]['key'] => 'teacher_absent',
+        ]);
+
+        $this->assertSame([], $service->missingSubjectsForBatch($data['batch']->id, $date));
+
+        $physicsItems = collect($service->deskForDate($date)['groups'][0]['sections'][0]['items'])
+            ->where('course_subject_id', $data['physics']->id);
+        $this->assertSame($data['physicsTeacher']->name, $physicsItems->firstWhere('assignment_id', '!=', null)['teacher']);
+        $extraLine = $physicsItems->firstWhere('teacher', 'Extra Physics Teacher');
+        $this->assertSame('Teacher was absent', $extraLine['closure_label']);
+
+        try {
+            $service->submit($extra, [
+                'batch_id' => $data['batch']->id,
+                'course_subject_id' => $data['physics']->id,
+                'homework_date' => $date,
+                'title' => 'Late',
+                'description' => 'Optics',
+            ]);
+            $this->fail('A teacher marked absent still added homework.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('closed for the day', $exception->errors()['homework_date'][0]);
+        }
+    }
+
+    public function test_a_reason_saved_before_per_teacher_reasons_still_covers_every_teacher(): void
+    {
+        $data = $this->seedClass();
+        $service = app(HomeworkSubmissionService::class);
+        $date = now()->toDateString();
+
+        $extra = User::factory()->create(['is_active' => true]);
+        BatchStaffAssignment::query()->create([
+            'batch_id' => $data['batch']->id,
+            'user_id' => $extra->id,
+            'role' => BatchStaffRole::SubjectTeacher,
+            'course_subject_id' => $data['maths']->id,
+        ]);
+
+        HomeworkSubjectClosure::query()->create([
+            'batch_id' => $data['batch']->id,
+            'course_subject_id' => $data['maths']->id,
+            'homework_date' => $date,
+            'reason' => HomeworkSubjectClosure::TeacherAbsent,
+            'teacher_user_id' => $data['mathTeacher']->id,
+            'whole_subject' => true,
+        ]);
+
+        $missingSubjectIds = collect($service->missingSubjectsForBatch($data['batch']->id, $date))
+            ->pluck('course_subject_id')
+            ->all();
+
+        $this->assertNotContains($data['maths']->id, $missingSubjectIds);
+        $this->assertContains($data['physics']->id, $missingSubjectIds);
     }
 
     public function test_approving_one_subject_does_not_approve_the_other(): void

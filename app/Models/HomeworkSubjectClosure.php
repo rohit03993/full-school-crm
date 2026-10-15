@@ -18,6 +18,7 @@ class HomeworkSubjectClosure extends Model
         'reason',
         'reason_note',
         'teacher_user_id',
+        'whole_subject',
         'closed_by_user_id',
     ];
 
@@ -25,7 +26,18 @@ class HomeworkSubjectClosure extends Model
     {
         return [
             'homework_date' => 'date',
+            'whole_subject' => 'boolean',
         ];
+    }
+
+    /**
+     * Does this reason answer for that teacher? Old reasons and subjects without a teacher cover everyone.
+     */
+    public function covers(int $teacherUserId): bool
+    {
+        return $this->whole_subject
+            || $this->teacher_user_id === null
+            || (int) $this->teacher_user_id === $teacherUserId;
     }
 
     public function label(): string

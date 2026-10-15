@@ -409,11 +409,9 @@
                 }
             }
 
-            $readyToSend = collect($missingSubjects)->every(function (array $missing) use ($missingSubjectReasons): bool {
-                $subjectId = $missing['course_subject_id'];
-
-                return filled($missingSubjectReasons[$subjectId] ?? $missingSubjectReasons[(string) $subjectId] ?? null);
-            });
+            $readyToSend = collect($missingSubjects)->every(
+                fn (array $missing): bool => filled($missingSubjectReasons[$missing['key']] ?? null),
+            );
         @endphp
         <div
             class="fixed inset-0 z-50 flex items-end justify-center bg-gray-950/60 p-0 sm:items-center sm:p-6"
@@ -423,14 +421,14 @@
                 <div class="border-b border-rose-100 bg-rose-50 px-4 py-4 dark:border-rose-500/20 dark:bg-rose-500/10 sm:px-5">
                     <p class="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-200">{{ $confirmCourse }} · {{ $confirmSection }}</p>
                     <h3 class="mt-1 text-lg font-bold text-gray-950 dark:text-white">A teacher has not given homework</h3>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">Choose one answer for each subject. Nothing is sent until you do. After you send, that teacher cannot add homework for this day.</p>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">Choose one answer for each teacher. Nothing is sent until you do. After you send, that teacher cannot add homework for this day.</p>
                 </div>
                 <ul class="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 sm:px-5">
                     @foreach ($missingSubjects as $missing)
                         @php
-                            $subjectKey = $missing['course_subject_id'];
-                            $chosen = $missingSubjectReasons[$subjectKey] ?? $missingSubjectReasons[(string) $subjectKey] ?? null;
-                            $askingNote = (bool) ($noHomeworkAsking[$subjectKey] ?? $noHomeworkAsking[(string) $subjectKey] ?? false);
+                            $missingKey = (string) $missing['key'];
+                            $chosen = $missingSubjectReasons[$missingKey] ?? null;
+                            $askingNote = (bool) ($noHomeworkAsking[$missingKey] ?? false);
                             $showNote = $askingNote || $chosen === 'no_homework';
                         @endphp
                         <li @class([
@@ -443,7 +441,7 @@
                             <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                 <button
                                     type="button"
-                                    wire:click="setMissingReason({{ (int) $missing['course_subject_id'] }}, 'teacher_absent')"
+                                    wire:click="setMissingReason('{{ $missingKey }}', 'teacher_absent')"
                                     @class([
                                         'rounded-xl px-3 py-3 text-sm font-semibold',
                                         'bg-rose-600 text-white' => $chosen === 'teacher_absent',
@@ -454,7 +452,7 @@
                                 </button>
                                 <button
                                     type="button"
-                                    wire:click="setMissingReason({{ (int) $missing['course_subject_id'] }}, 'no_homework')"
+                                    wire:click="setMissingReason('{{ $missingKey }}', 'no_homework')"
                                     @class([
                                         'rounded-xl px-3 py-3 text-sm font-semibold',
                                         'bg-sky-600 text-white' => $showNote,
@@ -465,10 +463,10 @@
                                 </button>
                             </div>
                             @if ($showNote)
-                                <label class="mt-3 block text-xs font-semibold text-gray-600 dark:text-gray-300" for="no-homework-note-{{ (int) $subjectKey }}">Why is there no homework?</label>
+                                <label class="mt-3 block text-xs font-semibold text-gray-600 dark:text-gray-300" for="no-homework-note-{{ $missingKey }}">Why is there no homework?</label>
                                 <textarea
-                                    id="no-homework-note-{{ (int) $subjectKey }}"
-                                    wire:model="missingSubjectNotes.{{ (int) $subjectKey }}"
+                                    id="no-homework-note-{{ $missingKey }}"
+                                    wire:model="missingSubjectNotes.{{ $missingKey }}"
                                     rows="2"
                                     maxlength="500"
                                     class="mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-950 dark:border-white/15 dark:bg-gray-900 dark:text-white"
@@ -476,7 +474,7 @@
                                 ></textarea>
                                 <button
                                     type="button"
-                                    wire:click="confirmNoHomeworkNote({{ (int) $subjectKey }})"
+                                    wire:click="confirmNoHomeworkNote('{{ $missingKey }}')"
                                     class="mt-2 rounded-xl bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500"
                                 >
                                     OK

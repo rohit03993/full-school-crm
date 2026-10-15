@@ -68,13 +68,13 @@ class HomeworkReviewPage extends Page
 
     public ?int $duplicateSendBatchId = null;
 
-    /** @var array<int|string, string> */
+    /** @var array<string, string> missing row key => reason */
     public array $missingSubjectReasons = [];
 
-    /** @var array<int|string, string> */
+    /** @var array<string, string> missing row key => note */
     public array $missingSubjectNotes = [];
 
-    /** @var array<int|string, bool> */
+    /** @var array<string, bool> */
     public array $noHomeworkAsking = [];
 
     protected const PARENT_SEND_COOLDOWN_MINUTES = 5;
@@ -347,26 +347,26 @@ class HomeworkReviewPage extends Page
         $this->sendCombined();
     }
 
-    public function setMissingReason(int $subjectId, string $reason): void
+    public function setMissingReason(string $key, string $reason): void
     {
         if (! in_array($reason, ['teacher_absent', 'no_homework'], true)) {
             return;
         }
 
         if ($reason === 'no_homework') {
-            unset($this->missingSubjectReasons[$subjectId]);
-            $this->noHomeworkAsking[$subjectId] = true;
+            unset($this->missingSubjectReasons[$key]);
+            $this->noHomeworkAsking[$key] = true;
 
             return;
         }
 
-        $this->missingSubjectReasons[$subjectId] = $reason;
-        unset($this->missingSubjectNotes[$subjectId], $this->noHomeworkAsking[$subjectId]);
+        $this->missingSubjectReasons[$key] = $reason;
+        unset($this->missingSubjectNotes[$key], $this->noHomeworkAsking[$key]);
     }
 
-    public function confirmNoHomeworkNote(int $subjectId): void
+    public function confirmNoHomeworkNote(string $key): void
     {
-        $note = trim((string) ($this->missingSubjectNotes[$subjectId] ?? ''));
+        $note = trim((string) ($this->missingSubjectNotes[$key] ?? ''));
 
         if ($note === '') {
             Notification::make()->title('Write why there is no homework')->warning()->send();
@@ -380,9 +380,9 @@ class HomeworkReviewPage extends Page
             return;
         }
 
-        $this->missingSubjectNotes[$subjectId] = $note;
-        $this->missingSubjectReasons[$subjectId] = 'no_homework';
-        unset($this->noHomeworkAsking[$subjectId]);
+        $this->missingSubjectNotes[$key] = $note;
+        $this->missingSubjectReasons[$key] = 'no_homework';
+        unset($this->noHomeworkAsking[$key]);
     }
 
     public function cancelClosedSend(): void
