@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\BatchStaffRole;
 use App\Enums\BatchStatus;
 use App\Enums\HomeworkAssignmentStatus;
 use App\Enums\HomeworkCheckNotifyStatus;
@@ -55,6 +56,24 @@ class HomeworkSubmissionService
     public function subjectOptionsForBatch(User $user, int $batchId): array
     {
         return $this->scope->subjectOptionsForBatch($user, $batchId);
+    }
+
+    /**
+     * Teachers assigned to this subject in this class.
+     *
+     * @return array<int, string> user id => name
+     */
+    public function subjectTeacherOptions(int $batchId, int $subjectId): array
+    {
+        return BatchStaffAssignment::query()
+            ->where('batch_id', $batchId)
+            ->where('course_subject_id', $subjectId)
+            ->where('role', BatchStaffRole::SubjectTeacher)
+            ->with('user:id,name')
+            ->get()
+            ->filter(fn (BatchStaffAssignment $row): bool => filled($row->user?->name))
+            ->mapWithKeys(fn (BatchStaffAssignment $row): array => [(int) $row->user_id => (string) $row->user->name])
+            ->all();
     }
 
     /**
@@ -267,6 +286,16 @@ class HomeworkSubmissionService
 
         $existing = $existingQuery->first();
 
+        // Admin or coordinator types it in, but the homework belongs to the subject teacher.
+        $teachers = $asAdmin ? $this->subjectTeacherOptions($batchId, $subjectId) : [];
+        $requestedTeacherId = (int) ($data['teacher_user_id'] ?? 0);
+        $ownerId = match (true) {
+            ! $asAdmin => (int) $user->id,
+            isset($teachers[$requestedTeacherId]) => $requestedTeacherId,
+            count($teachers) === 1 => (int) array_key_first($teachers),
+            default => (int) $user->id,
+        };
+
         if (! $asAdmin && $existing) {
             $blocked = $this->teacherEditBlockedMessage($existing);
 
@@ -317,6 +346,10 @@ class HomeworkSubmissionService
         if ($existing) {
             $existing->fill($attributes);
 
+            if ($asAdmin && in_array((int) $existing->submitted_by_user_id, [0, (int) $user->id], true)) {
+                $existing->submitted_by_user_id = $ownerId;
+            }
+
             if (! $asAdmin) {
                 $existing->submitted_by_user_id = $user->id;
                 $existing->submitted_at = now();
@@ -326,7 +359,6 @@ class HomeworkSubmissionService
             } elseif (! $preserveReviewStatus) {
                 $existing->approved_by_user_id = $user->id;
                 $existing->approved_at = now();
-                $existing->submitted_by_user_id ??= $user->id;
                 $existing->submitted_at ??= now();
                 $existing->published_at ??= now();
             }
@@ -338,7 +370,7 @@ class HomeworkSubmissionService
 
         $assignment = new HomeworkAssignment($attributes);
         $assignment->created_by_user_id = $user->id;
-        $assignment->submitted_by_user_id = $user->id;
+        $assignment->submitted_by_user_id = $ownerId;
         $assignment->submitted_at = now();
 
         if ($asAdmin) {
@@ -1627,6 +1659,7 @@ class HomeworkSubmissionService
         $givenBy = (string) ($assignment?->submittedBy?->name
             ?? $assignment?->createdBy?->name
             ?? '');
+        $addedBy = (string) ($assignment?->createdBy?->name ?? $givenBy);
         $teacherUserId = $assignment
             ? (int) ($assignment->submitted_by_user_id ?: $assignment->created_by_user_id)
             : $pendingTeacherUserId;
@@ -1641,7 +1674,7 @@ class HomeworkSubmissionService
             'assignment_id' => $assignment?->id,
             'teacher' => ($assignment && $givenBy !== '') ? $givenBy : $pendingTeacher,
             'teacher_user_id' => $teacherUserId,
-            'submitted_by' => $givenBy,
+            'submitted_by' => $addedBy,
             'subject' => $subjectLabel,
             'title' => (string) ($assignment?->title ?? ''),
             'description' => (string) ($assignment?->description ?? ''),

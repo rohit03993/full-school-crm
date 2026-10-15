@@ -2,10 +2,8 @@
 
 namespace App\Filament\Concerns;
 
-use App\Enums\BatchStaffRole;
 use App\Enums\HomeworkAssignmentStatus;
 use App\Models\Batch;
-use App\Models\BatchStaffAssignment;
 use App\Models\CourseSubject;
 use App\Models\HomeworkAssignment;
 use App\Services\HomeworkAiService;
@@ -176,6 +174,14 @@ trait AddsHomeworkModal
         return [
             $classField,
             $subjectField,
+            Select::make('teacher_user_id')
+                ->label('Teacher')
+                ->helperText('Parents see this teacher\'s name with the subject.')
+                ->options(fn (Get $get): array => $this->homeworkModalTeacherOptions($get))
+                ->native(false)
+                ->required()
+                ->visible(fn (Get $get): bool => $this->homeworkModalSavesAsAdmin()
+                    && count($this->homeworkModalTeacherOptions($get)) > 1),
             TextInput::make('title')
                 ->label('Title (optional)')
                 ->placeholder('e.g. Chapter 5 – Q1 to Q10')
@@ -217,6 +223,7 @@ trait AddsHomeworkModal
         return [
             'batch_id' => $this->homeworkModalBatchId($arguments) ?: null,
             'course_subject_id' => $this->homeworkModalSubjectId($arguments) ?: null,
+            'teacher_user_id' => ((int) ($arguments['teacherUserId'] ?? 0)) ?: $existing?->submitted_by_user_id,
             'title' => (string) ($existing?->title ?? ''),
             'description' => (string) ($existing?->description ?? ''),
             'attachment' => $existing?->file_path,
@@ -249,6 +256,7 @@ trait AddsHomeworkModal
                 'batch_id' => $batchId,
                 'course_subject_id' => $subjectId,
                 'assignment_id' => (int) ($arguments['assignmentId'] ?? 0),
+                'teacher_user_id' => (int) ($data['teacher_user_id'] ?? $arguments['teacherUserId'] ?? 0),
                 'homework_date' => $this->dateString(),
                 'title' => (string) ($data['title'] ?? ''),
                 'description' => (string) ($data['description'] ?? ''),
@@ -560,27 +568,28 @@ trait AddsHomeworkModal
             return '';
         }
 
-        $query = BatchStaffAssignment::query()
-            ->where('batch_id', $batchId)
-            ->where('course_subject_id', $subjectId)
-            ->where('role', BatchStaffRole::SubjectTeacher)
-            ->with('user:id,name');
+        $teachers = app(HomeworkSubmissionService::class)->subjectTeacherOptions($batchId, $subjectId);
 
         if ($teacherUserId > 0) {
-            $query->where('user_id', $teacherUserId);
+            return (string) ($teachers[$teacherUserId] ?? '');
         }
 
-        $names = $query->get()
-            ->map(fn (BatchStaffAssignment $row): string => trim((string) ($row->user?->name ?? '')))
-            ->filter()
-            ->unique()
-            ->values();
+        return count($teachers) === 1 ? (string) reset($teachers) : '';
+    }
 
-        if ($teacherUserId > 0) {
-            return (string) ($names->first() ?? '');
+    /**
+     * @return array<int, string>
+     */
+    protected function homeworkModalTeacherOptions(Get $get): array
+    {
+        $batchId = (int) ($get('batch_id') ?? 0);
+        $subjectId = (int) ($get('course_subject_id') ?? 0);
+
+        if ($batchId < 1 || $subjectId < 1) {
+            return [];
         }
 
-        return $names->count() === 1 ? (string) $names->first() : '';
+        return app(HomeworkSubmissionService::class)->subjectTeacherOptions($batchId, $subjectId);
     }
 
     /**

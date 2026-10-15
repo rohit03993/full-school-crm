@@ -288,20 +288,21 @@ class HomeworkSubmissionServiceTest extends TestCase
 
         $this->assertSame(HomeworkAssignmentStatus::Approved, $assignment->status);
         $this->assertSame($coordinator->id, $assignment->created_by_user_id);
-        $this->assertSame($coordinator->id, $assignment->submitted_by_user_id);
+        $this->assertSame($data['physicsTeacher']->id, $assignment->submitted_by_user_id);
         $this->assertSame($coordinator->id, $assignment->approved_by_user_id);
+        $this->assertSame('Physics ('.$data['physicsTeacher']->name.')', $assignment->fresh()->teacherSubjectLabel());
 
         $desk = $service->deskForDate(now()->toDateString());
         $physicsRow = collect($desk['groups'][0]['sections'][0]['items'])
             ->firstWhere('course_subject_id', $data['physics']->id);
 
         $this->assertSame('Khushi Coordinator', $physicsRow['submitted_by']);
-        $this->assertSame('Khushi Coordinator', $physicsRow['teacher']);
+        $this->assertSame($data['physicsTeacher']->name, $physicsRow['teacher']);
 
         Livewire::test(HomeworkReviewPage::class)
             ->call('toggleDeskSection', $data['batch']->id)
-            ->assertSee('Khushi Coordinator')
-            ->assertDontSee('Added by');
+            ->assertSee($data['physicsTeacher']->name)
+            ->assertSee('Added by Khushi Coordinator');
     }
 
     public function test_coordinator_adds_homework_from_review_desk_popup(): void
