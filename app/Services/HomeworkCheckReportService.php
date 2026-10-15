@@ -28,6 +28,7 @@ class HomeworkCheckReportService
      *         lines: list<array{
      *             assignment_id: int,
      *             label: string,
+     *             topic: string|null,
      *             counts_open: bool,
      *             done: int,
      *             not_done: int,
@@ -237,6 +238,7 @@ class HomeworkCheckReportService
      * @return array{
      *     assignment_id: int,
      *     label: string,
+     *     topic: string|null,
      *     counts_open: bool,
      *     done: int,
      *     not_done: int,
@@ -279,9 +281,13 @@ class HomeworkCheckReportService
             $note = 'Check opens tomorrow';
         }
 
+        $subjectName = trim((string) ($assignment->courseSubject?->name ?? ''));
+        $title = trim((string) ($assignment->title ?? ''));
+
         return [
             'assignment_id' => (int) $assignment->id,
             'label' => $assignment->teacherSubjectLabel(),
+            'topic' => $title !== '' && strcasecmp($title, $subjectName) !== 0 ? $title : null,
             'counts_open' => $countsOpen,
             'done' => $done,
             'not_done' => $notDone,
