@@ -480,7 +480,7 @@ class HomeworkCheckService
     }
 
     /**
-     * Ticked students are one result. Everyone else in the class gets the other result.
+     * Only the ticked students get this result. Everyone else stays not checked.
      * WhatsApp goes only to students marked Not Done.
      *
      * @param  list<int>  $selectedIds
@@ -520,46 +520,28 @@ class HomeworkCheckService
             ]);
         }
 
-        $rest = array_values(array_diff($classIds, $selected));
-        $notDoneIds = $choice === 'not_done' ? $selected : $rest;
-        $doneIds = $choice === 'done' ? $selected : $rest;
-
-        $doneResult = $this->markMany(
+        $result = $this->markMany(
             $teacher,
             $batchId,
-            $doneIds,
+            $selected,
             $courseSubjectId,
             $topic,
-            HomeworkCheckStatus::Done,
-            $checkedOn,
-            $homeworkAssignmentId,
-        );
-        $notDoneResult = $this->markMany(
-            $teacher,
-            $batchId,
-            $notDoneIds,
-            $courseSubjectId,
-            $topic,
-            HomeworkCheckStatus::NotDone,
+            $choice === 'not_done' ? HomeworkCheckStatus::NotDone : HomeworkCheckStatus::Done,
             $checkedOn,
             $homeworkAssignmentId,
         );
 
         return [
-            'done' => $doneResult['marked'],
-            'not_done' => $notDoneResult['marked'],
-            'whatsappQueued' => $notDoneResult['whatsappQueued'],
-            'whatsappFailed' => $notDoneResult['whatsappFailed'],
-            'errors' => array_values(array_filter([
-                ...$doneResult['errors'],
-                ...$notDoneResult['errors'],
-            ])),
+            'done' => $choice === 'done' ? $result['marked'] : 0,
+            'not_done' => $choice === 'not_done' ? $result['marked'] : 0,
+            'whatsappQueued' => $result['whatsappQueued'],
+            'whatsappFailed' => $result['whatsappFailed'],
+            'errors' => $result['errors'],
         ];
     }
 
     /**
-     * One student is Not Done. Students with no mark yet become Done.
-     * Students already Done or Not Done stay as they are.
+     * One student is Not Done. Other students stay as they are, including those not checked yet.
      *
      * @return array{done: int, whatsappQueued: bool, whatsappMessage: string}
      */
@@ -581,13 +563,6 @@ class HomeworkCheckService
             ]);
         }
 
-        $openIds = $roster
-            ->filter(fn (array $row): bool => blank($row['last_status']) && (int) $row['id'] !== $studentId)
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->values()
-            ->all();
-
         $notDoneResult = $this->mark(
             $teacher,
             $batchId,
@@ -598,28 +573,16 @@ class HomeworkCheckService
             $checkedOn,
             $homeworkAssignmentId,
         );
-        $doneResult = $openIds === []
-            ? ['marked' => 0]
-            : $this->markMany(
-                $teacher,
-                $batchId,
-                $openIds,
-                $courseSubjectId,
-                $topic,
-                HomeworkCheckStatus::Done,
-                $checkedOn,
-                $homeworkAssignmentId,
-            );
 
         return [
-            'done' => (int) $doneResult['marked'],
+            'done' => 0,
             'whatsappQueued' => (bool) ($notDoneResult['whatsapp']['queued'] ?? false),
             'whatsappMessage' => (string) ($notDoneResult['whatsapp']['message'] ?? ''),
         ];
     }
 
     /**
-     * When at least one student is already Not Done, students with no mark become Done.
+     * Opening the check list must not mark anyone. Kept so older calls do nothing.
      */
     public function closeOpenStudentsWhenAnyNotDone(
         User $teacher,
@@ -629,39 +592,7 @@ class HomeworkCheckService
         ?string $checkedOn = null,
         ?int $homeworkAssignmentId = null,
     ): int {
-        $checkedOnDate = $this->normalizeCheckedOn($checkedOn);
-        $this->assertCheckDateInWindow($checkedOnDate);
-
-        $roster = $this->rosterForBatch($batchId, $courseSubjectId, null, $checkedOnDate, $homeworkAssignmentId);
-        $hasNotDone = $roster->contains(
-            fn (array $row): bool => ($row['status_key'] ?? null) === 'not_done',
-        );
-
-        if (! $hasNotDone) {
-            return 0;
-        }
-
-        $openIds = $roster
-            ->filter(fn (array $row): bool => blank($row['last_status']))
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->values()
-            ->all();
-
-        if ($openIds === []) {
-            return 0;
-        }
-
-        return (int) $this->markMany(
-            $teacher,
-            $batchId,
-            $openIds,
-            $courseSubjectId,
-            $topic,
-            HomeworkCheckStatus::Done,
-            $checkedOnDate,
-            $homeworkAssignmentId,
-        )['marked'];
+        return 0;
     }
 
     /**

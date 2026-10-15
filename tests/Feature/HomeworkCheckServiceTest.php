@@ -311,13 +311,9 @@ class HomeworkCheckServiceTest extends TestCase
         ]);
     }
 
-    public function test_ticked_done_students_leave_the_rest_not_done_with_one_message_each(): void
+    public function test_ticked_done_students_stay_done_and_the_rest_stay_not_checked(): void
     {
-        Http::fake([
-            'https://graph.facebook.com/*' => Http::response([
-                'messages' => [['id' => 'wamid.HWBULKREST']],
-            ], 200),
-        ]);
+        Http::fake();
 
         [$teacher, $batch, $finished, $subject] = $this->seedClass();
         $missing = Student::query()->create([
@@ -345,19 +341,18 @@ class HomeworkCheckServiceTest extends TestCase
         );
 
         $this->assertSame(1, $result['done']);
-        $this->assertSame(1, $result['not_done']);
-        $this->assertSame(1, $result['whatsappQueued']);
+        $this->assertSame(0, $result['not_done']);
+        $this->assertSame(0, $result['whatsappQueued']);
         $this->assertDatabaseHas('homework_checks', [
             'student_id' => $finished->id,
             'status' => 'done',
         ]);
-        $this->assertDatabaseHas('homework_checks', [
+        $this->assertDatabaseMissing('homework_checks', [
             'student_id' => $missing->id,
-            'status' => 'not_done',
         ]);
     }
 
-    public function test_one_not_done_marks_open_students_done_and_keeps_an_earlier_not_done(): void
+    public function test_one_not_done_does_not_change_the_other_students(): void
     {
         Http::fake();
 
@@ -396,13 +391,6 @@ class HomeworkCheckServiceTest extends TestCase
             $date,
         );
 
-        $this->assertDatabaseMissing('homework_checks', [
-            'student_id' => $first->id,
-        ]);
-        $this->assertDatabaseMissing('homework_checks', [
-            'student_id' => $second->id,
-        ]);
-
         $service->markNotDoneAndCloseOpen(
             $teacher,
             $batch->id,
@@ -416,31 +404,8 @@ class HomeworkCheckServiceTest extends TestCase
             'student_id' => $first->id,
             'status' => 'not_done',
         ]);
-        $this->assertDatabaseHas('homework_checks', [
+        $this->assertDatabaseMissing('homework_checks', [
             'student_id' => $second->id,
-            'status' => 'done',
-        ]);
-        $this->assertDatabaseHas('homework_checks', [
-            'student_id' => $third->id,
-            'status' => 'done',
-        ]);
-
-        $service->markNotDoneAndCloseOpen(
-            $teacher,
-            $batch->id,
-            $second->id,
-            $subject->id,
-            "Today's homework",
-            $date,
-        );
-
-        $this->assertDatabaseHas('homework_checks', [
-            'student_id' => $first->id,
-            'status' => 'not_done',
-        ]);
-        $this->assertDatabaseHas('homework_checks', [
-            'student_id' => $second->id,
-            'status' => 'not_done',
         ]);
         $this->assertDatabaseHas('homework_checks', [
             'student_id' => $third->id,
@@ -488,9 +453,8 @@ class HomeworkCheckServiceTest extends TestCase
             'student_id' => $student->id,
             'status' => 'not_done',
         ]);
-        $this->assertDatabaseHas('homework_checks', [
+        $this->assertDatabaseMissing('homework_checks', [
             'student_id' => $other->id,
-            'status' => 'done',
         ]);
     }
 
@@ -523,7 +487,7 @@ class HomeworkCheckServiceTest extends TestCase
         }
     }
 
-    public function test_existing_not_done_marks_only_the_open_students_done(): void
+    public function test_an_existing_not_done_does_not_mark_open_students_done(): void
     {
         Http::fake();
 
@@ -562,23 +526,14 @@ class HomeworkCheckServiceTest extends TestCase
             $date,
         );
 
-        $this->assertSame(1, $marked);
+        $this->assertSame(0, $marked);
         $this->assertDatabaseHas('homework_checks', [
             'student_id' => $first->id,
             'status' => 'not_done',
         ]);
-        $this->assertDatabaseHas('homework_checks', [
+        $this->assertDatabaseMissing('homework_checks', [
             'student_id' => $second->id,
-            'status' => 'done',
         ]);
-
-        $this->assertSame(0, $service->closeOpenStudentsWhenAnyNotDone(
-            $teacher,
-            $batch->id,
-            $subject->id,
-            'Topic',
-            $date,
-        ));
     }
 
     public function test_teacher_homework_list_hides_student_mobile(): void

@@ -231,7 +231,6 @@ class HomeworkCheckPage extends Page
             View::make('filament.pages.partials.homework-check-actions')
                 ->visible(fn (): bool => ! $this->showingAllClasses())
                 ->viewData(function (): array {
-                    $this->closeOpenStudentsIfNeeded();
                     $students = $this->rosterStudents();
                     $summary = app(HomeworkCheckService::class)->daySummaryFromRoster($students);
                     $selected = $this->selectedStudentsPayload($students);
@@ -452,9 +451,8 @@ class HomeworkCheckPage extends Page
             $class->pluck('id')->map(fn ($id): int => (int) $id)->all(),
         ));
         $selected = $class->whereIn('id', $selectedIds)->values();
-        $rest = $class->reject(fn (array $row): bool => in_array((int) $row['id'], $selectedIds, true))->values();
-        $notDone = $this->bulkChoice === 'done' ? $rest : $selected;
-        $done = $this->bulkChoice === 'done' ? $selected : $rest;
+        $notDone = $this->bulkChoice === 'not_done' ? $selected : collect();
+        $done = $this->bulkChoice === 'done' ? $selected : collect();
         $freshNotDone = $notDone->filter(fn (array $row): bool => ($row['status_key'] ?? null) !== 'not_done');
 
         return [
@@ -549,14 +547,12 @@ class HomeworkCheckPage extends Page
 
         $this->singleNotDoneStudentId = null;
 
-        $body = $result['whatsappQueued']
-            ? 'Homework not done. Message shared with parents.'
-            : ($result['whatsappMessage'] !== ''
+        if ($result['whatsappQueued']) {
+            $body = 'Homework not done. Message shared with parents. Other students stay not checked.';
+        } else {
+            $body = $result['whatsappMessage'] !== ''
                 ? $result['whatsappMessage']
-                : 'Homework not done. Message was not shared.');
-
-        if ($result['done'] > 0) {
-            $body .= ' '.$result['done'].' open '.($result['done'] === 1 ? 'student' : 'students').' marked Done. No message to them.';
+                : 'Homework not done. Message was not shared. Other students stay not checked.';
         }
 
         Notification::make()
@@ -567,7 +563,7 @@ class HomeworkCheckPage extends Page
     }
 
     /**
-     * @return array{name: string, open: int, will_message: bool, already_shared: bool, no_mobile: bool}|null
+     * @return array{name: string, will_message: bool, already_shared: bool, no_mobile: bool}|null
      */
     protected function singleNotDoneSummary(): ?array
     {
@@ -588,9 +584,6 @@ class HomeworkCheckPage extends Page
 
         return [
             'name' => (string) $student['name'],
-            'open' => $class->filter(
-                fn (array $row): bool => blank($row['last_status']) && (int) $row['id'] !== $studentId,
-            )->count(),
             'will_message' => ! $alreadyShared && filled($student['mobile'] ?? null),
             'already_shared' => $alreadyShared,
             'no_mobile' => ! $alreadyShared && blank($student['mobile'] ?? null),
@@ -717,35 +710,6 @@ class HomeworkCheckPage extends Page
         }
 
         return 'No subjects found for this class.';
-    }
-
-    protected function closeOpenStudentsIfNeeded(): void
-    {
-        $user = Auth::user();
-
-        if (! $user || $this->checkDateBlockedMessage() !== null || ! $this->homeworkListOpen()) {
-            return;
-        }
-
-        $target = $this->selectedCheckTarget();
-        $marked = app(HomeworkCheckService::class)->closeOpenStudentsWhenAnyNotDone(
-            $user,
-            (int) $this->data['batch_id'],
-            $target['subject_id'],
-            (string) ($this->data['topic'] ?? ''),
-            $this->checkDate(),
-            $target['assignment_id'],
-        );
-
-        if ($marked < 1) {
-            return;
-        }
-
-        Notification::make()
-            ->title($marked.' open '.($marked === 1 ? 'student' : 'students').' marked Done')
-            ->body('No message was sent to them.')
-            ->success()
-            ->send();
     }
 
     protected function checkDateBlockedMessage(): ?string

@@ -131,11 +131,12 @@
                 border: 1px solid #e5e7eb;
             }
             .crm-hw-phone-actions button {
-                height: 22px !important;
-                min-height: 22px !important;
+                height: 36px !important;
+                min-height: 36px !important;
+                min-width: 44px !important;
                 width: auto !important;
-                padding: 0 6px !important;
-                font-size: 10px !important;
+                padding: 0 10px !important;
+                font-size: 12px !important;
                 line-height: 1 !important;
             }
             .crm-hw-phone-meta {
@@ -433,16 +434,12 @@
                     @if (is_array($singleNotDone ?? null))
                         <p class="text-xs leading-5 text-gray-800 dark:text-gray-100">
                             @if ($singleNotDone['will_message'])
-                                {{ $singleNotDone['name'] }}'s parent will get a WhatsApp that the homework is not done.
+                                {{ $singleNotDone['name'] }} will be marked Not done. Their parent will get a WhatsApp. Other students stay not checked.
                             @elseif ($singleNotDone['already_shared'])
-                                {{ $singleNotDone['name'] }} is already Not done. No new WhatsApp.
+                                {{ $singleNotDone['name'] }} is already Not done. No new WhatsApp. Other students stay not checked.
                             @else
-                                {{ $singleNotDone['name'] }} has no mobile number, so no WhatsApp will go.
+                                {{ $singleNotDone['name'] }} will be marked Not done. There is no mobile number, so no WhatsApp will go. Other students stay not checked.
                             @endif
-                            @if ($singleNotDone['open'] > 0)
-                                {{ $singleNotDone['open'] }} {{ $singleNotDone['open'] === 1 ? 'student still open will be marked Done' : 'students still open will be marked Done' }}. No message to them.
-                            @endif
-                            Are you sure?
                         </p>
                         <div class="mt-2 flex items-center gap-2">
                             <button
@@ -450,12 +447,12 @@
                                 wire:click="confirmSingleNotDone"
                                 wire:loading.attr="disabled"
                                 wire:target="confirmSingleNotDone"
-                                class="h-8 flex-1 rounded-lg bg-rose-600 px-2 text-xs font-semibold text-white disabled:opacity-70"
+                                class="h-11 flex-1 rounded-lg bg-rose-600 px-2 text-sm font-semibold text-white disabled:opacity-70"
                             >
-                                <span wire:loading.remove wire:target="confirmSingleNotDone">Send and save</span>
+                                <span wire:loading.remove wire:target="confirmSingleNotDone">Send to parent</span>
                                 <span wire:loading wire:target="confirmSingleNotDone">Saving…</span>
                             </button>
-                            <button type="button" wire:click="cancelSingleNotDone" class="h-8 rounded-lg px-2 text-xs font-semibold text-gray-700 ring-1 ring-gray-300 dark:text-gray-200 dark:ring-white/20">Cancel</button>
+                            <button type="button" wire:click="cancelSingleNotDone" class="h-11 rounded-lg px-3 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 dark:text-gray-200 dark:ring-white/20">Cancel</button>
                         </div>
                     @elseif (($bulkStep ?? '') === 'ask')
                         <p class="text-xs font-semibold text-gray-950 dark:text-white">Did these {{ $selectedCount }} do the homework?</p>
@@ -465,25 +462,17 @@
                             <button type="button" wire:click="cancelBulk" class="h-8 rounded-lg px-2 text-xs font-semibold text-gray-600 dark:text-gray-300">Cancel</button>
                         </div>
                     @elseif (($bulkStep ?? '') === 'confirm' && is_array($bulkSummary ?? null))
-                        <p class="text-xs leading-5 text-gray-800 dark:text-gray-100">
+                        <p class="text-sm leading-5 text-gray-800 dark:text-gray-100">
                             @if (($bulkChoice ?? '') === 'not_done')
-                                {{ $bulkSummary['not_done'] }} {{ $bulkSummary['not_done'] === 1 ? 'student is' : 'students are' }} Not done.
+                                These {{ $bulkSummary['not_done'] }} {{ $bulkSummary['not_done'] === 1 ? 'student' : 'students' }} will be marked Not done.
                                 @if ($bulkSummary['messages'] > 0)
-                                    Their parents will get a WhatsApp that the homework is not done.
+                                    Their parents will get a WhatsApp.
                                 @else
                                     No new WhatsApp will go.
                                 @endif
-                                @if ($bulkSummary['done'] > 0)
-                                    The other students will be marked Done. No message to them.
-                                @endif
+                                Students you did not tick stay not checked.
                             @else
-                                {{ $bulkSummary['done'] }} {{ $bulkSummary['done'] === 1 ? 'student is' : 'students are' }} Done. No message to them.
-                                {{ $bulkSummary['not_done'] }} {{ $bulkSummary['not_done'] === 1 ? 'student is' : 'students are' }} Not done.
-                                @if ($bulkSummary['messages'] > 0)
-                                    Their parents will get a WhatsApp that the homework is not done.
-                                @else
-                                    No new WhatsApp will go.
-                                @endif
+                                These {{ $bulkSummary['done'] }} {{ $bulkSummary['done'] === 1 ? 'student' : 'students' }} will be marked Done. No WhatsApp goes to parents. Students you did not tick stay not checked.
                             @endif
                             @if ($bulkSummary['no_mobile'] > 0)
                                 {{ $bulkSummary['no_mobile'] }} have no mobile.
@@ -491,7 +480,6 @@
                             @if ($bulkSummary['already_shared'] > 0)
                                 {{ $bulkSummary['already_shared'] }} already messaged, so no second WhatsApp.
                             @endif
-                            Are you sure?
                         </p>
                         <div class="mt-2 flex items-center gap-2">
                             <button
@@ -499,18 +487,23 @@
                                 wire:click="confirmBulk"
                                 wire:loading.attr="disabled"
                                 wire:target="confirmBulk"
-                                class="h-8 flex-1 rounded-lg bg-primary-600 px-2 text-xs font-semibold text-white disabled:opacity-70"
+                                @class([
+                                    'h-11 flex-1 rounded-lg px-2 text-sm font-semibold text-white disabled:opacity-70',
+                                    'bg-rose-600' => ($bulkChoice ?? '') === 'not_done',
+                                    'bg-emerald-600' => ($bulkChoice ?? '') !== 'not_done',
+                                ])
                             >
-                                <span wire:loading.remove wire:target="confirmBulk">Save and send</span>
+                                <span wire:loading.remove wire:target="confirmBulk">{{ ($bulkChoice ?? '') === 'not_done' ? 'Send to parents' : 'Mark done' }}</span>
                                 <span wire:loading wire:target="confirmBulk">Saving…</span>
                             </button>
-                            <button type="button" wire:click="backToBulkAsk" class="h-8 rounded-lg px-2 text-xs font-semibold text-gray-700 ring-1 ring-gray-300 dark:text-gray-200 dark:ring-white/20">Back</button>
+                            <button type="button" wire:click="cancelBulk" class="h-11 rounded-lg px-3 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 dark:text-gray-200 dark:ring-white/20">Cancel</button>
                         </div>
                     @else
                         <div class="flex items-center gap-2">
                             <p class="min-w-0 flex-1 text-sm font-semibold text-gray-950 dark:text-white">{{ $selectedCount }} selected</p>
-                            <button type="button" wire:click="clearBulkSelection" class="h-8 rounded-lg px-2 text-xs font-semibold text-gray-600 dark:text-gray-300">Clear</button>
-                            <button type="button" wire:click="openBulkAsk" class="h-8 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white">Continue</button>
+                            <button type="button" wire:click="clearBulkSelection" class="h-11 rounded-lg px-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Clear</button>
+                            <button type="button" wire:click="chooseBulk('done')" class="h-11 rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white">Mark done</button>
+                            <button type="button" wire:click="chooseBulk('not_done')" class="h-11 rounded-lg bg-rose-600 px-3 text-sm font-semibold text-white">Mark not done</button>
                         </div>
                     @endif
                 </div>
