@@ -102,6 +102,7 @@ class StaffDailySessionTest extends TestCase
         session([
             StaffDailySessionService::SESSION_KEY => $service->nextLogoutAt()->toIso8601String(),
         ]);
+        $this->withCookie(config('session.cookie'), session()->getId());
 
         $this->get(Dashboard::getUrl())->assertOk();
         $this->assertAuthenticatedAs($user);

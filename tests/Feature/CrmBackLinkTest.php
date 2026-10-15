@@ -107,6 +107,7 @@ class CrmBackLinkTest extends TestCase
     {
         Setting::setValue('site.name', 'Test Institute', 'general');
         Setting::setValue('crm.onboarding_completed', '1', 'crm');
+        $this->withCookie(config('session.cookie'), session()->getId());
 
         $this->get(AttendanceHubPage::getUrl())
             ->assertOk()

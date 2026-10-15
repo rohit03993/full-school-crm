@@ -72,10 +72,10 @@ class MetaWhatsAppInboxTest extends TestCase
             'status' => StudentStatus::Enquiry,
         ]);
 
-        $sentAt = now()->subMinutes(30);
+        $sentAt = now()->subMinutes(30)->startOfSecond();
         $readAt = now();
 
-        MetaWhatsAppMessage::query()->create([
+        MetaWhatsAppMessage::query()->forceCreate([
             'direction' => MetaWhatsAppMessageDirection::Outbound->value,
             'phone' => '919811223344',
             'student_id' => $student->id,

@@ -73,7 +73,8 @@ class HomeworkWhatsAppService
     }
 
     /**
-     * Default APPROVED 4-param template for the combined daily homework message.
+     * Default APPROVED template for the combined daily homework message:
+     * one subject per line (3 + SUBJECT_SLOTS params) or all subjects in {{4}} (4 params).
      */
     public function defaultCombinedTemplateName(): ?string
     {
@@ -90,7 +91,7 @@ class HomeworkWhatsAppService
             ...CombinedHomeworkWhatsAppTemplate::ALIASES,
         ])));
 
-        $templates = $this->approvedShareTemplates();
+        $templates = $this->approvedShareTemplates([4, 3 + CombinedHomeworkWhatsAppTemplate::SUBJECT_SLOTS]);
 
         foreach ($preferred as $name) {
             $match = $templates->first(
@@ -519,13 +520,14 @@ class HomeworkWhatsAppService
     }
 
     /**
+     * @param  list<int>  $paramCounts
      * @return Collection<int, MetaWhatsAppTemplate>
      */
-    protected function approvedShareTemplates(): Collection
+    protected function approvedShareTemplates(array $paramCounts = [4]): Collection
     {
         return MetaWhatsAppTemplate::query()
             ->whereRaw('UPPER(status) = ?', ['APPROVED'])
-            ->where('param_count', 4)
+            ->whereIn('param_count', $paramCounts)
             ->where(function ($query): void {
                 $query->where('is_active', true)
                     ->orWhereRaw('UPPER(status) = ?', ['APPROVED']);
