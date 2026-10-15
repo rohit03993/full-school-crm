@@ -52,7 +52,7 @@
                     ])>
                         <p class="font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">{{ $subjectRow['label'] }}</p>
                         <p class="mt-1 text-gray-500">
-                            Done {{ $subjectRow['done'] }} · ND {{ $subjectRow['not_done'] }} · Open {{ $subjectRow['unmarked'] }}
+                            Done {{ $subjectRow['done'] }} · ND {{ $subjectRow['not_done'] }} · Not checked {{ $subjectRow['unmarked'] }}
                         </p>
                     </div>
                 @endforeach
@@ -73,7 +73,7 @@
                 <p class="mt-1 text-2xl font-bold text-rose-900 dark:text-rose-200">{{ $summary['not_done'] }}</p>
             </div>
             <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
-                <p class="text-[11px] font-bold uppercase tracking-wide text-gray-500">Unmarked</p>
+                <p class="text-[11px] font-bold uppercase tracking-wide text-gray-500">Not checked</p>
                 <p class="mt-1 text-2xl font-bold text-gray-950 dark:text-white">{{ $summary['unmarked'] }}</p>
             </div>
         </div>
@@ -254,6 +254,9 @@
                                 if (($student['not_done_week'] ?? 0) > 0) {
                                     $phoneBits[] = 'Week '.$student['not_done_week'];
                                 }
+                                if (blank($student['status_key'] ?? null)) {
+                                    $phoneBits[] = 'Not checked';
+                                }
                                 if (($student['status_key'] ?? null) === 'not_done') {
                                     $phoneBits[] = match ($student['parent_line'] ?? null) {
                                         'Message shared with parents' => 'Sent',
@@ -361,7 +364,7 @@
                                             </button>
                                         @endif
                                     @else
-                                        —
+                                        <span class="font-semibold text-gray-500">Not checked</span>
                                     @endif
                                 </td>
                                 <td class="px-4 py-2 text-right crm-responsive-table__actions" data-label="">
