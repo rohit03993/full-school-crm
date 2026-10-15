@@ -7,13 +7,16 @@ namespace App\Support;
  *
  * One message per student. {{1}} {{2}} {{3}} are the student, roll number, and class date.
  * {{4}} onwards is one subject per line. The new line is in this template text, between the boxes.
- * A day with fewer subjects leaves the spare boxes as a short dash.
+ * A day with fewer subjects fills the spare boxes with EMPTY_SLOT, so parents see a blank line.
  */
 final class CombinedHomeworkWhatsAppTemplate
 {
     public const NAME = 'homework_combined';
 
     public const SUBJECT_SLOTS = 6;
+
+    /** Zero-width space: Meta rejects an empty box, and this one shows as nothing. */
+    public const EMPTY_SLOT = "\u{200B}";
 
     /** @var list<string> */
     public const ALIASES = [

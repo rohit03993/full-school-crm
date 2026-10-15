@@ -350,7 +350,7 @@ class HomeworkWhatsAppService
         $params = [...$params, ...$lines];
 
         while (count($params) < 3 + $subjectSlots) {
-            $params[] = '—';
+            $params[] = CombinedHomeworkWhatsAppTemplate::EMPTY_SLOT;
         }
 
         return $params;

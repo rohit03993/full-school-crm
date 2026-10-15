@@ -1252,7 +1252,8 @@ class HomeworkSubmissionServiceTest extends TestCase
         $this->assertTrue($bodies->every(function (string $body): bool {
             return str_contains($body, "Mathematics")
                 && str_contains($body, "Physics")
-                && ! str_contains($body, ' | ');
+                && ! str_contains($body, ' | ')
+                && ! preg_match('/^\s*—\s*$/mu', $body);
         }));
     }
 
