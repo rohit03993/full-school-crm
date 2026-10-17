@@ -124,16 +124,18 @@
             }
             .crm-hw-phone-name {
                 min-width: 0;
+                flex: 1;
                 overflow: visible;
                 text-overflow: unset;
                 white-space: normal;
                 overflow-wrap: anywhere;
-                font-size: 14px;
-                line-height: 1.25;
-                color: #111827 !important;
+                font-size: 15px;
+                font-weight: 700 !important;
+                line-height: 1.35;
+                color: #c2410c !important;
             }
             .dark .crm-hw-phone-name {
-                color: #f9fafb !important;
+                color: #fdba74 !important;
             }
             .crm-hw-phone-opened {
                 flex: 0 0 auto;
@@ -151,14 +153,48 @@
             }
             .crm-hw-phone-actions button {
                 flex: 1 1 0;
-                height: 32px !important;
-                min-height: 32px !important;
+                height: 36px !important;
+                min-height: 36px !important;
                 min-width: 0 !important;
                 width: auto !important;
                 padding: 0 4px !important;
                 font-size: 12px !important;
+                font-weight: 700 !important;
                 line-height: 1.1 !important;
                 white-space: nowrap;
+                border: 0 !important;
+            }
+            .crm-hw-phone-actions button + button {
+                box-shadow: inset 1px 0 0 #ffffff;
+            }
+            .crm-hw-btn-wait {
+                background: #e5e7eb !important;
+                color: #1f2937 !important;
+            }
+            .crm-hw-btn-wait.is-on {
+                background: #374151 !important;
+                color: #ffffff !important;
+            }
+            .crm-hw-btn-done {
+                background: #d1fae5 !important;
+                color: #065f46 !important;
+            }
+            .crm-hw-btn-done.is-on {
+                background: #059669 !important;
+                color: #ffffff !important;
+            }
+            .crm-hw-btn-miss {
+                background: #ffe4e6 !important;
+                color: #9f1239 !important;
+            }
+            .crm-hw-btn-miss.is-on {
+                background: #e11d48 !important;
+                color: #ffffff !important;
+            }
+            .crm-hw-btn-wait.is-locked,
+            .crm-hw-btn-done.is-locked {
+                background: #f3f4f6 !important;
+                color: #9ca3af !important;
             }
             .crm-hw-phone-meta {
                 margin: 0;
@@ -265,10 +301,9 @@
                                         title="{{ ($student['status_key'] ?? null) === 'not_done' ? 'Not done is final.' : 'No mark yet' }}"
                                         wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                         @class([
-                                            'font-semibold',
-                                            'bg-gray-700 text-white' => blank($student['status_key'] ?? null),
-                                            'cursor-not-allowed bg-gray-100 text-gray-400' => ($student['status_key'] ?? null) === 'not_done',
-                                            'bg-white text-gray-600' => filled($student['status_key'] ?? null) && ($student['status_key'] ?? null) !== 'not_done',
+                                            'crm-hw-btn-wait',
+                                            'is-on' => blank($student['status_key'] ?? null),
+                                            'is-locked' => ($student['status_key'] ?? null) === 'not_done',
                                         ])
                                     >Not checked</button>
                                     <button
@@ -279,10 +314,9 @@
                                         title="{{ ($student['status_key'] ?? null) === 'not_done' ? 'Not done is final.' : 'Mark done. No WhatsApp.' }}"
                                         wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                         @class([
-                                            'font-semibold',
-                                            'bg-emerald-600 text-white' => ($student['status_key'] ?? null) === 'done',
-                                            'cursor-not-allowed bg-gray-100 text-gray-400' => ($student['status_key'] ?? null) === 'not_done',
-                                            'bg-white text-gray-600' => ($student['status_key'] ?? null) !== 'done' && ($student['status_key'] ?? null) !== 'not_done',
+                                            'crm-hw-btn-done',
+                                            'is-on' => ($student['status_key'] ?? null) === 'done',
+                                            'is-locked' => ($student['status_key'] ?? null) === 'not_done',
                                         ])
                                     >Done</button>
                                     <button
@@ -293,9 +327,8 @@
                                         title="{{ ($student['status_key'] ?? null) === 'not_done' ? 'Not done is final.' : 'Parents will get a WhatsApp.' }}"
                                         wire:target="markStudentNotChecked({{ $student['id'] }}),markStudentDone({{ $student['id'] }}),askSingleNotDone({{ $student['id'] }}),confirmSingleNotDone"
                                         @class([
-                                            'font-semibold',
-                                            'bg-rose-600 text-white' => ($student['status_key'] ?? null) === 'not_done',
-                                            'bg-white text-gray-600' => ($student['status_key'] ?? null) !== 'not_done',
+                                            'crm-hw-btn-miss',
+                                            'is-on' => ($student['status_key'] ?? null) === 'not_done',
                                         ])
                                     >Not done</button>
                             </div>
