@@ -99,15 +99,45 @@
                 align-items: center;
                 gap: 8px;
             }
+            .crm-hw-phone {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                padding: 8px;
+                background: #f3f4f6;
+            }
+            .dark .crm-hw-phone {
+                background: #111827;
+            }
             .crm-hw-phone-row {
                 display: flex;
                 align-items: flex-start;
                 gap: 10px;
-                padding: 8px 12px;
-                border-top: 1px solid #f3f4f6;
+                padding: 10px 12px;
+                border: 1px solid #d1d5db;
+                border-radius: 10px;
+                background: #ffffff;
+            }
+            .dark .crm-hw-phone-row {
+                border-color: #4b5563;
+                background: #1f2937;
             }
             .crm-hw-phone-row > .crm-hw-tick {
-                margin-top: 4px !important;
+                width: 22px !important;
+                height: 22px !important;
+                min-width: 22px !important;
+                max-width: 22px !important;
+                min-height: 22px !important;
+                max-height: 22px !important;
+                flex: 0 0 22px !important;
+                margin-top: 1px !important;
+                border-width: 2px !important;
+                border-radius: 5px !important;
+                font-size: 14px !important;
+            }
+            .crm-hw-phone-row > .crm-hw-tick.border-gray-300 {
+                border-color: #4b5563 !important;
+                background: #ffffff !important;
             }
             .crm-hw-phone-main {
                 min-width: 0;
