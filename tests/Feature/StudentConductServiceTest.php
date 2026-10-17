@@ -46,7 +46,7 @@ class StudentConductServiceTest extends TestCase
         $this->assertTrue($record->fine_charged);
         $this->assertSame(200, $record->amount);
         $this->assertSame(['creating_noise', 'phone_in_classroom'], $record->type_keys);
-        $this->assertSame('Creating noise, Using phone in classroom', $record->typeLabelList());
+        $this->assertSame('Creating noise, Using phone in class', $record->typeLabelList());
         $this->assertSame('Fine charged · ₹200', $record->fineSummary());
 
         $timeline = app(StudentActivityTimelineService::class)->forStudent($student, $coordinator);

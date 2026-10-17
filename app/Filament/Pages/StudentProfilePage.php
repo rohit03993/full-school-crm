@@ -274,10 +274,7 @@ class StudentProfilePage extends Page
 
     public string $conductRecordedOn = '';
 
-    /**
-     * @var list<string>
-     */
-    public array $conductTypeKeys = [];
+    public string $conductTypeKey = '';
 
     public string $conductFineChoice = 'without_fine';
 
@@ -1627,7 +1624,7 @@ class StudentProfilePage extends Page
         try {
             app(StudentConductService::class)->store($this->record, $staff, [
                 'recorded_on' => $this->conductRecordedOn,
-                'type_keys' => $this->conductTypeKeys,
+                'type_keys' => $this->conductTypeKey !== '' ? [$this->conductTypeKey] : [],
                 'fine_choice' => $this->conductFineChoice,
                 'amount' => $this->conductAmount,
                 'note' => $this->conductNote,
@@ -1641,7 +1638,7 @@ class StudentProfilePage extends Page
             return;
         }
 
-        $this->conductTypeKeys = [];
+        $this->conductTypeKey = '';
         $this->conductFineChoice = 'without_fine';
         $this->conductAmount = '';
         $this->conductNote = '';

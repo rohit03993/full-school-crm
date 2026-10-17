@@ -13,16 +13,13 @@
                 </div>
 
                 <div>
-                    <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">Types</p>
-                    <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Tick one or more.</p>
-                    <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Type</label>
+                    <x-crm.select wire:model="conductTypeKey" class="mt-2 min-h-11">
+                        <option value="">Select a type</option>
                         @foreach ($conductTypeOptions as $value => $label)
-                            <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-800 has-[:checked]:border-rose-400 has-[:checked]:bg-rose-50 dark:border-white/10 dark:text-gray-100 dark:has-[:checked]:border-rose-400/60 dark:has-[:checked]:bg-rose-500/10">
-                                <input type="checkbox" value="{{ $value }}" wire:model="conductTypeKeys" class="h-4 w-4 rounded border-gray-300 text-rose-600" />
-                                <span>{{ $label }}</span>
-                            </label>
+                            <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
-                    </div>
+                    </x-crm.select>
                 </div>
 
                 <div class="grid gap-3 sm:grid-cols-2">

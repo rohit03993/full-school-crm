@@ -79,7 +79,7 @@ class ManageConductTypes extends Page
         return $schema->components([
             CrmHint::placeholder('setup.conduct_types'),
             Section::make('Report types')
-                ->description('These appear as tick boxes when staff report a student. Add a name, rename one, or hide one the school does not use.')
+                ->description('These appear in the Type dropdown when staff report a student. Add a name, rename one, or hide one the school does not use.')
                 ->schema([
                     Repeater::make('options')
                         ->label('Types')

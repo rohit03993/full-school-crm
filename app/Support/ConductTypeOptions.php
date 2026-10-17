@@ -17,8 +17,22 @@ class ConductTypeOptions
         return [
             ['value' => 'creating_noise', 'label' => 'Creating noise', 'is_active' => true],
             ['value' => 'indiscipline', 'label' => 'Indiscipline', 'is_active' => true],
-            ['value' => 'phone_in_classroom', 'label' => 'Using phone in classroom', 'is_active' => true],
+            ['value' => 'phone_in_classroom', 'label' => 'Using phone in class', 'is_active' => true],
             ['value' => 'fighting', 'label' => 'Fighting', 'is_active' => true],
+            ['value' => 'late_arrival', 'label' => 'Late arrival', 'is_active' => true],
+            ['value' => 'left_without_permission', 'label' => 'Left class without permission', 'is_active' => true],
+            ['value' => 'bunking', 'label' => 'Bunking class', 'is_active' => true],
+            ['value' => 'uniform', 'label' => 'Uniform or dress code', 'is_active' => true],
+            ['value' => 'homework_not_done', 'label' => 'Homework or assignment not done', 'is_active' => true],
+            ['value' => 'test_not_given', 'label' => 'Missed a test', 'is_active' => true],
+            ['value' => 'cheating', 'label' => 'Cheating in a test', 'is_active' => true],
+            ['value' => 'misbehaviour_with_staff', 'label' => 'Misbehaviour with teacher or staff', 'is_active' => true],
+            ['value' => 'abusive_language', 'label' => 'Abusive language', 'is_active' => true],
+            ['value' => 'bullying', 'label' => 'Bullying or ragging', 'is_active' => true],
+            ['value' => 'damaging_property', 'label' => 'Damaging property', 'is_active' => true],
+            ['value' => 'no_study_material', 'label' => 'Books or material not brought', 'is_active' => true],
+            ['value' => 'disturbing_class', 'label' => 'Disturbing the class', 'is_active' => true],
+            ['value' => 'other', 'label' => 'Other', 'is_active' => true],
         ];
     }
 
@@ -33,7 +47,16 @@ class ConductTypeOptions
             return self::defaults();
         }
 
-        return self::normalizeList($stored);
+        $saved = self::normalizeList($stored);
+        $have = array_column($saved, 'value');
+
+        foreach (self::defaults() as $default) {
+            if (! in_array($default['value'], $have, true)) {
+                $saved[] = $default;
+            }
+        }
+
+        return $saved;
     }
 
     /**
