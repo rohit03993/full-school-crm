@@ -22,6 +22,9 @@
             >
                 <span class="sm:hidden">{{ $action['short'] }}</span>
                 <span class="hidden sm:inline">{{ $action['label'] }}</span>
+                @if (($action['count'] ?? 0) > 0)
+                    <span class="ml-1.5 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-rose-700">{{ $action['count'] }}</span>
+                @endif
             </button>
         @endforeach
 

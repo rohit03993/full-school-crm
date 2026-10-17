@@ -93,6 +93,11 @@ final class CrmMenuLabels
         return 'Certificates';
     }
 
+    public static function studentReports(): string
+    {
+        return 'Student reports';
+    }
+
     // —— Calls ——
     public static function callQueue(): string
     {

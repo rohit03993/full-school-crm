@@ -1596,7 +1596,7 @@ class StudentProfilePage extends Page
             ->with('recordedBy')
             ->orderByDesc('recorded_on')
             ->orderByDesc('id')
-            ->limit(CrmPagination::PER_PAGE)
+            ->limit(30)
             ->get();
     }
 
@@ -3453,6 +3453,9 @@ class StudentProfilePage extends Page
                     default => 'gray',
                 },
                 'click' => $name === 'reportStudent' ? 'openReportStudent' : null,
+                'count' => $name === 'reportStudent'
+                    ? app(StudentConductService::class)->countForStudent($this->record)
+                    : null,
             ];
         }
 
@@ -4407,6 +4410,8 @@ class StudentProfilePage extends Page
             View::make('filament.pages.partials.student-profile-report-modal')
                 ->viewData(fn (): array => [
                     'showReportStudent' => $this->showReportStudent,
+                    'studentName' => $this->record->name,
+                    'reportCount' => app(StudentConductService::class)->countForStudent($this->record),
                     'conductTabLoaded' => $this->conductTabLoaded,
                     'conductRecords' => $this->conductRecords,
                     'conductTypeOptions' => ConductTypeOptions::formOptions(),

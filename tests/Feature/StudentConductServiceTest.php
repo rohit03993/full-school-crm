@@ -11,6 +11,7 @@ use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
 use App\Enums\VisitStatus;
 use App\Filament\Pages\ManageConductTypes;
+use App\Filament\Pages\StudentReportsPage;
 use App\Models\Admission;
 use App\Models\Course;
 use App\Models\Enrollment;
@@ -154,6 +155,46 @@ class StudentConductServiceTest extends TestCase
             'fine_choice' => 'without_fine',
             'note' => 'Should not save.',
         ]);
+    }
+
+    public function test_school_list_counts_reports_and_keeps_teachers_out(): void
+    {
+        $coordinator = $this->coordinator();
+        $student = $this->enrolledStudent($coordinator);
+        $service = app(StudentConductService::class);
+
+        $service->store($student, $coordinator, [
+            'recorded_on' => now()->toDateString(),
+            'type_keys' => ['creating_noise'],
+            'fine_choice' => 'fine_charged',
+            'amount' => '150',
+            'note' => 'Noise during class.',
+        ]);
+        $service->store($student, $coordinator, [
+            'recorded_on' => now()->toDateString(),
+            'type_keys' => ['fighting'],
+            'fine_choice' => 'without_fine',
+            'note' => 'Warned only.',
+        ]);
+
+        $this->assertSame(2, $service->countForStudent($student));
+        $stats = $service->stats();
+        $this->assertSame(2, $stats['total']);
+        $this->assertSame(1, $stats['with_fine']);
+        $this->assertSame(1, $stats['without_fine']);
+        $this->assertSame(150, $stats['fine_amount']);
+
+        $page = $service->paginate('Noise');
+        $this->assertSame(1, $page->total());
+        $this->assertSame('Noise during class.', $page->items()[0]->note);
+
+        $this->actingAs($coordinator);
+        $this->assertTrue(StudentReportsPage::canAccess());
+
+        $teacher = User::factory()->create(['is_active' => true]);
+        $teacher->assignRole(StaffJobRole::Teacher->value);
+        $this->actingAs($teacher);
+        $this->assertFalse(StudentReportsPage::canAccess());
     }
 
     public function test_conduct_is_open_for_admin_and_academic_head_without_a_license_switch(): void

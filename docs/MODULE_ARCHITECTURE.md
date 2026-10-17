@@ -371,7 +371,7 @@ Every management system below lists:
 | **Formal name** | Student Conduct Management System |
 | **Key** | none — always on, not a license switch |
 | **Status** | Live (V1) |
-| **Includes** | Profile Conduct tab, multi-type records, fine charged or without fine, Setup → Conduct types |
+| **Includes** | Header Report student button with a count, saved reports on that student, Students → Student reports for the whole school, Setup → Report types |
 | **Works** | Super Admin and Academic coordinator only. Each row shows who entered it. Super Admin removes a wrong record and edits the type list. |
 | **Omit** | Fee ledger, receipt, parent portal, WhatsApp, license toggle |
 | **Edit** | Role check only: Super Admin or Academic coordinator |

@@ -8,6 +8,7 @@ use App\Models\Student;
 use App\Models\StudentConductRecord;
 use App\Models\User;
 use App\Support\ConductTypeOptions;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -28,6 +29,56 @@ class StudentConductService
     {
         return (bool) $user?->is_active
             && $user->hasRole(RoleName::SuperAdmin->value);
+    }
+
+    public function countForStudent(Student $student): int
+    {
+        return $student->conductRecords()->count();
+    }
+
+    /**
+     * @return array{total: int, with_fine: int, without_fine: int, fine_amount: int}
+     */
+    public function stats(): array
+    {
+        $base = StudentConductRecord::query();
+
+        return [
+            'total' => (clone $base)->count(),
+            'with_fine' => (clone $base)->where('fine_charged', true)->count(),
+            'without_fine' => (clone $base)->where('fine_charged', false)->count(),
+            'fine_amount' => (int) (clone $base)->where('fine_charged', true)->sum('amount'),
+        ];
+    }
+
+    public function paginate(string $search = '', string $fine = '', string $type = '', int $perPage = 15): LengthAwarePaginator
+    {
+        $query = StudentConductRecord::query()
+            ->with(['student:id,name', 'recordedBy:id,name'])
+            ->orderByDesc('recorded_on')
+            ->orderByDesc('id');
+
+        if ($fine === 'fine') {
+            $query->where('fine_charged', true);
+        } elseif ($fine === 'without') {
+            $query->where('fine_charged', false);
+        }
+
+        if ($type !== '') {
+            $query->whereJsonContains('type_keys', $type);
+        }
+
+        $search = trim($search);
+
+        if ($search !== '') {
+            $query->where(function ($inner) use ($search): void {
+                $inner->where('note', 'like', '%'.$search.'%')
+                    ->orWhereHas('student', fn ($student) => $student->where('name', 'like', '%'.$search.'%'))
+                    ->orWhereHas('recordedBy', fn ($staff) => $staff->where('name', 'like', '%'.$search.'%'));
+            });
+        }
+
+        return $query->paginate($perPage);
     }
 
     /**
