@@ -3369,7 +3369,7 @@ class StudentProfilePage extends Page
     {
         $isEnrolled = $this->record->activeEnrollment !== null;
         $primaryNames = $isEnrolled
-            ? ['addPayment', 'reportStudent', 'dropStudent', 'editStudent']
+            ? ['addPayment', 'reportStudent', 'editStudent']
             : ['addVisit', 'convertToAdmission', 'addPayment', 'editStudent'];
 
         $primary = [];
@@ -3423,7 +3423,7 @@ class StudentProfilePage extends Page
                     $more[] = [
                         'name' => $child->getName(),
                         'label' => (string) $child->getLabel(),
-                        'danger' => $child->getName() === 'deleteStudent',
+                        'danger' => in_array($child->getName(), ['dropStudent', 'deleteStudent'], true),
                     ];
                 }
 
@@ -3442,7 +3442,6 @@ class StudentProfilePage extends Page
                 'short' => match ($name) {
                     'addPayment' => 'Pay',
                     'reportStudent' => 'Report',
-                    'dropStudent' => 'Drop',
                     'editStudent' => 'Edit',
                     'addVisit' => 'Visit',
                     'convertToAdmission' => 'Admit',
@@ -3451,7 +3450,6 @@ class StudentProfilePage extends Page
                 'tone' => match ($name) {
                     'addPayment' => 'success',
                     'reportStudent' => 'warning',
-                    'dropStudent' => 'danger',
                     'addVisit', 'convertToAdmission' => 'primary',
                     default => 'gray',
                 },
