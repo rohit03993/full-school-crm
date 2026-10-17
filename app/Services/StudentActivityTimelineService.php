@@ -17,6 +17,7 @@ use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\StudentCase;
 use App\Models\StudentCertificate;
+use App\Models\StudentConductRecord;
 use App\Models\User;
 use App\Models\Visit;
 use App\Support\AttendanceSourceLabel;
@@ -70,6 +71,7 @@ class StudentActivityTimelineService
             ->merge($this->homeworkChecks($student, $viewer, $perSource))
             ->merge($this->examMarks($student, $viewer, $perSource))
             ->merge($this->certificates($student, $viewer, $perSource))
+            ->merge($this->conductRecords($student, $viewer, $perSource))
             ->merge($this->documents($student, $viewer, $perSource))
             ->merge($this->enrollmentAndBatch($student, $viewer, $perSource))
             ->filter(fn (array $item): bool => $item['occurred_at'] instanceof Carbon)
@@ -586,6 +588,41 @@ class StudentActivityTimelineService
                         ? Carbon::parse($cert->issued_on)->setTime(12, 0)
                         : ($cert->created_at ?? now()),
                     tab: 'certificates',
+                );
+            })
+            ->all();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function conductRecords(Student $student, ?User $viewer, int $limit): array
+    {
+        if (! FeatureGate::enabled(LicenseFeature::Conduct)
+            || ! CrmAccess::can($viewer, CrmPermission::ConductRecord)) {
+            return [];
+        }
+
+        return StudentConductRecord::query()
+            ->where('student_id', $student->id)
+            ->with('recordedBy')
+            ->orderByDesc('recorded_on')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->map(function (StudentConductRecord $record): array {
+                return $this->item(
+                    id: 'conduct-'.$record->id,
+                    type: 'conduct',
+                    category: 'CONDUCT',
+                    title: 'Conduct · '.$record->typeLabelList(),
+                    summary: $record->fineSummary(),
+                    detail: filled($record->note) ? (string) $record->note : null,
+                    staffName: $record->recordedBy?->name,
+                    at: $record->recorded_on
+                        ? Carbon::parse($record->recorded_on)->setTime(12, 0)
+                        : ($record->created_at ?? now()),
+                    tab: 'conduct',
                 );
             })
             ->all();

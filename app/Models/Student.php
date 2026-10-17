@@ -137,6 +137,11 @@ class Student extends Model
         return $this->hasMany(StudentCertificate::class);
     }
 
+    public function conductRecords(): HasMany
+    {
+        return $this->hasMany(StudentConductRecord::class);
+    }
+
     public function parentFeeNotices(): HasMany
     {
         return $this->hasMany(ParentFeeNotice::class);

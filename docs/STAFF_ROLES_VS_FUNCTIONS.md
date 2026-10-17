@@ -95,14 +95,14 @@ Permission labels live in [`app/Enums/CrmPermission.php`](../app/Enums/CrmPermis
 
 **Academic coordinator**
 
-- Has: students, certificates, attendance (+ workshops), marks import **and publish**, homework, academics setup, own cases  
+- Has: students, certificates, attendance (+ workshops), marks import **and publish**, homework, academics setup, own cases, student conduct records
   Can send exam-marks WhatsApp because they can publish (`CrmAccess::canSendExamMarksWhatsApp`)
-- Has not: fees, leads admin, WhatsApp campaigns desk
+- Has not: fees, leads admin, WhatsApp campaigns desk, remove a conduct record (Super Admin only)
 
 **Teacher**
 
 - Has: students, mark attendance, enter marks, own cases (later scoped by class assignment)
-- Has not: publish marks, homework manage, academics setup, fees, leads, WhatsApp
+- Has not: publish marks, homework manage, academics setup, fees, leads, WhatsApp, student conduct records
 
 ### Functions currently stored as jobs (should become toggles later)
 

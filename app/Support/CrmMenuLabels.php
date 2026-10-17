@@ -304,6 +304,11 @@ final class CrmMenuLabels
         return 'Meeting types';
     }
 
+    public static function conductTypes(): string
+    {
+        return 'Conduct types';
+    }
+
     public static function biometricSetup(): string
     {
         return 'Biometric setup';

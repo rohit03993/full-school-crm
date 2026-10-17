@@ -41,6 +41,7 @@ return [
             LicenseFeature::Fees->value,
             LicenseFeature::Homework->value,
             LicenseFeature::TeacherTracking->value,
+            LicenseFeature::Conduct->value,
         ],
         LicensePlan::FullCrm->value => [
             LicenseFeature::Attendance->value,
@@ -52,6 +53,7 @@ return [
             LicenseFeature::Calls->value,
             LicenseFeature::Admissions->value,
             LicenseFeature::Cases->value,
+            LicenseFeature::Conduct->value,
             LicenseFeature::WhatsApp->value,
             LicenseFeature::Portal->value,
             LicenseFeature::Reports->value,

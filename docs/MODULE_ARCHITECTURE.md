@@ -364,6 +364,19 @@ Every management system below lists:
 | **Edit** | — |
 | **Add** | Portal surface when Portal + Certificates ON (later) |
 
+### 20. Student Conduct Management System
+
+| | |
+|--|--|
+| **Formal name** | Student Conduct Management System |
+| **Key** | `conduct` |
+| **Status** | Live (V1) |
+| **Includes** | Profile Conduct tab, multi-type records, fine charged or without fine, Setup → Conduct types |
+| **Works** | Super Admin and Academic coordinator add records for enrolled students. Super Admin removes a wrong record and edits the type list. |
+| **Omit** | Fee ledger, receipt, parent portal, WhatsApp |
+| **Edit** | License key + `crm.conduct.record` on Academic coordinator |
+| **Add** | More default types from Setup; parent view later |
+
 ---
 
 # Part 3 — Planned modules (not built)
@@ -440,6 +453,7 @@ LIVE LICENSED
 ├── Website CMS MS         (website)
 ├── Student Cases MS       (cases)
 ├── Certificates MS        (certificates)
+├── Student Conduct MS     (conduct)
 └── Teacher Tracking       (teacher_tracking) — Milestone 2: section plan, teacher submit, academic head finalizes
 
 PLANNED
@@ -454,6 +468,7 @@ PLANNED
 
 | Date | Change |
 |------|--------|
+| 2026-10-17 | Student Conduct module key `conduct`. Profile tab for noise, indiscipline, phone, fighting, optional fine amount. Setup list of types. Academic coordinator and Super Admin only. |
 | 2026-09-28 | Teacher Tracking milestone 2: copy a ready course plan onto a section, teacher submits, academic head finalizes. Student profile and portal show topics without minutes. |
 | 2026-09-27 | Teacher Tracking module key `teacher_tracking`. Milestone 1 is the Standard course planner (programme + subject + chapters + topics). |
 | 2026-09-07 | Student Profile Overview = activity timeline (calls, fees, WhatsApp, attendance, etc.; click-through to tabs) |

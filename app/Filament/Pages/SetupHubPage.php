@@ -95,6 +95,14 @@ class SetupHubPage extends Page
             ];
         }
 
+        if (ManageConductTypes::canAccess()) {
+            $cards[] = [
+                'title' => CrmMenuLabels::conductTypes(),
+                'description' => 'Indiscipline names on the student Conduct tab.',
+                'url' => ManageConductTypes::getUrl(),
+            ];
+        }
+
         if (ManageFeeSettings::canAccess()) {
             $cards[] = [
                 'title' => CrmMenuLabels::feeSettings(),

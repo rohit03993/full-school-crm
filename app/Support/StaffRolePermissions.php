@@ -87,6 +87,7 @@ class StaffRolePermissions
                 CrmPermission::MarksPublish,
                 CrmPermission::HomeworkManage,
                 CrmPermission::AcademicsManage,
+                CrmPermission::ConductRecord,
                 CrmPermission::CasesView,
                 CrmPermission::CasesOpen,
                 CrmPermission::CasesAssign,
@@ -171,6 +172,7 @@ class StaffRolePermissions
                 CrmPermission::LeadsReassign,
                 CrmPermission::ReportsExport,
                 CrmPermission::StudentsViewMobile,
+                CrmPermission::ConductRecord,
             ], true),
         ));
     }

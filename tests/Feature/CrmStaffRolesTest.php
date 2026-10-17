@@ -195,6 +195,7 @@ class CrmStaffRolesTest extends TestCase
         $this->assertTrue($user->canCrm(CrmPermission::MarksPublish));
         $this->assertTrue($user->canCrm(CrmPermission::AcademicsManage));
         $this->assertTrue($user->canCrm(CrmPermission::HomeworkManage));
+        $this->assertTrue($user->canCrm(CrmPermission::ConductRecord));
         $this->assertTrue(\App\Support\CrmAccess::canSendExamMarksWhatsApp($user));
         $this->assertFalse($user->canCrm(CrmPermission::WhatsappCampaigns));
         $this->assertTrue(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::canAccess());
@@ -253,6 +254,7 @@ class CrmStaffRolesTest extends TestCase
         $this->assertFalse($user->canCrm(CrmPermission::MarksPublish));
         $this->assertFalse($user->canCrm(CrmPermission::AcademicsManage));
         $this->assertFalse($user->canCrm(CrmPermission::HomeworkManage));
+        $this->assertFalse($user->canCrm(CrmPermission::ConductRecord));
         $this->assertFalse(\App\Support\CrmAccess::canSendExamMarksWhatsApp($user));
         $this->assertFalse(\App\Filament\Pages\CreateExamWindowPage::canAccess());
         $this->assertTrue(\App\Filament\Resources\ActivitySessions\ActivitySessionResource::canAccess());

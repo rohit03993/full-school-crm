@@ -43,6 +43,7 @@ use App\Models\Student;
 use App\Models\StudentCall;
 use App\Models\StudentCase;
 use App\Models\StudentCertificate;
+use App\Models\StudentConductRecord;
 use App\Models\ParentFeeNotice;
 use App\Models\User;
 use App\Models\WhatsAppTemplate;
@@ -81,6 +82,8 @@ use App\Services\StudentCaseService;
 use App\Services\ActivityMarksWhatsAppService;
 use App\Services\StudentExamMarksWriter;
 use App\Services\CertificateService;
+use App\Services\StudentConductService;
+use App\Support\ConductTypeOptions;
 use App\Services\StudentCounterService;
 use App\Services\StudentProfileDeleteService;
 use App\Services\StudentUpdateService;
@@ -148,6 +151,8 @@ class StudentProfilePage extends Page
     public bool $casesTabLoaded = false;
 
     public bool $certificatesTabLoaded = false;
+
+    public bool $conductTabLoaded = false;
 
     public bool $parentUpdatesTabLoaded = false;
 
@@ -259,6 +264,24 @@ class StudentProfilePage extends Page
      * @var Collection<int, StudentCertificate>
      */
     public Collection $certificates;
+
+    /**
+     * @var Collection<int, StudentConductRecord>
+     */
+    public Collection $conductRecords;
+
+    public string $conductRecordedOn = '';
+
+    /**
+     * @var list<string>
+     */
+    public array $conductTypeKeys = [];
+
+    public string $conductFineChoice = 'without_fine';
+
+    public string $conductAmount = '';
+
+    public string $conductNote = '';
 
     /**
      * @var Collection<int, ParentFeeNotice>
@@ -456,6 +479,8 @@ class StudentProfilePage extends Page
         $this->callRecordings = new Collection;
         $this->cases = new Collection;
         $this->certificates = new Collection;
+        $this->conductRecords = new Collection;
+        $this->conductRecordedOn = now()->toDateString();
         $this->parentFeeNotices = new Collection;
         $this->profileCertificateType = CertificateType::Bonafide->value;
         $this->openCaseBanners = [];
@@ -589,6 +614,7 @@ class StudentProfilePage extends Page
             'calls' => $this->loadCallsTab(),
             'cases' => $this->loadCasesTab(),
             'certificates' => $this->loadCertificatesTab(),
+            'conduct' => $this->loadConductTab(),
             'parent_updates' => $this->loadParentUpdatesTab(),
             'messages' => $this->loadMessagesTab(),
             'documents' => $this->loadDocumentsTab(),
@@ -702,6 +728,12 @@ class StudentProfilePage extends Page
             && $this->licensed(LicenseFeature::Certificates)
             && $this->userCan(CrmPermission::CertificatesView)) {
             $tabs[] = 'certificates';
+        }
+
+        if ($this->record->activeEnrollment !== null
+            && $this->licensed(LicenseFeature::Conduct)
+            && $this->userCan(CrmPermission::ConductRecord)) {
+            $tabs[] = 'conduct';
         }
 
         if ($this->licensed(LicenseFeature::WhatsApp)) {
@@ -1550,6 +1582,92 @@ class StudentProfilePage extends Page
             ->orderByDesc('id')
             ->limit(CrmPagination::PER_PAGE)
             ->get();
+    }
+
+    public function loadConductTab(): void
+    {
+        if ($this->conductTabLoaded) {
+            return;
+        }
+
+        $this->conductTabLoaded = true;
+        $this->conductRecords = $this->record->conductRecords()
+            ->with('recordedBy')
+            ->orderByDesc('recorded_on')
+            ->orderByDesc('id')
+            ->limit(CrmPagination::PER_PAGE)
+            ->get();
+    }
+
+    public function saveConductRecord(): void
+    {
+        $staff = Auth::user();
+
+        if (! $staff instanceof User) {
+            return;
+        }
+
+        try {
+            app(StudentConductService::class)->store($this->record, $staff, [
+                'recorded_on' => $this->conductRecordedOn,
+                'type_keys' => $this->conductTypeKeys,
+                'fine_choice' => $this->conductFineChoice,
+                'amount' => $this->conductAmount,
+                'note' => $this->conductNote,
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Notification::make()
+                ->title(collect($e->errors())->flatten()->first() ?: 'Could not save the conduct record.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->conductTypeKeys = [];
+        $this->conductFineChoice = 'without_fine';
+        $this->conductAmount = '';
+        $this->conductNote = '';
+        $this->conductRecordedOn = now()->toDateString();
+        $this->conductTabLoaded = false;
+        $this->activityTimelineLoaded = false;
+        $this->loadConductTab();
+
+        Notification::make()->title('Conduct record saved')->success()->send();
+    }
+
+    public function deleteConductRecord(int $recordId): void
+    {
+        $staff = Auth::user();
+
+        if (! $staff instanceof User) {
+            return;
+        }
+
+        $record = $this->record->conductRecords()->whereKey($recordId)->first();
+
+        if (! $record) {
+            Notification::make()->title('Conduct record was not found.')->danger()->send();
+
+            return;
+        }
+
+        try {
+            app(StudentConductService::class)->delete($record, $staff);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Notification::make()
+                ->title(collect($e->errors())->flatten()->first() ?: 'Could not remove the conduct record.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->conductTabLoaded = false;
+        $this->activityTimelineLoaded = false;
+        $this->loadConductTab();
+
+        Notification::make()->title('Conduct record removed')->success()->send();
     }
 
     public function loadParentUpdatesTab(): void
@@ -4393,6 +4511,26 @@ class StudentProfilePage extends Page
                                     'typeOptions' => CertificateType::options(),
                                     'profileCertificateType' => $this->profileCertificateType,
                                     'profileCertificateRemarks' => $this->profileCertificateRemarks,
+                                ]),
+                        ]),
+                    'conduct' => Tab::make('Conduct')
+                        ->icon('heroicon-o-exclamation-triangle')
+                        ->badge(fn (): ?string => $this->record->activeEnrollment
+                            && $this->licensed(LicenseFeature::Conduct)
+                            && $this->userCan(CrmPermission::ConductRecord)
+                            ? (string) $this->record->conductRecords()->count() ?: null
+                            : null)
+                        ->visible(fn (): bool => $this->record->activeEnrollment !== null
+                            && $this->licensed(LicenseFeature::Conduct)
+                            && $this->userCan(CrmPermission::ConductRecord))
+                        ->schema([
+                            View::make('filament.pages.partials.student-profile-conduct')
+                                ->viewData(fn (): array => [
+                                    'conductTabLoaded' => $this->conductTabLoaded,
+                                    'conductRecords' => $this->conductRecords,
+                                    'conductTypeOptions' => ConductTypeOptions::formOptions(),
+                                    'conductFineChoice' => $this->conductFineChoice,
+                                    'canDeleteConduct' => app(StudentConductService::class)->canDelete(Auth::user()),
                                 ]),
                         ]),
                     'parent_updates' => Tab::make('Parent updates')
