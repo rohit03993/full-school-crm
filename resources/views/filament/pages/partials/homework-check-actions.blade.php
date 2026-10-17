@@ -102,39 +102,57 @@
             .crm-hw-phone-row {
                 display: flex;
                 align-items: flex-start;
-                gap: 8px;
-                padding: 8px 10px;
+                gap: 10px;
+                padding: 8px 12px;
                 border-top: 1px solid #f3f4f6;
             }
             .crm-hw-phone-row > .crm-hw-tick {
-                margin-top: 3px !important;
+                margin-top: 4px !important;
             }
             .crm-hw-phone-main {
                 min-width: 0;
                 flex: 1;
                 display: flex;
                 flex-direction: column;
-                gap: 4px;
+                gap: 6px;
+            }
+            .crm-hw-phone-head {
+                display: flex;
+                align-items: baseline;
+                justify-content: space-between;
+                gap: 8px;
             }
             .crm-hw-phone-name {
+                min-width: 0;
                 overflow: visible;
                 text-overflow: unset;
                 white-space: normal;
                 overflow-wrap: anywhere;
-                font-size: 15px;
-                line-height: 1.3;
+                font-size: 14px;
+                line-height: 1.25;
+                color: #111827 !important;
+            }
+            .dark .crm-hw-phone-name {
+                color: #f9fafb !important;
+            }
+            .crm-hw-phone-opened {
+                flex: 0 0 auto;
+                font-size: 11px;
+                line-height: 1.2;
+                font-weight: 600;
+                color: #047857;
             }
             .crm-hw-phone-actions {
                 display: flex;
                 width: 100%;
                 overflow: hidden;
-                border-radius: 6px;
+                border-radius: 8px;
                 border: 1px solid #e5e7eb;
             }
             .crm-hw-phone-actions button {
                 flex: 1 1 0;
-                height: 36px !important;
-                min-height: 36px !important;
+                height: 32px !important;
+                min-height: 32px !important;
                 min-width: 0 !important;
                 width: auto !important;
                 padding: 0 4px !important;
@@ -143,10 +161,11 @@
                 white-space: nowrap;
             }
             .crm-hw-phone-meta {
-                margin: 1px 0 0;
-                font-size: 10px;
+                margin: 0;
+                font-size: 11px;
                 line-height: 1.2;
-                color: #6b7280;
+                font-weight: 600;
+                color: #be123c;
             }
             @media (max-width: 1023px) {
                 .crm-hw-shell .grid.gap-3 {
@@ -220,31 +239,22 @@
                             ])
                         >✓</button>
                         <div class="crm-hw-phone-main">
-                            <x-crm.person-name class="crm-hw-phone-name" :student-id="$student['id']" :name="$student['name']" />
-                            @php
-                                $phoneBits = [];
-                                if ($student['link_opened'] ?? false) {
-                                    $phoneBits[] = filled($student['link_opened_at'] ?? null)
-                                        ? 'Opened '.$student['link_opened_at']
-                                        : 'Opened';
-                                }
-                                if (($student['not_done_week'] ?? 0) > 0) {
-                                    $phoneBits[] = 'Week '.$student['not_done_week'];
-                                }
-                                if (blank($student['status_key'] ?? null)) {
-                                    $phoneBits[] = 'Not checked';
-                                }
-                                if (($student['status_key'] ?? null) === 'not_done') {
-                                    $phoneBits[] = match ($student['parent_line'] ?? null) {
-                                        'Message shared with parents' => 'Sent',
-                                        'Message was not shared' => 'Not sent',
-                                        'Message to parents is waiting' => 'Waiting',
+                            <div class="crm-hw-phone-head">
+                                <x-crm.person-name class="crm-hw-phone-name" :student-id="$student['id']" :name="$student['name']" />
+                                @if ($student['link_opened'] ?? false)
+                                    <span class="crm-hw-phone-opened">Opened {{ $student['link_opened_at'] ?? '' }}</span>
+                                @endif
+                            </div>
+                            @if (($student['status_key'] ?? null) === 'not_done')
+                                @php
+                                    $parentNote = match ($student['parent_line'] ?? null) {
+                                        'Message shared with parents' => 'WhatsApp sent',
+                                        'Message was not shared' => 'WhatsApp not sent',
+                                        'Message to parents is waiting' => 'WhatsApp waiting',
                                         default => 'Not done',
                                     };
-                                }
-                            @endphp
-                            @if ($phoneBits !== [])
-                                <p class="crm-hw-phone-meta">{{ implode(' · ', $phoneBits) }}</p>
+                                @endphp
+                                <p class="crm-hw-phone-meta">{{ $parentNote }}</p>
                             @endif
                             <div class="crm-hw-phone-actions">
                                     <button
