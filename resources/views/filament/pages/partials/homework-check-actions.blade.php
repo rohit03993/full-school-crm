@@ -101,43 +101,46 @@
             }
             .crm-hw-phone-row {
                 display: flex;
-                align-items: center;
+                align-items: flex-start;
                 gap: 8px;
-                padding: 5px 10px;
+                padding: 8px 10px;
                 border-top: 1px solid #f3f4f6;
+            }
+            .crm-hw-phone-row > .crm-hw-tick {
+                margin-top: 3px !important;
             }
             .crm-hw-phone-main {
                 min-width: 0;
                 flex: 1;
-            }
-            .crm-hw-phone-top {
                 display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 8px;
+                flex-direction: column;
+                gap: 4px;
             }
-            .crm-hw-phone-top .crm-person-name {
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                font-size: 13px;
-                line-height: 1.2;
+            .crm-hw-phone-name {
+                overflow: visible;
+                text-overflow: unset;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                font-size: 15px;
+                line-height: 1.3;
             }
             .crm-hw-phone-actions {
                 display: flex;
-                flex: 0 0 auto;
+                width: 100%;
                 overflow: hidden;
                 border-radius: 6px;
                 border: 1px solid #e5e7eb;
             }
             .crm-hw-phone-actions button {
+                flex: 1 1 0;
                 height: 36px !important;
                 min-height: 36px !important;
-                min-width: 44px !important;
+                min-width: 0 !important;
                 width: auto !important;
-                padding: 0 10px !important;
+                padding: 0 4px !important;
                 font-size: 12px !important;
-                line-height: 1 !important;
+                line-height: 1.1 !important;
+                white-space: nowrap;
             }
             .crm-hw-phone-meta {
                 margin: 1px 0 0;
@@ -217,9 +220,33 @@
                             ])
                         >✓</button>
                         <div class="crm-hw-phone-main">
-                            <div class="crm-hw-phone-top">
-                                <x-crm.person-name :student-id="$student['id']" :name="$student['name']" />
-                                <div class="crm-hw-phone-actions">
+                            <x-crm.person-name class="crm-hw-phone-name" :student-id="$student['id']" :name="$student['name']" />
+                            @php
+                                $phoneBits = [];
+                                if ($student['link_opened'] ?? false) {
+                                    $phoneBits[] = filled($student['link_opened_at'] ?? null)
+                                        ? 'Opened '.$student['link_opened_at']
+                                        : 'Opened';
+                                }
+                                if (($student['not_done_week'] ?? 0) > 0) {
+                                    $phoneBits[] = 'Week '.$student['not_done_week'];
+                                }
+                                if (blank($student['status_key'] ?? null)) {
+                                    $phoneBits[] = 'Not checked';
+                                }
+                                if (($student['status_key'] ?? null) === 'not_done') {
+                                    $phoneBits[] = match ($student['parent_line'] ?? null) {
+                                        'Message shared with parents' => 'Sent',
+                                        'Message was not shared' => 'Not sent',
+                                        'Message to parents is waiting' => 'Waiting',
+                                        default => 'Not done',
+                                    };
+                                }
+                            @endphp
+                            @if ($phoneBits !== [])
+                                <p class="crm-hw-phone-meta">{{ implode(' · ', $phoneBits) }}</p>
+                            @endif
+                            <div class="crm-hw-phone-actions">
                                     <button
                                         type="button"
                                         wire:click="markStudentNotChecked({{ $student['id'] }})"
@@ -261,33 +288,7 @@
                                             'bg-white text-gray-600' => ($student['status_key'] ?? null) !== 'not_done',
                                         ])
                                     >Not done</button>
-                                </div>
                             </div>
-                            @php
-                                $phoneBits = [];
-                                if ($student['link_opened'] ?? false) {
-                                    $phoneBits[] = filled($student['link_opened_at'] ?? null)
-                                        ? 'Opened '.$student['link_opened_at']
-                                        : 'Opened';
-                                }
-                                if (($student['not_done_week'] ?? 0) > 0) {
-                                    $phoneBits[] = 'Week '.$student['not_done_week'];
-                                }
-                                if (blank($student['status_key'] ?? null)) {
-                                    $phoneBits[] = 'Not checked';
-                                }
-                                if (($student['status_key'] ?? null) === 'not_done') {
-                                    $phoneBits[] = match ($student['parent_line'] ?? null) {
-                                        'Message shared with parents' => 'Sent',
-                                        'Message was not shared' => 'Not sent',
-                                        'Message to parents is waiting' => 'Waiting',
-                                        default => 'Not done',
-                                    };
-                                }
-                            @endphp
-                            @if ($phoneBits !== [])
-                                <p class="crm-hw-phone-meta">{{ implode(' · ', $phoneBits) }}</p>
-                            @endif
                         </div>
                     </div>
                 @empty
