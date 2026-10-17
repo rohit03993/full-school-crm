@@ -165,27 +165,21 @@
                 border: 0 !important;
             }
             .crm-hw-phone-actions button + button {
-                box-shadow: inset 1px 0 0 #ffffff;
+                box-shadow: inset 1px 0 0 #e5e7eb;
             }
-            .crm-hw-btn-wait {
-                background: #e5e7eb !important;
-                color: #1f2937 !important;
+            .crm-hw-btn-wait,
+            .crm-hw-btn-done,
+            .crm-hw-btn-miss {
+                background: #ffffff !important;
+                color: #4b5563 !important;
             }
             .crm-hw-btn-wait.is-on {
                 background: #374151 !important;
                 color: #ffffff !important;
             }
-            .crm-hw-btn-done {
-                background: #d1fae5 !important;
-                color: #065f46 !important;
-            }
             .crm-hw-btn-done.is-on {
                 background: #059669 !important;
                 color: #ffffff !important;
-            }
-            .crm-hw-btn-miss {
-                background: #ffe4e6 !important;
-                color: #9f1239 !important;
             }
             .crm-hw-btn-miss.is-on {
                 background: #e11d48 !important;
