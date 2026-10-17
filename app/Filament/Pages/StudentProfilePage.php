@@ -154,6 +154,8 @@ class StudentProfilePage extends Page
 
     public bool $conductTabLoaded = false;
 
+    public bool $showReportStudent = false;
+
     public bool $parentUpdatesTabLoaded = false;
 
     public bool $messagesTabLoaded = false;
@@ -614,7 +616,6 @@ class StudentProfilePage extends Page
             'calls' => $this->loadCallsTab(),
             'cases' => $this->loadCasesTab(),
             'certificates' => $this->loadCertificatesTab(),
-            'conduct' => $this->loadConductTab(),
             'parent_updates' => $this->loadParentUpdatesTab(),
             'messages' => $this->loadMessagesTab(),
             'documents' => $this->loadDocumentsTab(),
@@ -671,6 +672,12 @@ class StudentProfilePage extends Page
 
     public function openActivityTimelineTab(?string $tab): void
     {
+        if ($tab === 'conduct') {
+            $this->openReportStudent();
+
+            return;
+        }
+
         if (! filled($tab) || $tab === 'overview') {
             return;
         }
@@ -728,11 +735,6 @@ class StudentProfilePage extends Page
             && $this->licensed(LicenseFeature::Certificates)
             && $this->userCan(CrmPermission::CertificatesView)) {
             $tabs[] = 'certificates';
-        }
-
-        if ($this->record->activeEnrollment !== null
-            && app(StudentConductService::class)->canRecord(Auth::user())) {
-            $tabs[] = 'conduct';
         }
 
         if ($this->licensed(LicenseFeature::WhatsApp)) {
@@ -1605,8 +1607,13 @@ class StudentProfilePage extends Page
             return;
         }
 
-        $this->profileTab = 'conduct';
-        $this->updatedProfileTab();
+        $this->showReportStudent = true;
+        $this->loadConductTab();
+    }
+
+    public function closeReportStudent(): void
+    {
+        $this->showReportStudent = false;
     }
 
     public function saveConductRecord(): void
@@ -4397,6 +4404,15 @@ class StudentProfilePage extends Page
         return $schema
             ->extraAttributes(['class' => 'fi-student-profile-page'])
             ->components([
+            View::make('filament.pages.partials.student-profile-report-modal')
+                ->viewData(fn (): array => [
+                    'showReportStudent' => $this->showReportStudent,
+                    'conductTabLoaded' => $this->conductTabLoaded,
+                    'conductRecords' => $this->conductRecords,
+                    'conductTypeOptions' => ConductTypeOptions::formOptions(),
+                    'conductFineChoice' => $this->conductFineChoice,
+                    'canDeleteConduct' => app(StudentConductService::class)->canDelete(Auth::user()),
+                ]),
             View::make('filament.pages.partials.close-meeting-modal')
                 ->viewData(fn (): array => [
                     'showCloseMeetingModal' => $this->showCloseMeetingModal,
@@ -4538,24 +4554,6 @@ class StudentProfilePage extends Page
                                     'typeOptions' => CertificateType::options(),
                                     'profileCertificateType' => $this->profileCertificateType,
                                     'profileCertificateRemarks' => $this->profileCertificateRemarks,
-                                ]),
-                        ]),
-                    'conduct' => Tab::make('Report student')
-                        ->icon('heroicon-o-exclamation-triangle')
-                        ->badge(fn (): ?string => $this->record->activeEnrollment
-                            && app(StudentConductService::class)->canRecord(Auth::user())
-                            ? (string) $this->record->conductRecords()->count() ?: null
-                            : null)
-                        ->visible(fn (): bool => $this->record->activeEnrollment !== null
-                            && app(StudentConductService::class)->canRecord(Auth::user()))
-                        ->schema([
-                            View::make('filament.pages.partials.student-profile-conduct')
-                                ->viewData(fn (): array => [
-                                    'conductTabLoaded' => $this->conductTabLoaded,
-                                    'conductRecords' => $this->conductRecords,
-                                    'conductTypeOptions' => ConductTypeOptions::formOptions(),
-                                    'conductFineChoice' => $this->conductFineChoice,
-                                    'canDeleteConduct' => app(StudentConductService::class)->canDelete(Auth::user()),
                                 ]),
                         ]),
                     'parent_updates' => Tab::make('Parent updates')
