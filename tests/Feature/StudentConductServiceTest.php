@@ -6,8 +6,6 @@ use App\Enums\AdmissionStatus;
 use App\Enums\CourseStatus;
 use App\Enums\EnrollmentStatus;
 use App\Enums\LeadSource;
-use App\Enums\LicenseFeature;
-use App\Enums\LicensePlan;
 use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
@@ -19,7 +17,6 @@ use App\Models\Enrollment;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\EnquiryService;
-use App\Services\LicenseService;
 use App\Services\StudentActivityTimelineService;
 use App\Services\StudentConductService;
 use App\Support\ConductTypeOptions;
@@ -159,24 +156,17 @@ class StudentConductServiceTest extends TestCase
         ]);
     }
 
-    public function test_conduct_setup_is_super_admin_only_and_module_can_be_off(): void
+    public function test_conduct_is_open_for_admin_and_academic_head_without_a_license_switch(): void
     {
         $coordinator = $this->coordinator();
         $this->actingAs($coordinator);
+        $this->assertTrue(app(StudentConductService::class)->canRecord($coordinator));
         $this->assertFalse(ManageConductTypes::canAccess());
 
         $admin = $this->superAdmin();
         $this->actingAs($admin);
+        $this->assertTrue(app(StudentConductService::class)->canRecord($admin));
         $this->assertTrue(ManageConductTypes::canAccess());
-
-        app(LicenseService::class)->save([
-            'plan' => LicensePlan::Custom->value,
-            'features' => [LicenseFeature::Attendance->value],
-            'expires_at' => now()->addYear()->toDateString(),
-        ]);
-
-        $this->assertFalse(ManageConductTypes::canAccess());
-        $this->assertFalse(app(StudentConductService::class)->canRecord($admin));
     }
 
     protected function coordinator(): User

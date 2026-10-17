@@ -2,13 +2,11 @@
 
 namespace App\Filament\Pages;
 
-use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Support\ConductTypeOptions;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
-use App\Support\FeatureGate;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
@@ -61,8 +59,7 @@ class ManageConductTypes extends Page
 
     public static function canAccess(): bool
     {
-        return FeatureGate::enabled(LicenseFeature::Conduct)
-            && (Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false);
+        return Auth::user()?->hasRole(RoleName::SuperAdmin->value) ?? false;
     }
 
     public function mount(): void

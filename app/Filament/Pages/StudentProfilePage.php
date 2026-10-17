@@ -731,8 +731,7 @@ class StudentProfilePage extends Page
         }
 
         if ($this->record->activeEnrollment !== null
-            && $this->licensed(LicenseFeature::Conduct)
-            && $this->userCan(CrmPermission::ConductRecord)) {
+            && app(StudentConductService::class)->canRecord(Auth::user())) {
             $tabs[] = 'conduct';
         }
 
@@ -4516,13 +4515,11 @@ class StudentProfilePage extends Page
                     'conduct' => Tab::make('Conduct')
                         ->icon('heroicon-o-exclamation-triangle')
                         ->badge(fn (): ?string => $this->record->activeEnrollment
-                            && $this->licensed(LicenseFeature::Conduct)
-                            && $this->userCan(CrmPermission::ConductRecord)
+                            && app(StudentConductService::class)->canRecord(Auth::user())
                             ? (string) $this->record->conductRecords()->count() ?: null
                             : null)
                         ->visible(fn (): bool => $this->record->activeEnrollment !== null
-                            && $this->licensed(LicenseFeature::Conduct)
-                            && $this->userCan(CrmPermission::ConductRecord))
+                            && app(StudentConductService::class)->canRecord(Auth::user()))
                         ->schema([
                             View::make('filament.pages.partials.student-profile-conduct')
                                 ->viewData(fn (): array => [

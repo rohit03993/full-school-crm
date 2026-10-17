@@ -12,7 +12,6 @@ enum LicenseFeature: string
     case Admissions = 'admissions';
     case Cases = 'cases';
     case Certificates = 'certificates';
-    case Conduct = 'conduct';
     case WhatsApp = 'whatsapp';
     case Portal = 'portal';
     case Reports = 'reports';
@@ -33,7 +32,6 @@ enum LicenseFeature: string
             self::Admissions => 'Admissions Management',
             self::Cases => 'Student Cases Management',
             self::Certificates => 'Certificates Management',
-            self::Conduct => 'Student Conduct',
             self::WhatsApp => 'WhatsApp Management',
             self::Portal => 'Student Portal',
             self::Reports => 'Reports Management',
@@ -56,7 +54,6 @@ enum LicenseFeature: string
             self::Admissions => 'Admission records and enrolment workflow.',
             self::Cases => 'Enrolled-student support cases: open, transfer, close.',
             self::Certificates => 'Issue TC, bonafide, character, and fee certificates.',
-            self::Conduct => 'Student conduct records: noise, indiscipline, and fines.',
             self::WhatsApp => 'Templates, inbox, and bulk WhatsApp campaigns.',
             self::Portal => 'Student/parent login portal.',
             self::Reports => 'Operational and academic reports.',

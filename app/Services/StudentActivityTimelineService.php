@@ -598,8 +598,7 @@ class StudentActivityTimelineService
      */
     protected function conductRecords(Student $student, ?User $viewer, int $limit): array
     {
-        if (! FeatureGate::enabled(LicenseFeature::Conduct)
-            || ! CrmAccess::can($viewer, CrmPermission::ConductRecord)) {
+        if (! app(StudentConductService::class)->canRecord($viewer)) {
             return [];
         }
 
@@ -616,7 +615,7 @@ class StudentActivityTimelineService
                     type: 'conduct',
                     category: 'CONDUCT',
                     title: 'Conduct · '.$record->typeLabelList(),
-                    summary: $record->fineSummary(),
+                    summary: $record->fineSummary().' · Entered by '.($record->recordedBy?->name ?: 'Unknown'),
                     detail: filled($record->note) ? (string) $record->note : null,
                     staffName: $record->recordedBy?->name,
                     at: $record->recorded_on

@@ -2,15 +2,12 @@
 
 namespace App\Services;
 
-use App\Enums\CrmPermission;
-use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Models\Student;
 use App\Models\StudentConductRecord;
 use App\Models\User;
 use App\Support\ConductTypeOptions;
-use App\Support\CrmAccess;
-use App\Support\FeatureGate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -19,14 +16,18 @@ class StudentConductService
 {
     public function canRecord(?User $user): bool
     {
-        return FeatureGate::enabled(LicenseFeature::Conduct)
-            && CrmAccess::can($user, CrmPermission::ConductRecord);
+        if (! $user?->is_active) {
+            return false;
+        }
+
+        return $user->hasRole(RoleName::SuperAdmin->value)
+            || $user->hasRole(StaffJobRole::AcademicCoordinator->value);
     }
 
     public function canDelete(?User $user): bool
     {
-        return $this->canRecord($user)
-            && (bool) $user?->hasRole(RoleName::SuperAdmin->value);
+        return (bool) $user?->is_active
+            && $user->hasRole(RoleName::SuperAdmin->value);
     }
 
     /**

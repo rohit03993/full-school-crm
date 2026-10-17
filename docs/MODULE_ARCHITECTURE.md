@@ -369,12 +369,12 @@ Every management system below lists:
 | | |
 |--|--|
 | **Formal name** | Student Conduct Management System |
-| **Key** | `conduct` |
+| **Key** | none — always on, not a license switch |
 | **Status** | Live (V1) |
 | **Includes** | Profile Conduct tab, multi-type records, fine charged or without fine, Setup → Conduct types |
-| **Works** | Super Admin and Academic coordinator add records for enrolled students. Super Admin removes a wrong record and edits the type list. |
-| **Omit** | Fee ledger, receipt, parent portal, WhatsApp |
-| **Edit** | License key + `crm.conduct.record` on Academic coordinator |
+| **Works** | Super Admin and Academic coordinator only. Each row shows who entered it. Super Admin removes a wrong record and edits the type list. |
+| **Omit** | Fee ledger, receipt, parent portal, WhatsApp, license toggle |
+| **Edit** | Role check only: Super Admin or Academic coordinator |
 | **Add** | More default types from Setup; parent view later |
 
 ---
@@ -453,8 +453,10 @@ LIVE LICENSED
 ├── Website CMS MS         (website)
 ├── Student Cases MS       (cases)
 ├── Certificates MS        (certificates)
-├── Student Conduct MS     (conduct)
 └── Teacher Tracking       (teacher_tracking) — Milestone 2: section plan, teacher submit, academic head finalizes
+
+STUDENT PROFILE (always on for the role, not a license switch)
+└── Conduct tab            Super Admin + Academic coordinator
 
 PLANNED
 ├── Front office / Notices / Timetable / Parent app
@@ -468,7 +470,7 @@ PLANNED
 
 | Date | Change |
 |------|--------|
-| 2026-10-17 | Student Conduct module key `conduct`. Profile tab for noise, indiscipline, phone, fighting, optional fine amount. Setup list of types. Academic coordinator and Super Admin only. |
+| 2026-10-17 | Student Conduct on the profile for Super Admin and Academic coordinator. Not a license switch. Each row shows who entered it. |
 | 2026-09-28 | Teacher Tracking milestone 2: copy a ready course plan onto a section, teacher submits, academic head finalizes. Student profile and portal show topics without minutes. |
 | 2026-09-27 | Teacher Tracking module key `teacher_tracking`. Milestone 1 is the Standard course planner (programme + subject + chapters + topics). |
 | 2026-09-07 | Student Profile Overview = activity timeline (calls, fees, WhatsApp, attendance, etc.; click-through to tabs) |

@@ -72,12 +72,10 @@
                     <div class="flex flex-wrap items-start justify-between gap-2">
                         <div>
                             <p class="text-sm font-bold text-gray-950 dark:text-white">{{ $conductRecord->typeLabelList() }}</p>
+                            <p class="mt-1 text-sm font-semibold text-gray-950 dark:text-white">Entered by {{ $conductRecord->recordedBy?->name ?: 'Unknown' }}</p>
                             <p class="text-xs text-gray-500 dark:text-gray-400">
                                 {{ $conductRecord->recorded_on?->format('d M Y') }}
                                 · {{ $conductRecord->fineSummary() }}
-                                @if ($conductRecord->recordedBy)
-                                    · {{ $conductRecord->recordedBy->name }}
-                                @endif
                             </p>
                             <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ $conductRecord->note }}</p>
                         </div>
