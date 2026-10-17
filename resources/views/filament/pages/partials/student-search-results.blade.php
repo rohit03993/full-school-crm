@@ -49,6 +49,9 @@
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                             <span class="truncate text-sm font-bold text-gray-950 dark:text-white">{{ $student->name }}</span>
+                            @if ($student->status === \App\Enums\StudentStatus::Dropped)
+                                <span class="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">Dropped</span>
+                            @endif
                             <span class="font-mono text-sm font-semibold text-primary-600 dark:text-primary-400"><x-crm.student-mobile :mobile="$student->mobile" /></span>
                         </div>
                         <p class="mt-0.5 truncate text-[11px] text-gray-500 dark:text-gray-400">
@@ -64,6 +67,10 @@
                             @if ($student->latestEnquiry?->course)
                                 @if ($student->city) · @endif
                                 {{ $student->latestEnquiry->course->name }}
+                            @endif
+                            @if ($student->status === \App\Enums\StudentStatus::Dropped && $student->latestDrop?->batch)
+                                @if ($student->father_name || $student->city || $student->latestEnquiry?->course) · @endif
+                                Was in {{ $student->latestDrop->batch->name }}
                             @endif
                         </p>
                     </div>

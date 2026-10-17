@@ -14,6 +14,7 @@ use App\Enums\DocumentType;
 use App\Enums\FeeMiscChargeAdjustmentType;
 use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
+use App\Enums\StudentStatus;
 use App\Enums\WhatsAppMessageSource;
 use App\Services\SectionCoursePlanService;
 use App\Support\CrmAccess;
@@ -83,6 +84,7 @@ use App\Services\ActivityMarksWhatsAppService;
 use App\Services\StudentExamMarksWriter;
 use App\Services\CertificateService;
 use App\Services\StudentConductService;
+use App\Services\StudentDropService;
 use App\Support\ConductTypeOptions;
 use App\Services\StudentCounterService;
 use App\Services\StudentProfileDeleteService;
@@ -3315,6 +3317,8 @@ class StudentProfilePage extends Page
             'activeEnrollment.feeStructure',
             'activeEnrollment.admission.enquiry',
             'activeBatchStudent.batch.trainer',
+            'latestDrop.batch.trainer',
+            'latestDrop.droppedBy',
         ]);
 
         $this->cachedProfileSummary = null;
@@ -3365,7 +3369,7 @@ class StudentProfilePage extends Page
     {
         $isEnrolled = $this->record->activeEnrollment !== null;
         $primaryNames = $isEnrolled
-            ? ['addPayment', 'reportStudent', 'editStudent']
+            ? ['addPayment', 'reportStudent', 'dropStudent', 'editStudent']
             : ['addVisit', 'convertToAdmission', 'addPayment', 'editStudent'];
 
         $primary = [];
@@ -3438,6 +3442,7 @@ class StudentProfilePage extends Page
                 'short' => match ($name) {
                     'addPayment' => 'Pay',
                     'reportStudent' => 'Report',
+                    'dropStudent' => 'Drop',
                     'editStudent' => 'Edit',
                     'addVisit' => 'Visit',
                     'convertToAdmission' => 'Admit',
@@ -3446,6 +3451,7 @@ class StudentProfilePage extends Page
                 'tone' => match ($name) {
                     'addPayment' => 'success',
                     'reportStudent' => 'warning',
+                    'dropStudent' => 'danger',
                     'addVisit', 'convertToAdmission' => 'primary',
                     default => 'gray',
                 },
@@ -3920,6 +3926,39 @@ class StudentProfilePage extends Page
                 })
                 ->visible(fn (): bool => $this->record->activeEnrollment !== null
                     && app(StudentConductService::class)->canRecord(Auth::user())),
+            Action::make('dropStudent')
+                ->label('Drop student')
+                ->icon('heroicon-o-user-minus')
+                ->color('danger')
+                ->button()
+                ->modalHeading('Drop this student?')
+                ->modalDescription('They leave the live class list, class attendance, and new homework. Old fees, old attendance, and old homework stay on this page. Search will still find them with a Dropped tag.')
+                ->modalSubmitActionLabel('Drop student')
+                ->form([
+                    Textarea::make('reason')
+                        ->label('Reason')
+                        ->required()
+                        ->maxLength(1000)
+                        ->rows(3),
+                ])
+                ->action(function (array $data): void {
+                    app(StudentDropService::class)->drop(
+                        $this->record,
+                        Auth::user(),
+                        (string) ($data['reason'] ?? ''),
+                    );
+
+                    $this->refreshRecord();
+
+                    Notification::make()
+                        ->title('Student dropped')
+                        ->body($this->record->name.' is marked Dropped. The old class name stays on this page.')
+                        ->success()
+                        ->send();
+                })
+                ->visible(fn (): bool => $this->record->status === StudentStatus::Enrolled
+                    && $this->record->activeEnrollment !== null
+                    && app(StudentDropService::class)->canDrop(Auth::user())),
             Action::make('addPayment')
                 ->label('Add Payment')
                 ->icon('heroicon-o-banknotes')

@@ -142,6 +142,16 @@ class Student extends Model
         return $this->hasMany(StudentConductRecord::class);
     }
 
+    public function drops(): HasMany
+    {
+        return $this->hasMany(StudentDrop::class);
+    }
+
+    public function latestDrop(): HasOne
+    {
+        return $this->hasOne(StudentDrop::class)->latestOfMany();
+    }
+
     public function parentFeeNotices(): HasMany
     {
         return $this->hasMany(ParentFeeNotice::class);

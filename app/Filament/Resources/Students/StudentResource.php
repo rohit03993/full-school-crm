@@ -85,6 +85,7 @@ class StudentResource extends Resource
                 'activeEnrollment.academicSession',
                 'activeEnrollment.feeStructure.installments',
                 'activeBatchStudent.batch.course',
+                'latestDrop.batch.course',
             ]);
     }
 
@@ -131,20 +132,7 @@ class StudentResource extends Resource
                     })
                     ->sortable()
                     ->weight('semibold')
-                    ->description(function (Student $record): string {
-                        $roll = $record->activeEnrollment?->enrollment_number;
-                        $batch = $record->activeBatchStudent?->batch;
-                        $class = $batch
-                            ? ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false)
-                            : ($record->activeEnrollment?->course?->name
-                                ? $record->activeEnrollment->course->name.' · No section'
-                                : null);
-
-                        return collect([
-                            filled($roll) ? 'Roll '.$roll : null,
-                            $class,
-                        ])->filter()->implode(' · ');
-                    })
+                    ->description(fn (Student $record): string => static::directorySubtitle($record))
                     ->wrap()
                     ->url(fn (Student $record): string => StudentProfilePage::getUrl(['record' => $record->id]))
                     ->color('primary'),
@@ -381,6 +369,7 @@ class StudentResource extends Resource
             'latestEnquiry',
             'activeBatchStudent.batch.course',
             'activeBatchStudent.batch.academicSession',
+            'latestDrop.batch.course',
         ]);
     }
 
@@ -396,22 +385,42 @@ class StudentResource extends Resource
         return StudentProfilePage::getUrl(['record' => $record->id]);
     }
 
+    protected static function directorySubtitle(Student $record): string
+    {
+        $roll = $record->activeEnrollment?->enrollment_number;
+        $dropped = $record->status === StudentStatus::Dropped;
+        $batch = $record->activeBatchStudent?->batch ?? ($dropped ? $record->latestDrop?->batch : null);
+        $class = $batch
+            ? ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false)
+            : ($record->activeEnrollment?->course?->name
+                ? $record->activeEnrollment->course->name.' · No section'
+                : null);
+
+        return collect([
+            $dropped ? 'Dropped' : null,
+            filled($roll) ? 'Roll '.$roll : null,
+            $class ? ($dropped ? 'Was in '.$class : $class) : null,
+        ])->filter()->implode(' · ');
+    }
+
     /**
      * @return array<string, string>
      */
     public static function getGlobalSearchResultDetails(Model $record): array
     {
         /** @var Student $record */
+        $dropped = $record->status === StudentStatus::Dropped;
         $kind = match ($record->status) {
             StudentStatus::Enquiry => 'Lead',
-            StudentStatus::Enrolled, StudentStatus::Completed, StudentStatus::Dropped => 'Student',
+            StudentStatus::Dropped => 'Dropped',
+            StudentStatus::Enrolled, StudentStatus::Completed => 'Student',
             default => $record->status?->label() ?? 'Person',
         };
 
-        $batch = $record->activeBatchStudent?->batch;
+        $batch = $record->activeBatchStudent?->batch ?? ($dropped ? $record->latestDrop?->batch : null);
         $class = $batch
-            ? ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false)
-            : 'No class yet';
+            ? ($dropped ? 'Was in ' : '').ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false)
+            : ($dropped ? 'Dropped' : 'No class yet');
 
         return array_filter([
             'Type' => $kind,

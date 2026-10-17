@@ -149,6 +149,7 @@ class StudentDataResetService
             'student_cases',
             'student_certificates',
             'student_conduct_records',
+            'student_drops',
             'visit_meeting_assignments',
             'face_verification_requests',
             'documents',

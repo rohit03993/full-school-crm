@@ -9,6 +9,7 @@ use App\Enums\HomeworkCheckNotifyStatus;
 use App\Enums\HomeworkCheckStatus;
 use App\Enums\HomeworkContentType;
 use App\Enums\LicenseFeature;
+use App\Enums\StudentStatus;
 use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
 use App\Models\BatchStudent;
@@ -1296,7 +1297,21 @@ class HomeworkSubmissionService
             ->pluck('batch_id');
 
         if ($batchIds->isEmpty()) {
-            return [];
+            if ($student->status !== StudentStatus::Dropped) {
+                return [];
+            }
+
+            $lastBatchId = BatchStudent::query()
+                ->where('student_id', $student->id)
+                ->where('is_active', false)
+                ->latest('id')
+                ->value('batch_id');
+
+            if (! $lastBatchId) {
+                return [];
+            }
+
+            $batchIds = collect([$lastBatchId]);
         }
 
         $assignments = HomeworkAssignment::query()

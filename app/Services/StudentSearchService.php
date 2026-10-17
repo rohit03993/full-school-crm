@@ -31,6 +31,7 @@ class StudentSearchService
             'lastCall.staff',
             'activeEnrollment.admission.documents',
             'activeBatchStudent.batch',
+            'latestDrop.batch',
             'admissions' => fn ($query) => $query->latest()->limit(1)->with('documents'),
         ];
     }

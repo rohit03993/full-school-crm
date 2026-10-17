@@ -3,6 +3,9 @@
     $enrollment = $dossier['enrollment'];
     $course = $enrollment->course;
     $batch = $dossier['batch'] ?? null;
+    $drop = $dossier['drop'] ?? null;
+    $showDroppedClass = $drop && ! $record->activeBatchStudent;
+    $isDropped = $record->status === \App\Enums\StudentStatus::Dropped;
     $fees = $dossier['fees'];
     $photo = $dossier['photo'];
     $items = $profile['items'];
@@ -66,8 +69,16 @@
             <div class="fi-student-profile-meta min-w-0 flex-1 text-left">
                 <div class="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
                     <div class="flex min-w-0 flex-wrap items-center gap-1">
-                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-500/20 dark:text-emerald-300 sm:px-2.5 sm:py-1 sm:text-[11px]">
-                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                        <span @class([
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 sm:px-2.5 sm:py-1 sm:text-[11px]',
+                            'bg-rose-500/15 text-rose-800 ring-rose-500/20 dark:text-rose-300' => $isDropped,
+                            'bg-emerald-500/15 text-emerald-800 ring-emerald-500/20 dark:text-emerald-300' => ! $isDropped,
+                        ])>
+                            <span @class([
+                                'h-1.5 w-1.5 rounded-full',
+                                'bg-rose-500' => $isDropped,
+                                'bg-emerald-500' => ! $isDropped,
+                            ])></span>
                             {{ $record->status->label() }}
                         </span>
                         <span class="rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-gray-700 dark:bg-white/10 dark:text-gray-300 sm:px-2 sm:py-1 sm:text-[11px]">
@@ -103,6 +114,11 @@
                     <p class="mt-0.5 line-clamp-2 text-xs leading-snug text-gray-600 sm:mt-1 sm:text-sm dark:text-gray-400">
                         {{ $course?->name ?? '—' }}@if ($course?->duration_label)<span class="text-gray-400"> · </span>{{ $course->duration_label }}@endif
                     </p>
+                    @if ($showDroppedClass)
+                        <p class="mt-1 text-xs font-semibold text-rose-700 dark:text-rose-300">Was in {{ $batch?->name ?? 'a class' }}</p>
+                        <p class="line-clamp-2 text-xs text-gray-600 dark:text-gray-400">{{ $drop->reason }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ $drop->dropped_at?->timezone(config('app.timezone'))->format('d M Y') }} · {{ $drop->droppedBy?->name ?? 'Staff' }}</p>
+                    @endif
                 </div>
 
                 {{-- Mobile: contact inline (desktop uses Contact card below) --}}
@@ -122,7 +138,7 @@
                 {{-- Quick metrics — desktop/tablet only (batch also in stats strip; contact on mobile above) --}}
                 <div class="mt-3 hidden gap-2 sm:grid sm:grid-cols-2">
                     <div class="rounded-xl border border-gray-100 bg-white/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Batch</p>
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">{{ $showDroppedClass ? 'Was in class' : 'Batch' }}</p>
                         <p class="mt-0.5 truncate text-lg font-bold text-gray-950 dark:text-white">{{ $batch?->name ?? 'Not assigned' }}</p>
                         @if ($batch?->trainer)
                             <p class="truncate text-[10px] text-gray-500">{{ $batch->trainer->name }}</p>

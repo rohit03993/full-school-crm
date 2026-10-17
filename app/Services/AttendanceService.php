@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\AttendanceStatus;
+use App\Enums\StudentStatus;
 use App\Models\Attendance;
 use App\Models\Batch;
 use App\Models\BatchStudent;
@@ -238,6 +239,14 @@ class AttendanceService
         $student->loadMissing('activeBatchStudent');
 
         $batchStudent = $student->activeBatchStudent;
+
+        if (! $batchStudent && $student->status === StudentStatus::Dropped) {
+            $batchStudent = $student->batchStudents()
+                ->where('is_active', false)
+                ->latest('id')
+                ->first();
+        }
+
         $batchId = $batchStudent?->batch_id;
 
         if (! $batchId) {

@@ -56,7 +56,8 @@ class StudentCounterService
      *         enrollment: \App\Models\Enrollment,
      *         admission: ?\App\Models\Admission,
      *         fees: ?\App\Models\FeeStructure,
-     *         batch: ?Batch
+     *         batch: ?Batch,
+     *         drop: ?\App\Models\StudentDrop
      *     }
      * }
      */
@@ -68,6 +69,8 @@ class StudentCounterService
             'activeEnrollment.feeStructure',
             'activeEnrollment.admission.documents',
             'activeBatchStudent.batch.trainer',
+            'latestDrop.batch.trainer',
+            'latestDrop.droppedBy',
             'enquiries',
         ]);
 
@@ -336,7 +339,8 @@ class StudentCounterService
      *     enrollment: \App\Models\Enrollment,
      *     admission: ?Admission,
      *     fees: ?\App\Models\FeeStructure,
-     *     batch: ?Batch
+     *     batch: ?Batch,
+     *     drop: ?\App\Models\StudentDrop
      * }
      */
     protected function dossierFor(Student $student): ?array
@@ -351,12 +355,15 @@ class StudentCounterService
         $photo = $admission?->documentForType(DocumentType::Photo)
             ?? $student->profilePhoto();
 
+        $drop = $student->latestDrop;
+
         return [
             'photo' => $photo,
             'enrollment' => $enrollment,
             'admission' => $admission,
             'fees' => $enrollment->feeStructure,
-            'batch' => $student->activeBatchStudent?->batch,
+            'batch' => $student->activeBatchStudent?->batch ?? $drop?->batch,
+            'drop' => $drop,
         ];
     }
 
