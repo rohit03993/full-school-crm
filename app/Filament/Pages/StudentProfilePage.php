@@ -1598,6 +1598,17 @@ class StudentProfilePage extends Page
             ->get();
     }
 
+    public function openReportStudent(): void
+    {
+        if ($this->record->activeEnrollment === null
+            || ! app(StudentConductService::class)->canRecord(Auth::user())) {
+            return;
+        }
+
+        $this->profileTab = 'conduct';
+        $this->updatedProfileTab();
+    }
+
     public function saveConductRecord(): void
     {
         $staff = Auth::user();
@@ -1632,7 +1643,7 @@ class StudentProfilePage extends Page
         $this->activityTimelineLoaded = false;
         $this->loadConductTab();
 
-        Notification::make()->title('Conduct record saved')->success()->send();
+        Notification::make()->title('Report saved')->success()->send();
     }
 
     public function deleteConductRecord(int $recordId): void
@@ -1646,7 +1657,7 @@ class StudentProfilePage extends Page
         $record = $this->record->conductRecords()->whereKey($recordId)->first();
 
         if (! $record) {
-            Notification::make()->title('Conduct record was not found.')->danger()->send();
+            Notification::make()->title('Report was not found.')->danger()->send();
 
             return;
         }
@@ -1655,7 +1666,7 @@ class StudentProfilePage extends Page
             app(StudentConductService::class)->delete($record, $staff);
         } catch (\Illuminate\Validation\ValidationException $e) {
             Notification::make()
-                ->title(collect($e->errors())->flatten()->first() ?: 'Could not remove the conduct record.')
+                ->title(collect($e->errors())->flatten()->first() ?: 'Could not remove the report.')
                 ->danger()
                 ->send();
 
@@ -1666,7 +1677,7 @@ class StudentProfilePage extends Page
         $this->activityTimelineLoaded = false;
         $this->loadConductTab();
 
-        Notification::make()->title('Conduct record removed')->success()->send();
+        Notification::make()->title('Report removed')->success()->send();
     }
 
     public function loadParentUpdatesTab(): void
@@ -3350,7 +3361,7 @@ class StudentProfilePage extends Page
     {
         $isEnrolled = $this->record->activeEnrollment !== null;
         $primaryNames = $isEnrolled
-            ? ['addPayment', 'editStudent']
+            ? ['addPayment', 'reportStudent', 'editStudent']
             : ['addVisit', 'convertToAdmission', 'addPayment', 'editStudent'];
 
         $primary = [];
@@ -3365,6 +3376,10 @@ class StudentProfilePage extends Page
 
             $more[] = $action;
         }
+
+        usort($primary, function (Action $a, Action $b) use ($primaryNames): int {
+            return array_search($a->getName(), $primaryNames, true) <=> array_search($b->getName(), $primaryNames, true);
+        });
 
         if ($more !== []) {
             $primary[] = ActionGroup::make($more)
@@ -3418,6 +3433,7 @@ class StudentProfilePage extends Page
                 'label' => $label,
                 'short' => match ($name) {
                     'addPayment' => 'Pay',
+                    'reportStudent' => 'Report',
                     'editStudent' => 'Edit',
                     'addVisit' => 'Visit',
                     'convertToAdmission' => 'Admit',
@@ -3425,9 +3441,11 @@ class StudentProfilePage extends Page
                 },
                 'tone' => match ($name) {
                     'addPayment' => 'success',
+                    'reportStudent' => 'warning',
                     'addVisit', 'convertToAdmission' => 'primary',
                     default => 'gray',
                 },
+                'click' => $name === 'reportStudent' ? 'openReportStudent' : null,
             ];
         }
 
@@ -3885,6 +3903,16 @@ class StudentProfilePage extends Page
                 })
                 ->visible(fn (): bool => $this->userCan(CrmPermission::AcademicsManage)
                     && $this->record->activeEnrollment !== null),
+            Action::make('reportStudent')
+                ->label('Report student')
+                ->icon('heroicon-o-exclamation-triangle')
+                ->color('warning')
+                ->button()
+                ->action(function (): void {
+                    $this->openReportStudent();
+                })
+                ->visible(fn (): bool => $this->record->activeEnrollment !== null
+                    && app(StudentConductService::class)->canRecord(Auth::user())),
             Action::make('addPayment')
                 ->label('Add Payment')
                 ->icon('heroicon-o-banknotes')
@@ -4512,7 +4540,7 @@ class StudentProfilePage extends Page
                                     'profileCertificateRemarks' => $this->profileCertificateRemarks,
                                 ]),
                         ]),
-                    'conduct' => Tab::make('Conduct')
+                    'conduct' => Tab::make('Report student')
                         ->icon('heroicon-o-exclamation-triangle')
                         ->badge(fn (): ?string => $this->record->activeEnrollment
                             && app(StudentConductService::class)->canRecord(Auth::user())

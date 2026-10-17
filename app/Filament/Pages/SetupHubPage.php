@@ -98,7 +98,7 @@ class SetupHubPage extends Page
         if (ManageConductTypes::canAccess()) {
             $cards[] = [
                 'title' => CrmMenuLabels::conductTypes(),
-                'description' => 'Indiscipline names on the student Conduct tab.',
+                'description' => 'Names staff can tick when they report a student.',
                 'url' => ManageConductTypes::getUrl(),
             ];
         }

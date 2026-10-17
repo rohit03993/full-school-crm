@@ -78,8 +78,8 @@ class ManageConductTypes extends Page
     {
         return $schema->components([
             CrmHint::placeholder('setup.conduct_types'),
-            Section::make('Indiscipline types')
-                ->description('These appear as tick boxes on the student Conduct tab. Add a name, rename one, or hide one the school does not use.')
+            Section::make('Report types')
+                ->description('These appear as tick boxes when staff report a student. Add a name, rename one, or hide one the school does not use.')
                 ->schema([
                     Repeater::make('options')
                         ->label('Types')
@@ -113,8 +113,8 @@ class ManageConductTypes extends Page
         ]);
 
         Notification::make()
-            ->title('Conduct types saved')
-            ->body('The student Conduct tab will use this list.')
+            ->title('Report types saved')
+            ->body('Report student will use this list.')
             ->success()
             ->send();
     }

@@ -614,7 +614,7 @@ class StudentActivityTimelineService
                     id: 'conduct-'.$record->id,
                     type: 'conduct',
                     category: 'CONDUCT',
-                    title: 'Conduct · '.$record->typeLabelList(),
+                    title: 'Report · '.$record->typeLabelList(),
                     summary: $record->fineSummary().' · Entered by '.($record->recordedBy?->name ?: 'Unknown'),
                     detail: filled($record->note) ? (string) $record->note : null,
                     staffName: $record->recordedBy?->name,

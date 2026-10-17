@@ -1,10 +1,10 @@
 <div wire:init="loadConductTab" class="space-y-4">
     <div class="rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-900 sm:p-5">
-        <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Add conduct record</h3>
+        <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Report this student</h3>
         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">This note stays on the student profile. It does not create a fee or a receipt.</p>
 
         @if ($conductTypeOptions === [])
-            <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">No conduct types are switched on. Super Admin can add them under Setup → Conduct types.</p>
+            <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">No report types are switched on. Super Admin can add them under Setup → Report types.</p>
         @else
             <div class="fi-crm-form mt-3 grid gap-3">
                 <div class="sm:max-w-xs">
@@ -52,7 +52,7 @@
                         wire:click="saveConductRecord"
                         class="rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-500"
                     >
-                        Save record
+                        Save report
                     </button>
                 </div>
             </div>
@@ -60,10 +60,10 @@
     </div>
 
     @if (! $conductTabLoaded)
-        <p class="text-sm text-gray-500 dark:text-gray-400">Loading conduct records…</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Loading reports…</p>
     @elseif ($conductRecords->isEmpty())
         <div class="fi-section rounded-xl px-4 py-8 text-center shadow-sm ring-1 ring-gray-950/5 dark:ring-white/10 sm:px-6">
-            <p class="text-sm text-gray-500 dark:text-gray-400">No conduct records for this student yet.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">No reports for this student yet.</p>
         </div>
     @else
         <div class="space-y-3">
@@ -83,7 +83,7 @@
                             <button
                                 type="button"
                                 wire:click="deleteConductRecord({{ $conductRecord->id }})"
-                                wire:confirm="Remove this conduct record?"
+                                wire:confirm="Remove this report?"
                                 class="text-sm font-semibold text-danger-600 hover:underline dark:text-danger-400"
                             >
                                 Remove

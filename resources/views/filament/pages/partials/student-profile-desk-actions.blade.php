@@ -7,10 +7,15 @@
         @foreach ($desk['primary'] as $action)
             <button
                 type="button"
-                wire:click="mountAction(@js($action['name']))"
+                @if (filled($action['click'] ?? null))
+                    wire:click="{{ $action['click'] }}"
+                @else
+                    wire:click="mountAction(@js($action['name']))"
+                @endif
                 @class([
                     'inline-flex min-h-8 flex-1 items-center justify-center rounded-lg px-2 text-[11px] font-semibold transition sm:min-h-9 sm:flex-none sm:rounded-full sm:px-3 sm:text-sm',
                     'bg-emerald-600 text-white shadow-sm hover:bg-emerald-500' => $action['tone'] === 'success',
+                    'bg-rose-600 text-white shadow-sm hover:bg-rose-500' => $action['tone'] === 'warning',
                     'bg-amber-500 text-white shadow-sm hover:bg-amber-400' => $action['tone'] === 'primary',
                     'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15 dark:hover:bg-white/15' => $action['tone'] === 'gray',
                 ])

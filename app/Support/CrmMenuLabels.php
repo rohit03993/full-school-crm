@@ -306,7 +306,7 @@ final class CrmMenuLabels
 
     public static function conductTypes(): string
     {
-        return 'Conduct types';
+        return 'Report types';
     }
 
     public static function biometricSetup(): string
