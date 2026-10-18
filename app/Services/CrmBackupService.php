@@ -186,7 +186,7 @@ class CrmBackupService
                 'filename' => $file->getFilename(),
                 'path' => $file->getPathname(),
                 'size_bytes' => $file->getSize(),
-                'created_at' => Carbon::createFromTimestamp($file->getMTime()),
+                'created_at' => Carbon::createFromTimestamp($file->getMTime())->timezone(config('app.timezone')),
             ];
         })->all();
     }

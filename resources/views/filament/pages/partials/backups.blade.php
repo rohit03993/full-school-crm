@@ -161,7 +161,7 @@
                                 {{ $backup['filename'] }}
                             </p>
                             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                {{ $backup['created_at']?->format('d M Y, h:i A') }}
+                                {{ $backup['created_at']?->timezone(config('app.timezone'))->format('d M Y, h:i A') }}
                                 · {{ $formatBytes($backup['size_bytes']) }}
                             </p>
                         </div>
