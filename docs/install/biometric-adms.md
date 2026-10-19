@@ -68,10 +68,42 @@ Newer K40 boards can often follow HTTPS. Old eSSL often **cannot**.
 
 | Field | Typical school LAN |
 |---|---|
-| Gateway | Router, e.g. **`192.168.1.1`** — **not** `0.0.0.0` |
-| DNS | **`8.8.8.8`** — **not** `0.0.0.0` |
-| DHCP | OFF is OK with a free static IP |
+| Gateway | Router, e.g. **`192.168.29.1`** — **not** `0.0.0.0` |
+| DNS | **`8.8.8.8`** — **not** blank and **not** `0.0.0.0` |
+| DHCP | **OFF** when you must type DNS. **ON** locks the DNS line. |
+| IP Address | Same range as the gateway. Router `192.168.29.1` needs an IP like `192.168.29.8`, not `192.168.1.201`. |
 | TCP COMM.Port **4370** | Leave it. CRM does **not** use 4370 |
+
+**DHCP ON** is why the DNS box will not open. Turn **DHCP OFF**, then type IP, mask, gateway, and DNS. Press **M/OK** and reboot.
+
+### Motion machine (18 Oct 2026) — gateway `0.0.0.0`
+
+Cloud address `motion.taskbook.co.in` was already saved. The machine still did not connect.
+
+Ethernet had **DHCP OFF**, DNS **`8.8.8.8`**, but **Gateway `0.0.0.0`** and IP **`192.168.1.201`**. The office router was **`192.168.29.1`**. A gateway of `0.0.0.0` means no route to the internet, and `192.168.1.201` is not on that router’s network.
+
+Working Ethernet:
+
+| Field | Value |
+|---|---|
+| DHCP | **OFF** |
+| IP Address | `192.168.29.8` |
+| Subnet Mask | `255.255.255.0` |
+| Gateway | `192.168.29.1` |
+| DNS | `8.8.8.8` |
+| TCP COMM.Port | `4370` (leave it) |
+
+Working Cloud Server:
+
+| Field | Value |
+|---|---|
+| Server Mode | **ADMS** |
+| Enable Domain Name | **ON** |
+| Server Address | `motion.taskbook.co.in` |
+| Enable Proxy Server | **OFF** |
+| HTTPS | **OFF** |
+
+HTTPS **ON** on this board did not connect. Use the host only. After **M/OK**, reboot and wait about two minutes. **Setup → Biometric devices → Last seen** should move.
 
 Save and **reboot** the machine after cloud + Ethernet changes.
 
