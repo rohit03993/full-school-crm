@@ -8,6 +8,7 @@ use App\Support\LoginOtpWhatsAppTemplate;
 use App\Support\MetaWhatsAppTemplateBuilder;
 use App\Support\MetaWhatsAppTemplateParser;
 use App\Support\WhatsAppTemplateParamMappingInferrer;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 
@@ -113,6 +114,12 @@ class MetaWhatsAppTemplateSubmitService
                 'synced_at' => now(),
             ],
         );
+
+        if ($template->wasRecentlyCreated && Auth::id()) {
+            $template->forceFill([
+                'created_by_user_id' => Auth::id(),
+            ])->save();
+        }
 
         if ($status === 'APPROVED') {
             $this->mirrorToWhatsAppTemplate($template);

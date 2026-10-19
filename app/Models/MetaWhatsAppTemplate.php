@@ -6,6 +6,7 @@ use App\Support\MetaWhatsAppTemplateBuilder;
 use App\Support\MetaWhatsAppTemplateParser;
 use App\Support\WhatsAppTemplateParamMappingInferrer;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MetaWhatsAppTemplate extends Model
@@ -23,6 +24,7 @@ class MetaWhatsAppTemplate extends Model
         'provider_meta',
         'is_active',
         'synced_at',
+        'created_by_user_id',
     ];
 
     protected function casts(): array
@@ -70,6 +72,11 @@ class MetaWhatsAppTemplate extends Model
         }
 
         return $sources;
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
     public function liveCampaigns(): HasMany

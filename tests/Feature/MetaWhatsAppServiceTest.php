@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\MetaWhatsAppService;
 use App\Services\MetaWhatsAppTemplateSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -389,6 +391,91 @@ class MetaWhatsAppServiceTest extends TestCase
             'name' => 'parent_checkin',
             'status' => 'PENDING',
         ]);
+    }
+
+    public function test_new_template_remembers_the_staff_who_made_it(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.waba_id' => 'waba-1',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+        ]);
+
+        $maker = User::factory()->create(['name' => 'Neha Ops']);
+        $other = User::factory()->create(['name' => 'Amit Ops']);
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/waba-1/message_templates' => Http::response([
+                'id' => 'tpl-123',
+                'status' => 'PENDING',
+                'category' => 'UTILITY',
+            ], 200),
+        ]);
+
+        $this->actingAs($maker);
+
+        app(\App\Services\MetaWhatsAppTemplateSubmitService::class)->submit([
+            'name' => 'parent_checkin',
+            'language' => 'en',
+            'category' => 'UTILITY',
+            'body_text' => 'Hello {{1}}, checked in at {{2}}.',
+            'body_examples_csv' => 'Rohit, 9 AM',
+        ]);
+
+        $this->actingAs($other);
+
+        app(\App\Services\MetaWhatsAppTemplateSubmitService::class)->submit([
+            'name' => 'parent_checkin',
+            'language' => 'en',
+            'category' => 'UTILITY',
+            'body_text' => 'Hello {{1}}, checked in at {{2}} today.',
+            'body_examples_csv' => 'Rohit, 9 AM',
+        ]);
+
+        $this->assertSame(
+            $maker->id,
+            MetaWhatsAppTemplate::query()->where('name', 'parent_checkin')->value('created_by_user_id'),
+        );
+    }
+
+    public function test_sync_does_not_clear_who_made_the_template(): void
+    {
+        config([
+            'meta_whatsapp.graph_version' => 'v20.0',
+            'meta_whatsapp.waba_id' => 'waba-1',
+            'meta_whatsapp.access_token' => 'meta-test-token',
+        ]);
+
+        $maker = User::factory()->create(['name' => 'Neha Ops']);
+
+        MetaWhatsAppTemplate::query()->create([
+            'name' => 'parent_checkin',
+            'language' => 'en',
+            'status' => 'APPROVED',
+            'body' => 'Hello {{1}}.',
+            'created_by_user_id' => $maker->id,
+            'is_active' => true,
+        ]);
+
+        Http::fake([
+            'https://graph.facebook.com/v20.0/waba-1/message_templates*' => Http::response([
+                'data' => [[
+                    'name' => 'parent_checkin',
+                    'language' => 'en',
+                    'status' => 'APPROVED',
+                    'components' => [
+                        ['type' => 'BODY', 'text' => 'Hello {{1}}, checked in at {{2}}.'],
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        app(MetaWhatsAppTemplateSyncService::class)->sync();
+
+        $this->assertSame(
+            $maker->id,
+            MetaWhatsAppTemplate::query()->where('name', 'parent_checkin')->value('created_by_user_id'),
+        );
     }
 
     public function test_template_submit_accepts_url_sample_without_csv_splitting(): void

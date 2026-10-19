@@ -45,6 +45,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Notifications\Notification;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use InvalidArgumentException;
 use UnitEnum;
@@ -506,10 +507,14 @@ class MetaWhatsAppTemplateResource extends Resource
                 TextColumn::make('body')
                     ->limit(50)
                     ->toggleable(),
-                TextColumn::make('synced_at')
-                    ->label('Last sync')
+                TextColumn::make('created_at')
+                    ->label('Made')
                     ->dateTime('d M Y H:i')
+                    ->timezone(config('app.timezone'))
                     ->sortable(),
+                TextColumn::make('createdBy.name')
+                    ->label('Made by')
+                    ->placeholder('Not recorded'),
                 IconColumn::make('is_active')
                     ->boolean()
                     ->label('Active'),
@@ -694,6 +699,11 @@ class MetaWhatsAppTemplateResource extends Resource
         }
 
         return [];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->with('createdBy');
     }
 
     public static function getPages(): array
