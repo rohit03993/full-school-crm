@@ -10,6 +10,7 @@ use App\Models\Enrollment;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\AttendanceService;
+use App\Services\StudentRecordGuard;
 use App\Support\CrmCacheInvalidator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +39,10 @@ class ManualBatchAttendanceService
     public function manualIn(Student $student, string $date, User $staff, ?string $time = null, bool $notifyParents = true): array
     {
         if ($blocked = $this->manualDateBlockedResult($date)) {
+            return $blocked;
+        }
+
+        if ($blocked = $this->inactiveBlocked($student, $date)) {
             return $blocked;
         }
 
@@ -116,6 +121,10 @@ class ManualBatchAttendanceService
     public function manualOut(Student $student, string $date, User $staff): array
     {
         if ($blocked = $this->manualDateBlockedResult($date)) {
+            return $blocked;
+        }
+
+        if ($blocked = $this->inactiveBlocked($student, $date)) {
             return $blocked;
         }
 
@@ -304,6 +313,12 @@ class ManualBatchAttendanceService
         User $staff,
         string $reason,
     ): array {
+        if ($blocked = $this->inactiveBlocked($student, $date)) {
+            return [
+                'ok' => false,
+                'message' => $blocked['message'],
+            ];
+        }
         $roll = $this->rollForStudent($student);
         if ($roll !== null && $date === now()->toDateString()) {
             $dayRow = app(LivePunchDashboardService::class)->studentDayRow($roll, $date, $student);
@@ -361,6 +376,10 @@ class ManualBatchAttendanceService
     public function markAbsent(Student $student, string $date, User $staff, ?Batch $batch = null): array
     {
         if ($blocked = $this->manualDateBlockedResult($date)) {
+            return $blocked;
+        }
+
+        if ($blocked = $this->inactiveBlocked($student, $date)) {
             return $blocked;
         }
 
@@ -484,6 +503,10 @@ class ManualBatchAttendanceService
                     continue;
                 }
 
+                if (! app(StudentRecordGuard::class)->allows($student, $date, true)) {
+                    continue;
+                }
+
                 if ($status === AttendanceStatus::Present) {
                     $roll = $this->rollForStudent($student);
 
@@ -517,6 +540,24 @@ class ManualBatchAttendanceService
         }
 
         return $stats;
+    }
+
+    /**
+     * @return array{ok: false, message: string, whatsapp: null}|null
+     */
+    private function inactiveBlocked(Student $student, string $date): ?array
+    {
+        $message = app(StudentRecordGuard::class)->denialMessage($student, $date, true);
+
+        if ($message === null) {
+            return null;
+        }
+
+        return [
+            'ok' => false,
+            'message' => $message,
+            'whatsapp' => null,
+        ];
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BlocksInactiveStudentWrites;
 use App\Enums\CampusVisitPurpose;
 use App\Enums\StudentCaseStatus;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StudentCase extends Model
 {
+    use BlocksInactiveStudentWrites;
+
     protected $fillable = [
         'case_number',
         'student_id',

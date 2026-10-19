@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BlocksInactiveStudentWrites;
 use App\Enums\CallDirection;
 use App\Enums\CallStatus;
 use App\Enums\EnrolledCallPurpose;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StudentCall extends Model
 {
+    use BlocksInactiveStudentWrites;
+
     protected $fillable = [
         'student_id',
         'enquiry_id',

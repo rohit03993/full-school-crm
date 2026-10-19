@@ -96,12 +96,12 @@
                             <a href="{{ $enrollment->idCardDownloadUrl() }}" class="inline-flex items-center rounded-lg bg-gray-100 px-2 py-1 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-200 dark:bg-white/10 dark:text-gray-200 dark:hover:bg-white/15 sm:px-2.5 sm:py-1.5 sm:text-xs">
                                 Download
                             </a>
-                            @if (auth()->user()?->hasRole(\App\Enums\RoleName::SuperAdmin->value))
+                            @if (auth()->user()?->hasRole(\App\Enums\RoleName::SuperAdmin->value) && ! $isDropped)
                                 <button type="button" wire:click="regenerateIdCard" wire:confirm="Regenerate ID card with the latest student photo and details?" class="inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-medium text-amber-700 transition hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10 sm:px-2.5 sm:py-1.5 sm:text-xs">
                                     Regenerate
                                 </button>
                             @endif
-                        @elseif ($fees && $tuitionPaid > 0)
+                        @elseif ($fees && $tuitionPaid > 0 && ! $isDropped)
                             <x-filament::button wire:click="generateIdCard" size="xs" color="gray" icon="heroicon-o-identification">
                                 Generate ID card
                             </x-filament::button>
@@ -117,7 +117,10 @@
                     @if ($showDroppedClass)
                         <p class="mt-1 text-xs font-semibold text-rose-700 dark:text-rose-300">Was in {{ $batch?->name ?? 'a class' }}</p>
                         <p class="line-clamp-2 text-xs text-gray-600 dark:text-gray-400">{{ $drop->reason }}</p>
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ $drop->dropped_at?->timezone(config('app.timezone'))->format('d M Y') }} · {{ $drop->droppedBy?->name ?? 'Staff' }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ $drop->dropped_at?->timezone(config('app.timezone'))->format('d M Y, h:i A') }} · {{ $drop->droppedBy?->name ?? 'Staff' }}</p>
+                        @if ($isDropped)
+                            <p class="mt-1 text-[11px] font-medium text-rose-700 dark:text-rose-300">Fees, attendance, and other records are locked from this time.</p>
+                        @endif
                     @endif
                 </div>
 

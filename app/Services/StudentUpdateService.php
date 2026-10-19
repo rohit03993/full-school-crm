@@ -21,6 +21,8 @@ class StudentUpdateService
      */
     public function update(Student $student, array $data, ?User $staff = null): Student
     {
+        app(StudentRecordGuard::class)->assertWritable($student);
+
         return DB::transaction(function () use ($student, $data, $staff): Student {
             // Hidden mobile fields are omitted from the form. Keep the saved numbers
             // so staff without "see mobile" cannot wipe them while editing other details.

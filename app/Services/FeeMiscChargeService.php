@@ -30,6 +30,12 @@ class FeeMiscChargeService
         ?string $dueDate,
         User $staff,
     ): FeeMiscCharge {
+        $student = $feeStructure->enrollment?->student;
+
+        if ($student instanceof \App\Models\Student) {
+            app(StudentRecordGuard::class)->assertWritable($student, $dueDate, true);
+        }
+
         $label = trim($label);
         $amount = round($amount, 2);
 
@@ -228,6 +234,12 @@ class FeeMiscChargeService
             throw ValidationException::withMessages([
                 'charge' => 'Only late fee penalty charges can be waived here.',
             ]);
+        }
+
+        $student = $charge->feeStructure?->enrollment?->student;
+
+        if ($student instanceof \App\Models\Student) {
+            app(StudentRecordGuard::class)->assertWritable($student);
         }
 
         if ((float) $charge->paid_amount > 0) {

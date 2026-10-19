@@ -110,6 +110,7 @@ use App\Support\InstituteProfile;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -890,7 +891,8 @@ class StudentProfilePage extends Page
     protected function canEditExamMarks(): bool
     {
         return $this->licensed(LicenseFeature::Marks)
-            && $this->userCan(CrmPermission::AcademicsManage);
+            && $this->userCan(CrmPermission::AcademicsManage)
+            && $this->record->status !== StudentStatus::Dropped;
     }
 
     protected function canSendExamMarksWhatsApp(): bool
@@ -899,6 +901,7 @@ class StudentProfilePage extends Page
             && $this->licensed(LicenseFeature::Marks)
             && CrmAccess::canSendExamMarksWhatsApp(Auth::user())
             && $this->record->activeEnrollment !== null
+            && $this->record->status !== StudentStatus::Dropped
             && filled($this->record->mobile);
     }
 
@@ -2081,6 +2084,16 @@ class StudentProfilePage extends Page
 
     public function sendWhatsAppMessage(): void
     {
+        if ($this->record->status === StudentStatus::Dropped) {
+            Notification::make()
+                ->title('Student is inactive')
+                ->body('WhatsApp stays locked until this student is made active.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         if (! $this->licensed(LicenseFeature::WhatsApp)) {
             Notification::make()
                 ->title('WhatsApp module is not enabled')
@@ -2567,12 +2580,20 @@ class StudentProfilePage extends Page
 
     public function openPayMiscCharge(int $chargeId): void
     {
+        if ($this->record->status === StudentStatus::Dropped) {
+            return;
+        }
+
         $this->mountAction('addPayment', ['miscChargeId' => $chargeId]);
     }
 
     public function openPayInstallment(int $installmentId): void
     {
         abort_unless($this->userCan(CrmPermission::FeesCollect), 403);
+
+        if ($this->record->status === StudentStatus::Dropped) {
+            return;
+        }
 
         $this->mountAction('addPayment', [
             'miscChargeId' => null,
@@ -3319,6 +3340,7 @@ class StudentProfilePage extends Page
             'activeBatchStudent.batch.trainer',
             'latestDrop.batch.trainer',
             'latestDrop.droppedBy',
+            'latestDrop.reactivatedBy',
         ]);
 
         $this->cachedProfileSummary = null;
@@ -3524,7 +3546,8 @@ class StudentProfilePage extends Page
                 ->visible(fn (): bool => $this->profileTab === 'fees'
                     && $this->licensed(LicenseFeature::WhatsApp)
                     && $this->userCan(CrmPermission::FeesCollect)
-                    && $this->record->activeEnrollment?->feeStructure !== null),
+                    && $this->record->activeEnrollment?->feeStructure !== null
+                    && $this->record->status !== StudentStatus::Dropped),
             Action::make('sendExamMarksWhatsApp')
                 ->label('Send marks on WhatsApp')
                 ->icon('heroicon-o-chat-bubble-left-ellipsis')
@@ -3656,7 +3679,8 @@ class StudentProfilePage extends Page
                 })
                 ->visible(fn (): bool => $this->licensed(LicenseFeature::Enquiries)
                     && $this->userCan(CrmPermission::LeadsCall)
-                    && ($this->record->enquiries->isNotEmpty() || $this->record->activeEnrollment !== null)),
+                    && ($this->record->enquiries->isNotEmpty() || $this->record->activeEnrollment !== null)
+                    && $this->record->status !== StudentStatus::Dropped),
             Action::make('addEnquiry')
                 ->label('Add Enquiry')
                 ->icon('heroicon-o-document-plus')
@@ -3681,7 +3705,8 @@ class StudentProfilePage extends Page
                 })
                 ->visible(fn (): bool => $this->licensed(LicenseFeature::Enquiries)
                     && $this->userCan(CrmPermission::LeadsCall)
-                    && $this->record->enquiries()->doesntExist()),
+                    && $this->record->enquiries()->doesntExist()
+                    && $this->record->status !== StudentStatus::Dropped),
             Action::make('convertToAdmission')
                 ->label('Convert to Admission')
                 ->icon('heroicon-o-arrow-right-circle')
@@ -3768,7 +3793,8 @@ class StudentProfilePage extends Page
                 })
                 ->visible(fn (ConvertToAdmissionPresenter $presenter): bool => $this->licensed(LicenseFeature::Admissions)
                     && $this->userCan(CrmPermission::AdmissionsView)
-                    && $presenter->convertibleEnquiries($this->record)->isNotEmpty()),
+                    && $presenter->convertibleEnquiries($this->record)->isNotEmpty()
+                    && $this->record->status !== StudentStatus::Dropped),
             Action::make('setAdmissionFeePlan')
                 ->label('Set fee plan')
                 ->icon('heroicon-o-banknotes')
@@ -3867,7 +3893,8 @@ class StudentProfilePage extends Page
                         ->success()
                         ->send();
                 })
-                ->visible(fn (): bool => $this->canManageAdmissionFeePlan),
+                ->visible(fn (): bool => $this->canManageAdmissionFeePlan
+                    && $this->record->status !== StudentStatus::Dropped),
             Action::make('assignBatch')
                 ->label('Assign Batch')
                 ->icon('heroicon-o-user-group')
@@ -3914,7 +3941,8 @@ class StudentProfilePage extends Page
                         ->send();
                 })
                 ->visible(fn (): bool => $this->userCan(CrmPermission::AcademicsManage)
-                    && $this->record->activeEnrollment !== null),
+                    && $this->record->activeEnrollment !== null
+                    && $this->record->status !== StudentStatus::Dropped),
             Action::make('reportStudent')
                 ->label('Report student')
                 ->icon('heroicon-o-exclamation-triangle')
@@ -3924,6 +3952,7 @@ class StudentProfilePage extends Page
                     $this->openReportStudent();
                 })
                 ->visible(fn (): bool => $this->record->activeEnrollment !== null
+                    && $this->record->status !== StudentStatus::Dropped
                     && app(StudentConductService::class)->canRecord(Auth::user())),
             Action::make('reinstateStudent')
                 ->label('Make active')
@@ -3952,9 +3981,17 @@ class StudentProfilePage extends Page
                 ->color('danger')
                 ->button()
                 ->modalHeading('Mark this student inactive?')
-                ->modalDescription('They leave the live class list, class attendance, and new homework. Old fees, old attendance, and old homework stay on this page. Search will still find them with an Inactive tag.')
+                ->modalDescription('They leave the live class list, class attendance, and new homework. Pick the date and time this starts. Old records from before that moment stay on this page.')
                 ->modalSubmitActionLabel('Make inactive')
                 ->form([
+                    DateTimePicker::make('inactive_at')
+                        ->label('Inactive from')
+                        ->default(fn () => now())
+                        ->required()
+                        ->seconds(false)
+                        ->native(false)
+                        ->maxDate(now())
+                        ->helperText('Opens as today and the current time. You can choose an earlier date and time.'),
                     Textarea::make('reason')
                         ->label('Reason')
                         ->required()
@@ -3966,6 +4003,7 @@ class StudentProfilePage extends Page
                         $this->record,
                         Auth::user(),
                         (string) ($data['reason'] ?? ''),
+                        $data['inactive_at'] ?? null,
                     );
 
                     $this->refreshRecord();
@@ -4067,7 +4105,8 @@ class StudentProfilePage extends Page
                 ->visible(fn (): bool => $this->licensed(LicenseFeature::Fees)
                     && $this->userCan(CrmPermission::FeesCollect)
                     && $this->record->activeEnrollment?->feeStructure !== null
-                    && (float) ($this->record->activeEnrollment->feeStructure->totalCollectiblePending() ?? 0) > 0),
+                    && (float) ($this->record->activeEnrollment->feeStructure->totalCollectiblePending() ?? 0) > 0
+                    && $this->record->status !== StudentStatus::Dropped),
             Action::make('adjustFees')
                 ->label('Adjust Fees')
                 ->icon('heroicon-o-calculator')
@@ -4192,7 +4231,8 @@ class StudentProfilePage extends Page
                 })
                 ->visible(fn (): bool => $this->licensed(LicenseFeature::Fees)
                     && $this->userCan(CrmPermission::FeesAdjustStructure)
-                    && $this->record->activeEnrollment?->feeStructure !== null),
+                    && $this->record->activeEnrollment?->feeStructure !== null
+                    && $this->record->status !== StudentStatus::Dropped),
             Action::make('editStudent')
                 ->label('Edit')
                 ->icon('heroicon-o-pencil-square')
@@ -4276,7 +4316,8 @@ class StudentProfilePage extends Page
                             ->send();
                     }
                 })
-                ->visible(fn (): bool => $this->userCan(CrmPermission::StudentsEdit)),
+                ->visible(fn (): bool => $this->userCan(CrmPermission::StudentsEdit)
+                    && $this->record->status !== StudentStatus::Dropped),
             Action::make('pullFacePhoto')
                 ->label('Face Photo')
                 ->icon('heroicon-o-camera')
@@ -4357,6 +4398,7 @@ class StudentProfilePage extends Page
                 })
                 ->visible(fn (): bool => (bool) config('face_verify.enabled', false)
                     && $this->record->activeEnrollment !== null
+                    && $this->record->status !== StudentStatus::Dropped
                     && $this->userCan(CrmPermission::StudentsEdit)),
             Action::make('deleteStudent')
                 ->label('Delete Student')
@@ -4472,7 +4514,8 @@ class StudentProfilePage extends Page
                     'conductRecords' => $this->conductRecords,
                     'conductTypeOptions' => ConductTypeOptions::formOptions(),
                     'conductFineChoice' => $this->conductFineChoice,
-                    'canDeleteConduct' => app(StudentConductService::class)->canDelete(Auth::user()),
+                    'canDeleteConduct' => $this->record->status !== StudentStatus::Dropped
+                        && app(StudentConductService::class)->canDelete(Auth::user()),
                 ]),
             View::make('filament.pages.partials.close-meeting-modal')
                 ->viewData(fn (): array => [
@@ -4583,7 +4626,8 @@ class StudentProfilePage extends Page
                                     'staffOptions' => StudentCaseService::activeStaffOptions(),
                                     'caseService' => app(StudentCaseService::class),
                                     'viewer' => Auth::user(),
-                                    'canOpenCaseAsAdmin' => app(StudentCaseService::class)->canOpenAsAdmin(Auth::user(), $this->record),
+                                    'canOpenCaseAsAdmin' => $this->record->status !== StudentStatus::Dropped
+                                        && app(StudentCaseService::class)->canOpenAsAdmin(Auth::user(), $this->record),
                                     'showOpenCaseForm' => $this->showOpenCaseForm,
                                     'openCaseType' => $this->openCaseType,
                                     'openCaseTitle' => $this->openCaseTitle,
@@ -4611,7 +4655,8 @@ class StudentProfilePage extends Page
                                 ->viewData(fn (): array => [
                                     'certificatesTabLoaded' => $this->certificatesTabLoaded,
                                     'certificates' => $this->certificates,
-                                    'canIssue' => $this->userCan(CrmPermission::CertificatesIssue),
+                                    'canIssue' => $this->record->status !== StudentStatus::Dropped
+                                        && $this->userCan(CrmPermission::CertificatesIssue),
                                     'typeOptions' => CertificateType::options(),
                                     'profileCertificateType' => $this->profileCertificateType,
                                     'profileCertificateRemarks' => $this->profileCertificateRemarks,
@@ -4682,7 +4727,8 @@ class StudentProfilePage extends Page
                                     'feeStructureHistory' => $this->feeStructureHistory,
                                     'canCollectFees' => $this->userCan(CrmPermission::FeesCollect),
                                     'canRequestMiscAdjustment' => $this->userCanRequestMiscAdjustment(),
-                                    'canRequestPaymentCancellation' => $this->userCanRequestPaymentCancellation(),
+                                    'canRequestPaymentCancellation' => $this->record->status !== StudentStatus::Dropped
+                                        && $this->userCanRequestPaymentCancellation(),
                                     'latestActivePaymentId' => $this->latestActivePaymentId(),
                                     'paymentCancellationsUrl' => PaymentCancellationRequestsPage::getUrl(),
                                     'adjustmentsUrl' => MiscChargeAdjustmentRequestsPage::getUrl(),

@@ -28,6 +28,8 @@ class DocumentService
         UploadedFile $file,
         ?User $uploader = null,
     ): Document {
+        $this->assertDocumentStudentOpen($documentable);
+
         $studentId = $documentable instanceof Admission
             ? $documentable->student_id
             : $documentable->getKey();
@@ -104,6 +106,12 @@ class DocumentService
 
     public function deleteFile(Document $document): void
     {
+        $owner = $document->documentable;
+
+        if ($owner instanceof Model) {
+            $this->assertDocumentStudentOpen($owner);
+        }
+
         $this->storage->deleteStoredFile($document->file_path);
 
         $document->delete();
@@ -122,5 +130,22 @@ class DocumentService
         }
 
         return true;
+    }
+
+    protected function assertDocumentStudentOpen(Model $documentable): void
+    {
+        $student = $documentable instanceof \App\Models\Student
+            ? $documentable
+            : null;
+
+        if (! $student && filled($documentable->getAttribute('student_id'))) {
+            $student = $documentable->relationLoaded('student')
+                ? $documentable->getRelation('student')
+                : \App\Models\Student::query()->find($documentable->getAttribute('student_id'));
+        }
+
+        if ($student instanceof \App\Models\Student) {
+            app(StudentRecordGuard::class)->assertWritable($student);
+        }
     }
 }

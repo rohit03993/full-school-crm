@@ -48,7 +48,8 @@ class StudentProfileDeleteService
             ]);
         }
 
-        DB::transaction(function () use ($student, $actor): void {
+        StudentRecordGuard::bypass(function () use ($student, $actor): void {
+            DB::transaction(function () use ($student, $actor): void {
             $student = Student::query()
                 ->with([
                     'enrollments.feeStructure.installments',
@@ -116,6 +117,7 @@ class StudentProfileDeleteService
             CrmCacheInvalidator::afterEnquiryChange();
             CrmCacheInvalidator::afterAdmissionChange();
             CrmCacheInvalidator::afterBulkImport();
+            });
         });
     }
 

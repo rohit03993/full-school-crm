@@ -114,6 +114,10 @@ class PenaltyCalculationService
             return null;
         }
 
+        if (! app(StudentRecordGuard::class)->allows($student, $today, true)) {
+            return null;
+        }
+
         $existing = FeeMiscCharge::query()
             ->where('fee_installment_id', $installment->id)
             ->where('kind', FeeMiscChargeKind::LateFeePenalty)
@@ -175,6 +179,12 @@ class PenaltyCalculationService
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'penalty' => 'Only pending late fees can be waived.',
             ]);
+        }
+
+        $student = $penalty->student ?? \App\Models\Student::query()->find($penalty->student_id);
+
+        if ($student instanceof \App\Models\Student) {
+            app(StudentRecordGuard::class)->assertWritable($student, $penalty->penalty_date, true);
         }
 
         $penalty->update([

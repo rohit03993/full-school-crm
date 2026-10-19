@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BlocksInactiveStudentWrites;
 use App\Enums\CampusVisitOutcome;
 use App\Enums\CampusVisitPurpose;
 use App\Enums\VisitStatus;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Visit extends Model
 {
+    use BlocksInactiveStudentWrites;
     /**
      * @var list<string>
      */

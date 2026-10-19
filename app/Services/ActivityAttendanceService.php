@@ -101,6 +101,12 @@ class ActivityAttendanceService
                     continue;
                 }
 
+                $markedStudent = Student::query()->find($studentId);
+
+                if (! $markedStudent || ! app(StudentRecordGuard::class)->allows($markedStudent, $attendable->session_date, true)) {
+                    continue;
+                }
+
                 $score = $this->normalizeScore($scores[$studentId] ?? null, $maxMarks);
                 $isPresent = filter_var($isPresent, FILTER_VALIDATE_BOOLEAN);
 
@@ -232,6 +238,12 @@ class ActivityAttendanceService
         DB::transaction(function () use ($session, $studentScores, $staff, $maxMarks, $wasPublished, $groupKey, $oldScores, &$saved): void {
             foreach ($studentScores as $studentId => $rawMark) {
                 if (! filled($rawMark) && $rawMark !== 0 && $rawMark !== '0') {
+                    continue;
+                }
+
+                $markedStudent = Student::query()->find((int) $studentId);
+
+                if (! $markedStudent || ! app(StudentRecordGuard::class)->allows($markedStudent, $session->session_date, true)) {
                     continue;
                 }
 

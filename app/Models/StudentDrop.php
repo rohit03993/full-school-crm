@@ -14,12 +14,15 @@ class StudentDrop extends Model
         'reason',
         'dropped_by_user_id',
         'dropped_at',
+        'reactivated_by_user_id',
+        'reactivated_at',
     ];
 
     protected function casts(): array
     {
         return [
             'dropped_at' => 'datetime',
+            'reactivated_at' => 'datetime',
         ];
     }
 
@@ -41,5 +44,10 @@ class StudentDrop extends Model
     public function droppedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'dropped_by_user_id');
+    }
+
+    public function reactivatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reactivated_by_user_id');
     }
 }

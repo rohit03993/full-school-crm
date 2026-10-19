@@ -358,6 +358,7 @@
                         @endif
                     </p>
                 </div>
+                @if ($record->status !== \App\Enums\StudentStatus::Dropped)
                 <button
                     type="button"
                     wire:click="openPayInstallment({{ $nextInstallment->id }})"
@@ -369,6 +370,7 @@
                 >
                     Collect ₹{{ number_format($nextPending, 0) }}
                 </button>
+                @endif
             </div>
         @endif
 
@@ -421,7 +423,7 @@
                                     <td class="px-4 py-3" data-label="Status">
                                         <span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold {{ $statusClass }}">{{ $status }}</span>
                                     </td>
-                                    @if ($canCollectFees ?? false)
+                                    @if (($canCollectFees ?? false) && $record->status !== \App\Enums\StudentStatus::Dropped)
                                         <td class="crm-responsive-table__actions px-4 py-3 text-right" data-label="">
                                             @if ($canCollectRow)
                                                 <button
@@ -513,7 +515,7 @@
                                     </td>
                                     <td class="crm-responsive-table__actions px-4 py-3 text-right" data-label="">
                                         <div class="flex flex-wrap items-center justify-end gap-2">
-                                            @if ($charge->isPayableSeparately() && ($canCollectFees ?? false))
+                                            @if ($charge->isPayableSeparately() && ($canCollectFees ?? false) && $record->status !== \App\Enums\StudentStatus::Dropped)
                                                 <button
                                                     type="button"
                                                     wire:click="openPayMiscCharge({{ $charge->id }})"

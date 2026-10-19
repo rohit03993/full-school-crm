@@ -7,6 +7,7 @@ use App\Enums\RoleName;
 use App\Models\Attendance;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\StudentRecordGuard;
 use Illuminate\Support\Carbon;
 
 class PunchAttendanceSyncService
@@ -20,6 +21,10 @@ class PunchAttendanceSyncService
         ?int $markedByUserId = null,
     ): void {
         $student->loadMissing('activeBatchStudent');
+
+        if (! app(StudentRecordGuard::class)->allows($student, $date.' '.$this->normalizeTime($punchTime))) {
+            return;
+        }
 
         $batchId = $student->activeBatchStudent?->batch_id;
 

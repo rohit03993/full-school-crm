@@ -29,6 +29,12 @@ class MetaWhatsAppInboxService
         ?User $sender = null,
         WhatsAppMessageSource $source = WhatsAppMessageSource::Profile,
     ): array {
+        $locked = app(StudentRecordGuard::class)->denialMessage($student);
+
+        if ($locked) {
+            return ['status' => 'failed', 'error' => $locked];
+        }
+
         if (blank($student->mobile)) {
             return ['status' => 'failed', 'error' => 'Student has no mobile number.'];
         }

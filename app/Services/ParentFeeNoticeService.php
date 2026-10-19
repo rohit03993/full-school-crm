@@ -158,6 +158,12 @@ class ParentFeeNoticeService
             $now = now();
 
             foreach ($selected as $row) {
+                $noticeStudent = Student::query()->find($row['student_id']);
+
+                if ($noticeStudent && ! app(StudentRecordGuard::class)->allows($noticeStudent)) {
+                    continue;
+                }
+
                 $recipient = $campaign->recipients->firstWhere('student_id', $row['student_id']);
 
                 ParentFeeNotice::query()->create([

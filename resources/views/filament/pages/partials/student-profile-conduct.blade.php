@@ -1,6 +1,9 @@
 <div wire:init="loadConductTab" class="space-y-4">
     <div class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-900">
         <h3 class="text-base font-semibold text-gray-950 dark:text-white">New report</h3>
+        @if ($record->status === \App\Enums\StudentStatus::Dropped)
+            <p class="mt-1 text-sm text-rose-700 dark:text-rose-300">This student is inactive. New reports stay locked until they are made active.</p>
+        @else
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Saved on this student only. It does not create a fee or a receipt.</p>
 
         @if ($conductTypeOptions === [])
@@ -51,6 +54,7 @@
                     Save report
                 </button>
             </div>
+        @endif
         @endif
     </div>
 

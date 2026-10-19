@@ -152,6 +152,8 @@ class FeeReminderWhatsAppService
             throw ValidationException::withMessages(['student' => 'WhatsApp is not enabled on this licence.']);
         }
 
+        app(StudentRecordGuard::class)->assertWritable($student);
+
         $row = $this->previewForStudent($student);
 
         if (! $row) {

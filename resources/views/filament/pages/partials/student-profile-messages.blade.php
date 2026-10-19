@@ -17,6 +17,10 @@
         $attachmentFieldId = ($compactInbox ?? false) ? 'wa-quick-attachment-inbox' : 'wa-quick-attachment-profile';
         $canSendTemplates = (bool) $record && $waTemplates->isNotEmpty();
         $canComposeReply = ($metaRoutingActive ?? false) && ($metaSessionOpen ?? false);
+        if ($record && $record->status === \App\Enums\StudentStatus::Dropped) {
+            $canSendTemplates = false;
+            $canComposeReply = false;
+        }
         $hasAttachment = filled($metaReplyAttachment ?? null);
         $attachmentName = $hasAttachment
             ? (method_exists($metaReplyAttachment, 'getClientOriginalName')

@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BlocksInactiveStudentWrites;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ActivityAttendance extends Model
 {
+    use BlocksInactiveStudentWrites;
+
     protected $fillable = [
         'attendable_type',
         'attendable_id',

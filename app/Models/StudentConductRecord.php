@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BlocksInactiveStudentWrites;
 use App\Support\ConductTypeOptions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StudentConductRecord extends Model
 {
+    use BlocksInactiveStudentWrites;
+
     protected $fillable = [
         'student_id',
         'recorded_on',

@@ -109,6 +109,12 @@ class FeeStructureService
     {
         Gate::forUser($admin)->authorize('update', $feeStructure);
 
+        $student = $feeStructure->enrollment?->student;
+
+        if ($student instanceof \App\Models\Student) {
+            app(StudentRecordGuard::class)->assertWritable($student);
+        }
+
         $courseFee = round((float) $data['course_fee'], 2);
         $discount = round(max(0, (float) $data['discount_amount']), 2);
         $reason = trim((string) ($data['reason'] ?? ''));

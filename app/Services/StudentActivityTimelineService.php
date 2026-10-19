@@ -18,6 +18,7 @@ use App\Models\StudentCall;
 use App\Models\StudentCase;
 use App\Models\StudentCertificate;
 use App\Models\StudentConductRecord;
+use App\Models\StudentDrop;
 use App\Models\User;
 use App\Models\Visit;
 use App\Support\AttendanceSourceLabel;
@@ -74,6 +75,7 @@ class StudentActivityTimelineService
             ->merge($this->conductRecords($student, $viewer, $perSource))
             ->merge($this->documents($student, $viewer, $perSource))
             ->merge($this->enrollmentAndBatch($student, $viewer, $perSource))
+            ->merge($this->inactivePeriods($student, $perSource))
             ->filter(fn (array $item): bool => $item['occurred_at'] instanceof Carbon)
             ->sortByDesc(fn (array $item): int => $item['occurred_at']->getTimestamp())
             ->values();
@@ -720,6 +722,57 @@ class StudentActivityTimelineService
                 at: Carbon::parse($row->assigned_at),
                 tab: 'overview',
             );
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    protected function inactivePeriods(Student $student, int $limit): array
+    {
+        $rows = [];
+
+        $drops = StudentDrop::query()
+            ->where('student_id', $student->id)
+            ->with(['droppedBy', 'reactivatedBy', 'batch'])
+            ->orderByDesc('dropped_at')
+            ->limit($limit)
+            ->get();
+
+        foreach ($drops as $drop) {
+            if (! $drop->dropped_at) {
+                continue;
+            }
+
+            $className = $drop->batch?->name;
+
+            $rows[] = $this->item(
+                id: 'inactive-'.$drop->id,
+                type: 'inactive',
+                category: 'STATUS',
+                title: 'Marked inactive',
+                summary: $drop->reason,
+                detail: $className ? 'Class '.$className : null,
+                staffName: $drop->droppedBy?->name,
+                at: $drop->dropped_at,
+                tab: 'overview',
+            );
+
+            if ($drop->reactivated_at) {
+                $rows[] = $this->item(
+                    id: 'active-'.$drop->id,
+                    type: 'active',
+                    category: 'STATUS',
+                    title: 'Made active',
+                    summary: $className ? 'Back in '.$className : 'Back in class',
+                    detail: null,
+                    staffName: $drop->reactivatedBy?->name,
+                    at: $drop->reactivated_at,
+                    tab: 'overview',
+                );
+            }
         }
 
         return $rows;

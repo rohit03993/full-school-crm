@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BlocksInactiveStudentWrites;
 use App\Enums\PaymentMode;
 use App\Enums\PaymentShortfallAction;
 use App\Enums\PaymentStatus;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Payment extends Model
 {
+    use BlocksInactiveStudentWrites;
+
     protected $fillable = [
         'fee_structure_id',
         'fee_installment_id',

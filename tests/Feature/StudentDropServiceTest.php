@@ -197,6 +197,9 @@ class StudentDropServiceTest extends TestCase
         $this->assertTrue(app(HomeworkAssignmentService::class)->studentCanAccess($homework, $active));
         $this->assertTrue(app(BatchStaffAssignmentService::class)->canViewStudent($teacher, $active));
         $this->assertSame(1, \App\Models\StudentDrop::query()->where('student_id', $student->id)->count());
+        $dropRow = \App\Models\StudentDrop::query()->where('student_id', $student->id)->first();
+        $this->assertNotNull($dropRow->reactivated_at);
+        $this->assertSame($coordinator->id, $dropRow->reactivated_by_user_id);
 
         try {
             $service->reinstate($active->fresh(), $coordinator);
@@ -206,6 +209,108 @@ class StudentDropServiceTest extends TestCase
                 'Only an inactive student can be made active again.',
                 $exception->errors()['reason'][0],
             );
+        }
+    }
+
+    public function test_inactive_date_is_saved_and_locks_records_until_the_student_is_active(): void
+    {
+        Carbon::setTestNow('2026-10-19 18:00:00');
+
+        try {
+            $coordinator = $this->coordinator();
+            $teacher = $this->teacher();
+            [$student, $batch] = $this->enrolledStudentInClass($coordinator, $teacher);
+            $student->activeEnrollment->update(['enrolled_at' => '2026-04-01 09:00:00']);
+
+            $past = Attendance::query()->create([
+                'batch_id' => $batch->id,
+                'student_id' => $student->id,
+                'attendance_date' => '2026-09-15',
+                'status' => AttendanceStatus::Present,
+                'marked_by_user_id' => $coordinator->id,
+            ]);
+
+            $service = app(StudentDropService::class);
+
+            try {
+                $service->drop($student, $coordinator, 'In the future.', '2026-12-01 10:00:00');
+                $this->fail('A future inactive date must be refused.');
+            } catch (ValidationException $exception) {
+                $this->assertSame(
+                    'Inactive from cannot be a future date or time.',
+                    $exception->errors()['inactive_at'][0],
+                );
+            }
+
+            try {
+                $service->drop($student->fresh(), $coordinator, 'Too soon.', '2020-01-01 10:00:00');
+                $this->fail('A date before the student joined must be refused.');
+            } catch (ValidationException $exception) {
+                $this->assertSame(
+                    'Inactive from cannot be before the student joined.',
+                    $exception->errors()['inactive_at'][0],
+                );
+            }
+
+            $service->drop($student->fresh(), $coordinator, 'Left early.', '2026-10-01 10:30:00');
+            $student->refresh();
+            $this->assertSame(StudentStatus::Dropped, $student->status);
+
+            $drop = $student->drops()->first();
+            $this->assertSame('2026-10-01 10:30:00', $drop->dropped_at->timezone(config('app.timezone'))->format('Y-m-d H:i:s'));
+
+            try {
+                $past->delete();
+                $this->fail('Attendance cannot be deleted while the student is inactive.');
+            } catch (ValidationException $exception) {
+                $this->assertStringContainsString('inactive', $exception->errors()['student'][0]);
+            }
+
+            try {
+                Attendance::query()->create([
+                    'batch_id' => $batch->id,
+                    'student_id' => $student->id,
+                    'attendance_date' => '2026-09-01',
+                    'status' => AttendanceStatus::Present,
+                    'marked_by_user_id' => $coordinator->id,
+                ]);
+                $this->fail('No attendance can be added while the student is inactive.');
+            } catch (ValidationException $exception) {
+                $this->assertStringContainsString('inactive', $exception->errors()['student'][0]);
+            }
+
+            $this->assertSame(1, Attendance::query()->where('student_id', $student->id)->count());
+
+            $service->reinstate($student->fresh(), $coordinator);
+
+            Attendance::query()->create([
+                'batch_id' => $batch->id,
+                'student_id' => $student->id,
+                'attendance_date' => '2026-10-19',
+                'status' => AttendanceStatus::Present,
+                'marked_by_user_id' => $coordinator->id,
+            ]);
+
+            try {
+                Attendance::query()->create([
+                    'batch_id' => $batch->id,
+                    'student_id' => $student->id,
+                    'attendance_date' => '2026-10-05',
+                    'status' => AttendanceStatus::Absent,
+                    'marked_by_user_id' => $coordinator->id,
+                ]);
+                $this->fail('A date inside the inactive period must stay closed.');
+            } catch (ValidationException $exception) {
+                $this->assertStringContainsString('inactive period', $exception->errors()['student'][0]);
+            }
+
+            $titles = collect(app(\App\Services\StudentActivityTimelineService::class)->forStudent($student->fresh(), $coordinator)['items'])
+                ->pluck('title');
+
+            $this->assertTrue($titles->contains('Marked inactive'));
+            $this->assertTrue($titles->contains('Made active'));
+        } finally {
+            Carbon::setTestNow();
         }
     }
 

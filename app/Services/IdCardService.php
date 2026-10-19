@@ -42,6 +42,12 @@ class IdCardService
             return $enrollment;
         }
 
+        $enrollment->loadMissing('student');
+
+        if ($enrollment->student instanceof \App\Models\Student) {
+            app(StudentRecordGuard::class)->assertWritable($enrollment->student);
+        }
+
         $enrollment->loadMissing([
             'student.activeBatchStudent.batch.academicSession',
             'course',

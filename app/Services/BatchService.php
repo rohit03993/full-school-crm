@@ -22,6 +22,8 @@ class BatchService
 
     public function assign(Student $student, Batch $batch, User $staff): BatchStudent
     {
+        app(StudentRecordGuard::class)->assertWritable($student);
+
         if (! $batch->isActive()) {
             throw ValidationException::withMessages([
                 'batch_id' => 'Cannot assign students to a completed batch.',

@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BlocksInactiveStudentWrites;
 use App\Enums\CertificateType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StudentCertificate extends Model
 {
+    use BlocksInactiveStudentWrites;
+
     protected $fillable = [
         'student_id',
         'enrollment_id',

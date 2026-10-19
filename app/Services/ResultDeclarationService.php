@@ -109,6 +109,10 @@ class ResultDeclarationService
                     continue;
                 }
 
+                if (! app(StudentRecordGuard::class)->allows($student)) {
+                    continue;
+                }
+
                 $snapshot = $this->snapshotForStudent($student, $groupKey, $activityTypeId);
 
                 if ($snapshot === null) {

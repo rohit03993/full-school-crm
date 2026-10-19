@@ -64,6 +64,12 @@ class AttendanceService
                     continue;
                 }
 
+                $markedStudent = Student::query()->find($studentId);
+
+                if (! $markedStudent || ! app(StudentRecordGuard::class)->allows($markedStudent, $date, true)) {
+                    continue;
+                }
+
                 $status = AttendanceStatus::tryFrom((string) $statusValue);
 
                 if (! $status) {

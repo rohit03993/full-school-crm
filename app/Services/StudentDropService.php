@@ -11,6 +11,7 @@ use App\Models\BatchStudent;
 use App\Models\Student;
 use App\Models\StudentDrop;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -31,7 +32,7 @@ class StudentDropService
             || $user->hasRole(StaffJobRole::AcademicCoordinator->value);
     }
 
-    public function drop(Student $student, User $staff, string $reason): StudentDrop
+    public function drop(Student $student, User $staff, string $reason, Carbon|string|null $inactiveAt = null): StudentDrop
     {
         if (! $this->canDrop($staff)) {
             throw ValidationException::withMessages([
@@ -40,14 +41,24 @@ class StudentDropService
         }
 
         $reason = trim($reason);
+        $inactiveAt = $this->inactiveMoment($inactiveAt);
 
         Validator::make(
-            ['reason' => $reason],
-            ['reason' => ['required', 'string', 'max:1000']],
+            ['reason' => $reason, 'inactive_at' => $inactiveAt->toDateTimeString()],
+            [
+                'reason' => ['required', 'string', 'max:1000'],
+                'inactive_at' => ['required', 'date'],
+            ],
             ['reason.required' => 'Enter the reason for marking this student inactive.'],
         )->validate();
 
-        return DB::transaction(function () use ($student, $staff, $reason): StudentDrop {
+        if ($inactiveAt->greaterThan(now()->addMinute())) {
+            throw ValidationException::withMessages([
+                'inactive_at' => 'Inactive from cannot be a future date or time.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($student, $staff, $reason, $inactiveAt): StudentDrop {
             $locked = Student::query()->whereKey($student->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status === StudentStatus::Dropped) {
@@ -61,6 +72,12 @@ class StudentDropService
             if (! $enrollment || $locked->status !== StudentStatus::Enrolled) {
                 throw ValidationException::withMessages([
                     'reason' => 'Only an enrolled student can be marked inactive.',
+                ]);
+            }
+
+            if ($enrollment->enrolled_at && $inactiveAt->lt($enrollment->enrolled_at)) {
+                throw ValidationException::withMessages([
+                    'inactive_at' => 'Inactive from cannot be before the student joined.',
                 ]);
             }
 
@@ -84,7 +101,7 @@ class StudentDropService
                 'batch_id' => $seat?->batch_id,
                 'reason' => $reason,
                 'dropped_by_user_id' => $staff->id,
-                'dropped_at' => now(),
+                'dropped_at' => $inactiveAt,
             ]);
 
             $this->audit->log(
@@ -120,7 +137,8 @@ class StudentDropService
                 ]);
             }
 
-            $drop = $locked->latestDrop()->first();
+            $drop = $locked->drops()->whereNull('reactivated_at')->latest('dropped_at')->first()
+                ?? $locked->latestDrop()->first();
             $enrollment = $drop?->enrollment()->lockForUpdate()->first()
                 ?? $locked->activeEnrollment()->lockForUpdate()->first();
 
@@ -139,6 +157,13 @@ class StudentDropService
             ]);
 
             $seat = $this->seatToRestore($locked, $drop?->batch_id);
+
+            if ($drop && $drop->reactivated_at === null) {
+                $drop->update([
+                    'reactivated_at' => now(),
+                    'reactivated_by_user_id' => $staff->id,
+                ]);
+            }
 
             if ($seat && Batch::query()->whereKey($seat->batch_id)->exists()) {
                 BatchStudent::query()
@@ -186,5 +211,18 @@ class StudentDropService
             ->orderByDesc('id')
             ->lockForUpdate()
             ->first();
+    }
+
+    protected function inactiveMoment(Carbon|string|null $inactiveAt): Carbon
+    {
+        if ($inactiveAt instanceof Carbon) {
+            return $inactiveAt->copy()->timezone(config('app.timezone'));
+        }
+
+        if (filled($inactiveAt)) {
+            return Carbon::parse($inactiveAt, config('app.timezone'));
+        }
+
+        return now();
     }
 }
