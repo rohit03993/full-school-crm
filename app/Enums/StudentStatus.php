@@ -21,7 +21,7 @@ enum StudentStatus: string
             self::Approved => 'Approved',
             self::Enrolled => 'Enrolled',
             self::Completed => 'Completed',
-            self::Dropped => 'Dropped',
+            self::Dropped => 'Inactive',
         };
     }
 }

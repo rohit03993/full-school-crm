@@ -13,7 +13,7 @@ enum EnrollmentStatus: string
         return match ($this) {
             self::Enrolled => 'Enrolled',
             self::Completed => 'Completed',
-            self::Dropped => 'Dropped',
+            self::Dropped => 'Inactive',
         };
     }
 }

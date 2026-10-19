@@ -397,7 +397,7 @@ class StudentResource extends Resource
                 : null);
 
         return collect([
-            $dropped ? 'Dropped' : null,
+            $dropped ? 'Inactive' : null,
             filled($roll) ? 'Roll '.$roll : null,
             $class ? ($dropped ? 'Was in '.$class : $class) : null,
         ])->filter()->implode(' · ');
@@ -412,7 +412,7 @@ class StudentResource extends Resource
         $dropped = $record->status === StudentStatus::Dropped;
         $kind = match ($record->status) {
             StudentStatus::Enquiry => 'Lead',
-            StudentStatus::Dropped => 'Dropped',
+            StudentStatus::Dropped => 'Inactive',
             StudentStatus::Enrolled, StudentStatus::Completed => 'Student',
             default => $record->status?->label() ?? 'Person',
         };
@@ -420,7 +420,7 @@ class StudentResource extends Resource
         $batch = $record->activeBatchStudent?->batch ?? ($dropped ? $record->latestDrop?->batch : null);
         $class = $batch
             ? ($dropped ? 'Was in ' : '').ClassSectionLabel::forBatch($batch, includeSession: false, includeShift: false)
-            : ($dropped ? 'Dropped' : 'No class yet');
+            : ($dropped ? 'Inactive' : 'No class yet');
 
         return array_filter([
             'Type' => $kind,

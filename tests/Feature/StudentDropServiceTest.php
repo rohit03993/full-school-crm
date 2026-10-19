@@ -104,7 +104,7 @@ class StudentDropServiceTest extends TestCase
             app(StudentDropService::class)->drop($student->fresh(), $coordinator, 'Again.');
             $this->fail('A dropped student cannot be dropped a second time.');
         } catch (ValidationException $exception) {
-            $this->assertSame('This student is already dropped.', $exception->errors()['reason'][0]);
+            $this->assertSame('This student is already inactive.', $exception->errors()['reason'][0]);
         }
     }
 
@@ -119,7 +119,7 @@ class StudentDropServiceTest extends TestCase
             $this->fail('A teacher must not drop a student.');
         } catch (ValidationException $exception) {
             $this->assertSame(
-                'Only Super Admin or Academic coordinator can drop a student.',
+                'Only Super Admin or Academic coordinator can mark a student inactive.',
                 $exception->errors()['reason'][0],
             );
         }
@@ -138,7 +138,7 @@ class StudentDropServiceTest extends TestCase
             $this->fail('A blank reason must not save.');
         } catch (ValidationException $exception) {
             $this->assertSame(
-                'Enter the reason for dropping this student.',
+                'Enter the reason for marking this student inactive.',
                 $exception->errors()['reason'][0],
             );
         }
@@ -160,7 +160,52 @@ class StudentDropServiceTest extends TestCase
             app(StudentDropService::class)->drop($student, $coordinator, 'Not enrolled yet.');
             $this->fail('A lead must not be dropped.');
         } catch (ValidationException $exception) {
-            $this->assertSame('Only an enrolled student can be dropped.', $exception->errors()['reason'][0]);
+            $this->assertSame('Only an enrolled student can be marked inactive.', $exception->errors()['reason'][0]);
+        }
+    }
+
+    public function test_admin_can_make_an_inactive_student_active_again(): void
+    {
+        $coordinator = $this->coordinator();
+        $teacher = $this->teacher();
+        [$student, $batch] = $this->enrolledStudentInClass($coordinator, $teacher);
+        $homework = new HomeworkAssignment(['batch_id' => $batch->id]);
+        $service = app(StudentDropService::class);
+
+        $service->drop($student, $coordinator, 'Will join later.');
+
+        $this->assertFalse(app(BatchStaffAssignmentService::class)->canViewStudent($teacher, $student->fresh()));
+        $this->assertFalse($service->canDrop($teacher));
+
+        try {
+            $service->reinstate($student->fresh(), $teacher);
+            $this->fail('A teacher must not make a student active again.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'Only Super Admin or Academic coordinator can make a student active again.',
+                $exception->errors()['reason'][0],
+            );
+        }
+
+        $active = $service->reinstate($student->fresh(), $coordinator);
+
+        $this->assertSame(StudentStatus::Enrolled, $active->status);
+        $this->assertSame(EnrollmentStatus::Enrolled, $active->activeEnrollment->status);
+        $this->assertTrue($active->activeEnrollment->is_active);
+        $this->assertTrue($active->activeBatchStudent->is_active);
+        $this->assertSame($batch->id, $active->activeBatchStudent->batch_id);
+        $this->assertTrue(app(HomeworkAssignmentService::class)->studentCanAccess($homework, $active));
+        $this->assertTrue(app(BatchStaffAssignmentService::class)->canViewStudent($teacher, $active));
+        $this->assertSame(1, \App\Models\StudentDrop::query()->where('student_id', $student->id)->count());
+
+        try {
+            $service->reinstate($active->fresh(), $coordinator);
+            $this->fail('An active student cannot be made active again.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'Only an inactive student can be made active again.',
+                $exception->errors()['reason'][0],
+            );
         }
     }
 

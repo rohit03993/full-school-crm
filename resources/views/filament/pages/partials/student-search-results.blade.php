@@ -50,7 +50,7 @@
                         <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                             <span class="truncate text-sm font-bold text-gray-950 dark:text-white">{{ $student->name }}</span>
                             @if ($student->status === \App\Enums\StudentStatus::Dropped)
-                                <span class="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">Dropped</span>
+                                <span class="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">Inactive</span>
                             @endif
                             <span class="font-mono text-sm font-semibold text-primary-600 dark:text-primary-400"><x-crm.student-mobile :mobile="$student->mobile" /></span>
                         </div>

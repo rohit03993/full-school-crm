@@ -3924,14 +3924,35 @@ class StudentProfilePage extends Page
                 })
                 ->visible(fn (): bool => $this->record->activeEnrollment !== null
                     && app(StudentConductService::class)->canRecord(Auth::user())),
+            Action::make('reinstateStudent')
+                ->label('Make active')
+                ->icon('heroicon-o-user-plus')
+                ->color('success')
+                ->button()
+                ->modalHeading('Make this student active again?')
+                ->modalDescription('They go back to the old class. They show again in class attendance, new homework, and campaigns.')
+                ->modalSubmitActionLabel('Make active')
+                ->action(function (): void {
+                    app(StudentDropService::class)->reinstate($this->record, Auth::user());
+
+                    $this->refreshRecord();
+
+                    Notification::make()
+                        ->title('Student is active')
+                        ->body($this->record->name.' is back in the class.')
+                        ->success()
+                        ->send();
+                })
+                ->visible(fn (): bool => $this->record->status === StudentStatus::Dropped
+                    && app(StudentDropService::class)->canDrop(Auth::user())),
             Action::make('dropStudent')
-                ->label('Drop student')
+                ->label('Make inactive')
                 ->icon('heroicon-o-user-minus')
                 ->color('danger')
                 ->button()
-                ->modalHeading('Drop this student?')
-                ->modalDescription('They leave the live class list, class attendance, and new homework. Old fees, old attendance, and old homework stay on this page. Search will still find them with a Dropped tag.')
-                ->modalSubmitActionLabel('Drop student')
+                ->modalHeading('Mark this student inactive?')
+                ->modalDescription('They leave the live class list, class attendance, and new homework. Old fees, old attendance, and old homework stay on this page. Search will still find them with an Inactive tag.')
+                ->modalSubmitActionLabel('Make inactive')
                 ->form([
                     Textarea::make('reason')
                         ->label('Reason')
@@ -3949,8 +3970,8 @@ class StudentProfilePage extends Page
                     $this->refreshRecord();
 
                     Notification::make()
-                        ->title('Student dropped')
-                        ->body($this->record->name.' is marked Dropped. The old class name stays on this page.')
+                        ->title('Student marked inactive')
+                        ->body($this->record->name.' is marked Inactive. The old class name stays on this page.')
                         ->success()
                         ->send();
                 })

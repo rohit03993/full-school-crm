@@ -6,6 +6,8 @@ use App\Enums\EnrollmentStatus;
 use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
+use App\Models\Batch;
+use App\Models\BatchStudent;
 use App\Models\Student;
 use App\Models\StudentDrop;
 use App\Models\User;
@@ -33,7 +35,7 @@ class StudentDropService
     {
         if (! $this->canDrop($staff)) {
             throw ValidationException::withMessages([
-                'reason' => 'Only Super Admin or Academic coordinator can drop a student.',
+                'reason' => 'Only Super Admin or Academic coordinator can mark a student inactive.',
             ]);
         }
 
@@ -42,7 +44,7 @@ class StudentDropService
         Validator::make(
             ['reason' => $reason],
             ['reason' => ['required', 'string', 'max:1000']],
-            ['reason.required' => 'Enter the reason for dropping this student.'],
+            ['reason.required' => 'Enter the reason for marking this student inactive.'],
         )->validate();
 
         return DB::transaction(function () use ($student, $staff, $reason): StudentDrop {
@@ -50,7 +52,7 @@ class StudentDropService
 
             if ($locked->status === StudentStatus::Dropped) {
                 throw ValidationException::withMessages([
-                    'reason' => 'This student is already dropped.',
+                    'reason' => 'This student is already inactive.',
                 ]);
             }
 
@@ -58,7 +60,7 @@ class StudentDropService
 
             if (! $enrollment || $locked->status !== StudentStatus::Enrolled) {
                 throw ValidationException::withMessages([
-                    'reason' => 'Only an enrolled student can be dropped.',
+                    'reason' => 'Only an enrolled student can be marked inactive.',
                 ]);
             }
 
@@ -99,5 +101,90 @@ class StudentDropService
 
             return $drop;
         });
+    }
+
+    public function reinstate(Student $student, User $staff): Student
+    {
+        if (! $this->canDrop($staff)) {
+            throw ValidationException::withMessages([
+                'reason' => 'Only Super Admin or Academic coordinator can make a student active again.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($student, $staff): Student {
+            $locked = Student::query()->whereKey($student->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status !== StudentStatus::Dropped) {
+                throw ValidationException::withMessages([
+                    'reason' => 'Only an inactive student can be made active again.',
+                ]);
+            }
+
+            $drop = $locked->latestDrop()->first();
+            $enrollment = $drop?->enrollment()->lockForUpdate()->first()
+                ?? $locked->activeEnrollment()->lockForUpdate()->first();
+
+            if (! $enrollment) {
+                throw ValidationException::withMessages([
+                    'reason' => 'This student has no admission to make active again.',
+                ]);
+            }
+
+            $enrollment->update([
+                'status' => EnrollmentStatus::Enrolled,
+            ]);
+
+            $locked->update([
+                'status' => StudentStatus::Enrolled,
+            ]);
+
+            $seat = $this->seatToRestore($locked, $drop?->batch_id);
+
+            if ($seat && Batch::query()->whereKey($seat->batch_id)->exists()) {
+                BatchStudent::query()
+                    ->where('student_id', $locked->id)
+                    ->where('is_active', true)
+                    ->whereKeyNot($seat->id)
+                    ->update(['is_active' => false]);
+
+                $seat->update(['is_active' => true]);
+            }
+
+            $this->audit->log(
+                'student.reactivated',
+                $locked,
+                ['status' => StudentStatus::Dropped->value],
+                [
+                    'status' => StudentStatus::Enrolled->value,
+                    'batch_id' => $seat?->batch_id,
+                ],
+                null,
+                $staff,
+            );
+
+            return $locked->fresh();
+        });
+    }
+
+    protected function seatToRestore(Student $student, ?int $batchId): ?BatchStudent
+    {
+        if ($batchId) {
+            $match = BatchStudent::query()
+                ->where('student_id', $student->id)
+                ->where('batch_id', $batchId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($match) {
+                return $match;
+            }
+        }
+
+        return BatchStudent::query()
+            ->where('student_id', $student->id)
+            ->where('is_active', false)
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->first();
     }
 }

@@ -132,7 +132,7 @@ class WhatsAppCampaignResource extends Resource
                 ])
                 ->columns(1),
             Section::make('2. Audience')
-                ->description('Pick who receives this campaign. Only students with a mobile number are included. Dropped students are left out.')
+                ->description('Pick who receives this campaign. Only students with a mobile number are included. Inactive students are left out.')
                 ->schema([
                     Select::make('audience_type')
                         ->label('Send to')
