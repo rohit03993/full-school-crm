@@ -8,6 +8,7 @@ use App\Enums\BatchStaffRole;
 use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\EnrollmentStatus;
+use App\Enums\InactiveReason;
 use App\Enums\LeadSource;
 use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
@@ -20,6 +21,7 @@ use App\Models\Batch;
 use App\Models\BatchStaffAssignment;
 use App\Models\BatchStudent;
 use App\Models\Course;
+use App\Models\CourseSubject;
 use App\Models\Enrollment;
 use App\Models\HomeworkAssignment;
 use App\Models\Student;
@@ -138,7 +140,7 @@ class StudentDropServiceTest extends TestCase
             $this->fail('A blank reason must not save.');
         } catch (ValidationException $exception) {
             $this->assertSame(
-                'Enter the reason for marking this student inactive.',
+                'Write a short summary of why this student is inactive.',
                 $exception->errors()['reason'][0],
             );
         }
@@ -312,6 +314,71 @@ class StudentDropServiceTest extends TestCase
         } finally {
             Carbon::setTestNow();
         }
+    }
+
+    public function test_academics_reason_saves_the_class_subject_and_its_teacher(): void
+    {
+        $coordinator = $this->coordinator();
+        $teacher = $this->teacher();
+        [$student, $batch] = $this->enrolledStudentInClass($coordinator, $teacher);
+
+        $chemistry = CourseSubject::query()->create([
+            'course_id' => $batch->course_id,
+            'name' => 'Chemistry',
+            'code' => 'CHEM-'.uniqid(),
+            'default_max_marks' => 100,
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+        $batch->subjects()->attach($chemistry->id, ['sort_order' => 1]);
+        BatchStaffAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'user_id' => $teacher->id,
+            'role' => BatchStaffRole::SubjectTeacher,
+            'course_subject_id' => $chemistry->id,
+        ]);
+
+        $service = app(StudentDropService::class);
+
+        try {
+            $service->drop(
+                $student,
+                $coordinator,
+                'Could not follow the classes.',
+                null,
+                InactiveReason::Academics->value,
+                null,
+            );
+            $this->fail('Academics needs a subject from the class.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'Pick the subject this student was struggling with.',
+                $exception->errors()['course_subject_id'][0],
+            );
+        }
+
+        $drop = $service->drop(
+            $student->fresh(),
+            $coordinator,
+            'Could not follow the Chemistry classes.',
+            null,
+            InactiveReason::Academics->value,
+            $chemistry->id,
+        );
+
+        $this->assertSame(InactiveReason::Academics, $drop->reason_type);
+        $this->assertSame($chemistry->id, $drop->course_subject_id);
+        $this->assertSame('Chemistry', $drop->subject_name);
+        $this->assertSame($teacher->id, $drop->subject_teacher_user_id);
+        $this->assertSame('Class Teacher', $drop->subject_teacher_name);
+        $this->assertSame(
+            'Marked inactive · Academics · Chemistry · Class Teacher',
+            $drop->inactiveTimelineTitle(),
+        );
+
+        $titles = collect(app(\App\Services\StudentActivityTimelineService::class)->forStudent($student->fresh(), $coordinator)['items'])
+            ->pluck('title');
+        $this->assertTrue($titles->contains('Marked inactive · Academics · Chemistry · Class Teacher'));
     }
 
     protected function coordinator(): User

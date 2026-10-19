@@ -752,7 +752,7 @@ class StudentActivityTimelineService
                 id: 'inactive-'.$drop->id,
                 type: 'inactive',
                 category: 'STATUS',
-                title: 'Marked inactive',
+                title: $drop->inactiveTimelineTitle(),
                 summary: $drop->reason,
                 detail: $className ? 'Class '.$className : null,
                 staffName: $drop->droppedBy?->name,

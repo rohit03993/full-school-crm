@@ -12,6 +12,7 @@ use App\Models\ActivityType;
 use App\Enums\CrmPermission;
 use App\Enums\DocumentType;
 use App\Enums\FeeMiscChargeAdjustmentType;
+use App\Enums\InactiveReason;
 use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
@@ -109,11 +110,13 @@ use App\Support\CrmHint;
 use App\Support\InstituteProfile;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Validation\ValidationException;
 use Filament\Pages\Page;
 use Filament\Panel;
@@ -4000,11 +4003,39 @@ class StudentProfilePage extends Page
                         ->native(false)
                         ->maxDate(now())
                         ->helperText('Opens as today and the current time. You can choose an earlier date and time.'),
-                    Textarea::make('reason')
+                    Select::make('reason_type')
                         ->label('Reason')
+                        ->options(InactiveReason::options())
                         ->required()
+                        ->live()
+                        ->native(false),
+                    Select::make('course_subject_id')
+                        ->label('Subject')
+                        ->options(fn (): array => app(StudentDropService::class)->subjectChoices($this->record))
+                        ->visible(fn (Get $get): bool => $get('reason_type') === InactiveReason::Academics->value)
+                        ->required(fn (Get $get): bool => $get('reason_type') === InactiveReason::Academics->value)
+                        ->live()
+                        ->searchable()
+                        ->native(false)
+                        ->helperText('Subjects from this student’s class.'),
+                    Placeholder::make('subject_teacher_name')
+                        ->label('Subject teacher')
+                        ->visible(fn (Get $get): bool => $get('reason_type') === InactiveReason::Academics->value && filled($get('course_subject_id')))
+                        ->content(fn (Get $get): string => app(StudentDropService::class)->subjectTeacherLabel(
+                            $this->record,
+                            (int) $get('course_subject_id'),
+                        )),
+                    Textarea::make('reason')
+                        ->label(fn (Get $get): string => $get('reason_type') === InactiveReason::Other->value
+                            ? 'Write the reason'
+                            : 'Brief summary')
+                        ->required()
+                        ->minLength(10)
                         ->maxLength(1000)
-                        ->rows(3),
+                        ->rows(3)
+                        ->helperText(fn (Get $get): string => $get('reason_type') === InactiveReason::Other->value
+                            ? 'Write the full reason in a few words.'
+                            : 'A few words on what happened. This is saved with the reason you picked.'),
                 ])
                 ->action(function (array $data): void {
                     app(StudentDropService::class)->drop(
@@ -4012,6 +4043,8 @@ class StudentProfilePage extends Page
                         Auth::user(),
                         (string) ($data['reason'] ?? ''),
                         $data['inactive_at'] ?? null,
+                        (string) ($data['reason_type'] ?? ''),
+                        filled($data['course_subject_id'] ?? null) ? (int) $data['course_subject_id'] : null,
                     );
 
                     $this->refreshRecord();

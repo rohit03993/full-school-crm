@@ -116,7 +116,7 @@
                     </p>
                     @if ($showDroppedClass)
                         <p class="mt-1 text-xs font-semibold text-rose-700 dark:text-rose-300">Was in {{ $batch?->name ?? 'a class' }}</p>
-                        <p class="line-clamp-2 text-xs text-gray-600 dark:text-gray-400">{{ $drop->reason }}</p>
+                        <p class="line-clamp-2 text-xs text-gray-600 dark:text-gray-400">{{ $drop->reasonLine() }}</p>
                         <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ $drop->dropped_at?->timezone(config('app.timezone'))->format('d M Y, h:i A') }} · {{ $drop->droppedBy?->name ?? 'Staff' }}</p>
                         @if ($isDropped)
                             <p class="mt-1 text-[11px] font-medium text-rose-700 dark:text-rose-300">Fees, attendance, and other records are locked from this time.</p>
