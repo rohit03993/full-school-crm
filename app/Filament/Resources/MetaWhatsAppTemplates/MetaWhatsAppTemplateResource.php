@@ -522,7 +522,7 @@ class MetaWhatsAppTemplateResource extends Resource
                         'REJECTED' => 'Rejected',
                     ]),
             ])
-            ->defaultSort('name')
+            ->defaultSort('created_at', 'desc')
             ->recordActions([
                 EditAction::make(),
                 static::deleteTemplateAction(),
