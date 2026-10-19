@@ -49,6 +49,8 @@
                                         'certificate' => 'border-teal-500 bg-teal-500',
                                         'document' => 'border-slate-500 bg-slate-500',
                                         'enrollment', 'batch' => 'border-primary-500 bg-primary-500',
+                                        'inactive' => 'border-rose-500 bg-rose-500',
+                                        'active' => 'border-emerald-500 bg-emerald-500',
                                         default => 'border-gray-400 bg-white dark:bg-gray-900',
                                     };
                                     $clickable = filled($item['tab'] ?? null) && ($item['tab'] ?? '') !== 'overview';

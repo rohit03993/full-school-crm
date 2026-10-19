@@ -3346,6 +3346,13 @@ class StudentProfilePage extends Page
         $this->cachedProfileSummary = null;
     }
 
+    protected function showInactiveStatusOnTimeline(): void
+    {
+        $this->profileTab = 'overview';
+        $this->activityTimelineLoaded = false;
+        $this->loadOverviewTab();
+    }
+
     protected function syncCatalogCourseFeeIfNeeded(): bool
     {
         if (! $this->userCan(CrmPermission::FeesAdjustStructure)) {
@@ -3966,6 +3973,7 @@ class StudentProfilePage extends Page
                     app(StudentDropService::class)->reinstate($this->record, Auth::user());
 
                     $this->refreshRecord();
+                    $this->showInactiveStatusOnTimeline();
 
                     Notification::make()
                         ->title('Student is active')
@@ -4007,6 +4015,7 @@ class StudentProfilePage extends Page
                     );
 
                     $this->refreshRecord();
+                    $this->showInactiveStatusOnTimeline();
 
                     Notification::make()
                         ->title('Student marked inactive')
