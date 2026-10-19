@@ -3424,6 +3424,7 @@ class StudentProfilePage extends Page
                         'name' => $child->getName(),
                         'label' => (string) $child->getLabel(),
                         'danger' => in_array($child->getName(), ['dropStudent', 'deleteStudent'], true),
+                        'success' => $child->getName() === 'reinstateStudent',
                     ];
                 }
 

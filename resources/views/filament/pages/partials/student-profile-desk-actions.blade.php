@@ -47,9 +47,10 @@
                         type="button"
                         wire:click="mountAction(@js($action['name']))"
                         @class([
-                            'block w-full px-3 py-2 text-left text-sm font-medium hover:bg-gray-50 dark:hover:bg-white/5',
-                            'text-rose-700 dark:text-rose-300' => $action['danger'],
-                            'text-gray-800 dark:text-gray-100' => ! $action['danger'],
+                            'block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/5',
+                            'bg-emerald-50 font-semibold text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20' => $action['success'] ?? false,
+                            'font-medium text-rose-700 dark:text-rose-300' => $action['danger'],
+                            'font-medium text-gray-800 dark:text-gray-100' => ! $action['danger'] && ! ($action['success'] ?? false),
                         ])
                         role="menuitem"
                     >{{ $action['label'] }}</button>
