@@ -86,7 +86,7 @@ class CrmHint
         'activity.sessions.create' => 'Rare: add one subject by hand. Prefer Exams → Teachers enter marks, or Upload Excel.',
         'activity.attendance' => 'Mark Present or Absent, then enter marks for each student who appeared.',
         'activity.marks.import' => 'New exam: pick a name and date, then upload. Existing exam: only students in the file are overwritten.',
-        'whatsapp.templates' => 'Create templates here and submit to Meta for approval. Sync refreshes APPROVED / PENDING / REJECTED status. Map {{1}} to student name before bulk campaigns.',
+        'whatsapp.templates' => 'Open a template to change the message. Turn on approval before saving new words. WhatsApp must approve them again. Delete removes that one template. Sync refreshes Approved, Pending, and Rejected.',
         'whatsapp.templates.create' => 'Any Meta template: put {{1}}, {{2}}, … in the body. Presets: fee_reminder_*, punch_in, punch_out, manual_in, manual_out, homework_not_done, homework_api, homework_combined, staff_punch_in, staff_punch_out, login_otp. For login_otp the CRM submits an Authentication Copy-code OTP template (Meta rejects OTP text as Utility).',
         'whatsapp.campaigns.create' => 'Pick template, audience (batch or course), fill message fields, then send or save as draft.',
         'audit.logs' => 'Read-only history of important changes — fees, admissions, profile edits. For Super Admin oversight.',

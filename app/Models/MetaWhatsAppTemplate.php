@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Support\MetaWhatsAppTemplateBuilder;
+use App\Support\MetaWhatsAppTemplateParser;
 use App\Support\WhatsAppTemplateParamMappingInferrer;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MetaWhatsAppTemplate extends Model
 {
@@ -67,6 +70,67 @@ class MetaWhatsAppTemplate extends Model
         }
 
         return $sources;
+    }
+
+    public function liveCampaigns(): HasMany
+    {
+        return $this->hasMany(WhatsAppLiveCampaign::class, 'meta_whatsapp_template_id');
+    }
+
+    /**
+     * Null means the message words can be sent to WhatsApp again.
+     */
+    public function wordingLockReason(): ?string
+    {
+        $category = (string) data_get($this->provider_meta, 'category', '');
+
+        if (MetaWhatsAppTemplateBuilder::isAuthenticationOtp((string) $this->name, $category) || $this->hasAuthenticationComponent()) {
+            return 'Login code templates use fixed WhatsApp wording. The words cannot be changed here.';
+        }
+
+        $header = MetaWhatsAppTemplateParser::headerFormat(is_array($this->components) ? $this->components : []);
+
+        if ($header === null) {
+            $stored = strtoupper(trim((string) data_get($this->provider_meta, 'header_format', '')));
+            $header = in_array($stored, ['IMAGE', 'VIDEO', 'DOCUMENT', 'TEXT'], true) ? $stored : null;
+        }
+
+        if (in_array($header, ['IMAGE', 'VIDEO', 'DOCUMENT'], true)) {
+            return 'This template has a photo or video header. Changing the words here would remove that header. Create a new template instead, so this one keeps working.';
+        }
+
+        $status = strtoupper((string) $this->status);
+
+        if ($status === 'PENDING') {
+            return 'WhatsApp is still reviewing this template. You can change the words after the status is Approved or Rejected.';
+        }
+
+        if (! in_array($status, ['APPROVED', 'REJECTED', 'PAUSED'], true)) {
+            return 'WhatsApp status is '.$status.'. The words can be changed when the status is Approved, Rejected, or Paused.';
+        }
+
+        return null;
+    }
+
+    protected function hasAuthenticationComponent(): bool
+    {
+        foreach ($this->components ?? [] as $component) {
+            if (! is_array($component)) {
+                continue;
+            }
+
+            if (! empty($component['add_security_recommendation'])) {
+                return true;
+            }
+
+            foreach ($component['buttons'] ?? [] as $button) {
+                if (is_array($button) && strtoupper((string) ($button['type'] ?? '')) === 'OTP') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     protected function looksLikeAttendancePunchName(string $name): bool

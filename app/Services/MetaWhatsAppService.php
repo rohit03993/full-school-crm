@@ -446,6 +446,99 @@ class MetaWhatsAppService
     }
 
     /**
+     * One language only. hsm_id stops WhatsApp from deleting every language of this name.
+     *
+     * @return array{status: string, data?: array<string, mixed>, error?: string}
+     */
+    public function deleteMessageTemplate(string $name, string $templateId): array
+    {
+        if (! filled($this->accessToken())) {
+            return ['status' => 'failed', 'error' => 'Access token is not configured.'];
+        }
+
+        if (blank($this->wabaId())) {
+            return ['status' => 'failed', 'error' => 'WhatsApp Business Account ID (WABA) is required to delete templates.'];
+        }
+
+        $name = trim($name);
+        $templateId = trim($templateId);
+
+        if ($name === '' || $templateId === '') {
+            return ['status' => 'failed', 'error' => 'WhatsApp template name and id are required to delete one template.'];
+        }
+
+        try {
+            $response = Http::timeout(60)
+                ->withToken((string) $this->accessToken())
+                ->acceptJson()
+                ->delete($this->graphUrl($this->wabaId().'/message_templates').'?'.http_build_query([
+                    'name' => $name,
+                    'hsm_id' => $templateId,
+                ]));
+
+            $data = $response->json();
+
+            if ($response->successful()) {
+                return ['status' => 'success', 'data' => is_array($data) ? $data : []];
+            }
+
+            return [
+                'status' => 'failed',
+                'error' => $this->parseApiError($data, $response->body()),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Meta WhatsApp template delete failed', ['error' => $e->getMessage()]);
+
+            return ['status' => 'failed', 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{status: string, id?: string, error?: string}
+     */
+    public function resolveMessageTemplateId(string $name, string $language, ?string $storedId = null): array
+    {
+        $storedId = trim((string) $storedId);
+
+        if ($storedId !== '') {
+            return ['status' => 'success', 'id' => $storedId];
+        }
+
+        $fetched = $this->fetchTemplates();
+
+        if ($fetched['status'] !== 'success') {
+            return [
+                'status' => 'failed',
+                'error' => (string) ($fetched['error'] ?? 'Could not read templates from WhatsApp.'),
+            ];
+        }
+
+        foreach ($fetched['items'] ?? [] as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $sameName = trim((string) ($item['name'] ?? '')) === trim($name);
+            $sameLanguage = trim((string) ($item['language'] ?? '')) === trim($language);
+
+            if (! $sameName || ! $sameLanguage) {
+                continue;
+            }
+
+            $id = trim((string) ($item['id'] ?? ''));
+
+            if ($id !== '') {
+                return ['status' => 'success', 'id' => $id];
+            }
+        }
+
+        return [
+            'status' => 'missing',
+            'error' => 'This template is not on WhatsApp. Click Sync from Meta, then try again.',
+        ];
+    }
+
+    /**
      * @return array{status: string, items?: list<array<string, mixed>>, error?: string}
      */
     public function fetchTemplates(): array

@@ -11,6 +11,7 @@ use App\Filament\Resources\MetaWhatsAppTemplates\Pages\ListMetaWhatsAppTemplates
 use App\Filament\Support\CrmTable;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\WhatsAppTemplate;
+use App\Services\MetaWhatsAppTemplateDeleteService;
 use App\Services\WhatsAppTemplateParamResolver;
 use App\Support\CrmMenuLabels;
 use App\Support\CombinedHomeworkWhatsAppTemplate;
@@ -24,6 +25,8 @@ use App\Support\StudentPunchWhatsAppTemplate;
 use App\Support\TestMarksWhatsAppTemplate;
 use App\Support\MetaWhatsAppTemplateBuilder;
 use App\Support\MetaWhatsAppTemplateVariableHelper;
+use Filament\Actions\Action;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
@@ -40,8 +43,10 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Notifications\Notification;
 use Filament\Tables\Table;
 use Illuminate\Support\HtmlString;
+use InvalidArgumentException;
 use UnitEnum;
 
 class MetaWhatsAppTemplateResource extends Resource
@@ -90,6 +95,7 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->schema(static::createFormSchema())
                 ->visible(fn (?MetaWhatsAppTemplate $record): bool => $record === null),
             Section::make('Template details')
+                ->description('Changing the message words sends them to WhatsApp for approval again. The name stays the same. Sending pauses until the status is Approved. Mapping and Active do not ask WhatsApp again.')
                 ->schema(static::editFormSchema())
                 ->visible(fn (?MetaWhatsAppTemplate $record): bool => $record !== null),
         ]);
@@ -372,11 +378,88 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->disabled(),
             TextInput::make('language')
                 ->disabled(),
+            Placeholder::make('wording_lock_reason')
+                ->hiddenLabel()
+                ->content(fn (MetaWhatsAppTemplate $record): string => (string) $record->wordingLockReason())
+                ->visible(fn (MetaWhatsAppTemplate $record): bool => $record->wordingLockReason() !== null)
+                ->columnSpanFull(),
             Textarea::make('body')
                 ->label('Message body')
                 ->disabled()
+                ->dehydrated(false)
                 ->rows(4)
+                ->visible(fn (MetaWhatsAppTemplate $record): bool => $record->wordingLockReason() !== null)
                 ->columnSpanFull(),
+            Textarea::make('body_text')
+                ->label('Message body')
+                ->required()
+                ->rows(8)
+                ->helperText('Change the words, fill the sample line for each {{n}}, turn on the approval switch, then save. WhatsApp must approve the new words. Until then this template cannot be sent.')
+                ->live(debounce: 400)
+                ->afterStateUpdated(function (?string $state, Set $set, Get $get): void {
+                    $set(
+                        'body_variable_samples',
+                        MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
+                            (string) $state,
+                            $get('body_variable_samples') ?? [],
+                            (string) $get('name'),
+                        ),
+                    );
+                })
+                ->visible(fn (MetaWhatsAppTemplate $record): bool => $record->wordingLockReason() === null)
+                ->columnSpanFull(),
+            Section::make('Template variables')
+                ->description('For each {{n}}, choose the CRM field. The sample word is only for WhatsApp approval.')
+                ->schema([
+                    Repeater::make('body_variable_samples')
+                        ->label('')
+                        ->schema([
+                            TextInput::make('index')
+                                ->hidden()
+                                ->dehydrated(),
+                            TextInput::make('label')
+                                ->hidden()
+                                ->dehydrated(),
+                            Select::make('source')
+                                ->label(fn (Get $get): string => '{{'.$get('index').'}} — CRM field')
+                                ->options(WhatsAppTemplateParamResolver::sourceOptions())
+                                ->searchable()
+                                ->placeholder('Student name, class, father name…')
+                                ->required(),
+                            TextInput::make('example')
+                                ->label(fn (Get $get): string => '{{'.$get('index').'}} — sample for WhatsApp')
+                                ->helperText('A short example only. WhatsApp does not use this as the live student data.')
+                                ->required()
+                                ->maxLength(256),
+                        ])
+                        ->addable(false)
+                        ->deletable(false)
+                        ->reorderable(false)
+                        ->columnSpanFull(),
+                    Placeholder::make('body_preview')
+                        ->label('Preview with sample values')
+                        ->content(function (Get $get): HtmlString {
+                            $preview = MetaWhatsAppTemplateVariableHelper::previewBody(
+                                (string) $get('body_text'),
+                                $get('body_variable_samples') ?? [],
+                            );
+
+                            return new HtmlString(
+                                '<div class="whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-gray-100">'
+                                .e($preview)
+                                .'</div>'
+                            );
+                        })
+                        ->columnSpanFull(),
+                ])
+                ->visible(fn (MetaWhatsAppTemplate $record, Get $get): bool => $record->wordingLockReason() === null
+                    && MetaWhatsAppTemplateVariableHelper::variableCount((string) $get('body_text')) > 0)
+                ->columnSpanFull(),
+            Toggle::make('send_wording_for_approval')
+                ->label('Send the new words to WhatsApp for approval')
+                ->helperText('Leave this off when you only change the CRM field or the Active switch. Turn it on only when the message text changed.')
+                ->default(false)
+                ->visible(fn (MetaWhatsAppTemplate $record): bool => $record->wordingLockReason() === null),
             Repeater::make('param_mapping_rows')
                 ->label('Parameter mapping')
                 ->helperText('Maps {{1}}, {{2}}, … to student data when sending campaigns and profile messages.')
@@ -389,7 +472,7 @@ class MetaWhatsAppTemplateResource extends Resource
                 ])
                 ->defaultItems(0)
                 ->maxItems(10)
-                ->visible(fn (MetaWhatsAppTemplate $record): bool => (int) $record->param_count > 0)
+                ->visible(fn (MetaWhatsAppTemplate $record): bool => $record->wordingLockReason() !== null && (int) $record->param_count > 0)
                 ->columnSpanFull(),
             Toggle::make('is_active')
                 ->label('Active for sending')
@@ -439,7 +522,44 @@ class MetaWhatsAppTemplateResource extends Resource
                         'REJECTED' => 'Rejected',
                     ]),
             ])
-            ->defaultSort('name');
+            ->defaultSort('name')
+            ->recordActions([
+                EditAction::make(),
+                static::deleteTemplateAction(),
+            ]);
+    }
+
+    public static function deleteTemplateAction(): Action
+    {
+        return Action::make('deleteTemplate')
+            ->label('Delete template')
+            ->icon(Heroicon::OutlinedTrash)
+            ->color('danger')
+            ->requiresConfirmation()
+            ->modalHeading('Delete this WhatsApp template?')
+            ->modalDescription(fn (MetaWhatsAppTemplate $record): string => app(MetaWhatsAppTemplateDeleteService::class)->confirmText($record))
+            ->modalSubmitActionLabel('Delete from WhatsApp')
+            ->successNotification(
+                Notification::make()
+                    ->success()
+                    ->title('Template removed from WhatsApp')
+                    ->body('Messages already sent stay. This name cannot be used again for 30 days.')
+            )
+            ->successRedirectUrl(fn (): string => static::getUrl('index'))
+            ->action(function (MetaWhatsAppTemplate $record, Action $action): void {
+                try {
+                    app(MetaWhatsAppTemplateDeleteService::class)->delete($record);
+                } catch (InvalidArgumentException $exception) {
+                    Notification::make()
+                        ->title('Could not delete template')
+                        ->body($exception->getMessage())
+                        ->danger()
+                        ->persistent()
+                        ->send();
+
+                    $action->halt();
+                }
+            });
     }
 
     /**
@@ -526,6 +646,54 @@ class MetaWhatsAppTemplateResource extends Resource
                 'synced_at' => now(),
             ],
         );
+    }
+
+    /**
+     * @return list<array{index: int, label: string, example: string, source: string}>
+     */
+    public static function sampleRowsForEdit(MetaWhatsAppTemplate $record): array
+    {
+        $order = MetaWhatsAppTemplateBuilder::positionalPlaceholderOrder((string) $record->body);
+        $examples = static::bodyExamplesFromComponents(is_array($record->components) ? $record->components : []);
+        $mappings = array_values($record->param_mappings ?? []);
+        $rows = [];
+
+        foreach ($order as $position => $index) {
+            $rows[] = [
+                'index' => $index,
+                'label' => MetaWhatsAppTemplateVariableHelper::labelForIndex($index),
+                'example' => $examples[$position] ?? MetaWhatsAppTemplateVariableHelper::defaultSampleForIndex($index),
+                'source' => (string) ($mappings[$position] ?? ''),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $components
+     * @return list<string>
+     */
+    public static function bodyExamplesFromComponents(array $components): array
+    {
+        foreach ($components as $component) {
+            if (! is_array($component) || strtoupper((string) ($component['type'] ?? '')) !== 'BODY') {
+                continue;
+            }
+
+            $examples = $component['example']['body_text'][0] ?? [];
+
+            if (! is_array($examples)) {
+                return [];
+            }
+
+            return array_values(array_map(
+                static fn (mixed $value): string => trim((string) $value),
+                $examples,
+            ));
+        }
+
+        return [];
     }
 
     public static function getPages(): array

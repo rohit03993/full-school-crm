@@ -109,6 +109,49 @@ class MetaWhatsAppTemplateBuilder
     }
 
     /**
+     * Keep the header, footer, and buttons. Replace only the message body.
+     *
+     * @param  list<array<string, mixed>>  $existingComponents
+     * @param  list<string>|null  $bodyExamples
+     * @return list<array<string, mixed>>
+     */
+    public static function componentsWithReplacedBody(array $existingComponents, string $bodyText, ?array $bodyExamples = null): array
+    {
+        $bodyText = trim($bodyText);
+
+        if ($bodyText === '') {
+            throw new InvalidArgumentException('Message body is required.');
+        }
+
+        self::assertBodyVariablesNotAtEdges($bodyText);
+
+        [$bodyComponent] = self::buildBodyComponent($bodyText, null, $bodyExamples);
+        $components = [];
+        $replaced = false;
+
+        foreach ($existingComponents as $component) {
+            if (! is_array($component)) {
+                continue;
+            }
+
+            if (strtoupper((string) ($component['type'] ?? '')) === 'BODY') {
+                $components[] = $bodyComponent;
+                $replaced = true;
+
+                continue;
+            }
+
+            $components[] = $component;
+        }
+
+        if (! $replaced) {
+            $components[] = $bodyComponent;
+        }
+
+        return $components;
+    }
+
+    /**
      * @param  list<string>|null  $bodyExamples
      * @return array{0: array<string, mixed>, 1: string|null}
      */

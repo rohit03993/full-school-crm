@@ -195,4 +195,20 @@ class MetaWhatsAppTemplateBuilderTest extends TestCase
         $this->assertSame('AUTHENTICATION', $payload['category']);
         $this->assertSame('staff_login_otp', $payload['name']);
     }
+
+    public function test_replaced_body_keeps_header_and_footer(): void
+    {
+        $components = MetaWhatsAppTemplateBuilder::componentsWithReplacedBody([
+            ['type' => 'HEADER', 'format' => 'TEXT', 'text' => 'Motion'],
+            ['type' => 'BODY', 'text' => 'Hello {{1}}.'],
+            ['type' => 'FOOTER', 'text' => 'Thank you'],
+        ], 'Hello {{1}}, class is {{2}}.', ['Aarav', '10-A']);
+
+        $this->assertSame('HEADER', $components[0]['type']);
+        $this->assertSame('Motion', $components[0]['text']);
+        $this->assertSame('Hello {{1}}, class is {{2}}.', $components[1]['text']);
+        $this->assertSame(['Aarav', '10-A'], $components[1]['example']['body_text'][0]);
+        $this->assertSame('FOOTER', $components[2]['type']);
+        $this->assertSame('Thank you', $components[2]['text']);
+    }
 }
