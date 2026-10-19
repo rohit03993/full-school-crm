@@ -1607,8 +1607,7 @@ class StudentProfilePage extends Page
 
     public function openReportStudent(): void
     {
-        if ($this->record->activeEnrollment === null
-            || ! app(StudentConductService::class)->canRecord(Auth::user())) {
+        if (! app(StudentConductService::class)->canRecordStudent(Auth::user(), $this->record)) {
             return;
         }
 
@@ -3961,9 +3960,7 @@ class StudentProfilePage extends Page
                 ->action(function (): void {
                     $this->openReportStudent();
                 })
-                ->visible(fn (): bool => $this->record->activeEnrollment !== null
-                    && $this->record->status !== StudentStatus::Dropped
-                    && app(StudentConductService::class)->canRecord(Auth::user())),
+                ->visible(fn (): bool => app(StudentConductService::class)->canRecordStudent(Auth::user(), $this->record)),
             Action::make('reinstateStudent')
                 ->label('Make active')
                 ->icon('heroicon-o-user-plus')
@@ -4550,6 +4547,7 @@ class StudentProfilePage extends Page
             View::make('filament.pages.partials.student-profile-report-modal')
                 ->viewData(fn (): array => [
                     'showReportStudent' => $this->showReportStudent,
+                    'record' => $this->record,
                     'studentName' => $this->record->name,
                     'reportCount' => app(StudentConductService::class)->countForStudent($this->record),
                     'conductTabLoaded' => $this->conductTabLoaded,

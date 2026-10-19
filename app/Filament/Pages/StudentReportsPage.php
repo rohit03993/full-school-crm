@@ -2,18 +2,22 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\StudentConductRecord;
+use App\Models\User;
+use App\Services\BatchStaffAssignmentService;
+use App\Services\StudentConductParentNoticeService;
 use App\Services\StudentConductService;
 use App\Support\ConductTypeOptions;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\CrmPagination;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\WithPagination;
 use UnitEnum;
 
@@ -34,6 +38,21 @@ class StudentReportsPage extends Page
     public string $fineFilter = '';
 
     public string $typeFilter = '';
+
+    public string $bulkBatchId = '';
+
+    /** @var list<int|string> */
+    public array $selectedStudentIds = [];
+
+    public string $bulkRecordedOn = '';
+
+    public string $bulkTypeKey = '';
+
+    public string $bulkFineChoice = 'without_fine';
+
+    public string $bulkAmount = '';
+
+    public string $bulkNote = '';
 
     public static function getNavigationLabel(): string
     {
@@ -66,7 +85,8 @@ class StudentReportsPage extends Page
             return null;
         }
 
-        $total = StudentConductRecord::query()->count();
+        $viewer = Auth::user();
+        $total = app(StudentConductService::class)->stats($viewer instanceof User ? $viewer : null)['total'];
 
         return $total > 0 ? (string) $total : null;
     }
@@ -74,6 +94,16 @@ class StudentReportsPage extends Page
     public static function getNavigationBadgeColor(): string|array|null
     {
         return 'danger';
+    }
+
+    public function mount(): void
+    {
+        $this->bulkRecordedOn = now()->toDateString();
+        $options = app(BatchStaffAssignmentService::class)->activeBatchOptionsFor(Auth::user());
+
+        if (count($options) === 1) {
+            $this->bulkBatchId = (string) array_key_first($options);
+        }
     }
 
     public function updatedSearch(): void
@@ -91,9 +121,68 @@ class StudentReportsPage extends Page
         $this->resetPage();
     }
 
+    public function updatedBulkBatchId(): void
+    {
+        $this->selectedStudentIds = [];
+    }
+
+    public function toggleSelectAllStudents(): void
+    {
+        $ids = $this->currentClassStudentIds();
+        $selected = array_map(strval(...), $this->selectedStudentIds);
+        $allSelected = $ids !== [] && array_diff($ids, $selected) === [];
+        $this->selectedStudentIds = $allSelected ? [] : $ids;
+    }
+
+    public function sendBulkReport(): void
+    {
+        $staff = Auth::user();
+
+        if (! $staff instanceof User) {
+            return;
+        }
+
+        try {
+            $records = app(StudentConductService::class)->storeMany($staff, $this->selectedStudentIds, [
+                'recorded_on' => $this->bulkRecordedOn,
+                'type_keys' => $this->bulkTypeKey !== '' ? [$this->bulkTypeKey] : [],
+                'fine_choice' => $this->bulkFineChoice,
+                'amount' => $this->bulkAmount,
+                'note' => $this->bulkNote,
+            ]);
+        } catch (ValidationException $exception) {
+            Notification::make()
+                ->title(collect($exception->errors())->flatten()->first() ?: 'Could not save the reports.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $records->load('student');
+        $notice = app(StudentConductParentNoticeService::class)->notifyMany($records, $staff);
+        $count = $records->count();
+
+        $this->selectedStudentIds = [];
+        $this->bulkTypeKey = '';
+        $this->bulkFineChoice = 'without_fine';
+        $this->bulkAmount = '';
+        $this->bulkNote = '';
+        $this->bulkRecordedOn = now()->toDateString();
+        $this->resetPage();
+
+        Notification::make()
+            ->title($count === 1 ? 'Report saved for 1 student' : 'Reports saved for '.$count.' students')
+            ->body($notice['note'])
+            ->success()
+            ->send();
+    }
+
     public function content(Schema $schema): Schema
     {
         $service = app(StudentConductService::class);
+        $viewer = Auth::user();
+        $viewer = $viewer instanceof User ? $viewer : null;
 
         return $schema->components([
             View::make('filament.pages.partials.student-reports')
@@ -103,10 +192,43 @@ class StudentReportsPage extends Page
                         $this->fineFilter,
                         $this->typeFilter,
                         CrmPagination::PER_PAGE,
+                        $viewer,
                     ),
-                    'stats' => $service->stats(),
+                    'stats' => $service->stats($viewer),
                     'typeOptions' => ConductTypeOptions::formOptions(),
+                    'classOptions' => app(BatchStaffAssignmentService::class)->activeBatchOptionsFor($viewer),
+                    'bulkStudents' => $viewer ? $service->studentsInClass($viewer, (int) $this->bulkBatchId) : collect(),
+                    'bulkBatchId' => $this->bulkBatchId,
+                    'selectedStudentIds' => $this->selectedStudentIds,
+                    'bulkFineChoice' => $this->bulkFineChoice,
+                    'allStudentsSelected' => $this->allStudentsSelected(),
                 ]),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function currentClassStudentIds(): array
+    {
+        $viewer = Auth::user();
+
+        if (! $viewer instanceof User) {
+            return [];
+        }
+
+        return app(StudentConductService::class)
+            ->studentsInClass($viewer, (int) $this->bulkBatchId)
+            ->pluck('id')
+            ->map(fn (mixed $id): string => (string) $id)
+            ->all();
+    }
+
+    protected function allStudentsSelected(): bool
+    {
+        $ids = $this->currentClassStudentIds();
+        $selected = array_map(strval(...), $this->selectedStudentIds);
+
+        return $ids !== [] && array_diff($ids, $selected) === [];
     }
 }

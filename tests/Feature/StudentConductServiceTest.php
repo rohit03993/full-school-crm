@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Enums\AdmissionStatus;
+use App\Enums\BatchStaffRole;
+use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\EnrollmentStatus;
 use App\Enums\LeadSource;
+use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
@@ -13,12 +16,19 @@ use App\Enums\VisitStatus;
 use App\Filament\Pages\ManageConductTypes;
 use App\Filament\Pages\StudentReportsPage;
 use App\Models\Admission;
+use App\Models\Batch;
+use App\Models\BatchStaffAssignment;
+use App\Models\BatchStudent;
 use App\Models\Course;
+use App\Models\CourseSubject;
 use App\Models\Enrollment;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\EnquiryService;
+use App\Services\LicenseService;
+use App\Services\MetaWhatsAppInboxService;
 use App\Services\StudentActivityTimelineService;
+use App\Services\StudentConductParentNoticeService;
 use App\Services\StudentConductService;
 use App\Support\ConductTypeOptions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -92,21 +102,145 @@ class StudentConductServiceTest extends TestCase
         }
     }
 
-    public function test_teacher_cannot_add_a_conduct_record(): void
+    public function test_teacher_without_a_class_cannot_add_a_conduct_record(): void
     {
         $coordinator = $this->coordinator();
         $teacher = User::factory()->create(['is_active' => true]);
         $teacher->assignRole(StaffJobRole::Teacher->value);
         $student = $this->enrolledStudent($coordinator);
 
+        try {
+            app(StudentConductService::class)->store($student, $teacher, [
+                'recorded_on' => now()->toDateString(),
+                'type_keys' => ['creating_noise'],
+                'fine_choice' => 'without_fine',
+                'note' => 'Noise.',
+            ]);
+            $this->fail('A teacher with no class should not save a report.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'You can report only students in a class assigned to you.',
+                $exception->errors()['conduct'][0],
+            );
+        }
+    }
+
+    public function test_assigned_teacher_can_report_that_class_with_a_fine(): void
+    {
+        $coordinator = $this->coordinator();
+        $teacher = User::factory()->create(['name' => 'Class Teacher', 'is_active' => true]);
+        $teacher->assignRole(StaffJobRole::Teacher->value);
+        $student = $this->enrolledStudent($coordinator);
+        $this->putStudentInClass($student, $teacher, $coordinator, BatchStaffRole::LeadTeacher);
+
+        $record = app(StudentConductService::class)->store($student, $teacher, [
+            'recorded_on' => now()->toDateString(),
+            'type_keys' => ['creating_noise'],
+            'fine_choice' => 'fine_charged',
+            'amount' => '100',
+            'note' => 'The class was noisy.',
+        ]);
+
+        $this->assertSame($teacher->id, $record->recorded_by_user_id);
+        $this->assertTrue($record->fine_charged);
+        $this->assertSame(100, $record->amount);
+    }
+
+    public function test_subject_teacher_cannot_report_a_student_from_another_class(): void
+    {
+        $coordinator = $this->coordinator();
+        $teacher = User::factory()->create(['is_active' => true]);
+        $teacher->assignRole(StaffJobRole::Teacher->value);
+        $ownStudent = $this->enrolledStudent($coordinator);
+        $otherStudent = $this->enrolledStudent($coordinator);
+        $this->putStudentInClass($ownStudent, $teacher, $coordinator, BatchStaffRole::SubjectTeacher);
+        $this->putStudentInClass($otherStudent, $coordinator, $coordinator, BatchStaffRole::LeadTeacher);
+
         $this->expectException(ValidationException::class);
 
-        app(StudentConductService::class)->store($student, $teacher, [
+        app(StudentConductService::class)->store($otherStudent, $teacher, [
             'recorded_on' => now()->toDateString(),
             'type_keys' => ['creating_noise'],
             'fine_choice' => 'without_fine',
-            'note' => 'Noise.',
+            'note' => 'Should stay in their own class.',
         ]);
+    }
+
+    public function test_bulk_report_saves_one_row_per_student_with_the_same_fine(): void
+    {
+        $coordinator = $this->coordinator();
+        $teacher = User::factory()->create(['name' => 'Class Teacher', 'is_active' => true]);
+        $teacher->assignRole(StaffJobRole::Teacher->value);
+        $first = $this->enrolledStudent($coordinator);
+        $second = $this->enrolledStudent($coordinator);
+        $batch = $this->putStudentInClass($first, $teacher, $coordinator, BatchStaffRole::LeadTeacher);
+        BatchStudent::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $second->id,
+            'assigned_at' => now(),
+            'is_active' => true,
+            'assigned_by_user_id' => $coordinator->id,
+        ]);
+
+        $records = app(StudentConductService::class)->storeMany($teacher, [$first->id, $second->id], [
+            'recorded_on' => now()->toDateString(),
+            'type_keys' => ['creating_noise'],
+            'fine_choice' => 'fine_charged',
+            'amount' => '50',
+            'note' => 'The whole class was noisy.',
+        ]);
+
+        $this->assertCount(2, $records);
+        $this->assertEqualsCanonicalizing(
+            [$first->id, $second->id],
+            $records->pluck('student_id')->all(),
+        );
+        $this->assertTrue($records->every(fn ($record): bool => $record->fine_charged && $record->amount === 50));
+        $this->assertTrue($records->every(fn ($record): bool => $record->recorded_by_user_id === $teacher->id));
+    }
+
+    public function test_parent_notice_is_skipped_when_whatsapp_is_off(): void
+    {
+        $coordinator = $this->coordinator();
+        $student = $this->enrolledStudent($coordinator);
+        $record = app(StudentConductService::class)->store($student, $coordinator, [
+            'recorded_on' => now()->toDateString(),
+            'type_keys' => ['creating_noise'],
+            'fine_choice' => 'without_fine',
+            'note' => 'Warned in class.',
+        ]);
+
+        $result = app(StudentConductParentNoticeService::class)->notifyMany(collect([$record->load('student')]), $coordinator);
+
+        $this->assertSame(0, $result['sent']);
+        $this->assertStringContainsString('WhatsApp is not enabled', $result['note']);
+    }
+
+    public function test_parent_notice_sends_when_whatsapp_is_on(): void
+    {
+        $coordinator = $this->coordinator();
+        $student = $this->enrolledStudent($coordinator);
+        $record = app(StudentConductService::class)->store($student, $coordinator, [
+            'recorded_on' => now()->toDateString(),
+            'type_keys' => ['creating_noise'],
+            'fine_choice' => 'fine_charged',
+            'amount' => '80',
+            'note' => 'Phone in class.',
+        ]);
+        $record->load('student');
+
+        $this->mock(LicenseService::class, function ($mock): void {
+            $mock->shouldReceive('hasFeature')
+                ->andReturnUsing(fn (LicenseFeature|string $feature): bool => ($feature instanceof LicenseFeature ? $feature->value : $feature) === LicenseFeature::WhatsApp->value);
+        });
+        $this->mock(MetaWhatsAppInboxService::class, function ($mock): void {
+            $mock->shouldReceive('sendReply')->once()->andReturn(['status' => 'success', 'message_id' => 'wamid.test']);
+        });
+
+        $result = app(StudentConductParentNoticeService::class)->notifyMany(collect([$record]), $coordinator);
+
+        $this->assertSame(1, $result['sent']);
+        $this->assertSame(0, $result['skipped']);
     }
 
     public function test_only_super_admin_can_remove_a_record(): void
@@ -194,7 +328,9 @@ class StudentConductServiceTest extends TestCase
         $teacher = User::factory()->create(['is_active' => true]);
         $teacher->assignRole(StaffJobRole::Teacher->value);
         $this->actingAs($teacher);
-        $this->assertFalse(StudentReportsPage::canAccess());
+        $this->assertTrue(StudentReportsPage::canAccess());
+        $this->assertSame(0, $service->paginate('', '', '', 15, $teacher)->total());
+        $this->assertSame(0, $service->stats($teacher)['total']);
     }
 
     public function test_conduct_is_open_for_admin_and_academic_head_without_a_license_switch(): void
@@ -285,5 +421,40 @@ class StudentConductServiceTest extends TestCase
         ]);
 
         return $student->fresh(['activeEnrollment']);
+    }
+
+    protected function putStudentInClass(Student $student, User $teacher, User $assignedBy, BatchStaffRole $role): Batch
+    {
+        $student->loadMissing('activeEnrollment');
+        $batch = Batch::query()->create([
+            'name' => 'Class 9 A '.uniqid(),
+            'course_id' => $student->activeEnrollment->course_id,
+            'status' => BatchStatus::Active,
+        ]);
+        $subjectId = null;
+
+        if ($role === BatchStaffRole::SubjectTeacher) {
+            $subjectId = CourseSubject::query()->create([
+                'course_id' => $student->activeEnrollment->course_id,
+                'name' => 'Chemistry '.uniqid(),
+                'is_active' => true,
+            ])->id;
+        }
+
+        BatchStaffAssignment::query()->create([
+            'batch_id' => $batch->id,
+            'user_id' => $teacher->id,
+            'role' => $role,
+            'course_subject_id' => $subjectId,
+        ]);
+        BatchStudent::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $student->id,
+            'assigned_at' => now(),
+            'is_active' => true,
+            'assigned_by_user_id' => $assignedBy->id,
+        ]);
+
+        return $batch;
     }
 }

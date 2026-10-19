@@ -1,4 +1,98 @@
 <div class="mx-auto max-w-lg space-y-4 pb-24 lg:max-w-4xl lg:pb-6">
+    <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 sm:p-5">
+        <h3 class="text-base font-semibold text-gray-950 dark:text-white">Report students</h3>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Same type, note, and fine are saved on every ticked student. Parents are messaged on WhatsApp when it is on.</p>
+
+        @if ($classOptions === [])
+            <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">No active class is available for you.</p>
+        @else
+            <div class="fi-crm-form mt-4 grid gap-4">
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Class</label>
+                    <x-crm.select wire:model.live="bulkBatchId" class="mt-2 min-h-11 w-full">
+                        <option value="">Select a class</option>
+                        @foreach ($classOptions as $id => $label)
+                            <option value="{{ $id }}">{{ $label }}</option>
+                        @endforeach
+                    </x-crm.select>
+                </div>
+
+                @if ($bulkBatchId !== '')
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">Students</p>
+                        @if ($bulkStudents->isNotEmpty())
+                            <button type="button" wire:click="toggleSelectAllStudents" class="text-sm font-semibold text-rose-700 hover:underline dark:text-rose-300">
+                                {{ $allStudentsSelected ? 'Clear all' : 'Select all' }}
+                            </button>
+                        @endif
+                    </div>
+
+                    @if ($bulkStudents->isEmpty())
+                        <p class="text-sm text-gray-500 dark:text-gray-400">No active students in this class.</p>
+                    @else
+                        <div class="max-h-72 space-y-2 overflow-y-auto">
+                            @foreach ($bulkStudents as $student)
+                                <label class="flex min-h-11 items-center gap-3 rounded-xl px-3 ring-1 ring-gray-200 dark:ring-white/10">
+                                    <input type="checkbox" value="{{ $student->id }}" wire:model.live="selectedStudentIds" class="h-4 w-4 rounded border-gray-300 text-rose-600" />
+                                    <span class="min-w-0 truncate text-sm font-medium text-gray-950 dark:text-white">{{ $student->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    @endif
+                @endif
+
+                @if (count($selectedStudentIds) > 0)
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Date</label>
+                        <input type="date" wire:model="bulkRecordedOn" max="{{ now()->toDateString() }}" class="fi-crm-input mt-2 block min-h-11 w-full" />
+                    </div>
+
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Type</label>
+                        <x-crm.select wire:model="bulkTypeKey" class="mt-2 min-h-11 w-full">
+                            <option value="">Select a type</option>
+                            @foreach ($typeOptions as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </x-crm.select>
+                    </div>
+
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <div>
+                            <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Fine</label>
+                            <x-crm.select wire:model.live="bulkFineChoice" class="mt-2 min-h-11 w-full">
+                                <option value="without_fine">Without fine</option>
+                                <option value="fine_charged">Fine charged</option>
+                            </x-crm.select>
+                        </div>
+                        @if ($bulkFineChoice === 'fine_charged')
+                            <div>
+                                <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">Amount (₹)</label>
+                                <input type="number" min="1" step="1" inputmode="numeric" wire:model="bulkAmount" class="fi-crm-input mt-2 block min-h-11 w-full" placeholder="e.g. 200" />
+                            </div>
+                        @endif
+                    </div>
+
+                    <div>
+                        <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">What happened</label>
+                        <textarea wire:model="bulkNote" rows="3" maxlength="1000" class="fi-crm-input mt-2 block min-h-24 w-full" placeholder="Short note about this incident"></textarea>
+                    </div>
+
+                    <button
+                        type="button"
+                        wire:click="sendBulkReport"
+                        wire:confirm="Save this report for {{ count($selectedStudentIds) }} {{ count($selectedStudentIds) === 1 ? 'student' : 'students' }} and message their parents on WhatsApp?"
+                        wire:loading.attr="disabled"
+                        wire:target="sendBulkReport"
+                        class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-rose-600 px-4 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-70 sm:w-auto"
+                    >
+                        Send bulk report
+                    </button>
+                @endif
+            </div>
+        @endif
+    </div>
+
     <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
         @foreach ([
             ['label' => 'All reports', 'value' => $stats['total'] ?? 0],

@@ -600,7 +600,7 @@ class StudentActivityTimelineService
      */
     protected function conductRecords(Student $student, ?User $viewer, int $limit): array
     {
-        if (! app(StudentConductService::class)->canRecord($viewer)) {
+        if (! $viewer instanceof User || ! app(StudentConductService::class)->canRecordStudent($viewer, $student)) {
             return [];
         }
 
