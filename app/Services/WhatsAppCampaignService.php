@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Enums\EnrollmentStatus;
+use App\Enums\StudentStatus;
 use App\Enums\WhatsAppAudienceType;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Enums\WhatsAppRecipientStatus;
@@ -230,7 +232,7 @@ class WhatsAppCampaignService
     protected function audienceStudents(array $data, WhatsAppAudienceType $audienceType): Collection
     {
         if (! empty($data['student_ids'])) {
-            return Student::query()
+            return $this->exceptDropped(Student::query())
                 ->whereIn('id', $data['student_ids'])
                 ->whereNotNull('mobile')
                 ->where('mobile', '!=', '')
@@ -254,7 +256,7 @@ class WhatsAppCampaignService
             return collect();
         }
 
-        return Student::query()
+        return $this->exceptDropped(Student::query())
             ->whereNotNull('mobile')
             ->where('mobile', '!=', '')
             ->whereHas('batchStudents', function (Builder $batchStudentQuery) use ($data): void {
@@ -276,12 +278,13 @@ class WhatsAppCampaignService
             return collect();
         }
 
-        return Student::query()
+        return $this->exceptDropped(Student::query())
             ->whereNotNull('mobile')
             ->where('mobile', '!=', '')
             ->whereHas('enrollments', function (Builder $enrollmentQuery) use ($data): void {
                 $enrollmentQuery
                     ->where('is_active', true)
+                    ->where('status', EnrollmentStatus::Enrolled)
                     ->where('course_id', $data['course_id']);
 
                 if (! empty($data['academic_session_id'])) {
@@ -338,7 +341,7 @@ class WhatsAppCampaignService
         $storedStudentIds = $campaign->campaignVariable('_student_ids');
 
         if (is_array($storedStudentIds) && $storedStudentIds !== []) {
-            $students = Student::query()
+            $students = $this->exceptDropped(Student::query())
                 ->whereIn('id', $storedStudentIds)
                 ->whereNotNull('mobile')
                 ->where('mobile', '!=', '')
@@ -406,7 +409,7 @@ class WhatsAppCampaignService
             return;
         }
 
-        $students = Student::query()
+        $students = $this->exceptDropped(Student::query())
             ->whereIn('id', $storedStudentIds)
             ->whereNotNull('mobile')
             ->where('mobile', '!=', '')
@@ -431,6 +434,14 @@ class WhatsAppCampaignService
         ]);
 
         $this->replaceCampaignRecipients($campaign, $students);
+    }
+
+    /**
+     * A dropped student keeps an active admission so old fees stay. Campaigns must still skip them.
+     */
+    protected function exceptDropped(Builder $query): Builder
+    {
+        return $query->where('status', '!=', StudentStatus::Dropped->value);
     }
 
     /**

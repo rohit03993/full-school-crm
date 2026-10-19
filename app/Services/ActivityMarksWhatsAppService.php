@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\StudentStatus;
 use App\Enums\WhatsAppCampaignStatus;
 use App\Enums\WhatsAppRecipientStatus;
 use App\Models\ActivityAttendance;
@@ -112,6 +113,7 @@ class ActivityMarksWhatsAppService
 
         return Student::query()
             ->whereIn('id', array_keys($summaries))
+            ->where('status', '!=', StudentStatus::Dropped->value)
             ->whereNotNull('mobile')
             ->where('mobile', '!=', '')
             ->get();

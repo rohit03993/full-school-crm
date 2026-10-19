@@ -112,6 +112,46 @@ class WhatsAppCampaignServiceTest extends TestCase
         $this->assertNotContains($otherStudent->id, $recipientIds);
     }
 
+    public function test_dropped_students_are_left_out_of_campaign_sends(): void
+    {
+        $admin = $this->createSuperAdmin();
+        [$course, $batchA] = $this->createCourseWithBatches($admin);
+        $active = $this->createEnrolledStudent('Still here', '9876500401', '901', $course, $batchA);
+        $dropped = $this->createEnrolledStudent('Left the class', '9876500402', '902', $course, $batchA);
+
+        $dropped->update(['status' => StudentStatus::Dropped]);
+        $dropped->enrollments()->update([
+            'status' => EnrollmentStatus::Dropped,
+            'is_active' => true,
+        ]);
+
+        $template = $this->createTemplate();
+        $service = app(WhatsAppCampaignService::class);
+
+        $courseCampaign = $service->createCampaign([
+            'name' => 'Whole class',
+            'whatsapp_template_id' => $template->id,
+            'audience_type' => WhatsAppAudienceType::Course->value,
+            'course_id' => $course->id,
+        ], $admin);
+
+        $pickedCampaign = $service->createCampaign([
+            'name' => 'Picked students',
+            'whatsapp_template_id' => $template->id,
+            'audience_type' => WhatsAppAudienceType::Batch->value,
+            'course_id' => $course->id,
+            'batch_id' => $batchA->id,
+            'student_ids' => [$active->id, $dropped->id],
+        ], $admin);
+
+        $this->assertSame([$active->id], $courseCampaign->recipients()->pluck('student_id')->all());
+        $this->assertSame([$active->id], $pickedCampaign->recipients()->pluck('student_id')->all());
+        $this->assertSame(1, $service->estimateAudienceCount([
+            'audience_type' => WhatsAppAudienceType::Course->value,
+            'course_id' => $course->id,
+        ]));
+    }
+
     public function test_param_resolver_uses_batch_and_campaign_variables(): void
     {
         $admin = $this->createSuperAdmin();
