@@ -95,7 +95,7 @@ final class CrmMenuLabels
 
     public static function studentReports(): string
     {
-        return 'Student reports';
+        return 'Report Students';
     }
 
     // —— Calls ——

@@ -297,22 +297,21 @@ class StudentConductService
     {
         $query = StudentConductRecord::query();
 
-        if (! $viewer || ! app(BatchStaffAssignmentService::class)->shouldLimitToAssignedClasses($viewer)) {
+        if (! $viewer || $this->seesEveryReport($viewer)) {
             return $query;
         }
 
-        $batchIds = app(BatchStaffAssignmentService::class)->assignedBatchIds($viewer);
-
-        if ($batchIds === []) {
-            return $query->whereRaw('0 = 1');
+        if ($viewer->hasRole(StaffJobRole::Teacher->value)) {
+            return $query->where('recorded_by_user_id', $viewer->id);
         }
 
-        return $query->whereHas(
-            'student.batchStudents',
-            fn (Builder $batchStudents): Builder => $batchStudents
-                ->where('is_active', true)
-                ->whereIn('batch_id', $batchIds),
-        );
+        return $query->whereRaw('0 = 1');
+    }
+
+    protected function seesEveryReport(User $viewer): bool
+    {
+        return $viewer->hasRole(RoleName::SuperAdmin->value)
+            || $viewer->hasRole(StaffJobRole::AcademicCoordinator->value);
     }
 
     public function delete(StudentConductRecord $record, User $staff): void

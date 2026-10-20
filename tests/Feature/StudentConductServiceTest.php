@@ -333,6 +333,37 @@ class StudentConductServiceTest extends TestCase
         $this->assertSame(0, $service->stats($teacher)['total']);
     }
 
+    public function test_teacher_saved_list_shows_only_reports_that_teacher_entered(): void
+    {
+        $coordinator = $this->coordinator();
+        $teacher = User::factory()->create(['name' => 'Class Teacher', 'is_active' => true]);
+        $teacher->assignRole(StaffJobRole::Teacher->value);
+        $student = $this->enrolledStudent($coordinator);
+        $this->putStudentInClass($student, $teacher, $coordinator, BatchStaffRole::LeadTeacher);
+        $service = app(StudentConductService::class);
+
+        $service->store($student, $coordinator, [
+            'recorded_on' => now()->toDateString(),
+            'type_keys' => ['fighting'],
+            'fine_choice' => 'without_fine',
+            'note' => 'Entered by the coordinator.',
+        ]);
+        $service->store($student, $teacher, [
+            'recorded_on' => now()->toDateString(),
+            'type_keys' => ['creating_noise'],
+            'fine_choice' => 'without_fine',
+            'note' => 'Entered by the teacher.',
+        ]);
+
+        $teacherPage = $service->paginate('', '', '', 15, $teacher);
+        $this->assertSame(1, $teacherPage->total());
+        $this->assertSame('Entered by the teacher.', $teacherPage->items()[0]->note);
+        $this->assertSame(1, $service->stats($teacher)['total']);
+
+        $this->assertSame(2, $service->paginate('', '', '', 15, $coordinator)->total());
+        $this->assertSame(2, $service->countForStudent($student));
+    }
+
     public function test_conduct_is_open_for_admin_and_academic_head_without_a_license_switch(): void
     {
         $coordinator = $this->coordinator();
