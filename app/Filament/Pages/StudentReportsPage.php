@@ -39,7 +39,11 @@ class StudentReportsPage extends Page
 
     public string $typeFilter = '';
 
+    public string $reportMode = 'one';
+
     public string $bulkBatchId = '';
+
+    public string $singleStudentId = '';
 
     /** @var list<int|string> */
     public array $selectedStudentIds = [];
@@ -121,9 +125,31 @@ class StudentReportsPage extends Page
         $this->resetPage();
     }
 
+    public function setReportMode(string $mode): void
+    {
+        if (! in_array($mode, ['one', 'many', 'saved'], true) || $mode === $this->reportMode) {
+            return;
+        }
+
+        $this->reportMode = $mode;
+        $this->selectedStudentIds = [];
+        $this->singleStudentId = '';
+        $this->resetReportDraft();
+
+        if ($mode === 'saved') {
+            $this->resetPage();
+        }
+    }
+
     public function updatedBulkBatchId(): void
     {
         $this->selectedStudentIds = [];
+        $this->singleStudentId = '';
+    }
+
+    public function saveSingleReport(): void
+    {
+        $this->storeReports([(int) $this->singleStudentId]);
     }
 
     public function toggleSelectAllStudents(): void
@@ -136,6 +162,14 @@ class StudentReportsPage extends Page
 
     public function sendBulkReport(): void
     {
+        $this->storeReports($this->selectedStudentIds);
+    }
+
+    /**
+     * @param  list<int|string>  $studentIds
+     */
+    protected function storeReports(array $studentIds): void
+    {
         $staff = Auth::user();
 
         if (! $staff instanceof User) {
@@ -143,7 +177,7 @@ class StudentReportsPage extends Page
         }
 
         try {
-            $records = app(StudentConductService::class)->storeMany($staff, $this->selectedStudentIds, [
+            $records = app(StudentConductService::class)->storeMany($staff, $studentIds, [
                 'recorded_on' => $this->bulkRecordedOn,
                 'type_keys' => $this->bulkTypeKey !== '' ? [$this->bulkTypeKey] : [],
                 'fine_choice' => $this->bulkFineChoice,
@@ -164,11 +198,8 @@ class StudentReportsPage extends Page
         $count = $records->count();
 
         $this->selectedStudentIds = [];
-        $this->bulkTypeKey = '';
-        $this->bulkFineChoice = 'without_fine';
-        $this->bulkAmount = '';
-        $this->bulkNote = '';
-        $this->bulkRecordedOn = now()->toDateString();
+        $this->singleStudentId = '';
+        $this->resetReportDraft();
         $this->resetPage();
 
         Notification::make()
@@ -176,6 +207,15 @@ class StudentReportsPage extends Page
             ->body($notice['note'])
             ->success()
             ->send();
+    }
+
+    protected function resetReportDraft(): void
+    {
+        $this->bulkTypeKey = '';
+        $this->bulkFineChoice = 'without_fine';
+        $this->bulkAmount = '';
+        $this->bulkNote = '';
+        $this->bulkRecordedOn = now()->toDateString();
     }
 
     public function content(Schema $schema): Schema
@@ -187,21 +227,27 @@ class StudentReportsPage extends Page
         return $schema->components([
             View::make('filament.pages.partials.student-reports')
                 ->viewData(fn (): array => [
-                    'reports' => $service->paginate(
-                        $this->search,
-                        $this->fineFilter,
-                        $this->typeFilter,
-                        CrmPagination::PER_PAGE,
-                        $viewer,
-                    ),
-                    'stats' => $service->stats($viewer),
+                    'reportMode' => $this->reportMode,
+                    'reports' => $this->reportMode === 'saved'
+                        ? $service->paginate(
+                            $this->search,
+                            $this->fineFilter,
+                            $this->typeFilter,
+                            CrmPagination::PER_PAGE,
+                            $viewer,
+                        )
+                        : null,
+                    'stats' => $this->reportMode === 'saved' ? $service->stats($viewer) : null,
                     'typeOptions' => ConductTypeOptions::formOptions(),
                     'classOptions' => app(BatchStaffAssignmentService::class)->activeBatchOptionsFor($viewer),
-                    'bulkStudents' => $viewer ? $service->studentsInClass($viewer, (int) $this->bulkBatchId) : collect(),
+                    'bulkStudents' => $viewer && $this->reportMode !== 'saved'
+                        ? $service->studentsInClass($viewer, (int) $this->bulkBatchId)
+                        : collect(),
                     'bulkBatchId' => $this->bulkBatchId,
+                    'singleStudentId' => $this->singleStudentId,
                     'selectedStudentIds' => $this->selectedStudentIds,
                     'bulkFineChoice' => $this->bulkFineChoice,
-                    'allStudentsSelected' => $this->allStudentsSelected(),
+                    'allStudentsSelected' => $this->reportMode === 'many' && $this->allStudentsSelected(),
                 ]),
         ]);
     }
