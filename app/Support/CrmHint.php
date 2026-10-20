@@ -19,7 +19,7 @@ class CrmHint
         'setup.custom_fields' => 'Optional extra fields on student or enquiry forms (e.g. blood group, previous school). Not used for exam marks — use Exams → Upload Excel.',
         'setup.meeting_for' => 'Choose what appears in the Meeting for dropdown on Search Student and enquiry forms — e.g. Enquiry, Admission, Marketing. Reorder, rename, add, or hide options here.',
         'setup.conduct_types' => 'Names in the Type dropdown when staff report a student. Add a name, or hide one the school does not use. Old reports keep the name they were saved with.',
-        'students.reports' => 'One student or many students in a class. Saved reports lists what is already stored. A teacher sees only the reports they entered. The same report still shows on that student profile.',
+        'students.reports' => 'One student or many students in a class. Saved reports lists what is already stored. A teacher sees only the reports they entered. The parent WhatsApp waits until Super Admin or Academic coordinator approves it, and only if Student report is on under Automations.',
         'setup.site_content' => 'Controls the public website: logo, phone number, homepage text, and gallery. Changes go live immediately after Save.',
         'setup.institute_settings' => 'Receipt and ID card PDF branding. Institute name and phone come from Website → Site Content — set logo here for printed documents.',
         'setup.meta_whatsapp' => 'Each school stores its own Meta WhatsApp credentials in this CRM. When enabled, all sends route through Meta Cloud API.',

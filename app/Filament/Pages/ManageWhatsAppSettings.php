@@ -357,6 +357,31 @@ class ManageWhatsAppSettings extends Page
                 ])
                 ->columns(2),
                         ]),
+                    Tab::make('Student reports')
+                        ->icon(Heroicon::OutlinedExclamationTriangle)
+                        ->schema([
+            Section::make('Parents — student report')
+                ->description('Off means no parent message. A teacher saves the report. Super Admin or Academic coordinator approve it before WhatsApp goes out.')
+                ->schema([
+                    Placeholder::make('student_report_template_guide')
+                        ->hiddenLabel()
+                        ->content(fn (WhatsAppSettingsService $settings): HtmlString => $settings->renderStudentReportTemplateGuide())
+                        ->columnSpanFull(),
+                    Toggle::make('student_report_autosend_enabled')
+                        ->label('Send WhatsApp after a student report is approved')
+                        ->helperText('When this is off, approval does not message parents.')
+                        ->columnSpanFull(),
+                    Select::make('student_report_live_campaign_id')
+                        ->label('Student report template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(7))
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->placeholder('Choose template…')
+                        ->helperText('Template student_report. Seven blanks: student name, class, date, type, fine, remark, school name.'),
+                ])
+                ->columns(2),
+                        ]),
                     Tab::make('Sending batches')
                         ->icon(Heroicon::OutlinedRectangleStack)
                         ->schema([

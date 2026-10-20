@@ -90,6 +90,9 @@
                     <p class="mt-3 text-xs font-medium text-gray-500 dark:text-gray-400">
                         {{ $conductRecord->recorded_on?->format('d M Y') }}
                         · Entered by {{ $conductRecord->recordedBy?->name ?: 'Unknown' }}
+                        @if ($conductRecord->parentNoticeLabel())
+                            · {{ $conductRecord->parentNoticeLabel() }}
+                        @endif
                     </p>
                     @if ($canDeleteConduct)
                         <button
@@ -107,7 +110,7 @@
         @if (($reportCount ?? 0) > $conductRecords->count())
             <p class="text-center text-xs text-gray-500 dark:text-gray-400">
                 Showing the latest {{ $conductRecords->count() }}.
-                <a href="{{ \App\Filament\Pages\StudentReportsPage::getUrl() }}" class="font-semibold text-rose-700 hover:underline dark:text-rose-300">All student reports</a>
+                <a href="{{ \App\Filament\Pages\StudentReportsPage::getUrl() }}" class="font-semibold text-rose-700 hover:underline dark:text-rose-300">Report Students</a>
             </p>
         @endif
     @endif

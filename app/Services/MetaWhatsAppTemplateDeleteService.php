@@ -147,6 +147,7 @@ class MetaWhatsAppTemplateDeleteService
             'whatsapp.homework_template_name', 'whatsapp.homework_share_live_campaign_id' => 'Homework share',
             'whatsapp.homework_combined_template_name', 'whatsapp.homework_combined_live_campaign_id' => 'Combined homework',
             'whatsapp.homework_not_done_live_campaign_id' => 'Homework not done',
+            'whatsapp.student_report_live_campaign_id' => 'Student report',
             'whatsapp.activity_marks_template_name', 'whatsapp.activity_marks_live_campaign_id' => 'Test marks',
             'whatsapp.fee_reminder_template_id', 'whatsapp.fee_reminder_live_campaign_id' => 'Fee reminder',
             'whatsapp.fee_reminder_upcoming_live_campaign_id' => 'Fee reminder (upcoming)',

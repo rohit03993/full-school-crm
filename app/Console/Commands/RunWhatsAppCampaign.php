@@ -403,6 +403,8 @@ class RunWhatsAppCampaign extends Command
                 => [WhatsAppMessageSource::Punch, WhatsAppSendActor::Automatic],
             $audience === 'homework_check'
                 => [WhatsAppMessageSource::Homework, WhatsAppSendActor::Automatic],
+            $audience === 'student_report'
+                => [WhatsAppMessageSource::Automation, WhatsAppSendActor::Staff],
             in_array($audience, ['fee_reminder', 'activity_marks'], true)
                 => [WhatsAppMessageSource::Automation, WhatsAppSendActor::Automatic],
             default

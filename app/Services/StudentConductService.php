@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ParentNoticeStatus;
 use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
@@ -66,6 +67,11 @@ class StudentConductService
         }
 
         return 'You cannot add a report for this student.';
+    }
+
+    public function canApproveParentNotice(?User $user): bool
+    {
+        return (bool) $user?->is_active && $this->seesEveryReport($user);
     }
 
     public function canDelete(?User $user): bool
@@ -290,6 +296,7 @@ class StudentConductService
             'amount' => $validated['amount'],
             'note' => $validated['note'],
             'recorded_by_user_id' => $staff->id,
+            'parent_notice_status' => ParentNoticeStatus::Waiting,
         ]);
     }
 

@@ -1654,7 +1654,11 @@ class StudentProfilePage extends Page
         $this->activityTimelineLoaded = false;
         $this->loadConductTab();
 
-        Notification::make()->title('Report saved')->success()->send();
+        Notification::make()
+            ->title('Report saved')
+            ->body('The parent message waits until Super Admin or Academic coordinator approves it.')
+            ->success()
+            ->send();
     }
 
     public function deleteConductRecord(int $recordId): void

@@ -8,8 +8,7 @@
     $confirmWho = $pickedCount === 1
         ? ($singleStudent?->name ?: '1 student')
         : $pickedCount.' students';
-    $confirmParents = $pickedCount === 1 ? 'parent' : 'parents';
-    $saveLabel = $pickedCount > 1 ? 'Send bulk report' : 'Save report';
+    $saveLabel = $pickedCount > 1 ? 'Save reports' : 'Save report';
     $saveAction = ($reportMode ?? 'one') === 'one' ? 'saveSingleReport' : 'sendBulkReport';
 @endphp
 
@@ -75,29 +74,52 @@
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Try another name, or clear the filters.</p>
             </div>
         @else
+            @if (($canApproveParentNotice ?? false) && count($noticeIds ?? []) > 0)
+                <div class="flex flex-col gap-2 sm:flex-row">
+                    <button
+                        type="button"
+                        wire:click="approveSelectedNotices"
+                        wire:confirm="Send the parent WhatsApp for {{ count($noticeIds) }} selected {{ count($noticeIds) === 1 ? 'report' : 'reports' }}?"
+                        class="inline-flex min-h-11 items-center justify-center rounded-xl bg-rose-600 px-4 text-sm font-semibold text-white hover:bg-rose-500"
+                    >Approve and send</button>
+                    <button
+                        type="button"
+                        wire:click="declineSelectedNotices"
+                        wire:confirm="Do not send the parent message for the selected reports? The reports stay saved."
+                        class="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:ring-white/10"
+                    >Do not send</button>
+                </div>
+            @endif
             <div class="space-y-3">
                 @foreach ($reports as $report)
-                    <a
-                        href="{{ \App\Filament\Pages\StudentProfilePage::getUrl(['record' => $report->student_id]) }}"
-                        class="block rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 transition hover:ring-rose-300 dark:bg-gray-900 dark:ring-white/10 dark:hover:ring-rose-400/40"
-                    >
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <p class="truncate text-base font-bold text-gray-950 dark:text-white">{{ $report->student?->name ?? 'Student' }}</p>
-                                <p class="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $report->typeLabelList() }}</p>
+                    <article class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                        <div class="flex items-start gap-3">
+                            @if (($canApproveParentNotice ?? false) && $report->parent_notice_status?->value === 'waiting')
+                                <input type="checkbox" value="{{ $report->id }}" wire:model.live="noticeIds" class="mt-1 h-4 w-4 rounded border-gray-300 text-rose-600" />
+                            @endif
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <a href="{{ \App\Filament\Pages\StudentProfilePage::getUrl(['record' => $report->student_id]) }}" class="truncate text-base font-bold text-gray-950 hover:underline dark:text-white">{{ $report->student?->name ?? 'Student' }}</a>
+                                        <p class="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $report->typeLabelList() }}</p>
+                                    </div>
+                                    <span @class([
+                                        'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
+                                        'bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200' => $report->fine_charged,
+                                        'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300' => ! $report->fine_charged,
+                                    ])>{{ $report->fineSummary() }}</span>
+                                </div>
+                                <p class="mt-3 text-sm leading-6 text-gray-700 dark:text-gray-300">{{ $report->note }}</p>
+                                <p class="mt-3 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                    {{ $report->recorded_on?->format('d M Y') }}
+                                    · Entered by {{ $report->recordedBy?->name ?: 'Unknown' }}
+                                    @if ($report->parentNoticeLabel())
+                                        · {{ $report->parentNoticeLabel() }}
+                                    @endif
+                                </p>
                             </div>
-                            <span @class([
-                                'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
-                                'bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200' => $report->fine_charged,
-                                'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300' => ! $report->fine_charged,
-                            ])>{{ $report->fineSummary() }}</span>
                         </div>
-                        <p class="mt-3 text-sm leading-6 text-gray-700 dark:text-gray-300">{{ $report->note }}</p>
-                        <p class="mt-3 text-xs font-medium text-gray-500 dark:text-gray-400">
-                            {{ $report->recorded_on?->format('d M Y') }}
-                            · Entered by {{ $report->recordedBy?->name ?: 'Unknown' }}
-                        </p>
-                    </a>
+                    </article>
                 @endforeach
             </div>
 
@@ -212,7 +234,7 @@
                         <button
                             type="button"
                             wire:click="{{ $saveAction }}"
-                            wire:confirm="Save this report for {{ $confirmWho }} and message their {{ $confirmParents }} on WhatsApp?"
+                            wire:confirm="Save this report for {{ $confirmWho }}? The parent message waits until it is approved."
                             wire:loading.attr="disabled"
                             wire:target="saveSingleReport,sendBulkReport"
                             class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-rose-600 px-4 text-sm font-semibold text-white hover:bg-rose-500 disabled:opacity-70 sm:w-auto"

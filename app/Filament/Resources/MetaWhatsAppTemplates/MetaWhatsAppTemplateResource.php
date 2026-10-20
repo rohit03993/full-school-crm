@@ -150,6 +150,14 @@ class MetaWhatsAppTemplateResource extends Resource
                         return;
                     }
 
+                    if (\App\Support\StudentReportWhatsAppTemplate::looksLikeName($normalized)) {
+                        $set('category', \App\Support\StudentReportWhatsAppTemplate::CATEGORY);
+                        $set('body_text', \App\Support\StudentReportWhatsAppTemplate::BODY);
+                        $set('body_variable_samples', \App\Support\StudentReportWhatsAppTemplate::sampleRows());
+
+                        return;
+                    }
+
                     if (CombinedHomeworkWhatsAppTemplate::looksLikeName($normalized)) {
                         $set('category', CombinedHomeworkWhatsAppTemplate::CATEGORY);
                         $set('body_text', CombinedHomeworkWhatsAppTemplate::BODY);

@@ -52,6 +52,11 @@ class WhatsAppTemplateParamResolver
             'homework.topic' => 'Homework topic',
             'homework.date' => 'Homework date',
             'homework.link' => 'Student homework link',
+            'report.class' => 'Student report class',
+            'report.date' => 'Student report date',
+            'report.type' => 'Student report type',
+            'report.fine' => 'Student report fine',
+            'report.remark' => 'Student report remark',
         ];
     }
 
@@ -113,6 +118,11 @@ class WhatsAppTemplateParamResolver
             'homework.topic' => (string) ($campaign?->campaignVariable('topic') ?? ''),
             'homework.date' => (string) ($campaign?->campaignVariable('date_label') ?: $campaign?->campaignVariable('date') ?? ''),
             'homework.link', 'homework.portal_link' => (string) ($campaign?->campaignVariable('homework_link') ?? ''),
+            'report.class' => (string) ($campaign?->campaignVariable('report_class') ?? ''),
+            'report.date' => (string) ($campaign?->campaignVariable('report_date') ?? ''),
+            'report.type' => (string) ($campaign?->campaignVariable('report_type') ?? ''),
+            'report.fine' => (string) ($campaign?->campaignVariable('report_fine') ?? ''),
+            'report.remark' => (string) ($campaign?->campaignVariable('report_remark') ?? ''),
             default => '',
         };
     }

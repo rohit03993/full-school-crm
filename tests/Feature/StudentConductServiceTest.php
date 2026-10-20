@@ -8,7 +8,7 @@ use App\Enums\BatchStatus;
 use App\Enums\CourseStatus;
 use App\Enums\EnrollmentStatus;
 use App\Enums\LeadSource;
-use App\Enums\LicenseFeature;
+use App\Enums\ParentNoticeStatus;
 use App\Enums\RoleName;
 use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
@@ -22,12 +22,15 @@ use App\Models\BatchStudent;
 use App\Models\Course;
 use App\Models\CourseSubject;
 use App\Models\Enrollment;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
+use App\Models\WhatsAppCampaign;
+use App\Models\WhatsAppTemplate;
 use App\Services\EnquiryService;
 use App\Services\LicenseService;
-use App\Services\MetaWhatsAppInboxService;
 use App\Services\StudentActivityTimelineService;
+use App\Services\WhatsAppCampaignService;
 use App\Services\StudentConductParentNoticeService;
 use App\Services\StudentConductService;
 use App\Support\ConductTypeOptions;
@@ -199,7 +202,7 @@ class StudentConductServiceTest extends TestCase
         $this->assertTrue($records->every(fn ($record): bool => $record->recorded_by_user_id === $teacher->id));
     }
 
-    public function test_parent_notice_is_skipped_when_whatsapp_is_off(): void
+    public function test_parent_notice_stays_waiting_until_automation_is_on(): void
     {
         $coordinator = $this->coordinator();
         $student = $this->enrolledStudent($coordinator);
@@ -210,16 +213,58 @@ class StudentConductServiceTest extends TestCase
             'note' => 'Warned in class.',
         ]);
 
-        $result = app(StudentConductParentNoticeService::class)->notifyMany(collect([$record->load('student')]), $coordinator);
+        $this->assertSame(ParentNoticeStatus::Waiting, $record->parent_notice_status);
+
+        $result = app(StudentConductParentNoticeService::class)->approve([$record->id], $coordinator);
 
         $this->assertSame(0, $result['sent']);
-        $this->assertStringContainsString('WhatsApp is not enabled', $result['note']);
+        $this->assertStringContainsString('Automations', $result['note']);
+        $this->assertSame(ParentNoticeStatus::Waiting, $record->fresh()->parent_notice_status);
     }
 
-    public function test_parent_notice_sends_when_whatsapp_is_on(): void
+    public function test_teacher_cannot_approve_the_parent_message(): void
+    {
+        $coordinator = $this->coordinator();
+        $teacher = User::factory()->create(['is_active' => true]);
+        $teacher->assignRole(StaffJobRole::Teacher->value);
+        $student = $this->enrolledStudent($coordinator);
+        $record = app(StudentConductService::class)->store($student, $coordinator, [
+            'recorded_on' => now()->toDateString(),
+            'type_keys' => ['creating_noise'],
+            'fine_choice' => 'without_fine',
+            'note' => 'Warned in class.',
+        ]);
+
+        $result = app(StudentConductParentNoticeService::class)->approve([$record->id], $teacher);
+
+        $this->assertSame(0, $result['sent']);
+        $this->assertStringContainsString('Academic coordinator', $result['note']);
+        $this->assertSame(ParentNoticeStatus::Waiting, $record->fresh()->parent_notice_status);
+    }
+
+    public function test_coordinator_can_keep_the_parent_message_unsent(): void
     {
         $coordinator = $this->coordinator();
         $student = $this->enrolledStudent($coordinator);
+        $record = app(StudentConductService::class)->store($student, $coordinator, [
+            'recorded_on' => now()->toDateString(),
+            'type_keys' => ['creating_noise'],
+            'fine_choice' => 'without_fine',
+            'note' => 'Warned in class.',
+        ]);
+
+        $result = app(StudentConductParentNoticeService::class)->decline([$record->id], $coordinator);
+
+        $this->assertSame(1, $result['declined']);
+        $this->assertSame(ParentNoticeStatus::Declined, $record->fresh()->parent_notice_status);
+        $this->assertSame($coordinator->id, $record->fresh()->parent_notice_by_user_id);
+    }
+
+    public function test_parent_notice_queues_when_the_automation_is_on(): void
+    {
+        $coordinator = $this->coordinator();
+        $student = $this->enrolledStudent($coordinator);
+        $student->update(['mobile' => '9811111111']);
         $record = app(StudentConductService::class)->store($student, $coordinator, [
             'recorded_on' => now()->toDateString(),
             'type_keys' => ['creating_noise'],
@@ -227,20 +272,27 @@ class StudentConductServiceTest extends TestCase
             'amount' => '80',
             'note' => 'Phone in class.',
         ]);
-        $record->load('student');
+        $template = WhatsAppTemplate::query()->create([
+            'name' => 'student_report',
+            'param_count' => 7,
+            'is_active' => true,
+        ]);
+        Setting::setValue('whatsapp.student_report_autosend_enabled', '1', 'whatsapp');
+        Setting::setValue('whatsapp.student_report_live_campaign_id', 'template:'.$template->id, 'whatsapp');
 
         $this->mock(LicenseService::class, function ($mock): void {
-            $mock->shouldReceive('hasFeature')
-                ->andReturnUsing(fn (LicenseFeature|string $feature): bool => ($feature instanceof LicenseFeature ? $feature->value : $feature) === LicenseFeature::WhatsApp->value);
+            $mock->shouldReceive('hasFeature')->andReturn(true);
         });
-        $this->mock(MetaWhatsAppInboxService::class, function ($mock): void {
-            $mock->shouldReceive('sendReply')->once()->andReturn(['status' => 'success', 'message_id' => 'wamid.test']);
+        $campaign = WhatsAppCampaign::make();
+        $this->mock(WhatsAppCampaignService::class, function ($mock) use ($campaign): void {
+            $mock->shouldReceive('createCampaign')->once()->andReturn($campaign);
+            $mock->shouldReceive('queueCampaign')->once()->andReturn($campaign);
         });
 
-        $result = app(StudentConductParentNoticeService::class)->notifyMany(collect([$record]), $coordinator);
+        $result = app(StudentConductParentNoticeService::class)->approve([$record->id], $coordinator);
 
         $this->assertSame(1, $result['sent']);
-        $this->assertSame(0, $result['skipped']);
+        $this->assertSame(ParentNoticeStatus::Sent, $record->fresh()->parent_notice_status);
     }
 
     public function test_only_super_admin_can_remove_a_record(): void

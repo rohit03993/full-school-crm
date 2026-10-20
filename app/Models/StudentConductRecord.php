@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ParentNoticeStatus;
 use App\Models\Concerns\BlocksInactiveStudentWrites;
 use App\Support\ConductTypeOptions;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,9 @@ class StudentConductRecord extends Model
         'amount',
         'note',
         'recorded_by_user_id',
+        'parent_notice_status',
+        'parent_notice_sent_at',
+        'parent_notice_by_user_id',
     ];
 
     protected function casts(): array
@@ -28,6 +32,8 @@ class StudentConductRecord extends Model
             'type_keys' => 'array',
             'fine_charged' => 'boolean',
             'amount' => 'integer',
+            'parent_notice_status' => ParentNoticeStatus::class,
+            'parent_notice_sent_at' => 'datetime',
         ];
     }
 
@@ -39,6 +45,16 @@ class StudentConductRecord extends Model
     public function recordedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by_user_id');
+    }
+
+    public function parentNoticeBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'parent_notice_by_user_id');
+    }
+
+    public function parentNoticeLabel(): ?string
+    {
+        return $this->parent_notice_status?->label();
     }
 
     public function typeLabelList(): string

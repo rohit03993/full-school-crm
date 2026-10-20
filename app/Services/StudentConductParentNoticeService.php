@@ -3,115 +3,216 @@
 namespace App\Services;
 
 use App\Enums\LicenseFeature;
-use App\Enums\WhatsAppMessageSource;
-use App\Models\Student;
+use App\Enums\ParentNoticeStatus;
+use App\Enums\WhatsAppRecipientStatus;
+use App\Models\Setting;
 use App\Models\StudentConductRecord;
 use App\Models\User;
+use App\Models\WhatsAppTemplate;
 use App\Support\FeatureGate;
 use Illuminate\Support\Collection;
 
 class StudentConductParentNoticeService
 {
     public function __construct(
-        protected MetaWhatsAppInboxService $inbox,
+        protected WhatsAppCampaignService $campaigns,
+        protected WhatsAppSettingsService $settings,
+        protected StudentConductService $conduct,
     ) {}
 
     /**
-     * @param  Collection<int, StudentConductRecord>  $records
-     * @return array{sent: int, skipped: int, note: string}
+     * @param  list<int|string>  $recordIds
+     * @return array{sent: int, waiting: int, note: string}
      */
-    public function notifyMany(Collection $records, User $staff): array
+    public function approve(array $recordIds, User $staff): array
     {
+        if (! $this->conduct->canApproveParentNotice($staff)) {
+            return [
+                'sent' => 0,
+                'waiting' => 0,
+                'note' => 'Only Super Admin or Academic coordinator can send the parent message.',
+            ];
+        }
+
+        $records = $this->waitingRecords($recordIds);
+
+        if ($records->isEmpty()) {
+            return [
+                'sent' => 0,
+                'waiting' => 0,
+                'note' => 'Select a report that is waiting for approval.',
+            ];
+        }
+
         if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
             return [
                 'sent' => 0,
-                'skipped' => $records->count(),
-                'note' => 'Reports are saved. WhatsApp is off, so parents were not messaged.',
+                'waiting' => $records->count(),
+                'note' => 'Reports stay waiting. WhatsApp is off, so parents were not messaged.',
+            ];
+        }
+
+        if (! Setting::getValue('whatsapp.student_report_autosend_enabled')) {
+            return [
+                'sent' => 0,
+                'waiting' => $records->count(),
+                'note' => 'Reports stay waiting. Turn on Student report WhatsApp under Automations.',
+            ];
+        }
+
+        $template = $this->settings->resolveAutomationTemplate(
+            Setting::getValue('whatsapp.student_report_live_campaign_id'),
+        );
+
+        if (! $template) {
+            return [
+                'sent' => 0,
+                'waiting' => $records->count(),
+                'note' => 'Reports stay waiting. Pick the student report template under Automations.',
             ];
         }
 
         $sent = 0;
-        $skipped = 0;
         $firstError = null;
 
         foreach ($records as $record) {
-            $student = $record->student;
+            $result = $this->queueOne($record, $staff, $template);
 
-            if (! $student instanceof Student) {
-                $skipped++;
-
-                continue;
-            }
-
-            $result = $this->notify($student, $record, $staff);
-
-            if (($result['status'] ?? '') === 'success') {
+            if ($result['queued']) {
+                $record->update([
+                    'parent_notice_status' => ParentNoticeStatus::Sent,
+                    'parent_notice_sent_at' => now(),
+                    'parent_notice_by_user_id' => $staff->id,
+                ]);
                 $sent++;
 
                 continue;
             }
 
-            $skipped++;
-            $firstError ??= $result['error'] ?? null;
+            $firstError ??= $result['message'];
         }
 
+        $waiting = $records->count() - $sent;
+
+        if ($sent === 0) {
+            return [
+                'sent' => 0,
+                'waiting' => $waiting,
+                'note' => $firstError ?: 'Reports stay waiting. The parent message was not sent.',
+            ];
+        }
+
+        $note = 'Parent message sent for '.$sent.($sent === 1 ? ' student.' : ' students.');
+
+        if ($waiting > 0) {
+            $note .= ' '.$waiting.' still waiting.'.($firstError ? ' '.$firstError : '');
+        }
+
+        return ['sent' => $sent, 'waiting' => $waiting, 'note' => $note];
+    }
+
+    /**
+     * @param  list<int|string>  $recordIds
+     * @return array{declined: int, note: string}
+     */
+    public function decline(array $recordIds, User $staff): array
+    {
+        if (! $this->conduct->canApproveParentNotice($staff)) {
+            return [
+                'declined' => 0,
+                'note' => 'Only Super Admin or Academic coordinator can decide the parent message.',
+            ];
+        }
+
+        $records = $this->waitingRecords($recordIds);
+
+        if ($records->isEmpty()) {
+            return [
+                'declined' => 0,
+                'note' => 'Select a report that is waiting for approval.',
+            ];
+        }
+
+        foreach ($records as $record) {
+            $record->update([
+                'parent_notice_status' => ParentNoticeStatus::Declined,
+                'parent_notice_by_user_id' => $staff->id,
+            ]);
+        }
+
+        $count = $records->count();
+
         return [
-            'sent' => $sent,
-            'skipped' => $skipped,
-            'note' => $this->note($sent, $skipped, $firstError),
+            'declined' => $count,
+            'note' => 'Parent message will not be sent for '.$count.($count === 1 ? ' report.' : ' reports.'),
         ];
     }
 
     /**
-     * @return array{status: string, error?: string, message_id?: string}
+     * @param  list<int|string>  $recordIds
+     * @return Collection<int, StudentConductRecord>
      */
-    public function notify(Student $student, StudentConductRecord $record, User $staff): array
+    protected function waitingRecords(array $recordIds): Collection
     {
-        if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
-            return ['status' => 'failed', 'error' => 'WhatsApp is off, so parents were not messaged.'];
+        $ids = collect($recordIds)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        return StudentConductRecord::query()
+            ->with(['student.activeBatchStudent.batch', 'student.activeEnrollment'])
+            ->whereIn('id', $ids)
+            ->where('parent_notice_status', ParentNoticeStatus::Waiting->value)
+            ->get();
+    }
+
+    /**
+     * @return array{queued: bool, message: string}
+     */
+    protected function queueOne(StudentConductRecord $record, User $staff, WhatsAppTemplate $template): array
+    {
+        $student = $record->student;
+
+        if (! $student || blank($student->mobile)) {
+            return ['queued' => false, 'message' => 'Add a parent mobile number before sending.'];
         }
 
         try {
-            return $this->inbox->sendReply(
-                $student,
-                $this->message($student, $record, $staff),
-                $staff,
-                WhatsAppMessageSource::Profile,
-            );
-        } catch (\Throwable) {
-            return ['status' => 'failed', 'error' => 'WhatsApp could not be sent.'];
+            $className = trim((string) ($student->activeBatchStudent?->batch?->displayLabel() ?? ''));
+            $campaign = $this->campaigns->createCampaign([
+                'name' => 'Student report · '.$student->name.' · '.now()->format('d M H:i'),
+                'whatsapp_template_id' => $template->id,
+                'student_ids' => [$student->id],
+                'campaign_variables' => [
+                    'audience_source' => 'student_report',
+                    'report_class' => $className !== '' ? $className : 'Class',
+                    'report_date' => $record->recorded_on?->timezone((string) config('app.timezone'))->format('d M Y')
+                        ?? now()->timezone((string) config('app.timezone'))->format('d M Y'),
+                    'report_type' => $record->typeLabelList(),
+                    'report_fine' => $record->fine_charged
+                        ? '₹'.number_format((int) $record->amount)
+                        : 'No fine',
+                    'report_remark' => trim((string) $record->note),
+                    '_student_ids' => [$student->id],
+                    '_student_conduct_record_id' => $record->id,
+                ],
+            ], $staff);
+
+            $campaign = $this->campaigns->queueCampaign($campaign, $staff, true);
+            $recipient = $campaign->recipients()->first();
+
+            if ($recipient?->status === WhatsAppRecipientStatus::Failed) {
+                return ['queued' => false, 'message' => 'WhatsApp send failed for '.$student->name.'.'];
+            }
+
+            return ['queued' => true, 'message' => 'WhatsApp queued to parent.'];
+        } catch (\Throwable $exception) {
+            return ['queued' => false, 'message' => $exception->getMessage()];
         }
-    }
-
-    public function message(Student $student, StudentConductRecord $record, User $staff): string
-    {
-        $fine = $record->fine_charged
-            ? 'Fine: ₹'.number_format((int) $record->amount)
-            : 'Fine: none';
-
-        return implode("\n", [
-            'Dear Parent,',
-            $student->name.' has a new school report.',
-            'Type: '.$record->typeLabelList(),
-            'Date: '.($record->recorded_on?->format('d M Y') ?? ''),
-            $fine,
-            'Note: '.$record->note,
-            'Reported by: '.($staff->name ?: 'School'),
-        ]);
-    }
-
-    protected function note(int $sent, int $skipped, ?string $firstError): string
-    {
-        if ($sent === 0) {
-            return $firstError ?: 'Reports are saved. Parents were not messaged.';
-        }
-
-        $sentLine = 'WhatsApp sent to '.$sent.($sent === 1 ? ' parent.' : ' parents.');
-
-        if ($skipped === 0) {
-            return $sentLine;
-        }
-
-        return $sentLine.' '.$skipped.' not sent.';
     }
 }

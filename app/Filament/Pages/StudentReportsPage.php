@@ -48,6 +48,9 @@ class StudentReportsPage extends Page
     /** @var list<int|string> */
     public array $selectedStudentIds = [];
 
+    /** @var list<int|string> */
+    public array $noticeIds = [];
+
     public string $bulkRecordedOn = '';
 
     public string $bulkTypeKey = '';
@@ -134,6 +137,7 @@ class StudentReportsPage extends Page
         $this->reportMode = $mode;
         $this->selectedStudentIds = [];
         $this->singleStudentId = '';
+        $this->noticeIds = [];
         $this->resetReportDraft();
 
         if ($mode === 'saved') {
@@ -193,8 +197,6 @@ class StudentReportsPage extends Page
             return;
         }
 
-        $records->load('student');
-        $notice = app(StudentConductParentNoticeService::class)->notifyMany($records, $staff);
         $count = $records->count();
 
         $this->selectedStudentIds = [];
@@ -204,8 +206,41 @@ class StudentReportsPage extends Page
 
         Notification::make()
             ->title($count === 1 ? 'Report saved for 1 student' : 'Reports saved for '.$count.' students')
-            ->body($notice['note'])
+            ->body('The parent message waits until Super Admin or Academic coordinator approves it.')
             ->success()
+            ->send();
+    }
+
+    public function approveSelectedNotices(): void
+    {
+        $this->decideSelectedNotices(true);
+    }
+
+    public function declineSelectedNotices(): void
+    {
+        $this->decideSelectedNotices(false);
+    }
+
+    protected function decideSelectedNotices(bool $approve): void
+    {
+        $staff = Auth::user();
+
+        if (! $staff instanceof User) {
+            return;
+        }
+
+        $result = $approve
+            ? app(StudentConductParentNoticeService::class)->approve($this->noticeIds, $staff)
+            : app(StudentConductParentNoticeService::class)->decline($this->noticeIds, $staff);
+
+        $this->noticeIds = [];
+        $this->resetPage();
+
+        $done = $approve ? ($result['sent'] ?? 0) > 0 : ($result['declined'] ?? 0) > 0;
+
+        Notification::make()
+            ->title($result['note'])
+            ->{$done ? 'success' : 'warning'}()
             ->send();
     }
 
@@ -248,6 +283,8 @@ class StudentReportsPage extends Page
                     'selectedStudentIds' => $this->selectedStudentIds,
                     'bulkFineChoice' => $this->bulkFineChoice,
                     'allStudentsSelected' => $this->reportMode === 'many' && $this->allStudentsSelected(),
+                    'canApproveParentNotice' => $viewer && $service->canApproveParentNotice($viewer),
+                    'noticeIds' => $this->noticeIds,
                 ]),
         ]);
     }
