@@ -35,13 +35,18 @@
                 <ul class="divide-y divide-gray-100 dark:divide-white/10">
                     @foreach ($day['people'] as $person)
                         <li class="flex items-center justify-between gap-3 px-4 py-2">
-                            @if (filled($person['url']))
-                                <a href="{{ $person['url'] }}" wire:navigate class="flex min-h-11 items-center text-sm font-medium text-primary-600 hover:underline dark:text-primary-400">
-                                    {{ $person['name'] }}
-                                </a>
-                            @else
-                                <span class="flex min-h-11 items-center text-sm font-medium text-gray-950 dark:text-white">{{ $person['name'] }}</span>
-                            @endif
+                            <div class="min-w-0 py-2">
+                                @if (filled($person['url']))
+                                    <a href="{{ $person['url'] }}" wire:navigate class="text-sm font-medium text-primary-600 hover:underline dark:text-primary-400">
+                                        {{ $person['name'] }}
+                                    </a>
+                                @else
+                                    <span class="text-sm font-medium text-gray-950 dark:text-white">{{ $person['name'] }}</span>
+                                @endif
+                                @if (filled($person['place'] ?? null))
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ $person['place'] }}</p>
+                                @endif
+                            </div>
                             <span @class(['inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold', $badges[$person['tone']]])>
                                 {{ $person['occasion'] }}
                             </span>

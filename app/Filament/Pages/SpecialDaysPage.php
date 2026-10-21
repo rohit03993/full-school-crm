@@ -48,9 +48,10 @@ class SpecialDaysPage extends Page
         $start = now()->startOfDay();
         $grouped = [];
 
-        foreach (app(OccasionWishService::class)->upcoming($start) as $match) {
+        foreach (app(OccasionWishService::class)->upcoming($start, OccasionWishService::UPCOMING_DAYS, Auth::user()) as $match) {
             $grouped[$match['on']][] = [
                 'name' => $match['name'],
+                'place' => $match['place'],
                 'occasion' => OccasionWishType::from($match['occasion'])->label(),
                 'tone' => match ($match['occasion']) {
                     OccasionWishType::StaffBirthday->value => 'amber',

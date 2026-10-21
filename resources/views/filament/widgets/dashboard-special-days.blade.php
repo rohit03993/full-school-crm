@@ -45,13 +45,19 @@
                                         <a
                                             href="{{ $person['url'] }}"
                                             wire:navigate
-                                            class="flex min-h-11 items-center rounded-xl px-2 text-sm font-medium text-gray-950 hover:bg-white dark:text-white dark:hover:bg-white/10"
+                                            class="flex min-h-11 flex-col justify-center rounded-xl px-2 py-1 text-sm font-medium text-gray-950 hover:bg-white dark:text-white dark:hover:bg-white/10"
                                         >
-                                            {{ $person['name'] }}
+                                            <span>{{ $person['name'] }}</span>
+                                            @if (filled($person['place'] ?? null))
+                                                <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ $person['place'] }}</span>
+                                            @endif
                                         </a>
                                     @else
-                                        <span class="flex min-h-11 items-center px-2 text-sm font-medium text-gray-950 dark:text-white">
-                                            {{ $person['name'] }}
+                                        <span class="flex min-h-11 flex-col justify-center px-2 py-1 text-sm font-medium text-gray-950 dark:text-white">
+                                            <span>{{ $person['name'] }}</span>
+                                            @if (filled($person['place'] ?? null))
+                                                <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ $person['place'] }}</span>
+                                            @endif
                                         </span>
                                     @endif
                                 </li>

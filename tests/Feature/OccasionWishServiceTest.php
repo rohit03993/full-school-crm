@@ -2,18 +2,33 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AdmissionStatus;
+use App\Enums\BatchStaffRole;
+use App\Enums\BatchStatus;
+use App\Enums\CourseStatus;
+use App\Enums\EnrollmentStatus;
 use App\Enums\Gender;
+use App\Enums\LeadSource;
 use App\Enums\LicenseFeature;
 use App\Enums\LicensePlan;
 use App\Enums\MetaWhatsAppMessageStatus;
 use App\Enums\OccasionWishStatus;
 use App\Enums\OccasionWishType;
 use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Enums\StudentStatus;
 use App\Filament\Pages\ManageWhatsAppSettings;
 use App\Filament\Pages\OccasionWishesPage;
 use App\Filament\Pages\SpecialDaysPage;
 use App\Filament\Widgets\DashboardSpecialDaysWidget;
+use App\Models\AcademicSession;
+use App\Models\Admission;
+use App\Models\Batch;
+use App\Models\BatchStaffAssignment;
+use App\Models\BatchStudent;
+use App\Models\Course;
+use App\Models\Enrollment;
+use App\Models\Enquiry;
 use Filament\Facades\Filament;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\OccasionWish;
@@ -252,6 +267,82 @@ class OccasionWishServiceTest extends TestCase
             ->assertDontSee('Far Student');
     }
 
+    public function test_teacher_sees_only_own_students_with_class_and_roll(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-21 09:00:00'));
+        Role::findOrCreate(StaffJobRole::Teacher->value);
+        $teacher = User::factory()->create(['is_active' => true, 'name' => 'Class Teacher']);
+        $teacher->assignRole(StaffJobRole::Teacher->value);
+        $this->actingAs($teacher);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $session = AcademicSession::query()->create([
+            'name' => '2026-27',
+            'code' => '2026-27-special-days',
+            'starts_on' => '2026-04-01',
+            'ends_on' => '2027-03-31',
+            'is_current' => true,
+            'is_active' => true,
+        ]);
+        $course = Course::query()->create([
+            'name' => 'Class 11',
+            'code' => 'CLS-11-DAYS',
+            'programme_category' => 'school',
+            'duration' => 1,
+            'duration_type' => 'years',
+            'fee' => 10000,
+            'status' => CourseStatus::Active,
+        ]);
+        $ownBatch = Batch::query()->create([
+            'name' => 'Class 11 - A',
+            'section' => 'A',
+            'course_id' => $course->id,
+            'academic_session_id' => $session->id,
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'status' => BatchStatus::Active,
+        ]);
+        $otherBatch = Batch::query()->create([
+            'name' => 'Class 11 - B',
+            'section' => 'B',
+            'course_id' => $course->id,
+            'academic_session_id' => $session->id,
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'status' => BatchStatus::Active,
+        ]);
+        BatchStaffAssignment::query()->create([
+            'batch_id' => $ownBatch->id,
+            'user_id' => $teacher->id,
+            'role' => BatchStaffRole::SubjectTeacher,
+        ]);
+
+        $own = $this->makeStudent('Own Student', '2012-10-21', '9811111141', StudentStatus::Enrolled);
+        $other = $this->makeStudent('Other Student', '2011-10-21', '9811111142', StudentStatus::Enrolled);
+        $this->putStudentInClass($own, $ownBatch, $teacher, '14');
+        $this->putStudentInClass($other, $otherBatch, $teacher, '22');
+        $this->makeStaff('Hari Sir', '9876543299', true, '1980-10-21', null);
+
+        $everyone = collect(app(OccasionWishService::class)->matchesForDate(now()))->pluck('name')->all();
+        $this->assertContains('Own Student', $everyone);
+        $this->assertContains('Other Student', $everyone);
+
+        Livewire::test(SpecialDaysPage::class)
+            ->assertOk()
+            ->assertSee('Own Student')
+            ->assertSee('Class 11-A')
+            ->assertSee('Roll No. 14')
+            ->assertSee('Hari Sir')
+            ->assertDontSee('Other Student')
+            ->assertDontSee('Class 11-B');
+
+        Livewire::test(DashboardSpecialDaysWidget::class)
+            ->assertOk()
+            ->assertSee('Own Student')
+            ->assertSee('Roll No. 14')
+            ->assertDontSee('Other Student');
+    }
+
     public function test_whatsapp_off_does_not_build_or_send(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-10-21 10:00:00'));
@@ -339,5 +430,42 @@ class OccasionWishServiceTest extends TestCase
         ]);
 
         return $user;
+    }
+
+    private function putStudentInClass(Student $student, Batch $batch, User $teacher, string $roll): void
+    {
+        BatchStudent::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $student->id,
+            'is_active' => true,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $teacher->id,
+        ]);
+
+        $enquiry = Enquiry::query()->create([
+            'student_id' => $student->id,
+            'enquiry_number' => 'ENQ-DAYS-'.$student->id,
+            'course_id' => $batch->course_id,
+            'lead_source' => LeadSource::WalkIn,
+            'meeting_for' => 'school',
+            'visit_type' => 'first_visit',
+            'latest_visit_status' => 'interested',
+        ]);
+        $admission = Admission::query()->create([
+            'student_id' => $student->id,
+            'enquiry_id' => $enquiry->id,
+            'admission_number' => 'ADM-DAYS-'.$student->id,
+            'status' => AdmissionStatus::Approved,
+        ]);
+        Enrollment::query()->create([
+            'student_id' => $student->id,
+            'admission_id' => $admission->id,
+            'course_id' => $batch->course_id,
+            'academic_session_id' => $batch->academic_session_id,
+            'enrollment_number' => $roll,
+            'enrolled_at' => now(),
+            'status' => EnrollmentStatus::Enrolled,
+            'is_active' => true,
+        ]);
     }
 }

@@ -17,6 +17,7 @@ use App\Models\WhatsAppTemplate;
 use App\Support\FeatureGate;
 use App\Support\InstituteSettings;
 use App\Support\OccasionWishWhatsAppTemplate;
+use App\Support\StudentLabels;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -220,18 +221,27 @@ class OccasionWishService
     }
 
     /**
-     * @return list<array{occasion: string, recipient_key: string, student_id: ?int, user_id: ?int, name: string, mobile: string}>
+     * A viewer is used only on the screens. The morning WhatsApp job passes no viewer, so every enrolled student is still included.
+     *
+     * @return list<array{occasion: string, recipient_key: string, student_id: ?int, user_id: ?int, name: string, mobile: string, place: string}>
      */
-    public function matchesForDate(Carbon $date): array
+    public function matchesForDate(Carbon $date, ?User $viewer = null): array
     {
         $matches = [];
 
-        Student::query()
+        $students = Student::query()
             ->where('status', StudentStatus::Enrolled->value)
             ->whereNotNull('date_of_birth')
             ->where(fn ($query) => $this->whereMonthDay($query, 'date_of_birth', $date))
+            ->with(['activeEnrollment', 'activeBatchStudent.batch']);
+
+        if ($viewer) {
+            app(BatchStaffAssignmentService::class)->constrainStudentsQuery($students, $viewer);
+        }
+
+        $students
             ->orderBy('id')
-            ->get(['id', 'name', 'mobile'])
+            ->get()
             ->each(function (Student $student) use (&$matches): void {
                 $matches[] = [
                     'occasion' => OccasionWishType::StudentBirthday->value,
@@ -240,6 +250,7 @@ class OccasionWishService
                     'user_id' => null,
                     'name' => $this->displayName($student->name, 'Student'),
                     'mobile' => $this->normalizeMobile((string) $student->mobile),
+                    'place' => $this->studentPlace($student),
                 ];
             });
 
@@ -266,9 +277,9 @@ class OccasionWishService
      * People with a birthday or anniversary from this day, for the next few days.
      * Day 1 is today. A date in January is included when the window starts in December.
      *
-     * @return list<array{occasion: string, recipient_key: string, student_id: ?int, user_id: ?int, name: string, mobile: string, on: string}>
+     * @return list<array{occasion: string, recipient_key: string, student_id: ?int, user_id: ?int, name: string, mobile: string, place: string, on: string}>
      */
-    public function upcoming(Carbon $start, int $days = self::UPCOMING_DAYS): array
+    public function upcoming(Carbon $start, int $days = self::UPCOMING_DAYS, ?User $viewer = null): array
     {
         $days = max(1, min(31, $days));
         $rows = [];
@@ -276,7 +287,7 @@ class OccasionWishService
         for ($offset = 0; $offset < $days; $offset++) {
             $date = $start->copy()->startOfDay()->addDays($offset);
 
-            foreach ($this->matchesForDate($date) as $match) {
+            foreach ($this->matchesForDate($date, $viewer) as $match) {
                 $match['on'] = $date->toDateString();
                 $rows[] = $match;
             }
@@ -625,7 +636,7 @@ class OccasionWishService
     }
 
     /**
-     * @return array{occasion: string, recipient_key: string, student_id: null, user_id: int, name: string, mobile: string}
+     * @return array{occasion: string, recipient_key: string, student_id: null, user_id: int, name: string, mobile: string, place: string}
      */
     private function staffMatch(User $staff, OccasionWishType $type, string $suffix): array
     {
@@ -639,7 +650,25 @@ class OccasionWishService
             'user_id' => $staff->id,
             'name' => $this->displayName($staff->name, 'Staff member'),
             'mobile' => $this->normalizeMobile((string) $mobile),
+            'place' => '',
         ];
+    }
+
+    private function studentPlace(Student $student): string
+    {
+        $class = trim((string) ($student->activeBatchStudent?->batch?->name ?? ''));
+        $roll = trim((string) ($student->activeEnrollment?->enrollment_number ?? ''));
+        $parts = [];
+
+        if ($class !== '') {
+            $parts[] = $class;
+        }
+
+        if ($roll !== '') {
+            $parts[] = StudentLabels::rollNumberLabel().' '.$roll;
+        }
+
+        return implode(' · ', $parts);
     }
 
     private function markFailed(OccasionWish $wish, string $error): void
