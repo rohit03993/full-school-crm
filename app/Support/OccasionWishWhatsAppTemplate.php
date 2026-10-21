@@ -27,7 +27,7 @@ Hello {{1}}, wishing you a very happy birthday from {{2}}. Have a wonderful day.
 TXT;
 
     public const STAFF_BIRTHDAY_BODY = <<<'TXT'
-Hello {{1}}, wishing you a very happy birthday from {{2}}. Have a wonderful day.
+Hello {{1}}, the team at {{2}} wishes you a very happy birthday. Thank you for your work.
 TXT;
 
     public const STAFF_ANNIVERSARY_BODY = <<<'TXT'

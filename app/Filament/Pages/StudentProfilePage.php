@@ -16,7 +16,9 @@ use App\Enums\InactiveReason;
 use App\Enums\LicenseFeature;
 use App\Enums\RoleName;
 use App\Enums\StudentStatus;
+use App\Enums\OccasionWishType;
 use App\Enums\WhatsAppMessageSource;
+use App\Services\OccasionWishService;
 use App\Services\SectionCoursePlanService;
 use App\Support\CrmAccess;
 use App\Support\FeatureGate;
@@ -589,6 +591,26 @@ class StudentProfilePage extends Page
         }
 
         return CrmHint::text('students.profile');
+    }
+
+    public function sendBirthdayWish(): void
+    {
+        $result = app(OccasionWishService::class)->sendOne(
+            OccasionWishType::StudentBirthday->value,
+            'student:'.$this->record->id,
+            now(),
+            Auth::user(),
+        );
+
+        $notification = Notification::make()->title($result['message']);
+
+        if ($result['ok']) {
+            $notification->success();
+        } else {
+            $notification->warning();
+        }
+
+        $notification->send();
     }
 
     public function updatedProfileTab(): void

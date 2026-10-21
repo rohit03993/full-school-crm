@@ -51,6 +51,7 @@
                                             @if (filled($person['place'] ?? null))
                                                 <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ $person['place'] }}</span>
                                             @endif
+                                            <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ $person['message'] }}</span>
                                         </a>
                                     @else
                                         <span class="flex min-h-11 flex-col justify-center px-2 py-1 text-sm font-medium text-gray-950 dark:text-white">
@@ -58,6 +59,7 @@
                                             @if (filled($person['place'] ?? null))
                                                 <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ $person['place'] }}</span>
                                             @endif
+                                            <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ $person['message'] }}</span>
                                         </span>
                                     @endif
                                 </li>

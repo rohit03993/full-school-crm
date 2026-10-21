@@ -142,6 +142,140 @@ class OccasionWishService
         return $saved;
     }
 
+    public function occursOn(mixed $stored, Carbon $day): bool
+    {
+        if (blank($stored)) {
+            return false;
+        }
+
+        $stored = $stored instanceof Carbon ? $stored : Carbon::parse((string) $stored);
+
+        if ((int) $stored->month === (int) $day->month && (int) $stored->day === (int) $day->day) {
+            return true;
+        }
+
+        return (int) $day->month === 2
+            && (int) $day->day === 28
+            && ! $day->isLeapYear()
+            && (int) $stored->month === 2
+            && (int) $stored->day === 29;
+    }
+
+    /**
+     * @param  list<array{occasion: string, recipient_key: string, on: string, mobile: string}>  $rows
+     * @return array<string, array{label: string, can_send: bool}>
+     */
+    public function messageStates(array $rows): array
+    {
+        $wishes = collect();
+        $keys = array_values(array_unique(array_filter(array_column($rows, 'recipient_key'))));
+
+        if ($keys !== [] && Schema::hasTable('occasion_wishes')) {
+            $wishes = OccasionWish::query()
+                ->whereIn('recipient_key', $keys)
+                ->where('occasion', '!=', OccasionWishType::DailyReport->value)
+                ->get()
+                ->keyBy(function (OccasionWish $wish): string {
+                    $occasion = $wish->occasion instanceof OccasionWishType ? $wish->occasion->value : (string) $wish->occasion;
+
+                    return $wish->occasion_on->toDateString().'|'.$wish->recipient_key.'|'.$occasion;
+                });
+        }
+
+        $whatsappOn = FeatureGate::enabled(LicenseFeature::WhatsApp);
+        $states = [];
+
+        foreach ($rows as $row) {
+            $key = $row['on'].'|'.$row['recipient_key'].'|'.$row['occasion'];
+            $states[$key] = $this->presentMessage(
+                $wishes->get($key),
+                Carbon::parse($row['on'])->isSameDay(now()),
+                (string) $row['mobile'],
+                $whatsappOn,
+            );
+        }
+
+        return $states;
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    public function sendOne(string $occasion, string $recipientKey, Carbon $date, ?User $viewer = null): array
+    {
+        $type = OccasionWishType::tryFrom($occasion);
+
+        if (! in_array($type, [OccasionWishType::StudentBirthday, OccasionWishType::StaffBirthday, OccasionWishType::StaffAnniversary], true)) {
+            return ['ok' => false, 'message' => 'This wish cannot be sent.'];
+        }
+
+        if (! Schema::hasTable('occasion_wishes')) {
+            return ['ok' => false, 'message' => 'Birthday wish list is not ready yet.'];
+        }
+
+        if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
+            return ['ok' => false, 'message' => 'WhatsApp is off for this school.'];
+        }
+
+        $date = $date->copy()->startOfDay();
+
+        if (! $date->isSameDay(now())) {
+            return ['ok' => false, 'message' => 'This wish can be sent on that day.'];
+        }
+
+        $match = collect($this->matchesForDate($date, $viewer))
+            ->first(fn (array $row): bool => $row['occasion'] === $occasion && $row['recipient_key'] === $recipientKey);
+
+        if (! is_array($match)) {
+            return ['ok' => false, 'message' => 'This person is not in today\'s list.'];
+        }
+
+        if ($match['mobile'] === '') {
+            return ['ok' => false, 'message' => 'No mobile number.'];
+        }
+
+        $wish = $this->upsertMatch($date, $match);
+
+        if (in_array($wish->status, [OccasionWishStatus::Sent, OccasionWishStatus::Delivered], true)) {
+            return ['ok' => true, 'message' => 'Message already sent.'];
+        }
+
+        $outcome = $this->sendWish($wish, $this->templateFor($wish->occasion), null, true);
+        $wish->refresh();
+
+        if ($outcome === 'sent') {
+            $sent = $type === OccasionWishType::StaffAnniversary
+                ? 'Anniversary message sent.'
+                : 'Birthday message sent.';
+
+            return ['ok' => true, 'message' => $sent];
+        }
+
+        return ['ok' => false, 'message' => $wish->last_error ?: 'Message was not sent.'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function missingTemplateLabels(): array
+    {
+        $missing = [];
+
+        if (! $this->templateFor(OccasionWishType::StudentBirthday)) {
+            $missing[] = 'student birthday';
+        }
+
+        if (! $this->templateFor(OccasionWishType::StaffBirthday)) {
+            $missing[] = 'staff birthday';
+        }
+
+        if (! $this->templateFor(OccasionWishType::StaffAnniversary)) {
+            $missing[] = 'staff anniversary';
+        }
+
+        return $missing;
+    }
+
     /**
      * @return array{student_birthdays: int, staff_birthdays: int, anniversaries: int, sent: int, failed: int, skipped: int, pending: int}
      */
@@ -519,13 +653,13 @@ class OccasionWishService
     /**
      * @param  list<string>|null  $params
      */
-    private function sendWish(OccasionWish $wish, ?WhatsAppTemplate $template, ?array $params = null): string
+    private function sendWish(OccasionWish $wish, ?WhatsAppTemplate $template, ?array $params = null, bool $manual = false): string
     {
         if (in_array($wish->status, [OccasionWishStatus::Sent, OccasionWishStatus::Delivered, OccasionWishStatus::Skipped], true)) {
             return 'skipped';
         }
 
-        if ($wish->attempts >= $this->maxRetries()) {
+        if (! $manual && $wish->attempts >= $this->maxRetries()) {
             return 'skipped';
         }
 
@@ -559,7 +693,7 @@ class OccasionWishService
                 languageCode: data_get($template->provider_meta, 'language_code', 'en'),
                 logContext: [
                     'message_source' => WhatsAppMessageSource::Automation->value,
-                    'send_actor' => WhatsAppSendActor::Automatic->value,
+                    'send_actor' => ($manual ? WhatsAppSendActor::Staff : WhatsAppSendActor::Automatic)->value,
                     'source' => 'occasion_wish',
                     'student_id' => $wish->student_id,
                     'user_id' => $wish->user_id,
@@ -622,7 +756,7 @@ class OccasionWishService
     private function staffWithDate(Carbon $date, string $column): Collection
     {
         return User::query()
-            ->with('staffProfile')
+            ->with(['staffProfile', 'roles'])
             ->where('is_active', true)
             ->where(function ($query): void {
                 $query->where('is_platform_operator', false)->orWhereNull('is_platform_operator');
@@ -650,8 +784,27 @@ class OccasionWishService
             'user_id' => $staff->id,
             'name' => $this->displayName($staff->name, 'Staff member'),
             'mobile' => $this->normalizeMobile((string) $mobile),
-            'place' => '',
+            'place' => $this->staffPlace($staff),
         ];
+    }
+
+    private function staffPlace(User $staff): string
+    {
+        $designation = trim((string) ($staff->staffProfile?->designation ?? ''));
+
+        if ($designation !== '') {
+            return $designation;
+        }
+
+        $jobs = $staff->staffJobRoleLabels();
+
+        if ($jobs !== []) {
+            return implode(', ', $jobs);
+        }
+
+        $role = $staff->primaryRoleLabel();
+
+        return $role !== 'Unknown' ? $role : '';
     }
 
     private function studentPlace(Student $student): string
@@ -669,6 +822,39 @@ class OccasionWishService
         }
 
         return implode(' · ', $parts);
+    }
+
+    /**
+     * @return array{label: string, can_send: bool}
+     */
+    private function presentMessage(?OccasionWish $wish, bool $isToday, string $mobile, bool $whatsappOn): array
+    {
+        $status = $wish?->status;
+
+        if ($status === OccasionWishStatus::Delivered) {
+            return ['label' => 'Message delivered', 'can_send' => false];
+        }
+
+        if ($status === OccasionWishStatus::Sent) {
+            return ['label' => 'Message sent', 'can_send' => false];
+        }
+
+        if ($status === OccasionWishStatus::Skipped) {
+            return ['label' => $wish->skip_reason ?: 'Skipped', 'can_send' => false];
+        }
+
+        if (! $isToday) {
+            return ['label' => 'Sends on that day', 'can_send' => false];
+        }
+
+        if ($mobile === '') {
+            return ['label' => 'No mobile number', 'can_send' => false];
+        }
+
+        return [
+            'label' => 'Not sent',
+            'can_send' => $whatsappOn,
+        ];
     }
 
     private function markFailed(OccasionWish $wish, string $error): void

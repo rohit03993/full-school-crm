@@ -343,6 +343,93 @@ class OccasionWishServiceTest extends TestCase
             ->assertDontSee('Other Student');
     }
 
+    public function test_special_days_show_staff_position_and_message_status(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-21 09:00:00'));
+        Role::findOrCreate(RoleName::SuperAdmin->value);
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $staff = $this->makeStaff('Hari Sir', '9876543210', true, '1980-10-21', null);
+        $staff->staffProfile->update(['designation' => 'Principal']);
+        $student = $this->makeStudent('Aarav Sharma', '2012-10-21', '9811111111', StudentStatus::Enrolled);
+        OccasionWish::query()->create([
+            'occasion' => OccasionWishType::StudentBirthday->value,
+            'occasion_on' => '2026-10-21',
+            'recipient_key' => 'student:'.$student->id,
+            'student_id' => $student->id,
+            'recipient_name' => 'Aarav Sharma',
+            'mobile' => '9811111111',
+            'status' => OccasionWishStatus::Sent->value,
+            'attempts' => 1,
+        ]);
+
+        Livewire::test(SpecialDaysPage::class)
+            ->assertOk()
+            ->assertSee('Principal')
+            ->assertSee('Message sent')
+            ->assertSee('Not sent')
+            ->assertSee('Send message');
+    }
+
+    public function test_send_button_sends_today_wish_once(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-21 09:00:00'));
+        Role::findOrCreate(RoleName::SuperAdmin->value);
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $student = $this->makeStudent('Aarav Sharma', '2012-10-21', '9811111111', StudentStatus::Enrolled);
+        $this->enableWishes();
+
+        $this->mock(WhatsAppDispatchService::class, function ($mock): void {
+            $mock->shouldReceive('send')->once()->andReturn([
+                'status' => 'success',
+                'message_id' => 'wamid.manual',
+            ]);
+        });
+
+        Livewire::test(SpecialDaysPage::class)
+            ->call('sendMessage', OccasionWishType::StudentBirthday->value, 'student:'.$student->id);
+
+        $wish = OccasionWish::query()->where('recipient_key', 'student:'.$student->id)->first();
+        $this->assertNotNull($wish);
+        $this->assertSame(OccasionWishStatus::Sent, $wish->status);
+
+        $again = app(OccasionWishService::class)->sendOne(
+            OccasionWishType::StudentBirthday->value,
+            'student:'.$student->id,
+            now(),
+            $admin,
+        );
+        $this->assertSame('Message already sent.', $again['message']);
+    }
+
+    public function test_student_profile_shows_a_birthday_banner_only_on_that_day(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-21 09:00:00'));
+        $student = $this->makeStudent('Naitik Singh', '2012-10-21', '9811111111', StudentStatus::Enrolled);
+        $later = $this->makeStudent('Later Student', '2012-10-24', '9811111112', StudentStatus::Enrolled);
+
+        $today = view('filament.pages.partials.student-birthday-banner', ['record' => $student])->render();
+        $otherDay = view('filament.pages.partials.student-birthday-banner', ['record' => $later])->render();
+
+        $this->assertStringContainsString('Happy birthday, Naitik Singh', $today);
+        $this->assertStringContainsString('Send message', $today);
+        $this->assertStringNotContainsString('Happy birthday', $otherDay);
+        $this->assertNotSame(
+            \App\Support\OccasionWishWhatsAppTemplate::STUDENT_BIRTHDAY_BODY,
+            \App\Support\OccasionWishWhatsAppTemplate::STAFF_BIRTHDAY_BODY,
+        );
+        $this->assertNotSame(
+            \App\Support\OccasionWishWhatsAppTemplate::STAFF_BIRTHDAY_BODY,
+            \App\Support\OccasionWishWhatsAppTemplate::STAFF_ANNIVERSARY_BODY,
+        );
+    }
+
     public function test_whatsapp_off_does_not_build_or_send(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-10-21 10:00:00'));

@@ -8,6 +8,7 @@ use App\Support\CrmAccess;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\SpecialDayProfileLink;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Carbon;
@@ -40,19 +41,50 @@ class SpecialDaysPage extends Page
         return CrmHint::text('special_days');
     }
 
+    public function sendMessage(string $occasion, string $recipientKey): void
+    {
+        $result = app(OccasionWishService::class)->sendOne($occasion, $recipientKey, now(), Auth::user());
+
+        $notification = Notification::make()->title($result['message']);
+
+        if ($result['ok']) {
+            $notification->success();
+        } else {
+            $notification->warning();
+        }
+
+        $notification->send();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function missingTemplates(): array
+    {
+        return app(OccasionWishService::class)->missingTemplateLabels();
+    }
+
     /**
      * @return list<array{label: string, is_today: bool, people: list<array{name: string, occasion: string, tone: string, url: ?string}>}>
      */
     public function days(): array
     {
         $start = now()->startOfDay();
+        $service = app(OccasionWishService::class);
+        $matches = $service->upcoming($start, OccasionWishService::UPCOMING_DAYS, Auth::user());
+        $states = $service->messageStates($matches);
         $grouped = [];
 
-        foreach (app(OccasionWishService::class)->upcoming($start, OccasionWishService::UPCOMING_DAYS, Auth::user()) as $match) {
+        foreach ($matches as $match) {
+            $state = $states[$match['on'].'|'.$match['recipient_key'].'|'.$match['occasion']] ?? ['label' => 'Not sent', 'can_send' => false];
             $grouped[$match['on']][] = [
                 'name' => $match['name'],
                 'place' => $match['place'],
                 'occasion' => OccasionWishType::from($match['occasion'])->label(),
+                'occasion_key' => $match['occasion'],
+                'recipient_key' => $match['recipient_key'],
+                'message' => $state['label'],
+                'can_send' => $state['can_send'] && Carbon::parse($match['on'])->isSameDay($start),
                 'tone' => match ($match['occasion']) {
                     OccasionWishType::StaffBirthday->value => 'amber',
                     OccasionWishType::StaffAnniversary->value => 'violet',

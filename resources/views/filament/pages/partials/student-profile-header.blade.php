@@ -7,6 +7,7 @@
 
 <div class="fi-student-profile-shell">
     @include('filament.pages.partials.student-profile-back')
+    @include('filament.pages.partials.student-birthday-banner', ['record' => $record])
 
     @if (($phase === ProfilePhase::Enrolled || $phase === ProfilePhase::ActiveStudent) && ($profile['dossier'] ?? null))
         @include('filament.pages.partials.student-profile-header-dossier', [

@@ -32,8 +32,16 @@ class DashboardSpecialDaysWidget extends Widget
             'staff_birthdays' => [],
             'anniversaries' => [],
         ];
+        $rows = [];
 
         foreach (app(OccasionWishService::class)->matchesForDate(now(), Auth::user()) as $match) {
+            $match['on'] = now()->toDateString();
+            $rows[] = $match;
+        }
+
+        $states = app(OccasionWishService::class)->messageStates($rows);
+
+        foreach ($rows as $match) {
             $key = match ($match['occasion']) {
                 OccasionWishType::StudentBirthday->value => 'students',
                 OccasionWishType::StaffBirthday->value => 'staff_birthdays',
@@ -45,9 +53,11 @@ class DashboardSpecialDaysWidget extends Widget
                 continue;
             }
 
+            $state = $states[$match['on'].'|'.$match['recipient_key'].'|'.$match['occasion']] ?? ['label' => 'Not sent', 'can_send' => false];
             $groups[$key][] = [
                 'name' => $match['name'],
                 'place' => $match['place'],
+                'message' => $state['label'],
                 'url' => SpecialDayProfileLink::url($match['student_id'], $match['user_id']),
             ];
         }
