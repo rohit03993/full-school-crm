@@ -3,10 +3,9 @@
 namespace App\Filament\Widgets;
 
 use App\Enums\OccasionWishType;
-use App\Filament\Pages\OccasionWishesPage;
-use App\Filament\Pages\StudentProfilePage;
-use App\Filament\Resources\Staff\StaffResource;
+use App\Filament\Pages\SpecialDaysPage;
 use App\Services\OccasionWishService;
+use App\Support\SpecialDayProfileLink;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Facades\Auth;
 
@@ -48,7 +47,7 @@ class DashboardSpecialDaysWidget extends Widget
 
             $groups[$key][] = [
                 'name' => $match['name'],
-                'url' => $this->profileUrl($match),
+                'url' => SpecialDayProfileLink::url($match['student_id'], $match['user_id']),
             ];
         }
 
@@ -58,7 +57,7 @@ class DashboardSpecialDaysWidget extends Widget
 
         return [
             'dateLabel' => now()->format('d M Y'),
-            'wishesUrl' => OccasionWishesPage::canAccess() ? OccasionWishesPage::getUrl() : null,
+            'wishesUrl' => SpecialDaysPage::canAccess() ? SpecialDaysPage::getUrl() : null,
             'groups' => [
                 [
                     'key' => 'students',
@@ -82,19 +81,4 @@ class DashboardSpecialDaysWidget extends Widget
         ];
     }
 
-    /**
-     * @param  array{student_id: ?int, user_id: ?int}  $match
-     */
-    private function profileUrl(array $match): ?string
-    {
-        if (filled($match['student_id']) && StudentProfilePage::canAccess()) {
-            return StudentProfilePage::getUrl(['record' => $match['student_id']]);
-        }
-
-        if (filled($match['user_id']) && StaffResource::canAccess()) {
-            return StaffResource::getUrl('edit', ['record' => $match['user_id']]);
-        }
-
-        return null;
-    }
 }

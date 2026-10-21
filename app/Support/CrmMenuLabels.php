@@ -32,6 +32,11 @@ final class CrmMenuLabels
         return 'Dashboard';
     }
 
+    public static function specialDays(): string
+    {
+        return 'Special days';
+    }
+
     public static function myActivity(): string
     {
         return 'My activity';

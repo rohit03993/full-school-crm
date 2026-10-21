@@ -12,6 +12,7 @@ use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Filament\Pages\ManageWhatsAppSettings;
 use App\Filament\Pages\OccasionWishesPage;
+use App\Filament\Pages\SpecialDaysPage;
 use App\Filament\Widgets\DashboardSpecialDaysWidget;
 use Filament\Facades\Filament;
 use App\Models\MetaWhatsAppMessage;
@@ -225,6 +226,30 @@ class OccasionWishServiceTest extends TestCase
             ->assertSee('Aarav Sharma')
             ->assertSee('Hari Sir')
             ->assertDontSee('Left Student');
+    }
+
+    public function test_special_days_page_lists_the_next_seven_days_only(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-21 09:00:00'));
+        Role::findOrCreate(RoleName::SuperAdmin->value);
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->makeStudent('Aarav Sharma', '2020-10-21', '9811111111', StudentStatus::Enrolled);
+        $this->makeStudent('Meera Rao', '2018-10-24', '9811111112', StudentStatus::Enrolled);
+        $this->makeStudent('Far Student', '2015-10-28', '9811111113', StudentStatus::Enrolled);
+        $this->makeStaff('Priya Maam', '9876543212', true, null, '2010-10-22');
+
+        Livewire::test(SpecialDaysPage::class)
+            ->assertOk()
+            ->assertSee('Next 7 days')
+            ->assertSee('Aarav Sharma')
+            ->assertSee('Meera Rao')
+            ->assertSee('Priya Maam')
+            ->assertSee('Staff anniversary')
+            ->assertDontSee('Far Student');
     }
 
     public function test_whatsapp_off_does_not_build_or_send(): void

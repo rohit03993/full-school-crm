@@ -20,7 +20,7 @@
             </div>
             @if (filled($wishesUrl))
                 <a href="{{ $wishesUrl }}" wire:navigate class="text-sm font-semibold text-primary-600 hover:underline dark:text-primary-400">
-                    Full list
+                    Next 7 days
                 </a>
             @endif
         </div>

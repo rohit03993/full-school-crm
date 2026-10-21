@@ -25,6 +25,8 @@ use Illuminate\Support\Facades\Schema;
 
 class OccasionWishService
 {
+    public const UPCOMING_DAYS = 7;
+
     public const SETTING_ENABLED = 'whatsapp.occasion_wishes_enabled';
 
     public const SETTING_SEND_TIME = 'whatsapp.occasion_wishes_send_time';
@@ -258,6 +260,29 @@ class OccasionWishService
         }
 
         return $matches;
+    }
+
+    /**
+     * People with a birthday or anniversary from this day, for the next few days.
+     * Day 1 is today. A date in January is included when the window starts in December.
+     *
+     * @return list<array{occasion: string, recipient_key: string, student_id: ?int, user_id: ?int, name: string, mobile: string, on: string}>
+     */
+    public function upcoming(Carbon $start, int $days = self::UPCOMING_DAYS): array
+    {
+        $days = max(1, min(31, $days));
+        $rows = [];
+
+        for ($offset = 0; $offset < $days; $offset++) {
+            $date = $start->copy()->startOfDay()->addDays($offset);
+
+            foreach ($this->matchesForDate($date) as $match) {
+                $match['on'] = $date->toDateString();
+                $rows[] = $match;
+            }
+        }
+
+        return $rows;
     }
 
     /**
