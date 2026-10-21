@@ -13,7 +13,6 @@ use App\Support\CombinedHomeworkWhatsAppTemplate;
 use App\Support\FeeReminderWhatsAppTemplate;
 use App\Support\HomeworkNotDoneWhatsAppTemplate;
 use App\Support\HomeworkShareWhatsAppTemplate;
-use App\Support\OccasionWishWhatsAppTemplate;
 use App\Support\StaffPunchWhatsAppTemplate;
 use App\Support\StudentReportWhatsAppTemplate;
 use App\Support\TestMarksWhatsAppTemplate;
@@ -68,19 +67,15 @@ class WhatsAppSettingsService
             'occasion_wishes_max_retries' => (int) Setting::getValue('whatsapp.occasion_wishes_max_retries', 3),
             'occasion_student_birthday_live_campaign_id' => $this->formTemplateIdFromStored(
                 Setting::getValue('whatsapp.occasion_student_birthday_live_campaign_id'),
-                OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT,
             ),
             'occasion_staff_birthday_live_campaign_id' => $this->formTemplateIdFromStored(
                 Setting::getValue('whatsapp.occasion_staff_birthday_live_campaign_id'),
-                OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT,
             ),
             'occasion_staff_anniversary_live_campaign_id' => $this->formTemplateIdFromStored(
                 Setting::getValue('whatsapp.occasion_staff_anniversary_live_campaign_id'),
-                OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT,
             ),
             'occasion_daily_report_live_campaign_id' => $this->formTemplateIdFromStored(
                 Setting::getValue('whatsapp.occasion_daily_report_live_campaign_id'),
-                OccasionWishWhatsAppTemplate::REPORT_PARAM_COUNT,
             ),
             'campaign_batch_size' => (int) Setting::getValue('whatsapp.campaign_batch_size', config('whatsapp.batch_size', 10)),
             'campaign_batch_delay_seconds' => (int) Setting::getValue(
@@ -542,10 +537,6 @@ class WhatsAppSettingsService
             'homework_share_live_campaign_id' => 4,
             'homework_not_done_live_campaign_id' => [5, 7],
             'student_report_live_campaign_id' => 7,
-            'occasion_student_birthday_live_campaign_id' => OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT,
-            'occasion_staff_birthday_live_campaign_id' => OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT,
-            'occasion_staff_anniversary_live_campaign_id' => OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT,
-            'occasion_daily_report_live_campaign_id' => OccasionWishWhatsAppTemplate::REPORT_PARAM_COUNT,
         ];
 
         foreach ($keysWithParamCount as $key => $paramCount) {
@@ -566,6 +557,10 @@ class WhatsAppSettingsService
             'staff_punch_in_autosend_live_campaign_id',
             'staff_punch_out_autosend_live_campaign_id',
             'activity_marks_live_campaign_id',
+            'occasion_student_birthday_live_campaign_id',
+            'occasion_staff_birthday_live_campaign_id',
+            'occasion_staff_anniversary_live_campaign_id',
+            'occasion_daily_report_live_campaign_id',
         ] as $key) {
             $data[$key] = $this->sanitizeSelectedTemplateId($data[$key] ?? null);
         }
@@ -627,6 +622,26 @@ class WhatsAppSettingsService
     public function templateOptions(): array
     {
         return $this->templateOptionsForParamCount();
+    }
+
+    /**
+     * Every active template, with its blank count, so a birthday list is not limited to one count.
+     *
+     * @return array<int, string>
+     */
+    public function templateOptionsForBirthdays(): array
+    {
+        return WhatsAppTemplate::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'param_count'])
+            ->mapWithKeys(function (WhatsAppTemplate $template): array {
+                $blanks = (int) $template->param_count;
+                $blankLabel = $blanks === 1 ? '1 blank' : $blanks.' blanks';
+
+                return [$template->id => $template->name.' · '.$blankLabel];
+            })
+            ->all();
     }
 
     /**

@@ -7,7 +7,6 @@ use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Services\WhatsAppProviderResolver;
 use App\Services\WhatsAppSettingsService;
-use App\Support\OccasionWishWhatsAppTemplate;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
@@ -245,32 +244,32 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('How many times a failed wish is tried. Default 3.'),
                     Select::make('occasion_student_birthday_live_campaign_id')
                         ->label('Student birthday template')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT))
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForBirthdays())
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Template '.OccasionWishWhatsAppTemplate::STUDENT_BIRTHDAY_NAME.'. {{1}} person name, {{2}} institute name.'),
+                        ->helperText('Every active template is listed. This wish needs 2 blanks: person name, then institute name.'),
                     Select::make('occasion_staff_birthday_live_campaign_id')
                         ->label('Staff birthday template')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT))
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForBirthdays())
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Template '.OccasionWishWhatsAppTemplate::STAFF_BIRTHDAY_NAME.'. Same two blanks.'),
+                        ->helperText('Every active template is listed. This wish needs 2 blanks: person name, then institute name.'),
                     Select::make('occasion_staff_anniversary_live_campaign_id')
                         ->label('Staff anniversary template')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT))
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForBirthdays())
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Template '.OccasionWishWhatsAppTemplate::STAFF_ANNIVERSARY_NAME.'. Same two blanks.'),
+                        ->helperText('Every active template is listed. This wish needs 2 blanks: person name, then institute name.'),
                     Select::make('occasion_daily_report_live_campaign_id')
                         ->label('Admin report template')
-                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(OccasionWishWhatsAppTemplate::REPORT_PARAM_COUNT))
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForBirthdays())
                         ->searchable()
                         ->nullable()
                         ->native(false)
-                        ->helperText('Template '.OccasionWishWhatsAppTemplate::DAILY_REPORT_NAME.'. Eight blanks: date, institute, three counts, sent, failed, skipped.'),
+                        ->helperText('Every active template is listed. This report needs 8 blanks.'),
                 ])
                 ->columns(2),
                         ]),

@@ -430,6 +430,34 @@ class OccasionWishServiceTest extends TestCase
         );
     }
 
+    public function test_birthday_template_list_includes_every_active_template(): void
+    {
+        WhatsAppTemplate::query()->create([
+            'name' => 'student_birthday',
+            'param_count' => 2,
+            'is_active' => true,
+            'body' => 'Hello {{1}} from {{2}}.',
+        ]);
+        WhatsAppTemplate::query()->create([
+            'name' => 'fee_due_notice',
+            'param_count' => 7,
+            'is_active' => true,
+            'body' => 'Fee {{1}}.',
+        ]);
+        WhatsAppTemplate::query()->create([
+            'name' => 'old_template',
+            'param_count' => 2,
+            'is_active' => false,
+            'body' => 'Old {{1}}.',
+        ]);
+
+        $labels = array_values(app(\App\Services\WhatsAppSettingsService::class)->templateOptionsForBirthdays());
+
+        $this->assertContains('student_birthday · 2 blanks', $labels);
+        $this->assertContains('fee_due_notice · 7 blanks', $labels);
+        $this->assertNotContains('old_template · 2 blanks', $labels);
+    }
+
     public function test_whatsapp_off_does_not_build_or_send(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-10-21 10:00:00'));
