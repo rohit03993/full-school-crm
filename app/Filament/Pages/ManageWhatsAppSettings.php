@@ -7,6 +7,7 @@ use App\Enums\LicenseFeature;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Services\WhatsAppProviderResolver;
 use App\Services\WhatsAppSettingsService;
+use App\Support\OccasionWishWhatsAppTemplate;
 use App\Support\CrmHint;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
@@ -105,6 +106,7 @@ class ManageWhatsAppSettings extends Page
                     .'<strong>Staff attendance</strong> = staff punch, WhatsApp to the staff phone. '
                     .'<strong>Homework</strong> = share templates (staff click Send) and optional Not Done alerts. '
                     .'<strong>Exam marks</strong> = default test-result template (staff click Send on the mark sheet). '
+                    .'<strong>Birthdays</strong> = student birthday, staff birthday, and staff anniversary text messages. '
                     .'Pick an approved template on each tab. <strong>Save settings</strong> stores every tab at once, but you stay on the tab you are editing.'
                     .'</p>'
                 ))
@@ -209,6 +211,66 @@ class ManageWhatsAppSettings extends Page
                         ->nullable()
                         ->native(false)
                         ->helperText('Same mapping as IN. Leave blank if you only want IN messages.'),
+                ])
+                ->columns(2),
+                        ]),
+                    Tab::make('Birthdays')
+                        ->icon(Heroicon::OutlinedCake)
+                        ->schema([
+            Section::make('Birthday and anniversary wishes')
+                ->description('Text messages only. Off until you turn the switch on and Meta has approved the templates. A missing date or mobile is skipped. The same person is not wished twice on the same day.')
+                ->schema([
+                    Toggle::make('occasion_wishes_enabled')
+                        ->label('Send birthday and anniversary wishes')
+                        ->helperText('Student birthday goes to the student mobile. Staff birthday and marriage anniversary go to that staff mobile.')
+                        ->columnSpanFull(),
+                    TextInput::make('occasion_wishes_send_time')
+                        ->label('Wish time')
+                        ->placeholder('08:00')
+                        ->helperText('24-hour clock, India time. Example: 08:00.'),
+                    TextInput::make('occasion_wishes_report_time')
+                        ->label('Admin report time')
+                        ->placeholder('09:00')
+                        ->helperText('Set this after the wish time. The WhatsApp to admin has counts only. Names stay on Today\'s wishes.'),
+                    TextInput::make('occasion_wishes_admin_mobile')
+                        ->label('Admin WhatsApp number')
+                        ->tel()
+                        ->maxLength(10)
+                        ->helperText('10-digit mobile that receives the daily count. A wrong number is ignored so the other tabs still save. Leave blank to skip that message.'),
+                    TextInput::make('occasion_wishes_max_retries')
+                        ->label('Retries')
+                        ->numeric()
+                        ->minValue(1)
+                        ->maxValue(5)
+                        ->helperText('How many times a failed wish is tried. Default 3.'),
+                    Select::make('occasion_student_birthday_live_campaign_id')
+                        ->label('Student birthday template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT))
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Template '.OccasionWishWhatsAppTemplate::STUDENT_BIRTHDAY_NAME.'. {{1}} person name, {{2}} institute name.'),
+                    Select::make('occasion_staff_birthday_live_campaign_id')
+                        ->label('Staff birthday template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT))
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Template '.OccasionWishWhatsAppTemplate::STAFF_BIRTHDAY_NAME.'. Same two blanks.'),
+                    Select::make('occasion_staff_anniversary_live_campaign_id')
+                        ->label('Staff anniversary template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT))
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Template '.OccasionWishWhatsAppTemplate::STAFF_ANNIVERSARY_NAME.'. Same two blanks.'),
+                    Select::make('occasion_daily_report_live_campaign_id')
+                        ->label('Admin report template')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForParamCount(OccasionWishWhatsAppTemplate::REPORT_PARAM_COUNT))
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Template '.OccasionWishWhatsAppTemplate::DAILY_REPORT_NAME.'. Eight blanks: date, institute, three counts, sent, failed, skipped.'),
                 ])
                 ->columns(2),
                         ]),

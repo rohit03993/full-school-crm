@@ -47,7 +47,8 @@ class WhatsAppHubPage extends Page
             || MetaWhatsAppTemplateResource::canAccess()
             || WhatsAppCampaignResource::canAccess()
             || WhatsAppLiveCampaignResource::canAccess()
-            || ParentFeeNoticesPage::canAccess();
+            || ParentFeeNoticesPage::canAccess()
+            || OccasionWishesPage::canAccess();
     }
 
     public function getSubheading(): ?string
@@ -114,8 +115,16 @@ class WhatsAppHubPage extends Page
         if (ManageWhatsAppSettings::canAccess()) {
             $cards[] = [
                 'title' => CrmMenuLabels::whatsAppAutomations(),
-                'description' => 'Attendance, homework, exam marks, and fee-reminder templates.',
+                'description' => 'Attendance, homework, exam marks, fee reminders, and birthday wishes.',
                 'url' => ManageWhatsAppSettings::getUrl(),
+            ];
+        }
+
+        if (OccasionWishesPage::canAccess()) {
+            $cards[] = [
+                'title' => CrmMenuLabels::whatsAppOccasions(),
+                'description' => 'Student birthdays, staff birthdays, and staff anniversaries for the day, with send status.',
+                'url' => OccasionWishesPage::getUrl(),
             ];
         }
 

@@ -25,6 +25,7 @@ use App\Support\FeatureGate;
 use App\Enums\LicenseFeature;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -42,6 +43,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema as DbSchema;
 use Throwable;
 use UnitEnum;
 
@@ -183,6 +185,18 @@ class StaffResource extends Resource
                             ->tel()
                             ->maxLength(10)
                             ->rules(['nullable', 'regex:/^[6-9]\d{9}$/']),
+                        DatePicker::make('date_of_birth')
+                            ->label('Date of birth')
+                            ->native(false)
+                            ->maxDate(now()->subDay())
+                            ->visible(fn (): bool => DbSchema::hasColumn('staff_profiles', 'date_of_birth'))
+                            ->helperText('Optional. The birthday WhatsApp uses this date and the staff mobile. Leave it blank if you do not have it.'),
+                        DatePicker::make('marriage_anniversary')
+                            ->label('Marriage anniversary')
+                            ->native(false)
+                            ->maxDate(now())
+                            ->visible(fn (): bool => DbSchema::hasColumn('staff_profiles', 'marriage_anniversary'))
+                            ->helperText('Optional. The anniversary WhatsApp uses this date and the staff mobile. Leave it blank if it does not apply.'),
                     ]),
                 Section::make('Access & roles')
                     ->description('Tick every job this person does. Roles combine — Accountant + Fee adjuster can collect fees and change fee plans.')

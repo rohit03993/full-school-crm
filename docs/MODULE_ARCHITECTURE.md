@@ -288,7 +288,7 @@ Every management system below lists:
 | **Formal name** | WhatsApp Management System |
 | **Key** | `whatsapp` |
 | **Status** | Incomplete (ops strong; settings cleanup) |
-| **Includes** | Meta templates, inbox, campaigns, analytics; soft hooks from fees/attendance/homework/calls/results; **Parent fee notices** (manual bulk pending-fee WhatsApp — independent of Fees ledger) |
+| **Includes** | Meta templates, inbox, campaigns, analytics; soft hooks from fees/attendance/homework/calls/results; **Parent fee notices** (manual bulk pending-fee WhatsApp — independent of Fees ledger); **Birthday wishes** (student birthday, staff birthday, staff anniversary — text only, switch off by default) |
 | **Staff roles** | Separate ticks: WhatsApp inbox, bulk campaigns, fee notices; optional **WhatsApp desk (full)** keeps templates/live (legacy Messaging) |
 | **Omit** | AiSensy; bus alerts |
 | **Edit** | Single WhatsApp settings path; docs = Meta only |
@@ -470,6 +470,7 @@ PLANNED
 
 | Date | Change |
 |------|--------|
+| 2026-10-21 | WhatsApp birthdays: optional staff date of birth and marriage anniversary. Morning text wishes and a daily count to admin. Switch off until Automations → Birthdays is turned on. No greeting card. |
 | 2026-10-17 | Student Conduct on the profile for Super Admin and Academic coordinator. Not a license switch. Each row shows who entered it. |
 | 2026-09-28 | Teacher Tracking milestone 2: copy a ready course plan onto a section, teacher submits, academic head finalizes. Student profile and portal show topics without minutes. |
 | 2026-09-27 | Teacher Tracking module key `teacher_tracking`. Milestone 1 is the Standard course planner (programme + subject + chapters + topics). |

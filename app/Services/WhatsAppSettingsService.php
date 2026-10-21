@@ -13,6 +13,7 @@ use App\Support\CombinedHomeworkWhatsAppTemplate;
 use App\Support\FeeReminderWhatsAppTemplate;
 use App\Support\HomeworkNotDoneWhatsAppTemplate;
 use App\Support\HomeworkShareWhatsAppTemplate;
+use App\Support\OccasionWishWhatsAppTemplate;
 use App\Support\StaffPunchWhatsAppTemplate;
 use App\Support\StudentReportWhatsAppTemplate;
 use App\Support\TestMarksWhatsAppTemplate;
@@ -60,6 +61,27 @@ class WhatsAppSettingsService
             'staff_punch_autosend_enabled' => (bool) Setting::getValue('whatsapp.staff_punch_autosend_enabled', false),
             'staff_punch_in_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.staff_punch_in_autosend_live_campaign_id')),
             'staff_punch_out_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.staff_punch_out_autosend_live_campaign_id')),
+            'occasion_wishes_enabled' => Setting::getValue('whatsapp.occasion_wishes_enabled', '0') === '1',
+            'occasion_wishes_send_time' => (string) Setting::getValue('whatsapp.occasion_wishes_send_time', '08:00'),
+            'occasion_wishes_report_time' => (string) Setting::getValue('whatsapp.occasion_wishes_report_time', '09:00'),
+            'occasion_wishes_admin_mobile' => (string) Setting::getValue('whatsapp.occasion_wishes_admin_mobile', ''),
+            'occasion_wishes_max_retries' => (int) Setting::getValue('whatsapp.occasion_wishes_max_retries', 3),
+            'occasion_student_birthday_live_campaign_id' => $this->formTemplateIdFromStored(
+                Setting::getValue('whatsapp.occasion_student_birthday_live_campaign_id'),
+                OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT,
+            ),
+            'occasion_staff_birthday_live_campaign_id' => $this->formTemplateIdFromStored(
+                Setting::getValue('whatsapp.occasion_staff_birthday_live_campaign_id'),
+                OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT,
+            ),
+            'occasion_staff_anniversary_live_campaign_id' => $this->formTemplateIdFromStored(
+                Setting::getValue('whatsapp.occasion_staff_anniversary_live_campaign_id'),
+                OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT,
+            ),
+            'occasion_daily_report_live_campaign_id' => $this->formTemplateIdFromStored(
+                Setting::getValue('whatsapp.occasion_daily_report_live_campaign_id'),
+                OccasionWishWhatsAppTemplate::REPORT_PARAM_COUNT,
+            ),
             'campaign_batch_size' => (int) Setting::getValue('whatsapp.campaign_batch_size', config('whatsapp.batch_size', 10)),
             'campaign_batch_delay_seconds' => (int) Setting::getValue(
                 'whatsapp.campaign_next_batch_delay_seconds',
@@ -130,6 +152,12 @@ class WhatsAppSettingsService
                 'label' => 'After a logged call',
                 'hint' => 'Leads / follow-up after an outgoing call',
                 'enabled' => (bool) Setting::getValue('whatsapp.postcall_autosend_enabled', false),
+            ],
+            [
+                'key' => 'occasion_wishes',
+                'label' => 'Birthday and anniversary wishes',
+                'hint' => 'Student birthday, staff birthday, and staff anniversary — off until you turn it on',
+                'enabled' => Setting::getValue('whatsapp.occasion_wishes_enabled', '0') === '1',
             ],
         ];
     }
@@ -358,6 +386,54 @@ class WhatsAppSettingsService
             'whatsapp',
         );
         Setting::setValue(
+            'whatsapp.occasion_wishes_enabled',
+            ! empty($data['occasion_wishes_enabled']) ? '1' : '0',
+            'whatsapp',
+        );
+        $wishTime = trim((string) ($data['occasion_wishes_send_time'] ?? '08:00'));
+        if (! preg_match('/^([01]?\d|2[0-3]):[0-5]\d$/', $wishTime)) {
+            $wishTime = '08:00';
+        }
+        Setting::setValue('whatsapp.occasion_wishes_send_time', strlen($wishTime) === 4 ? '0'.$wishTime : $wishTime, 'whatsapp');
+        $reportTime = trim((string) ($data['occasion_wishes_report_time'] ?? '09:00'));
+        if (! preg_match('/^([01]?\d|2[0-3]):[0-5]\d$/', $reportTime)) {
+            $reportTime = '09:00';
+        }
+        Setting::setValue('whatsapp.occasion_wishes_report_time', strlen($reportTime) === 4 ? '0'.$reportTime : $reportTime, 'whatsapp');
+        $adminMobile = preg_replace('/\D/', '', (string) ($data['occasion_wishes_admin_mobile'] ?? '')) ?? '';
+        if (strlen($adminMobile) > 10) {
+            $adminMobile = substr($adminMobile, -10);
+        }
+        if (preg_match('/^[6-9]\d{9}$/', $adminMobile) !== 1) {
+            $adminMobile = '';
+        }
+        Setting::setValue('whatsapp.occasion_wishes_admin_mobile', $adminMobile, 'whatsapp');
+        Setting::setValue(
+            'whatsapp.occasion_wishes_max_retries',
+            (string) max(1, min(5, (int) ($data['occasion_wishes_max_retries'] ?? 3))),
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.occasion_student_birthday_live_campaign_id',
+            $this->encodeAutomationTemplateId($data['occasion_student_birthday_live_campaign_id'] ?? null),
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.occasion_staff_birthday_live_campaign_id',
+            $this->encodeAutomationTemplateId($data['occasion_staff_birthday_live_campaign_id'] ?? null),
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.occasion_staff_anniversary_live_campaign_id',
+            $this->encodeAutomationTemplateId($data['occasion_staff_anniversary_live_campaign_id'] ?? null),
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.occasion_daily_report_live_campaign_id',
+            $this->encodeAutomationTemplateId($data['occasion_daily_report_live_campaign_id'] ?? null),
+            'whatsapp',
+        );
+        Setting::setValue(
             'whatsapp.campaign_batch_size',
             (string) max(1, min(50, (int) ($data['campaign_batch_size'] ?? 10))),
             'whatsapp',
@@ -466,6 +542,10 @@ class WhatsAppSettingsService
             'homework_share_live_campaign_id' => 4,
             'homework_not_done_live_campaign_id' => [5, 7],
             'student_report_live_campaign_id' => 7,
+            'occasion_student_birthday_live_campaign_id' => OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT,
+            'occasion_staff_birthday_live_campaign_id' => OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT,
+            'occasion_staff_anniversary_live_campaign_id' => OccasionWishWhatsAppTemplate::WISH_PARAM_COUNT,
+            'occasion_daily_report_live_campaign_id' => OccasionWishWhatsAppTemplate::REPORT_PARAM_COUNT,
         ];
 
         foreach ($keysWithParamCount as $key => $paramCount) {

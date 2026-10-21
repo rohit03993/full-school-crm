@@ -160,6 +160,11 @@ final class CrmMenuLabels
         return 'Automations';
     }
 
+    public static function whatsAppOccasions(): string
+    {
+        return 'Today\'s wishes';
+    }
+
     // —— Students ——
     public static function students(): string
     {

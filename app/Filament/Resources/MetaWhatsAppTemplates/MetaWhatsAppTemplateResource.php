@@ -20,6 +20,7 @@ use App\Support\FeeReminderWhatsAppTemplate;
 use App\Support\HomeworkNotDoneWhatsAppTemplate;
 use App\Support\HomeworkShareWhatsAppTemplate;
 use App\Support\LoginOtpWhatsAppTemplate;
+use App\Support\OccasionWishWhatsAppTemplate;
 use App\Support\StaffPunchWhatsAppTemplate;
 use App\Support\StudentPunchWhatsAppTemplate;
 use App\Support\TestMarksWhatsAppTemplate;
@@ -120,7 +121,7 @@ class MetaWhatsAppTemplateResource extends Resource
                     .'<div class="rounded-xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-sm dark:border-amber-500/20 dark:bg-amber-500/5">'
                     .'<p class="font-bold text-gray-950 dark:text-white">Known CRM presets (optional)</p>'
                     .'<p class="mt-1 text-xs text-gray-600 dark:text-gray-300">'
-                    .'Name <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::UPCOMING_NAME).'</code>, <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::DUE_NAME).'</code>, <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::OVERDUE_NAME).'</code> (or <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>), <code class="text-xs">'.e(StudentPunchWhatsAppTemplate::IN_NAME).'</code> / <code class="text-xs">'.e(StudentPunchWhatsAppTemplate::OUT_NAME).'</code> (or <code class="text-xs">manual_in</code> / <code class="text-xs">manual_out</code>), <code class="text-xs">'.e(HomeworkNotDoneWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkShareWhatsAppTemplate::NAME).'</code> / <code class="text-xs">homework_update</code>, <code class="text-xs">'.e(CombinedHomeworkWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(StaffPunchWhatsAppTemplate::IN_NAME).'</code> / <code class="text-xs">'.e(StaffPunchWhatsAppTemplate::OUT_NAME).'</code>, <code class="text-xs">'.e(TestMarksWhatsAppTemplate::NAME).'</code>, or <code class="text-xs">'.e(LoginOtpWhatsAppTemplate::NAME).'</code>, leave body blank and blur the name — body + samples auto-fill. <strong>login_otp</strong> is submitted as Authentication (Copy code), not Utility.'
+                    .'Name <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::UPCOMING_NAME).'</code>, <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::DUE_NAME).'</code>, <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::OVERDUE_NAME).'</code> (or <code class="text-xs">'.e(FeeReminderWhatsAppTemplate::NAME).'</code>), <code class="text-xs">'.e(StudentPunchWhatsAppTemplate::IN_NAME).'</code> / <code class="text-xs">'.e(StudentPunchWhatsAppTemplate::OUT_NAME).'</code> (or <code class="text-xs">manual_in</code> / <code class="text-xs">manual_out</code>), <code class="text-xs">'.e(HomeworkNotDoneWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(HomeworkShareWhatsAppTemplate::NAME).'</code> / <code class="text-xs">homework_update</code>, <code class="text-xs">'.e(CombinedHomeworkWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(StaffPunchWhatsAppTemplate::IN_NAME).'</code> / <code class="text-xs">'.e(StaffPunchWhatsAppTemplate::OUT_NAME).'</code>, <code class="text-xs">'.e(TestMarksWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(LoginOtpWhatsAppTemplate::NAME).'</code>, <code class="text-xs">'.e(OccasionWishWhatsAppTemplate::STUDENT_BIRTHDAY_NAME).'</code>, <code class="text-xs">'.e(OccasionWishWhatsAppTemplate::STAFF_BIRTHDAY_NAME).'</code>, <code class="text-xs">'.e(OccasionWishWhatsAppTemplate::STAFF_ANNIVERSARY_NAME).'</code>, or <code class="text-xs">'.e(OccasionWishWhatsAppTemplate::DAILY_REPORT_NAME).'</code>, leave body blank and blur the name — body + samples auto-fill. <strong>login_otp</strong> is submitted as Authentication (Copy code), not Utility.'
                     .'</p></div></div>'
                 ))
                 ->columnSpanFull(),
@@ -128,7 +129,7 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->label('Template name')
                 ->required()
                 ->maxLength(64)
-                ->helperText('Custom names are fine. Presets: '.FeeReminderWhatsAppTemplate::UPCOMING_NAME.', '.StudentPunchWhatsAppTemplate::IN_NAME.', '.StudentPunchWhatsAppTemplate::OUT_NAME.', '.HomeworkNotDoneWhatsAppTemplate::NAME.', '.HomeworkShareWhatsAppTemplate::NAME.', '.CombinedHomeworkWhatsAppTemplate::NAME.', '.StaffPunchWhatsAppTemplate::IN_NAME.', '.StaffPunchWhatsAppTemplate::OUT_NAME.', '.TestMarksWhatsAppTemplate::NAME.', '.LoginOtpWhatsAppTemplate::NAME)
+                ->helperText('Custom names are fine. Presets: '.FeeReminderWhatsAppTemplate::UPCOMING_NAME.', '.StudentPunchWhatsAppTemplate::IN_NAME.', '.StudentPunchWhatsAppTemplate::OUT_NAME.', '.HomeworkNotDoneWhatsAppTemplate::NAME.', '.HomeworkShareWhatsAppTemplate::NAME.', '.CombinedHomeworkWhatsAppTemplate::NAME.', '.StaffPunchWhatsAppTemplate::IN_NAME.', '.StaffPunchWhatsAppTemplate::OUT_NAME.', '.TestMarksWhatsAppTemplate::NAME.', '.LoginOtpWhatsAppTemplate::NAME.', '.OccasionWishWhatsAppTemplate::STUDENT_BIRTHDAY_NAME.', '.OccasionWishWhatsAppTemplate::STAFF_BIRTHDAY_NAME.', '.OccasionWishWhatsAppTemplate::STAFF_ANNIVERSARY_NAME.', '.OccasionWishWhatsAppTemplate::DAILY_REPORT_NAME)
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Set $set, Get $get, ?string $state): void {
                     $normalized = MetaWhatsAppTemplateBuilder::normalizeName((string) $state);
@@ -170,6 +171,38 @@ class MetaWhatsAppTemplateResource extends Resource
                         $set('category', HomeworkShareWhatsAppTemplate::CATEGORY);
                         $set('body_text', HomeworkShareWhatsAppTemplate::BODY);
                         $set('body_variable_samples', HomeworkShareWhatsAppTemplate::sampleRows());
+
+                        return;
+                    }
+
+                    if (OccasionWishWhatsAppTemplate::looksLikeStudentBirthday($normalized)) {
+                        $set('category', OccasionWishWhatsAppTemplate::CATEGORY);
+                        $set('body_text', OccasionWishWhatsAppTemplate::STUDENT_BIRTHDAY_BODY);
+                        $set('body_variable_samples', OccasionWishWhatsAppTemplate::sampleRows(OccasionWishWhatsAppTemplate::wishVariables()));
+
+                        return;
+                    }
+
+                    if (OccasionWishWhatsAppTemplate::looksLikeStaffBirthday($normalized)) {
+                        $set('category', OccasionWishWhatsAppTemplate::CATEGORY);
+                        $set('body_text', OccasionWishWhatsAppTemplate::STAFF_BIRTHDAY_BODY);
+                        $set('body_variable_samples', OccasionWishWhatsAppTemplate::sampleRows(OccasionWishWhatsAppTemplate::wishVariables()));
+
+                        return;
+                    }
+
+                    if (OccasionWishWhatsAppTemplate::looksLikeStaffAnniversary($normalized)) {
+                        $set('category', OccasionWishWhatsAppTemplate::CATEGORY);
+                        $set('body_text', OccasionWishWhatsAppTemplate::STAFF_ANNIVERSARY_BODY);
+                        $set('body_variable_samples', OccasionWishWhatsAppTemplate::sampleRows(OccasionWishWhatsAppTemplate::wishVariables()));
+
+                        return;
+                    }
+
+                    if (OccasionWishWhatsAppTemplate::looksLikeDailyReport($normalized)) {
+                        $set('category', OccasionWishWhatsAppTemplate::CATEGORY);
+                        $set('body_text', OccasionWishWhatsAppTemplate::DAILY_REPORT_BODY);
+                        $set('body_variable_samples', OccasionWishWhatsAppTemplate::sampleRows(OccasionWishWhatsAppTemplate::reportVariables()));
 
                         return;
                     }

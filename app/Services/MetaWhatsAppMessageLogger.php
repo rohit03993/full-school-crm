@@ -10,6 +10,8 @@ use App\Models\MetaWhatsAppMessage;
 use App\Models\MetaWhatsAppTemplate;
 use App\Models\Student;
 use App\Support\WhatsAppInboxBodyPreview;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class MetaWhatsAppMessageLogger
 {
@@ -236,6 +238,14 @@ class MetaWhatsAppMessageLogger
 
         if ($status === MetaWhatsAppMessageStatus::Failed) {
             app(WhatsAppAnalyticsService::class)->markUndelivered($message->fresh() ?? $message, $detail);
+        }
+
+        try {
+            if (Schema::hasTable('occasion_wishes')) {
+                app(OccasionWishService::class)->applyProviderStatus($wamid, $status, $detail);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Birthday wish delivery update failed: '.$exception->getMessage());
         }
     }
 

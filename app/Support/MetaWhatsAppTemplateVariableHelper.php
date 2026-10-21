@@ -82,6 +82,16 @@ class MetaWhatsAppTemplateVariableHelper
             return TestMarksWhatsAppTemplate::variables();
         }
 
+        if (OccasionWishWhatsAppTemplate::looksLikeDailyReport($name)) {
+            return OccasionWishWhatsAppTemplate::reportVariables();
+        }
+
+        if (OccasionWishWhatsAppTemplate::looksLikeStudentBirthday($name)
+            || OccasionWishWhatsAppTemplate::looksLikeStaffBirthday($name)
+            || OccasionWishWhatsAppTemplate::looksLikeStaffAnniversary($name)) {
+            return OccasionWishWhatsAppTemplate::wishVariables();
+        }
+
         if (StudentPunchWhatsAppTemplate::looksLikeName($name)
             || str_contains($body, 'your ward')
             || str_contains($body, 'has checked in at')

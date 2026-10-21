@@ -12,7 +12,17 @@ class StaffProfile extends Model
         'designation',
         'employee_code',
         'mobile',
+        'date_of_birth',
+        'marriage_anniversary',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'date_of_birth' => 'date',
+            'marriage_anniversary' => 'date',
+        ];
+    }
 
     public function user(): BelongsTo
     {
