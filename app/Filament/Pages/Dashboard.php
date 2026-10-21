@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Filament\Widgets\CrmFinanceStatsWidget;
 use App\Filament\Widgets\CrmLeadStatsWidget;
 use App\Filament\Widgets\DashboardHeroWidget;
+use App\Filament\Widgets\DashboardSpecialDaysWidget;
 use App\Filament\Widgets\DashboardTodayPulseWidget;
 use App\Filament\Widgets\HomeworkCheckReportWidget;
 use App\Filament\Widgets\LicenseStatusWidget;
@@ -53,6 +54,7 @@ class Dashboard extends BaseDashboard
             LicenseStatusWidget::class,
             DashboardHeroWidget::class,
             DashboardTodayPulseWidget::class,
+            DashboardSpecialDaysWidget::class,
             HomeworkCheckReportWidget::class,
             CrmFinanceStatsWidget::class,
             CrmLeadStatsWidget::class,

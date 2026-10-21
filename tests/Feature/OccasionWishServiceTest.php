@@ -12,6 +12,8 @@ use App\Enums\RoleName;
 use App\Enums\StudentStatus;
 use App\Filament\Pages\ManageWhatsAppSettings;
 use App\Filament\Pages\OccasionWishesPage;
+use App\Filament\Widgets\DashboardSpecialDaysWidget;
+use Filament\Facades\Filament;
 use App\Models\MetaWhatsAppMessage;
 use App\Models\OccasionWish;
 use App\Models\Setting;
@@ -199,6 +201,30 @@ class OccasionWishServiceTest extends TestCase
             ->assertOk()
             ->assertSee('Birthdays')
             ->assertSee('Student birthday template');
+    }
+
+    public function test_dashboard_splits_today_into_student_staff_and_anniversary(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-21 09:00:00'));
+        Role::findOrCreate(RoleName::SuperAdmin->value);
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole(RoleName::SuperAdmin->value);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $this->makeStudent('Aarav Sharma', '2020-10-21', '9811111111', StudentStatus::Enrolled);
+        $this->makeStudent('Left Student', '2019-10-21', '9822222222', StudentStatus::Dropped);
+        $this->makeStaff('Hari Sir', '9876543210', true, '1980-10-21', '2010-10-21');
+
+        Livewire::test(DashboardSpecialDaysWidget::class)
+            ->assertOk()
+            ->assertSee("Today's special days", false)
+            ->assertSee('Student birthdays')
+            ->assertSee('Staff birthdays')
+            ->assertSee('Anniversaries')
+            ->assertSee('Aarav Sharma')
+            ->assertSee('Hari Sir')
+            ->assertDontSee('Left Student');
     }
 
     public function test_whatsapp_off_does_not_build_or_send(): void
