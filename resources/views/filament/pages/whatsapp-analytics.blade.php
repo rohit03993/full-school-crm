@@ -99,7 +99,7 @@
 
     <section class="crm-wa-cost__hero">
         <div>
-            <p class="crm-wa-cost__kicker">{{ $usesMeta ? 'WhatsApp bill' : 'School log estimate' }}</p>
+            <p class="crm-wa-cost__kicker">{{ $usesMeta ? 'Message charge' : 'School log estimate' }}</p>
             @if ($showMessageCost)
                 <p class="crm-wa-cost__amount">{{ $this->formatMoney((float) ($connected['total_cost'] ?? 0), $currency) }}</p>
             @else
@@ -107,9 +107,10 @@
             @endif
             <p class="crm-wa-cost__note">
                 @if ($usesMeta)
-                    This is the charge WhatsApp reported for these dates. The cards and tables split that same charge. A failed message is not added.
+                    This is the message charge WhatsApp calculated for these dates. It is not the amount taken from the card. WhatsApp adds tax, then charges the card in one lump when the balance is high enough, or at the end of the month. A failed message is not included.
+                    <a href="https://business.facebook.com/billing_hub/payment_activity" target="_blank" rel="noopener" style="color:#fff; font-weight:600; text-decoration:underline;">Open card charges</a>
                 @else
-                    WhatsApp’s bill could not be loaded, so this is only what the school log recorded.
+                    WhatsApp’s message charge could not be loaded, so this is only what the school log recorded.
                 @endif
             </p>
         </div>
@@ -146,7 +147,7 @@
     <section class="crm-wa-analytics__panel">
         <div class="mb-4">
             <h3 class="crm-wa-analytics__panel-title">Day by day</h3>
-            <p class="mt-1 text-xs text-gray-500">Newest first. The bar is that day’s share of the {{ $usesMeta ? 'WhatsApp bill' : 'school log' }}.</p>
+            <p class="mt-1 text-xs text-gray-500">Newest first. The bar is that day’s share of the message charge. The card is not charged on each of these days.</p>
         </div>
         @if ($dayRows === [])
             <p class="text-sm text-gray-500">No messages in these dates.</p>
@@ -158,7 +159,7 @@
                             <th class="py-2 pr-3">Date</th>
                             <th class="py-2 pr-3">{{ $usesMeta ? 'WhatsApp messages' : 'Messages' }}</th>
                             @if ($showMessageCost)
-                                <th class="py-2 pr-3">{{ $usesMeta ? 'WhatsApp bill' : 'Estimate' }}</th>
+                                <th class="py-2 pr-3">{{ $usesMeta ? 'Message charge' : 'Estimate' }}</th>
                                 <th class="py-2 pr-3">Share</th>
                             @endif
                             <th class="py-2 pr-3">School log</th>
@@ -191,7 +192,7 @@
     <div class="grid gap-6 lg:grid-cols-2">
         <section class="crm-wa-analytics__panel">
             <h3 class="crm-wa-analytics__panel-title">Cost by source</h3>
-            <p class="mt-1 text-xs text-gray-500">Each row is a school feature. The rupee is its share of the WhatsApp bill, not a second estimate.</p>
+            <p class="mt-1 text-xs text-gray-500">Each row is a school feature. The rupee is its share of the message charge. Add the rows and you get the number at the top.</p>
             @if ($sources === [])
                 <p class="mt-4 text-sm text-gray-500">No messages in this period.</p>
             @else
