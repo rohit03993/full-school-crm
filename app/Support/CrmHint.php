@@ -28,7 +28,7 @@ class CrmHint
         'whatsapp.occasions' => 'Today\'s student birthdays, staff birthdays, and staff anniversaries. The list fills even when sending is off. Messages go out only after you turn Birthdays on under Automations and Meta has approved the templates.',
         'whatsapp.live_campaigns' => 'Live API campaigns — like AiSensy campaignName. Go live to use in automations, bulk sends, and external POST triggers.',
         'whatsapp.live_campaigns.create' => 'Pick an approved template and a unique campaign name. After saving, open the campaign and click Go live.',
-        'meta_whatsapp.messages' => 'Outbound sends and parent replies logged via Meta webhooks. Delivery status updates appear here.',
+        'meta_whatsapp.messages' => 'Each school send shows its WhatsApp category and the message charge saved at send time. A failed send is ₹0. This is not the amount taken from the card.',
         'meta_whatsapp.inbox' => 'WhatsApp inbox — all recent chats (students and unknown numbers). Select a conversation to reply, send templates, or open a student profile.',
         'meta_whatsapp.analytics' => 'The rupee total is the message charge WhatsApp calculated. It is not the amount taken from the card. Homework, attendance, and the other rows are shares of that message charge.',
         'students.profile.messages' => 'Send an approved template from the left panel — only the fields that template needs appear. Student name and roll number are pre-filled when possible.',
