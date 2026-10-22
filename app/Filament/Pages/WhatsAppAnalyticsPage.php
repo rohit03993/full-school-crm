@@ -62,6 +62,8 @@ class WhatsAppAnalyticsPage extends Page
 
     public ?string $dateTo = null;
 
+    public int $dayPage = 1;
+
     public function mount(): void
     {
         $this->applyPreset('30d');
@@ -85,12 +87,19 @@ class WhatsAppAnalyticsPage extends Page
 
     public function updatedDateFrom(): void
     {
+        $this->dayPage = 1;
         $this->matchPresetFromDates();
     }
 
     public function updatedDateTo(): void
     {
+        $this->dayPage = 1;
         $this->matchPresetFromDates();
+    }
+
+    public function goToDayPage(int $page): void
+    {
+        $this->dayPage = max(1, $page);
     }
 
     public function rangeLabel(): string
@@ -127,6 +136,7 @@ class WhatsAppAnalyticsPage extends Page
 
     public function applyPreset(string $preset): void
     {
+        $this->dayPage = 1;
         $this->datePreset = $preset;
 
         $this->dateTo = now()->toDateString();

@@ -8,6 +8,13 @@
     $sources = $connected['sources'] ?? [];
     $staffRows = $connected['staff'] ?? [];
     $dayRows = $data['by_day'] ?? [];
+    $daysPerPage = \App\Support\CrmPagination::PER_PAGE;
+    $dayTotal = count($dayRows);
+    $dayPageCount = max(1, (int) ceil($dayTotal / $daysPerPage));
+    $dayPage = min(max(1, (int) $this->dayPage), $dayPageCount);
+    $visibleDays = array_slice($dayRows, ($dayPage - 1) * $daysPerPage, $daysPerPage);
+    $dayFrom = $dayTotal === 0 ? 0 : (($dayPage - 1) * $daysPerPage) + 1;
+    $dayTo = min($dayTotal, $dayPage * $daysPerPage);
     $maxDayCost = 0.0;
 
     foreach ($dayRows as $day) {
@@ -147,7 +154,7 @@
     <section class="crm-wa-analytics__panel">
         <div class="mb-4">
             <h3 class="crm-wa-analytics__panel-title">Day by day</h3>
-            <p class="mt-1 text-xs text-gray-500">Newest first. The bar is that day’s share of the message charge. The card is not charged on each of these days.</p>
+            <p class="mt-1 text-xs text-gray-500">Newest first, 15 days on each page. The bar is that day’s share of the message charge. The card is not charged on each of these days.</p>
         </div>
         @if ($dayRows === [])
             <p class="text-sm text-gray-500">No messages in these dates.</p>
@@ -167,7 +174,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($dayRows as $day)
+                        @foreach ($visibleDays as $day)
                             @php
                                 $dayCost = (float) ($usesMeta ? ($day['meta_cost'] ?? 0) : ($day['crm_cost_inr'] ?? 0));
                                 $dayWidth = $maxDayCost > 0 ? min(100, ($dayCost / $maxDayCost) * 100) : 0;
@@ -186,6 +193,15 @@
                     </tbody>
                 </table>
             </x-crm.responsive-table>
+            @if ($dayPageCount > 1)
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-xs text-gray-500">Days {{ $dayFrom }}–{{ $dayTo }} of {{ number_format($dayTotal) }}</p>
+                    <div class="flex gap-2">
+                        <button type="button" class="crm-wa-analytics__preset" wire:click="goToDayPage({{ $dayPage - 1 }})" @disabled($dayPage <= 1)>Previous</button>
+                        <button type="button" class="crm-wa-analytics__preset" wire:click="goToDayPage({{ $dayPage + 1 }})" @disabled($dayPage >= $dayPageCount)>Next</button>
+                    </div>
+                </div>
+            @endif
         @endif
     </section>
 
