@@ -557,6 +557,7 @@ class MetaWhatsAppService
                 ->acceptJson()
                 ->get($this->graphUrl($this->wabaId().'/message_templates'), [
                     'limit' => 100,
+                    'fields' => 'id,name,language,status,category,previous_category,rejected_reason,components',
                 ]);
 
             $data = $response->json();

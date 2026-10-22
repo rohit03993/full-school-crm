@@ -416,6 +416,11 @@ class MetaWhatsAppTemplateResource extends Resource
                     }
                     .'">'.e($record->status).'</span>'
                 )),
+            Placeholder::make('category_display')
+                ->label('Category')
+                ->content(fn (MetaWhatsAppTemplate $record): string => $record->approvedCategoryLabel() !== ''
+                    ? $record->approvedCategoryLabel()
+                    : 'Click Sync from Meta on the list to load this.'),
             TextInput::make('name')
                 ->disabled(),
             TextInput::make('language')
@@ -542,6 +547,18 @@ class MetaWhatsAppTemplateResource extends Resource
                         default => 'gray',
                     })
                     ->sortable(),
+                TextColumn::make('provider_meta.category')
+                    ->label('Category')
+                    ->badge()
+                    ->placeholder('Sync to see')
+                    ->formatStateUsing(fn (?string $state, MetaWhatsAppTemplate $record): string => $record->approvedCategoryLabel())
+                    ->color(fn (?string $state): string => match (strtoupper((string) $state)) {
+                        'MARKETING' => 'warning',
+                        'UTILITY' => 'info',
+                        'AUTHENTICATION' => 'gray',
+                        default => 'gray',
+                    })
+                    ->tooltip(fn (MetaWhatsAppTemplate $record): string => $record->approvedCategoryHint()),
                 TextColumn::make('param_count')
                     ->label('Params')
                     ->sortable(),

@@ -74,7 +74,8 @@ class MetaWhatsAppTemplateSyncService
                     'components' => $components,
                     'provider_meta' => [
                         'body_variables' => $bodyVariables,
-                        'category' => $item['category'] ?? null,
+                        'category' => filled($item['category'] ?? null) ? strtoupper((string) $item['category']) : null,
+                        'previous_category' => filled($item['previous_category'] ?? null) ? strtoupper((string) $item['previous_category']) : null,
                         'id' => $item['id'] ?? null,
                         'rejected_reason' => $item['rejected_reason'] ?? null,
                         'header_format' => $headerFormat,

@@ -283,6 +283,8 @@ class MetaWhatsAppServiceTest extends TestCase
                         'name' => 'parent_checkin',
                         'language' => 'en',
                         'status' => 'APPROVED',
+                        'category' => 'MARKETING',
+                        'previous_category' => 'UTILITY',
                         'components' => [
                             ['type' => 'BODY', 'text' => 'Hello {{1}}, checked in at {{2}}.'],
                         ],
@@ -321,6 +323,11 @@ class MetaWhatsAppServiceTest extends TestCase
             'name' => 'draft_template',
             'is_active' => true,
         ]);
+
+        $template = MetaWhatsAppTemplate::query()->where('name', 'parent_checkin')->first();
+        $this->assertSame('MARKETING', $template->provider_meta['category']);
+        $this->assertSame('UTILITY', $template->provider_meta['previous_category']);
+        $this->assertSame('Marketing (was Utility)', $template->approvedCategoryLabel());
     }
 
     public function test_create_message_template_posts_to_meta(): void

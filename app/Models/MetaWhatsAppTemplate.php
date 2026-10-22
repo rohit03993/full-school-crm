@@ -85,6 +85,61 @@ class MetaWhatsAppTemplate extends Model
     }
 
     /**
+     * The bucket Meta approved (Utility, Marketing, or Authentication).
+     * Empty until Sync from Meta has stored it.
+     */
+    public function metaCategoryCode(): string
+    {
+        return strtoupper(trim((string) data_get($this->provider_meta, 'category', '')));
+    }
+
+    public function approvedCategoryLabel(): string
+    {
+        $category = $this->metaCategoryCode();
+
+        if ($category === '') {
+            return '';
+        }
+
+        $label = self::categoryWord($category);
+        $previous = strtoupper(trim((string) data_get($this->provider_meta, 'previous_category', '')));
+
+        if ($previous !== '' && $previous !== $category) {
+            return $label.' (was '.self::categoryWord($previous).')';
+        }
+
+        return $label;
+    }
+
+    public function approvedCategoryHint(): string
+    {
+        $category = $this->metaCategoryCode();
+
+        if ($category === '') {
+            return 'Click Sync from Meta. This is the bucket WhatsApp approved.';
+        }
+
+        $previous = strtoupper(trim((string) data_get($this->provider_meta, 'previous_category', '')));
+
+        if ($previous !== '' && $previous !== $category) {
+            return 'We sent this as '.self::categoryWord($previous).'. WhatsApp moved it to '.self::categoryWord($category).'.';
+        }
+
+        return 'WhatsApp approved this template as '.self::categoryWord($category).'.';
+    }
+
+    public static function categoryWord(string $code): string
+    {
+        return match (strtoupper(trim($code))) {
+            'UTILITY' => 'Utility',
+            'MARKETING' => 'Marketing',
+            'AUTHENTICATION' => 'Authentication',
+            '' => 'Unknown',
+            default => ucfirst(strtolower(trim($code))),
+        };
+    }
+
+    /**
      * Null means the message words can be sent to WhatsApp again.
      */
     public function wordingLockReason(): ?string
