@@ -30,7 +30,7 @@ class CrmHint
         'whatsapp.live_campaigns.create' => 'Pick an approved template and a unique campaign name. After saving, open the campaign and click Go live.',
         'meta_whatsapp.messages' => 'Outbound sends and parent replies logged via Meta webhooks. Delivery status updates appear here.',
         'meta_whatsapp.inbox' => 'WhatsApp inbox — all recent chats (students and unknown numbers). Select a conversation to reply, send templates, or open a student profile.',
-        'meta_whatsapp.analytics' => 'Meta billed cost = official spend. CRM log / Cost by source / Campaigns = only messages this CRM recorded (with estimates). The Meta vs CRM coverage box shows how complete the CRM log is for the selected dates.',
+        'meta_whatsapp.analytics' => 'The rupee total is the bill WhatsApp charged for these dates. Homework, attendance, and the other rows are shares of that same bill.',
         'students.profile.messages' => 'Send an approved template from the left panel — only the fields that template needs appear. Student name and roll number are pre-filled when possible.',
         'setup.biometric' => 'EasyTimePro writes punches to punch_logs on the same MySQL server. Match device employee ID to student roll number, then configure parent messages under WhatsApp → Automations.',
         'attendance.display' => 'Reception TV screen — read-only. Shows the latest IN/OUT punch with student photo from their profile. Works for biometric device and manual Live IN/OUT. Does not change attendance logic.',

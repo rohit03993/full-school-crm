@@ -381,4 +381,47 @@ class WhatsAppAnalyticsTest extends TestCase
         $this->assertEquals(1.73, $byDate['2026-10-13']['meta_cost']);
         $this->assertSame('2026-10-13', $days[0]['date']);
     }
+
+    public function test_connected_bill_splits_the_whatsapp_charge_across_features(): void
+    {
+        foreach ([
+            ['wamid.H1', WhatsAppMessageSource::Homework, 'UTILITY', 'delivered', 9],
+            ['wamid.H2', WhatsAppMessageSource::Homework, 'UTILITY', 'delivered', 9],
+            ['wamid.P1', WhatsAppMessageSource::Punch, 'UTILITY', 'delivered', 9],
+            ['wamid.P2', WhatsAppMessageSource::Punch, 'UTILITY', 'delivered', 9],
+            ['wamid.B1', WhatsAppMessageSource::Automation, 'MARKETING', 'failed', 0.86],
+        ] as [$wamid, $source, $category, $status, $cost]) {
+            MetaWhatsAppMessage::query()->create([
+                'wamid' => $wamid,
+                'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+                'phone' => '918320936480',
+                'body_preview' => 'Hello',
+                'message_type' => 'text',
+                'conversation_category' => $category,
+                'message_source' => $source->value,
+                'estimated_cost_inr' => $cost,
+                'status' => $status,
+                'status_at' => now(),
+            ]);
+        }
+
+        $bill = app(WhatsAppAnalyticsService::class)->connectedBill([
+            'status' => 'success',
+            'currency' => 'INR',
+            'total_cost' => 1.32,
+            'total_volume' => 5,
+            'by_category' => [
+                'UTILITY' => ['volume' => 4, 'cost' => 0.46],
+                'MARKETING' => ['volume' => 1, 'cost' => 0.86],
+            ],
+        ], now()->subDay(), now()->addDay());
+
+        $sources = collect($bill['sources'])->keyBy('key');
+
+        $this->assertEqualsWithDelta(0.23, $sources[WhatsAppMessageSource::Homework->value]['cost'], 0.0001);
+        $this->assertEqualsWithDelta(0.23, $sources[WhatsAppMessageSource::Punch->value]['cost'], 0.0001);
+        $this->assertEqualsWithDelta(0.0, $sources[WhatsAppMessageSource::Automation->value]['cost'], 0.0001);
+        $this->assertEqualsWithDelta(0.86, $bill['unlogged_cost'], 0.0001);
+        $this->assertEqualsWithDelta(1.32, $bill['total_cost'], 0.0001);
+    }
 }

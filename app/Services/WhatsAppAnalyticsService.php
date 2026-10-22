@@ -9,6 +9,7 @@ use App\Enums\WhatsAppPricingCategory;
 use App\Enums\WhatsAppRecipientStatus;
 use App\Enums\WhatsAppSendActor;
 use App\Models\MetaWhatsAppMessage;
+use App\Models\MetaWhatsAppTemplate;
 use App\Models\User;
 use App\Models\WhatsAppCampaign;
 use App\Models\WhatsAppCampaignRecipient;
@@ -33,6 +34,7 @@ class WhatsAppAnalyticsService
 
         $meta = $this->metaPricing->fetchForRange($from, $to);
         $local = $this->localOutboundSummary($from, $to);
+        $connected = $this->connectedBill($meta, $from, $to);
 
         return [
             'from' => $from->toDateString(),
@@ -41,10 +43,117 @@ class WhatsAppAnalyticsService
             'local' => $local,
             'gap' => $this->coverageGap($meta, $local),
             'by_day' => $this->dailyBreakdown($from, $to, is_array($meta['data_points'] ?? null) ? $meta['data_points'] : []),
-            'campaigns' => $this->campaignBreakdown($from, $to),
+            'campaigns' => $this->attachCampaignWhatsAppShare(
+                $this->campaignBreakdown($from, $to),
+                $connected['uses_meta'] ? $connected['rates'] : [],
+                $connected['uses_meta'] ? $connected['scales'] : [],
+            ),
             'by_source' => $this->breakdownBySource($from, $to),
             'by_category' => $this->breakdownByCategory($from, $to),
             'by_staff' => $this->breakdownByStaff($from, $to),
+            'connected' => $connected,
+        ];
+    }
+
+    /**
+     * One WhatsApp bill, then a share of that same bill for each school feature.
+     *
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    public function connectedBill(array $meta, Carbon $from, Carbon $to): array
+    {
+        $usesMeta = ($meta['status'] ?? '') === 'success';
+        $metaCategories = $usesMeta && is_array($meta['by_category'] ?? null) ? $meta['by_category'] : [];
+        $rates = [];
+
+        foreach ($metaCategories as $category => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $volume = (int) ($row['volume'] ?? 0);
+            $cost = (float) ($row['cost'] ?? 0);
+            $rates[(string) $category] = $volume > 0 ? $cost / $volume : 0.0;
+        }
+
+        $logged = $this->loggedBillableCounts($from, $to);
+        $sourceCosts = [];
+        $unlogged = 0.0;
+        $scales = [];
+
+        if ($usesMeta) {
+            foreach ($metaCategories as $category => $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $category = (string) $category;
+                $volume = (int) ($row['volume'] ?? 0);
+                $cost = (float) ($row['cost'] ?? 0);
+                $crmBillable = (int) ($logged['by_category'][$category] ?? 0);
+                $scales[$category] = ($volume > 0 && $crmBillable > 0) ? min($crmBillable, $volume) / $crmBillable : 0.0;
+
+                if ($volume <= 0) {
+                    $unlogged += $cost;
+
+                    continue;
+                }
+
+                $covered = min($crmBillable, $volume);
+                $unlogged += $cost * (($volume - $covered) / $volume);
+                $pool = $cost * ($covered / $volume);
+
+                if ($crmBillable <= 0 || $pool <= 0) {
+                    continue;
+                }
+
+                foreach ($logged['sources'] as $source => $parts) {
+                    $billable = (int) ($parts['billable'][$category] ?? 0);
+
+                    if ($billable <= 0) {
+                        continue;
+                    }
+
+                    $sourceCosts[$source] = ($sourceCosts[$source] ?? 0) + ($pool * ($billable / $crmBillable));
+                }
+            }
+        }
+
+        $sources = [];
+
+        foreach ($logged['sources'] as $source => $parts) {
+            $cost = $usesMeta
+                ? (float) ($sourceCosts[$source] ?? 0)
+                : (float) $parts['estimate'];
+
+            $sources[] = [
+                'key' => $source,
+                'count' => (int) $parts['count'],
+                'failed' => (int) $parts['failed'],
+                'billable' => (int) $parts['billable_total'],
+                'categories' => array_keys(array_filter($parts['billable'])),
+                'cost' => round($cost, 4),
+            ];
+        }
+
+        usort($sources, fn (array $a, array $b): int => $b['cost'] <=> $a['cost'] ?: $b['count'] <=> $a['count']);
+
+        $totalCost = $usesMeta
+            ? round((float) ($meta['total_cost'] ?? 0), 4)
+            : round(array_sum(array_column($sources, 'cost')), 4);
+
+        return [
+            'uses_meta' => $usesMeta,
+            'currency' => $usesMeta ? (string) ($meta['currency'] ?? 'INR') : 'INR',
+            'total_cost' => $totalCost,
+            'total_volume' => $usesMeta ? (int) ($meta['total_volume'] ?? 0) : (int) $logged['count'],
+            'unlogged_cost' => round($unlogged, 4),
+            'rates' => $rates,
+            'scales' => $scales,
+            'categories' => $this->connectedCategories($usesMeta, $metaCategories, $logged, $totalCost),
+            'sources' => $sources,
+            'staff' => $this->connectedStaff($from, $to, $usesMeta, $rates, $scales, $logged),
         ];
     }
 
@@ -311,6 +420,8 @@ class WhatsAppAnalyticsService
                     'sent_count' => (int) $campaign->sent_count,
                     'failed_count' => (int) $campaign->failed_count,
                     'estimated_total_cost_inr' => round((float) $campaign->estimated_total_cost_inr, 4),
+                    'category' => null,
+                    'whatsapp_cost' => round((float) $campaign->estimated_total_cost_inr, 4),
                 ];
             })
             ->values()
@@ -521,6 +632,211 @@ class WhatsAppAnalyticsService
         }
 
         return [$from, $to];
+    }
+
+    /**
+     * @param  array<string, float>  $rates
+     * @param  array<string, float>  $scales
+     * @param  list<array<string, mixed>>  $campaigns
+     * @return list<array<string, mixed>>
+     */
+    protected function attachCampaignWhatsAppShare(array $campaigns, array $rates, array $scales = []): array
+    {
+        if ($campaigns === [] || $rates === []) {
+            return $campaigns;
+        }
+
+        $names = collect($campaigns)->pluck('template')->filter()->unique()->values()->all();
+        $categories = MetaWhatsAppTemplate::query()
+            ->whereIn('name', $names)
+            ->get(['name', 'provider_meta'])
+            ->mapWithKeys(fn (MetaWhatsAppTemplate $template): array => [
+                $template->name => strtoupper((string) data_get($template->provider_meta, 'category', '')),
+            ]);
+
+        foreach ($campaigns as $index => $campaign) {
+            $category = (string) ($categories[$campaign['template'] ?? ''] ?? '');
+            $campaigns[$index]['category'] = $category !== '' ? $category : null;
+
+            if ($category !== '' && array_key_exists($category, $rates)) {
+                $scale = (float) ($scales[$category] ?? 0);
+                $campaigns[$index]['whatsapp_cost'] = round(((int) $campaign['sent_count']) * $rates[$category] * $scale, 4);
+            }
+        }
+
+        return $campaigns;
+    }
+
+    /**
+     * @param  array<string, array{volume?: int, cost?: float}>  $metaCategories
+     * @param  array{count: int, by_category: array<string, int>, sources: array<string, mixed>}  $logged
+     * @return list<array{key: string, volume: int, cost: float, share: float}>
+     */
+    protected function connectedCategories(bool $usesMeta, array $metaCategories, array $logged, float $totalCost): array
+    {
+        $rows = [];
+
+        if ($usesMeta) {
+            foreach ($metaCategories as $category => $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $cost = round((float) ($row['cost'] ?? 0), 4);
+                $rows[] = [
+                    'key' => (string) $category,
+                    'volume' => (int) ($row['volume'] ?? 0),
+                    'cost' => $cost,
+                    'share' => $totalCost > 0 ? round(($cost / $totalCost) * 100, 1) : 0.0,
+                ];
+            }
+        } else {
+            foreach ($logged['sources'] as $parts) {
+                foreach ($parts['estimate_by_category'] as $category => $cost) {
+                    if (! isset($rows[$category])) {
+                        $rows[$category] = ['key' => $category, 'volume' => 0, 'cost' => 0.0, 'share' => 0.0];
+                    }
+
+                    $rows[$category]['volume'] += (int) ($parts['billable'][$category] ?? 0);
+                    $rows[$category]['cost'] += (float) $cost;
+                }
+            }
+
+            $rows = array_values($rows);
+
+            foreach ($rows as $index => $row) {
+                $rows[$index]['cost'] = round($row['cost'], 4);
+                $rows[$index]['share'] = $totalCost > 0 ? round(($rows[$index]['cost'] / $totalCost) * 100, 1) : 0.0;
+            }
+        }
+
+        $order = ['UTILITY' => 0, 'MARKETING' => 1, 'AUTHENTICATION' => 2, 'AUTHENTICATION_INTERNATIONAL' => 3, 'SERVICE' => 4];
+
+        usort($rows, function (array $a, array $b) use ($order): int {
+            return ($order[$a['key']] ?? 9) <=> ($order[$b['key']] ?? 9);
+        });
+
+        return $rows;
+    }
+
+    /**
+     * @return array{
+     *     count: int,
+     *     by_category: array<string, int>,
+     *     sources: array<string, array{count: int, failed: int, billable_total: int, billable: array<string, int>, estimate: float, estimate_by_category: array<string, float>}>
+     * }
+     */
+    protected function loggedBillableCounts(Carbon $from, Carbon $to): array
+    {
+        $rows = $this->outboundQuery($from, $to)
+            ->selectRaw('message_source')
+            ->selectRaw('conversation_category')
+            ->selectRaw('COUNT(*) as message_count')
+            ->selectRaw("SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count")
+            ->selectRaw("SUM(CASE WHEN status = 'failed' THEN 0 ELSE COALESCE(estimated_cost_inr, 0) END) as estimate_cost")
+            ->groupBy('message_source', 'conversation_category')
+            ->get();
+
+        $sources = [];
+        $byCategory = [];
+        $count = 0;
+
+        foreach ($rows as $row) {
+            $source = (string) ($row->message_source ?: WhatsAppMessageSource::Automation->value);
+            $category = strtoupper((string) ($row->conversation_category ?: WhatsAppPricingCategory::Unknown->value));
+            $messages = (int) $row->message_count;
+            $failed = (int) $row->failed_count;
+            $billable = max(0, $messages - $failed);
+
+            if (! isset($sources[$source])) {
+                $sources[$source] = [
+                    'count' => 0,
+                    'failed' => 0,
+                    'billable_total' => 0,
+                    'billable' => [],
+                    'estimate' => 0.0,
+                    'estimate_by_category' => [],
+                ];
+            }
+
+            $sources[$source]['count'] += $messages;
+            $sources[$source]['failed'] += $failed;
+            $sources[$source]['billable_total'] += $billable;
+            $sources[$source]['billable'][$category] = ($sources[$source]['billable'][$category] ?? 0) + $billable;
+            $sources[$source]['estimate'] += (float) $row->estimate_cost;
+            $sources[$source]['estimate_by_category'][$category] = ($sources[$source]['estimate_by_category'][$category] ?? 0) + (float) $row->estimate_cost;
+            $byCategory[$category] = ($byCategory[$category] ?? 0) + $billable;
+            $count += $messages;
+        }
+
+        return [
+            'count' => $count,
+            'by_category' => $byCategory,
+            'sources' => $sources,
+        ];
+    }
+
+    /**
+     * @param  array<string, float>  $rates
+     * @param  array<string, float>  $scales
+     * @param  array{by_category: array<string, int>}  $logged
+     * @return list<array{user_id: int|null, name: string, count: int, cost: float}>
+     */
+    protected function connectedStaff(Carbon $from, Carbon $to, bool $usesMeta, array $rates, array $scales, array $logged): array
+    {
+        $staff = $this->breakdownByStaff($from, $to);
+
+        if (! $usesMeta || $rates === [] || $staff === []) {
+            return array_map(function (array $row): array {
+                $row['cost'] = $row['cost_inr'];
+
+                return $row;
+            }, $staff);
+        }
+
+        if (! Schema::hasColumn('meta_whatsapp_messages', 'sent_by_user_id')) {
+            return [];
+        }
+
+        $rows = $this->outboundQuery($from, $to)
+            ->where(function (Builder $query): void {
+                $query->where('send_actor', WhatsAppSendActor::Staff->value)
+                    ->orWhere(function (Builder $inner): void {
+                        $inner->whereNull('send_actor')
+                            ->whereNotNull('sent_by_user_id');
+                    });
+            })
+            ->selectRaw('sent_by_user_id')
+            ->selectRaw('conversation_category')
+            ->selectRaw("SUM(CASE WHEN status = 'failed' THEN 0 ELSE 1 END) as billable_count")
+            ->groupBy('sent_by_user_id', 'conversation_category')
+            ->get();
+
+        $costs = [];
+
+        foreach ($rows as $row) {
+            $category = strtoupper((string) ($row->conversation_category ?: WhatsAppPricingCategory::Unknown->value));
+            $billable = (int) $row->billable_count;
+            $crmBillable = (int) ($logged['by_category'][$category] ?? 0);
+            $rate = $rates[$category] ?? null;
+
+            if ($billable <= 0 || $crmBillable <= 0 || $rate === null) {
+                continue;
+            }
+
+            $userId = $row->sent_by_user_id ? (int) $row->sent_by_user_id : 0;
+            $scale = (float) ($scales[$category] ?? 0);
+            $costs[$userId] = ($costs[$userId] ?? 0) + ($billable * $rate * $scale);
+        }
+
+        foreach ($staff as $index => $row) {
+            $userId = $row['user_id'] ?? 0;
+            $staff[$index]['cost'] = round((float) ($costs[$userId] ?? 0), 4);
+        }
+
+        usort($staff, fn (array $a, array $b): int => $b['cost'] <=> $a['cost']);
+
+        return $staff;
     }
 
     protected function outboundQuery(Carbon $from, Carbon $to): Builder

@@ -173,6 +173,18 @@ class WhatsAppAnalyticsPage extends Page
         return WhatsAppPricingCategory::tryFromMeta($category)->label();
     }
 
+    public function categoryNote(string $category): string
+    {
+        return match (strtoupper($category)) {
+            'UTILITY' => 'Homework, fees, attendance, and other school notices.',
+            'MARKETING' => 'Greetings and offers, including birthday wishes.',
+            'AUTHENTICATION' => 'Login codes.',
+            'AUTHENTICATION_INTERNATIONAL' => 'Login codes sent outside India.',
+            'SERVICE' => 'A reply while the parent chat is still open. WhatsApp does not charge this.',
+            default => 'Other WhatsApp charges.',
+        };
+    }
+
     public function sourceLabel(string $source): string
     {
         return WhatsAppMessageSource::tryFrom($source)?->label() ?? ucfirst(str_replace('_', ' ', $source));
