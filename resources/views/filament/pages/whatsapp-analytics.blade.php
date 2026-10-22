@@ -266,49 +266,4 @@
             @endif
         </section>
     </div>
-
-    <section class="crm-wa-analytics__panel">
-        <div class="mb-4 flex items-center justify-between gap-3">
-            <h3 class="crm-wa-analytics__panel-title">Campaigns</h3>
-            <span class="text-xs text-gray-500">{{ $data['from'] ?? '' }} → {{ $data['to'] ?? '' }}</span>
-        </div>
-        @if (($data['campaigns'] ?? []) === [])
-            <p class="text-sm text-gray-500">No campaigns were sent in this date range.</p>
-        @else
-            <x-crm.responsive-table>
-                <table class="min-w-full text-sm">
-                    <thead>
-                        <tr class="text-left text-xs uppercase text-gray-500">
-                            <th class="px-2 py-2">Campaign</th>
-                            <th class="px-2 py-2">Template</th>
-                            <th class="px-2 py-2">Category</th>
-                            <th class="px-2 py-2">Sent</th>
-                            <th class="px-2 py-2">Failed</th>
-                            @if ($showMessageCost)
-                                <th class="px-2 py-2">Share of bill</th>
-                            @endif
-                            <th class="px-2 py-2">When</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($data['campaigns'] as $campaign)
-                            <tr class="border-t border-gray-100 dark:border-white/10">
-                                <td class="crm-responsive-table__title px-2 py-2" data-label="">
-                                    <a href="{{ $this->campaignViewUrl((int) $campaign['id']) }}" class="font-medium text-primary-600 hover:underline dark:text-primary-400">{{ $campaign['name'] }}</a>
-                                </td>
-                                <td class="px-2 py-2" data-label="Template">{{ $campaign['template'] ?? '—' }}</td>
-                                <td class="px-2 py-2" data-label="Category">{{ filled($campaign['category'] ?? null) ? $this->categoryLabel((string) $campaign['category']) : '—' }}</td>
-                                <td class="px-2 py-2 tabular-nums" data-label="Sent">{{ number_format((int) $campaign['sent_count']) }}</td>
-                                <td class="px-2 py-2 tabular-nums" data-label="Failed">{{ number_format((int) $campaign['failed_count']) }}</td>
-                                @if ($showMessageCost)
-                                    <td class="px-2 py-2 tabular-nums font-semibold" data-label="Share of bill">{{ $this->formatMoney((float) ($campaign['whatsapp_cost'] ?? 0), $currency) }}</td>
-                                @endif
-                                <td class="px-2 py-2 whitespace-nowrap text-xs text-gray-500" data-label="When">{{ $campaign['shot_at'] }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </x-crm.responsive-table>
-        @endif
-    </section>
 </div>
