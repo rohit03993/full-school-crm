@@ -5,11 +5,14 @@ namespace Tests\Feature;
 use App\Enums\LicenseFeature;
 use App\Enums\LicensePlan;
 use App\Enums\RoleName;
+use App\Enums\StaffJobRole;
 use App\Filament\Pages\Dashboard;
 use App\Livewire\AskCrmChatWidget;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\CrmPermissionSyncService;
 use App\Services\LicenseService;
+use App\Support\CrmMobileBottomNav;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
@@ -56,6 +59,31 @@ class MobileBottomNavAskCrmTest extends TestCase
             ->assertDontSee("Livewire.dispatch('ask-crm-toggle')", false)
             ->assertDontSee('crm-ask__launcher', false)
             ->assertDontSee('>Ask CRM<', false);
+    }
+
+    public function test_super_admin_gets_cases_and_callers_keep_calls(): void
+    {
+        app(CrmPermissionSyncService::class)->sync();
+
+        $adminLabels = array_column(CrmMobileBottomNav::tabs(auth()->user(), 'admin'), 'label');
+        $this->assertContains('Cases', $adminLabels);
+        $this->assertNotContains('Calls', $adminLabels);
+
+        $counsellor = User::factory()->create(['is_active' => true]);
+        $counsellor->assignRole(StaffJobRole::Counsellor->value);
+        $this->actingAs($counsellor);
+
+        $callerLabels = array_column(CrmMobileBottomNav::tabs($counsellor, 'admin'), 'label');
+        $this->assertContains('Calls', $callerLabels);
+        $this->assertNotContains('Cases', $callerLabels);
+
+        $accountant = User::factory()->create(['is_active' => true]);
+        $accountant->assignRole(StaffJobRole::Accountant->value);
+        $this->actingAs($accountant);
+
+        $otherLabels = array_column(CrmMobileBottomNav::tabs($accountant, 'admin'), 'label');
+        $this->assertContains('Cases', $otherLabels);
+        $this->assertNotContains('Calls', $otherLabels);
     }
 
     public function test_nav_button_event_opens_and_closes_the_chat(): void
