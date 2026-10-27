@@ -21,6 +21,9 @@
         $maxDayCost = max($maxDayCost, (float) ($usesMeta ? ($day['meta_cost'] ?? 0) : ($day['crm_cost_inr'] ?? 0)));
     }
 
+    $chargedTotal = (int) data_get($data, 'local.charged_messages', 0);
+    $serviceTotal = (int) data_get($data, 'local.service_messages', 0);
+
     $toneFor = function (string $category): string {
         return match (strtoupper($category)) {
             'MARKETING' => '#d97706',
@@ -100,13 +103,13 @@
 
     @if (($data['meta']['status'] ?? '') === 'failed')
         <p class="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
-            WhatsApp did not return the bill ({{ $data['meta']['error'] ?? 'unavailable' }}). The numbers below are the school log only.
+            WhatsApp did not return the bill ({{ $data['meta']['error'] ?? 'unavailable' }}). The numbers below are only what Motion recorded.
         </p>
     @endif
 
     <section class="crm-wa-cost__hero">
         <div>
-            <p class="crm-wa-cost__kicker">{{ $usesMeta ? 'Message charge' : 'School log estimate' }}</p>
+            <p class="crm-wa-cost__kicker">{{ $usesMeta ? 'Message charge' : 'Motion estimate' }}</p>
             @if ($showMessageCost)
                 <p class="crm-wa-cost__amount">{{ $this->formatMoney((float) ($connected['total_cost'] ?? 0), $currency) }}</p>
             @else
@@ -117,15 +120,16 @@
                     This is the message charge WhatsApp calculated for these dates. It is not the amount taken from the card. WhatsApp adds tax, then charges the card in one lump when the balance is high enough, or at the end of the month. A failed message is not included.
                     <a href="https://business.facebook.com/billing_hub/payment_activity" target="_blank" rel="noopener" style="color:#fff; font-weight:600; text-decoration:underline;">Open card charges</a>
                 @else
-                    WhatsApp’s message charge could not be loaded, so this is only what the school log recorded.
+                    WhatsApp’s message charge could not be loaded, so this is only what Motion recorded.
                 @endif
             </p>
         </div>
         <div class="crm-wa-cost__side">
-            <span class="crm-wa-cost__kicker">Messages WhatsApp counted</span>
-            <strong>{{ number_format((int) ($connected['total_volume'] ?? 0)) }}</strong>
-            <span class="crm-wa-cost__kicker">In the school log</span>
-            <strong>{{ number_format((int) ($data['local']['total_messages'] ?? 0)) }}</strong>
+            <span class="crm-wa-cost__kicker">Charged messages</span>
+            <strong>{{ number_format($chargedTotal) }}</strong>
+            <span class="crm-wa-cost__kicker">Service, not charged</span>
+            <strong>{{ number_format($serviceTotal) }}</strong>
+            <span class="crm-wa-cost__kicker">For these dates</span>
         </div>
     </section>
 
@@ -154,7 +158,7 @@
     <section class="crm-wa-analytics__panel">
         <div class="mb-4">
             <h3 class="crm-wa-analytics__panel-title">Day by day</h3>
-            <p class="mt-1 text-xs text-gray-500">Newest first, 15 days on each page. The bar is that day’s share of the message charge. The card is not charged on each of these days.</p>
+            <p class="mt-1 text-xs text-gray-500">Newest first, 15 days on each page. Charged messages are the ones in this bill. Service messages are free. Both counts follow the dates above, and each day has its own service count. The card is not charged on each of these days.</p>
         </div>
         @if ($dayRows === [])
             <p class="text-sm text-gray-500">No messages in these dates.</p>
@@ -164,12 +168,12 @@
                     <thead>
                         <tr class="text-left text-xs uppercase text-gray-500">
                             <th class="py-2 pr-3">Date</th>
-                            <th class="py-2 pr-3">{{ $usesMeta ? 'WhatsApp messages' : 'Messages' }}</th>
+                            <th class="py-2 pr-3">Charged messages</th>
                             @if ($showMessageCost)
                                 <th class="py-2 pr-3">{{ $usesMeta ? 'Message charge' : 'Estimate' }}</th>
                                 <th class="py-2 pr-3">Share</th>
                             @endif
-                            <th class="py-2 pr-3">School log</th>
+                            <th class="py-2 pr-3">Service, not charged</th>
                             <th class="py-2">Failed</th>
                         </tr>
                     </thead>
@@ -181,12 +185,12 @@
                             @endphp
                             <tr class="border-t border-gray-100 dark:border-white/10">
                                 <td class="crm-responsive-table__title py-2 pr-3 font-medium whitespace-nowrap" data-label="">{{ $day['date_label'] }}</td>
-                                <td class="py-2 pr-3 tabular-nums" data-label="Messages">{{ number_format((int) ($usesMeta ? ($day['meta_volume'] ?? 0) : ($day['crm_messages'] ?? 0))) }}</td>
+                                <td class="py-2 pr-3 tabular-nums" data-label="Charged messages">{{ number_format((int) ($day['crm_charged'] ?? 0)) }}</td>
                                 @if ($showMessageCost)
                                     <td class="py-2 pr-3 tabular-nums font-semibold" data-label="Bill">{{ $this->formatMoney($dayCost, $currency) }}</td>
                                     <td class="py-2 pr-3" data-label="Share"><div class="crm-wa-cost__day"><span style="width: {{ $dayWidth }}%"></span></div></td>
                                 @endif
-                                <td class="py-2 pr-3 tabular-nums" data-label="School log">{{ number_format((int) ($day['crm_messages'] ?? 0)) }}</td>
+                                <td class="py-2 pr-3 tabular-nums" data-label="Service, not charged">{{ number_format((int) ($day['crm_service'] ?? 0)) }}</td>
                                 <td class="py-2 tabular-nums" data-label="Failed">{{ number_format((int) ($day['crm_failed'] ?? 0)) }}</td>
                             </tr>
                         @endforeach
@@ -237,7 +241,7 @@
                             @endforeach
                             @if ($showMessageCost && (float) ($connected['unlogged_cost'] ?? 0) > 0)
                                 <tr class="border-t border-gray-100 dark:border-white/10">
-                                    <td class="py-2 pr-3 font-medium" data-label="">Not in the school log</td>
+                                    <td class="py-2 pr-3 font-medium" data-label="">Not recorded in Motion</td>
                                     <td class="py-2 pr-3 text-gray-500" data-label="Messages">WhatsApp billed these</td>
                                     <td class="py-2 pr-3" data-label="Category">—</td>
                                     <td class="py-2 tabular-nums font-semibold" data-label="Share of bill">{{ $this->formatMoney((float) $connected['unlogged_cost'], $currency) }}</td>

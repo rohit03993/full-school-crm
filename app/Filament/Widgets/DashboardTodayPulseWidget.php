@@ -203,11 +203,9 @@ class DashboardTodayPulseWidget extends Widget
             ],
             [
                 'key' => 'whatsapp',
-                'label' => 'Messages sent',
+                'label' => 'Charged messages',
                 'value' => (string) $data['whatsapp_sent_today'],
-                'meta' => CrmAccess::canSeeMessageCost($user)
-                    ? $this->money((float) $data['whatsapp_cost_today']).' spend'
-                    : 'Sent today',
+                'meta' => ((int) ($data['whatsapp_service_today'] ?? 0)).' service, not charged',
                 'tone' => 'info',
                 'url' => $waUrl,
                 'show' => FeatureGate::enabled(LicenseFeature::WhatsApp)

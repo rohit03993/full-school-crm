@@ -132,6 +132,7 @@ class DashboardOpsService
      *     visits_today: int,
      *     homework_given_today: int,
      *     whatsapp_sent_today: int,
+     *     whatsapp_service_today: int,
      *     whatsapp_cost_today: float,
      *     fees_amount_today: float,
      *     fees_payments_today: int,
@@ -183,13 +184,15 @@ class DashboardOpsService
                 }
 
                 $waSent = 0;
+                $waService = 0;
                 $waCost = 0.0;
                 if (FeatureGate::enabled(LicenseFeature::WhatsApp)) {
                     $wa = app(WhatsAppAnalyticsService::class)->localOutboundSummary(
                         $today->copy()->startOfDay(),
                         $today->copy()->endOfDay(),
                     );
-                    $waSent = (int) ($wa['total_messages'] ?? 0);
+                    $waSent = (int) ($wa['charged_messages'] ?? 0);
+                    $waService = (int) ($wa['service_messages'] ?? 0);
                     $waCost = (float) ($wa['total_cost_inr'] ?? 0);
                 }
 
@@ -225,6 +228,7 @@ class DashboardOpsService
                     'visits_today' => $visitsToday,
                     'homework_given_today' => $homeworkGiven,
                     'whatsapp_sent_today' => $waSent,
+                    'whatsapp_service_today' => $waService,
                     'whatsapp_cost_today' => $waCost,
                     'fees_amount_today' => $feesAmount,
                     'fees_payments_today' => $feesCount,

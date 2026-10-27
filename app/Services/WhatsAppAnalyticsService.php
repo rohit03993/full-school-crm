@@ -306,7 +306,7 @@ class WhatsAppAnalyticsService
     }
 
     /**
-     * @return array{from: string, to: string, total_messages: int, total_cost_inr: float, by_category: array<string, array{count: int, cost_inr: float}>}
+     * @return array{from: string, to: string, total_messages: int, failed_messages: int, charged_messages: int, service_messages: int, total_cost_inr: float, by_category: array<string, array{count: int, cost_inr: float}>}
      */
     public function localOutboundSummary(Carbon $from, Carbon $to): array
     {
@@ -329,11 +329,19 @@ class WhatsAppAnalyticsService
             $totalCost += $cost;
         }
 
+        $failedCount = $messages->where('status', MetaWhatsAppMessageStatus::Failed->value)->count();
+        $serviceCount = $messages
+            ->filter(fn (MetaWhatsAppMessage $message): bool => (string) $message->status !== MetaWhatsAppMessageStatus::Failed->value
+                && $this->isServiceCategory($message->conversation_category))
+            ->count();
+
         return [
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
             'total_messages' => $messages->count(),
-            'failed_messages' => $messages->where('status', MetaWhatsAppMessageStatus::Failed->value)->count(),
+            'failed_messages' => $failedCount,
+            'charged_messages' => $messages->count() - $failedCount - $serviceCount,
+            'service_messages' => $serviceCount,
             'total_cost_inr' => round($totalCost, 4),
             'by_category' => $byCategory,
         ];
@@ -343,7 +351,7 @@ class WhatsAppAnalyticsService
      * One row per date. Meta billed is the official charge. CRM estimate skips failed sends.
      *
      * @param  list<array<string, mixed>>  $metaPoints
-     * @return list<array{date: string, date_label: string, meta_volume: int, meta_cost: float, crm_messages: int, crm_failed: int, crm_cost_inr: float}>
+     * @return list<array{date: string, date_label: string, meta_volume: int, meta_charged: int, meta_service: int, meta_cost: float, crm_messages: int, crm_charged: int, crm_service: int, crm_failed: int, crm_cost_inr: float}>
      */
     public function dailyBreakdown(Carbon $from, Carbon $to, array $metaPoints = []): array
     {
@@ -351,6 +359,8 @@ class WhatsAppAnalyticsService
             ->selectRaw('date(status_at) as day')
             ->selectRaw('COUNT(*) as message_count')
             ->selectRaw("SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count")
+            ->selectRaw("SUM(CASE WHEN status != 'failed' AND UPPER(COALESCE(conversation_category, '')) = 'SERVICE' THEN 1 ELSE 0 END) as service_count")
+            ->selectRaw("SUM(CASE WHEN status = 'failed' THEN 0 WHEN UPPER(COALESCE(conversation_category, '')) = 'SERVICE' THEN 0 ELSE 1 END) as charged_count")
             ->selectRaw("SUM(CASE WHEN status = 'failed' THEN 0 ELSE COALESCE(estimated_cost_inr, 0) END) as billable_cost")
             ->groupByRaw('date(status_at)')
             ->orderByRaw('date(status_at)')
@@ -367,6 +377,8 @@ class WhatsAppAnalyticsService
 
             $days[$day] = $this->emptyDayRow($day);
             $days[$day]['crm_messages'] = (int) $row->message_count;
+            $days[$day]['crm_charged'] = (int) $row->charged_count;
+            $days[$day]['crm_service'] = (int) $row->service_count;
             $days[$day]['crm_failed'] = (int) $row->failed_count;
             $days[$day]['crm_cost_inr'] = round((float) $row->billable_cost, 4);
         }
@@ -384,8 +396,15 @@ class WhatsAppAnalyticsService
                 $days[$day] = $this->emptyDayRow($day);
             }
 
-            $days[$day]['meta_volume'] += (int) ($point['volume'] ?? 0);
+            $volume = (int) ($point['volume'] ?? 0);
+            $days[$day]['meta_volume'] += $volume;
             $days[$day]['meta_cost'] += (float) ($point['cost'] ?? 0);
+
+            if ($this->isServiceCategory($point['pricing_category'] ?? null)) {
+                $days[$day]['meta_service'] += $volume;
+            } else {
+                $days[$day]['meta_charged'] += $volume;
+            }
         }
 
         krsort($days);
@@ -604,7 +623,7 @@ class WhatsAppAnalyticsService
     }
 
     /**
-     * @return array{date: string, date_label: string, meta_volume: int, meta_cost: float, crm_messages: int, crm_failed: int, crm_cost_inr: float}
+     * @return array{date: string, date_label: string, meta_volume: int, meta_charged: int, meta_service: int, meta_cost: float, crm_messages: int, crm_charged: int, crm_service: int, crm_failed: int, crm_cost_inr: float}
      */
     protected function emptyDayRow(string $day): array
     {
@@ -612,11 +631,20 @@ class WhatsAppAnalyticsService
             'date' => $day,
             'date_label' => Carbon::parse($day)->format('D, d M Y'),
             'meta_volume' => 0,
+            'meta_charged' => 0,
+            'meta_service' => 0,
             'meta_cost' => 0.0,
             'crm_messages' => 0,
+            'crm_charged' => 0,
+            'crm_service' => 0,
             'crm_failed' => 0,
             'crm_cost_inr' => 0.0,
         ];
+    }
+
+    protected function isServiceCategory(mixed $category): bool
+    {
+        return strtoupper(trim((string) $category)) === WhatsAppPricingCategory::Service->value;
     }
 
     /**

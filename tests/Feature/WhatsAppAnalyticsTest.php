@@ -231,6 +231,8 @@ class WhatsAppAnalyticsTest extends TestCase
         Livewire::test(WhatsAppAnalyticsPage::class)
             ->assertSuccessful()
             ->assertSee('Day by day')
+            ->assertSee('Charged messages')
+            ->assertSee('Service, not charged')
             ->assertSee('From date')
             ->assertSee('Cost by source')
             ->assertSee('Staff usage');
@@ -380,6 +382,64 @@ class WhatsAppAnalyticsTest extends TestCase
         $this->assertSame(4, $byDate['2026-10-13']['meta_volume']);
         $this->assertEquals(1.73, $byDate['2026-10-13']['meta_cost']);
         $this->assertSame('2026-10-13', $days[0]['date']);
+        $this->assertSame(1, $byDate['2026-10-12']['crm_charged']);
+        $this->assertSame(0, $byDate['2026-10-12']['crm_service']);
+        $this->assertSame(0, $byDate['2026-10-13']['crm_charged']);
+        $this->assertSame(4, $byDate['2026-10-13']['meta_charged']);
+        $this->assertSame(0, $byDate['2026-10-13']['meta_service']);
+    }
+
+    public function test_charged_count_leaves_out_free_service_messages(): void
+    {
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.CHARGED',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '918320936471',
+            'body_preview' => 'Homework',
+            'message_type' => 'text',
+            'conversation_category' => 'UTILITY',
+            'message_source' => WhatsAppMessageSource::Homework->value,
+            'estimated_cost_inr' => 0.115,
+            'status' => 'delivered',
+            'status_at' => Carbon::parse('2026-10-20 09:00:00'),
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.FREE',
+            'direction' => MetaWhatsAppMessageDirection::Outbound->value,
+            'phone' => '918320936472',
+            'body_preview' => 'Reply',
+            'message_type' => 'text',
+            'conversation_category' => 'SERVICE',
+            'message_source' => WhatsAppMessageSource::Inbox->value,
+            'estimated_cost_inr' => 0,
+            'status' => 'delivered',
+            'status_at' => Carbon::parse('2026-10-20 11:00:00'),
+        ]);
+
+        $from = Carbon::parse('2026-10-20');
+        $to = Carbon::parse('2026-10-20');
+        $local = app(WhatsAppAnalyticsService::class)->localOutboundSummary($from, $to);
+
+        $this->assertSame(1, $local['charged_messages']);
+        $this->assertSame(1, $local['service_messages']);
+
+        $days = app(WhatsAppAnalyticsService::class)->dailyBreakdown($from, $to, [[
+            'start' => Carbon::parse('2026-10-20 00:00:00')->timestamp,
+            'volume' => 3,
+            'cost' => 0.34,
+            'pricing_category' => 'UTILITY',
+        ], [
+            'start' => Carbon::parse('2026-10-20 00:00:00')->timestamp,
+            'volume' => 5,
+            'cost' => 0,
+            'pricing_category' => 'SERVICE',
+        ]]);
+
+        $this->assertSame(1, $days[0]['crm_charged']);
+        $this->assertSame(1, $days[0]['crm_service']);
+        $this->assertSame(3, $days[0]['meta_charged']);
+        $this->assertSame(5, $days[0]['meta_service']);
     }
 
     public function test_connected_bill_splits_the_whatsapp_charge_across_features(): void
