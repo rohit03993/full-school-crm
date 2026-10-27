@@ -24,23 +24,34 @@
 @endphp
 
 <div class="space-y-3">
-    <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <p class="text-xs text-gray-500 dark:text-gray-400">
-            {{ $dateLabel }}
-            @if ($isToday)
-                · today
-            @endif
-        </p>
-        <div class="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs font-semibold">
-            <a href="{{ $checkUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">Check completion</a>
-            @if (filled($teacherScoresUrl ?? null))
-                <a href="{{ $teacherScoresUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">Teacher scores</a>
-            @endif
-            <a href="{{ $historyUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">History</a>
-            @if (filled($sendReportUrl))
-                <a href="{{ $sendReportUrl }}" class="text-primary-600 hover:underline dark:text-primary-400">Send report</a>
-            @endif
-        </div>
+    <p class="text-xs text-gray-500 dark:text-gray-400">
+        {{ $dateLabel }}
+        @if ($isToday)
+            · today
+        @endif
+    </p>
+
+    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <a href="{{ $checkUrl }}" class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-left hover:border-sky-400 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-sky-500/10 dark:hover:bg-sky-500/20">
+            <span class="block text-sm font-bold text-sky-950 dark:text-sky-100">Check completion</span>
+            <span class="mt-0.5 block text-xs font-medium text-sky-800 dark:text-sky-200">Mark who finished yesterday's homework</span>
+        </a>
+        @if (filled($teacherScoresUrl ?? null))
+            <a href="{{ $teacherScoresUrl }}" class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-left hover:border-amber-400 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:hover:bg-amber-500/20">
+                <span class="block text-sm font-bold text-amber-950 dark:text-amber-100">Teacher scores</span>
+                <span class="mt-0.5 block text-xs font-medium text-amber-800 dark:text-amber-200">See which teachers gave homework on time</span>
+            </a>
+        @endif
+        <a href="{{ $historyUrl }}" class="rounded-xl border border-gray-200 bg-white px-3 py-3 text-left hover:border-gray-400 hover:bg-gray-50 dark:border-white/15 dark:bg-gray-900 dark:hover:bg-white/5">
+            <span class="block text-sm font-bold text-gray-950 dark:text-white">History</span>
+            <span class="mt-0.5 block text-xs font-medium text-gray-600 dark:text-gray-300">Open homework already saved</span>
+        </a>
+        @if (filled($sendReportUrl))
+            <a href="{{ $sendReportUrl }}" class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-left hover:border-emerald-400 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20">
+                <span class="block text-sm font-bold text-emerald-950 dark:text-emerald-100">Send report</span>
+                <span class="mt-0.5 block text-xs font-medium text-emerald-800 dark:text-emerald-200">See WhatsApp messages already sent</span>
+            </a>
+        @endif
     </div>
 
     @if (filled($windowNote))
