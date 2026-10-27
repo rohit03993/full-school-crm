@@ -3,18 +3,19 @@
     $showAskCrm = \App\Livewire\AskCrmChatWidget::canView();
 
     // Six slots leave ~56px each on a small phone, so labels drop a point to avoid truncating
-    $labelSize = (count($tabs) + ($showAskCrm ? 1 : 0)) > 5 ? 'text-[9px]' : 'text-[10px]';
+    $labelSize = (count($tabs) + ($showAskCrm ? 1 : 0)) > 5 ? 'text-[10px]' : 'text-[11px]';
 @endphp
 
 @if ($tabs !== [])
     <div class="fi-mobile-bottom-nav lg:hidden">
-        <div class="h-[4.25rem] pb-[env(safe-area-inset-bottom)]" aria-hidden="true"></div>
+        {{-- In-flow spacer. Height is set in theme.css so it includes the Android/iPhone home-gesture strip. --}}
+        <div class="fi-mobile-bottom-nav__spacer" aria-hidden="true"></div>
 
         <nav
-            class="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur-md dark:border-white/10 dark:bg-gray-900/95"
+            class="fi-mobile-bottom-nav__bar fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur-md dark:border-white/10 dark:bg-gray-900/95"
             aria-label="Quick navigation"
         >
-            <div class="flex h-[4.25rem] w-full items-stretch justify-around px-0.5 pb-[env(safe-area-inset-bottom)]">
+            <div class="fi-mobile-bottom-nav__row flex w-full items-stretch justify-around px-1">
                 @foreach ($tabs as $tab)
                     <a
                         href="{{ $tab['url'] }}"

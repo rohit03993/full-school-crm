@@ -104,6 +104,24 @@
         }
     }
 
+    /* Phones in landscape and small tablets: the 18rem search must shrink
+       or it pushes the bell and account menu off the screen. */
+    @media (max-width: 1023px) {
+        .fi-topbar .fi-global-search-ctn {
+            flex: 1 1 auto;
+            min-width: 0;
+            max-width: none;
+        }
+
+        .fi-topbar .fi-global-search {
+            position: relative;
+            flex: 1 1 auto;
+            width: auto;
+            min-width: 0;
+            max-width: none;
+        }
+    }
+
     /* ── Back to previous page (render hook on every panel page) ── */
     /* The chip takes over the page's top padding, so the heading below tightens up */
     .fi-crm-back {
@@ -838,7 +856,7 @@
     /* Mobile-first CRM polish */
     @media (max-width: 639px) {
         .fi-main-ctn {
-            @apply px-2;
+            @apply px-4;
         }
 
         .fi-page-header {
@@ -864,7 +882,7 @@
 
         .fi-header-actions .fi-ac,
         .fi-header-actions-ctn > .fi-ac {
-            @apply w-full flex-nowrap justify-end gap-1.5;
+            @apply w-full flex-wrap justify-end gap-1.5;
         }
 
         .fi-header-actions .fi-btn,
@@ -2740,6 +2758,32 @@
     /* Sidebar nav has its own scroll — hide when drawer is closed on mobile */
     .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-nav {
         overflow: hidden !important;
+    }
+
+    /* Open menu must cover the bottom tabs. Both are z-30, and the tabs
+       are painted later, so they used to hide the last menu links. */
+    .fi-sidebar.fi-sidebar-open,
+    .fi-sidebar-close-overlay {
+        z-index: 40 !important;
+    }
+
+    .fi-sidebar.fi-sidebar-open .fi-sidebar-nav {
+        padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+    }
+
+    /* Bottom tabs: 4.25rem for icon + label, then the gesture strip extra.
+       Do not put the safe-area inside the 4.25rem or the labels get clipped. */
+    .fi-mobile-bottom-nav__spacer {
+        height: calc(4.25rem + env(safe-area-inset-bottom));
+    }
+
+    .fi-mobile-bottom-nav__bar {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .fi-mobile-bottom-nav__row {
+        height: 4.25rem;
+        min-height: 4.25rem;
     }
 
     .fi-ta-ctn {
