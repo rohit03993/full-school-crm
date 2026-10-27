@@ -95,6 +95,7 @@ class HomeworkCheckReportService
      *     dateLabel: string,
      *     isToday: bool,
      *     maxDate: string,
+     *     dates: list<array{value: string, label: string}>,
      *     classes: list<array<string, mixed>>
      * }
      */
@@ -129,8 +130,64 @@ class HomeworkCheckReportService
             'dateLabel' => $report['date_label'],
             'isToday' => $report['is_today'],
             'maxDate' => now()->toDateString(),
+            'dates' => $this->dateChoices($report['date']),
             'classes' => $classes,
         ];
+    }
+
+    /**
+     * Days the date box can offer. Newest first.
+     * The day already open stays in the list, so the box matches the classes below.
+     * Every other day is one that already has homework.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    public function dateChoices(string $selected): array
+    {
+        $selected = $this->normalizeDate($selected);
+        $dates = $this->datesWithHomework();
+
+        if (! in_array($selected, array_column($dates, 'value'), true)) {
+            array_unshift($dates, [
+                'value' => $selected,
+                'label' => Carbon::parse($selected)->format('j M Y'),
+            ]);
+        }
+
+        return $dates;
+    }
+
+    /**
+     * Past and today dates that already have homework on an active class.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    public function datesWithHomework(): array
+    {
+        $today = now()->toDateString();
+
+        return HomeworkAssignment::query()
+            ->whereNotNull('homework_date')
+            ->whereNotNull('course_subject_id')
+            ->whereDate('homework_date', '<=', $today)
+            ->whereHas('batch', function ($query): void {
+                $query->where('status', BatchStatus::Active);
+            })
+            ->select('homework_date')
+            ->distinct()
+            ->orderByDesc('homework_date')
+            ->pluck('homework_date')
+            ->map(function (mixed $date): array {
+                $day = Carbon::parse($date)->toDateString();
+
+                return [
+                    'value' => $day,
+                    'label' => Carbon::parse($day)->format('j M Y'),
+                ];
+            })
+            ->unique('value')
+            ->values()
+            ->all();
     }
 
     public function normalizeDate(?string $date): string

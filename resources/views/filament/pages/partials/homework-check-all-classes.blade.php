@@ -8,13 +8,17 @@
             @endif
         </div>
         <label class="block w-full text-sm font-medium text-gray-700 sm:w-auto dark:text-gray-200">
-            Date
-            <input
-                type="date"
+            Homework day
+            <select
                 wire:model.live="reportDate"
-                max="{{ $maxDate }}"
-                class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-950 sm:w-auto dark:border-gray-600 dark:bg-gray-950 dark:text-white"
-            />
+                class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-950 sm:min-w-44 dark:border-gray-600 dark:bg-gray-950 dark:text-white"
+            >
+                @forelse ($dates ?? [] as $homeworkDay)
+                    <option value="{{ $homeworkDay['value'] }}">{{ $homeworkDay['label'] }}</option>
+                @empty
+                    <option value="{{ $reportDate ?? '' }}">No homework saved yet</option>
+                @endforelse
+            </select>
         </label>
     </div>
 

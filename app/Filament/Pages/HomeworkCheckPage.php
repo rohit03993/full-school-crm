@@ -89,7 +89,7 @@ class HomeworkCheckPage extends Page
     public function getSubheading(): ?string
     {
         if ($this->showingAllClasses()) {
-            return 'Every class is listed. Change the date if you want another day. Today opens first.';
+            return 'Every class is listed. The date list shows only days that already have homework. Today opens first.';
         }
 
         return 'Pick a class. You can check the last 7 days, not today.';
