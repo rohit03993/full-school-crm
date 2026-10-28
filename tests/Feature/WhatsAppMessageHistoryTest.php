@@ -43,6 +43,7 @@ class WhatsAppMessageHistoryTest extends TestCase
             'conversation_category' => 'MARKETING',
             'estimated_cost_inr' => 0.8631,
             'status' => 'failed',
+            'status_detail' => 'Message undeliverable (code 131026)',
             'status_at' => now(),
         ]);
 
@@ -55,6 +56,7 @@ class WhatsAppMessageHistoryTest extends TestCase
             ->assertSee('₹0')
             ->set('categoryFilter', 'MARKETING')
             ->assertSee('student_birthday')
+            ->assertSee('Message undeliverable (code 131026)')
             ->assertDontSee('parent_attendance_auto_in')
             ->set('categoryFilter', '')
             ->set('chargeFilter', 'charged')

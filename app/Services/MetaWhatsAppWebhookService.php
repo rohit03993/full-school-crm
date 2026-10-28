@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\MetaWhatsAppMessageStatus;
 use App\Jobs\DownloadMetaWhatsAppMediaJob;
+use App\Support\MetaWhatsAppFailureReason;
 use App\Support\MetaWhatsAppInboundMessageParser;
 use App\Support\MetaWhatsAppWebhookTrace;
 use Illuminate\Http\Request;
@@ -107,11 +108,9 @@ class MetaWhatsAppWebhookService
                 continue;
             }
 
-            $detail = null;
-
-            if ($status === MetaWhatsAppMessageStatus::Failed) {
-                $detail = (string) data_get($statusRow, 'errors.0.title', data_get($statusRow, 'errors.0.message', 'Delivery failed'));
-            }
+            $detail = $status === MetaWhatsAppMessageStatus::Failed
+                ? MetaWhatsAppFailureReason::fromWebhookStatus($statusRow)
+                : null;
 
             $this->logger->applyWebhookStatus($wamid, $status, $detail, $statusRow);
         }

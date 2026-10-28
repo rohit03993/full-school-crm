@@ -90,4 +90,64 @@ class MetaWhatsAppWebhookTest extends TestCase
             'status' => MetaWhatsAppMessageStatus::Delivered->value,
         ]);
     }
+
+    public function test_webhook_saves_the_meta_failure_reason(): void
+    {
+        Setting::setValue('meta_whatsapp.app_secret', Crypt::encryptString('meta-app-secret'), 'meta_whatsapp');
+
+        MetaWhatsAppMessage::query()->create([
+            'wamid' => 'wamid.FAIL123',
+            'direction' => 'outbound',
+            'phone' => '919811223344',
+            'status' => MetaWhatsAppMessageStatus::Sent->value,
+            'body_preview' => 'test',
+            'status_at' => now(),
+        ]);
+
+        $payload = [
+            'object' => 'whatsapp_business_account',
+            'entry' => [[
+                'changes' => [[
+                    'value' => [
+                        'statuses' => [[
+                            'id' => 'wamid.FAIL123',
+                            'status' => 'failed',
+                            'timestamp' => '1710000000',
+                            'recipient_id' => '919811223344',
+                            'errors' => [[
+                                'code' => 131026,
+                                'title' => 'Message undeliverable',
+                                'message' => 'Message undeliverable',
+                                'error_data' => [
+                                    'details' => 'Receiver is incapable of receiving this message.',
+                                ],
+                            ]],
+                        ]],
+                    ],
+                ]],
+            ]],
+        ];
+
+        $body = json_encode($payload, JSON_THROW_ON_ERROR);
+        $signature = 'sha256='.hash_hmac('sha256', $body, 'meta-app-secret');
+
+        $this->call(
+            'POST',
+            '/webhooks/meta/whatsapp',
+            [],
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_HUB_SIGNATURE_256' => $signature,
+            ],
+            $body,
+        )->assertOk();
+
+        $this->assertDatabaseHas('meta_whatsapp_messages', [
+            'wamid' => 'wamid.FAIL123',
+            'status' => MetaWhatsAppMessageStatus::Failed->value,
+            'status_detail' => 'Message undeliverable (code 131026). Receiver is incapable of receiving this message.',
+        ]);
+    }
 }

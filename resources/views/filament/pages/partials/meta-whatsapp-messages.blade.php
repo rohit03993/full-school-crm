@@ -97,6 +97,7 @@
                             <th class="px-4 py-3">Charge</th>
                         @endif
                         <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Reason</th>
                         <th class="px-4 py-3">Template</th>
                         <th class="px-4 py-3">Preview</th>
                     </tr>
@@ -113,6 +114,7 @@
                             };
                             $categoryCode = strtoupper((string) ($message->conversation_category ?? ''));
                             $tone = $categoryCode !== '' ? $toneFor($categoryCode) : '#6b7280';
+                            $failureReason = \App\Support\MetaWhatsAppFailureReason::forMessage($message);
                         @endphp
                         <tr class="hover:bg-gray-50/80 dark:hover:bg-white/5">
                             <td class="px-4 py-3 whitespace-nowrap text-gray-700 dark:text-gray-200" data-label="When">
@@ -163,6 +165,13 @@
                                     {{ $status?->label() ?? $message->status }}
                                 </span>
                             </td>
+                            <td class="px-4 py-3 max-w-xs text-xs leading-relaxed text-gray-600 dark:text-gray-300" data-label="Reason" @if ($failureReason) title="{{ $failureReason }}" @endif>
+                                @if ($failureReason)
+                                    {{ \Illuminate\Support\Str::limit($failureReason, 140) }}
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-gray-700 dark:text-gray-200" data-label="Template">{{ $message->template_name ?? '—' }}</td>
                             <td class="crm-responsive-table__wide px-4 py-3 max-w-xs text-xs leading-relaxed text-gray-600 dark:text-gray-300" data-label="Preview">
                                 {{ \Illuminate\Support\Str::limit($message->body_preview, 120) }}
@@ -170,7 +179,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $showMessageCost ? 10 : 9 }}" class="px-4 py-12 text-center">
+                            <td colspan="{{ $showMessageCost ? 11 : 10 }}" class="px-4 py-12 text-center">
                                 <p class="text-sm font-medium text-gray-700 dark:text-gray-200">No messages match these filters</p>
                                 <p class="mt-1 text-xs text-gray-500">Choose All categories, or send a message and refresh.</p>
                             </td>
