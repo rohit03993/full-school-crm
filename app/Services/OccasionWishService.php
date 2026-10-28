@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Models\WhatsAppTemplate;
 use App\Support\FeatureGate;
 use App\Support\InstituteSettings;
+use App\Support\MetaWhatsAppFailureReason;
 use App\Support\OccasionWishWhatsAppTemplate;
 use App\Support\StudentLabels;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -663,6 +664,10 @@ class OccasionWishService
             return 'skipped';
         }
 
+        if (MetaWhatsAppFailureReason::isMarketingLimit($wish->last_error)) {
+            return 'skipped';
+        }
+
         if (blank($wish->mobile)) {
             $wish->update([
                 'status' => OccasionWishStatus::Skipped,
@@ -841,6 +846,10 @@ class OccasionWishService
 
         if ($status === OccasionWishStatus::Skipped) {
             return ['label' => $wish->skip_reason ?: 'Skipped', 'can_send' => false];
+        }
+
+        if ($status === OccasionWishStatus::Failed && MetaWhatsAppFailureReason::isMarketingLimit($wish->last_error)) {
+            return ['label' => 'WhatsApp blocked this marketing message today', 'can_send' => false];
         }
 
         if (! $isToday) {

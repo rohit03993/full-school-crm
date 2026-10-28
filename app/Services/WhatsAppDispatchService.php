@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\WhatsAppProvider;
 use App\Models\MetaWhatsAppTemplate;
 use App\Support\CrmNavigation;
+use App\Support\MetaWhatsAppFailureReason;
 use App\Support\WhatsAppTemplateParams;
 
 class WhatsAppDispatchService
@@ -88,6 +89,14 @@ class WhatsAppDispatchService
             return [
                 'status' => 'failed',
                 'error' => 'Template "'.$templateName.'" is not synced. Open '.CrmNavigation::whatsAppMenu('Connection & Setup').' and click Sync templates.',
+                'provider' => WhatsAppProvider::Meta->value,
+            ];
+        }
+
+        if ($metaTemplate->metaCategoryCode() === 'MARKETING' && MetaWhatsAppFailureReason::recentlyLimited($phone)) {
+            return [
+                'status' => 'failed',
+                'error' => MetaWhatsAppFailureReason::HOLD_MESSAGE,
                 'provider' => WhatsAppProvider::Meta->value,
             ];
         }

@@ -241,7 +241,7 @@ class ManageWhatsAppSettings extends Page
                         ->numeric()
                         ->minValue(1)
                         ->maxValue(5)
-                        ->helperText('How many times a failed wish is tried. Default 3.'),
+                        ->helperText('How many times a failed wish is tried. Default 3. A WhatsApp marketing limit is not tried again.'),
                     Select::make('occasion_student_birthday_live_campaign_id')
                         ->label('Student birthday template')
                         ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptionsForBirthdays())

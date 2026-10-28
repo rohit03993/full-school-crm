@@ -169,6 +169,34 @@ class OccasionWishServiceTest extends TestCase
         $this->assertSame('Meta down', $wish->last_error);
     }
 
+    public function test_marketing_limit_is_not_retried(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-21 10:00:00'));
+        $this->makeStudent('Aarav Sharma', '2020-10-21', '9811111111', StudentStatus::Enrolled);
+        $this->enableWishes();
+
+        $this->mock(WhatsAppDispatchService::class, function ($mock): void {
+            $mock->shouldReceive('send')->once()->andReturn([
+                'status' => 'success',
+                'message_id' => 'wamid.LIMIT1',
+            ]);
+        });
+
+        $service = app(OccasionWishService::class);
+        $service->runScheduled();
+
+        $wish = OccasionWish::query()->where('occasion', OccasionWishType::StudentBirthday->value)->first();
+        $wish->update([
+            'status' => OccasionWishStatus::Failed,
+            'last_error' => 'This message was not delivered to maintain healthy ecosystem engagement.',
+        ]);
+
+        $again = $service->runScheduled();
+
+        $this->assertSame(0, $again['sent']);
+        $this->assertSame(1, $wish->fresh()->attempts);
+    }
+
     public function test_delivery_webhook_marks_the_wish_delivered(): void
     {
         $wish = OccasionWish::query()->create([

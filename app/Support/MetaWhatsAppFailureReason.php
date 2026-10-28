@@ -6,6 +6,42 @@ use App\Models\MetaWhatsAppMessage;
 
 class MetaWhatsAppFailureReason
 {
+    public const HOLD_MESSAGE = 'WhatsApp already refused a marketing message to this number today. It was not sent again.';
+
+    public static function isMarketingLimit(?string $detail): bool
+    {
+        $detail = mb_strtolower(trim((string) $detail));
+
+        return $detail !== '' && (
+            str_contains($detail, 'healthy ecosystem engagement')
+            || str_contains($detail, '131049')
+        );
+    }
+
+    public static function recentlyLimited(string $phone): bool
+    {
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+
+        if (strlen($digits) === 10) {
+            $digits = '91'.$digits;
+        }
+
+        if ($digits === '') {
+            return false;
+        }
+
+        return MetaWhatsAppMessage::query()
+            ->where('direction', 'outbound')
+            ->where('status', 'failed')
+            ->where('phone', $digits)
+            ->where('status_at', '>=', now()->subDay())
+            ->where(function ($query): void {
+                $query->where('status_detail', 'like', '%healthy ecosystem engagement%')
+                    ->orWhere('status_detail', 'like', '%131049%');
+            })
+            ->exists();
+    }
+
     public static function forMessage(MetaWhatsAppMessage $message): ?string
     {
         if ($message->status !== 'failed') {
