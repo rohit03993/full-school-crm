@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\MetaWhatsAppMessage;
 use App\Models\Setting;
 use App\Models\MetaWhatsAppTemplate;
 use App\Enums\MetaWhatsAppMessageStatus;
 use App\Support\CrmNavigation;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -365,6 +367,218 @@ class MetaWhatsAppService
         } catch (\Throwable $e) {
             return ['status' => 'failed', 'message' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Quality colour, connection, and the 24-hour people limit from Meta.
+     * The people count is from this CRM, not from Meta.
+     *
+     * @return array{
+     *     ok: bool,
+     *     message: string,
+     *     display_phone_number: ?string,
+     *     verified_name: ?string,
+     *     connection_label: ?string,
+     *     quality_code: ?string,
+     *     quality_label: ?string,
+     *     limit_code: ?string,
+     *     limit_label: ?string,
+     *     people_started: int,
+     *     checked_at: ?string
+     * }
+     */
+    public function accountHealth(bool $fresh = false): array
+    {
+        if (! $this->isConfigured()) {
+            return $this->emptyAccountHealth('WhatsApp is not connected yet. Open WhatsApp setup and save the phone number ID and token.');
+        }
+
+        $cacheKey = 'meta-whatsapp-account-health:'.$this->phoneNumberId();
+
+        if ($fresh) {
+            Cache::forget($cacheKey);
+        }
+
+        $cached = Cache::get($cacheKey);
+
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $health = $this->fetchAccountHealth();
+
+        if ($health['ok']) {
+            Cache::put($cacheKey, $health, now()->addMinutes(10));
+        }
+
+        return $health;
+    }
+
+    public function forgetAccountHealth(): void
+    {
+        if (filled($this->phoneNumberId())) {
+            Cache::forget('meta-whatsapp-account-health:'.$this->phoneNumberId());
+        }
+    }
+
+    /**
+     * @return array{
+     *     ok: bool,
+     *     message: string,
+     *     display_phone_number: ?string,
+     *     verified_name: ?string,
+     *     connection_label: ?string,
+     *     quality_code: ?string,
+     *     quality_label: ?string,
+     *     limit_code: ?string,
+     *     limit_label: ?string,
+     *     people_started: int,
+     *     checked_at: ?string
+     * }
+     */
+    protected function fetchAccountHealth(): array
+    {
+        $fields = 'display_phone_number,verified_name,quality_rating,status,whatsapp_business_manager_messaging_limit';
+        $data = $this->phoneNumberFields($fields);
+
+        if ($data === null) {
+            $data = $this->phoneNumberFields('display_phone_number,verified_name,quality_rating,status');
+        }
+
+        if ($data === null) {
+            return $this->emptyAccountHealth('Meta did not return the account status. Check the token in WhatsApp setup, then use Check again.');
+        }
+
+        $quality = strtoupper(trim((string) ($data['quality_rating'] ?? '')));
+        $limit = strtoupper(trim((string) ($data['whatsapp_business_manager_messaging_limit'] ?? '')));
+        $status = strtoupper(trim((string) ($data['status'] ?? '')));
+
+        return [
+            'ok' => true,
+            'message' => '',
+            'display_phone_number' => filled($data['display_phone_number'] ?? null) ? (string) $data['display_phone_number'] : null,
+            'verified_name' => filled($data['verified_name'] ?? null) ? (string) $data['verified_name'] : null,
+            'connection_label' => $this->connectionLabel($status),
+            'quality_code' => $quality !== '' ? $quality : null,
+            'quality_label' => $this->qualityLabel($quality),
+            'limit_code' => $limit !== '' ? $limit : null,
+            'limit_label' => $this->messagingLimitLabel($limit),
+            'people_started' => $this->peopleStartedInLastDay(),
+            'checked_at' => now()->timezone(config('app.timezone'))->format('d M Y, h:i A'),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function phoneNumberFields(string $fields): ?array
+    {
+        try {
+            $response = Http::timeout(12)
+                ->withToken((string) $this->accessToken())
+                ->acceptJson()
+                ->get($this->graphUrl((string) $this->phoneNumberId()), [
+                    'fields' => $fields,
+                ]);
+
+            $data = $response->json();
+
+            if (! $response->successful() || ! is_array($data) || isset($data['error'])) {
+                return null;
+            }
+
+            return $data;
+        } catch (\Throwable $exception) {
+            Log::warning('Meta WhatsApp account status failed: '.$exception->getMessage());
+
+            return null;
+        }
+    }
+
+    protected function peopleStartedInLastDay(): int
+    {
+        return (int) MetaWhatsAppMessage::query()
+            ->where('direction', 'outbound')
+            ->whereNotNull('template_name')
+            ->where('template_name', '!=', '')
+            ->where('status', '!=', MetaWhatsAppMessageStatus::Failed->value)
+            ->where('created_at', '>=', now()->subDay())
+            ->distinct()
+            ->count('phone');
+    }
+
+    protected function qualityLabel(string $code): string
+    {
+        return match ($code) {
+            'GREEN' => 'Good',
+            'YELLOW' => 'Falling',
+            'RED' => 'Poor',
+            'NA', 'UNKNOWN', '' => 'Not rated yet',
+            default => $code,
+        };
+    }
+
+    protected function messagingLimitLabel(string $code): string
+    {
+        return match ($code) {
+            'TIER_50' => '50 people',
+            'TIER_250' => '250 people',
+            'TIER_1K' => '1,000 people',
+            'TIER_2K' => '2,000 people',
+            'TIER_10K' => '10,000 people',
+            'TIER_100K' => '100,000 people',
+            'TIER_UNLIMITED' => 'Unlimited',
+            '' => 'Meta did not send a limit',
+            default => $code,
+        };
+    }
+
+    protected function connectionLabel(string $status): string
+    {
+        return match ($status) {
+            'CONNECTED' => 'Connected',
+            'FLAGGED' => 'Flagged',
+            'RESTRICTED' => 'Restricted',
+            'BANNED' => 'Banned',
+            'RATE_LIMITED' => 'Rate limited',
+            'PENDING' => 'Pending',
+            'UNVERIFIED' => 'Not verified',
+            'DISCONNECTED' => 'Disconnected',
+            '' => 'Unknown',
+            default => ucfirst(strtolower(str_replace('_', ' ', $status))),
+        };
+    }
+
+    /**
+     * @return array{
+     *     ok: bool,
+     *     message: string,
+     *     display_phone_number: ?string,
+     *     verified_name: ?string,
+     *     connection_label: ?string,
+     *     quality_code: ?string,
+     *     quality_label: ?string,
+     *     limit_code: ?string,
+     *     limit_label: ?string,
+     *     people_started: int,
+     *     checked_at: ?string
+     * }
+     */
+    protected function emptyAccountHealth(string $message): array
+    {
+        return [
+            'ok' => false,
+            'message' => $message,
+            'display_phone_number' => null,
+            'verified_name' => null,
+            'connection_label' => null,
+            'quality_code' => null,
+            'quality_label' => null,
+            'limit_code' => null,
+            'limit_label' => null,
+            'people_started' => 0,
+            'checked_at' => null,
+        ];
     }
 
     /**

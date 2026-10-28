@@ -6,6 +6,7 @@ use App\Enums\LicenseFeature;
 use App\Filament\Resources\MetaWhatsAppTemplates\MetaWhatsAppTemplateResource;
 use App\Filament\Resources\WhatsAppCampaigns\WhatsAppCampaignResource;
 use App\Filament\Resources\WhatsAppLiveCampaigns\WhatsAppLiveCampaignResource;
+use App\Services\MetaWhatsAppService;
 use App\Support\CrmAccess;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
@@ -54,6 +55,19 @@ class WhatsAppHubPage extends Page
     public function getSubheading(): ?string
     {
         return 'Inbox, campaigns, templates, automations, and Meta setup.';
+    }
+
+    public function refreshAccountStatus(): void
+    {
+        app(MetaWhatsAppService::class)->forgetAccountHealth();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function accountHealth(): array
+    {
+        return app(MetaWhatsAppService::class)->accountHealth();
     }
 
     public function content(Schema $schema): Schema
@@ -163,6 +177,10 @@ class WhatsAppHubPage extends Page
         }
 
         return $schema->components([
+            View::make('filament.pages.partials.whatsapp-account-status')
+                ->viewData(fn (): array => [
+                    'account' => $this->accountHealth(),
+                ]),
             View::make('filament.pages.partials.crm-hub')
                 ->viewData([
                     'heading' => 'WhatsApp desk',
