@@ -27,6 +27,17 @@ Status: {{5}}
 Thank you.
 TXT;
 
+    public const ABSENT_NAME = 'student_absent';
+
+    /** Parent message date, for example 5 Nov 2026. No clock time. */
+    public const ABSENT_DATE_FORMAT = 'j M Y';
+
+    public const ABSENT_BODY = <<<'TXT'
+Dear Parent,
+Your ward {{1}} (Roll: {{2}}) was marked Absent on {{3}}.
+Thank you.
+TXT;
+
     /**
      * @return array<int, array{label: string, example: string, crm_source: string}>
      */
@@ -62,13 +73,40 @@ TXT;
     }
 
     /**
-     * @return list<array{index: int, label: string, example: string}>
+     * Three blanks only: name, roll, date. No time.
+     *
+     * @return array<int, array{label: string, example: string, crm_source: string}>
      */
-    public static function sampleRows(): array
+    public static function absentVariables(): array
+    {
+        return [
+            1 => [
+                'label' => 'Student name',
+                'example' => 'Chandani Gupta',
+                'crm_source' => 'student.name',
+            ],
+            2 => [
+                'label' => 'Roll number',
+                'example' => '8991420071',
+                'crm_source' => 'student.enrollment_number',
+            ],
+            3 => [
+                'label' => 'Date',
+                'example' => '5 Nov 2026',
+                'crm_source' => 'campaign.date',
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<int, array{label: string, example: string, crm_source?: string}>|null  $variables
+     * @return list<array{index: int, label: string, example: string, source: string}>
+     */
+    public static function sampleRows(?array $variables = null): array
     {
         $rows = [];
 
-        foreach (self::variables() as $index => $variable) {
+        foreach ($variables ?? self::variables() as $index => $variable) {
             $rows[] = [
                 'index' => $index,
                 'label' => $variable['label'],
@@ -135,5 +173,28 @@ TXT;
     public static function looksLikeName(string $name): bool
     {
         return self::looksLikeInName($name) || self::looksLikeOutName($name);
+    }
+
+    public static function looksLikeAbsentName(string $name): bool
+    {
+        $normalized = strtolower(trim($name));
+
+        if ($normalized === '') {
+            return false;
+        }
+
+        foreach ([
+            'student_absent',
+            'manual_absent',
+            'marked_absent',
+            'parent_absent',
+            'attendance_absent',
+        ] as $needle) {
+            if (str_contains($normalized, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -138,6 +138,26 @@ class MetaWhatsAppTemplateVariableHelperTest extends TestCase
         $this->assertSame('Attendance status', $rows[4]['label']);
     }
 
+    public function test_student_absent_preset_has_date_and_no_time(): void
+    {
+        $this->assertTrue(\App\Support\StudentPunchWhatsAppTemplate::looksLikeAbsentName('student_absent'));
+        $this->assertFalse(\App\Support\StudentPunchWhatsAppTemplate::looksLikeInName('student_absent'));
+
+        $rows = MetaWhatsAppTemplateVariableHelper::syncRowsFromBody(
+            \App\Support\StudentPunchWhatsAppTemplate::ABSENT_BODY,
+            [],
+            'student_absent',
+        );
+
+        $this->assertCount(3, $rows);
+        $this->assertSame('Student name', $rows[0]['label']);
+        $this->assertSame('Roll number', $rows[1]['label']);
+        $this->assertSame('Date', $rows[2]['label']);
+        $this->assertSame('5 Nov 2026', $rows[2]['example']);
+        $this->assertStringNotContainsString('{{4}}', \App\Support\StudentPunchWhatsAppTemplate::ABSENT_BODY);
+        $this->assertStringNotContainsString('time', strtolower(\App\Support\StudentPunchWhatsAppTemplate::ABSENT_BODY));
+    }
+
     public function test_student_punch_out_preset_name_is_detected(): void
     {
         $this->assertTrue(\App\Support\StudentPunchWhatsAppTemplate::looksLikeOutName('punch_out'));

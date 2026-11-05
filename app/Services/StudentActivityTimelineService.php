@@ -391,6 +391,10 @@ class StudentActivityTimelineService
             return 'Fee reminder';
         }
 
+        if (StudentPunchWhatsAppTemplate::looksLikeAbsentName($name)) {
+            return 'Attendance absent';
+        }
+
         if (StudentPunchWhatsAppTemplate::looksLikeInName($name)) {
             return 'Attendance IN';
         }

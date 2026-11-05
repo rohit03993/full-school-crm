@@ -14,6 +14,7 @@ use App\Enums\LicenseFeature;
 use App\Support\FeatureGate;
 use App\Support\CrmNavigation;
 use App\Support\PunchWhatsAppOutcome;
+use App\Support\StudentPunchWhatsAppTemplate;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -127,6 +128,111 @@ class PunchWhatsAppService
 
             return PunchWhatsAppOutcome::skipped('Could not queue WhatsApp: '.$e->getMessage());
         }
+    }
+
+    /**
+     * One parent WhatsApp when staff marks the student Absent. Date only, no clock time.
+     *
+     * @return array{queued: bool, message: string}
+     */
+    public function outcomeForManualAbsent(
+        Student $student,
+        string $enrollmentNumber,
+        string $date,
+        User $staff,
+    ): array {
+        try {
+            if (! $this->absentAutosendEnabled()) {
+                return PunchWhatsAppOutcome::skipped('');
+            }
+
+            if (! FeatureGate::enabled(LicenseFeature::WhatsApp)) {
+                return PunchWhatsAppOutcome::skipped('WhatsApp is not enabled on your licence.');
+            }
+
+            $template = app(\App\Services\WhatsAppSettingsService::class)->resolveAutomationTemplate(
+                Setting::getValue('whatsapp.punch_absent_autosend_live_campaign_id'),
+                Setting::getValue('whatsapp.punch_absent_autosend_template_id'),
+            );
+
+            if (! $template) {
+                return PunchWhatsAppOutcome::skipped('No absent WhatsApp template selected in '.CrmNavigation::whatsAppMenu('Automations').'.');
+            }
+
+            if (blank($student->mobile)) {
+                return PunchWhatsAppOutcome::skipped('Student has no parent mobile number on file.');
+            }
+
+            $roll = filled($enrollmentNumber) ? $enrollmentNumber : 'student-'.$student->id;
+
+            if ($this->alreadySentAbsent($roll, $date, (string) $student->mobile)) {
+                return PunchWhatsAppOutcome::skipped('Parent absent message was already sent today.');
+            }
+
+            $dateLabel = Carbon::parse($date)->format(StudentPunchWhatsAppTemplate::ABSENT_DATE_FORMAT);
+
+            $campaign = $this->campaigns->createCampaign([
+                'name' => 'Manual ABSENT · '.$roll.' · '.$dateLabel,
+                'whatsapp_template_id' => $template->id,
+                'student_ids' => [$student->id],
+                'campaign_variables' => [
+                    'audience_source' => 'punch_manual_absent',
+                    'punch_state' => 'ABSENT',
+                    'punch_channel' => 'manual',
+                    'attendance_date' => $date,
+                    'date' => $dateLabel,
+                    'time' => '',
+                    '_student_ids' => [$student->id],
+                    '_student_rolls' => [
+                        $student->id => $roll,
+                    ],
+                    '_student_attendance_status' => [
+                        $student->id => 'Absent',
+                    ],
+                ],
+            ], $staff);
+
+            $campaign = $this->campaigns->queueCampaign($campaign, $staff);
+
+            $recipient = $campaign->recipients()->first();
+            $logStatus = match ($recipient?->status) {
+                WhatsAppRecipientStatus::Sent => 'sent',
+                WhatsAppRecipientStatus::Failed => 'failed',
+                default => 'queued',
+            };
+
+            AttendancePunchWhatsappLog::query()->create([
+                'student_id' => $student->id,
+                'enrollment_number' => $roll,
+                'state' => 'ABSENT',
+                'punch_date' => $date,
+                'punch_time' => '00:00:00',
+                'phone' => (string) $student->mobile,
+                'status' => $logStatus,
+                'sent_at' => now(),
+            ]);
+
+            return $this->outcomeFromCampaign($campaign);
+        } catch (\Throwable $e) {
+            Log::warning('Absent WhatsApp failed: '.$e->getMessage());
+
+            return PunchWhatsAppOutcome::skipped('Could not queue WhatsApp: '.$e->getMessage());
+        }
+    }
+
+    public function absentAutosendEnabled(): bool
+    {
+        return Setting::getValue('whatsapp.absent_autosend_enabled', '0') === '1';
+    }
+
+    private function alreadySentAbsent(string $roll, string $date, string $phone): bool
+    {
+        return AttendancePunchWhatsappLog::query()
+            ->where('enrollment_number', $roll)
+            ->whereDate('punch_date', $date)
+            ->where('state', 'ABSENT')
+            ->where('phone', $phone)
+            ->exists();
     }
 
     public function punchAutosendEnabled(): bool

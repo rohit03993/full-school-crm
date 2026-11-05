@@ -92,6 +92,11 @@ class MetaWhatsAppTemplateVariableHelper
             return OccasionWishWhatsAppTemplate::wishVariables();
         }
 
+        if (StudentPunchWhatsAppTemplate::looksLikeAbsentName($name)
+            || str_contains($body, 'was marked absent')) {
+            return StudentPunchWhatsAppTemplate::absentVariables();
+        }
+
         if (StudentPunchWhatsAppTemplate::looksLikeName($name)
             || str_contains($body, 'your ward')
             || str_contains($body, 'has checked in at')

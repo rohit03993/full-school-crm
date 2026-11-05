@@ -82,7 +82,15 @@ class WhatsAppTemplate extends Model
             }
         }
 
-        if ($this->looksLikeAttendancePunchTemplate($bodyVariables)) {
+        if (\App\Support\StudentPunchWhatsAppTemplate::looksLikeAbsentName((string) $this->name)) {
+            $defaults = WhatsAppTemplateParamMappingInferrer::absentDefaults($paramCount);
+
+            foreach ($defaults as $index => $default) {
+                if (! filled($sources[$index] ?? null) && filled($default)) {
+                    $sources[$index] = $default;
+                }
+            }
+        } elseif ($this->looksLikeAttendancePunchTemplate($bodyVariables)) {
             $defaults = WhatsAppTemplateParamMappingInferrer::attendancePunchDefaults($paramCount);
 
             foreach ($defaults as $index => $default) {

@@ -876,11 +876,25 @@ class AttendancePage extends Page
         $this->marks[$studentId] = AttendanceStatus::Absent->value;
         $this->loadRoster();
 
-        Notification::make()
+        $body = $student->name;
+        $whatsapp = $result['whatsapp'] ?? null;
+        $extra = is_array($whatsapp) ? trim((string) ($whatsapp['message'] ?? '')) : '';
+
+        if ($extra !== '') {
+            $body .= ' '.$extra;
+        }
+
+        $notification = Notification::make()
             ->title('Marked Absent')
-            ->body($student->name)
-            ->success()
-            ->send();
+            ->body($body);
+
+        if ($extra !== '' && ($whatsapp['queued'] ?? false) !== true) {
+            $notification->warning()->send();
+
+            return;
+        }
+
+        $notification->success()->send();
     }
 
     /**

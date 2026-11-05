@@ -18,10 +18,18 @@ use App\Models\BatchStudent;
 use App\Models\Course;
 use App\Models\Enquiry;
 use App\Models\Enrollment;
+use App\Models\MetaWhatsAppTemplate;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
+use App\Models\WhatsAppCampaign;
+use App\Models\WhatsAppTemplate;
 use App\Services\Punch\ManualBatchAttendanceService;
+use App\Services\WhatsAppTemplateParamResolver;
+use App\Support\StudentPunchWhatsAppTemplate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class ManualBatchAttendanceTest extends TestCase
@@ -248,6 +256,97 @@ class ManualBatchAttendanceTest extends TestCase
 
         $this->assertFalse($result['ok']);
         $this->assertStringContainsString('today', strtolower($result['message']));
+    }
+
+    public function test_manual_absent_sends_parent_whatsapp_with_date_only(): void
+    {
+        $this->travelTo('2026-11-05 15:48:00');
+
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-test-token'), 'meta_whatsapp');
+        Setting::flushValueCache();
+        config(['meta_whatsapp.graph_version' => 'v20.0']);
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response([
+                'messages' => [['id' => 'wamid.ABSENT']],
+            ], 200),
+        ]);
+
+        [$student, $batch, $staff] = $this->createEnrolledStudent('8991420071');
+        $template = WhatsAppTemplate::query()->create([
+            'name' => StudentPunchWhatsAppTemplate::ABSENT_NAME,
+            'param_count' => 3,
+            'param_mappings' => ['student.name', 'student.enrollment_number', 'campaign.date'],
+            'body' => StudentPunchWhatsAppTemplate::ABSENT_BODY,
+            'is_active' => true,
+            'provider_meta' => [
+                'body_variables' => ['1', '2', '3'],
+                'meta_language' => 'en',
+            ],
+        ]);
+        MetaWhatsAppTemplate::query()->create([
+            'name' => $template->name,
+            'language' => 'en',
+            'status' => 'APPROVED',
+            'param_count' => 3,
+            'param_mappings' => $template->param_mappings,
+            'body' => $template->body,
+            'provider_meta' => $template->provider_meta,
+            'is_active' => true,
+            'synced_at' => now(),
+        ]);
+
+        Setting::setValue('whatsapp.absent_autosend_enabled', '1', 'whatsapp');
+        Setting::setValue('whatsapp.punch_absent_autosend_template_id', (string) $template->id, 'whatsapp');
+        Setting::flushValueCache();
+
+        $service = app(ManualBatchAttendanceService::class);
+        $result = $service->markAbsent($student, '2026-11-05', $staff, $batch);
+
+        $this->assertTrue($result['ok']);
+        $this->assertTrue($result['whatsapp']['queued']);
+
+        $campaign = WhatsAppCampaign::query()->firstOrFail();
+        $this->assertSame('5 Nov 2026', $campaign->campaignVariable('date'));
+        $this->assertSame('', $campaign->campaignVariable('time'));
+
+        $params = app(WhatsAppTemplateParamResolver::class)->resolveAll(
+            $template->fresh()->paramSources(),
+            $student->fresh(),
+            $staff,
+            null,
+            $campaign,
+        );
+
+        $this->assertSame('Manual Student', $params[0]);
+        $this->assertSame('8991420071', $params[1]);
+        $this->assertSame('5 Nov 2026', $params[2]);
+        $this->assertCount(3, $params);
+
+        $again = $service->markAbsent($student->fresh(), '2026-11-05', $staff, $batch);
+
+        $this->assertTrue($again['ok']);
+        $this->assertFalse($again['whatsapp']['queued']);
+        $this->assertSame(1, WhatsAppCampaign::query()->count());
+    }
+
+    public function test_manual_absent_skips_parent_whatsapp_when_switch_is_off(): void
+    {
+        $this->travelTo('2026-11-05 15:48:00');
+
+        [$student, $batch, $staff] = $this->createEnrolledStudent('ROLL-ABS-OFF');
+
+        Setting::setValue('whatsapp.absent_autosend_enabled', '0', 'whatsapp');
+        Setting::flushValueCache();
+
+        $result = app(ManualBatchAttendanceService::class)->markAbsent($student, '2026-11-05', $staff, $batch);
+
+        $this->assertTrue($result['ok']);
+        $this->assertFalse($result['whatsapp']['queued']);
+        $this->assertSame('', $result['whatsapp']['message']);
+        $this->assertSame(AttendanceStatus::Absent, Attendance::query()->value('status'));
+        $this->assertSame(0, WhatsAppCampaign::query()->count());
     }
 
     /**

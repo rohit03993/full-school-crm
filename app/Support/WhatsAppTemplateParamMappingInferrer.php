@@ -128,6 +128,10 @@ class WhatsAppTemplateParamMappingInferrer
                 return self::homeworkNotDoneDefaults($paramCount);
             }
 
+            if ($templateName && StudentPunchWhatsAppTemplate::looksLikeAbsentName($templateName)) {
+                return self::absentDefaults($paramCount);
+            }
+
             if ($templateName && StudentPunchWhatsAppTemplate::looksLikeName($templateName)) {
                 return self::attendancePunchDefaults($paramCount);
             }
@@ -320,6 +324,28 @@ class WhatsAppTemplateParamMappingInferrer
         }
 
         return true;
+    }
+
+    /**
+     * Manual absent message: name, roll, date. The third blank is the date, not a clock time.
+     *
+     * @return list<string|null>
+     */
+    public static function absentDefaults(int $paramCount): array
+    {
+        $defaults = [
+            0 => 'student.name',
+            1 => 'student.enrollment_number',
+            2 => 'campaign.date',
+        ];
+
+        $sources = [];
+
+        for ($i = 0; $i < $paramCount; $i++) {
+            $sources[] = $defaults[$i] ?? null;
+        }
+
+        return $sources;
     }
 
     /**

@@ -371,7 +371,7 @@ class ManualBatchAttendanceService
     /**
      * Mark student Absent for the day (not Leave / not Present).
      *
-     * @return array{ok: bool, message: string, whatsapp: null}
+     * @return array{ok: bool, message: string, whatsapp: array{queued: bool, message: string}|null}
      */
     public function markAbsent(Student $student, string $date, User $staff, ?Batch $batch = null): array
     {
@@ -426,28 +426,43 @@ class ManualBatchAttendanceService
             ];
         }
 
-        Attendance::query()->updateOrCreate(
-            [
+        $alreadyAbsent = $existing?->status === AttendanceStatus::Absent;
+
+        $absentRow = [
+            'status' => AttendanceStatus::Absent,
+            'checked_in_at' => null,
+            'checked_out_at' => null,
+            'punch_source' => 'roll_call',
+            'leave_reason' => null,
+            'marked_by_user_id' => $staff->id,
+        ];
+
+        if ($existing) {
+            $existing->update($absentRow);
+        } else {
+            Attendance::query()->create([
                 'batch_id' => $batch->id,
                 'student_id' => $student->id,
                 'attendance_date' => $date,
-            ],
-            [
-                'status' => AttendanceStatus::Absent,
-                'checked_in_at' => null,
-                'checked_out_at' => null,
-                'punch_source' => 'roll_call',
-                'leave_reason' => null,
-                'marked_by_user_id' => $staff->id,
-            ],
-        );
+                ...$absentRow,
+            ]);
+        }
 
         CrmCacheInvalidator::afterAttendanceChange();
+
+        $whatsapp = $alreadyAbsent
+            ? ['queued' => false, 'message' => '']
+            : app(PunchWhatsAppService::class)->outcomeForManualAbsent(
+                $student,
+                $roll ?? '',
+                $date,
+                $staff,
+            );
 
         return [
             'ok' => true,
             'message' => 'Marked Absent.',
-            'whatsapp' => null,
+            'whatsapp' => $whatsapp,
         ];
     }
 

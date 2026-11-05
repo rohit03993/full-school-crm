@@ -158,6 +158,7 @@ class MetaWhatsAppTemplateDeleteService
             'whatsapp.punch_out_autosend_template_id', 'whatsapp.punch_out_autosend_live_campaign_id' => 'Punch out',
             'whatsapp.punch_manual_in_autosend_template_id', 'whatsapp.punch_manual_in_autosend_live_campaign_id' => 'Manual punch in',
             'whatsapp.punch_manual_out_autosend_template_id', 'whatsapp.punch_manual_out_autosend_live_campaign_id' => 'Manual punch out',
+            'whatsapp.punch_absent_autosend_template_id', 'whatsapp.punch_absent_autosend_live_campaign_id' => 'Manual absent',
             'whatsapp.staff_punch_in_autosend_live_campaign_id' => 'Staff punch in',
             'whatsapp.staff_punch_out_autosend_live_campaign_id' => 'Staff punch out',
             'whatsapp.occasion_student_birthday_live_campaign_id' => 'Student birthday',

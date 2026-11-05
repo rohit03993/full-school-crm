@@ -152,7 +152,7 @@ class ManageWhatsAppSettings extends Page
                         ->helperText('When student punches OUT at the device.'),
                     Placeholder::make('manual_templates_heading')
                         ->label('')
-                        ->content(new HtmlString('<p class="mt-2 text-sm font-bold text-gray-950 dark:text-white">Teacher marks the student on Attendance</p><p class="mt-0.5 text-xs text-gray-500">Manual IN, Manual OUT, or batch IN/OUT — still a student event; WhatsApp goes to the parent.</p>'))
+                        ->content(new HtmlString('<p class="mt-2 text-sm font-bold text-gray-950 dark:text-white">Teacher marks the student on Attendance</p><p class="mt-0.5 text-xs text-gray-500">Manual IN, Manual OUT, or ABSENT — WhatsApp goes to the parent mobile. Absent uses its own on/off switch below.</p>'))
                         ->columnSpanFull(),
                     Select::make('punch_manual_in_autosend_live_campaign_id')
                         ->label('Manual check-in (IN)')
@@ -168,6 +168,18 @@ class ManageWhatsAppSettings extends Page
                         ->nullable()
                         ->native(false)
                         ->helperText('Teacher marks the student OUT. Leave blank to reuse the Biometric OUT template.'),
+                    Toggle::make('absent_autosend_enabled')
+                        ->label('Send absent WhatsApp to parents')
+                        ->helperText('When a teacher taps ABSENT, one WhatsApp goes to the parent mobile. The message has the date only. Turn this off to save Absent with no message.')
+                        ->columnSpanFull(),
+                    Select::make('punch_absent_autosend_live_campaign_id')
+                        ->label('Manual absent')
+                        ->options(fn (WhatsAppSettingsService $settings): array => $settings->templateOptions())
+                        ->searchable()
+                        ->nullable()
+                        ->native(false)
+                        ->helperText('Template name student_absent. Blanks: student name, roll number, date (5 Nov 2026). No time.')
+                        ->columnSpanFull(),
                     Toggle::make('attendance_autosend_enabled')
                         ->label('Legacy: batch-save template (optional)')
                         ->helperText('Old roll-call Present flow only. Manual IN/OUT on Attendance uses the four punch templates above.')

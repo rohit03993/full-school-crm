@@ -57,6 +57,8 @@ class WhatsAppSettingsService
             'punch_out_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.punch_out_autosend_live_campaign_id')),
             'punch_manual_in_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.punch_manual_in_autosend_live_campaign_id')),
             'punch_manual_out_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.punch_manual_out_autosend_live_campaign_id')),
+            'absent_autosend_enabled' => Setting::getValue('whatsapp.absent_autosend_enabled', '0') === '1',
+            'punch_absent_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.punch_absent_autosend_live_campaign_id')),
             'staff_punch_autosend_enabled' => (bool) Setting::getValue('whatsapp.staff_punch_autosend_enabled', false),
             'staff_punch_in_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.staff_punch_in_autosend_live_campaign_id')),
             'staff_punch_out_autosend_live_campaign_id' => $this->formTemplateIdFromStored(Setting::getValue('whatsapp.staff_punch_out_autosend_live_campaign_id')),
@@ -98,6 +100,12 @@ class WhatsAppSettingsService
                 'label' => 'Student attendance (to parents)',
                 'hint' => 'Student gate / biometric / teacher IN and OUT — WhatsApp to parent mobile',
                 'enabled' => (bool) Setting::getValue('whatsapp.punch_autosend_enabled', true),
+            ],
+            [
+                'key' => 'absent',
+                'label' => 'Student absent (to parents)',
+                'hint' => 'Teacher taps ABSENT on Attendance — one WhatsApp with the date only',
+                'enabled' => Setting::getValue('whatsapp.absent_autosend_enabled', '0') === '1',
             ],
             [
                 'key' => 'attendance_legacy',
@@ -366,6 +374,16 @@ class WhatsAppSettingsService
             'whatsapp',
         );
         Setting::setValue(
+            'whatsapp.absent_autosend_enabled',
+            ! empty($data['absent_autosend_enabled']) ? '1' : '0',
+            'whatsapp',
+        );
+        Setting::setValue(
+            'whatsapp.punch_absent_autosend_live_campaign_id',
+            $this->encodeAutomationTemplateId($data['punch_absent_autosend_live_campaign_id'] ?? null),
+            'whatsapp',
+        );
+        Setting::setValue(
             'whatsapp.staff_punch_autosend_enabled',
             ! empty($data['staff_punch_autosend_enabled']) ? '1' : '0',
             'whatsapp',
@@ -554,6 +572,7 @@ class WhatsAppSettingsService
             'punch_out_autosend_live_campaign_id',
             'punch_manual_in_autosend_live_campaign_id',
             'punch_manual_out_autosend_live_campaign_id',
+            'punch_absent_autosend_live_campaign_id',
             'staff_punch_in_autosend_live_campaign_id',
             'staff_punch_out_autosend_live_campaign_id',
             'activity_marks_live_campaign_id',
@@ -708,9 +727,12 @@ class WhatsAppSettingsService
             .'<tr><td class="px-4 py-3 font-semibold text-rose-700 dark:text-rose-300">Student marked OUT by teacher</td>'
             .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Teacher taps OUT for that student on Attendance</td>'
             .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300"><strong>Manual OUT</strong> (falls back to Biometric OUT)</td></tr>'
-            .'<tr><td class="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300">Student absent / leave</td>'
-            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Teacher marks A or L for the student</td>'
-            .'<td class="px-4 py-3 text-gray-500 dark:text-gray-400">Not sent automatically</td></tr>'
+            .'<tr><td class="px-4 py-3 font-semibold text-amber-700 dark:text-amber-300">Student marked Absent by teacher</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Teacher taps ABSENT on Attendance. Message has the date only, no time. Turn the switch off to skip the message.</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300"><strong>Manual absent</strong></td></tr>'
+            .'<tr><td class="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300">Student marked Leave</td>'
+            .'<td class="px-4 py-3 text-gray-600 dark:text-gray-300">Teacher marks Leave for the student</td>'
+            .'<td class="px-4 py-3 text-gray-500 dark:text-gray-400">Not sent</td></tr>'
             .'</tbody></table></div></div>'
         );
     }
