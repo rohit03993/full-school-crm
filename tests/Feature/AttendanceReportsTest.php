@@ -134,6 +134,81 @@ class AttendanceReportsTest extends TestCase
         );
     }
 
+    public function test_class_and_student_attendance_report_sorts_lowest_first_and_counts_a_student_once(): void
+    {
+        $this->travelTo('2026-07-11 12:00:00');
+
+        $seed = $this->seedBatchWithTwoStudents();
+        $presentStudent = $seed['student_present'];
+        $absentStudent = $seed['student_absent'];
+        $batch = $seed['batch'];
+        $staff = $seed['staff'];
+        $course = $batch->course;
+
+        $secondBatch = Batch::query()->create([
+            'course_id' => $course->id,
+            'academic_session_id' => $batch->academic_session_id,
+            'name' => 'Batch B',
+            'status' => BatchStatus::Active,
+        ]);
+
+        BatchStudent::query()->create([
+            'batch_id' => $secondBatch->id,
+            'student_id' => $absentStudent->id,
+            'is_active' => true,
+            'assigned_at' => '2026-07-02 08:00:00',
+            'assigned_by_user_id' => $staff->id,
+        ]);
+
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $presentStudent->id,
+            'attendance_date' => '2026-07-10',
+            'status' => AttendanceStatus::Present,
+            'marked_by_user_id' => $staff->id,
+        ]);
+
+        $filters = [
+            'date_from' => '2026-07-01',
+            'date_to' => '2026-07-11',
+            'course_id' => $course->id,
+        ];
+
+        $students = app(ReportService::class)->generate(ReportType::ClassStudentAttendance, [
+            ...$filters,
+            'attendance_view' => 'student',
+        ]);
+
+        $this->assertSame('Student attendance · 01 Jul 2026 – 11 Jul 2026', $students['title']);
+        $this->assertCount(2, $students['rows']);
+        $this->assertSame($absentStudent->name, $students['rows'][0][0]);
+        $this->assertSame($presentStudent->name, $students['rows'][1][0]);
+        $this->assertSame(9, $students['percent_column']);
+        $this->assertSame(0.0, (float) $students['rows'][0][9]);
+        $this->assertGreaterThan(0, (float) $students['rows'][1][9]);
+
+        $below = app(ReportService::class)->generate(ReportType::ClassStudentAttendance, [
+            ...$filters,
+            'attendance_view' => 'student',
+            'max_percentage' => 5,
+        ]);
+
+        $this->assertCount(1, $below['rows']);
+        $this->assertSame($absentStudent->name, $below['rows'][0][0]);
+
+        $classes = app(ReportService::class)->generate(ReportType::ClassStudentAttendance, [
+            ...$filters,
+            'attendance_view' => 'class',
+            'max_percentage' => 5,
+        ]);
+
+        $this->assertSame('Class attendance · 01 Jul 2026 – 11 Jul 2026', $classes['title']);
+        $this->assertCount(1, $classes['rows']);
+        $this->assertSame('JEE', $classes['rows'][0][0]);
+        $this->assertSame(2, $classes['rows'][0][1]);
+        $this->assertSame(6, $classes['percent_column']);
+    }
+
     /**
      * @return array{present: Student, absent: Student, batch: Batch, staff: User}
      */

@@ -6,6 +6,24 @@
     @php
         $totalRows = count($report['rows']);
         $previewRows = $paginatedRows ?? collect();
+        $percentColumn = $report['percent_column'] ?? null;
+        $percentTone = function (int $index, mixed $cell) use ($percentColumn): ?string {
+            if ($percentColumn === null || $index !== $percentColumn || ! is_numeric($cell)) {
+                return null;
+            }
+
+            $value = (float) $cell;
+
+            if ($value < 75) {
+                return 'low';
+            }
+
+            if ($value < 90) {
+                return 'mid';
+            }
+
+            return 'high';
+        };
     @endphp
 
     <div class="space-y-4">
@@ -18,6 +36,13 @@
                         · Showing {{ $previewRows->firstItem() }}–{{ $previewRows->lastItem() }}
                     @endif
                 </p>
+                @if ($percentColumn !== null)
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        <span class="font-semibold text-red-600 dark:text-red-400">Red</span> is under 75%.
+                        <span class="font-semibold text-amber-600 dark:text-amber-400">Amber</span> is 75% to 89%.
+                        <span class="font-semibold text-green-600 dark:text-green-400">Green</span> is 90% and above.
+                    </p>
+                @endif
             </div>
             @if ($canExport)
                 <div class="flex flex-wrap gap-2">
@@ -44,8 +69,15 @@
                             'flex items-start justify-between gap-3 py-1.5 text-sm',
                             'border-b border-gray-100 pb-2 mb-1 font-semibold text-gray-950 dark:border-white/10 dark:text-white' => $colIndex === 0,
                         ])>
+                            @php $tone = $percentTone($colIndex, $row[$colIndex] ?? null); @endphp
                             <span class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-gray-500">{{ $column }}</span>
-                            <span class="text-right text-gray-700 dark:text-gray-300">{{ $row[$colIndex] ?? '—' }}</span>
+                            <span @class([
+                                'text-right',
+                                'text-gray-700 dark:text-gray-300' => $tone === null,
+                                'font-semibold text-red-600 dark:text-red-400' => $tone === 'low',
+                                'font-semibold text-amber-600 dark:text-amber-400' => $tone === 'mid',
+                                'font-semibold text-green-600 dark:text-green-400' => $tone === 'high',
+                            ])>{{ $row[$colIndex] ?? '—' }}</span>
                         </div>
                     @endforeach
                 </div>
@@ -68,8 +100,15 @@
                 <tbody class="divide-y divide-gray-100 dark:divide-white/10">
                     @forelse ($previewRows as $row)
                         <tr class="bg-white dark:bg-gray-900">
-                            @foreach ($row as $cell)
-                                <td class="px-4 py-2.5 text-gray-700 dark:text-gray-300">{{ $cell }}</td>
+                            @foreach ($row as $colIndex => $cell)
+                                @php $tone = $percentTone($colIndex, $cell); @endphp
+                                <td @class([
+                                    'px-4 py-2.5',
+                                    'text-gray-700 dark:text-gray-300' => $tone === null,
+                                    'font-semibold text-red-600 dark:text-red-400' => $tone === 'low',
+                                    'font-semibold text-amber-600 dark:text-amber-400' => $tone === 'mid',
+                                    'font-semibold text-green-600 dark:text-green-400' => $tone === 'high',
+                                ])>{{ $cell }}</td>
                             @endforeach
                         </tr>
                     @empty

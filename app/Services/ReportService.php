@@ -74,6 +74,7 @@ class ReportService
             ReportType::EnquirySources => $this->enquirySourcesReport($from, $to, $filters['lead_source'] ?? null),
             ReportType::AdmissionsByCourse => $this->admissionsByCourseReport($from, $to, $filters['course_id'] ?? null),
             ReportType::AdmissionsByStaff => $this->admissionsByStaffReport($from, $to, $filters['user_id'] ?? null),
+            ReportType::ClassStudentAttendance => $this->classStudentAttendanceReport($from, $to, $filters),
             ReportType::AttendanceByBatch => $this->attendanceByBatchReport($from, $to, $filters['batch_id'] ?? null),
             ReportType::AttendanceByStudent => $this->attendanceByStudentReport(
                 $from,
@@ -583,6 +584,233 @@ class ReportService
             'columns' => ['Student', 'Roll', 'Batch', 'Mobile', 'Present', 'Leave', 'Absent', 'Working days', '%'],
             'rows' => $rows,
         ]);
+    }
+
+    /**
+     * Class summary, or one row per student sorted from the lowest percentage.
+     * A student in two batches of the same class is counted once.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array{title: string, columns: array<int, string>, rows: array<int, array<int, string|int|float|null>>, percent_column: int}
+     */
+    protected function classStudentAttendanceReport(Carbon $from, Carbon $to, array $filters): array
+    {
+        $view = ($filters['attendance_view'] ?? 'student') === 'class' ? 'class' : 'student';
+        $rawMax = $filters['max_percentage'] ?? null;
+        $maxPercentage = ($view === 'student' && $rawMax !== null && $rawMax !== '')
+            ? (float) $rawMax
+            : null;
+        $lines = $this->classStudentAttendanceLines(
+            $from,
+            $to,
+            filled($filters['course_id'] ?? null) ? (int) $filters['course_id'] : null,
+            filled($filters['batch_id'] ?? null) ? (int) $filters['batch_id'] : null,
+            filled($filters['student_id'] ?? null) ? (int) $filters['student_id'] : null,
+            trim((string) ($filters['student_search'] ?? '')),
+        );
+        $period = $from->format('d M Y').' – '.$to->format('d M Y');
+
+        if ($view === 'class') {
+            return $this->finalizeDetailReport([
+                'title' => 'Class attendance · '.$period,
+                'columns' => ['Class', 'Students', 'Present', 'Leave', 'Absent', 'Working days', '%'],
+                'rows' => $this->classAttendanceRows($lines),
+                'percent_column' => 6,
+            ]);
+        }
+
+        if ($maxPercentage !== null) {
+            $lines = array_values(array_filter(
+                $lines,
+                fn (array $line): bool => $line['percentage'] < $maxPercentage,
+            ));
+        }
+
+        usort($lines, function (array $a, array $b): int {
+            $byPercent = $a['percentage'] <=> $b['percentage'];
+
+            return $byPercent !== 0 ? $byPercent : strcmp($a['student_name'], $b['student_name']);
+        });
+
+        $rows = [];
+
+        foreach ($lines as $line) {
+            $rows[] = [
+                $line['student_name'],
+                $line['roll'],
+                $line['class_name'],
+                $line['batch_name'],
+                $line['mobile'],
+                $line['present'],
+                $line['leave'],
+                $line['absent'],
+                $line['working'],
+                $line['percentage'],
+            ];
+
+            if (count($rows) >= self::MAX_DETAIL_ROWS) {
+                break;
+            }
+        }
+
+        $title = $maxPercentage !== null
+            ? 'Student attendance (below '.$maxPercentage.'%) · '.$period
+            : 'Student attendance · '.$period;
+
+        return $this->finalizeDetailReport([
+            'title' => $title,
+            'columns' => ['Student', 'Roll', 'Class', 'Batch', 'Mobile', 'Present', 'Leave', 'Absent', 'Working days', '%'],
+            'rows' => $rows,
+            'percent_column' => 9,
+        ]);
+    }
+
+    /**
+     * One line per student in a class. Two active batches in that class become one line.
+     *
+     * @return list<array{
+     *     student_id: int,
+     *     course_id: int,
+     *     student_name: string,
+     *     roll: string,
+     *     class_name: string,
+     *     batch_name: string,
+     *     mobile: string,
+     *     present: int,
+     *     leave: int,
+     *     absent: int,
+     *     working: int,
+     *     percentage: float
+     * }>
+     */
+    protected function classStudentAttendanceLines(
+        Carbon $from,
+        Carbon $to,
+        ?int $courseId,
+        ?int $batchId,
+        ?int $studentId,
+        string $studentSearch = '',
+    ): array {
+        $assignments = BatchStudent::query()
+            ->where('is_active', true)
+            ->when($batchId, fn ($query) => $query->where('batch_id', $batchId))
+            ->when($studentId, fn ($query) => $query->where('student_id', $studentId))
+            ->when($studentSearch !== '', function ($query) use ($studentSearch): void {
+                $query->whereHas('student', function ($student) use ($studentSearch): void {
+                    $like = '%'.$studentSearch.'%';
+                    $student->where(function ($inner) use ($like): void {
+                        $inner->where('name', 'like', $like)
+                            ->orWhere('mobile', 'like', $like);
+                    });
+                });
+            })
+            ->whereHas('batch', function ($query) use ($courseId): void {
+                if ($courseId) {
+                    $query->where('course_id', $courseId);
+                }
+            })
+            ->with(['student.activeEnrollment', 'batch.course'])
+            ->get()
+            ->groupBy(fn (BatchStudent $row): string => $row->student_id.'-'.($row->batch?->course_id ?? 0));
+
+        $lines = [];
+
+        foreach ($assignments as $group) {
+            /** @var BatchStudent|null $chosen */
+            $chosen = $group->sortByDesc(
+                fn (BatchStudent $row): int => $row->assigned_at?->getTimestamp() ?? 0
+            )->first();
+            $student = $chosen?->student;
+
+            if (! $chosen || ! $student) {
+                continue;
+            }
+
+            $student->setRelation('activeBatchStudent', $chosen);
+
+            $summary = $this->attendance->summaryForStudentInRange(
+                $student,
+                $from->copy()->startOfDay(),
+                $to->copy()->startOfDay(),
+            );
+
+            if ($summary === null) {
+                continue;
+            }
+
+            $lines[] = [
+                'student_id' => $student->id,
+                'course_id' => (int) ($chosen->batch?->course_id ?? 0),
+                'student_name' => $student->name,
+                'roll' => $student->activeEnrollment?->enrollment_number ?? '—',
+                'class_name' => $chosen->batch?->course?->name ?? '—',
+                'batch_name' => $chosen->batch?->name ?? '—',
+                'mobile' => $student->mobile ?? '—',
+                'present' => $summary['present_days'],
+                'leave' => $summary['leave_days'],
+                'absent' => $summary['absent_days'],
+                'working' => $summary['expected_days'],
+                'percentage' => $summary['percentage'],
+            ];
+        }
+
+        return $lines;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lines
+     * @return list<array<int, string|int|float|null>>
+     */
+    protected function classAttendanceRows(array $lines): array
+    {
+        $classes = [];
+
+        foreach ($lines as $line) {
+            $key = (int) $line['course_id'];
+
+            if (! isset($classes[$key])) {
+                $classes[$key] = [
+                    'name' => (string) $line['class_name'],
+                    'students' => 0,
+                    'present' => 0,
+                    'leave' => 0,
+                    'absent' => 0,
+                    'working' => 0,
+                    'percentage_total' => 0.0,
+                ];
+            }
+
+            $classes[$key]['students']++;
+            $classes[$key]['present'] += $line['present'];
+            $classes[$key]['leave'] += $line['leave'];
+            $classes[$key]['absent'] += $line['absent'];
+            $classes[$key]['working'] += $line['working'];
+            $classes[$key]['percentage_total'] += $line['percentage'];
+        }
+
+        $rows = [];
+
+        foreach ($classes as $class) {
+            $rows[] = [
+                $class['name'],
+                $class['students'],
+                $class['present'],
+                $class['leave'],
+                $class['absent'],
+                $class['working'],
+                $class['students'] > 0
+                    ? round($class['percentage_total'] / $class['students'], 1)
+                    : 0,
+            ];
+        }
+
+        usort($rows, function (array $a, array $b): int {
+            $byPercent = ((float) $a[6]) <=> ((float) $b[6]);
+
+            return $byPercent !== 0 ? $byPercent : strcmp((string) $a[0], (string) $b[0]);
+        });
+
+        return array_slice($rows, 0, self::MAX_DETAIL_ROWS);
     }
 
     /**

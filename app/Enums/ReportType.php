@@ -9,6 +9,7 @@ enum ReportType: string
     case EnquirySources = 'enquiry_sources';
     case AdmissionsByCourse = 'admissions_by_course';
     case AdmissionsByStaff = 'admissions_by_staff';
+    case ClassStudentAttendance = 'class_student_attendance';
     case AttendanceByBatch = 'attendance_by_batch';
     case AttendanceByStudent = 'attendance_by_student';
     case DailyAbsentSheet = 'daily_absent_sheet';
@@ -33,6 +34,7 @@ enum ReportType: string
             self::EnquirySources => 'Enquiry source-wise',
             self::AdmissionsByCourse => 'Admissions by course',
             self::AdmissionsByStaff => 'Admissions by staff',
+            self::ClassStudentAttendance => 'Class and student attendance',
             self::AttendanceByBatch => 'Attendance by batch',
             self::AttendanceByStudent => 'Attendance by student',
             self::DailyAbsentSheet => 'Daily absent sheet',
@@ -70,6 +72,7 @@ enum ReportType: string
         return match ($this) {
             self::Enquiries, self::LeadAging, self::EnquirySources => LicenseFeature::Enquiries,
             self::AdmissionsByCourse, self::AdmissionsByStaff => LicenseFeature::Admissions,
+            self::ClassStudentAttendance,
             self::AttendanceByBatch,
             self::AttendanceByStudent,
             self::DailyAbsentSheet,
@@ -121,6 +124,7 @@ enum ReportType: string
             self::EnquirySources => ['date_from', 'date_to', 'lead_source'],
             self::AdmissionsByCourse => ['date_from', 'date_to', 'course_id'],
             self::AdmissionsByStaff => ['date_from', 'date_to', 'user_id'],
+            self::ClassStudentAttendance => ['date_from', 'date_to', 'date_preset', 'attendance_view', 'course_id', 'batch_id', 'student_id', 'max_percentage'],
             self::AttendanceByBatch => ['date_from', 'date_to', 'batch_id'],
             self::AttendanceByStudent => ['date_from', 'date_to', 'student_id'],
             self::DailyAbsentSheet => ['date_from', 'date_to', 'batch_id'],
@@ -167,6 +171,7 @@ enum ReportType: string
         return match ($this) {
             self::LeadAging => 'All open leads in the pipeline (not enrolled, not Joined), newest contact gaps first. Optional filters below narrow the list — leave them blank to include everyone.',
             self::Enquiries => 'All enquiries created in the date range (including converted leads). Adjust dates below to change the period.',
+            self::ClassStudentAttendance => 'Class wise is one row per class. Student wise is one row per student, lowest % first. This month and Last month fill the dates. Leave Class blank for the whole school. Leave “Attendance below %” blank to see everyone.',
             self::AttendanceByStudent => 'Pick a student, set the date range, then tap Apply. Shows daily batch attendance for that student.',
             self::PendingFees, self::OverdueInstallments => 'All pending or overdue records. Optionally narrow by course or batch.',
             self::LowAttendanceAlert => 'Students below the attendance threshold in the date range. Change the % only if you need a stricter cutoff.',
