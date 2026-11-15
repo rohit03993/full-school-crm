@@ -67,6 +67,33 @@ class WhatsAppCampaignServiceTest extends TestCase
         $this->assertSame('Maths test', $campaign->campaignVariable('topic'));
     }
 
+    public function test_campaign_keeps_one_pdf_for_every_recipient(): void
+    {
+        $admin = $this->createSuperAdmin();
+        $template = $this->createTemplate();
+
+        $campaign = app(WhatsAppCampaignService::class)->createCampaign([
+            'name' => 'PDF notice',
+            'whatsapp_template_id' => $template->id,
+            'audience_type' => WhatsAppAudienceType::Batch->value,
+            'campaign_variables' => [
+                'topic' => 'Exam',
+                '_header' => [
+                    'type' => 'document',
+                    'id' => 'media-1',
+                    'filename' => 'sep-dates.pdf',
+                ],
+            ],
+        ], $admin);
+
+        $header = $campaign->campaignVariable('_header');
+
+        $this->assertIsArray($header);
+        $this->assertSame('document', $header['type']);
+        $this->assertSame('media-1', $header['id']);
+        $this->assertSame('sep-dates.pdf', $header['filename']);
+    }
+
     public function test_course_audience_includes_all_active_enrollments_in_course(): void
     {
         $admin = $this->createSuperAdmin();

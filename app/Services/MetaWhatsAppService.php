@@ -214,12 +214,18 @@ class MetaWhatsAppService
             return null;
         }
 
+        $media = ['id' => $id];
+
+        if ($type === 'document' && filled($headerMedia['filename'] ?? null)) {
+            $media['filename'] = (string) $headerMedia['filename'];
+        }
+
         return [
             'type' => 'header',
             'parameters' => [
                 [
                     'type' => $type,
-                    $type => ['id' => $id],
+                    $type => $media,
                 ],
             ],
         ];

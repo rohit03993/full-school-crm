@@ -23,6 +23,7 @@ use App\Support\WhatsAppCampaignViewHelper;
 use App\Support\CrmMenuLabels;
 use App\Support\CrmNavigation;
 use App\Support\InstituteProfile;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -117,6 +118,7 @@ class WhatsAppCampaignResource extends Resource
                         ->dehydrateStateUsing(fn ($state): ?int => filled($state) ? (int) $state : null)
                         ->afterStateUpdated(function ($state, callable $set): void {
                             $set('template_manual_params', []);
+                            $set('campaign_header_pdf', null);
                             $set('campaign_variables', WhatsAppCampaignFormHelper::defaultCampaignVariables(
                                 filled($state) ? (int) $state : null,
                             ));
@@ -128,6 +130,18 @@ class WhatsAppCampaignResource extends Resource
                             filled($get('whatsapp_template_id')) ? (int) $get('whatsapp_template_id') : null,
                         ))
                         ->visible(fn (Get $get): bool => filled($get('whatsapp_template_id')))
+                        ->columnSpanFull(),
+                    FileUpload::make('campaign_header_pdf')
+                        ->label('PDF for this send')
+                        ->helperText('This one PDF is attached to every parent message in this campaign. It can be different from the sample used to approve the template.')
+                        ->disk('local')
+                        ->directory('whatsapp-campaign-headers')
+                        ->visibility('private')
+                        ->acceptedFileTypes(['application/pdf'])
+                        ->maxSize(102400)
+                        ->required(fn (Get $get): bool => static::selectedTemplateHeaderFormat($get('whatsapp_template_id')) === 'DOCUMENT')
+                        ->visible(fn (Get $get): bool => static::selectedTemplateHeaderFormat($get('whatsapp_template_id')) === 'DOCUMENT')
+                        ->dehydrated(false)
                         ->columnSpanFull(),
                 ])
                 ->columns(1),
@@ -220,6 +234,21 @@ class WhatsAppCampaignResource extends Resource
                 ])
                 ->visible(fn (Get $get): bool => filled($get('whatsapp_template_id'))),
         ]);
+    }
+
+    public static function selectedTemplateHeaderFormat(mixed $templateId): ?string
+    {
+        if (! filled($templateId)) {
+            return null;
+        }
+
+        $name = WhatsAppTemplate::query()->whereKey((int) $templateId)->value('name');
+
+        if (! is_string($name) || $name === '') {
+            return null;
+        }
+
+        return app(WhatsAppTemplateCatalog::class)->headerFormatForName($name);
     }
 
     public static function infolist(Schema $schema): Schema

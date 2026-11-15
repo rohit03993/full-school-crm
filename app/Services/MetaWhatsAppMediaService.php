@@ -355,6 +355,25 @@ class MetaWhatsAppMediaService
      *
      * @return array{status: string, header?: array{type: string, id: string}|null, error?: string}
      */
+    /**
+     * Same as headerMediaForTemplateSend(), for a PDF already stored by the campaign form.
+     *
+     * @return array{status: string, header?: array{type: string, id: string, path?: string, mime?: string, filename?: string}|null, error?: string}
+     */
+    public function headerMediaForStoredFile(?string $relativePath, string $headerFormat, string $disk = 'local'): array
+    {
+        $relativePath = ltrim(trim((string) $relativePath), '/');
+
+        if ($relativePath === '' || ! Storage::disk($disk)->exists($relativePath)) {
+            return ['status' => 'failed', 'error' => 'Choose a PDF for this template before sending.'];
+        }
+
+        $absolute = Storage::disk($disk)->path($relativePath);
+        $uploaded = new UploadedFile($absolute, basename($absolute), 'application/pdf', null, true);
+
+        return $this->headerMediaForTemplateSend($uploaded, $headerFormat);
+    }
+
     public function headerMediaForTemplateSend(?UploadedFile $file, ?string $headerFormat): array
     {
         $format = strtoupper(trim((string) $headerFormat));

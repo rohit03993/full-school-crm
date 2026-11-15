@@ -106,6 +106,8 @@ class WhatsAppCampaignService
                 throw new \RuntimeException($dispatch->configurationError());
             }
 
+            $this->assertDocumentHeaderPresent($campaign);
+
             $this->refreshCampaignRecipients($campaign);
 
             $campaign->refresh();
@@ -467,6 +469,24 @@ class WhatsAppCampaignService
      * @param  array<string, mixed>|null  $variables
      * @return array<string, mixed>|null
      */
+    protected function assertDocumentHeaderPresent(WhatsAppCampaign $campaign): void
+    {
+        $campaign->loadMissing('template');
+        $format = app(WhatsAppTemplateCatalog::class)->headerFormatForName((string) $campaign->template?->name);
+
+        if ($format !== 'DOCUMENT') {
+            return;
+        }
+
+        $header = $campaign->campaignVariable('_header');
+        $type = strtolower(trim((string) (is_array($header) ? ($header['type'] ?? '') : '')));
+        $id = trim((string) (is_array($header) ? ($header['id'] ?? '') : ''));
+
+        if ($type !== 'document' || $id === '') {
+            throw new \RuntimeException('This template needs a PDF. Upload the PDF on the campaign form, then send again.');
+        }
+    }
+
     protected function normalizeCampaignVariables(?array $variables): ?array
     {
         if ($variables === null) {
@@ -474,7 +494,7 @@ class WhatsAppCampaignService
         }
 
         $normalized = [];
-        $preserveArrayKeys = ['_student_marks', '_student_ids', '_student_rolls', '_student_attendance_status', '_student_fee_context', '_manual_fee_notice_context', '_manual'];
+        $preserveArrayKeys = ['_student_marks', '_student_ids', '_student_rolls', '_student_attendance_status', '_student_fee_context', '_manual_fee_notice_context', '_manual', '_header'];
 
         foreach ($variables as $key => $value) {
             if (is_array($value)) {
