@@ -43,7 +43,7 @@ class MetaWhatsAppTemplateSubmitService
             $headerFormat = filled($headerText) ? 'TEXT' : 'NONE';
         }
 
-        $sampleHandle = in_array($headerFormat, ['IMAGE', 'VIDEO'], true)
+        $sampleHandle = in_array($headerFormat, ['IMAGE', 'VIDEO', 'DOCUMENT'], true)
             ? $this->sampleHandleFromUpload($data, $headerFormat)
             : null;
 
@@ -140,7 +140,11 @@ class MetaWhatsAppTemplateSubmitService
         }
 
         $relative = ltrim(trim((string) $stored), '/');
-        $kind = $headerFormat === 'VIDEO' ? 'MP4 video' : 'JPG or PNG image';
+        $kind = match ($headerFormat) {
+            'VIDEO' => 'MP4 video',
+            'DOCUMENT' => 'PDF',
+            default => 'JPG or PNG image',
+        };
 
         if ($relative === '' || ! Storage::disk('local')->exists($relative)) {
             throw new InvalidArgumentException('Choose a sample '.$kind.'. Meta reviews this file before the template can be approved.');
@@ -150,6 +154,7 @@ class MetaWhatsAppTemplateSubmitService
         $extension = strtolower(pathinfo($absolute, PATHINFO_EXTENSION));
         $mime = match (true) {
             $headerFormat === 'VIDEO' && $extension === 'mp4' => 'video/mp4',
+            $headerFormat === 'DOCUMENT' && $extension === 'pdf' => 'application/pdf',
             $headerFormat === 'IMAGE' && in_array($extension, ['jpg', 'jpeg'], true) => 'image/jpeg',
             $headerFormat === 'IMAGE' && $extension === 'png' => 'image/png',
             default => '',
@@ -162,16 +167,20 @@ class MetaWhatsAppTemplateSubmitService
         }
 
         $bytes = filesize($absolute);
-        $maxBytes = $headerFormat === 'VIDEO' ? 16 * 1024 * 1024 : 5 * 1024 * 1024;
+        $maxBytes = match ($headerFormat) {
+            'VIDEO' => 16 * 1024 * 1024,
+            'DOCUMENT' => 100 * 1024 * 1024,
+            default => 5 * 1024 * 1024,
+        };
 
         if ($bytes === false || $bytes > $maxBytes) {
             Storage::disk('local')->delete($relative);
 
-            throw new InvalidArgumentException(
-                $headerFormat === 'VIDEO'
-                    ? 'The sample video must be 16 MB or smaller.'
-                    : 'The sample image must be 5 MB or smaller.'
-            );
+            throw new InvalidArgumentException(match ($headerFormat) {
+                'VIDEO' => 'The sample video must be 16 MB or smaller.',
+                'DOCUMENT' => 'The sample PDF must be 100 MB or smaller.',
+                default => 'The sample image must be 5 MB or smaller.',
+            });
         }
 
         try {

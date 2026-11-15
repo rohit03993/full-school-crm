@@ -57,15 +57,15 @@ class MetaWhatsAppTemplateBuilder
         $components = [];
         $headerFormat = strtoupper(trim((string) $headerFormat));
 
-        if (in_array($headerFormat, ['IMAGE', 'VIDEO'], true)) {
+        if (in_array($headerFormat, ['IMAGE', 'VIDEO', 'DOCUMENT'], true)) {
             $handle = trim((string) $headerSampleHandle);
 
             if ($handle === '') {
-                throw new InvalidArgumentException(
-                    $headerFormat === 'VIDEO'
-                        ? 'Upload a sample MP4 video so Meta can review this template.'
-                        : 'Upload a sample JPG or PNG so Meta can review this template.'
-                );
+                throw new InvalidArgumentException(match ($headerFormat) {
+                    'VIDEO' => 'Upload a sample MP4 video so Meta can review this template.',
+                    'DOCUMENT' => 'Upload a sample PDF so Meta can review this template.',
+                    default => 'Upload a sample JPG or PNG so Meta can review this template.',
+                });
             }
 
             $components[] = [

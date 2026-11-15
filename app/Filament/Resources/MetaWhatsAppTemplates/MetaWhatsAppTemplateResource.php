@@ -300,10 +300,11 @@ class MetaWhatsAppTemplateResource extends Resource
                     'TEXT' => 'Text',
                     'IMAGE' => 'Image',
                     'VIDEO' => 'Video',
+                    'DOCUMENT' => 'PDF',
                 ])
                 ->default('NONE')
                 ->live()
-                ->helperText('A photo or video is a sample for Meta’s review. The picture you send later can be a different one.')
+                ->helperText('A photo, video, or PDF is a sample for Meta’s review. The file you send later can be a different one.')
                 ->visible(fn (Get $get): bool => ! MetaWhatsAppTemplateBuilder::isAuthenticationOtp((string) $get('name'), (string) $get('category'))),
             TextInput::make('header_text')
                 ->label('Header text')
@@ -312,19 +313,31 @@ class MetaWhatsAppTemplateResource extends Resource
                 ->visible(fn (Get $get): bool => $get('header_format') === 'TEXT'
                     && ! MetaWhatsAppTemplateBuilder::isAuthenticationOtp((string) $get('name'), (string) $get('category'))),
             FileUpload::make('header_sample')
-                ->label(fn (Get $get): string => $get('header_format') === 'VIDEO' ? 'Sample video' : 'Sample image')
-                ->helperText(fn (Get $get): string => $get('header_format') === 'VIDEO'
-                    ? 'MP4, up to 16 MB. Meta uses this only to approve the template.'
-                    : 'JPG or PNG, up to 5 MB. Meta uses this only to approve the template.')
+                ->label(fn (Get $get): string => match ($get('header_format')) {
+                    'VIDEO' => 'Sample video',
+                    'DOCUMENT' => 'Sample PDF',
+                    default => 'Sample image',
+                })
+                ->helperText(fn (Get $get): string => match ($get('header_format')) {
+                    'VIDEO' => 'MP4, up to 16 MB. Meta uses this only to approve the template.',
+                    'DOCUMENT' => 'PDF, up to 100 MB. Meta uses this only to approve the template.',
+                    default => 'JPG or PNG, up to 5 MB. Meta uses this only to approve the template.',
+                })
                 ->disk('local')
                 ->directory('whatsapp-template-samples')
                 ->visibility('private')
-                ->required(fn (Get $get): bool => in_array($get('header_format'), ['IMAGE', 'VIDEO'], true))
-                ->acceptedFileTypes(fn (Get $get): array => $get('header_format') === 'VIDEO'
-                    ? ['video/mp4']
-                    : ['image/jpeg', 'image/png'])
-                ->maxSize(fn (Get $get): int => $get('header_format') === 'VIDEO' ? 16384 : 5120)
-                ->visible(fn (Get $get): bool => in_array($get('header_format'), ['IMAGE', 'VIDEO'], true)
+                ->required(fn (Get $get): bool => in_array($get('header_format'), ['IMAGE', 'VIDEO', 'DOCUMENT'], true))
+                ->acceptedFileTypes(fn (Get $get): array => match ($get('header_format')) {
+                    'VIDEO' => ['video/mp4'],
+                    'DOCUMENT' => ['application/pdf'],
+                    default => ['image/jpeg', 'image/png'],
+                })
+                ->maxSize(fn (Get $get): int => match ($get('header_format')) {
+                    'VIDEO' => 16384,
+                    'DOCUMENT' => 102400,
+                    default => 5120,
+                })
+                ->visible(fn (Get $get): bool => in_array($get('header_format'), ['IMAGE', 'VIDEO', 'DOCUMENT'], true)
                     && ! MetaWhatsAppTemplateBuilder::isAuthenticationOtp((string) $get('name'), (string) $get('category')))
                 ->columnSpanFull(),
             Textarea::make('body_text')

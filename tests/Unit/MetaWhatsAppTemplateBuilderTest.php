@@ -121,6 +121,28 @@ class MetaWhatsAppTemplateBuilderTest extends TestCase
         $this->assertSame('BODY', $payload['components'][1]['type']);
     }
 
+    public function test_builds_pdf_header_with_sample_handle(): void
+    {
+        $payload = MetaWhatsAppTemplateBuilder::buildCreatePayload(
+            'fee_receipt',
+            'en',
+            'UTILITY',
+            'Your fee receipt is attached.',
+            null,
+            null,
+            null,
+            true,
+            null,
+            'DOCUMENT',
+            '4::pdf-handle',
+        );
+
+        $this->assertSame('HEADER', $payload['components'][0]['type']);
+        $this->assertSame('DOCUMENT', $payload['components'][0]['format']);
+        $this->assertSame(['4::pdf-handle'], $payload['components'][0]['example']['header_handle']);
+        $this->assertSame('BODY', $payload['components'][1]['type']);
+    }
+
     public function test_image_header_requires_a_sample_handle(): void
     {
         $this->expectException(InvalidArgumentException::class);
