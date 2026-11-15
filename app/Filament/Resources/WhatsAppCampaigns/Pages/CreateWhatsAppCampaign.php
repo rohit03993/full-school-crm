@@ -43,9 +43,14 @@ class CreateWhatsAppCampaign extends CreateRecord
     {
         unset($data['send_immediately']);
 
-        if (($data['audience_type'] ?? null) !== WhatsAppAudienceType::Batch->value) {
-            $data['batch_id'] = null;
-        }
+        $isBatch = ($data['audience_type'] ?? null) === WhatsAppAudienceType::Batch->value;
+        $courseIds = WhatsAppCampaignService::idList($data['course_ids'] ?? []);
+        $batchIds = $isBatch ? WhatsAppCampaignService::idList($data['batch_ids'] ?? []) : [];
+
+        $data['course_id'] = $courseIds[0] ?? null;
+        $data['batch_id'] = $batchIds[0] ?? null;
+        $data['course_ids'] = $courseIds;
+        $data['batch_ids'] = $batchIds;
 
         $variables = $data['campaign_variables'] ?? [];
         $manual = collect($data['template_manual_params'] ?? [])
@@ -55,6 +60,9 @@ class CreateWhatsAppCampaign extends CreateRecord
         if ($manual !== []) {
             $variables['_manual'] = $manual;
         }
+
+        $variables['_audience_course_ids'] = $courseIds;
+        $variables['_audience_batch_ids'] = $batchIds;
 
         if (filled($variables['date'] ?? null)) {
             $variables['date'] = Carbon::parse($variables['date'])->format('d M Y');

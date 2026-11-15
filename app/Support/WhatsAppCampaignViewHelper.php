@@ -2,12 +2,48 @@
 
 namespace App\Support;
 
+use App\Enums\WhatsAppAudienceType;
 use App\Enums\WhatsAppCampaignStatus;
+use App\Models\Batch;
+use App\Models\Course;
 use App\Models\WhatsAppCampaign;
+use App\Services\WhatsAppCampaignService;
 use Illuminate\Support\HtmlString;
 
 class WhatsAppCampaignViewHelper
 {
+    public static function classNames(WhatsAppCampaign $campaign): string
+    {
+        $stored = $campaign->campaignVariable('_audience_course_ids', null);
+        $ids = is_array($stored)
+            ? WhatsAppCampaignService::idList($stored)
+            : (filled($campaign->course_id) ? [(int) $campaign->course_id] : []);
+
+        if ($ids === []) {
+            return '—';
+        }
+
+        $names = Course::query()->whereIn('id', $ids)->orderBy('name')->pluck('name')->all();
+
+        return $names === [] ? '—' : implode(', ', $names);
+    }
+
+    public static function batchNames(WhatsAppCampaign $campaign): string
+    {
+        $stored = $campaign->campaignVariable('_audience_batch_ids', null);
+        $ids = is_array($stored)
+            ? WhatsAppCampaignService::idList($stored)
+            : (filled($campaign->batch_id) ? [(int) $campaign->batch_id] : []);
+
+        if ($ids === []) {
+            return '—';
+        }
+
+        $names = Batch::query()->whereIn('id', $ids)->orderBy('name')->pluck('name')->all();
+
+        return $names === [] ? '—' : implode(', ', $names);
+    }
+
     public static function isInProgress(WhatsAppCampaign $campaign): bool
     {
         return in_array($campaign->status, [
@@ -64,8 +100,10 @@ class WhatsAppCampaignViewHelper
 
         $meta = '<div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-600 dark:text-gray-300">'
             .'<span><strong>'.e($campaign->template?->name ?? '—').'</strong> template</span>'
-            .'<span>'.e($campaign->course?->name ?? '—').'</span>'
-            .($campaign->batch ? '<span>'.e($campaign->batch->name).'</span>' : '')
+            .'<span>'.e(self::classNames($campaign)).'</span>'
+            .($campaign->audience_type === WhatsAppAudienceType::Batch
+                ? '<span>'.e(self::batchNames($campaign)).'</span>'
+                : '')
             .'<span>'.$successRate.'% sent</span>'
             .'<span>Failed sends are not charged.</span>'
             .'</div>';

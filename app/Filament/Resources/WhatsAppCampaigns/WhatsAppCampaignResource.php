@@ -146,65 +146,92 @@ class WhatsAppCampaignResource extends Resource
                 ])
                 ->columns(1),
             Section::make('2. Audience')
-                ->description('Pick who receives this campaign. Only students with a mobile number are included. Inactive students are left out.')
+                ->description('Tick one or more classes. For batches, tick every batch that should get the message. Only students with a mobile number are included. A student in two chosen classes is messaged once.')
                 ->schema([
                     Select::make('audience_type')
                         ->label('Send to')
                         ->options([
-                            WhatsAppAudienceType::Batch->value => 'One batch',
+                            WhatsAppAudienceType::Batch->value => 'Chosen batches',
                             WhatsAppAudienceType::Course->value => 'Whole class / course',
                         ])
                         ->default(WhatsAppAudienceType::Batch->value)
                         ->required()
                         ->native(false)
                         ->live(),
-                    Select::make('course_id')
+                    Select::make('course_ids')
                         ->label('Class / course')
                         ->options(fn (): array => InstituteProfile::activeCourseOptions())
+                        ->multiple()
                         ->searchable()
                         ->required()
                         ->native(false)
                         ->live()
-                        ->dehydrateStateUsing(fn ($state): ?int => filled($state) ? (int) $state : null)
-                        ->placeholder('Select class…'),
-                    Select::make('batch_id')
-                        ->label('Batch')
-                        ->options(function (Get $get): array {
-                            $courseId = $get('course_id');
+                        ->afterStateUpdated(function ($state, callable $set, Get $get): void {
+                            $courseIds = WhatsAppCampaignService::idList($state);
+                            $batchIds = WhatsAppCampaignService::idList($get('batch_ids'));
 
-                            if (blank($courseId)) {
+                            if ($courseIds === [] || $batchIds === []) {
+                                if ($courseIds === []) {
+                                    $set('batch_ids', []);
+                                }
+
+                                return;
+                            }
+
+                            $valid = Batch::query()
+                                ->whereIn('course_id', $courseIds)
+                                ->whereIn('id', $batchIds)
+                                ->pluck('id')
+                                ->map(fn (mixed $id): string => (string) $id)
+                                ->all();
+
+                            $set('batch_ids', $valid);
+                        })
+                        ->placeholder('Select classes…')
+                        ->helperText('Tick every class that should receive this message.'),
+                    Select::make('batch_ids')
+                        ->label('Batches')
+                        ->options(function (Get $get): array {
+                            $courseIds = WhatsAppCampaignService::idList($get('course_ids'));
+
+                            if ($courseIds === []) {
                                 return [];
                             }
 
                             return Batch::query()
-                                ->where('course_id', $courseId)
+                                ->whereIn('course_id', $courseIds)
                                 ->orderBy('name')
                                 ->get()
                                 ->mapWithKeys(fn (Batch $batch): array => [$batch->id => $batch->selectLabel()])
                                 ->all();
                         })
+                        ->multiple()
                         ->searchable()
                         ->native(false)
                         ->live()
-                        ->dehydrateStateUsing(fn ($state): ?int => filled($state) ? (int) $state : null)
-                        ->placeholder('Select batch…')
+                        ->placeholder('Select batches…')
+                        ->helperText('Tick one or more batches from the classes above.')
                         ->visible(fn (Get $get): bool => $get('audience_type') === WhatsAppAudienceType::Batch->value)
                         ->required(fn (Get $get): bool => $get('audience_type') === WhatsAppAudienceType::Batch->value),
                     Placeholder::make('estimated_recipients')
                         ->label('')
                         ->content(function (Get $get): HtmlString|string {
-                            if (blank($get('course_id'))) {
+                            $courseIds = WhatsAppCampaignService::idList($get('course_ids'));
+
+                            if ($courseIds === []) {
                                 return 'Select a class to see how many students will receive this message.';
                             }
 
-                            if ($get('audience_type') === WhatsAppAudienceType::Batch->value && blank($get('batch_id'))) {
+                            $batchIds = WhatsAppCampaignService::idList($get('batch_ids'));
+
+                            if ($get('audience_type') === WhatsAppAudienceType::Batch->value && $batchIds === []) {
                                 return 'Select a batch to see how many students will receive this message.';
                             }
 
                             $count = app(WhatsAppCampaignService::class)->estimateAudienceCount([
                                 'audience_type' => $get('audience_type'),
-                                'course_id' => $get('course_id'),
-                                'batch_id' => $get('batch_id'),
+                                'course_ids' => $courseIds,
+                                'batch_ids' => $batchIds,
                                 'academic_session_id' => null,
                             ]);
 
@@ -286,8 +313,13 @@ class WhatsAppCampaignResource extends Resource
                         ->label('Audience')
                         ->badge()
                         ->color('info'),
-                    TextEntry::make('course.name')->label('Course'),
-                    TextEntry::make('batch.name')->label('Batch'),
+                    TextEntry::make('audience_classes')
+                        ->label('Classes')
+                        ->state(fn (WhatsAppCampaign $record): string => WhatsAppCampaignViewHelper::classNames($record)),
+                    TextEntry::make('audience_batches')
+                        ->label('Batches')
+                        ->state(fn (WhatsAppCampaign $record): string => WhatsAppCampaignViewHelper::batchNames($record))
+                        ->visible(fn (WhatsAppCampaign $record): bool => $record->audience_type === WhatsAppAudienceType::Batch),
                     TextEntry::make('shot_at')->label('Started')->dateTime('d M Y, h:i A'),
                     TextEntry::make('finished_at')->label('Finished')->dateTime('d M Y, h:i A'),
                 ])

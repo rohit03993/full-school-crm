@@ -249,22 +249,66 @@ class WhatsAppCampaignService
     }
 
     /**
-     * @param  array<string, mixed>  $data
-     * @return Collection<int, Student>
+     * @return list<int>
      */
+    public static function idList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            $value = filled($value) ? [$value] : [];
+        }
+
+        $ids = [];
+
+        foreach ($value as $id) {
+            if (is_numeric($id) && (int) $id > 0) {
+                $ids[] = (int) $id;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<int>
+     */
+    protected function courseIds(array $data): array
+    {
+        if (array_key_exists('course_ids', $data)) {
+            return self::idList($data['course_ids']);
+        }
+
+        return filled($data['course_id'] ?? null) ? [(int) $data['course_id']] : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<int>
+     */
+    protected function batchIds(array $data): array
+    {
+        if (array_key_exists('batch_ids', $data)) {
+            return self::idList($data['batch_ids']);
+        }
+
+        return filled($data['batch_id'] ?? null) ? [(int) $data['batch_id']] : [];
+    }
+
     protected function batchAudienceStudents(array $data): Collection
     {
-        if (empty($data['batch_id'])) {
+        $batchIds = $this->batchIds($data);
+
+        if ($batchIds === []) {
             return collect();
         }
 
         return $this->exceptDropped(Student::query())
             ->whereNotNull('mobile')
             ->where('mobile', '!=', '')
-            ->whereHas('batchStudents', function (Builder $batchStudentQuery) use ($data): void {
+            ->whereHas('batchStudents', function (Builder $batchStudentQuery) use ($batchIds): void {
                 $batchStudentQuery
                     ->where('is_active', true)
-                    ->where('batch_id', $data['batch_id']);
+                    ->whereIn('batch_id', $batchIds);
             })
             ->distinct()
             ->get();
@@ -276,18 +320,20 @@ class WhatsAppCampaignService
      */
     protected function courseAudienceStudents(array $data): Collection
     {
-        if (empty($data['course_id'])) {
+        $courseIds = $this->courseIds($data);
+
+        if ($courseIds === []) {
             return collect();
         }
 
         return $this->exceptDropped(Student::query())
             ->whereNotNull('mobile')
             ->where('mobile', '!=', '')
-            ->whereHas('enrollments', function (Builder $enrollmentQuery) use ($data): void {
+            ->whereHas('enrollments', function (Builder $enrollmentQuery) use ($data, $courseIds): void {
                 $enrollmentQuery
                     ->where('is_active', true)
                     ->where('status', EnrollmentStatus::Enrolled)
-                    ->where('course_id', $data['course_id']);
+                    ->whereIn('course_id', $courseIds);
 
                 if (! empty($data['academic_session_id'])) {
                     $enrollmentQuery->where('academic_session_id', $data['academic_session_id']);
@@ -308,8 +354,10 @@ class WhatsAppCampaignService
             ->where('mobile', '!=', '')
             ->whereDoesntHave('enrollments', fn (Builder $enrollmentQuery): Builder => $enrollmentQuery->where('is_active', true))
             ->whereHas('enquiries', function (Builder $enquiryQuery) use ($data): void {
-                if (! empty($data['course_id'])) {
-                    $enquiryQuery->where('course_id', $data['course_id']);
+                $courseIds = $this->courseIds($data);
+
+                if ($courseIds !== []) {
+                    $enquiryQuery->whereIn('course_id', $courseIds);
                 }
 
                 if (! empty($data['visit_status_filter'])) {
@@ -360,6 +408,17 @@ class WhatsAppCampaignService
             'academic_session_id' => $campaign->academic_session_id,
             'visit_status_filter' => $campaign->visit_status_filter,
         ];
+
+        $storedCourseIds = $campaign->campaignVariable('_audience_course_ids', null);
+        $storedBatchIds = $campaign->campaignVariable('_audience_batch_ids', null);
+
+        if (is_array($storedCourseIds)) {
+            $data['course_ids'] = $storedCourseIds;
+        }
+
+        if (is_array($storedBatchIds)) {
+            $data['batch_ids'] = $storedBatchIds;
+        }
 
         $students = $this->audienceStudents($data, $campaign->audience_type);
 
@@ -465,10 +524,6 @@ class WhatsAppCampaignService
         $campaign->update(['total_recipients' => $students->count()]);
     }
 
-    /**
-     * @param  array<string, mixed>|null  $variables
-     * @return array<string, mixed>|null
-     */
     protected function assertDocumentHeaderPresent(WhatsAppCampaign $campaign): void
     {
         $campaign->loadMissing('template');
@@ -487,6 +542,10 @@ class WhatsAppCampaignService
         }
     }
 
+    /**
+     * @param  array<string, mixed>|null  $variables
+     * @return array<string, mixed>|null
+     */
     protected function normalizeCampaignVariables(?array $variables): ?array
     {
         if ($variables === null) {
@@ -494,7 +553,7 @@ class WhatsAppCampaignService
         }
 
         $normalized = [];
-        $preserveArrayKeys = ['_student_marks', '_student_ids', '_student_rolls', '_student_attendance_status', '_student_fee_context', '_manual_fee_notice_context', '_manual', '_header'];
+        $preserveArrayKeys = ['_student_marks', '_student_ids', '_student_rolls', '_student_attendance_status', '_student_fee_context', '_manual_fee_notice_context', '_manual', '_header', '_audience_course_ids', '_audience_batch_ids'];
 
         foreach ($variables as $key => $value) {
             if (is_array($value)) {

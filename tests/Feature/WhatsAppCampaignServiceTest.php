@@ -94,6 +94,36 @@ class WhatsAppCampaignServiceTest extends TestCase
         $this->assertSame('sep-dates.pdf', $header['filename']);
     }
 
+    public function test_one_campaign_can_include_students_from_two_batches(): void
+    {
+        $admin = $this->createSuperAdmin();
+        [$course, $batchA, $batchB] = $this->createCourseWithBatches($admin);
+        $first = $this->createEnrolledStudent('Batch A Student', '9876500301', '901', $course, $batchA);
+        $second = $this->createEnrolledStudent('Batch B Student', '9876500302', '902', $course, $batchB);
+        $template = $this->createTemplate();
+
+        $campaign = app(WhatsAppCampaignService::class)->createCampaign([
+            'name' => 'Two batches',
+            'whatsapp_template_id' => $template->id,
+            'audience_type' => WhatsAppAudienceType::Batch->value,
+            'course_id' => $course->id,
+            'batch_id' => $batchA->id,
+            'course_ids' => [$course->id],
+            'batch_ids' => [$batchA->id, $batchB->id],
+            'campaign_variables' => [
+                '_audience_course_ids' => [$course->id],
+                '_audience_batch_ids' => [$batchA->id, $batchB->id],
+            ],
+        ], $admin);
+
+        $recipientIds = $campaign->recipients()->pluck('student_id')->all();
+
+        $this->assertSame(2, $campaign->total_recipients);
+        $this->assertContains($first->id, $recipientIds);
+        $this->assertContains($second->id, $recipientIds);
+        $this->assertSame([$batchA->id, $batchB->id], $campaign->campaignVariable('_audience_batch_ids'));
+    }
+
     public function test_course_audience_includes_all_active_enrollments_in_course(): void
     {
         $admin = $this->createSuperAdmin();
