@@ -163,8 +163,24 @@ class AttendanceReportsTest extends TestCase
         Attendance::query()->create([
             'batch_id' => $batch->id,
             'student_id' => $presentStudent->id,
+            'attendance_date' => '2026-07-09',
+            'status' => AttendanceStatus::Leave,
+            'marked_by_user_id' => $staff->id,
+        ]);
+
+        Attendance::query()->create([
+            'batch_id' => $batch->id,
+            'student_id' => $presentStudent->id,
             'attendance_date' => '2026-07-10',
             'status' => AttendanceStatus::Present,
+            'marked_by_user_id' => $staff->id,
+        ]);
+
+        Attendance::query()->create([
+            'batch_id' => $secondBatch->id,
+            'student_id' => $absentStudent->id,
+            'attendance_date' => '2026-07-10',
+            'status' => AttendanceStatus::Leave,
             'marked_by_user_id' => $staff->id,
         ]);
 
@@ -184,8 +200,14 @@ class AttendanceReportsTest extends TestCase
         $this->assertSame($absentStudent->name, $students['rows'][0][0]);
         $this->assertSame($presentStudent->name, $students['rows'][1][0]);
         $this->assertSame(9, $students['percent_column']);
+        $this->assertGreaterThan(0, (int) $students['rows'][0][6]);
         $this->assertSame(0.0, (float) $students['rows'][0][9]);
-        $this->assertGreaterThan(0, (float) $students['rows'][1][9]);
+        $this->assertSame(1, (int) $students['rows'][1][5]);
+        $this->assertGreaterThan(0, (int) $students['rows'][1][6]);
+        $this->assertSame(
+            round(((int) $students['rows'][1][5] / (int) $students['rows'][1][8]) * 100, 1),
+            (float) $students['rows'][1][9],
+        );
 
         $below = app(ReportService::class)->generate(ReportType::ClassStudentAttendance, [
             ...$filters,

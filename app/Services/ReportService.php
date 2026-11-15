@@ -750,7 +750,9 @@ class ReportService
                 'leave' => $summary['leave_days'],
                 'absent' => $summary['absent_days'],
                 'working' => $summary['expected_days'],
-                'percentage' => $summary['percentage'],
+                'percentage' => $summary['expected_days'] > 0
+                    ? round(($summary['present_days'] / $summary['expected_days']) * 100, 1)
+                    : 0,
             ];
         }
 

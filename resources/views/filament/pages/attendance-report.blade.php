@@ -21,7 +21,7 @@
             <div>
                 <h2 class="text-sm font-semibold text-gray-950 dark:text-white">{{ is_array($report) ? ($report['title'] ?? 'Attendance') : 'Attendance' }}</h2>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Red is under 75%. Amber is 75% to 89%. Green is 90% and above.
+                    % is Present divided by working days. Leave and Absent are not counted as present. Red is under 75%. Amber is 75% to 89%. Green is 90% and above.
                 </p>
             </div>
             <div class="flex flex-wrap gap-2">
