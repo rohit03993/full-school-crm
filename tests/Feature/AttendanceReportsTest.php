@@ -230,6 +230,20 @@ class AttendanceReportsTest extends TestCase
         $this->assertSame('JEE', $classes['rows'][0][0]);
         $this->assertSame(2, $classes['rows'][0][1]);
         $this->assertSame(6, $classes['percent_column']);
+
+        $register = app(ReportService::class)->attendanceRegister($filters);
+        $sunday = $register['dates'][4];
+
+        $this->assertCount(11, $register['dates']);
+        $this->assertSame('2026-07-05', $sunday['date']);
+        $this->assertSame('Sun', $sunday['weekday']);
+        $this->assertSame('Batch A', $register['sheets'][0]['batch_name']);
+        $this->assertSame('P', $register['sheets'][0]['students'][0]['marks'][9]);
+        $this->assertSame('L', $register['sheets'][0]['students'][0]['marks'][8]);
+        $this->assertSame('A', $register['sheets'][0]['students'][0]['marks'][4]);
+        $this->assertSame('Batch B', $register['sheets'][1]['batch_name']);
+        $this->assertSame('', $register['sheets'][1]['students'][0]['marks'][0]);
+        $this->assertSame('L', $register['sheets'][1]['students'][0]['marks'][9]);
     }
 
     /**

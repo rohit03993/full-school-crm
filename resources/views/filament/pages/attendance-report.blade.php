@@ -116,6 +116,8 @@
                     <button type="button" wire:click="exportExcel" class="crm-wa-analytics__apply-btn">Excel</button>
                     <button type="button" wire:click="exportCsv" class="crm-wa-analytics__preset">CSV</button>
                     <button type="button" wire:click="exportPdf" class="crm-wa-analytics__preset">PDF</button>
+                    <button type="button" wire:click="exportRegisterExcel" class="crm-wa-analytics__apply-btn">Register Excel</button>
+                    <button type="button" wire:click="exportRegisterPdf" class="crm-wa-analytics__preset">Register PDF</button>
                 </div>
             @endif
         </div>

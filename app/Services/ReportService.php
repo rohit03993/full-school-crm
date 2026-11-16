@@ -779,6 +779,8 @@ class ReportService
                 'percentage' => $totalDays > 0
                     ? round(($presentDays / $totalDays) * 100, 1)
                     : 0,
+                'batch_id' => (int) $chosen->batch_id,
+                'joined_on' => $joined->toDateString(),
             ];
         }
 
@@ -802,6 +804,145 @@ class ReportService
         }
 
         return $dates;
+    }
+
+    /**
+     * One sheet per batch. Every calendar date is a column, including Sunday.
+     * A day before the student joined that batch is blank. Any other day with no Present or Leave is A.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array{
+     *     title: string,
+     *     generated_at: string,
+     *     dates: list<array{date: string, label: string, weekday: string}>,
+     *     sheets: list<array{batch_id: int, batch_name: string, students: list<array<string, mixed>>}>
+     * }
+     */
+    public function attendanceRegister(array $filters): array
+    {
+        [$from, $to] = $this->dateRange($filters);
+        $lines = $this->classStudentAttendanceLines(
+            $from,
+            $to,
+            filled($filters['course_id'] ?? null) ? (int) $filters['course_id'] : null,
+            filled($filters['batch_id'] ?? null) ? (int) $filters['batch_id'] : null,
+            filled($filters['student_id'] ?? null) ? (int) $filters['student_id'] : null,
+            trim((string) ($filters['student_search'] ?? '')),
+        );
+        $rawMax = $filters['max_percentage'] ?? null;
+
+        if ($rawMax !== null && $rawMax !== '') {
+            $maxPercentage = (float) $rawMax;
+            $lines = array_values(array_filter(
+                $lines,
+                fn (array $line): bool => $line['percentage'] < $maxPercentage,
+            ));
+        }
+
+        $dates = array_map(function (string $date): array {
+            $day = Carbon::parse($date);
+
+            return [
+                'date' => $date,
+                'label' => $day->format('j M'),
+                'weekday' => $day->format('D'),
+            ];
+        }, $this->calendarDates($from->copy()->startOfDay(), $to->copy()->startOfDay()));
+
+        $lookup = $this->registerMarkLookup($lines, $from, $to);
+        $sheets = [];
+
+        foreach ($lines as $line) {
+            $batchId = (int) $line['batch_id'];
+
+            if (! isset($sheets[$batchId])) {
+                $sheets[$batchId] = [
+                    'batch_id' => $batchId,
+                    'batch_name' => (string) $line['batch_name'],
+                    'students' => [],
+                ];
+            }
+
+            $key = $line['student_id'].'-'.$batchId;
+            $marks = [];
+
+            foreach ($dates as $date) {
+                if ($date['date'] < $line['joined_on']) {
+                    $marks[] = '';
+
+                    continue;
+                }
+
+                $marks[] = $lookup[$key][$date['date']] ?? 'A';
+            }
+
+            $sheets[$batchId]['students'][] = [
+                'roll' => $line['roll'],
+                'name' => $line['student_name'],
+                'marks' => $marks,
+                'present' => $line['present'],
+                'leave' => $line['leave'],
+                'absent' => $line['absent'],
+                'days' => $line['working'],
+                'percentage' => $line['percentage'],
+            ];
+        }
+
+        $sheets = array_values($sheets);
+        usort($sheets, fn (array $a, array $b): int => strcmp($a['batch_name'], $b['batch_name']));
+
+        foreach ($sheets as &$sheet) {
+            usort($sheet['students'], function (array $a, array $b): int {
+                $byRoll = strcmp((string) $a['roll'], (string) $b['roll']);
+
+                return $byRoll !== 0 ? $byRoll : strcmp((string) $a['name'], (string) $b['name']);
+            });
+        }
+        unset($sheet);
+
+        return [
+            'title' => 'Attendance register · '.$from->format('d M Y').' – '.$to->format('d M Y'),
+            'generated_at' => now()->format('d M Y H:i'),
+            'dates' => $dates,
+            'sheets' => $sheets,
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lines
+     * @return array<string, array<string, string>>
+     */
+    protected function registerMarkLookup(array $lines, Carbon $from, Carbon $to): array
+    {
+        if ($lines === []) {
+            return [];
+        }
+
+        $marks = Attendance::query()
+            ->whereIn('student_id', array_values(array_unique(array_column($lines, 'student_id'))))
+            ->whereIn('batch_id', array_values(array_unique(array_column($lines, 'batch_id'))))
+            ->whereBetween('attendance_date', [$from->toDateString(), $to->toDateString()])
+            ->get(['student_id', 'batch_id', 'attendance_date', 'status']);
+
+        $lookup = [];
+
+        foreach ($marks as $mark) {
+            $key = $mark->student_id.'-'.$mark->batch_id;
+            $date = $mark->attendance_date->toDateString();
+            $code = match ($mark->status) {
+                AttendanceStatus::Present => 'P',
+                AttendanceStatus::Leave => 'L',
+                default => 'A',
+            };
+
+            if (($lookup[$key][$date] ?? null) === 'P') {
+                continue;
+            }
+
+            $lookup[$key][$date] = $code;
+        }
+
+        return $lookup;
     }
 
     /**

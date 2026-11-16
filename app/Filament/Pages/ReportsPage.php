@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Enums\CrmPermission;
 use App\Enums\LicenseFeature;
 use App\Enums\ReportType;
+use App\Exports\AttendanceRegisterExport;
 use App\Exports\ReportExport;
 use App\Models\Batch;
 use App\Policies\ReportPolicy;
@@ -179,6 +180,26 @@ class ReportsPage extends Page
         return response()->streamDownload(
             fn () => print $pdf->generate($data),
             'class-student-attendance-'.now()->format('Y-m-d').'.pdf',
+            ['Content-Type' => 'application/pdf'],
+        );
+    }
+
+    public function exportRegisterExcel(ReportService $reports): BinaryFileResponse
+    {
+        $this->authorizeExport();
+        $register = $reports->attendanceRegister($this->filtersForReport());
+
+        return Excel::download(new AttendanceRegisterExport($register), 'attendance-register-'.now()->format('Y-m-d').'.xlsx');
+    }
+
+    public function exportRegisterPdf(ReportService $reports, ReportPdfService $pdf): StreamedResponse
+    {
+        $this->authorizeExport();
+        $register = $reports->attendanceRegister($this->filtersForReport());
+
+        return response()->streamDownload(
+            fn () => print $pdf->register($register),
+            'attendance-register-'.now()->format('Y-m-d').'.pdf',
             ['Content-Type' => 'application/pdf'],
         );
     }
