@@ -203,6 +203,7 @@ class AttendanceReportsTest extends TestCase
         $this->assertGreaterThan(0, (int) $students['rows'][0][6]);
         $this->assertSame(0.0, (float) $students['rows'][0][9]);
         $this->assertSame(1, (int) $students['rows'][1][5]);
+        $this->assertSame(11, (int) $students['rows'][1][8]);
         $this->assertGreaterThan(0, (int) $students['rows'][1][6]);
         $this->assertSame(
             round(((int) $students['rows'][1][5] / (int) $students['rows'][1][8]) * 100, 1),

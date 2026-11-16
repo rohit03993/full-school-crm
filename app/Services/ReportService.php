@@ -726,17 +726,43 @@ class ReportService
                 continue;
             }
 
-            $student->setRelation('activeBatchStudent', $chosen);
+            $joined = $chosen->assigned_at
+                ? Carbon::parse($chosen->assigned_at)->startOfDay()
+                : $from->copy()->startOfDay();
+            $start = $joined->greaterThan($from) ? $joined->copy() : $from->copy()->startOfDay();
+            $end = $to->copy()->startOfDay();
 
-            $summary = $this->attendance->summaryForStudentInRange(
-                $student,
-                $from->copy()->startOfDay(),
-                $to->copy()->startOfDay(),
-            );
-
-            if ($summary === null) {
+            if ($start->greaterThan($end)) {
                 continue;
             }
+
+            $dates = $this->calendarDates($start, $end);
+            $marks = Attendance::query()
+                ->where('batch_id', $chosen->batch_id)
+                ->where('student_id', $student->id)
+                ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()])
+                ->get(['attendance_date', 'status']);
+
+            $presentDates = [];
+            $leaveDates = [];
+
+            foreach ($marks as $mark) {
+                $date = $mark->attendance_date->toDateString();
+
+                if (! in_array($date, $dates, true)) {
+                    continue;
+                }
+
+                if ($mark->status === AttendanceStatus::Present) {
+                    $presentDates[$date] = true;
+                } elseif ($mark->status === AttendanceStatus::Leave) {
+                    $leaveDates[$date] = true;
+                }
+            }
+
+            $presentDays = count($presentDates);
+            $leaveDays = count(array_diff_key($leaveDates, $presentDates));
+            $totalDays = count($dates);
 
             $lines[] = [
                 'student_id' => $student->id,
@@ -746,17 +772,36 @@ class ReportService
                 'class_name' => $chosen->batch?->course?->name ?? '—',
                 'batch_name' => $chosen->batch?->name ?? '—',
                 'mobile' => $student->mobile ?? '—',
-                'present' => $summary['present_days'],
-                'leave' => $summary['leave_days'],
-                'absent' => $summary['absent_days'],
-                'working' => $summary['expected_days'],
-                'percentage' => $summary['expected_days'] > 0
-                    ? round(($summary['present_days'] / $summary['expected_days']) * 100, 1)
+                'present' => $presentDays,
+                'leave' => $leaveDays,
+                'absent' => max(0, $totalDays - $presentDays - $leaveDays),
+                'working' => $totalDays,
+                'percentage' => $totalDays > 0
+                    ? round(($presentDays / $totalDays) * 100, 1)
                     : 0,
             ];
         }
 
         return $lines;
+    }
+
+    /**
+     * Every date from the start through the end, including Sunday.
+     *
+     * @return list<string>
+     */
+    protected function calendarDates(Carbon $from, Carbon $to): array
+    {
+        $dates = [];
+        $cursor = $from->copy()->startOfDay();
+        $end = $to->copy()->startOfDay();
+
+        while ($cursor->lte($end)) {
+            $dates[] = $cursor->toDateString();
+            $cursor->addDay();
+        }
+
+        return $dates;
     }
 
     /**
