@@ -61,6 +61,9 @@ class ManageWhatsAppInchatForms extends Page
 
     public bool $editingVisit = false;
 
+    /** Empty means the flow list. campus or form_12 means that flow is open. */
+    public string $openFlowKey = '';
+
     public string $replySearch = '';
 
     /** @var array<string, string> */
@@ -95,12 +98,27 @@ class ManageWhatsAppInchatForms extends Page
 
     public function startNewFlow(): void
     {
+        $this->openFlowKey = '';
         $this->editingVisit = false;
         $this->editingId = null;
         $this->editingName = '';
         $this->showEditor = true;
         $this->form->fill($this->blankState());
         $this->focusEditor();
+    }
+
+    public function openFlow(string $key): void
+    {
+        $this->openFlowKey = $key;
+        $this->replySearch = '';
+        $this->closeFlowEditor();
+    }
+
+    public function backToFlows(): void
+    {
+        $this->openFlowKey = '';
+        $this->replySearch = '';
+        $this->closeFlowEditor();
     }
 
     public function editFlow(int $formId, WhatsAppInchatFormService $forms): void
@@ -113,6 +131,7 @@ class ManageWhatsAppInchatForms extends Page
             return;
         }
 
+        $this->openFlowKey = 'form_'.$form->id;
         $this->editingVisit = false;
         $this->editingId = $form->id;
         $this->editingName = $form->name;
@@ -124,6 +143,7 @@ class ManageWhatsAppInchatForms extends Page
     public function editVisit(): void
     {
         $copy = WhatsAppCampusVisitFlowJson::copy();
+        $this->openFlowKey = 'campus';
         $this->showEditor = false;
         $this->editingId = null;
         $this->editingVisit = true;
@@ -272,6 +292,8 @@ class ManageWhatsAppInchatForms extends Page
             return;
         }
 
+        $this->showEditor = false;
+
         Notification::make()
             ->title('Form published')
             ->body('Parents can open it by typing the word.')
@@ -346,26 +368,57 @@ class ManageWhatsAppInchatForms extends Page
     }
 
     /**
-     * @return array<string, array{count: int, rows: list<array<string, mixed>>}>
+     * Campus visit and every saved flow, in one list.
+     *
+     * @return list<array{key: string, id: int, name: string, word: string, state: string, on: bool, count: int, kind: string}>
      */
-    public function replyPacks(): array
+    public function flowCards(): array
     {
         $list = app(WhatsAppFlowReplyList::class);
-        $packs = [
-            'campus' => [
-                'count' => $list->count('campus'),
-                'rows' => $list->rows('campus', 30, $this->replySearch),
-            ],
-        ];
+        $visitOn = WhatsAppCampusVisitFlowJson::enabled();
+        $published = filled(app(WhatsAppFlowService::class)->savedFlowId());
+
+        $cards = [[
+            'key' => 'campus',
+            'id' => 0,
+            'name' => 'Campus visit',
+            'word' => 'visit',
+            'state' => ! $visitOn ? 'Off' : ($published ? 'Live' : 'Not on WhatsApp'),
+            'on' => $visitOn,
+            'count' => $list->count('campus'),
+            'kind' => 'visit',
+        ]];
 
         foreach (app(WhatsAppInchatFormService::class)->listRows() as $flow) {
-            $packs['form_'.$flow['id']] = [
+            $cards[] = [
+                'key' => 'form_'.$flow['id'],
+                'id' => (int) $flow['id'],
+                'name' => $flow['name'],
+                'word' => $flow['trigger_word'],
+                'state' => $flow['state'],
+                'on' => (bool) $flow['enabled'],
                 'count' => $list->count($flow['name']),
-                'rows' => $list->rows($flow['name'], 30, $this->replySearch),
+                'kind' => 'form',
             ];
         }
 
-        return $packs;
+        return $cards;
+    }
+
+    /**
+     * @return array{flowKey: string, rows: list<array<string, mixed>>, count: int, templates: list<array{id: int, label: string}>}
+     */
+    public function openReplyView(): array
+    {
+        $card = collect($this->flowCards())->firstWhere('key', $this->openFlowKey);
+        $flow = $card === null ? '' : ($card['kind'] === 'visit' ? 'campus' : $card['name']);
+
+        return [
+            'flowKey' => $this->openFlowKey,
+            'rows' => $flow === '' ? [] : app(WhatsAppFlowReplyList::class)->rows($flow, 100, $this->replySearch),
+            'count' => $flow === '' ? 0 : app(WhatsAppFlowReplyList::class)->count($flow, $this->replySearch),
+            'templates' => $this->plainTemplates(),
+        ];
     }
 
     /**
@@ -401,8 +454,14 @@ class ManageWhatsAppInchatForms extends Page
             return;
         }
 
-        $pack = $this->replyPacks()[$flowKey] ?? null;
+        $pack = $this->openReplyView();
         $people = [];
+
+        if (($pack['flowKey'] ?? '') !== $flowKey) {
+            Notification::make()->title('Open that flow first')->warning()->send();
+
+            return;
+        }
 
         foreach ($pack['rows'] ?? [] as $row) {
             $mobile = trim((string) ($row['mobile'] ?? ''));
@@ -477,25 +536,23 @@ class ManageWhatsAppInchatForms extends Page
 
     public function content(Schema $schema): Schema
     {
-        $flowData = fn (): array => [
-            'part' => 'flows',
-            'flows' => app(WhatsAppInchatFormService::class)->listRows(),
-            'visitPublished' => filled(app(WhatsAppFlowService::class)->savedFlowId()),
-            'visitOn' => WhatsAppCampusVisitFlowJson::enabled(),
-            'editingVisit' => $this->editingVisit,
-            'editingId' => $this->editingId,
-            'editingName' => $this->editingName,
-            'replyPacks' => $this->replyPacks(),
-            'templates' => $this->plainTemplates(),
-        ];
-
         $components = [
             View::make('filament.pages.partials.whatsapp-inchat-forms-list')
-                ->viewData($flowData),
+                ->viewData(fn (): array => [
+                    'part' => 'flows',
+                    'cards' => $this->flowCards(),
+                    'openKey' => $this->openFlowKey,
+                    'editingVisit' => $this->editingVisit,
+                ]),
         ];
 
         if ($this->showEditor) {
             $components[] = $this->getFormContentComponent();
+        }
+
+        if ($this->openFlowKey !== '') {
+            $components[] = View::make('filament.pages.partials.whatsapp-flow-replies')
+                ->viewData(fn (): array => $this->openReplyView());
         }
 
         return $schema->components($components);
@@ -568,6 +625,8 @@ class ManageWhatsAppInchatForms extends Page
         }
 
         $this->editingId = $result['form']->id;
+        $this->editingName = $result['form']->name;
+        $this->openFlowKey = 'form_'.$result['form']->id;
         $this->form->fill($forms->formState($result['form']));
 
         return $result['form'];
