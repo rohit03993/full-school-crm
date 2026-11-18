@@ -50,6 +50,9 @@ class WhatsAppFlowReplyListTest extends TestCase
 
         $this->assertCount(1, $list->rows('Admission enquiry'));
         $this->assertCount(0, $list->rows('campus'));
+        $this->assertCount(1, $list->rows('Admission enquiry', 50, 'Riya'));
+        $this->assertCount(0, $list->rows('Admission enquiry', 50, '99999'));
+        $this->assertSame(1, $list->count('Admission enquiry'));
     }
 
     public function test_turning_a_visit_form_off_keeps_the_words(): void

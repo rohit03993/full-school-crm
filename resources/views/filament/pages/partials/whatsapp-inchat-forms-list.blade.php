@@ -36,6 +36,8 @@
     .crm-flow__head { padding: 0.9rem 1.25rem; border-bottom: 1px solid #e7e5e4; }
     .dark .crm-flow__head { border-bottom-color: rgba(255,255,255,.1); }
     .crm-flow__row { padding: 0.85rem 1.25rem; }
+    .crm-flow__open { box-shadow: inset 3px 0 0 var(--primary-600, #ea580c); background: #fff7ed; }
+    .dark .crm-flow__open { background: rgba(234,88,12,.08); }
     .crm-flow__row + .crm-flow__row { border-top: 1px solid #f5f5f4; }
     .dark .crm-flow__row + .crm-flow__row { border-top-color: rgba(255,255,255,.08); }
     .crm-flow__empty { margin: 0; padding: 1rem 1.25rem 1.15rem; font-size: 0.9rem; color: #78716c; }
@@ -56,22 +58,34 @@
     .dark .crm-flow__label { color: #e7e5e4; }
     .crm-flow__check { display: flex; align-items: center; gap: 0.45rem; font-size: 0.9rem; color: #44403c; }
     .crm-flow__locked { margin: 0.7rem 0 0; font-size: 0.85rem; color: #78716c; }
+    .crm-flow__replies { border-top: 1px solid #f5f5f4; padding: 0.35rem 0 0.2rem; }
+    .dark .crm-flow__replies { border-top-color: rgba(255,255,255,.08); }
+    .crm-flow__send { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; padding: 0.75rem 1.25rem 1rem; }
+    .crm-flow__search { display: block; max-width: 18rem; }
 </style>
 
 <div class="crm-flow">
-    <p class="crm-flow__lead">Each row is one form. Edit changes the questions. Turn off stops the word. People who already replied stay in the list below.</p>
+    <p class="crm-flow__lead">Each form keeps its own replies. Edit changes the questions. Turn off stops the word. People who already replied stay on that form.</p>
+    <label class="crm-flow__search">
+        <span class="crm-flow__label">Find a reply</span>
+        <input type="search" wire:model.live.debounce.400ms="replySearch" placeholder="Name or number" class="crm-flow__field" />
+    </label>
 
     @php
         $visitLive = ($visitPublished ?? false) && ($visitOn ?? true);
         $visitState = ! ($visitOn ?? true) ? 'Off' : (($visitPublished ?? false) ? 'Live' : 'Not on WhatsApp');
     @endphp
-    <article class="crm-flow__sheet crm-flow__visit">
+    <section class="crm-flow__sheet">
+    <article class="crm-flow__visit {{ ($editingVisit ?? false) ? 'crm-flow__open' : '' }}">
         <div>
             <p class="crm-flow__kicker">Built in</p>
             <h2 class="crm-flow__title">Campus visit</h2>
             <p class="crm-flow__meta">
                 Word <span class="crm-flow__chip">visit</span>
                 <span class="crm-flow__pill {{ $visitLive ? '' : 'crm-flow__pill--wait' }}">{{ $visitState }}</span>
+                @if ($editingVisit ?? false)
+                    <span class="crm-flow__pill">Editing this one</span>
+                @endif
             </p>
         </div>
         <div class="crm-flow__actions">
@@ -83,6 +97,13 @@
             @endif
         </div>
     </article>
+    @include('filament.pages.partials.whatsapp-flow-replies', [
+        'flowKey' => 'campus',
+        'rows' => $replyPacks['campus']['rows'] ?? [],
+        'count' => $replyPacks['campus']['count'] ?? 0,
+        'templates' => $templates ?? [],
+    ])
+    </section>
 
     <section class="crm-flow__sheet">
         <div class="crm-flow__head">
@@ -93,12 +114,15 @@
             <p class="crm-flow__empty">None yet. New flow asks for a name, one word, and one question.</p>
         @else
             @foreach ($flows as $flow)
-                <div class="crm-flow__row">
+                <div class="crm-flow__row {{ (int) ($editingId ?? 0) === (int) $flow['id'] ? 'crm-flow__open' : '' }}">
                     <div>
                         <p class="crm-flow__title">{{ $flow['name'] }}</p>
                         <p class="crm-flow__meta">
                             Word <span class="crm-flow__chip">{{ $flow['trigger_word'] }}</span>
                             <span class="crm-flow__pill {{ $flow['state'] === 'Live' ? '' : 'crm-flow__pill--wait' }}">{{ $flow['state'] }}</span>
+                            @if ((int) ($editingId ?? 0) === (int) $flow['id'])
+                                <span class="crm-flow__pill">Editing this one</span>
+                            @endif
                         </p>
                     </div>
                     <div class="crm-flow__actions">
@@ -110,6 +134,12 @@
                         @endif
                     </div>
                 </div>
+                @include('filament.pages.partials.whatsapp-flow-replies', [
+                    'flowKey' => 'form_'.$flow['id'],
+                    'rows' => $replyPacks['form_'.$flow['id']]['rows'] ?? [],
+                    'count' => $replyPacks['form_'.$flow['id']]['count'] ?? 0,
+                    'templates' => $templates ?? [],
+                ])
             @endforeach
         @endif
     </section>
@@ -118,7 +148,8 @@
         @if ($editingVisit ?? false)
             <section class="crm-flow__sheet">
                 <div class="crm-flow__editor">
-                    <h2 class="crm-flow__title">Edit campus visit</h2>
+                    <p class="crm-flow__kicker">You are editing</p>
+                    <h2 class="crm-flow__title">Campus visit</h2>
                     <p class="crm-flow__note">Change the words parents see. Course and visit date stay, because a booking needs both. Old replies stay in the list.</p>
                     <div class="crm-flow__grid" style="margin-top: 0.9rem;">
                         <label>
@@ -154,52 +185,5 @@
             </section>
         @endif
     </div>
-</div>
-@else
-<div class="crm-flow" style="margin-top: 1.25rem;">
-    <section class="crm-flow__sheet">
-        <div class="crm-flow__head">
-            <div>
-                <h2 class="crm-flow__title">Replies</h2>
-                <p class="crm-flow__meta">Everyone who finished a flow. Open a name only when you need the full lead.</p>
-            </div>
-            <select wire:model.live="replyFlow" class="crm-flow__pick" aria-label="Which flow">
-                <option value="all">All flows</option>
-                <option value="campus">Campus visit</option>
-                @foreach ($flows ?? [] as $flow)
-                    <option value="{{ $flow['name'] }}">{{ $flow['name'] }}</option>
-                @endforeach
-            </select>
-        </div>
-        @if (($replies ?? []) === [])
-            <p class="crm-flow__empty">No replies yet. When someone finishes a flow, the name, number, and answers show here.</p>
-        @else
-            @foreach ($replies as $reply)
-                <div class="crm-flow__row">
-                    <div>
-                        <p class="crm-flow__title">
-                            @if ($reply['profile_url'])
-                                <a href="{{ $reply['profile_url'] }}" class="crm-flow__edit">{{ $reply['name'] }}</a>
-                            @else
-                                {{ $reply['name'] }}
-                            @endif
-                        </p>
-                        <p class="crm-flow__meta">
-                            @if (\App\Support\CrmAccess::canViewStudentMobile(auth()->user()))
-                                {{ $reply['mobile'] !== '' ? $reply['mobile'] : 'No number' }}
-                            @else
-                                Number hidden
-                            @endif
-                            <span class="crm-flow__chip">{{ $reply['flow'] }}</span>
-                            {{ $reply['when'] }}
-                        </p>
-                        @if ($reply['answers'] !== '')
-                            <p class="crm-flow__answers">{{ $reply['answers'] }}</p>
-                        @endif
-                    </div>
-                </div>
-            @endforeach
-        @endif
-    </section>
 </div>
 @endif

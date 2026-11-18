@@ -9,14 +9,42 @@ use Illuminate\Database\Eloquent\Builder;
 class WhatsAppFlowReplyList
 {
     /**
-     * People who finished a WhatsApp flow. Read from the visit note already saved on the lead.
-     *
-     * @return list<array{name: string, mobile: string, flow: string, when: string, answers: string, profile_url: ?string}>
+     * @return list<array{name: string, mobile: string, flow: string, when: string, answers: string, profile_url: ?string, student_id: ?int}>
      */
-    public function rows(string $flow = 'all', int $limit = 50): array
+    public function rows(string $flow = 'all', int $limit = 50, string $search = ''): array
+    {
+        return $this->base($flow, $search)
+            ->with('student:id,name,mobile')
+            ->latest('id')
+            ->limit($limit)
+            ->get()
+            ->map(function (Visit $visit): array {
+                $summary = (string) $visit->discussion_summary;
+                $studentId = $visit->student_id;
+
+                return [
+                    'name' => $visit->student?->name ?: 'WhatsApp lead',
+                    'mobile' => (string) ($visit->student?->mobile ?? ''),
+                    'flow' => $this->flowName($summary, (string) $visit->remarks),
+                    'when' => $visit->created_at?->timezone(config('app.timezone'))->format('d M Y, h:i A') ?? '',
+                    'answers' => $this->answers($summary),
+                    'profile_url' => $studentId
+                        ? StudentProfilePage::getUrl(['record' => $studentId])
+                        : null,
+                    'student_id' => $studentId ? (int) $studentId : null,
+                ];
+            })
+            ->all();
+    }
+
+    public function count(string $flow, string $search = ''): int
+    {
+        return $this->base($flow, $search)->count();
+    }
+
+    protected function base(string $flow, string $search): Builder
     {
         $query = Visit::query()
-            ->with('student:id,name,mobile')
             ->where(function (Builder $query): void {
                 $query->where('remarks', 'like', 'whatsapp_lead:%')
                     ->orWhere('remarks', 'like', 'whatsapp_flow:%')
@@ -37,26 +65,17 @@ class WhatsAppFlowReplyList
                 });
         }
 
-        return $query
-            ->latest('id')
-            ->limit($limit)
-            ->get()
-            ->map(function (Visit $visit): array {
-                $summary = (string) $visit->discussion_summary;
-                $studentId = $visit->student_id;
+        $search = trim($search);
 
-                return [
-                    'name' => $visit->student?->name ?: 'WhatsApp lead',
-                    'mobile' => (string) ($visit->student?->mobile ?? ''),
-                    'flow' => $this->flowName($summary, (string) $visit->remarks),
-                    'when' => $visit->created_at?->timezone(config('app.timezone'))->format('d M Y, h:i A') ?? '',
-                    'answers' => $this->answers($summary),
-                    'profile_url' => $studentId
-                        ? StudentProfilePage::getUrl(['record' => $studentId])
-                        : null,
-                ];
-            })
-            ->all();
+        if ($search !== '') {
+            $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
+            $query->whereHas('student', function (Builder $student) use ($like): void {
+                $student->where('name', 'like', $like)
+                    ->orWhere('mobile', 'like', $like);
+            });
+        }
+
+        return $query;
     }
 
     protected function flowName(string $summary, string $remarks): string

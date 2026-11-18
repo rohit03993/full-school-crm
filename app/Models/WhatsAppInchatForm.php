@@ -57,7 +57,7 @@ class WhatsAppInchatForm extends Model
         }
 
         if ($this->needs_republish) {
-            return 'Edited';
+            return 'Not updated on WhatsApp';
         }
 
         return 'Live';

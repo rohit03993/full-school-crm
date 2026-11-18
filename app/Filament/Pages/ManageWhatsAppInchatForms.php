@@ -7,8 +7,11 @@ use App\Enums\LicenseFeature;
 use App\Enums\WhatsAppInchatAudience;
 use App\Enums\WhatsAppInchatFieldType;
 use App\Filament\Concerns\RequiresCrmPermission;
+use App\Enums\WhatsAppMessageSource;
+use App\Models\MetaWhatsAppTemplate;
 use App\Models\WhatsAppInchatForm;
 use App\Support\WhatsAppCampusVisitFlowJson;
+use App\Services\MetaWhatsAppService;
 use App\Services\WhatsAppFlowReplyList;
 use App\Services\WhatsAppFlowService;
 use App\Services\WhatsAppInchatFormService;
@@ -52,11 +55,16 @@ class ManageWhatsAppInchatForms extends Page
 
     public ?int $editingId = null;
 
+    public string $editingName = '';
+
     public bool $showEditor = false;
 
     public bool $editingVisit = false;
 
-    public string $replyFlow = 'all';
+    public string $replySearch = '';
+
+    /** @var array<string, string> */
+    public array $sendTemplateIds = [];
 
     public string $visitCourseLabel = 'Course';
 
@@ -89,6 +97,7 @@ class ManageWhatsAppInchatForms extends Page
     {
         $this->editingVisit = false;
         $this->editingId = null;
+        $this->editingName = '';
         $this->showEditor = true;
         $this->form->fill($this->blankState());
         $this->focusEditor();
@@ -106,6 +115,7 @@ class ManageWhatsAppInchatForms extends Page
 
         $this->editingVisit = false;
         $this->editingId = $form->id;
+        $this->editingName = $form->name;
         $this->showEditor = true;
         $this->form->fill($forms->formState($form));
         $this->focusEditor();
@@ -195,6 +205,7 @@ class ManageWhatsAppInchatForms extends Page
         $this->showEditor = false;
         $this->editingVisit = false;
         $this->editingId = null;
+        $this->editingName = '';
     }
 
     protected function focusEditor(): void
@@ -276,8 +287,10 @@ class ManageWhatsAppInchatForms extends Page
     public function form(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make(fn (): string => $this->editingId ? 'Edit flow' : 'New flow')
-                ->description('Name, one word, then the questions. Turn it off from the list. Do not use the word visit.')
+            Section::make(fn (): string => $this->editingId
+                ? 'Editing '.$this->editingName
+                : 'New flow')
+                ->description('You are changing this flow only. The word visit belongs to Campus visit, even when that flow is off.')
                 ->schema([
                     TextInput::make('name')
                         ->label('Name')
@@ -332,6 +345,136 @@ class ManageWhatsAppInchatForms extends Page
         ]);
     }
 
+    /**
+     * @return array<string, array{count: int, rows: list<array<string, mixed>>}>
+     */
+    public function replyPacks(): array
+    {
+        $list = app(WhatsAppFlowReplyList::class);
+        $packs = [
+            'campus' => [
+                'count' => $list->count('campus'),
+                'rows' => $list->rows('campus', 30, $this->replySearch),
+            ],
+        ];
+
+        foreach (app(WhatsAppInchatFormService::class)->listRows() as $flow) {
+            $packs['form_'.$flow['id']] = [
+                'count' => $list->count($flow['name']),
+                'rows' => $list->rows($flow['name'], 30, $this->replySearch),
+            ];
+        }
+
+        return $packs;
+    }
+
+    /**
+     * Approved templates with no fill-in words and no photo header.
+     *
+     * @return list<array{id: int, label: string}>
+     */
+    public function plainTemplates(): array
+    {
+        return MetaWhatsAppTemplate::query()
+            ->where('status', 'APPROVED')
+            ->where('is_active', true)
+            ->where('param_count', 0)
+            ->orderBy('name')
+            ->get()
+            ->reject(fn (MetaWhatsAppTemplate $template): bool => $this->templateNeedsFile($template))
+            ->map(fn (MetaWhatsAppTemplate $template): array => [
+                'id' => $template->id,
+                'label' => $template->name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function sendReplyTemplate(string $flowKey): void
+    {
+        $templateId = (int) ($this->sendTemplateIds[$flowKey] ?? 0);
+        $template = $templateId > 0 ? MetaWhatsAppTemplate::query()->find($templateId) : null;
+
+        if (! $template || (int) $template->param_count !== 0 || $this->templateNeedsFile($template)) {
+            Notification::make()->title('Choose a template with no blanks')->warning()->send();
+
+            return;
+        }
+
+        $pack = $this->replyPacks()[$flowKey] ?? null;
+        $people = [];
+
+        foreach ($pack['rows'] ?? [] as $row) {
+            $mobile = trim((string) ($row['mobile'] ?? ''));
+
+            if ($mobile === '' || isset($people[$mobile])) {
+                continue;
+            }
+
+            $people[$mobile] = $row['student_id'] ?? null;
+        }
+
+        if ($people === []) {
+            Notification::make()->title('No numbers in this list')->warning()->send();
+
+            return;
+        }
+
+        $meta = app(MetaWhatsAppService::class);
+        $sent = 0;
+        $failed = 0;
+
+        foreach (array_slice($people, 0, 40, true) as $mobile => $studentId) {
+            $result = $meta->sendTemplate(
+                (string) $mobile,
+                $template->name,
+                [],
+                filled($template->language) ? (string) $template->language : 'en',
+                0,
+                [
+                    'student_id' => $studentId,
+                    'message_source' => WhatsAppMessageSource::Campaign->value,
+                ],
+            );
+
+            if (($result['status'] ?? '') === 'success') {
+                $sent++;
+            } else {
+                $failed++;
+            }
+        }
+
+        $notice = Notification::make()
+            ->title($sent.' sent'.($failed > 0 ? ', '.$failed.' failed' : ''))
+            ->body('Each number is used once. A template with blanks is not in this list.');
+
+        if ($sent === 0) {
+            $notice->danger();
+        } else {
+            $notice->success();
+        }
+
+        $notice->send();
+    }
+
+    protected function templateNeedsFile(MetaWhatsAppTemplate $template): bool
+    {
+        foreach ($template->components ?? [] as $component) {
+            if (! is_array($component)) {
+                continue;
+            }
+
+            $type = strtoupper((string) ($component['type'] ?? ''));
+            $format = strtoupper((string) ($component['format'] ?? ''));
+
+            if ($type === 'HEADER' && in_array($format, ['IMAGE', 'VIDEO', 'DOCUMENT'], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function content(Schema $schema): Schema
     {
         $flowData = fn (): array => [
@@ -340,6 +483,10 @@ class ManageWhatsAppInchatForms extends Page
             'visitPublished' => filled(app(WhatsAppFlowService::class)->savedFlowId()),
             'visitOn' => WhatsAppCampusVisitFlowJson::enabled(),
             'editingVisit' => $this->editingVisit,
+            'editingId' => $this->editingId,
+            'editingName' => $this->editingName,
+            'replyPacks' => $this->replyPacks(),
+            'templates' => $this->plainTemplates(),
         ];
 
         $components = [
@@ -350,14 +497,6 @@ class ManageWhatsAppInchatForms extends Page
         if ($this->showEditor) {
             $components[] = $this->getFormContentComponent();
         }
-
-        $components[] = View::make('filament.pages.partials.whatsapp-inchat-forms-list')
-            ->viewData(fn (): array => [
-                'part' => 'replies',
-                'flows' => app(WhatsAppInchatFormService::class)->listRows(),
-                'replies' => app(WhatsAppFlowReplyList::class)->rows($this->replyFlow),
-                'showEditor' => false,
-            ]);
 
         return $schema->components($components);
     }
@@ -373,12 +512,14 @@ class ManageWhatsAppInchatForms extends Page
                         ->label('Save and publish')
                         ->action(fn () => $this->publish(app(WhatsAppInchatFormService::class))),
                     Action::make('save')
-                        ->label('Save for later')
+                        ->label('Save draft')
                         ->color('gray')
+                        ->link()
                         ->submit('save'),
                     Action::make('close')
                         ->label('Close')
                         ->color('gray')
+                        ->link()
                         ->action(fn () => $this->closeFlowEditor()),
                 ]),
             ]);
