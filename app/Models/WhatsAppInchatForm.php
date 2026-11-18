@@ -57,7 +57,7 @@ class WhatsAppInchatForm extends Model
         }
 
         if ($this->needs_republish) {
-            return 'Publish again';
+            return 'Edited';
         }
 
         return 'Published';

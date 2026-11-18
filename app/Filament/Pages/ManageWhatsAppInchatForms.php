@@ -128,7 +128,7 @@ class ManageWhatsAppInchatForms extends Page
 
         Notification::make()
             ->title('Form saved')
-            ->body('Click Publish when the questions are ready. Parents do not see a draft.')
+            ->body('Saved here only. Press Save and publish when it should open on WhatsApp.')
             ->success()
             ->send();
     }
@@ -171,69 +171,60 @@ class ManageWhatsAppInchatForms extends Page
     public function form(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('1. Word')
-                ->description('Someone types this one word in WhatsApp. The word visit is already used by the campus visit form. A student who is already in a class does not get this flow.')
+            Section::make('Flow')
+                ->description('Name it, pick one word, then the questions. Do not use the word visit.')
                 ->schema([
-                    TextInput::make('trigger_word')
-                        ->label('Word')
-                        ->required()
-                        ->maxLength(20)
-                        ->helperText('One word, letters and numbers. Do not use visit.'),
                     TextInput::make('name')
-                        ->label('Flow name')
+                        ->label('Name')
                         ->required()
                         ->maxLength(80)
-                        ->helperText('Parents see this name above the button.'),
-                ])
-                ->columns(2),
-            Section::make('2. Questions')
-                ->description('These three questions are ready. You can edit them.')
-                ->schema([
+                        ->placeholder('Admission enquiry'),
+                    TextInput::make('trigger_word')
+                        ->label('Word they type')
+                        ->required()
+                        ->maxLength(20)
+                        ->placeholder('admission'),
+                    TextInput::make('button_label')
+                        ->label('Button text')
+                        ->maxLength(20)
+                        ->placeholder('Open')
+                        ->default('Open'),
+                    Toggle::make('enabled')
+                        ->label('On')
+                        ->default(true),
                     Repeater::make('fields')
                         ->label('Questions')
                         ->schema([
                             TextInput::make('id')->hidden()->dehydrated(),
+                            TextInput::make('label')
+                                ->label('Question')
+                                ->required()
+                                ->maxLength(80)
+                                ->placeholder('Your name'),
                             Select::make('field_type')
-                                ->label('Type')
+                                ->label('Answer type')
                                 ->options(WhatsAppInchatFieldType::options())
                                 ->required()
                                 ->native(false)
                                 ->live()
                                 ->default(WhatsAppInchatFieldType::ShortText->value),
-                            TextInput::make('label')
-                                ->label('Question')
-                                ->required()
-                                ->maxLength(80),
                             Toggle::make('is_required')
-                                ->label('Required')
+                                ->label('Must answer')
                                 ->default(false),
                             Textarea::make('choices')
-                                ->label('Choices')
+                                ->label('Choices, one per line')
                                 ->rows(3)
-                                ->helperText('One choice per line. Each line can be 30 characters.')
                                 ->visible(fn (Get $get): bool => $get('field_type') === WhatsAppInchatFieldType::Choices->value)
                                 ->columnSpanFull(),
                         ])
                         ->columns(2)
                         ->reorderable()
-                        ->collapsible()
+                        ->addActionLabel('Add a question')
                         ->itemLabel(fn (array $state): ?string => $state['label'] ?? 'Question')
-                        ->defaultItems(3)
+                        ->defaultItems(1)
                         ->minItems(1)
                         ->maxItems(8)
                         ->columnSpanFull(),
-                ]),
-            Section::make('3. Publish')
-                ->schema([
-                    TextInput::make('button_label')
-                        ->label('Button text')
-                        ->maxLength(20)
-                        ->default('Apply')
-                        ->helperText('The words on the button in WhatsApp. Up to 20 characters.'),
-                    Toggle::make('enabled')
-                        ->label('On')
-                        ->default(true)
-                        ->helperText('Off means the word does nothing. The form stays saved.'),
                 ])
                 ->columns(2),
         ]);
@@ -264,12 +255,13 @@ class ManageWhatsAppInchatForms extends Page
             ->livewireSubmitHandler('save')
             ->footer([
                 Actions::make([
-                    Action::make('save')
-                        ->label('Save draft')
-                        ->submit('save'),
                     Action::make('publish')
-                        ->label('Publish')
+                        ->label('Save and publish')
                         ->action(fn () => $this->publish(app(WhatsAppInchatFormService::class))),
+                    Action::make('save')
+                        ->label('Save for later')
+                        ->color('gray')
+                        ->submit('save'),
                     Action::make('close')
                         ->label('Close')
                         ->color('gray')
@@ -292,22 +284,8 @@ class ManageWhatsAppInchatForms extends Page
                 [
                     'id' => null,
                     'field_type' => WhatsAppInchatFieldType::ShortText->value,
-                    'label' => 'Child name',
+                    'label' => 'Your name',
                     'is_required' => true,
-                    'choices' => '',
-                ],
-                [
-                    'id' => null,
-                    'field_type' => WhatsAppInchatFieldType::CourseList->value,
-                    'label' => 'Course',
-                    'is_required' => true,
-                    'choices' => '',
-                ],
-                [
-                    'id' => null,
-                    'field_type' => WhatsAppInchatFieldType::Note->value,
-                    'label' => 'Note',
-                    'is_required' => false,
                     'choices' => '',
                 ],
             ],
