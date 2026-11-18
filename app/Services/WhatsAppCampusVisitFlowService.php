@@ -82,6 +82,10 @@ class WhatsAppCampusVisitFlowService
             return ['status' => 'failed', 'error' => 'WhatsApp module is not enabled.'];
         }
 
+        if (! WhatsAppCampusVisitFlowJson::enabled()) {
+            return ['status' => 'failed', 'error' => 'The campus visit form is turned off.'];
+        }
+
         $phone = $this->thread->normalizePhoneForStorage($phone);
 
         if ($phone === '') {
@@ -122,7 +126,7 @@ class WhatsAppCampusVisitFlowService
         $text = mb_strtolower(trim($text));
         $text = trim($text, " \t\n\r\0\x0B.!?");
 
-        return $text === 'visit';
+        return $text === 'visit' && WhatsAppCampusVisitFlowJson::enabled();
     }
 
     /**

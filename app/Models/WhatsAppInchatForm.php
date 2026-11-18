@@ -60,6 +60,6 @@ class WhatsAppInchatForm extends Model
             return 'Edited';
         }
 
-        return 'Published';
+        return 'Live';
     }
 }

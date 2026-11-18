@@ -264,7 +264,8 @@
 
                 @if ($canComposeReply)
                     @php
-                        $visitFormReady = filled(app(\App\Services\WhatsAppFlowService::class)->savedFlowId());
+                        $visitFormReady = filled(app(\App\Services\WhatsAppFlowService::class)->savedFlowId())
+                            && \App\Support\WhatsAppCampusVisitFlowJson::enabled();
                         $inchatFormOptions = app(\App\Services\WhatsAppInchatFormService::class)
                             ->optionsForChat($record ?? null);
                         $flowBuilderUrl = \App\Filament\Pages\ManageWhatsAppInchatForms::canAccess()

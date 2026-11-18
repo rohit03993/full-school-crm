@@ -8,6 +8,7 @@ use App\Enums\WhatsAppInchatAudience;
 use App\Enums\WhatsAppInchatFieldType;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Models\WhatsAppInchatForm;
+use App\Support\WhatsAppCampusVisitFlowJson;
 use App\Services\WhatsAppFlowReplyList;
 use App\Services\WhatsAppFlowService;
 use App\Services\WhatsAppInchatFormService;
@@ -53,7 +54,19 @@ class ManageWhatsAppInchatForms extends Page
 
     public bool $showEditor = false;
 
+    public bool $editingVisit = false;
+
     public string $replyFlow = 'all';
+
+    public string $visitCourseLabel = 'Course';
+
+    public string $visitDateLabel = 'Visit date';
+
+    public string $visitNoteLabel = 'Note';
+
+    public string $visitButton = 'Finish';
+
+    public bool $visitNoteRequired = false;
 
     protected static function requiredCrmPermission(): CrmPermission
     {
@@ -74,9 +87,11 @@ class ManageWhatsAppInchatForms extends Page
 
     public function startNewFlow(): void
     {
+        $this->editingVisit = false;
         $this->editingId = null;
         $this->showEditor = true;
         $this->form->fill($this->blankState());
+        $this->focusEditor();
     }
 
     public function editFlow(int $formId, WhatsAppInchatFormService $forms): void
@@ -89,15 +104,102 @@ class ManageWhatsAppInchatForms extends Page
             return;
         }
 
+        $this->editingVisit = false;
         $this->editingId = $form->id;
         $this->showEditor = true;
         $this->form->fill($forms->formState($form));
+        $this->focusEditor();
+    }
+
+    public function editVisit(): void
+    {
+        $copy = WhatsAppCampusVisitFlowJson::copy();
+        $this->showEditor = false;
+        $this->editingId = null;
+        $this->editingVisit = true;
+        $this->visitCourseLabel = $copy['course_label'];
+        $this->visitDateLabel = $copy['date_label'];
+        $this->visitNoteLabel = $copy['note_label'];
+        $this->visitButton = $copy['button_label'];
+        $this->visitNoteRequired = $copy['note_required'];
+        $this->focusEditor();
+    }
+
+    public function saveVisit(WhatsAppFlowService $flows): void
+    {
+        WhatsAppCampusVisitFlowJson::saveCopy([
+            'course_label' => $this->visitCourseLabel,
+            'date_label' => $this->visitDateLabel,
+            'note_label' => $this->visitNoteLabel,
+            'button_label' => $this->visitButton,
+            'note_required' => $this->visitNoteRequired,
+        ]);
+
+        $result = $flows->publishCampusVisit();
+
+        if (($result['status'] ?? '') !== 'success') {
+            Notification::make()
+                ->title('Words saved here')
+                ->body((string) ($result['error'] ?? 'WhatsApp did not update the visit form yet.'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->editingVisit = false;
+
+        Notification::make()
+            ->title('Campus visit updated')
+            ->body('The new words are on WhatsApp. Old visit replies stay in the list.')
+            ->success()
+            ->send();
+    }
+
+    public function setVisitEnabled(bool $on): void
+    {
+        WhatsAppCampusVisitFlowJson::saveCopy(['enabled' => $on]);
+
+        Notification::make()
+            ->title($on ? 'Campus visit is on' : 'Campus visit is off')
+            ->body($on
+                ? 'The word visit opens the form again.'
+                : 'The word visit does nothing now. Old replies stay.')
+            ->success()
+            ->send();
+    }
+
+    public function setFlowEnabled(int $formId, bool $on): void
+    {
+        $form = WhatsAppInchatForm::query()->find($formId);
+
+        if (! $form) {
+            Notification::make()->title('That flow was not found')->warning()->send();
+
+            return;
+        }
+
+        $form->update(['enabled' => $on]);
+
+        Notification::make()
+            ->title($on ? $form->name.' is on' : $form->name.' is off')
+            ->body($on
+                ? 'The word opens this form again.'
+                : 'The word does nothing now. Replies and leads stay.')
+            ->success()
+            ->send();
     }
 
     public function closeFlowEditor(): void
     {
         $this->showEditor = false;
+        $this->editingVisit = false;
         $this->editingId = null;
+    }
+
+    protected function focusEditor(): void
+    {
+        $this->js('document.getElementById("flow-editor")?.scrollIntoView({block:"start"})');
     }
 
     public function publishVisit(WhatsAppFlowService $flows): void
@@ -174,8 +276,8 @@ class ManageWhatsAppInchatForms extends Page
     public function form(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Flow')
-                ->description('Name it, pick one word, then the questions. Do not use the word visit.')
+            Section::make(fn (): string => $this->editingId ? 'Edit flow' : 'New flow')
+                ->description('Name, one word, then the questions. Turn it off from the list. Do not use the word visit.')
                 ->schema([
                     TextInput::make('name')
                         ->label('Name')
@@ -192,9 +294,6 @@ class ManageWhatsAppInchatForms extends Page
                         ->maxLength(20)
                         ->placeholder('Open')
                         ->default('Open'),
-                    Toggle::make('enabled')
-                        ->label('On')
-                        ->default(true),
                     Repeater::make('fields')
                         ->label('Questions')
                         ->schema([
@@ -235,20 +334,30 @@ class ManageWhatsAppInchatForms extends Page
 
     public function content(Schema $schema): Schema
     {
+        $flowData = fn (): array => [
+            'part' => 'flows',
+            'flows' => app(WhatsAppInchatFormService::class)->listRows(),
+            'visitPublished' => filled(app(WhatsAppFlowService::class)->savedFlowId()),
+            'visitOn' => WhatsAppCampusVisitFlowJson::enabled(),
+            'editingVisit' => $this->editingVisit,
+        ];
+
         $components = [
             View::make('filament.pages.partials.whatsapp-inchat-forms-list')
-                ->viewData(fn (): array => [
-                    'flows' => app(WhatsAppInchatFormService::class)->listRows(),
-                    'visitPublished' => filled(app(WhatsAppFlowService::class)->savedFlowId()),
-                    'showEditor' => $this->showEditor,
-                    'replies' => app(WhatsAppFlowReplyList::class)->rows($this->replyFlow),
-                    'replyFlow' => $this->replyFlow,
-                ]),
+                ->viewData($flowData),
         ];
 
         if ($this->showEditor) {
             $components[] = $this->getFormContentComponent();
         }
+
+        $components[] = View::make('filament.pages.partials.whatsapp-inchat-forms-list')
+            ->viewData(fn (): array => [
+                'part' => 'replies',
+                'flows' => app(WhatsAppInchatFormService::class)->listRows(),
+                'replies' => app(WhatsAppFlowReplyList::class)->rows($this->replyFlow),
+                'showEditor' => false,
+            ]);
 
         return $schema->components($components);
     }
@@ -304,6 +413,7 @@ class ManageWhatsAppInchatForms extends Page
             ? WhatsAppInchatForm::query()->find($this->editingId)
             : null;
         $state['audience'] = $existing?->audience->value ?? WhatsAppInchatAudience::EducationLead->value;
+        $state['enabled'] = $existing?->enabled ?? true;
         $result = $forms->save($state, $this->editingId);
 
         if (($result['status'] ?? '') !== 'success' || ! isset($result['form'])) {

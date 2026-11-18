@@ -328,7 +328,7 @@ class WhatsAppInchatFormService
     }
 
     /**
-     * @return list<array{id: int, name: string, audience: string, trigger_word: string, state: string}>
+     * @return list<array{id: int, name: string, audience: string, trigger_word: string, state: string, enabled: bool}>
      */
     public function listRows(): array
     {
@@ -340,7 +340,8 @@ class WhatsAppInchatFormService
                 'name' => $form->name,
                 'audience' => $form->audience->label(),
                 'trigger_word' => $form->trigger_word,
-                'state' => $form->stateLabel(),
+                'state' => $form->enabled ? $form->stateLabel() : 'Off',
+                'enabled' => $form->enabled,
             ])
             ->all();
     }

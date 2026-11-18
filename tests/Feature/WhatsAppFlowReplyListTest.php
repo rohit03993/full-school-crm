@@ -51,4 +51,14 @@ class WhatsAppFlowReplyListTest extends TestCase
         $this->assertCount(1, $list->rows('Admission enquiry'));
         $this->assertCount(0, $list->rows('campus'));
     }
+
+    public function test_turning_a_visit_form_off_keeps_the_words(): void
+    {
+        $this->assertTrue(\App\Support\WhatsAppCampusVisitFlowJson::enabled());
+
+        \App\Support\WhatsAppCampusVisitFlowJson::saveCopy(['enabled' => false]);
+
+        $this->assertFalse(\App\Support\WhatsAppCampusVisitFlowJson::enabled());
+        $this->assertSame('Course', \App\Support\WhatsAppCampusVisitFlowJson::copy()['course_label']);
+    }
 }
