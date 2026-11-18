@@ -8,6 +8,7 @@ use App\Enums\WhatsAppInchatAudience;
 use App\Enums\WhatsAppInchatFieldType;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Models\WhatsAppInchatForm;
+use App\Services\WhatsAppFlowService;
 use App\Services\WhatsAppInchatFormService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Repeater;
@@ -38,7 +39,7 @@ class ManageWhatsAppInchatForms extends Page
 
     protected static ?string $slug = 'whatsapp-inchat-forms';
 
-    protected static ?string $title = 'Education lead form';
+    protected static ?string $title = 'Flow builder';
 
     protected static string|UnitEnum|null $navigationGroup = null;
 
@@ -48,6 +49,8 @@ class ManageWhatsAppInchatForms extends Page
     public ?array $data = [];
 
     public ?int $editingId = null;
+
+    public bool $showEditor = false;
 
     protected static function requiredCrmPermission(): CrmPermission
     {
@@ -59,22 +62,60 @@ class ManageWhatsAppInchatForms extends Page
         return LicenseFeature::WhatsApp;
     }
 
-    public function mount(WhatsAppInchatFormService $forms): void
+    public function mount(): void
     {
-        $form = WhatsAppInchatForm::query()
-            ->where('audience', WhatsAppInchatAudience::EducationLead)
-            ->orderBy('id')
-            ->first();
+        $this->showEditor = false;
+        $this->editingId = null;
+        $this->form->fill($this->blankState());
+    }
 
-        if ($form) {
-            $this->editingId = $form->id;
-            $this->form->fill($forms->formState($form));
+    public function startNewFlow(): void
+    {
+        $this->editingId = null;
+        $this->showEditor = true;
+        $this->form->fill($this->blankState());
+    }
+
+    public function editFlow(int $formId, WhatsAppInchatFormService $forms): void
+    {
+        $form = WhatsAppInchatForm::query()->with('fields')->find($formId);
+
+        if (! $form) {
+            Notification::make()->title('That flow was not found')->warning()->send();
 
             return;
         }
 
+        $this->editingId = $form->id;
+        $this->showEditor = true;
+        $this->form->fill($forms->formState($form));
+    }
+
+    public function closeFlowEditor(): void
+    {
+        $this->showEditor = false;
         $this->editingId = null;
-        $this->form->fill($this->blankState());
+    }
+
+    public function publishVisit(WhatsAppFlowService $flows): void
+    {
+        $result = $flows->publishCampusVisit();
+
+        if (($result['status'] ?? '') !== 'success') {
+            Notification::make()
+                ->title('Could not publish the visit form')
+                ->body((string) ($result['error'] ?? 'WhatsApp did not publish the visit form.'))
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('Visit form published')
+            ->body('Staff can send it from the chat. A parent can also open it by typing visit.')
+            ->success()
+            ->send();
     }
 
     public function save(WhatsAppInchatFormService $forms): void
@@ -131,16 +172,15 @@ class ManageWhatsAppInchatForms extends Page
     {
         return $schema->components([
             Section::make('1. Word')
-                ->description('A parent types this one word. A child who is already in a class does not get the form.')
+                ->description('Someone types this one word in WhatsApp. The word visit is already used by the campus visit form. A student who is already in a class does not get this flow.')
                 ->schema([
                     TextInput::make('trigger_word')
                         ->label('Word')
                         ->required()
                         ->maxLength(20)
-                        ->default('admission')
-                        ->helperText('Suggested word: admission. The word visit is already used.'),
+                        ->helperText('One word, letters and numbers. Do not use visit.'),
                     TextInput::make('name')
-                        ->label('Form name')
+                        ->label('Flow name')
                         ->required()
                         ->maxLength(80)
                         ->helperText('Parents see this name above the button.'),
@@ -201,10 +241,20 @@ class ManageWhatsAppInchatForms extends Page
 
     public function content(Schema $schema): Schema
     {
-        return $schema->components([
-            View::make('filament.pages.partials.whatsapp-inchat-forms-list'),
-            $this->getFormContentComponent(),
-        ]);
+        $components = [
+            View::make('filament.pages.partials.whatsapp-inchat-forms-list')
+                ->viewData(fn (): array => [
+                    'flows' => app(WhatsAppInchatFormService::class)->listRows(),
+                    'visitPublished' => filled(app(WhatsAppFlowService::class)->savedFlowId()),
+                    'showEditor' => $this->showEditor,
+                ]),
+        ];
+
+        if ($this->showEditor) {
+            $components[] = $this->getFormContentComponent();
+        }
+
+        return $schema->components($components);
     }
 
     public function getFormContentComponent(): Component
@@ -220,6 +270,10 @@ class ManageWhatsAppInchatForms extends Page
                     Action::make('publish')
                         ->label('Publish')
                         ->action(fn () => $this->publish(app(WhatsAppInchatFormService::class))),
+                    Action::make('close')
+                        ->label('Close')
+                        ->color('gray')
+                        ->action(fn () => $this->closeFlowEditor()),
                 ]),
             ]);
     }
@@ -230,9 +284,9 @@ class ManageWhatsAppInchatForms extends Page
     protected function blankState(): array
     {
         return [
-            'name' => 'Admission enquiry',
-            'trigger_word' => 'admission',
-            'button_label' => 'Apply',
+            'name' => '',
+            'trigger_word' => '',
+            'button_label' => 'Open',
             'enabled' => true,
             'fields' => [
                 [
@@ -263,7 +317,10 @@ class ManageWhatsAppInchatForms extends Page
     protected function store(WhatsAppInchatFormService $forms): ?WhatsAppInchatForm
     {
         $state = $this->form->getState();
-        $state['audience'] = WhatsAppInchatAudience::EducationLead->value;
+        $existing = $this->editingId
+            ? WhatsAppInchatForm::query()->find($this->editingId)
+            : null;
+        $state['audience'] = $existing?->audience->value ?? WhatsAppInchatAudience::EducationLead->value;
         $result = $forms->save($state, $this->editingId);
 
         if (($result['status'] ?? '') !== 'success' || ! isset($result['form'])) {

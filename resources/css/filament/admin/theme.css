@@ -1643,6 +1643,10 @@
         @apply inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/10;
     }
 
+    summary.crm-wa-inbox__icon-btn::-webkit-details-marker {
+        display: none;
+    }
+
     .crm-wa-inbox__textarea--reply {
         @apply mt-0 max-h-32 min-h-[2.75rem] resize-none rounded-3xl border-0 bg-[#f0f2f5] py-2.5 shadow-none focus:ring-2 focus:ring-emerald-500/30 dark:bg-white/5;
     }

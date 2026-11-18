@@ -120,8 +120,8 @@ class WhatsAppHubPage extends Page
 
         if (ManageWhatsAppInchatForms::canAccess()) {
             $cards[] = [
-                'title' => 'Education lead form',
-                'description' => 'A word such as admission opens a form for a new parent. Students already in a class are not included.',
+                'title' => 'Flow builder',
+                'description' => 'Publish the visit form, and add more forms that open when someone types a word.',
                 'url' => ManageWhatsAppInchatForms::getUrl(),
             ];
         }

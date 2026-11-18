@@ -2015,6 +2015,12 @@ class StudentProfilePage extends Page
             ->send();
     }
 
+    public function sendChatForm(int $formId): void
+    {
+        $this->sendInchatFormId = (string) $formId;
+        $this->sendSelectedInchatForm();
+    }
+
     public function sendSelectedInchatForm(): void
     {
         $formId = (int) $this->sendInchatFormId;

@@ -393,6 +393,12 @@ trait InteractsWithStudentWhatsAppInbox
             ->send();
     }
 
+    public function sendChatForm(int $formId): void
+    {
+        $this->sendInchatFormId = (string) $formId;
+        $this->sendSelectedInchatForm();
+    }
+
     public function sendSelectedInchatForm(): void
     {
         $student = $this->whatsAppMessageStudent();

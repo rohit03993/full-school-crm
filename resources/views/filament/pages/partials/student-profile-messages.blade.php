@@ -263,44 +263,15 @@
                 @endif
 
                 @if ($canComposeReply)
+                    @php
+                        $visitFormReady = filled(app(\App\Services\WhatsAppFlowService::class)->savedFlowId());
+                        $inchatFormOptions = app(\App\Services\WhatsAppInchatFormService::class)
+                            ->optionsForChat($record ?? null);
+                        $flowBuilderUrl = \App\Filament\Pages\ManageWhatsAppInchatForms::canAccess()
+                            ? \App\Filament\Pages\ManageWhatsAppInchatForms::getUrl()
+                            : null;
+                    @endphp
                     <section class="crm-wa-inbox__composer crm-wa-inbox__composer--reply" aria-label="Quick reply">
-                        <button
-                            type="button"
-                            wire:click="sendCampusVisitForm"
-                            wire:loading.attr="disabled"
-                            wire:target="sendCampusVisitForm"
-                            class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--full"
-                        >
-                            <span wire:loading.remove wire:target="sendCampusVisitForm">Send visit form</span>
-                            <span wire:loading wire:target="sendCampusVisitForm">Sending…</span>
-                        </button>
-                        @php
-                            $inchatFormOptions = app(\App\Services\WhatsAppInchatFormService::class)
-                                ->optionsForChat($record ?? null);
-                        @endphp
-                        @if ($inchatFormOptions !== [])
-                            <label class="crm-wa-inbox__label" for="wa-inchat-form-{{ ($compactInbox ?? false) ? 'inbox' : 'profile' }}">Send a form</label>
-                            <select
-                                id="wa-inchat-form-{{ ($compactInbox ?? false) ? 'inbox' : 'profile' }}"
-                                wire:model.live="sendInchatFormId"
-                                class="crm-wa-inbox__input"
-                            >
-                                <option value="">Choose a form…</option>
-                                @foreach ($inchatFormOptions as $formId => $formLabel)
-                                    <option value="{{ $formId }}">{{ $formLabel }}</option>
-                                @endforeach
-                            </select>
-                            <button
-                                type="button"
-                                wire:click="sendSelectedInchatForm"
-                                wire:loading.attr="disabled"
-                                wire:target="sendSelectedInchatForm"
-                                class="crm-wa-inbox__send-btn crm-wa-inbox__send-btn--full"
-                            >
-                                <span wire:loading.remove wire:target="sendSelectedInchatForm">Send a form</span>
-                                <span wire:loading wire:target="sendSelectedInchatForm">Sending…</span>
-                            </button>
-                        @endif
                         @if ($hasAttachment)
                             <div class="crm-wa-inbox__attach-chip">
                                 <x-filament::icon icon="heroicon-o-paper-clip" class="h-4 w-4 shrink-0" />
@@ -333,6 +304,44 @@
                                     class="sr-only"
                                 />
                             </label>
+
+                            <style>summary.crm-wa-inbox__icon-btn::-webkit-details-marker{display:none}</style>
+                            <details class="flex shrink-0 flex-col-reverse">
+                                <summary class="crm-wa-inbox__icon-btn" title="Send a form" style="list-style: none;">
+                                    <x-filament::icon icon="heroicon-o-queue-list" class="h-5 w-5" />
+                                    <span class="sr-only">Send a form</span>
+                                </summary>
+                                <div class="mb-1 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-white/10 dark:bg-gray-900">
+                                    @if ($visitFormReady)
+                                        <button
+                                            type="button"
+                                            wire:click="sendCampusVisitForm"
+                                            wire:loading.attr="disabled"
+                                            wire:target="sendCampusVisitForm"
+                                            class="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-white/5"
+                                        >
+                                            Campus visit
+                                        </button>
+                                    @endif
+                                    @foreach ($inchatFormOptions as $formId => $formLabel)
+                                        <button
+                                            type="button"
+                                            wire:click="sendChatForm({{ (int) $formId }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="sendChatForm"
+                                            class="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-white/5"
+                                        >
+                                            {{ $formLabel }}
+                                        </button>
+                                    @endforeach
+                                    @if (! $visitFormReady && $inchatFormOptions === [])
+                                        <p class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No form is published yet.</p>
+                                        @if ($flowBuilderUrl)
+                                            <a href="{{ $flowBuilderUrl }}" class="block px-3 py-2 text-sm font-medium text-primary-600 hover:bg-gray-50 dark:text-primary-300 dark:hover:bg-white/5">Open Flow builder</a>
+                                        @endif
+                                    @endif
+                                </div>
+                            </details>
 
                             <div class="crm-wa-inbox__field crm-wa-inbox__field--reply">
                                 <label class="crm-wa-inbox__label sr-only" for="{{ $replyFieldId }}">Message</label>
