@@ -8,6 +8,7 @@ use App\Enums\WhatsAppInchatAudience;
 use App\Enums\WhatsAppInchatFieldType;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Models\WhatsAppInchatForm;
+use App\Services\WhatsAppFlowReplyList;
 use App\Services\WhatsAppFlowService;
 use App\Services\WhatsAppInchatFormService;
 use Filament\Actions\Action;
@@ -51,6 +52,8 @@ class ManageWhatsAppInchatForms extends Page
     public ?int $editingId = null;
 
     public bool $showEditor = false;
+
+    public string $replyFlow = 'all';
 
     protected static function requiredCrmPermission(): CrmPermission
     {
@@ -238,6 +241,8 @@ class ManageWhatsAppInchatForms extends Page
                     'flows' => app(WhatsAppInchatFormService::class)->listRows(),
                     'visitPublished' => filled(app(WhatsAppFlowService::class)->savedFlowId()),
                     'showEditor' => $this->showEditor,
+                    'replies' => app(WhatsAppFlowReplyList::class)->rows($this->replyFlow),
+                    'replyFlow' => $this->replyFlow,
                 ]),
         ];
 

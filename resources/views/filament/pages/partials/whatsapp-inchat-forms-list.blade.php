@@ -40,6 +40,13 @@
     .crm-flow__empty { margin: 0; padding: 1rem 1.25rem 1.15rem; font-size: 0.9rem; color: #78716c; }
     .crm-flow__note { margin: 0; font-size: 0.9rem; color: #57534e; }
     .dark .crm-flow__note { color: #d6d3d1; }
+    .crm-flow__pick {
+        border: 1px solid #e7e5e4; border-radius: 0.7rem; background: #fff; color: #1c1917;
+        padding: 0.4rem 0.6rem; font: inherit; font-size: 0.85rem;
+    }
+    .dark .crm-flow__pick { border-color: rgba(255,255,255,.12); background: transparent; color: #fafaf9; }
+    .crm-flow__answers { margin: 0.3rem 0 0; max-width: 36rem; font-size: 0.85rem; line-height: 1.45; color: #44403c; }
+    .dark .crm-flow__answers { color: #e7e5e4; }
 </style>
 
 <div class="crm-flow">
@@ -91,6 +98,51 @@
                         </p>
                     </div>
                     <button type="button" wire:click="editFlow({{ (int) $flow['id'] }})" class="crm-flow__edit">Edit</button>
+                </div>
+            @endforeach
+        @endif
+    </section>
+
+    <section class="crm-flow__sheet">
+        <div class="crm-flow__head">
+            <div>
+                <h2 class="crm-flow__title">Replies</h2>
+                <p class="crm-flow__meta">Everyone who finished a flow. Open a name only when you need the full lead.</p>
+            </div>
+            <select wire:model.live="replyFlow" class="crm-flow__pick" aria-label="Which flow">
+                <option value="all">All flows</option>
+                <option value="campus">Campus visit</option>
+                @foreach ($flows ?? [] as $flow)
+                    <option value="{{ $flow['name'] }}">{{ $flow['name'] }}</option>
+                @endforeach
+            </select>
+        </div>
+        @if (($replies ?? []) === [])
+            <p class="crm-flow__empty">No replies yet. When someone finishes a flow, the name, number, and answers show here.</p>
+        @else
+            @foreach ($replies as $reply)
+                <div class="crm-flow__row">
+                    <div>
+                        <p class="crm-flow__title">
+                            @if ($reply['profile_url'])
+                                <a href="{{ $reply['profile_url'] }}" class="crm-flow__edit">{{ $reply['name'] }}</a>
+                            @else
+                                {{ $reply['name'] }}
+                            @endif
+                        </p>
+                        <p class="crm-flow__meta">
+                            @if (\App\Support\CrmAccess::canViewStudentMobile(auth()->user()))
+                                {{ $reply['mobile'] !== '' ? $reply['mobile'] : 'No number' }}
+                            @else
+                                Number hidden
+                            @endif
+                            <span class="crm-flow__chip">{{ $reply['flow'] }}</span>
+                            {{ $reply['when'] }}
+                        </p>
+                        @if ($reply['answers'] !== '')
+                            <p class="crm-flow__answers">{{ $reply['answers'] }}</p>
+                        @endif
+                    </div>
                 </div>
             @endforeach
         @endif
