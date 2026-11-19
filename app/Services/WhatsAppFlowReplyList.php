@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Filament\Pages\StudentProfilePage;
+use App\Models\MetaWhatsAppMessage;
+use App\Models\Student;
 use App\Models\Visit;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -40,6 +42,22 @@ class WhatsAppFlowReplyList
     public function count(string $flow, string $search = ''): int
     {
         return $this->base($flow, $search)->count();
+    }
+
+    /**
+     * People who were sent this form and have not submitted it.
+     * WhatsApp does not tell us whether they opened the screen.
+     *
+     * @return list<array{name: string, mobile: string, when: string, profile_url: ?string, student_id: ?int}>
+     */
+    public function unfinished(string $flow, int $limit = 50, string $search = ''): array
+    {
+        return array_slice($this->unfinishedRows($flow, $search), 0, $limit);
+    }
+
+    public function unfinishedCount(string $flow, string $search = ''): int
+    {
+        return count($this->unfinishedRows($flow, $search));
     }
 
     protected function base(string $flow, string $search): Builder
@@ -107,5 +125,111 @@ class WhatsAppFlowReplyList
         }
 
         return implode(' · ', $kept);
+    }
+
+    /**
+     * @return list<array{name: string, mobile: string, when: string, profile_url: ?string, student_id: ?int}>
+     */
+    protected function unfinishedRows(string $flow, string $search): array
+    {
+        if ($flow === '' || $flow === 'all') {
+            return [];
+        }
+
+        $finished = $this->finishedMobiles($flow);
+        $latestIds = $this->sentFormQuery($flow)
+            ->selectRaw('max(id) as id')
+            ->groupBy('phone')
+            ->pluck('id');
+
+        if ($latestIds->isEmpty()) {
+            return [];
+        }
+
+        $search = trim($search);
+        $needle = mb_strtolower($search);
+        $rows = [];
+
+        $messages = MetaWhatsAppMessage::query()
+            ->with('student:id,name,mobile')
+            ->whereIn('id', $latestIds)
+            ->orderByDesc('id')
+            ->get();
+
+        foreach ($messages as $message) {
+            $stored = (string) $message->phone;
+            $ten = $this->lastTen($stored);
+
+            if ($ten !== '' && isset($finished[$ten])) {
+                continue;
+            }
+
+            $student = $message->student;
+            $name = $student?->name ?: 'WhatsApp number';
+            $mobile = (string) ($student?->mobile ?: $stored);
+
+            if ($needle !== '' && ! str_contains(mb_strtolower($name), $needle) && ! str_contains($mobile, $search) && ! str_contains($stored, $search)) {
+                continue;
+            }
+
+            $studentId = $student?->id ? (int) $student->id : ($message->student_id ? (int) $message->student_id : null);
+
+            $rows[] = [
+                'name' => $name,
+                'mobile' => $mobile,
+                'when' => $message->created_at?->timezone(config('app.timezone'))->format('d M Y, h:i A') ?? '',
+                'profile_url' => $studentId ? StudentProfilePage::getUrl(['record' => $studentId]) : null,
+                'student_id' => $studentId,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    protected function finishedMobiles(string $flow): array
+    {
+        $ids = $this->base($flow, '')
+            ->whereNotNull('student_id')
+            ->distinct()
+            ->pluck('student_id');
+
+        $done = [];
+
+        foreach (Student::query()->whereIn('id', $ids)->pluck('mobile') as $mobile) {
+            $ten = $this->lastTen((string) $mobile);
+
+            if ($ten !== '') {
+                $done[$ten] = true;
+            }
+        }
+
+        return $done;
+    }
+
+    protected function sentFormQuery(string $flow): Builder
+    {
+        $query = MetaWhatsAppMessage::query()
+            ->where('direction', 'outbound')
+            ->where('status_detail', $flow === 'campus' ? 'Visit form' : 'In-chat form');
+
+        if ($flow !== 'campus') {
+            $query->where('body_preview', $flow);
+        }
+
+        return $query;
+    }
+
+    protected function lastTen(string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+
+        if (strlen($digits) > 10) {
+            return substr($digits, -10);
+        }
+
+        return $digits;
     }
 }

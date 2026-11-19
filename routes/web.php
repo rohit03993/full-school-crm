@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\PaymentProofDownloadController;
 use App\Http\Controllers\Admin\ReceiptDownloadController;
 use App\Http\Controllers\Api\AisensyCampaignTriggerController;
 use App\Http\Controllers\Display\AttendanceDisplayController;
+use App\Http\Controllers\MarketingJoinController;
 use App\Http\Controllers\PublicHomeworkController;
 use App\Http\Controllers\PublicSite\ContactController;
 use App\Http\Controllers\PublicSite\CourseController;
@@ -177,6 +178,11 @@ Route::prefix('staff')->name('staff.')->group(function () {
 Route::post('/contact/enquiry', [ContactController::class, 'store'])
     ->middleware(['throttle:10,1', 'license.feature:enquiries', EnsureWebsiteLicensed::class])
     ->name('contact.enquiry');
+
+Route::get('/join', [MarketingJoinController::class, 'show'])->name('marketing.join');
+Route::post('/join', [MarketingJoinController::class, 'store'])
+    ->middleware('throttle:10,1')
+    ->name('marketing.join.store');
 
 Route::prefix('portal')->name('portal.')->middleware(EnsurePortalLicensed::class)->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');

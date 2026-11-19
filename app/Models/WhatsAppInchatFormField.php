@@ -16,6 +16,7 @@ class WhatsAppInchatFormField extends Model
         'label',
         'is_required',
         'choices',
+        'show_when',
     ];
 
     protected function casts(): array

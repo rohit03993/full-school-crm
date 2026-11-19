@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\StudentStatus;
 use App\Enums\VisitStatus;
+use App\Models\MetaWhatsAppMessage;
 use App\Models\Student;
 use App\Models\Visit;
 use App\Services\WhatsAppFlowReplyList;
@@ -53,6 +54,52 @@ class WhatsAppFlowReplyListTest extends TestCase
         $this->assertCount(1, $list->rows('Admission enquiry', 50, 'Riya'));
         $this->assertCount(0, $list->rows('Admission enquiry', 50, '99999'));
         $this->assertSame(1, $list->count('Admission enquiry'));
+    }
+
+    public function test_a_sent_form_with_no_submit_is_listed_apart_from_finished_replies(): void
+    {
+        $waiting = Student::query()->create([
+            'name' => 'Aman',
+            'mobile' => '9876502222',
+            'status' => StudentStatus::Enquiry,
+        ]);
+        $done = Student::query()->create([
+            'name' => 'Riya',
+            'mobile' => '9876501111',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        MetaWhatsAppMessage::query()->create([
+            'direction' => 'outbound',
+            'phone' => '919876502222',
+            'student_id' => $waiting->id,
+            'body_preview' => 'Admission enquiry',
+            'status' => 'sent',
+            'status_detail' => 'In-chat form',
+        ]);
+        MetaWhatsAppMessage::query()->create([
+            'direction' => 'outbound',
+            'phone' => '919876501111',
+            'student_id' => $done->id,
+            'body_preview' => 'Admission enquiry',
+            'status' => 'sent',
+            'status_detail' => 'In-chat form',
+        ]);
+        Visit::query()->create([
+            'student_id' => $done->id,
+            'visit_date' => now()->toDateString(),
+            'discussion_summary' => "Admission enquiry\nYour name: Riya",
+            'remarks' => 'whatsapp_lead:wamid.1',
+            'status' => VisitStatus::FollowUpRequired,
+        ]);
+
+        $list = app(WhatsAppFlowReplyList::class);
+        $rows = $list->unfinished('Admission enquiry');
+
+        $this->assertSame(1, $list->unfinishedCount('Admission enquiry'));
+        $this->assertSame('Aman', $rows[0]['name']);
+        $this->assertSame('9876502222', $rows[0]['mobile']);
+        $this->assertSame(0, $list->unfinishedCount('Admission enquiry', 'Riya'));
     }
 
     public function test_turning_a_visit_form_off_keeps_the_words(): void

@@ -126,6 +126,14 @@ class WhatsAppHubPage extends Page
             ];
         }
 
+        if (ManageWhatsAppMarketing::canAccess()) {
+            $cards[] = [
+                'title' => 'Marketing list',
+                'description' => 'Upload names and numbers that are not students, and send one template.',
+                'url' => ManageWhatsAppMarketing::getUrl(),
+            ];
+        }
+
         if (ManageWhatsAppSettings::canAccess()) {
             $cards[] = [
                 'title' => CrmMenuLabels::whatsAppAutomations(),

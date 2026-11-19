@@ -20,9 +20,17 @@ class WhatsAppInchatFlowJson
         foreach ($form->fields as $field) {
             $component = self::component($field);
 
-            if ($component !== null) {
-                $children[] = $component;
+            if ($component === null) {
+                continue;
             }
+
+            $branch = self::branch($form, $field);
+            $children[] = $branch === null ? $component : [
+                'type' => 'If',
+                'condition' => '${form.'.$branch['key']."} == '".$branch['choice']."'",
+                'then' => [$component],
+                'else' => [],
+            ];
         }
 
         $children[] = [
@@ -80,6 +88,41 @@ class WhatsAppInchatFlowJson
         }
 
         return $payload;
+    }
+
+    /**
+     * @return array{key: string, choice: string}|null
+     */
+    protected static function branch(WhatsAppInchatForm $form, WhatsAppInchatFormField $field): ?array
+    {
+        $raw = trim((string) $field->show_when);
+
+        if ($raw === '' || ! str_contains($raw, '|')) {
+            return null;
+        }
+
+        [$label, $choice] = explode('|', $raw, 2);
+        $label = trim($label);
+        $choice = trim($choice);
+
+        if ($label === '' || ! preg_match('/^c\d+$/', $choice)) {
+            return null;
+        }
+
+        $parent = $form->fields->first(function (WhatsAppInchatFormField $item) use ($label, $field): bool {
+            return $item->id !== $field->id
+                && $item->field_type === WhatsAppInchatFieldType::Choices
+                && trim($item->label) === $label;
+        });
+
+        if (! $parent) {
+            return null;
+        }
+
+        return [
+            'key' => $parent->answerKey(),
+            'choice' => $choice,
+        ];
     }
 
     /**

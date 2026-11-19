@@ -9,9 +9,12 @@ use App\Enums\WhatsAppInchatFieldType;
 use App\Filament\Concerns\RequiresCrmPermission;
 use App\Enums\WhatsAppMessageSource;
 use App\Models\MetaWhatsAppTemplate;
+use App\Models\Student;
 use App\Models\WhatsAppInchatForm;
 use App\Support\WhatsAppCampusVisitFlowJson;
 use App\Services\MetaWhatsAppService;
+use App\Support\MetaWhatsAppTemplateParser;
+use App\Support\WhatsAppOutboundBlanks;
 use App\Services\WhatsAppFlowReplyList;
 use App\Services\WhatsAppFlowService;
 use App\Services\WhatsAppInchatFormService;
@@ -71,6 +74,12 @@ class ManageWhatsAppInchatForms extends Page
 
     /** @var array<string, string> */
     public array $sendTemplateIds = [];
+
+    /** @var array<string, array<int, string>> */
+    public array $sendBlankSources = [];
+
+    /** @var array<string, array<int, string>> */
+    public array $sendBlankText = [];
 
     public string $visitCourseLabel = 'Course';
 
@@ -351,7 +360,7 @@ class ManageWhatsAppInchatForms extends Page
             Section::make(fn (): string => $this->editingId
                 ? 'Editing '.$this->editingName
                 : 'New flow')
-                ->description('You are changing this flow only. The word visit belongs to Campus visit, even when that flow is off.')
+                ->description('You are changing this flow only. A later question can wait until they pick a choice. Save and publish to update WhatsApp. The word visit belongs to Campus visit, even when that flow is off.')
                 ->schema([
                     TextInput::make('name')
                         ->label('Name')
@@ -391,6 +400,13 @@ class ManageWhatsAppInchatForms extends Page
                                 ->label('Choices, one per line')
                                 ->rows(3)
                                 ->visible(fn (Get $get): bool => $get('field_type') === WhatsAppInchatFieldType::Choices->value)
+                                ->columnSpanFull(),
+                            Select::make('show_when')
+                                ->label('Show this question')
+                                ->options(fn (Get $get): array => self::showWhenOptions($get))
+                                ->default('')
+                                ->native(false)
+                                ->visible(fn (Get $get): bool => count(self::showWhenOptions($get)) > 1)
                                 ->columnSpanFull(),
                         ])
                         ->columns(2)
@@ -445,41 +461,76 @@ class ManageWhatsAppInchatForms extends Page
     }
 
     /**
-     * @return array{flowKey: string, rows: list<array<string, mixed>>, count: int, templates: list<array{id: int, label: string}>}
+     * @return array{flowKey: string, rows: list<array<string, mixed>>, count: int, unfinished: list<array<string, mixed>>, unfinishedCount: int, templates: list<array{id: int, label: string}>}
      */
     public function openReplyView(): array
     {
         $card = collect($this->flowCards())->firstWhere('key', $this->openFlowKey);
         $flow = $card === null ? '' : ($card['kind'] === 'visit' ? 'campus' : $card['name']);
+        $list = app(WhatsAppFlowReplyList::class);
 
         return [
             'flowKey' => $this->openFlowKey,
-            'rows' => $flow === '' ? [] : app(WhatsAppFlowReplyList::class)->rows($flow, 100, $this->replySearch),
-            'count' => $flow === '' ? 0 : app(WhatsAppFlowReplyList::class)->count($flow, $this->replySearch),
+            'rows' => $flow === '' ? [] : $list->rows($flow, 100, $this->replySearch),
+            'count' => $flow === '' ? 0 : $list->count($flow, $this->replySearch),
+            'unfinished' => $flow === '' ? [] : $list->unfinished($flow, 100, $this->replySearch),
+            'unfinishedCount' => $flow === '' ? 0 : $list->unfinishedCount($flow, $this->replySearch),
             'templates' => $this->plainTemplates(),
+            'chosenTemplateId' => (string) ($this->sendTemplateIds[$this->openFlowKey] ?? ''),
+            'blankSources' => $this->sendBlankSources[$this->openFlowKey] ?? [],
+            'blankText' => $this->sendBlankText[$this->openFlowKey] ?? [],
         ];
     }
 
     /**
-     * Approved templates with no fill-in words and no photo header.
+     * @return array<string, string>
+     */
+    protected static function showWhenOptions(Get $get): array
+    {
+        $options = ['' => 'Always'];
+        $items = $get('../../fields');
+
+        if (! is_array($items)) {
+            return $options;
+        }
+
+        $ownLabel = trim((string) $get('label'));
+
+        foreach ($items as $item) {
+            if (! is_array($item) || ($item['field_type'] ?? '') !== WhatsAppInchatFieldType::Choices->value) {
+                continue;
+            }
+
+            $question = trim((string) ($item['label'] ?? ''));
+
+            if ($question === '' || $question === $ownLabel) {
+                continue;
+            }
+
+            $lines = preg_split('/\r\n|\r|\n/', (string) ($item['choices'] ?? '')) ?: [];
+
+            foreach ($lines as $index => $choice) {
+                $choice = trim((string) $choice);
+
+                if ($choice === '') {
+                    continue;
+                }
+
+                $options[$question.'|c'.$index] = 'Only if '.$question.' is '.$choice;
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * Approved templates with no photo header. Blanks are filled on this page.
      *
-     * @return list<array{id: int, label: string}>
+     * @return list<array{id: int, label: string, blanks: list<string>}>
      */
     public function plainTemplates(): array
     {
-        return MetaWhatsAppTemplate::query()
-            ->where('status', 'APPROVED')
-            ->where('is_active', true)
-            ->where('param_count', 0)
-            ->orderBy('name')
-            ->get()
-            ->reject(fn (MetaWhatsAppTemplate $template): bool => $this->templateNeedsFile($template))
-            ->map(fn (MetaWhatsAppTemplate $template): array => [
-                'id' => $template->id,
-                'label' => $template->name,
-            ])
-            ->values()
-            ->all();
+        return WhatsAppOutboundBlanks::templates();
     }
 
     public function sendReplyTemplate(string $flowKey): void
@@ -487,8 +538,18 @@ class ManageWhatsAppInchatForms extends Page
         $templateId = (int) ($this->sendTemplateIds[$flowKey] ?? 0);
         $template = $templateId > 0 ? MetaWhatsAppTemplate::query()->find($templateId) : null;
 
-        if (! $template || (int) $template->param_count !== 0 || $this->templateNeedsFile($template)) {
-            Notification::make()->title('Choose a template with no blanks')->warning()->send();
+        if (! $template || WhatsAppOutboundBlanks::needsFile($template)) {
+            Notification::make()->title('Choose a template')->warning()->send();
+
+            return;
+        }
+
+        $parsed = MetaWhatsAppTemplateParser::parse(is_array($template->components) ? $template->components : []);
+        $sources = $this->sendBlankSources[$flowKey] ?? [];
+        $texts = $this->sendBlankText[$flowKey] ?? [];
+
+        if (! WhatsAppOutboundBlanks::textsAreFilled($parsed['body_variables'], $sources, $texts)) {
+            Notification::make()->title('Fill every blank that uses the same words')->warning()->send();
 
             return;
         }
@@ -523,12 +584,14 @@ class ManageWhatsAppInchatForms extends Page
         $failed = 0;
 
         foreach (array_slice($people, 0, 40, true) as $mobile => $studentId) {
+            $personName = $studentId ? (string) Student::query()->whereKey($studentId)->value('name') : '';
+            $values = WhatsAppOutboundBlanks::values($parsed['body_variables'], $sources, $texts, $personName);
             $result = $meta->sendTemplate(
                 (string) $mobile,
                 $template->name,
-                [],
+                $values,
                 filled($template->language) ? (string) $template->language : 'en',
-                0,
+                count($values),
                 [
                     'student_id' => $studentId,
                     'message_source' => WhatsAppMessageSource::Campaign->value,
@@ -544,7 +607,7 @@ class ManageWhatsAppInchatForms extends Page
 
         $notice = Notification::make()
             ->title($sent.' sent'.($failed > 0 ? ', '.$failed.' failed' : ''))
-            ->body('Each number is used once. A template with blanks is not in this list.');
+            ->body('Each number is used once. A blank set to a name uses that person\'s name.');
 
         if ($sent === 0) {
             $notice->danger();
@@ -553,24 +616,6 @@ class ManageWhatsAppInchatForms extends Page
         }
 
         $notice->send();
-    }
-
-    protected function templateNeedsFile(MetaWhatsAppTemplate $template): bool
-    {
-        foreach ($template->components ?? [] as $component) {
-            if (! is_array($component)) {
-                continue;
-            }
-
-            $type = strtoupper((string) ($component['type'] ?? ''));
-            $format = strtoupper((string) ($component['format'] ?? ''));
-
-            if ($type === 'HEADER' && in_array($format, ['IMAGE', 'VIDEO', 'DOCUMENT'], true)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     public function content(Schema $schema): Schema

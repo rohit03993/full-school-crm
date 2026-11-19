@@ -134,6 +134,7 @@ class WhatsAppInchatFormService
                     'label' => $row['label'],
                     'is_required' => $row['is_required'],
                     'choices' => $row['choices'],
+                    'show_when' => $row['show_when'],
                 ]);
                 $field->save();
                 $keep[] = $field->id;
@@ -382,6 +383,7 @@ class WhatsAppInchatFormService
                 'label' => $field->label,
                 'is_required' => $field->is_required,
                 'choices' => implode("\n", $field->choices ?? []),
+                'show_when' => (string) ($field->show_when ?? ''),
             ])->all(),
         ];
     }
@@ -678,7 +680,7 @@ class WhatsAppInchatFormService
 
     /**
      * @param  list<array<string, mixed>>  $fields
-     * @return list<array{id: ?int, field_type: WhatsAppInchatFieldType, label: string, is_required: bool, choices: ?list<string>}>
+     * @return list<array{id: ?int, field_type: WhatsAppInchatFieldType, label: string, is_required: bool, choices: ?list<string>, show_when: ?string}>
      */
     protected function prepareFields(array $fields): array
     {
@@ -712,12 +714,18 @@ class WhatsAppInchatFormService
                 }
             }
 
+            $showWhen = trim((string) ($row['show_when'] ?? ''));
+            if (! preg_match('/^.+\|c\d+$/', $showWhen) || str_starts_with($showWhen, $label.'|')) {
+                $showWhen = '';
+            }
+
             $prepared[] = [
                 'id' => filled($row['id'] ?? null) ? (int) $row['id'] : null,
                 'field_type' => $type,
                 'label' => mb_substr($label, 0, 80),
                 'is_required' => ! empty($row['is_required']),
                 'choices' => $choices,
+                'show_when' => $showWhen !== '' ? mb_substr($showWhen, 0, 160) : null,
             ];
         }
 
