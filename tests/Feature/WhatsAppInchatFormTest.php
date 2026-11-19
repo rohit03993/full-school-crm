@@ -16,9 +16,12 @@ use App\Models\Enrollment;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\Visit;
+use App\Enums\StudentStatus;
+use App\Models\Student;
 use App\Models\WhatsAppInchatForm;
 use App\Models\WhatsAppInchatFormField;
 use App\Services\EnquiryService;
+use App\Services\WhatsAppInchatFormService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
@@ -190,6 +193,57 @@ class WhatsAppInchatFormTest extends TestCase
         $this->assertDatabaseHas('visits', [
             'remarks' => 'whatsapp_lead:wamid.LEAD2',
         ]);
+    }
+
+    public function test_a_flow_with_no_replies_can_be_deleted_and_its_word_used_again(): void
+    {
+        $form = $this->makeForm(WhatsAppInchatAudience::EducationLead, 'admission', '801', 'Admission enquiry');
+
+        $deleted = app(WhatsAppInchatFormService::class)->deleteIfUnused($form->fresh());
+
+        $this->assertSame('success', $deleted['status']);
+        $this->assertSame('admission', $deleted['word']);
+        $this->assertDatabaseMissing('whatsapp_inchat_forms', ['id' => $form->id]);
+
+        $again = app(WhatsAppInchatFormService::class)->save([
+            'name' => 'Admission again',
+            'audience' => WhatsAppInchatAudience::EducationLead->value,
+            'trigger_word' => 'admission',
+            'button_label' => 'Open',
+            'enabled' => true,
+            'fields' => [[
+                'label' => 'Your name',
+                'field_type' => WhatsAppInchatFieldType::ShortText->value,
+                'is_required' => true,
+                'choices' => '',
+            ]],
+        ]);
+
+        $this->assertSame('success', $again['status']);
+        $this->assertSame('admission', $again['form']->trigger_word);
+    }
+
+    public function test_a_flow_with_a_reply_is_not_deleted(): void
+    {
+        $form = $this->makeForm(WhatsAppInchatAudience::EducationLead, 'admission', '801', 'Admission enquiry');
+        $student = Student::query()->create([
+            'name' => 'Riya',
+            'mobile' => '9876501111',
+            'status' => StudentStatus::Enquiry,
+        ]);
+
+        Visit::query()->create([
+            'student_id' => $student->id,
+            'visit_date' => now()->toDateString(),
+            'discussion_summary' => "Admission enquiry\nYour name: Riya",
+            'remarks' => 'whatsapp_lead:wamid.1',
+            'status' => \App\Enums\VisitStatus::FollowUpRequired,
+        ]);
+
+        $result = app(WhatsAppInchatFormService::class)->deleteIfUnused($form->fresh());
+
+        $this->assertSame('failed', $result['status']);
+        $this->assertDatabaseHas('whatsapp_inchat_forms', ['id' => $form->id, 'trigger_word' => 'admission']);
     }
 
     protected function makeForm(WhatsAppInchatAudience $audience, string $word, string $flowId, string $name): WhatsAppInchatForm

@@ -70,6 +70,11 @@
     }
     .dark .crm-flow__ghost { border-color: rgba(255,255,255,.14); background: transparent; color: #fafaf9; }
     .crm-flow__ghost:hover { border-color: #fdba74; }
+    .crm-flow__danger {
+        border: 1px solid #fecaca; border-radius: 0.65rem; background: #fff; color: #b91c1c;
+        padding: 0.42rem 0.75rem; cursor: pointer; font: inherit; font-size: 0.84rem; font-weight: 650;
+    }
+    .crm-flow__danger:hover { background: #fef2f2; }
     .crm-flow__detail { padding: 1rem 1.15rem; gap: 1rem; }
     .crm-flow__note { margin: 0.4rem 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; font-size: 0.88rem; color: #57534e; }
     .dark .crm-flow__note { color: #d6d3d1; }
@@ -172,6 +177,9 @@
                             <button type="button" wire:click="setFlowEnabled({{ (int) $open['id'] }}, false)" class="crm-flow__ghost">Turn off</button>
                         @else
                             <button type="button" wire:click="setFlowEnabled({{ (int) $open['id'] }}, true)" class="crm-flow__ghost">Turn on</button>
+                        @endif
+                        @if ((int) $open['count'] === 0)
+                            <button type="button" wire:click="deleteFlow({{ (int) $open['id'] }})" wire:confirm="Delete this flow? Its word can be used on a new flow." class="crm-flow__danger">Delete</button>
                         @endif
                     @endif
                 </div>

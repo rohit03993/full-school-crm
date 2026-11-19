@@ -148,6 +148,23 @@ class WhatsAppInchatFormService
     }
 
     /**
+     * Remove a flow only when nobody has finished it. The trigger word is then free.
+     *
+     * @return array{status: string, word?: string, error?: string}
+     */
+    public function deleteIfUnused(WhatsAppInchatForm $form): array
+    {
+        if (app(WhatsAppFlowReplyList::class)->count($form->name) > 0) {
+            return ['status' => 'failed', 'error' => 'This flow has replies. Turn it off instead. The replies stay.'];
+        }
+
+        $word = $form->trigger_word;
+        $form->delete();
+
+        return ['status' => 'success', 'word' => $word];
+    }
+
+    /**
      * @return array{status: string, error?: string, flow_id?: string}
      */
     public function publish(WhatsAppInchatForm $form): array

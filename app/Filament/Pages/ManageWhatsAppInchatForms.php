@@ -223,6 +223,42 @@ class ManageWhatsAppInchatForms extends Page
             ->send();
     }
 
+    public function deleteFlow(int $formId, WhatsAppInchatFormService $forms): void
+    {
+        $form = WhatsAppInchatForm::query()->find($formId);
+
+        if (! $form) {
+            Notification::make()->title('That flow was not found')->warning()->send();
+
+            return;
+        }
+
+        $result = $forms->deleteIfUnused($form);
+
+        if (($result['status'] ?? '') !== 'success') {
+            Notification::make()
+                ->title('This flow was not deleted')
+                ->body((string) ($result['error'] ?? 'Turn it off instead.'))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if ($this->editingId === $formId) {
+            $this->closeFlowEditor();
+        }
+
+        $this->openFlowKey = '';
+        $this->replySearch = '';
+
+        Notification::make()
+            ->title('Flow deleted')
+            ->body('The word '.$result['word'].' can be used on a new flow.')
+            ->success()
+            ->send();
+    }
+
     public function closeFlowEditor(): void
     {
         $this->showEditor = false;
