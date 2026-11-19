@@ -64,6 +64,9 @@ class ManageWhatsAppInchatForms extends Page
     /** Empty means the flow list. campus or form_12 means that flow is open. */
     public string $openFlowKey = '';
 
+    /** all, on, or off. Filters the flow list only. */
+    public string $listFilter = 'all';
+
     public string $replySearch = '';
 
     /** @var array<string, string> */
@@ -542,6 +545,7 @@ class ManageWhatsAppInchatForms extends Page
                     'part' => 'flows',
                     'cards' => $this->flowCards(),
                     'openKey' => $this->openFlowKey,
+                    'listFilter' => $this->listFilter,
                     'editingVisit' => $this->editingVisit,
                 ]),
         ];
