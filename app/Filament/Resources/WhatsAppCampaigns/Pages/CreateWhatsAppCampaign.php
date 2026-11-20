@@ -72,14 +72,14 @@ class CreateWhatsAppCampaign extends CreateRecord
             $variables['time'] = Carbon::parse($variables['time'])->format('g:i A');
         }
 
-        $header = $this->pdfHeaderForCampaign($data['whatsapp_template_id'] ?? null);
+        $header = $this->headerFileForCampaign($data['whatsapp_template_id'] ?? null);
 
         if ($header !== null) {
             $variables['_header'] = $header;
         }
 
         $data['campaign_variables'] = $variables === [] ? null : $variables;
-        unset($data['template_manual_params'], $data['campaign_header_pdf']);
+        unset($data['template_manual_params'], $data['campaign_header_file']);
 
         if (blank($data['name'] ?? null)) {
             $data['name'] = WhatsAppCampaignFormHelper::generateDefaultName();
@@ -89,17 +89,19 @@ class CreateWhatsAppCampaign extends CreateRecord
     }
 
     /**
-     * One PDF for every parent in this campaign. Text templates return null.
+     * One photo, video, or PDF for every parent in this campaign. A text template returns null.
      *
      * @return array{type: string, id: string, path: ?string, mime: ?string, filename: ?string}|null
      */
-    protected function pdfHeaderForCampaign(mixed $templateId): ?array
+    protected function headerFileForCampaign(mixed $templateId): ?array
     {
-        if (WhatsAppCampaignResource::selectedTemplateHeaderFormat($templateId) !== 'DOCUMENT') {
+        $format = WhatsAppCampaignResource::selectedTemplateHeaderFormat($templateId);
+
+        if (! in_array($format, ['IMAGE', 'VIDEO', 'DOCUMENT'], true)) {
             return null;
         }
 
-        $fileState = data_get($this->form->getRawState(), 'campaign_header_pdf');
+        $fileState = data_get($this->form->getRawState(), 'campaign_header_file');
 
         if (is_array($fileState)) {
             $fileState = $fileState[array_key_first($fileState)] ?? null;
@@ -107,19 +109,19 @@ class CreateWhatsAppCampaign extends CreateRecord
 
         $media = app(MetaWhatsAppMediaService::class);
         $prepared = $fileState instanceof UploadedFile
-            ? $media->headerMediaForTemplateSend($fileState, 'DOCUMENT')
-            : $media->headerMediaForStoredFile(is_string($fileState) ? $fileState : null, 'DOCUMENT');
+            ? $media->headerMediaForTemplateSend($fileState, $format)
+            : $media->headerMediaForStoredFile(is_string($fileState) ? $fileState : null, (string) $format);
 
         $header = is_array($prepared['header'] ?? null) ? $prepared['header'] : null;
 
         if (($prepared['status'] ?? '') !== 'success' || blank($header['id'] ?? null)) {
             throw ValidationException::withMessages([
-                'campaign_header_pdf' => (string) ($prepared['error'] ?? 'Choose a PDF for this template before sending.'),
+                'campaign_header_file' => (string) ($prepared['error'] ?? 'Choose a file for this template before sending.'),
             ]);
         }
 
         return [
-            'type' => strtolower((string) ($header['type'] ?? 'document')),
+            'type' => strtolower((string) ($header['type'] ?? '')),
             'id' => (string) ($header['id'] ?? ''),
             'path' => $header['path'] ?? null,
             'mime' => $header['mime'] ?? null,

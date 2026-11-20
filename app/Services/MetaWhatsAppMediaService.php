@@ -305,7 +305,7 @@ class MetaWhatsAppMediaService
             return ['status' => 'failed', 'error' => 'WhatsApp is not configured.'];
         }
 
-        $mimeType = (string) ($file->getMimeType() ?: 'application/octet-stream');
+        $mimeType = $this->mimeTypeForUpload($file);
         $messageType = $this->messageTypeForMime($mimeType);
 
         if ($messageType === null) {
@@ -350,30 +350,37 @@ class MetaWhatsAppMediaService
     }
 
     /**
-     * Turn the file chosen on a send screen into the header Meta expects.
-     * A word template returns no header. An image or video template must have a file.
-     *
-     * @return array{status: string, header?: array{type: string, id: string}|null, error?: string}
-     */
-    /**
-     * Same as headerMediaForTemplateSend(), for a PDF already stored by the campaign form.
+     * Same as headerMediaForTemplateSend(), for a photo, video, or PDF already stored by the campaign form.
      *
      * @return array{status: string, header?: array{type: string, id: string, path?: string, mime?: string, filename?: string}|null, error?: string}
      */
     public function headerMediaForStoredFile(?string $relativePath, string $headerFormat, string $disk = 'local'): array
     {
         $relativePath = ltrim(trim((string) $relativePath), '/');
+        $format = strtoupper(trim($headerFormat));
 
         if ($relativePath === '' || ! Storage::disk($disk)->exists($relativePath)) {
-            return ['status' => 'failed', 'error' => 'Choose a PDF for this template before sending.'];
+            return ['status' => 'failed', 'error' => $this->missingHeaderFileMessage($format)];
         }
 
         $absolute = Storage::disk($disk)->path($relativePath);
-        $uploaded = new UploadedFile($absolute, basename($absolute), 'application/pdf', null, true);
+        $uploaded = new UploadedFile(
+            $absolute,
+            basename($absolute),
+            $this->mimeForStoredHeader($absolute, $format),
+            null,
+            true,
+        );
 
-        return $this->headerMediaForTemplateSend($uploaded, $headerFormat);
+        return $this->headerMediaForTemplateSend($uploaded, $format);
     }
 
+    /**
+     * Turn the file chosen on a send screen into the header Meta expects.
+     * A word template returns no header. An image or video template must have a file.
+     *
+     * @return array{status: string, header?: array{type: string, id: string, path?: string, mime?: string, filename?: string}|null, error?: string}
+     */
     public function headerMediaForTemplateSend(?UploadedFile $file, ?string $headerFormat): array
     {
         $format = strtoupper(trim((string) $headerFormat));
@@ -382,11 +389,6 @@ class MetaWhatsAppMediaService
             return ['status' => 'success', 'header' => null];
         }
 
-        $kind = match ($format) {
-            'VIDEO' => 'video',
-            'DOCUMENT' => 'PDF',
-            default => 'image',
-        };
         $expectedType = match ($format) {
             'VIDEO' => 'video',
             'DOCUMENT' => 'document',
@@ -394,7 +396,7 @@ class MetaWhatsAppMediaService
         };
 
         if (! $file) {
-            return ['status' => 'failed', 'error' => 'Choose a '.$kind.' for this template before sending.'];
+            return ['status' => 'failed', 'error' => $this->missingHeaderFileMessage($format)];
         }
 
         $stored = $this->storeHeaderCopy($file, $expectedType);
@@ -419,7 +421,7 @@ class MetaWhatsAppMediaService
         if ($uploadedType !== $expectedType) {
             Storage::disk(self::DISK)->delete($stored['path']);
 
-            return ['status' => 'failed', 'error' => 'This template needs a '.$kind.'. The chosen file is a different type.'];
+            return ['status' => 'failed', 'error' => 'This template needs '.$this->headerKind($format).'. The chosen file is a different type.'];
         }
 
         return [
@@ -551,6 +553,81 @@ class MetaWhatsAppMediaService
             $messageType === 'audio' => 'ogg',
             $messageType === 'image' => 'jpg',
             default => 'bin',
+        };
+    }
+
+    protected function mimeTypeForUpload(UploadedFile $file): string
+    {
+        $guessed = strtolower(trim((string) ($file->getMimeType() ?: '')));
+        $client = $this->knownHeaderMime(strtolower(trim($file->getClientMimeType())));
+
+        if ($guessed === 'image/jpg' || $guessed === 'application/mp4') {
+            $guessed = $guessed === 'image/jpg' ? 'image/jpeg' : 'video/mp4';
+        }
+
+        $knownGuess = $this->knownHeaderMime($guessed);
+
+        if ($knownGuess !== null) {
+            return $knownGuess;
+        }
+
+        if ($client !== null && ($guessed === '' || $guessed === 'application/octet-stream')) {
+            return $client;
+        }
+
+        return $guessed !== '' ? $guessed : 'application/octet-stream';
+    }
+
+    protected function mimeForStoredHeader(string $absolutePath, string $headerFormat): string
+    {
+        $detected = mime_content_type($absolutePath);
+
+        if (is_string($detected)) {
+            $known = $this->knownHeaderMime(strtolower($detected));
+
+            if ($known !== null) {
+                return $known;
+            }
+        }
+
+        $extension = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
+
+        return match ($extension) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'mp4' => 'video/mp4',
+            'pdf' => 'application/pdf',
+            default => match (strtoupper($headerFormat)) {
+                'VIDEO' => 'video/mp4',
+                'DOCUMENT' => 'application/pdf',
+                default => 'image/jpeg',
+            },
+        };
+    }
+
+    protected function knownHeaderMime(string $mime): ?string
+    {
+        return match ($mime) {
+            'image/jpeg', 'image/jpg', 'image/png', 'video/mp4', 'application/pdf' => $mime === 'image/jpg' ? 'image/jpeg' : $mime,
+            default => null,
+        };
+    }
+
+    protected function missingHeaderFileMessage(string $headerFormat): string
+    {
+        return match (strtoupper(trim($headerFormat))) {
+            'VIDEO' => 'Choose a video for this template before sending.',
+            'DOCUMENT' => 'Choose a PDF for this template before sending.',
+            default => 'Choose an image for this template before sending.',
+        };
+    }
+
+    protected function headerKind(string $headerFormat): string
+    {
+        return match (strtoupper(trim($headerFormat))) {
+            'VIDEO' => 'a video',
+            'DOCUMENT' => 'a PDF',
+            default => 'an image',
         };
     }
 

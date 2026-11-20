@@ -118,7 +118,7 @@ class WhatsAppCampaignResource extends Resource
                         ->dehydrateStateUsing(fn ($state): ?int => filled($state) ? (int) $state : null)
                         ->afterStateUpdated(function ($state, callable $set): void {
                             $set('template_manual_params', []);
-                            $set('campaign_header_pdf', null);
+                            $set('campaign_header_file', null);
                             $set('campaign_variables', WhatsAppCampaignFormHelper::defaultCampaignVariables(
                                 filled($state) ? (int) $state : null,
                             ));
@@ -131,16 +131,32 @@ class WhatsAppCampaignResource extends Resource
                         ))
                         ->visible(fn (Get $get): bool => filled($get('whatsapp_template_id')))
                         ->columnSpanFull(),
-                    FileUpload::make('campaign_header_pdf')
-                        ->label('PDF for this send')
-                        ->helperText('This one PDF is attached to every parent message in this campaign. It can be different from the sample used to approve the template.')
+                    FileUpload::make('campaign_header_file')
+                        ->label(fn (Get $get): string => match (static::selectedTemplateHeaderFormat($get('whatsapp_template_id'))) {
+                            'VIDEO' => 'Video for this send',
+                            'DOCUMENT' => 'PDF for this send',
+                            default => 'Image for this send',
+                        })
+                        ->helperText(fn (Get $get): string => match (static::selectedTemplateHeaderFormat($get('whatsapp_template_id'))) {
+                            'VIDEO' => 'This one MP4 is attached to every parent message in this campaign. Up to 16 MB. It can be different from the sample used to approve the template.',
+                            'DOCUMENT' => 'This one PDF is attached to every parent message in this campaign. It can be different from the sample used to approve the template.',
+                            default => 'This one JPG or PNG is attached to every parent message in this campaign. Up to 5 MB. It can be different from the sample used to approve the template.',
+                        })
                         ->disk('local')
                         ->directory('whatsapp-campaign-headers')
                         ->visibility('private')
-                        ->acceptedFileTypes(['application/pdf'])
-                        ->maxSize(102400)
-                        ->required(fn (Get $get): bool => static::selectedTemplateHeaderFormat($get('whatsapp_template_id')) === 'DOCUMENT')
-                        ->visible(fn (Get $get): bool => static::selectedTemplateHeaderFormat($get('whatsapp_template_id')) === 'DOCUMENT')
+                        ->acceptedFileTypes(fn (Get $get): array => match (static::selectedTemplateHeaderFormat($get('whatsapp_template_id'))) {
+                            'VIDEO' => ['video/mp4'],
+                            'DOCUMENT' => ['application/pdf'],
+                            default => ['image/jpeg', 'image/png'],
+                        })
+                        ->maxSize(fn (Get $get): int => match (static::selectedTemplateHeaderFormat($get('whatsapp_template_id'))) {
+                            'VIDEO' => 16384,
+                            'DOCUMENT' => 102400,
+                            default => 5120,
+                        })
+                        ->required(fn (Get $get): bool => in_array(static::selectedTemplateHeaderFormat($get('whatsapp_template_id')), ['IMAGE', 'VIDEO', 'DOCUMENT'], true))
+                        ->visible(fn (Get $get): bool => in_array(static::selectedTemplateHeaderFormat($get('whatsapp_template_id')), ['IMAGE', 'VIDEO', 'DOCUMENT'], true))
                         ->dehydrated(false)
                         ->columnSpanFull(),
                 ])
@@ -269,13 +285,20 @@ class WhatsAppCampaignResource extends Resource
             return null;
         }
 
+        static $cache = [];
+        $key = (string) (int) $templateId;
+
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
+        }
+
         $name = WhatsAppTemplate::query()->whereKey((int) $templateId)->value('name');
 
         if (! is_string($name) || $name === '') {
-            return null;
+            return $cache[$key] = null;
         }
 
-        return app(WhatsAppTemplateCatalog::class)->headerFormatForName($name);
+        return $cache[$key] = app(WhatsAppTemplateCatalog::class)->headerFormatForName($name);
     }
 
     public static function infolist(Schema $schema): Schema
@@ -301,6 +324,25 @@ class WhatsAppCampaignResource extends Resource
                 ->schema([
                     TextEntry::make('name')->label('Campaign name'),
                     TextEntry::make('template.name')->label('Template'),
+                    TextEntry::make('header_file')
+                        ->label('Header file')
+                        ->state(function (WhatsAppCampaign $record): ?string {
+                            $header = $record->campaignVariable('_header');
+
+                            if (! is_array($header) || blank($header['id'] ?? null)) {
+                                return null;
+                            }
+
+                            $kind = match (strtolower((string) ($header['type'] ?? ''))) {
+                                'video' => 'Video',
+                                'document' => 'PDF',
+                                default => 'Image',
+                            };
+                            $name = filled($header['filename'] ?? null) ? (string) $header['filename'] : 'Attached';
+
+                            return $kind.' — '.$name;
+                        })
+                        ->visible(fn (WhatsAppCampaign $record): bool => is_array($record->campaignVariable('_header')) && filled(data_get($record->campaignVariable('_header'), 'id'))),
                     TextEntry::make('status')
                         ->badge()
                         ->color(fn (WhatsAppCampaignStatus|string $state): string => match ($state instanceof WhatsAppCampaignStatus ? $state->value : $state) {

@@ -106,7 +106,7 @@ class WhatsAppCampaignService
                 throw new \RuntimeException($dispatch->configurationError());
             }
 
-            $this->assertDocumentHeaderPresent($campaign);
+            $this->assertHeaderFilePresent($campaign);
 
             $this->refreshCampaignRecipients($campaign);
 
@@ -524,21 +524,32 @@ class WhatsAppCampaignService
         $campaign->update(['total_recipients' => $students->count()]);
     }
 
-    protected function assertDocumentHeaderPresent(WhatsAppCampaign $campaign): void
+    protected function assertHeaderFilePresent(WhatsAppCampaign $campaign): void
     {
         $campaign->loadMissing('template');
         $format = app(WhatsAppTemplateCatalog::class)->headerFormatForName((string) $campaign->template?->name);
 
-        if ($format !== 'DOCUMENT') {
+        if (! in_array($format, ['IMAGE', 'VIDEO', 'DOCUMENT'], true)) {
             return;
         }
+
+        $expectedType = match ($format) {
+            'VIDEO' => 'video',
+            'DOCUMENT' => 'document',
+            default => 'image',
+        };
+        $kind = match ($format) {
+            'VIDEO' => 'video',
+            'DOCUMENT' => 'PDF',
+            default => 'photo',
+        };
 
         $header = $campaign->campaignVariable('_header');
         $type = strtolower(trim((string) (is_array($header) ? ($header['type'] ?? '') : '')));
         $id = trim((string) (is_array($header) ? ($header['id'] ?? '') : ''));
 
-        if ($type !== 'document' || $id === '') {
-            throw new \RuntimeException('This template needs a PDF. Upload the PDF on the campaign form, then send again.');
+        if ($type !== $expectedType || $id === '') {
+            throw new \RuntimeException('This template needs a '.$kind.'. Upload the '.$kind.' on the campaign form, then send again.');
         }
     }
 

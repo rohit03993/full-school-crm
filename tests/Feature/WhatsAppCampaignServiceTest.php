@@ -19,6 +19,7 @@ use App\Models\BatchStudent;
 use App\Models\Course;
 use App\Models\Enquiry;
 use App\Models\Enrollment;
+use App\Models\MetaWhatsAppTemplate;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
@@ -92,6 +93,86 @@ class WhatsAppCampaignServiceTest extends TestCase
         $this->assertSame('document', $header['type']);
         $this->assertSame('media-1', $header['id']);
         $this->assertSame('sep-dates.pdf', $header['filename']);
+    }
+
+    public function test_queue_refuses_an_image_template_until_a_photo_is_saved(): void
+    {
+        Queue::fake();
+        $this->configureMeta();
+
+        $admin = $this->createSuperAdmin();
+        [$course, $batch] = $this->createCourseWithBatches($admin);
+        $this->createEnrolledStudent('Photo Student', '9876500601', '1201', $course, $batch);
+        $template = $this->createMediaTemplate('IMAGE');
+
+        $campaign = app(WhatsAppCampaignService::class)->createCampaign([
+            'name' => 'Photo notice',
+            'whatsapp_template_id' => $template->id,
+            'audience_type' => WhatsAppAudienceType::Batch->value,
+            'course_id' => $course->id,
+            'batch_id' => $batch->id,
+        ], $admin);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('This template needs a photo.');
+
+        app(WhatsAppCampaignService::class)->queueCampaign($campaign, $admin, wait: false);
+    }
+
+    public function test_queue_accepts_an_image_template_when_the_photo_is_saved(): void
+    {
+        Queue::fake();
+        $this->configureMeta();
+
+        $admin = $this->createSuperAdmin();
+        [$course, $batch] = $this->createCourseWithBatches($admin);
+        $this->createEnrolledStudent('Photo Student', '9876500602', '1202', $course, $batch);
+        $template = $this->createMediaTemplate('IMAGE');
+
+        $campaign = app(WhatsAppCampaignService::class)->createCampaign([
+            'name' => 'Photo notice saved',
+            'whatsapp_template_id' => $template->id,
+            'audience_type' => WhatsAppAudienceType::Batch->value,
+            'course_id' => $course->id,
+            'batch_id' => $batch->id,
+            'campaign_variables' => [
+                '_header' => [
+                    'type' => 'image',
+                    'id' => 'media-photo',
+                    'filename' => 'notice.jpg',
+                ],
+            ],
+        ], $admin);
+
+        $queued = app(WhatsAppCampaignService::class)->queueCampaign($campaign, $admin, wait: false);
+
+        $this->assertSame(WhatsAppCampaignStatus::Queued, $queued->status);
+        $this->assertSame('image', $queued->campaignVariable('_header')['type']);
+        Queue::assertPushed(RunWhatsAppCampaignJob::class);
+    }
+
+    public function test_queue_refuses_a_video_template_until_a_video_is_saved(): void
+    {
+        Queue::fake();
+        $this->configureMeta();
+
+        $admin = $this->createSuperAdmin();
+        [$course, $batch] = $this->createCourseWithBatches($admin);
+        $this->createEnrolledStudent('Video Student', '9876500603', '1203', $course, $batch);
+        $template = $this->createMediaTemplate('VIDEO');
+
+        $campaign = app(WhatsAppCampaignService::class)->createCampaign([
+            'name' => 'Video notice',
+            'whatsapp_template_id' => $template->id,
+            'audience_type' => WhatsAppAudienceType::Batch->value,
+            'course_id' => $course->id,
+            'batch_id' => $batch->id,
+        ], $admin);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('This template needs a video.');
+
+        app(WhatsAppCampaignService::class)->queueCampaign($campaign, $admin, wait: false);
     }
 
     public function test_one_campaign_can_include_students_from_two_batches(): void
@@ -324,6 +405,40 @@ class WhatsAppCampaignServiceTest extends TestCase
         $admin->assignRole(RoleName::SuperAdmin->value);
 
         return $admin;
+    }
+
+    protected function configureMeta(): void
+    {
+        Setting::setValue('meta_whatsapp.enabled', '1', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.phone_number_id', '1234567890', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-test-token'), 'meta_whatsapp');
+        Setting::flushValueCache();
+    }
+
+    protected function createMediaTemplate(string $headerFormat): WhatsAppTemplate
+    {
+        $name = 'media_'.strtolower($headerFormat).'_'.uniqid();
+
+        MetaWhatsAppTemplate::query()->create([
+            'name' => $name,
+            'language' => 'en',
+            'status' => 'APPROVED',
+            'param_count' => 0,
+            'body' => 'Hello parents',
+            'components' => [
+                ['type' => 'HEADER', 'format' => $headerFormat],
+                ['type' => 'BODY', 'text' => 'Hello parents'],
+            ],
+            'provider_meta' => ['header_format' => $headerFormat],
+            'is_active' => true,
+            'synced_at' => now(),
+        ]);
+
+        return WhatsAppTemplate::query()->create([
+            'name' => $name,
+            'param_count' => 0,
+            'param_mappings' => [],
+        ]);
     }
 
     protected function createTemplate(): WhatsAppTemplate

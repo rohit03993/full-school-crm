@@ -378,4 +378,63 @@ class MetaWhatsAppMediaTest extends TestCase
         $this->assertSame('image', $item['messageType']);
         $this->assertNotNull($item['mediaUrl']);
     }
+
+    public function test_stored_campaign_image_is_sent_as_an_image_header(): void
+    {
+        Storage::fake(MetaWhatsAppMediaService::DISK);
+        Setting::setValue('meta_whatsapp.phone_number_id', '123456789', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-token'), 'meta_whatsapp');
+        Setting::flushValueCache();
+
+        $jpeg = base64_decode('/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAn/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAGf/9k=');
+        Storage::disk(MetaWhatsAppMediaService::DISK)->put('whatsapp-campaign-headers/notice.jpg', $jpeg);
+
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response(['id' => 'media-photo-1'], 200),
+        ]);
+
+        $result = app(MetaWhatsAppMediaService::class)->headerMediaForStoredFile(
+            'whatsapp-campaign-headers/notice.jpg',
+            'IMAGE',
+        );
+
+        $this->assertSame('success', $result['status']);
+        $this->assertSame('image', $result['header']['type'] ?? null);
+        $this->assertSame('media-photo-1', $result['header']['id'] ?? null);
+        $this->assertSame('image/jpeg', $result['header']['mime'] ?? null);
+    }
+
+    public function test_stored_campaign_video_is_sent_as_a_video_header(): void
+    {
+        Storage::fake(MetaWhatsAppMediaService::DISK);
+        Setting::setValue('meta_whatsapp.phone_number_id', '123456789', 'meta_whatsapp');
+        Setting::setValue('meta_whatsapp.access_token', Crypt::encryptString('meta-token'), 'meta_whatsapp');
+        Setting::flushValueCache();
+
+        $mp4 = hex2bin('00000018667479706d703432000000006d70343269736f6d');
+        Storage::disk(MetaWhatsAppMediaService::DISK)->put('whatsapp-campaign-headers/clip.mp4', $mp4);
+
+        Http::fake([
+            'https://graph.facebook.com/*' => Http::response(['id' => 'media-video-1'], 200),
+        ]);
+
+        $result = app(MetaWhatsAppMediaService::class)->headerMediaForStoredFile(
+            'whatsapp-campaign-headers/clip.mp4',
+            'VIDEO',
+        );
+
+        $this->assertSame('success', $result['status'], (string) ($result['error'] ?? ''));
+        $this->assertSame('video', $result['header']['type'] ?? null);
+        $this->assertSame('media-video-1', $result['header']['id'] ?? null);
+    }
+
+    public function test_missing_campaign_image_asks_for_an_image(): void
+    {
+        Storage::fake(MetaWhatsAppMediaService::DISK);
+
+        $result = app(MetaWhatsAppMediaService::class)->headerMediaForStoredFile('whatsapp-campaign-headers/missing.jpg', 'IMAGE');
+
+        $this->assertSame('failed', $result['status']);
+        $this->assertSame('Choose an image for this template before sending.', $result['error']);
+    }
 }
